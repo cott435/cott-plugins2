@@ -280,6 +280,193 @@ The interesting tension: variations 1 and 5 fix the *output* problem (nothing ch
 
 ---
 
+## Example 4: Quant Research Package (New Project, Data-Dependent)
+
+**User invokes:** `/ideate a Python package for researching and backtesting equity strategies — I keep rewriting the same notebook code`
+
+### Phase 1: Understand & Expand
+
+**Skill response:**
+
+> **How might we** get from a strategy idea to a backtest we can actually trust, without rebuilding the data and backtest plumbing every time?
+
+Before expanding:
+
+1. **Who uses it?** Just you, or a small team that needs to compare each other's results?
+2. **What markets and frequency?** US equities? Daily bars, or intraday?
+3. **What data do you have today, and what's the budget?** Free sources, an existing subscription, or room to pay?
+4. **Research only, or does this end in live trading?**
+
+**User responds:** "Me and two collaborators. US equities, daily is fine — we rebalance weekly to monthly. We've been using a free end-of-day price API. Budget maybe $100/month. Research only for now."
+
+**Skill continues:**
+
+"Rewriting notebook code" is the symptom. The expensive problem is **not trusting the results**. One-off notebooks are where look-ahead bias and survivorship bias creep in, and a strategy that only works because of a bug is worse than no strategy.
+
+Here are 5 variations:
+
+1. **Backtest Engine First:** A clean event loop with costs and slippage. Strategies plug in. Data is the user's problem.
+2. **Data Layer First (Inversion):** Start from trustworthy data, not the engine: a local, point-in-time store with one interface. Any simple backtester is fine once the data is right.
+3. **Simplification — Vectorized Only:** No event loop. Strategies are functions from a date-by-stock signal table to weights. Fast and easy for weekly/monthly rebalancing.
+4. **Combination — Research Notebook Kit:** Keep notebooks, but ship the pieces as a library: data loader, backtest function, standard tear-sheet.
+5. **10x — Full Platform:** Scheduled data pulls, experiment tracking, and a strategy registry. Clearly too much for three people.
+
+### Phase 2: Evaluate & Converge
+
+**Data feasibility decides this one.** Price data is easy to get. **Historical index membership including delisted companies** is not, and without it every backtest quietly drops the stocks that went bust, so results look better than reality. That's the dealbreaker to check first: can it be had within $100/month?
+
+**Direction (2 + 3): Trustworthy data layer + vectorized backtests.** It attacks the real problem (trust). It fits daily/monthly strategies. Hiding the data source behind one interface keeps the vendor decision open.
+
+**Direction (1): Event-driven engine.** More realistic order modeling, but none of your strategies need it yet. Pushing back: this is where these projects usually sink months.
+
+The user picks (2 + 3).
+
+### Phase 3: Write the Brief
+
+```markdown
+# Factor Lab
+
+**Status:** Draft · **Last updated:** 2026-10-14
+
+## The problem
+Testing a strategy idea takes about a week of one-off notebook code: pulling data, cleaning it, and writing a backtest from scratch. Results can't be compared across ideas. Worse, subtle mistakes, like using information that wasn't available at the time, make strategies look better than they are.
+
+## Who it's for
+A small research team (1-3 people) testing US stock strategies that trade weekly to monthly.
+
+## Goals
+1. Go from a strategy idea to a backtest report in under a day.
+2. Trust the results: no peeking at future data, and no silently dropping companies that failed.
+3. Compare any two strategies side by side on the same data and assumptions.
+4. Change data providers without rewriting strategies.
+
+## Constraints
+- Python, running on a laptop.
+- Daily US stock data only.
+- Data budget: free sources to start, under $100/month at most.
+
+## What success looks like
+- Three of our past notebook strategies re-run in the package, with matching results or explained differences.
+- A new strategy takes under a day from idea to report.
+
+## What we're betting on
+- Daily data is enough for the strategies we care about.
+- Affordable data is good enough for research (not for live trading).
+- We can get history that includes companies that were delisted, within budget. If not, Goal 2 needs rethinking.
+
+## Not doing
+- Live trading or placing orders — research only.
+- Intraday data, options, futures, or crypto.
+- An event-driven engine — weekly/monthly strategies don't need one yet.
+- A user interface — notebooks and a command line are enough.
+
+## Open questions
+- Which data provider? (Decided in planning, against the data requirements in the spec.)
+```
+
+*Notice what's **not** in the brief: a data API. The brief records data **needs** (daily, US, includes delisted companies, under budget) as constraints and bets. `spec-writing` turns them into data requirements, and the provider is chosen in planning against those requirements.*
+
+---
+
+## Example 5: ML Feature in an Existing Product (Extend Mode)
+
+**User invokes:** `/ideate use ML to flag bad assay plates automatically in our lab results app`
+
+The app already has `docs/brief.md` (Goal 2: *Bad data is caught before it reaches analysis*) and `docs/spec.md`, so this is **extend mode**. The skill reads both, plus the `qc` module in the codebase.
+
+### Phase 1: Understand & Expand
+
+> **How might we** catch failed plates before they reach analysis, without scientists reviewing every plate by hand?
+
+Questions:
+
+1. **How are plates checked today, and how long does it take?**
+2. **What history exists?** How many plates, and is there a record of which ones were failed and why?
+3. **What's worse: a bad plate getting through, or a good plate being re-run?**
+
+**User responds:** "Scientists eyeball every plate — about 6 hours a week. We have 3 years of plate reads, roughly 40,000 plates, and about 2% were marked failed in the app. Missing a bad plate is much worse; a re-run costs a day."
+
+**Skill continues:**
+
+Before any ML: assay QC already has a standard rule, the **Z′-factor** (plates under 0.5 are suspect). Your `qc` module computes it but nobody acts on it. That's the baseline any model has to beat. If the rule alone catches most failures, you may not need ML at all.
+
+Variations:
+
+1. **Simplification — Just Use the Rule:** Auto-flag plates with Z′ < 0.5 and stop there. Zero ML.
+2. **Ranked Review Queue:** A model scores every plate. Scientists review the riskiest first and stop when the scores get low. Humans still decide.
+3. **Inversion — Auto-Pass the Obvious:** Instead of finding bad plates, confidently clear the clearly-good ones, and scientists review the rest.
+4. **Anomaly Detection:** No labels needed. Flag plates that look unlike typical ones. Useful if past "failed" labels turn out to be unreliable.
+5. **Expert Lens — Layout Patterns:** Many failures show up as spatial patterns (edge effects, a dead column). Features built from plate layout may beat a generic model.
+
+### Phase 2: Evaluate & Converge (summary)
+
+**Data check:** 40,000 plates with 800 failures is enough to try a supervised model, *if* the labels are consistent. That's the biggest bet. Different scientists may fail plates for different reasons. **Baseline:** the Z′ rule. **Cost asymmetry:** missing a bad plate is far worse, so measure recall at a fixed review budget, not accuracy (98% accuracy is free by passing everything).
+
+The user picks **2 (ranked queue), with 1 as the baseline it must beat**. **Fit check:** it serves existing Goal 2 and the same users, so **the brief does not change.**
+
+### Phase 3: Write the Idea File
+
+`docs/ideas/plate-qc-ranking.md`:
+
+```markdown
+# Idea: Plate QC Ranking
+
+**Status:** Draft · **Last updated:** 2026-10-14 · **Brief:** [../brief.md](../brief.md)
+
+## In one sentence
+This ranks every new assay plate by how likely it is to fail QC, so scientists review the riskiest plates first instead of checking all of them.
+
+## The problem
+Scientists check every plate by eye, about 6 hours a week. Failures are rare (about 2%) but costly: a bad plate that slips through corrupts downstream analysis. A good plate failed by mistake costs a day to re-run. The app already computes a standard quality score (Z′) but nothing acts on it.
+
+## Who it's for
+Lab scientists doing plate QC, during their weekly review.
+
+## How it fits
+- **Serves:** Goal 2 (bad data caught before analysis)
+- **Touches:** QC-01 (Z′ is calculated per plate), QC-03 (scientist marks pass/fail)
+- **Brief changes:** None
+
+## Recommended direction
+Each new plate gets a risk score from a model trained on three years of past pass/fail decisions. The review screen sorts plates riskiest first. Scientists still make every pass/fail call; the model only sets the order.
+
+The Z′ rule is the baseline. If the model doesn't clearly beat "sort by Z′", we ship the rule alone and stop.
+
+## Data
+- About 40,000 plates over 3 years, with raw reads, Z′, and the scientist's pass/fail decision (about 800 failures).
+- All in our own database. No outside data needed.
+- Evaluate on the most recent 6 months, never trained on, to mimic real use.
+
+## Alternatives considered
+- Rule only (Z′ < 0.5) — kept as the baseline, and the fallback if the model doesn't beat it.
+- Anomaly detection — only if past labels turn out to be unreliable.
+- Auto-passing obvious plates — revisit once the ranking has earned trust.
+
+## What success looks like
+- Reviewing the top 20% of plates catches at least 90% of the plates scientists would fail.
+- Clearly better than sorting by Z′ alone on the same 6 months.
+- Weekly review time drops from about 6 hours to under 2.
+
+## What we're betting on
+- Past pass/fail decisions are consistent enough to learn from.
+- New plates look like past plates (same instruments and assays).
+
+## Not doing
+- Automatically failing or passing plates — a scientist always decides.
+- Image-based models of the plate.
+- Plates from other sites or instruments.
+
+## Open questions
+- How often do two scientists agree on the same plate? Measure before training.
+- How often should the model be retrained, and who signs off?
+```
+
+**Skill then says:** "The idea is at `docs/ideas/plate-qc-ranking.md`. The brief is unchanged: this serves Goal 2. The biggest risk is label consistency. I'd measure scientist agreement on ~100 plates before anyone trains anything. Accept it or tell me what to change." *(Turn ends.)*
+
+*An idea file for an ML feature adds a **Data** section. It names the data, where it lives, and how it will be evaluated. It still says nothing about model type or libraries; those are decided in planning.*
+
+---
+
 ## What to Notice in These Examples
 
 1. **The restatement changes the frame.** "Help restaurants compete" becomes "retain existing customers." "Add real-time collaboration" becomes "let people work simultaneously without chaos." "Fix stale retros" becomes "fix the output layer."
@@ -301,3 +488,9 @@ The interesting tension: variations 1 and 5 fix the *output* problem (nothing ch
 9. **The brief waits for acceptance.** The turn ends after the Draft is saved. The spec is written only after the user accepts.
 
 10. **Extend mode writes an idea file, not a bigger brief.** The shared-editing idea gets its own file with the context the spec needs: which goal it serves, which existing requirements it touches, and the alternatives that were rejected. The brief changes only when the fit check says the project's goals or constraints changed.
+
+11. **Data decides ML and quant ideas early.** The quant example's dealbreaker is history that includes delisted companies; the plate example's is label consistency. Both are raised in Phase 2, not discovered during the build.
+
+12. **Every ML idea names its baseline.** "Sort by Z′" and "the old notebook results" are what success is measured against. Without a baseline, any result looks like success.
+
+13. **Data needs, not data vendors.** Briefs and idea files say what data is needed and where it comes from if that's fixed. Choosing APIs, datasets, and models happens after the spec.

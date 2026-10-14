@@ -87,8 +87,9 @@ After the user reacts to Phase 1, shift to convergent mode:
    - **User value:** Who benefits and how much? Painkiller or vitamin?
    - **Feasibility:** What's the cost? What's the hardest part?
    - **Differentiation:** Would someone switch from what they do today?
+   - **Data (ML and data projects):** Does usable data exist, can we use it, and what's the non-ML baseline? Treat "no usable data" as a feasibility failure, not an open question.
 
-   Read `refinement-criteria.md` in this skill directory for the full rubric.
+   Read `refinement-criteria.md` in this skill directory for the full rubric, including the Data & ML feasibility checks.
 
 3. **Surface hidden assumptions.** For each direction, name what you're betting is true, what could kill it, and what you're choosing to ignore for now.
 
@@ -139,6 +140,7 @@ Write `docs/brief.md` (create `docs/` if needed) using the template below. The b
 - **One page or less.** Aim for 250-450 words. If it's longer, cut — don't shrink the font.
 - **Plain English.** Write for a smart person outside the team. No acronyms without a definition, no jargon, no code, no file paths.
 - **Short sentences, short bullets.** One idea per bullet. No bullet longer than two lines.
+- **Data needs, not data vendors.** For ML and data projects, say what data the project depends on in plain terms ("10+ years of daily US stock prices, including companies that no longer exist") as a constraint or a bet. Name a specific source only if it's fixed (our own data, a required benchmark). Choosing APIs and datasets happens after the spec.
 - **Goals are numbered** so `spec-writing` can trace requirements back to them ("serves Goal 2").
 - **3-5 goals.** More than five means the project isn't focused yet — go back to Phase 2.
 - **The Not Doing list is mandatory.** It is the most valuable part: it makes trade-offs explicit.
@@ -198,6 +200,9 @@ When `docs/brief.md` already exists, the new idea gets its own file and must ear
 ## Recommended direction
 [1-3 paragraphs on how it should work from the user's point of view, and why this direction over the others.]
 
+## Data
+[ML and data ideas only — omit otherwise. What data it needs, where it lives or could come from, how much history and labels exist, and how results will be evaluated (held-out data, baseline).]
+
 ## Alternatives considered
 - [Direction] — [why not, in one line]
 
@@ -238,7 +243,7 @@ When `docs/brief.md` already exists, the new idea gets its own file and must ear
 
 Direct, thoughtful, slightly provocative during ideation — a sharp thinking partner, not a facilitator reading from a script. Calm and plain when writing the brief or idea file: they are for readers, not for showing off the ideation.
 
-Read `examples.md` in this skill directory for examples of full sessions, a finished brief, and an extend-mode idea file.
+Read `examples.md` in this skill directory for examples of full sessions, finished briefs (including a quant package), and extend-mode idea files (including an ML feature).
 
 ## Common Rationalizations
 

@@ -49,6 +49,18 @@ idea-refine → docs/ideas/<idea>.md (+ brief edits, if needed) → you accept
 
 Spec changes never renumber or delete requirement IDs. Changed requirements keep their ID, and removed ones are struck through and retired. Each change gets a changelog row.
 
+## Data and ML projects
+
+Data decisions are spread across the stages on purpose:
+
+| Stage | Decides | Example |
+|---|---|---|
+| Brief / idea (`idea-refine`) | Whether usable data **exists** and is affordable and legal. The non-ML baseline. | "Need daily US prices including delisted companies, under $100/month" |
+| Spec (`spec-writing`) | What the data must **contain and guarantee** (`DATA-` requirements). Model targets against a baseline. | "No value published after date D is visible to a backtest on D" |
+| Planning (next step) | **Which** API, vendor, or dataset, and which model type | Candidates are checked against the `DATA-` requirements |
+
+A data source is named earlier only when it's a fixed constraint, such as your own database or a required benchmark.
+
 ## Skills
 
 | Skill | Phase | Produces |

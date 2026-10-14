@@ -22,6 +22,8 @@ The brief (`docs/brief.md`) says **why** the project exists; idea files (`docs/i
 
 ## Preconditions
 
+Run `bash skills/spec-writing/scripts/spec-status.sh` first. It reports the mode, brief and spec status, which ideas are `Accepted` and waiting to be specced, and the next free requirement ID for each prefix — use those IDs rather than counting by hand.
+
 1. Read `docs/brief.md`. If it doesn't exist, stop and route to `idea-refine`.
 2. Decide the mode:
    - **New mode** — `docs/spec.md` does not exist. The brief is the input.
@@ -115,6 +117,11 @@ Write `docs/spec.md` with this template:
 **Edge cases & errors**
 - [Situation] → [expected behavior]
 
+## Data requirements
+*(Data and ML projects only — omit otherwise.)*
+- **DATA-01** [What data the system needs: content, coverage, history, frequency, freshness — not which vendor.]
+  - Given [...], when [...], then [...].
+
 ## Quality requirements
 - **QR-01** [Measurable non-functional requirement: speed, reliability, accessibility, privacy, security.]
   - [How it's checked.]
@@ -140,6 +147,13 @@ Write `docs/spec.md` with this template:
 - **Requirement IDs are permanent.** `CODE-NN`, numbered within the feature, never reused or renumbered.
 - **Quality requirements only when measurable.** Leave out generic wishes ("should be secure"); keep checkable ones ("passwords are never shown in full").
 - **No tech stack, schemas, endpoints, or file structure.** Those belong to planning.
+
+**Data and ML projects — extra rules:**
+
+- **Specify the data, not the source.** `DATA-NN` requirements say what the data must contain and guarantee ("daily prices for all US stocks, including delisted ones, since 2010"; "every record is stamped with the date it became known"). Which API, vendor, or dataset meets them is a planning decision, made by checking candidates against these requirements. Name a source only when the brief makes it a fixed constraint (our own database, a required benchmark).
+- **Write data guarantees as testable criteria.** Leakage, look-ahead, survivorship bias, and coverage gaps are requirements, not hopes: "Given a backtest date D, when the strategy requests data, then no value published after D is returned."
+- **Model quality is a requirement with a baseline.** Acceptance criteria name the metric, the held-out data, the threshold, and the baseline to beat: "Given the most recent 6 months of plates (never trained on), when ranked, then reviewing the top 20% catches ≥ 90% of scientist-failed plates, and beats ranking by Z′ alone." Never "the model is accurate".
+- **No model types or libraries.** "Gradient boosting" or "PyTorch" are planning decisions; the spec says what the model must achieve.
 
 ### Step 5: Review Gate (CRITICAL)
 
@@ -169,7 +183,7 @@ Run Steps 1-5 for the idea only, with these rules:
 1. **Check for conflicts first.** Start with the IDs under *Touches*, then search the rest of the spec for anything else the idea contradicts. List conflicts for the user before writing — "Shared editing changes **EDIT-03** (only the owner can edit). Proposed: owner *or invited editors* can edit."
 2. **Add, don't rewrite.**
    - New feature → new `### Feature (CODE)` section with a new code and IDs starting at `-01`.
-   - New behavior in an existing feature → next unused number in that feature (if `SAVE-04` is the highest, add `SAVE-05`, even if `SAVE-02` was removed).
+   - New behavior in an existing feature → next unused number in that feature (if `SAVE-04` is the highest, add `SAVE-05`, even if `SAVE-02` was removed). `spec-status.sh` reports it.
    - Changed requirement → edit it in place, keep its ID, and append `*(changed YYYY-MM-DD)*`.
    - Removed requirement → replace its text with `~~[old text]~~ *Removed YYYY-MM-DD: [reason]*`. Never delete the line — the ID stays retired.
 3. **Link back to the idea.** Add `**Source:** [ideas/<slug>.md](ideas/<slug>.md)` under the `Serves:` line of each new feature section, so readers can find the full why.
@@ -198,6 +212,7 @@ Run Steps 1-5 for the idea only, with these rules:
 - Requirements with no Given/When/Then criteria
 - Vague words in requirements: "fast", "easy", "intuitive", "robust", "etc."
 - Tech stack, database tables, API routes, or file paths in the spec
+- Data or ML project with no `DATA-` requirements, a specific vendor chosen without the brief requiring it, or model criteria with no baseline or held-out data
 - Out of scope missing items from the brief's Not Doing list
 - Extend mode: IDs renumbered, removed requirements deleted, no Changelog row, or conflicts with existing requirements not raised
 - Extend mode: new feature with no `Source:` link, or the idea file left `Accepted` after the spec was approved
@@ -212,7 +227,8 @@ Before handing off to planning:
 - [ ] Every requirement has a permanent ID and at least one Given/When/Then criterion
 - [ ] Edge cases and error behavior are written for each feature
 - [ ] Out of scope includes everything on the brief's Not Doing list
-- [ ] No implementation details (stack, schema, endpoints, files)
+- [ ] No implementation details (stack, schema, endpoints, files, vendors, model types)
+- [ ] Data/ML projects: data needs are `DATA-` requirements with testable guarantees; model criteria name metric, held-out data, threshold, and baseline
 - [ ] Assumptions were confirmed by the user; open questions are listed
 - [ ] The turn ended after the Draft was saved; approval came in a later turn
 - [ ] Extend mode: no IDs renumbered or reused, changes marked in place, Changelog row added, conflicts raised with the user

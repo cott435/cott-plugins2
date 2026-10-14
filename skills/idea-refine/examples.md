@@ -83,51 +83,57 @@ One thing I want to push back on: you said variation 1 feels "necessary but bori
 
 ---
 
-### Phase 3: Sharpen & Ship
+### Phase 3: Write the Brief
 
-**Skill produces:**
+**User picks Direction A.** The skill writes `docs/brief.md` as a Draft:
 
-# ReOrder: Keep Your Regulars Ordering Direct
+```markdown
+# ReOrder
 
-## Problem Statement
-How might we help independent restaurants retain their best existing customers through direct ordering, eliminating the 25-30% platform commission on the revenue that matters most?
+**Status:** Draft · **Last updated:** 2026-10-14
 
-## Recommended Direction
-Build a **regulars-only retention engine** — not a marketplace, not a full ordering platform. Hyper-focused on one job: make it effortless for a restaurant's repeat customers to reorder directly.
+## The problem
+Independent restaurants pay delivery apps 25-30% on every order, including orders from their most loyal customers. Those regulars would happily order direct, but there is no easy way for them to do it, so the restaurant pays a fee on relationships it already owns.
 
-The key insight is that restaurants don't need help *finding* their best customers — they know who walks in every Tuesday. They need help moving those relationships off-platform. And the tool needs to run itself, because the owner is in the kitchen, not at a dashboard.
+## Who it's for
+Owners of independent restaurants with a steady base of repeat customers. Secondary: those regular customers.
 
-SMS-first (not app-first) is likely the right channel. A text saying "Hey, want your usual Thursday order from Marco's?" with a one-tap confirmation is lower friction than any app install.
+## Goals
+1. Regulars can reorder their usual meal directly in under 30 seconds.
+2. Owners move their best customers off delivery apps without extra daily work.
+3. Owners keep the full value of repeat orders.
 
-## Key Assumptions to Validate
-- [ ] Repeat customers will reorder via SMS/direct link instead of their usual delivery app — test with 5 restaurants, 20 regulars each, measure conversion over 4 weeks
-- [ ] Restaurant owners can identify their top 20-30 regulars and share contact info — test by asking 10 restaurant owners if they'd do this
-- [ ] The commission savings ($8-10 per order) is motivating enough for owners to invest initial setup effort — interview 10 owners about platform fee pain
+## Constraints
+- The owner is in the kitchen, not at a computer. Setup must take under 15 minutes.
+- Pickup only at first. We have no delivery drivers.
+- Must work for customers without installing an app.
 
-## MVP Scope
-- SMS-based reordering for a restaurant's self-identified regular customers
-- Restaurant owner adds regulars manually (name + phone + usual order) — 15-minute setup
-- Customer receives a text with their usual order, confirms with a reply, pays via link
-- Restaurant receives the order via text/simple dashboard
-- No delivery — pickup only in v1
-- No discovery, no marketplace, no app
+## What success looks like
+- 5 pilot restaurants, each with 20 regulars set up.
+- At least 30% of those regulars reorder direct within 4 weeks.
 
-## Not Doing (and Why)
-- **Delivery logistics** — delivery is the expensive, complex part and not the core problem. Pickup-first validates demand without operational burden.
-- **Customer acquisition/discovery** — that's the platform's game. Competing on discovery means competing with DoorDash's budget. We compete on retention instead.
-- **Branded restaurant apps/websites** — commodity. Square and Toast already do this. Another branded channel doesn't solve the behavioral problem.
-- **Menu management, POS integration** — scope creep. "Your usual" doesn't need a dynamic menu. Start with static orders.
-- **Analytics dashboards** — the owner is in the kitchen. Build reporting that's passive (weekly text summary) not active (log in and look at charts).
+## What we're betting on
+- Regulars will order by text instead of their usual delivery app.
+- Owners know who their regulars are and will share their contact details.
+- Saving $8-10 per order is worth 15 minutes of setup.
 
-## Open Questions
-- What's the legal/compliance landscape for SMS marketing to restaurant customers?
-- How do you handle menu/price changes for "usual" orders?
-- Is there a way to bootstrap the regular customer list from existing POS data instead of manual entry?
-- What's the pricing model? Per-order fee? Monthly subscription?
+## Not doing
+- Delivery — expensive and not the core problem.
+- Helping restaurants find new customers — that is the delivery apps' game.
+- A branded app or website — Square and Toast already do this.
+- Menu or till integration — "your usual" doesn't need a live menu yet.
+- Reporting dashboards — owners get a weekly text summary instead.
+
+## Open questions
+- What rules apply to texting customers for marketing?
+- How do we handle price changes on a saved "usual" order?
+```
+
+**Skill then says:** "The brief is at `docs/brief.md` (about 300 words). In short: restaurants pay platform fees on customers they already own; the top goal is a 30-second direct reorder; the biggest thing we're not doing is delivery. Read it and tell me to accept it or what to change — I'll write the spec once it's accepted." *(Turn ends.)*
 
 ---
 
-## Example 2: Feature Idea Within an Existing Product (Codebase-Aware)
+## Example 2: Feature Idea Within an Existing Product (Extend Mode, Codebase-Aware)
 
 **User invokes:** `/ideate adding real-time collaboration to our document editor`
 
@@ -169,7 +175,62 @@ Given your architecture and the competitive context, I'd push you toward variati
 
 *Phase 2 would cluster into "minimum viable co-editing (1 or 3)" vs. "differentiated collaboration model (2 or 4)" — evaluating whether to check the competitive box quickly or invest in something that becomes a selling point.*
 
-*Phase 3 would produce a one-pager recommending block-level locking as the MVP, with a "Not Doing" list that includes character-level CRDT (too complex), offline sync (not needed for 2-5 users), and AI features (premature).*
+*Phase 2 clusters into "minimum viable co-editing (1 or 3)" vs. "differentiated collaboration model (2 or 4)". The user picks block-level locking.*
+
+### Phase 3: Write the Idea File (Extend Mode)
+
+The editor already has `docs/brief.md` and `docs/spec.md`, so this is extend mode. **Fit check:** the brief's users are small teams writing shared documents, and Goal 2 is "Teams can produce a finished document without emailing drafts around." Real-time editing serves Goal 2 directly, so **the brief does not change.** The skill writes `docs/ideas/shared-editing.md`:
+
+```markdown
+# Idea: Shared Editing
+
+**Status:** Draft · **Last updated:** 2026-10-14 · **Brief:** [../brief.md](../brief.md)
+
+## In one sentence
+This lets 2-5 teammates edit the same document at the same time, so they stop waiting on each other or overwriting each other's work.
+
+## The problem
+Teams today take turns: one person edits while the others wait, or they edit copies and merge by hand. Customers ask for this every month, and sales has lost three deals this quarter to tools that already have it. For most buyers it's a box that must be ticked before they'll consider us.
+
+## Who it's for
+Small teams (2-5 people) working on one document, usually each in their own section.
+
+## How it fits
+- **Serves:** Goal 2 (finish documents without emailing drafts)
+- **Touches:** EDIT-03 (only the owner can edit) must change; SAVE-01 (autosave) must handle several editors
+- **Brief changes:** None
+
+## Recommended direction
+When someone starts editing a block, it's reserved for them. Everyone else sees who is in it ("Alex is editing") and can edit any other block freely. When they click away, the block is released.
+
+This fits how teams already work, each in their own section, and avoids the hard problem of two people typing in the same sentence. Our documents are already made of separate blocks, which makes this much cheaper than full live co-typing.
+
+## Alternatives considered
+- Presence only, no co-editing — cheaper, but may not tick the box buyers are checking.
+- Suggestion-only (async) — interesting, but doesn't answer the request we keep hearing.
+- Branch and merge — powerful, but adds a merge step teams don't want.
+
+## What success looks like
+- Lost-deal notes stop citing missing collaboration.
+- 30% of active teams have two or more people editing at once within two months.
+
+## What we're betting on
+- Teams rarely need to edit the same paragraph at the same moment.
+- A "someone is editing this" label is enough. People won't feel blocked.
+
+## Not doing
+- Two people typing in the same block — complex, and rarely needed by small teams.
+- Offline editing — not requested by 2-5 person teams.
+- AI-merged drafts — premature.
+
+## Open questions
+- What happens if someone leaves a block reserved and walks away? Release it after a timeout?
+- Can viewers (not editors) see live changes?
+```
+
+**Skill then says:** "The idea is at `docs/ideas/shared-editing.md`. The brief is unchanged: this serves Goal 2. Heads-up for the spec: it changes EDIT-03. Accept it or tell me what to change." *(Turn ends.)*
+
+*If instead the idea had needed a new goal — say, "let clients outside the team comment" (a new user) — the fit check would flag it. Either the brief gains a goal and adds clients as a user, or it's a separate project.*
 
 ---
 
@@ -215,7 +276,7 @@ The interesting tension: variations 1 and 5 fix the *output* problem (nothing ch
 
 *Phase 2 would evaluate in terms of: effort to try (most are free — just change how you run the next meeting), risk (variation 2 is the biggest departure), and whether the team's real problem is output (action items die) or input (not enough honesty).*
 
-*Phase 3 would produce a one-pager recommending starting with variation 1 (one action item, demo next week) as a zero-cost experiment, combined with variation 3's anonymous submission. "Not Doing" list: new tools, elaborate facilitation techniques, or anything requiring budget. The first fix should take 0 minutes of prep and $0.*
+*Phase 3 would produce a brief recommending starting with variation 1 (one action item, demo next week) as a zero-cost experiment, combined with variation 3's anonymous submission. "Not Doing" list: new tools, elaborate facilitation techniques, or anything requiring budget. The first fix should take 0 minutes of prep and $0.*
 
 ---
 
@@ -231,8 +292,12 @@ The interesting tension: variations 1 and 5 fix the *output* problem (nothing ch
 
 5. **Phase 2 is honest.** Ideas get called out for low differentiation or high complexity. The skill pushes back: "That instinct to include the 'necessary' thing is how products lose focus."
 
-6. **The output is actionable.** The one-pager ends with things you can *do* (validate assumptions, build the MVP, try the experiment), not things to *think about*.
+6. **The brief is short and plain.** Anyone could read the ReOrder brief in two minutes. It says why the project exists and what we're betting on; it leaves requirements to the spec.
 
 7. **The "Not Doing" list does real work.** It's specific and reasoned. Each item is something you might *want* to do but shouldn't yet.
 
 8. **The skill adapts to context.** A codebase-aware example references actual architecture. A process idea generates zero-cost experiments instead of products. The framework stays the same but the output matches the domain.
+
+9. **The brief waits for acceptance.** The turn ends after the Draft is saved. The spec is written only after the user accepts.
+
+10. **Extend mode writes an idea file, not a bigger brief.** The shared-editing idea gets its own file with the context the spec needs: which goal it serves, which existing requirements it touches, and the alternatives that were rejected. The brief changes only when the fit check says the project's goals or constraints changed.

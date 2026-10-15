@@ -46,7 +46,7 @@ Record the shape in the header: `**Shape:** Single package` or `**Shape:** Multi
 
 ## Modes
 
-Run `python3 skills/architecture-design/scripts/arch-status.py` first. It reports the mode, the shape, spec requirements with no home in the design, requirements changed since the architecture was last updated, the next free decision ID, and packages found in the repo.
+Run `python3 skills/architecture-design/scripts/arch-status.py` first. It reports the mode, the shape, spec requirements with no home in the design, requirements changed since the architecture was last updated, the next free decision ID, packages found in the repo, and the project's other installed skills.
 
 | Mode | When | Do |
 |---|---|---|
@@ -93,6 +93,8 @@ Make the choices the spec deliberately left open: language and versions, key lib
 3. Recommend one with a reason. **Ask the user** (`AskUserQuestion`) for decisions that are expensive to reverse or that they may have opinions on: language, framework, paid services, infrastructure.
 
 Record each as a decision (`AD-NN`) in the template format. Small, easily reversed choices (a formatting tool) go in the tech stack table without a decision entry.
+
+**Route steps to installed skills.** `arch-status.py` lists the project's other skills under `skills`, and your context lists any others. If one owns a step the design contains, such as a hypothesis test or a security review, the component that runs that step names the skill. Its interface takes what the skill needs: for a hypothesis test, the hypothesis, the statistic, the null construction and the data split. Don't design a replacement procedure. If the spec names a skill for a step, the design must route to it.
 
 **If the repo already has ADRs** (for example `docs/decisions/` or `docs/adr/`), follow that convention instead: write the ADR files there and list them in the Decisions section with links.
 
@@ -149,8 +151,11 @@ tests/             → ...
 - **Alternatives:** [Option — why not.] [Option — why not.]
 - **Consequences:** [What this makes easy, what it makes hard, what we must now live with.]
 
+### AD-02: ~~[Old title]~~
+**Status:** Superseded by AD-07 · YYYY-MM-DD — [one-line reason]
+
 ## Risks and open questions
-- [Technical risk — mitigation, or the question and who answers it]
+- [Technical risk — mitigation, or the question and who answers it. One list for the whole system, live items only.]
 
 ## Changelog
 | Date | Change | Source | IDs |
@@ -171,7 +176,9 @@ tests/             → ...
 
 **Writing rules:**
 
-- **Decisions are permanent.** `AD-NN` IDs are never reused or renumbered. A reversed decision is marked `**Status:** Superseded by AD-NN`, never deleted.
+- **Decision IDs are permanent; superseded decisions shrink.** `AD-NN` IDs are never reused or renumbered, and the heading is never deleted. A reversed decision collapses to its heading with the title struck, plus one status line: `**Status:** Superseded by AD-NN · date — reason`. Delete its Context, Decision, Alternatives and Consequences. The new decision's Context says what the old one chose and why that no longer holds. Then update every section that cited the old decision (tech stack, interfaces, code comments, layout, risks) so that only the superseded line, the new decision and the Changelog mention it.
+- **Describe the design as it is now, not how it got here.** No process notes ("no code was built before this change"), no struck-through risks, no per-stage blocks of risks or notes. The Changelog has one row per round, one line long, with IDs as ranges (`AD-12–AD-15; TANK-01–TANK-12`). Git keeps the rest.
+- **Risks and open questions is one consolidated list.** Each round merges into it: add new risks, rewrite ones that changed, and delete ones that are resolved. Record a resolution in a decision or the Changelog, not as a struck-through risk.
 - **Size to the project.** A proof of concept with three modules doesn't need a Cross-cutting section longer than its Components table. Omit sections that would only say "N/A".
 - **Pin what matters.** Versions or version ranges for the language and key libraries; not for every transitive dependency.
 - **Diagrams are optional but cheap.** One Mermaid flowchart beats a paragraph of "A calls B which calls C".
@@ -179,27 +186,38 @@ tests/             → ...
 
 ### Step 6: Review Gate (CRITICAL)
 
+Before presenting the Draft, run `arch-status.py` again. `uncovered` and `stale` should be empty, or each gap should be listed under Risks and open questions. Also check that a superseded decision is cited only by its own line, the decision that replaced it, and the Changelog.
+
 After saving the Draft:
 
 1. Summarize: the shape, the components (or packages), the decisions that need the user's attention, and any spec requirements that couldn't be covered.
 2. Ask the user to approve or request changes.
 3. **STOP YOUR TURN.** Do not start planning or code in the same turn.
 
-On approval: set Status to `Approved` (on the root and every package doc touched), set any `Proposed` decisions to `Accepted`, update the date, and point the user to planning.
+**Handling the reply.** Requested edits are the whole turn, and nothing follows an approval.
+
+| The user says | Do | Then |
+|---|---|---|
+| Approved, nothing to change | Set Status to `Approved` on the root and every package doc touched, set `Proposed` decisions to `Accepted`, update the date | **Stop.** See below |
+| Approved, with a change ("approved, but split the doc per package", "rename `sim` to `world`") | Make exactly that edit. If the user fully specified it and it changes no decision or interface (moving text, splitting files, renaming), set Approved. Otherwise keep Draft. | **Stop.** List what you changed |
+| Changes requested | Edit, keep Draft | Repeat this gate |
+
+**After approval, this skill is done.** Do not write a build plan, task list, milestones, `docs/plan.md`, or code, even if the user says "go ahead" or "continue". Tell the user the architecture is approved. Breaking it into tasks is the job of a planning skill: name it if one is installed, and if none is, say so and end the turn. If the user brings a new idea or stage, that goes to `idea-refine`.
 
 ## Extend Mode
 
 The spec gained requirements (usually from a specced idea) or changed some.
 
-1. Take the uncovered and changed IDs from `arch-status.sh`. Read the idea file each came from (`Source:` link in the spec) for context.
+1. Take the uncovered and changed IDs from `arch-status.py`. Read the idea file each came from (`Source:` link in the spec) for context.
 2. For each requirement, choose: an existing component covers it (add the ID to Covers), an existing component grows (update its interface), or a new component is needed (add it, check the dependency direction).
-3. Any new technical choice gets a new `AD-NN`. A changed choice supersedes the old one.
+3. Any new technical choice gets a new `AD-NN`. A changed choice supersedes the old one, and the old one collapses to its superseded line.
 4. Requirements *removed* from the spec: take their IDs out of Covers; if a component now covers nothing, propose removing it.
-5. Add one Changelog row (source: the idea file or `spec.md`), set Status to Draft, and run the Review Gate, highlighting only what changed.
+5. Consolidate: merge new risks into the one Risks list, and delete the risks this round resolved. Rewrite the Overview and any section still worded for an earlier stage so it describes the whole system.
+6. Add one one-line Changelog row (source: the idea file or `spec.md`), set Status to Draft, and run the Review Gate, highlighting only what changed.
 
 ## Revise Mode
 
-A technical change with no spec change. Write a new decision whose Context explains what was learned ("the simulator is 40× too slow for QR-02 at 1M steps"), mark the old one `Superseded by AD-NN`, update every section the change touches (tech stack, interfaces, components), and run the Review Gate. Check whether the change breaks any interface other components rely on; if it does, list them.
+A technical change with no spec change. Write a new decision whose Context explains what was learned ("the simulator is 40× too slow for QR-02 at 1M steps"), collapse the old one to its superseded line, update every section the change touches (tech stack, interfaces, components), and run the Review Gate. Check whether the change breaks any interface other components rely on; if it does, list them.
 
 ## Grow: Single Package to Multi-Package
 
@@ -222,7 +240,9 @@ The code and the doc disagree, or there's code with no doc. Document what *is* f
 | "We'll need a monorepo eventually, so start with one" | Packages you don't need yet cost tooling, versioning, and boundary friction every day. Name the seams; split when there's a reason. |
 | "The decision is obvious, no need to record it" | Obvious today, mysterious in six months. A three-line decision entry is enough. |
 | "I'll pick the data vendor myself, it's a technical detail" | Paid services and data sources are expensive to reverse. Check them against DATA- requirements and ask the user. |
-| "I'll just update the old decision with the new choice" | Then the reason for the original choice, and why it changed, is lost. Supersede it. |
+| "I'll just update the old decision with the new choice" | Then the reason for the original choice, and why it changed, is lost. Supersede it: the new decision's Context records both, and the old one shrinks to one line. |
+| "I'll keep the superseded decision in full for the record" | Git is the record. A full superseded decision gets read as current, and every round adds more of them. |
+| "The user said go ahead, so I'll write the build plan" | An approved architecture is where this skill stops. A plan written here skips its own review and goes stale before the build. |
 | "The code is the documentation" | Code shows what was built, not why, and not which dependencies are forbidden. |
 
 ## Red Flags
@@ -231,10 +251,12 @@ The code and the doc disagree, or there's code with no doc. Document what *is* f
 - Dependency cycles, or "depends on" lists that include everything
 - Multi-package shape for a proof of concept, or a single package with several separately deployed parts
 - Tech choices with no decision entry where reversing them would be expensive
-- Decisions deleted or edited in place instead of superseded
+- Decisions deleted or edited in place instead of superseded, or superseded decisions kept in full
+- Sections that still cite a superseded decision; struck-through risks; a new Risks block per stage
+- A step an installed skill owns, designed as a home-made procedure instead of routed to the skill
 - Interfaces described in prose only, with no signatures or data shapes
 - Data sources or model types chosen without checking the spec's DATA- and model-quality requirements
-- Planning or code started in the same turn the architecture was written
+- Planning or code started in the same turn the architecture was written, or a plan or code written after it was approved
 
 ## Verification
 
@@ -242,12 +264,13 @@ Before handing off to planning:
 
 - [ ] Spec is `Approved`; the architecture links to it
 - [ ] Shape is recorded and justified
-- [ ] `arch-status.sh` reports no uncovered requirements (or each gap is listed under Risks and open questions)
+- [ ] `arch-status.py` reports no uncovered or stale requirements (or each gap is listed under Risks and open questions)
 - [ ] Dependency direction is one-way with no cycles; multi-package has written dependency rules
 - [ ] Every boundary has a contract with signatures, data shapes, and error behavior
 - [ ] Every expensive-to-reverse choice has an `AD-NN` entry with alternatives and consequences
 - [ ] Data and ML: sources and model approach are decisions checked against the spec's DATA- and model-quality requirements
-- [ ] Changes after the first approval: Changelog row added, superseded decisions kept, Status back to Draft until approved
-- [ ] The turn ended after the Draft was saved; approval came in a later turn
+- [ ] Changes after the first approval: one-line Changelog row added, superseded decisions collapsed to one line with nothing else citing them, Risks consolidated, Status back to Draft until approved
+- [ ] Steps owned by an installed skill are routed to it by name
+- [ ] The turn ended after the Draft was saved; approval came in a later turn; nothing was planned or built after approval
 
 Read `examples.md` in this skill directory for a single-package proof of concept and a multi-package platform.

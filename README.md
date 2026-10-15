@@ -57,7 +57,7 @@ idea-refine → docs/ideas/<idea>.md (+ brief edits, if needed) → you accept
 | Project outgrows one package | `architecture-design` | Split into packages: root becomes a system map, one doc per package |
 | Code has drifted from the design | `architecture-design` | Mismatches listed; you decide whether the doc or the code changes |
 
-Spec and architecture changes never renumber or delete IDs. Changed requirements keep their ID, and removed ones are struck through and retired. Each change gets a changelog row.
+Spec and architecture changes never renumber or delete IDs. Changed requirements are rewritten in place under the same ID. Removed requirements and superseded decisions collapse to one struck line with a date and reason. Each round of changes gets a one-line changelog row; git keeps the old text.
 
 ## Data and ML projects
 

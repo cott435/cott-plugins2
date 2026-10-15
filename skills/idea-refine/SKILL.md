@@ -155,10 +155,13 @@ After saving the Draft (brief, or idea file plus any brief edits):
 2. Ask them to read it and either **accept** it or request changes.
 3. **STOP YOUR TURN.** Do not start the spec in the same turn.
 
-When the user requests changes, edit and repeat this gate. When the user accepts:
+**Handling the reply.** Requested edits are the whole turn. Never edit the brief or idea file and draft the spec in the same turn.
 
-1. Change `**Status:** Draft` to `**Status:** Accepted` and update the date — on the brief, the idea file, or both, whichever were written or edited.
-2. Hand off to `spec-writing` to write or update `docs/spec.md`.
+| The user says | Do | Then |
+|---|---|---|
+| Accepted, nothing to change | Change `**Status:** Draft` to `**Status:** Accepted` and update the date, on whichever of the brief and idea file were written or edited | Hand off to `spec-writing` to write or update `docs/spec.md` |
+| Accepted, with a change ("accepted, but drop the leaderboard") | Make exactly that edit. If the user fully specified it, set Accepted. If it needs your judgment, keep Draft. | **Stop.** List what you changed. The spec starts next turn, after the user has seen the edit. |
+| Changes requested | Edit, keep Draft | Repeat this gate |
 
 ## Extend Mode: Adding an Idea to an Existing Project
 
@@ -201,7 +204,7 @@ When `docs/brief.md` already exists, the new idea gets its own file and must ear
 [1-3 paragraphs on how it should work from the user's point of view, and why this direction over the others.]
 
 ## Data
-[ML and data ideas only — omit otherwise. What data it needs, where it lives or could come from, how much history and labels exist, and how results will be evaluated (held-out data, baseline).]
+[ML and data ideas only — omit otherwise. What data it needs, where it lives or could come from, how much history and labels exist, and how results will be evaluated (held-out data, baseline). If an installed skill owns the evaluation step, such as a hypothesis-testing skill, name it here.]
 
 ## Alternatives considered
 - [Direction] — [why not, in one line]
@@ -224,6 +227,7 @@ When `docs/brief.md` already exists, the new idea gets its own file and must ear
 - **Plain English, still no requirements.** Describe what the user experiences and why; `spec-writing` turns that into requirement IDs and acceptance criteria.
 - **More room than the brief, not unlimited.** Aim for 300-700 words. The extra space goes to *How it fits*, *Alternatives considered*, and *Open questions* — the context the spec needs.
 - **One idea per file.** If the conversation produced two separable ideas, write two files (ask the user which to do first).
+- **Tool preferences live here, not in the spec.** If the user names a library, dataset or service ("hand-write PPO, then compare with Stable-Baselines3"), record it under *Recommended direction* or *Data*. `spec-writing` writes the behavior without the name, and `architecture-design` reads the name from here.
 - **Never paste the idea into the brief.** Brief edits are limited to the fit-check table above. Goal numbers stay stable; new goals take the next number. If a goal is dropped, tell the user which spec requirements referenced it.
 
 **Idea status lifecycle:** `Draft` → `Accepted` (user approved here) → `Specced` (set by `spec-writing` once the spec is approved). Parked ideas get `Parked` with a one-line reason, so they aren't re-proposed blindly.
@@ -269,6 +273,7 @@ Read `examples.md` in this skill directory for examples of full sessions, finish
 - Spec work started before the brief or idea file was marked Accepted
 - Extend mode: feature detail written into the brief, existing goals renumbered, or the brief and spec not read first
 - Extend mode: idea file missing *How it fits* (goals served, spec IDs touched, brief changes)
+- The spec drafted in the same turn as edits to the brief or idea file
 
 ## Verification
 

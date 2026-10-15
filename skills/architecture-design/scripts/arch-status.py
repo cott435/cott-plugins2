@@ -8,6 +8,7 @@
 - stale: IDs the architecture references that are removed from, or missing in, the spec
 - next_decision: next free AD-NN
 - package_docs / packages_found: documented packages vs package manifests found in the repo (for Sync and Grow)
+- skills: other skills installed in this project (.claude/skills), which may own steps the design must route to
 
 Usage: python3 skills/architecture-design/scripts/arch-status.py [docs_dir] [repo_root]
 """
@@ -79,6 +80,11 @@ for d, subdirs, files in os.walk(root):
     if manifests & set(files):
         found.append(os.path.relpath(d, root))
 
+skills_dir = os.path.join(root, ".claude", "skills")
+own = {"idea-refine", "spec-writing", "architecture-design"}
+skills = sorted(s for s in os.listdir(skills_dir)
+                if s not in own and os.path.isfile(os.path.join(skills_dir, s, "SKILL.md"))) if os.path.isdir(skills_dir) else []
+
 updated = field(arch, "Last updated") if arch else None
 uncovered = sorted(live - referenced)
 changed_since = sorted(r for r, d in changed.items() if updated and d > updated)
@@ -104,6 +110,7 @@ report = {
     "next_decision": f"AD-{(max(nums) + 1) if nums else 1:02d}",
     "package_docs": pkg_docs,
     "packages_found": sorted(found),
+    "skills": skills,
 }
 print(f"Mode: {mode} (spec: {report['spec']['status']}, architecture: {report['architecture']['status']}, "
       f"uncovered: {len(uncovered)})", file=sys.stderr)

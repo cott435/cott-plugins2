@@ -53,6 +53,7 @@ Run `python3 skills/architecture-design/scripts/arch-status.py` first. It report
 - spec Changelog rows the architecture hasn't caught up with (`spec_rows_pending`), and the placed requirements those rows mark `(changed)` (`changed_since`)
 - the next free decision ID
 - packages found in the repo, and the project's other installed skills
+- code fences that leave doc text inside a code block (`broken_fences`)
 
 | Mode | When | Do |
 |---|---|---|
@@ -194,7 +195,7 @@ tests/             → ...
 
 ### Step 6: Review Gate (CRITICAL)
 
-Before presenting the Draft, run `arch-status.py` again. `uncovered`, `changed_since` and `stale` should be empty, or each gap should be listed under Risks and open questions. Also check two things by hand:
+Before presenting the Draft, run `arch-status.py` again. `uncovered`, `changed_since` and `stale` should be empty, or each gap should be listed under Risks and open questions. `broken_fences` must be empty: move lines added after a block's closing fence inside it, and delete the stray fence. Also check two things by hand:
 
 - A superseded decision is cited only by its own line, the decision that replaced it, and the Changelog.
 - No Accepted decision, Overview sentence or interface contradicts a newer decision. Search for the counts, ranges and names this round changed.
@@ -220,12 +221,12 @@ After saving the Draft:
 The spec gained requirements (usually from a specced idea) or changed some.
 
 1. Take the `uncovered` and `changed_since` IDs and the `spec_rows_pending` rows from `arch-status.py`. Read the idea file each row cites for context.
-2. For each requirement, choose: an existing component covers it (add the ID to Covers), an existing component grows (update its interface), or a new component is needed (add it, check the dependency direction).
+2. For each requirement, choose: an existing component covers it (add the ID to Covers), an existing component grows (update its interface), or a new component is needed (add it, check the dependency direction). Lines added to a code block (an interface, the storage or project layout) go inside it, before its closing fence.
 3. Any new technical choice gets a new `AD-NN`. Then find every Accepted decision it touches: search the doc for the components, data, counts and names it changes.
    - It reverses an old choice → supersede the old decision, which collapses to its superseded line.
    - It changes part of an old choice → revise the old decision in place (see *Accepted decisions stay true*). Examples: a third holdout added to a decision that set up two, or a new caller of an interface that a decision said only one study uses.
 4. Requirements *removed* from the spec: take their IDs out of Covers; if a component now covers nothing, propose removing it.
-5. Consolidate: merge new risks into the one Risks list, and delete the risks this round resolved. Rewrite the Overview and any section still worded for an earlier stage so it describes the whole system. Every count, list and range the round changed is updated everywhere it appears: Overview, interfaces (such as the kinds of test a log entry accepts), cross-cutting concerns (such as which claims a skill tests), section headings, and older decisions. That includes text the round didn't set out to touch. Search for stage lists ("Stages 2 and 3", "both studies"), superlatives the new parts falsify ("the top of the dependency chain") and "later stage" or "milestone" framing for stages that now exist.
+5. Consolidate: merge new risks into the one Risks list, and delete the risks this round resolved. Rewrite the Overview and any section still worded for an earlier stage so it describes the whole system. Every count, list and range the round changed is updated everywhere it appears: Overview, Covers cells (`claims` still covering "EDA-06, OOS-10" after later stages added 26 claim families), interfaces (such as the kinds of test a log entry accepts), cross-cutting concerns (such as which claims a skill tests), section headings, and older decisions. That includes text the round didn't set out to touch. Search for stage lists ("Stages 2 and 3", "both studies"), superlatives the new parts falsify ("the top of the dependency chain") and "later stage" or "milestone" framing for stages that now exist. Delete notes on how the design got here, code comments included ("unchanged since the Snake stage", "Since the arena stage, …", "Older … files load into this form").
 6. Add one one-line Changelog row that cites the source files of `spec_rows_pending` (see the Changelog writing rule). Set Status to Draft and run the Review Gate, highlighting only what changed.
 
 ## Revise Mode
@@ -280,7 +281,7 @@ Before handing off to planning:
 
 - [ ] Spec is `Approved`; the architecture links to it
 - [ ] Shape is recorded and justified
-- [ ] `arch-status.py` reports no uncovered, changed or stale requirements (or each gap is listed under Risks and open questions)
+- [ ] `arch-status.py` reports no uncovered, changed or stale requirements (or each gap is listed under Risks and open questions), and no broken fences
 - [ ] Dependency direction is one-way with no cycles; multi-package has written dependency rules
 - [ ] Every boundary has a contract with signatures, data shapes, and error behavior
 - [ ] Every expensive-to-reverse choice has an `AD-NN` entry with alternatives and consequences

@@ -10,6 +10,8 @@
 - next_decision: next free AD-NN
 - package_docs / packages_found: documented packages vs package manifests found in the repo (for Sync and Grow)
 - skills: other skills installed in this project (.claude/skills), which may own steps the design must route to
+- broken_fences: doc:line of each code fence that leaves doc text inside a code block: one whose block holds a
+  heading (a stray fence, often closing lines added below a block's real closing fence) or one that never closes
 
 A spec Changelog row is pending if it is dated after the architecture's Last updated date. Rows dated
 that same day are told apart by order: they are pending if they come after the last spec row that the
@@ -80,6 +82,23 @@ def changelog(text):
                      "files": cited - {"spec.md", "architecture.md"}, "ids": marked_ids(cells[-1])})
     return rows
 
+def broken_fences(text):
+    """Line numbers of code fences that never close, or that open a block holding a ##–#### heading
+    (a block tagged markdown may hold headings)."""
+    out, start, fence, md, held = [], None, "", False, False
+    for n, line in enumerate(text.splitlines(), 1):
+        m = re.match(r"\s*(`{3,}|~{3,})(.*)", line)
+        if start is None:
+            if m and not (m.group(1)[0] == "`" and "`" in m.group(2)):
+                start, fence, held = n, m.group(1), False
+                md = bool(re.match(r"\s*(markdown|md)\b", m.group(2), re.I))
+        elif m and m.group(1)[0] == fence[0] and len(m.group(1)) >= len(fence) and not m.group(2).strip():
+            out += [start] if held else []
+            start = None
+        elif not md and re.match(r"#{2,4} \S", line):
+            held = True
+    return out + ([start] if start else [])
+
 def pending_rows(spec_rows, arch_rows, updated):
     """Spec Changelog rows with IDs that the architecture hasn't caught up with."""
     cites = [(a["files"], {i: m for i, m in a["ids"].items() if not i.startswith("AD-")}) for a in arch_rows]
@@ -116,7 +135,8 @@ for line in spec.splitlines():
 
 arch = read(arch_p)
 pkg_docs = sorted(f for f in os.listdir(pkg_dir) if f.endswith(".md")) if os.path.isdir(pkg_dir) else []
-arch_texts = ([arch] if arch else []) + [read(os.path.join(pkg_dir, f)) or "" for f in pkg_docs]
+arch_docs = ([(arch_p, arch)] if arch else []) + [(p, read(p) or "") for p in (os.path.join(pkg_dir, f) for f in pkg_docs)]
+arch_texts = [t for _, t in arch_docs]
 referenced = set().union(*(refs(t) for t in arch_texts)) if arch_texts else set()
 decisions = {r for r in referenced if r.startswith("AD-")}
 referenced -= decisions
@@ -165,7 +185,8 @@ report = {
     "package_docs": pkg_docs,
     "packages_found": sorted(found),
     "skills": skills,
+    "broken_fences": [f"{p}:{n}" for p, t in arch_docs for n in broken_fences(t)],
 }
 print(f"Mode: {mode} (spec: {report['spec']['status']}, architecture: {report['architecture']['status']}, "
-      f"uncovered: {len(uncovered)})", file=sys.stderr)
+      f"uncovered: {len(uncovered)}, broken fences: {len(report['broken_fences'])})", file=sys.stderr)
 print(json.dumps(report, indent=2))

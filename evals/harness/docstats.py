@@ -54,7 +54,7 @@ out = {
     "spec": {"requirements": len(blocks), "removed": len(removed),
              "removed_avg_words": round(sum(words(b) for _, b in removed) / len(removed), 1) if removed else 0,
              "changed_markers": len(re.findall(r"\(changed\b", spec)),
-             "changed_markers_off_id_lines": sum(1 for l in spec.splitlines()
+             "changed_markers_off_id_lines": sum(1 for l in re.split(r"^## Changelog", spec, flags=re.M)[0].splitlines()
                                                  if "(changed" in l and not re.search(r"\*\*[A-Z][A-Z0-9]*-\d{2,}\*\*", l)),
              "changelog_rows": len(re.findall(r"^\|\s*\d{4}-\d{2}-\d{2}", section(spec, "Changelog"), re.M))},
     "architecture": {"decisions": len(decisions), "superseded": len(superseded),

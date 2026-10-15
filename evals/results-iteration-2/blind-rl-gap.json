@@ -1,0 +1,127 @@
+{
+ "winner": "A",
+ "reasoning": "B has the better RL design. It uses step-based budgets so runs are reproducible, sets up a table-vs-network lesson for Snake, includes reward-hacking experiments, compares REINFORCE with PPO, and checks that the tank is hard enough and that predator-prey is balanced before any learning counts. Its opponent pool uses three game types so no rollout is wasted, it uses a cross-play table to tell progress from cycling, and its tests are concrete and numeric. But B carries a lot of edit history: superseded AD stubs, current decisions argued from superseded ones, '(changed 2026-10-15)' tags across the spec, and idea files that point at superseded decisions. It also has real cross-doc conflicts. The brief only describes Snake. GPU use is out of scope in the spec but a fallback in the architecture. CORE-01 is never extended to predator-prey. The brief says every environment must beat a random agent, but predator-prey has no random baseline. The whole set is also very long for a solo learner. A is lean, consistent and well organized, and has a clear build order and done gate per world. Its main flaws are in content. Wall-clock training budgets, a time-based epsilon schedule and time-based snapshot timing contradict its own determinism requirement (CORE-08). The tank and predator-prey physics have no numbers. A Snake DQN on the 11-fact view must beat a heuristic that uses the same 11 facts, and that risk is not flagged. SB3's DQN is not truly 'matched' to Double-DQN. On balance, A's cleaner and more usable documents outweigh B's deeper but inconsistent and bloated plan.",
+ "rubric": {
+  "A": {
+   "content": {
+    "rl_soundness": 3,
+    "completeness_three_envs": 3,
+    "cross_doc_consistency": 4,
+    "testability": 3,
+    "right_sizing": 4
+   },
+   "structure": {
+    "organization": 5,
+    "readability_for_solo_learner": 4,
+    "what_to_build_next": 4
+   },
+   "content_score": 3.4,
+   "structure_score": 4.3,
+   "overall_score": 7.7
+  },
+  "B": {
+   "content": {
+    "rl_soundness": 5,
+    "completeness_three_envs": 4,
+    "cross_doc_consistency": 2,
+    "testability": 5,
+    "right_sizing": 2
+   },
+   "structure": {
+    "organization": 3,
+    "readability_for_solo_learner": 3,
+    "what_to_build_next": 4
+   },
+   "content_score": 3.6,
+   "structure_score": 3.3,
+   "overall_score": 6.9
+  }
+ },
+ "output_quality": {
+  "A": {
+   "score": 7,
+   "strengths": [
+    "Compact three-doc set (about 750 lines) with no history residue and single-entry changelogs",
+    "Clean traceability: every component lists the requirement IDs it covers",
+    "Clear build order and gating: worlds are built in order, each gated by a done report, and the modules needed for Snake are listed",
+    "Sound PPO details: GAE, bootstrapping on time-outs, a policy shared per role, and agents that leave mid-episode",
+    "Covers all three worlds with baselines, significance tests (Holm-corrected families) and a reference check against an established library",
+    "Self-play section names the cycling risk and tests final vs earliest snapshots"
+   ],
+   "weaknesses": [
+    "Wall-clock budgets, a time-based epsilon schedule and time-based snapshot timing contradict the CORE-08 determinism requirement",
+    "Tank and predator-prey physics are underspecified: no speeds, sizes, catch or eating distances",
+    "Nothing checks that the tank's hand-written fish is beatable, or that predator-prey is balanced",
+    "Snake DQN on the 11-fact view must beat a heuristic that uses the same information; this risk is not flagged",
+    "Several tests are vague or circular (TANK-08, EVAL-02, RPLY-02)",
+    "Reward shaping, one of the user's stated concepts, is not explored"
+   ]
+  },
+  "B": {
+   "score": 6,
+   "strengths": [
+    "Pedagogically strong experiment design: table vs network, reward-hacking designs, REINFORCE vs PPO, simultaneous vs opponent-pool training",
+    "Very concrete, numeric acceptance tests (e.g. TANK-13 = 1,462.5, HUNT-13, 1.1 vs 1.3 sensing radii)",
+    "Careful RL reasoning: step-based budgets for reproducibility, truncation vs termination, a whole tank as one test sample, and swept-collision arithmetic",
+    "Opponent pool split into three game types so no rollout is wasted; cross-play tables plus cycling and forgetting reports",
+    "Gating checks (TEXP-01 tank difficulty, HEXP-01 balance) before any learning result counts",
+    "Learners never import environments, and a test enforces it; standard Gymnasium/PettingZoo faces support the later library comparison"
+   ],
+   "weaknesses": [
+    "Heavy history residue: superseded AD stubs, 'changed' tags throughout the spec, idea files describing past edits",
+    "Cross-doc conflicts: GPU out of scope vs GPU fallback; CORE-01 wording not extended to predator-prey; a brief that covers only Snake",
+    "Predator-prey lacks the random-baseline comparison the brief requires",
+    "Very long (about 1,350 lines including ideas) with some over-engineering (auto-profiling shrink ladder, PettingZoo face used only for a checker)",
+    "Plain-word stand-ins for standard terms ('situation estimate', 'policy spread') make it harder to map the text to RL literature",
+    "No explicit module build order for the first environment"
+   ]
+  }
+ },
+ "defects": {
+  "A": [
+   "spec.md: CORE-04 'it stops on its own within the budget' vs CORE-08 'when training runs twice, then the logged returns are identical'. Stopping on a wall-clock budget changes the episode count between reruns, so the two requirements contradict.",
+   "architecture.md AD-05: '\u03b5 decays linearly from 1.0 to 0.05 over the first 30% of the budget'. The budget is wall-clock minutes, so exploration depends on machine timing and CORE-08 determinism breaks. The same applies to AD-07 'Each side snapshots 6 times, evenly across the budget'.",
+   "architecture.md AD-08: 'Settings are matched to AD-05 and AD-06'. Stable-Baselines3's DQN has no Double-DQN option, so it cannot match AD-05's 'Double-DQN targets'.",
+   "architecture.md AD-06: 'the defaults above match SB3's'. This is wrong for 'minibatch 256': SB3's PPO default batch_size is 64.",
+   "spec.md TANK-02/TANK-03: 'The ball moves at constant speed' / 'Each is limited to a fixed range'. No ball speed, fish speed, turn range, tank size or body radii are given, so difficulty and reaction time cannot be checked, and nothing confirms the hand-written fish can be beaten.",
+   "spec.md PRED-03: 'The predator's top speed is 1.2\u00d7 a prey's'. No base speeds, catch distance or pellet-eating distance are given anywhere for predator-prey.",
+   "spec.md PRED-04: 'the predator: prey'. It is unclear whether animals still sense the wall and their own heading as in TANK-05.",
+   "spec.md VAL-05: 'A Snake agent trained with this method on the 11-fact observation passes EVAL-04' against the hand-written agent. The SNAKE-09 heuristic uses the same 11 facts, so the DQN has no information edge and may only tie it. The Risks section does not mention this.",
+   "architecture.md train_selfplay: 'for each side, opponent = current (p) or uniform snapshot (1-p); only sides playing their current policy record experience'. Independent draws per side make about 25% of rollouts snapshot vs snapshot, from which neither side learns.",
+   "spec.md PRED-10 / architecture.md AD-07: 'otherwise a snapshot picked at random'. Nothing says what happens before the first snapshot exists (taken at 1/6 of the budget).",
+   "architecture.md Risks: 'the cloud-computing fallback in the brief applies before any spec change'. QR-01 says 'on the learner's laptop CPU' and QR-05 requires CPU only, so moving to the cloud is itself a spec change.",
+   "spec.md TANK-08: 'Given fish that survived 1,000, 1,000 and 400 steps (and others)... then the score is the average across all 8'. The test gives no concrete expected value.",
+   "spec.md EVAL-02: 'then it behaves as the world section describes'. This test is circular.",
+   "spec.md RPLY-02: 'distinguishable at a glance'. This test is subjective.",
+   "spec.md PRED-11: 'rejects H0 each time against the matching snapshot of the prey'. The comparison is hard to parse in the spec; only the architecture makes it clear.",
+   "brief.md / spec.md: rewards are fixed per world ('PRED-05 Prey rewards', 'TANK-06'). Reward shaping, one of the user's stated learning concepts, is never studied.",
+   "architecture.md Project layout: 'The tank adds ... and extends `core` for continuous actions and several agents'. The Interfaces section already defines Box actions, roles and multi-agent dicts up front, so it is unclear what 'extends' means."
+  ],
+  "B": [
+   "architecture.md: 'AD-02: ~~Gymnasium environment format~~ Status: Superseded by AD-14' and 'AD-10: ~~Batched agents and a batch face for every environment~~ Superseded by AD-13'. Superseded decisions are kept as stubs.",
+   "architecture.md AD-13 Context: 'AD-10 gave every environment a batch face for one shared policy'. A current decision is argued from a superseded one.",
+   "architecture.md AD-14 Context: 'AD-02 chose Gymnasium for every environment's standard face'. A current decision is argued from a superseded one.",
+   "spec.md: '*(changed 2026-10-15)*' tags on CORE-01, CORE-02, CORE-04, BASE-01, BASE-03, PG-06, EVAL-01, EVAL-02, VIEW-01\u2013VIEW-03, NOTE-01, DATA-02, QR-01 and QR-04. This is edit-history residue in a spec where every change is dated the same day.",
+   "architecture.md AD-13: 'Snake, the corridor and the tank change only in name (\"main\"). Nothing is built yet.' This describes a change against an earlier design, not the current design.",
+   "architecture.md AD-15: 'The tank code is refactored to use envs.disk. Nothing is built yet, so this costs nothing.' Same problem: it describes a change against an earlier design.",
+   "spec.md CORE-01: 'Given the Snake environment or the tank, when it is checked with an established library's environment checker'. AD-14 says 'CORE-01 now also covers predator\u2013prey', but the requirement and its test were never extended to it, and the predator-prey changelog row omits CORE-01.",
+   "spec.md Out of scope: 'Any run that needs a GPU'. This contradicts architecture AD-04 'Rented cloud GPU \u2014 allowed by the brief, but kept only as a fallback' and the Risks line 'and only then a rented GPU'.",
+   "brief.md: success and bets cover only Snake ('In Snake, I have seen a lookup table of move values break down', 'A value-learning agent can beat the rule-based Snake player'). The tank, predator-prey, policy gradients and co-evolution never appear, and ideas/predator-prey.md says 'Brief changes: none.'",
+   "brief.md Goal 3: 'Each environment is built around one main concept' is followed by 'Snake comes first: learning move values, how what the agent sees shapes learning, and how badly designed rewards get exploited'. That is three concepts for one environment.",
+   "brief.md: 'For each environment, the trained agent clearly beats both a random agent and a simple hand-written rule-based player'. HEXP-02/03 compare only against scripted players; predator-prey has no random-player comparison (spec Summary: 'where it makes sense, a random player').",
+   "ideas/predator-prey.md: 'the setup shrinks (fewer fish, shorter games or fewer generations)'. The spec's HEXP-05 ladder has no 'fewer fish' step, and it adds fewer cross-play games and fewer training steps.",
+   "ideas/predator-prey.md: 'Architecture AD-10 assumes one policy per batch.' This points at a superseded decision.",
+   "ideas/fish-tank.md: 'CORE-04 and QR-04, which still need the change from architecture AD-09' and 'worded for Snake games and food scores'. Both are stale: the change is already applied and the wording already generalised.",
+   "ideas/fish-tank.md: 'This is my proposed limit, for you to check.' Draft conversation text is left in a doc marked 'Specced'.",
+   "spec.md Out of scope: 'Designing the shared core up front for environments not yet built'. None of the three environments is built, and AD-13 designs the core for all three; this is leftover framing from a Snake-only plan.",
+   "spec.md DQN-04: 'The replay memory and the target copy can each be switched off for an experiment'. No EXP experiment uses either switch, so the feature has no planned use or check.",
+   "architecture.md AD-07: 'MP4 \u2014 needs ffmpeg installed on the system'. imageio-ffmpeg installs its own ffmpeg binary through pip, so this reason for rejecting MP4 is wrong.",
+   "architecture.md Cross-cutting: 'The M1 has 8 cores.' The chip model is not given; the user only said Apple Silicon.",
+   "spec.md + architecture.md: 463 + 689 lines, 16 feature areas, an auto-profiling shrink ladder (AD-17) and a PettingZoo face used only for a checker. This is heavy for a solo evenings-and-weekends lab."
+  ]
+ },
+ "key": {
+  "A": "all-v2",
+  "B": "inc-v2"
+ }
+}

@@ -163,7 +163,8 @@ Write `docs/spec.md` with this template:
 Before presenting the Draft, run the **hygiene check** on everything above the Changelog. In extend mode, check the whole spec, not just the new section:
 
 - **Implementation names.** Search for library, framework, vendor, dataset, file-format, database and model-type names, including names the user, the brief or the idea file used. Rewrite each one as the behavior or guarantee it stands for: "within 10% of Stable-Baselines3" becomes "within 10% of an established reference implementation", and "NumPy only" becomes "written from basic array operations". The only exception is a source the brief makes a fixed constraint.
-- **Leftovers** (extend mode). The Summary describes the whole spec as it now stands. No requirement is still worded for one stage when it now covers several. Out of scope has no duplicates. Removed requirements are one line each. `*(changed …)*` markers appear only on requirement ID lines.
+- **Out of scope** (extend mode). Read every out-of-scope line against the features this round added. Drop a line the new features bring into scope. Narrow a line that is now only partly true to the part still excluded, and name the stage it applies to. Once a neural-network stage exists, "deep learning" is no longer out of scope. Once a trading stage uses return forecasts, "no return forecasts — the portfolio stage is variance-only" becomes "the variance-only portfolios use no return forecasts". Then merge duplicates.
+- **Leftovers** (extend mode). The Summary describes the whole spec as it now stands. No requirement is still worded for one stage when it now covers several. Removed requirements are one line each. No `(changed …)` marker or other change note appears above the Changelog.
 
 Then:
 
@@ -175,7 +176,7 @@ Then:
 
 | The user says | Do | Then |
 |---|---|---|
-| Approved, nothing to change | Set `**Status:** Approved`, update the date, mark the idea file `Specced` (extend mode) | Hand off to `architecture-design` |
+| Approved, nothing to change | Set `**Status:** Approved`, update the date, mark the idea file `Specced` and freeze it (extend mode; see below) | Hand off to `architecture-design` |
 | Approved, with a change ("approved, but make QR-02 ≤ 5 minutes") | Make exactly that edit. If the user fully specified it, set Approved. If it needs your judgment, keep Draft. | **Stop.** List what you changed. The architecture starts next turn, after the user has seen the edit. |
 | Changes requested | Edit, keep Draft | Repeat this gate |
 
@@ -199,14 +200,20 @@ Run Steps 1-5 for the idea only, with these rules:
    - New feature → new `### Feature (CODE)` section with a new code and IDs starting at `-01`.
    - New behavior in an existing feature → next unused number in that feature (if `SAVE-04` is the highest, add `SAVE-05`, even if `SAVE-02` was removed). `spec-status.sh` reports it.
    - **Widen, don't bolt on.** If an existing requirement already covers this concern for an earlier part of the project, rewrite it to cover the new part too, instead of adding a near-duplicate. A training-time limit written for the first game becomes a limit for every game. A summary that says "the first milestone" is rewritten.
-   - Changed requirement → rewrite it in place, keep its ID, and put `*(changed YYYY-MM-DD)*` at the end of its ID line. The marker is the date only, once per requirement: replace an older date rather than adding a second. The reason goes in the Changelog row. Don't mark Serves lines, scope items or prose. `arch-status.py` reads these markers to find what the architecture must revisit.
+   - Changed requirement → rewrite it in place and keep its ID. Put no marker on it. Instead, list it as `(changed)` in this round's Changelog row, with the reason in the row's Change text. `arch-status.py` reads those Changelog marks to find what the architecture must revisit, so list every changed ID.
    - Removed requirement → collapse it to one struck line and delete its criteria and edge cases: `- **CODE-03** ~~[short name]~~ *Removed YYYY-MM-DD: [reason, or "replaced by CODE-07"].*` Never delete the ID line; the ID stays retired.
 3. **Link back to the idea.** Add `**Source:** [ideas/<slug>.md](ideas/<slug>.md)` under the `Serves:` line of each new feature section, so readers can find the full why.
-4. **Update everything it touches, and consolidate.** Summary (rewritten for the whole spec, not appended to), Users, Serves lines. Scope stays one deduplicated list per side: merge new out-of-scope items into it and drop anything now in scope. Remove assumptions and open questions that are answered or no longer apply.
-5. **Add one Changelog row**, one line: the idea file as the source, a short description of the change, and the added, changed and removed IDs, written as ranges (`TANK-01–TANK-12, QR-03 (changed), SNAKE-04 (removed)`).
+4. **Update everything it touches, and consolidate.** Summary (rewritten for the whole spec, not appended to), Users, Serves lines. Scope stays one deduplicated list per side: merge new out-of-scope items into it, and drop or narrow anything the new features bring into scope (the hygiene check's *Out of scope* item). Remove assumptions and open questions that are answered or no longer apply.
+5. **Add one Changelog row**, one line: the idea file as the source, a short description of the change, and the IDs as ranges in up to three `;`-separated groups: added, then changed, then removed (`TANK-01–TANK-12; QR-03, CORE-04 (changed); SNAKE-04 (removed)`). A `(changed)` or `(removed)` mark covers every ID in its group.
 6. **Set the spec Status back to Draft** and run the Review Gate, highlighting the changed IDs so the user reviews only what's new.
 
-**After the spec is approved,** close the loop on the idea file: set its Status to `Specced` and add a line under the header — `**Spec:** CODE-01–CODE-04, EDIT-03 (changed)`. Delete the idea's open questions that the spec answered. If none are left, the section becomes one line: `Resolved in the spec.` Don't otherwise edit the idea; it's the record of why the feature was added.
+**After the spec is approved,** close the loop on the idea file, then freeze it. A `Specced` idea is the record of why the feature was added, as it stood that day. The spec is the current description.
+
+1. Set its Status to `Specced` and add two lines under the header: `**Spec:** CODE-01–CODE-04, EDIT-03 (changed)` and the banner `> Record of why, frozen when specced. The spec is current: [spec.md](../spec.md)`.
+2. Delete the open questions the spec answered. If none are left, the section becomes one line: `Resolved in the spec.`
+3. Delete wording that only served the review: notes to the user ("my proposed limit, for you to check") and instructions to this skill ("this line must be removed from the spec").
+
+After that, don't edit the file again, even when a later round changes what it describes, such as a narrowed holdout or a merged stage. That change goes in the spec, and the later idea file names this one under *Touches*.
 
 ## Common Rationalizations
 
@@ -218,8 +225,9 @@ Run Steps 1-5 for the idea only, with these rules:
 | "Renumbering makes the spec tidier" | Plans, tests, and PRs reference IDs. Renumbering silently breaks every one of them. |
 | "The idea file covers it, I don't need to read the existing spec" | The idea lists what it *thinks* it touches. Conflicts it missed are found by reading the spec. |
 | "It's just one new feature — I'll rewrite the spec cleanly" | Rewriting hides what changed and re-opens approved decisions. Keep IDs, change only what the idea touches, and log it. |
-| "I'll keep the old wording so readers can see what changed" | The Changelog and git show what changed. Old text left in the spec gets read as current. Struck lines are one line long. |
-| "The new stage needs its own copy of QR-01" | Two requirements for one concern drift apart. Widen QR-01 and mark it changed. |
+| "I'll keep the old wording, or tag the requirement `(changed)`, so readers can see what changed" | The Changelog and git show what changed. Old text gets read as current, and tags get read as noise. Struck lines are one line long. |
+| "The new stage needs its own copy of QR-01" | Two requirements for one concern drift apart. Widen QR-01 and list it as changed in the Changelog row. |
+| "That out-of-scope line was right when I wrote it" | A reader takes "no deep learning" at its word, then finds a neural-network stage. Each round, drop or narrow the lines it brings into scope. |
 | "The user named the library, so the spec can too" | The spec says what must be true. The library is an architecture decision, and the idea file and conversation still carry the user's preference. |
 | "I'll design the test procedure here; it's quicker than routing to a skill" | An installed skill is the user's chosen way to do that step. Name it at the step, and say what it gets and what counts as a pass. |
 | "This edge case is unlikely" | Unlikely edge cases are where users lose data. Write the expected behavior, even if it's "show an error and keep the draft". |
@@ -234,9 +242,11 @@ Run Steps 1-5 for the idea only, with these rules:
 - Data or ML project with no `DATA-` requirements, a specific vendor chosen without the brief requiring it, or model criteria with no baseline or held-out data
 - Out of scope missing items from the brief's Not Doing list
 - Extend mode: IDs renumbered, removed requirements deleted, no Changelog row, or conflicts with existing requirements not raised
-- Extend mode: removed requirements kept with their full text and criteria; change notes on Serves lines, scope items or prose; a Summary that still describes the first stage
+- Extend mode: removed requirements kept with their full text and criteria; `(changed)` markers or change notes anywhere above the Changelog; a Summary that still describes the first stage
+- Extend mode: an out-of-scope line that contradicts a feature now in the spec
+- Extend mode: a changed requirement missing from the Changelog row's `(changed)` IDs
 - Extend mode: a near-duplicate requirement added for the new stage instead of widening the existing one
-- Extend mode: new feature with no `Source:` link, or the idea file left `Accepted` after the spec was approved
+- Extend mode: new feature with no `Source:` link, the idea file left `Accepted` after the spec was approved, or a `Specced` idea file edited in a later round
 - A step an installed skill owns (such as a hypothesis test) specified as a home-made procedure instead of naming the skill
 - Architecture or code started in the same turn the spec was written, or in the same turn as edits to the idea file or brief
 
@@ -254,6 +264,7 @@ Before handing off to `architecture-design`:
 - [ ] Data/ML projects: data needs are `DATA-` requirements with testable guarantees; model criteria name metric, held-out data, threshold, and baseline
 - [ ] Assumptions were confirmed by the user; open questions are listed
 - [ ] The turn ended after the Draft was saved; approval came in a later turn
-- [ ] Extend mode: no IDs renumbered or reused, changes rewritten in place with a date-only marker, removed requirements collapsed to one struck line, one one-line Changelog row, conflicts raised with the user
-- [ ] Extend mode: Summary, Scope and quality requirements describe the whole spec as it now stands, with no duplicates
-- [ ] Extend mode: new features link to their idea file; the idea's Open questions are resolved or carried over; after approval the idea is `Specced` with its spec IDs listed and its answered questions removed
+- [ ] Extend mode: no IDs renumbered or reused, changes rewritten in place with no marker, removed requirements collapsed to one struck line, conflicts raised with the user
+- [ ] Extend mode: one one-line Changelog row, listing every changed ID as `(changed)`
+- [ ] Extend mode: Summary, Scope and quality requirements describe the whole spec as it now stands, with no duplicates and no out-of-scope line that a feature now contradicts
+- [ ] Extend mode: new features link to their idea file; the idea's Open questions are resolved or carried over; after approval the idea is `Specced`, with its spec IDs listed, the frozen-record banner, and its answered questions and review notes removed

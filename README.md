@@ -11,7 +11,7 @@ Skills for taking a project from a raw idea to a written spec and architecture. 
 | `docs/spec.md` | **What** is being built: requirements, acceptance criteria, scope, behavior | `spec-writing` | As long as it needs to be |
 | `docs/architecture.md` | **How** it will be built: components, dependencies, interfaces, technical decisions | `architecture-design` | 1-3 pages (single package); a system map plus `docs/architecture/<package>.md` per package (multi-package) |
 
-The **brief** is the stable foundation. It rarely changes. **Idea files** carry the detail for each addition, so the brief doesn't grow. The **spec** is the single source of truth for what gets built. Every requirement traces back to a brief goal, and features added later also link to their idea file. The **architecture** gives every spec requirement a home in a component and records each technical choice as a numbered decision (`AD-NN`).
+The **brief** is the stable foundation. It rarely changes. **Idea files** carry the detail for each addition, so the brief doesn't grow. Once an idea is specced, its file is frozen: a record of why the feature was added, not kept up to date. The **spec** is the single source of truth for what gets built. Every requirement traces back to a brief goal, and features added later also link to their idea file. The **architecture** gives every spec requirement a home in a component and records each technical choice as a numbered decision (`AD-NN`).
 
 A proof of concept gets one short architecture file. A monorepo gets a system map (packages, dependency rules, contracts between packages) plus one doc per package.
 
@@ -20,7 +20,7 @@ A proof of concept gets one short architecture file. A monorepo gets a system ma
 | Document | Lifecycle |
 |---|---|
 | Brief | `Draft` → `Accepted` |
-| Idea | `Draft` → `Accepted` → `Specced` (or `Parked`) |
+| Idea | `Draft` → `Accepted` → `Specced` (frozen from then on), or `Parked` |
 | Spec | `Draft` → `Approved` |
 | Architecture | `Draft` → `Approved`; each decision `Proposed` → `Accepted` → `Superseded by AD-NN` |
 
@@ -40,7 +40,7 @@ idea-refine → docs/brief.md (Draft) → you accept
 
 ```
 idea-refine → docs/ideas/<idea>.md (+ brief edits, if needed) → you accept
-            → spec-writing → adds to docs/spec.md → you approve → idea marked Specced
+            → spec-writing → adds to docs/spec.md → you approve → idea marked Specced and frozen
             → architecture-design → places the new requirements in the design → you approve
 ```
 
@@ -50,14 +50,16 @@ idea-refine → docs/ideas/<idea>.md (+ brief edits, if needed) → you accept
 
 | Change | Go to | Result |
 |---|---|---|
-| Small, clear tweak to existing behavior | `spec-writing` | Requirement edited in place (same ID, marked changed), changelog row |
+| Small, clear tweak to existing behavior | `spec-writing` | Requirement edited in place (same ID), listed as changed in a changelog row |
 | Rethinking how a feature works | `idea-refine` | New idea file describing the change, then `spec-writing` updates the spec |
 | Project direction (goals, users, constraints) | `idea-refine` | Brief edited and set back to Draft. Once you re-accept it, `spec-writing` brings the spec in line |
-| Technical change (library, data source, performance fix) with no spec change | `architecture-design` | New decision that supersedes the old one; affected sections updated |
+| Technical change (library, data source, performance fix) with no spec change | `architecture-design` | New decision; the old one superseded, or revised if only part of it changed; affected sections updated |
 | Project outgrows one package | `architecture-design` | Split into packages: root becomes a system map, one doc per package |
 | Code has drifted from the design | `architecture-design` | Mismatches listed; you decide whether the doc or the code changes |
 
-Spec and architecture changes never renumber or delete IDs. Changed requirements are rewritten in place under the same ID. Removed requirements and superseded decisions collapse to one struck line with a date and reason. Each round of changes gets a one-line changelog row; git keeps the old text.
+Spec and architecture changes never renumber or delete IDs. Changed requirements are rewritten in place under the same ID, with no marker in the text. Removed requirements and superseded decisions collapse to one struck line with a date and reason. A decision that a later one changes only in part is revised so it stays true. Each round of changes gets a one-line changelog row; git keeps the old text.
+
+The changelogs also connect the documents. Each spec row lists the requirements it changed as `(changed)`, and each architecture row cites the idea file of the spec rows it absorbed. From these, `arch-status.py` works out which changed requirements the architecture still has to revisit, even when several rounds happen on the same day.
 
 ## Data and ML projects
 

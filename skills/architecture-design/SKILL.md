@@ -46,13 +46,19 @@ Record the shape in the header: `**Shape:** Single package` or `**Shape:** Multi
 
 ## Modes
 
-Run `python3 skills/architecture-design/scripts/arch-status.py` first. It reports the mode, the shape, spec requirements with no home in the design, requirements changed since the architecture was last updated, the next free decision ID, packages found in the repo, and the project's other installed skills.
+Run `python3 skills/architecture-design/scripts/arch-status.py` first. It reports:
+
+- the mode and the shape
+- spec requirements with no home in the design (`uncovered`)
+- spec Changelog rows the architecture hasn't caught up with (`spec_rows_pending`), and the placed requirements those rows mark `(changed)` (`changed_since`)
+- the next free decision ID
+- packages found in the repo, and the project's other installed skills
 
 | Mode | When | Do |
 |---|---|---|
 | **New** | No `docs/architecture.md` | Full process below |
-| **Extend** | The spec has requirements not yet covered, or requirements changed since the architecture was last updated | Place each one; update interfaces; add decisions |
-| **Revise** | A technical change with no spec change (a library fails, performance problems found in the build, a better data source) | New decision that supersedes the old one; update the affected sections |
+| **Extend** | The spec has requirements not yet covered, or `changed_since` lists requirements whose change the design hasn't absorbed | Place each one; update interfaces; add decisions |
+| **Revise** | A technical change with no spec change (a library fails, performance problems found in the build, a better data source) | New decision; supersede or revise the old one; update the affected sections |
 | **Grow** | A single package needs to become several | Convert to multi-package (see [Grow](#grow-single-package-to-multi-package)) |
 | **Sync** | The code differs from the doc, or code exists with no doc | Document what *is*, mark gaps, then decide which side changes |
 
@@ -177,7 +183,9 @@ tests/             → ...
 **Writing rules:**
 
 - **Decision IDs are permanent; superseded decisions shrink.** `AD-NN` IDs are never reused or renumbered, and the heading is never deleted. A reversed decision collapses to its heading with the title struck, plus one status line: `**Status:** Superseded by AD-NN · date — reason`. Delete its Context, Decision, Alternatives and Consequences. The new decision's Context says what the old one chose and why that no longer holds. Then update every section that cited the old decision (tech stack, interfaces, code comments, layout, risks) so that only the superseded line, the new decision and the Changelog mention it.
-- **Describe the design as it is now, not how it got here.** No process notes ("no code was built before this change"), no struck-through risks, no per-stage blocks of risks or notes. The Changelog has one row per round, one line long, with IDs as ranges (`AD-12–AD-15; TANK-01–TANK-12`). Git keeps the rest.
+- **Accepted decisions stay true.** When a new decision changes only part of an Accepted one, revise the old one instead of superseding it. Rewrite the sentences that are no longer true and point to the new decision for the part it now owns. "Two holdouts, one per study" becomes "one holdout per study; AD-26 sets the ranges". The old decision stays Accepted. Supersede only when its choice is reversed as a whole. Readers take an Accepted decision as current, so a stale count in one is a defect.
+- **Describe the design as it is now, not how it got here.** No process notes ("no code was built before this change"), no struck-through risks, no per-stage blocks of risks or notes. Git keeps the rest.
+- **The Changelog has one row per round, one line long.** IDs are ranges: new decisions, then the spec IDs the round placed or revisited, copied from the spec rows with their `(changed)` marks (`AD-12–AD-15; TANK-01–TANK-12; QR-03 (changed)`). Source names the source files of the spec rows the round absorbs, as `spec_rows_pending` lists them: usually one idea file, sometimes `brief.md`. Use `spec.md` when those rows have none, as in a first architecture written from the initial spec alone. `arch-status.py` matches this Source against the spec's Changelog to decide which spec changes the design has absorbed. A row that doesn't cite them leaves `changed_since` stuck on those requirements.
 - **Risks and open questions is one consolidated list.** Each round merges into it: add new risks, rewrite ones that changed, and delete ones that are resolved. Record a resolution in a decision or the Changelog, not as a struck-through risk.
 - **Size to the project.** A proof of concept with three modules doesn't need a Cross-cutting section longer than its Components table. Omit sections that would only say "N/A".
 - **Pin what matters.** Versions or version ranges for the language and key libraries; not for every transitive dependency.
@@ -186,7 +194,10 @@ tests/             → ...
 
 ### Step 6: Review Gate (CRITICAL)
 
-Before presenting the Draft, run `arch-status.py` again. `uncovered` and `stale` should be empty, or each gap should be listed under Risks and open questions. Also check that a superseded decision is cited only by its own line, the decision that replaced it, and the Changelog.
+Before presenting the Draft, run `arch-status.py` again. `uncovered`, `changed_since` and `stale` should be empty, or each gap should be listed under Risks and open questions. Also check two things by hand:
+
+- A superseded decision is cited only by its own line, the decision that replaced it, and the Changelog.
+- No Accepted decision, Overview sentence or interface contradicts a newer decision. Search for the counts, ranges and names this round changed.
 
 After saving the Draft:
 
@@ -208,16 +219,18 @@ After saving the Draft:
 
 The spec gained requirements (usually from a specced idea) or changed some.
 
-1. Take the uncovered and changed IDs from `arch-status.py`. Read the idea file each came from (`Source:` link in the spec) for context.
+1. Take the `uncovered` and `changed_since` IDs and the `spec_rows_pending` rows from `arch-status.py`. Read the idea file each row cites for context.
 2. For each requirement, choose: an existing component covers it (add the ID to Covers), an existing component grows (update its interface), or a new component is needed (add it, check the dependency direction).
-3. Any new technical choice gets a new `AD-NN`. A changed choice supersedes the old one, and the old one collapses to its superseded line.
+3. Any new technical choice gets a new `AD-NN`. Then find every Accepted decision it touches: search the doc for the components, data, counts and names it changes.
+   - It reverses an old choice → supersede the old decision, which collapses to its superseded line.
+   - It changes part of an old choice → revise the old decision in place (see *Accepted decisions stay true*). Examples: a third holdout added to a decision that set up two, or a new caller of an interface that a decision said only one study uses.
 4. Requirements *removed* from the spec: take their IDs out of Covers; if a component now covers nothing, propose removing it.
-5. Consolidate: merge new risks into the one Risks list, and delete the risks this round resolved. Rewrite the Overview and any section still worded for an earlier stage so it describes the whole system.
-6. Add one one-line Changelog row (source: the idea file or `spec.md`), set Status to Draft, and run the Review Gate, highlighting only what changed.
+5. Consolidate: merge new risks into the one Risks list, and delete the risks this round resolved. Rewrite the Overview and any section still worded for an earlier stage so it describes the whole system. Every count, list and range the round changed is updated everywhere it appears: Overview, interfaces (such as the kinds of test a log entry accepts), cross-cutting concerns (such as which claims a skill tests) and older decisions.
+6. Add one one-line Changelog row that cites the source files of `spec_rows_pending` (see the Changelog writing rule). Set Status to Draft and run the Review Gate, highlighting only what changed.
 
 ## Revise Mode
 
-A technical change with no spec change. Write a new decision whose Context explains what was learned ("the simulator is 40× too slow for QR-02 at 1M steps"), collapse the old one to its superseded line, update every section the change touches (tech stack, interfaces, components), and run the Review Gate. Check whether the change breaks any interface other components rely on; if it does, list them.
+A technical change with no spec change. Write a new decision whose Context explains what was learned ("the simulator is 40× too slow for QR-02 at 1M steps"). Then supersede the old decision if the new one reverses it, or revise it in place if the new one changes only part of it (Extend step 3). Update every section the change touches (tech stack, interfaces, components, Overview), and run the Review Gate. Check whether the change breaks any interface other components rely on; if it does, list them.
 
 ## Grow: Single Package to Multi-Package
 
@@ -240,7 +253,8 @@ The code and the doc disagree, or there's code with no doc. Document what *is* f
 | "We'll need a monorepo eventually, so start with one" | Packages you don't need yet cost tooling, versioning, and boundary friction every day. Name the seams; split when there's a reason. |
 | "The decision is obvious, no need to record it" | Obvious today, mysterious in six months. A three-line decision entry is enough. |
 | "I'll pick the data vendor myself, it's a technical detail" | Paid services and data sources are expensive to reverse. Check them against DATA- requirements and ask the user. |
-| "I'll just update the old decision with the new choice" | Then the reason for the original choice, and why it changed, is lost. Supersede it: the new decision's Context records both, and the old one shrinks to one line. |
+| "I'll just update the old decision with the new choice" | If the choice is reversed, the reason for the original, and why it changed, is lost. Supersede it: the new decision's Context records both, and the old one shrinks to one line. |
+| "The old decision is still mostly right; the new one covers the change" | Readers trust an Accepted decision as written. If it says two holdouts and there are three, it's wrong. Revise the sentences that changed and point to the new decision. |
 | "I'll keep the superseded decision in full for the record" | Git is the record. A full superseded decision gets read as current, and every round adds more of them. |
 | "The user said go ahead, so I'll write the build plan" | An approved architecture is where this skill stops. A plan written here skips its own review and goes stale before the build. |
 | "The code is the documentation" | Code shows what was built, not why, and not which dependencies are forbidden. |
@@ -251,8 +265,10 @@ The code and the doc disagree, or there's code with no doc. Document what *is* f
 - Dependency cycles, or "depends on" lists that include everything
 - Multi-package shape for a proof of concept, or a single package with several separately deployed parts
 - Tech choices with no decision entry where reversing them would be expensive
-- Decisions deleted or edited in place instead of superseded, or superseded decisions kept in full
+- Decisions deleted, a reversed decision edited in place instead of superseded, or superseded decisions kept in full
 - Sections that still cite a superseded decision; struck-through risks; a new Risks block per stage
+- An Accepted decision, the Overview or an interface contradicted by a newer decision (a count, range or list it changed)
+- A Changelog row that doesn't cite the idea file of the spec rows it absorbed, leaving `changed_since` non-empty
 - A step an installed skill owns, designed as a home-made procedure instead of routed to the skill
 - Interfaces described in prose only, with no signatures or data shapes
 - Data sources or model types chosen without checking the spec's DATA- and model-quality requirements
@@ -264,12 +280,13 @@ Before handing off to planning:
 
 - [ ] Spec is `Approved`; the architecture links to it
 - [ ] Shape is recorded and justified
-- [ ] `arch-status.py` reports no uncovered or stale requirements (or each gap is listed under Risks and open questions)
+- [ ] `arch-status.py` reports no uncovered, changed or stale requirements (or each gap is listed under Risks and open questions)
 - [ ] Dependency direction is one-way with no cycles; multi-package has written dependency rules
 - [ ] Every boundary has a contract with signatures, data shapes, and error behavior
 - [ ] Every expensive-to-reverse choice has an `AD-NN` entry with alternatives and consequences
 - [ ] Data and ML: sources and model approach are decisions checked against the spec's DATA- and model-quality requirements
-- [ ] Changes after the first approval: one-line Changelog row added, superseded decisions collapsed to one line with nothing else citing them, Risks consolidated, Status back to Draft until approved
+- [ ] Changes after the first approval: a one-line Changelog row citing the spec rows' source files, superseded decisions collapsed to one line with nothing else citing them, Risks consolidated, Status back to Draft until approved
+- [ ] Accepted decisions that a new decision changed in part are revised to match it, and so are the Overview and interfaces
 - [ ] Steps owned by an installed skill are routed to it by name
 - [ ] The turn ended after the Draft was saved; approval came in a later turn; nothing was planned or built after approval
 

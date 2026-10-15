@@ -174,7 +174,7 @@ else:
     check("Architecture has a shared core reused by all environments", bool(re.search(r"(shared|common|core)", arch_all, re.I)) and bool(re.search(r"interface|protocol|abc|class", arch_all, re.I)), "")
     check("Each environment's learning criterion beats a random or scripted baseline",
           len(re.findall(r"random|scripted|heuristic", spec, re.I)) >= 3, f"{len(re.findall(r'random|scripted|heuristic', spec, re.I))} mentions")
-    check("CPU training-time budget (~1 hour) is a quality requirement", bool(re.search(r"(hour|60 min|minutes).{0,120}(CPU|laptop)|(CPU|laptop).{0,120}(hour|60 min|minutes)", spec, re.I)), "")
+    check("CPU training-time budget (~1 hour) is a quality requirement", bool(re.search(r"(hour|60 min|minutes).{0,120}(CPU|laptop|MacBook|processor)|(CPU|laptop|MacBook|processor).{0,120}(hour|60 min|minutes)", spec, re.I)), "")
     check("Proof-of-concept stays single package (no premature monorepo)", "Single" in ((st.get("architecture") or {}).get("shape") or ""), (st.get("architecture") or {}).get("shape"))
 
 passed = sum(r["passed"] for r in R)

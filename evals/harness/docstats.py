@@ -29,6 +29,12 @@ def words(t):
     return len(t.split())
 
 
+def id_count(text):
+    """IDs named in text, counting a range like AB-01–AB-05 as five."""
+    return sum(int(b[-2:]) - int(a[-2:]) + 1 if b else 1
+               for a, b in re.findall(r"\b([A-Z][A-Z0-9]*-\d{2,})(?:\s*[–-]\s*([A-Z][A-Z0-9]*-\d{2,}))?", text))
+
+
 def section(t, heading):
     m = re.search(rf"^## {heading}.*?$(.*?)(?=^## |\Z)", t, re.S | re.M)
     return m.group(1) if m else ""
@@ -63,7 +69,12 @@ out = {
                      "risks_words": words(risks), "risks_subheadings": len(re.findall(r"^###", risks, re.M)),
                      "struck_risks": len(re.findall(r"^\s*- ~~", risks, re.M)),
                      "package_docs": len(pkgs),
-                     "changelog_rows": len(re.findall(r"^\|\s*\d{4}-\d{2}-\d{2}", section(arch, "Changelog"), re.M))},
+                     # An odd count leaves a code block open, so the rest of the doc renders as code.
+                     "code_fences_unbalanced": len(re.findall(r"^\s*```", arch, re.M)) % 2 == 1,
+                     "changelog_rows": len(re.findall(r"^\|\s*\d{4}-\d{2}-\d{2}", section(arch, "Changelog"), re.M)),
+                     # Spec IDs copied into the architecture Changelog (its last column, minus AD- ranges).
+                     "changelog_spec_ids": sum(id_count(re.sub(r"AD-\d{2,}(\s*[–-]\s*AD-\d{2,})?", "", r.rstrip(" |").split("|")[-1]))
+                                               for r in re.findall(r"^\|\s*\d{4}-\d{2}-\d{2}.*$", section(arch, "Changelog"), re.M))},
     "ideas": {"count": len(ideas),
               "specced_without_banner": sum(1 for t in ideas if re.search(r"\*\*Status:\*\*\s*Specced", t)
                                             and not re.search(r"^> Record of why", t, re.M)),

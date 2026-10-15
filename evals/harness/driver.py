@@ -11,8 +11,8 @@ After every turn the project's docs/ are git-committed so doc evolution can be d
 Usage: driver.py <trajectory-id> <out-dir>
 
 Env: SKILLS_SRC (skills to install; default: this repo's skills/), CLAUDE_BIN (default: claude),
-AGENT_MODEL, USER_MODEL. Both sessions load project/local settings only, so the host's user-level
-CLAUDE.md, skills and plugins don't leak into the trajectory.
+AGENT_MODEL, USER_MODEL. Both sessions load project/local settings only and no CLAUDE.md files, so the
+host's user-level instructions, skills and plugins don't leak into the trajectory.
 """
 import json, os, re, subprocess, sys, time, uuid, shutil, pathlib
 
@@ -27,6 +27,7 @@ STRIP_ENV = ["CLAUDE_CODE_SESSION_ID", "CLAUDE_CODE_REMOTE_SESSION_ID", "CLAUDE_
              "CLAUDE_CODE_MESSAGING_SOCKET", "CLAUDE_CODE_MESSAGING_TOKEN", "CLAUDE_CODE_DIAGNOSTICS_FILE",
              "CLAUDECODE"]
 ENV = {k: v for k, v in os.environ.items() if k not in STRIP_ENV}
+ENV["CLAUDE_CODE_DISABLE_CLAUDE_MDS"] = "1"  # --setting-sources alone still loads the host's ~/.claude/CLAUDE.md
 
 
 def sh(cmd, cwd, **kw):

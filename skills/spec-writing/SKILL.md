@@ -7,7 +7,7 @@ description: Writes the project specification (docs/spec.md) — requirements, a
 
 ## Overview
 
-The brief (`docs/brief.md`) says **why** the project exists; idea files (`docs/ideas/*.md`) say why each later feature is worth adding and how it fits. The spec (`docs/spec.md`) says **what** is being built: every requirement, how we'll know it works, and where the edges are. It is a product spec, not a technical design — it describes behavior the user can observe, not frameworks, schemas, or file layouts. Those decisions come later, in planning.
+The brief (`docs/brief.md`) says **why** the project exists; idea files (`docs/ideas/*.md`) say why each later feature is worth adding and how it fits. The spec (`docs/spec.md`) says **what** is being built: every requirement, how we'll know it works, and where the edges are. It is a product spec, not a technical design — it describes behavior the user can observe, not frameworks, schemas, or file layouts. Those decisions come next, in `architecture-design` (`docs/architecture.md`).
 
 ## When to Use
 
@@ -17,7 +17,7 @@ The brief (`docs/brief.md`) says **why** the project exists; idea files (`docs/i
 
 **Not for:**
 - Ideas that are still vague, or projects with no brief (use `idea-refine` first)
-- Technical design, architecture, or task breakdown (use a planning skill after the spec is approved)
+- Technical design or architecture (use `architecture-design` after the spec is approved), or task breakdown (a planning skill)
 - One-line fixes where the expected behavior is obvious
 
 ## Preconditions
@@ -35,7 +35,7 @@ Run `bash skills/spec-writing/scripts/spec-status.sh` first. It reports the mode
 ## The Process
 
 ```
-READ BRIEF ─→ SURFACE ASSUMPTIONS ─→ CLARIFY ─→ WRITE SPEC ─→ [user approves] ─→ planning
+READ BRIEF ─→ SURFACE ASSUMPTIONS ─→ CLARIFY ─→ WRITE SPEC ─→ [user approves] ─→ architecture-design
 ```
 
 ### Step 1: Map Goals to Features
@@ -146,14 +146,14 @@ Write `docs/spec.md` with this template:
 - **Use exact numbers.** "≤ 2 seconds", "up to 50 regulars", never "fast" or "many".
 - **Requirement IDs are permanent.** `CODE-NN`, numbered within the feature, never reused or renumbered.
 - **Quality requirements only when measurable.** Leave out generic wishes ("should be secure"); keep checkable ones ("passwords are never shown in full").
-- **No tech stack, schemas, endpoints, or file structure.** Those belong to planning.
+- **No tech stack, schemas, endpoints, or file structure.** Those belong to `architecture-design`.
 
 **Data and ML projects — extra rules:**
 
-- **Specify the data, not the source.** `DATA-NN` requirements say what the data must contain and guarantee ("daily prices for all US stocks, including delisted ones, since 2010"; "every record is stamped with the date it became known"). Which API, vendor, or dataset meets them is a planning decision, made by checking candidates against these requirements. Name a source only when the brief makes it a fixed constraint (our own database, a required benchmark).
+- **Specify the data, not the source.** `DATA-NN` requirements say what the data must contain and guarantee ("daily prices for all US stocks, including delisted ones, since 2010"; "every record is stamped with the date it became known"). Which API, vendor, or dataset meets them is an architecture decision, made by checking candidates against these requirements. Name a source only when the brief makes it a fixed constraint (our own database, a required benchmark).
 - **Write data guarantees as testable criteria.** Leakage, look-ahead, survivorship bias, and coverage gaps are requirements, not hopes: "Given a backtest date D, when the strategy requests data, then no value published after D is returned."
 - **Model quality is a requirement with a baseline.** Acceptance criteria name the metric, the held-out data, the threshold, and the baseline to beat: "Given the most recent 6 months of plates (never trained on), when ranked, then reviewing the top 20% catches ≥ 90% of scientist-failed plates, and beats ranking by Z′ alone." Never "the model is accurate".
-- **No model types or libraries.** "Gradient boosting" or "PyTorch" are planning decisions; the spec says what the model must achieve.
+- **No model types or libraries.** "Gradient boosting" or "PyTorch" are architecture decisions; the spec says what the model must achieve.
 
 ### Step 5: Review Gate (CRITICAL)
 
@@ -161,9 +161,9 @@ After saving the Draft:
 
 1. Summarize: number of features and requirements, the goal → feature mapping, and the Open Questions.
 2. Ask the user to approve the spec or request changes.
-3. **STOP YOUR TURN.** Do not start planning or code in the same turn.
+3. **STOP YOUR TURN.** Do not start the architecture or code in the same turn.
 
-On changes, edit and repeat the gate. On approval, set `**Status:** Approved`, update the date, mark the idea file `Specced` (extend mode), and point the user to the next step (planning).
+On changes, edit and repeat the gate. On approval, set `**Status:** Approved`, update the date, mark the idea file `Specced` (extend mode), and point the user to the next step (`architecture-design`).
 
 ## Extend Mode: Adding an Idea to an Existing Spec
 
@@ -199,7 +199,7 @@ Run Steps 1-5 for the idea only, with these rules:
 |---|---|
 | "The brief is clear enough — I'll skip the acceptance check" | The gate exists so *why* is agreed before *what*. Ask. |
 | "Acceptance criteria are obvious from the requirement" | If they're obvious, they take ten seconds to write. If they're not, you just found a gap. |
-| "I'll add the tech stack so planning goes faster" | Mixing design into requirements locks in decisions before anyone reviewed them. Keep the spec about behavior. |
+| "I'll add the tech stack so the architecture goes faster" | Mixing design into requirements locks in decisions before anyone reviewed them. Keep the spec about behavior. |
 | "Renumbering makes the spec tidier" | Plans, tests, and PRs reference IDs. Renumbering silently breaks every one of them. |
 | "The idea file covers it, I don't need to read the existing spec" | The idea lists what it *thinks* it touches. Conflicts it missed are found by reading the spec. |
 | "It's just one new feature — I'll rewrite the spec cleanly" | Rewriting hides what changed and re-opens approved decisions. Add, mark, and log. |
@@ -216,11 +216,11 @@ Run Steps 1-5 for the idea only, with these rules:
 - Out of scope missing items from the brief's Not Doing list
 - Extend mode: IDs renumbered, removed requirements deleted, no Changelog row, or conflicts with existing requirements not raised
 - Extend mode: new feature with no `Source:` link, or the idea file left `Accepted` after the spec was approved
-- Planning or code started in the same turn the spec was written
+- Architecture or code started in the same turn the spec was written
 
 ## Verification
 
-Before handing off to planning:
+Before handing off to `architecture-design`:
 
 - [ ] `docs/brief.md` is `Accepted` and linked from the spec header (and, in extend mode, the idea file is `Accepted`)
 - [ ] Every brief goal maps to at least one feature; every feature lists the goals it serves

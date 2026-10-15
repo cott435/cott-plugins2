@@ -361,10 +361,10 @@ A small research team (1-3 people) testing US stock strategies that trade weekly
 - A user interface — notebooks and a command line are enough.
 
 ## Open questions
-- Which data provider? (Decided in planning, against the data requirements in the spec.)
+- Which data provider? (Decided in the architecture, against the data requirements in the spec.)
 ```
 
-*Notice what's **not** in the brief: a data API. The brief records data **needs** (daily, US, includes delisted companies, under budget) as constraints and bets. `spec-writing` turns them into data requirements, and the provider is chosen in planning against those requirements.*
+*Notice what's **not** in the brief: a data API. The brief records data **needs** (daily, US, includes delisted companies, under budget) as constraints and bets. `spec-writing` turns them into data requirements, and the provider is chosen in the architecture against those requirements.*
 
 ---
 
@@ -463,7 +463,7 @@ The Z′ rule is the baseline. If the model doesn't clearly beat "sort by Z′",
 
 **Skill then says:** "The idea is at `docs/ideas/plate-qc-ranking.md`. The brief is unchanged: this serves Goal 2. The biggest risk is label consistency. I'd measure scientist agreement on ~100 plates before anyone trains anything. Accept it or tell me what to change." *(Turn ends.)*
 
-*An idea file for an ML feature adds a **Data** section. It names the data, where it lives, and how it will be evaluated. It still says nothing about model type or libraries; those are decided in planning.*
+*An idea file for an ML feature adds a **Data** section. It names the data, where it lives, and how it will be evaluated. It still says nothing about model type or libraries; those are decided in the architecture.*
 
 ---
 
@@ -493,4 +493,4 @@ The Z′ rule is the baseline. If the model doesn't clearly beat "sort by Z′",
 
 12. **Every ML idea names its baseline.** "Sort by Z′" and "the old notebook results" are what success is measured against. Without a baseline, any result looks like success.
 
-13. **Data needs, not data vendors.** Briefs and idea files say what data is needed and where it comes from if that's fixed. Choosing APIs, datasets, and models happens after the spec.
+13. **Data needs, not data vendors.** Briefs and idea files say what data is needed and where it comes from if that's fixed. Choosing APIs, datasets, and models happens in the architecture, after the spec.

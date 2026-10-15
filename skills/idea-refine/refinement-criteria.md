@@ -84,7 +84,7 @@ Apply this when the idea depends on data or a learned model. For these projects 
 - What does a wrong prediction cost, and who catches it?
 
 **Does the data exist?**
-- Where would the data come from — data we own, a public dataset, a paid API? (Name candidates to test feasibility; the final choice is made in planning.)
+- Where would the data come from — data we own, a public dataset, a paid API? (Name candidates to test feasibility; the final choice is made in the architecture.)
 - Is there enough history and coverage (time span, entities, classes, regions)?
 - For supervised learning: are there labels? Who made them, and would two people agree?
 - Can we legally use it for this purpose? Licensing, terms of service, personal or patient data?

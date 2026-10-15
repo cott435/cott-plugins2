@@ -140,7 +140,7 @@ Write `docs/brief.md` (create `docs/` if needed) using the template below. The b
 - **One page or less.** Aim for 250-450 words. If it's longer, cut — don't shrink the font.
 - **Plain English.** Write for a smart person outside the team. No acronyms without a definition, no jargon, no code, no file paths.
 - **Short sentences, short bullets.** One idea per bullet. No bullet longer than two lines.
-- **Data needs, not data vendors.** For ML and data projects, say what data the project depends on in plain terms ("10+ years of daily US stock prices, including companies that no longer exist") as a constraint or a bet. Name a specific source only if it's fixed (our own data, a required benchmark). Choosing APIs and datasets happens after the spec.
+- **Data needs, not data vendors.** For ML and data projects, say what data the project depends on in plain terms ("10+ years of daily US stock prices, including companies that no longer exist") as a constraint or a bet. Name a specific source only if it's fixed (our own data, a required benchmark). Choosing APIs and datasets happens in the architecture, after the spec.
 - **Goals are numbered** so `spec-writing` can trace requirements back to them ("serves Goal 2").
 - **3-5 goals.** More than five means the project isn't focused yet — go back to Phase 2.
 - **The Not Doing list is mandatory.** It is the most valuable part: it makes trade-offs explicit.

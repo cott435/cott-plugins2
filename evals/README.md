@@ -40,8 +40,7 @@ CLAUDE_BIN=$PWD/evals/harness/fake_claude.py \
 
 The dry run replays the fixture's `references/` and `docs/references.md` as a reference-intake turn (with one fake Agent launch per file) before the M2 idea. To exercise the driver's reference copying and Agent parsing, run the fake loop on `quant-all-at-once` with `MAX_TURNS=5`: turn 4 is the intake layer and should record one launch per file.
 
-On the dry run, 44 of 57 checks pass. The 13 failures are expected, because the sample is a two-milestone project that is mid-build, not a finished four-stage run:
-- M2 has no plan.
+On the dry run, 45 of 57 checks pass. The 12 failures are expected, because the sample is a two-milestone project that is mid-build, not a finished four-stage run:
 - There is no features milestone, so no Grow.
 - M1-T01's code is already in `src/`.
 - The brief is already Accepted when the replay first shows it.
@@ -115,8 +114,8 @@ These are the §13 assertions. Each is a named check in `grading.json`.
 | `tasks_well_formed` | `Read:` IDs resolve (`dt context` exits 0), size is M or smaller, and Mode follows the rule or gives a Reason |
 | `context_packets_small` | Every `dt context` packet is under 2,000 lines |
 | `doc_budgets` | No `dt lint` budget warnings, and the brief is 500 words or fewer |
-| `roadmap_rows` | One roadmap row per stage, and `dt roadmap --check` exits 0 |
-| `incremental_all_planned` / `upfront_m1_planned` | Incremental: every milestone has a plan. All-at-once: M1 has a plan and every later milestone is at least Designed |
+| `roadmap_rows` | Every stage has at least one roadmap row, every row maps to a stage, and `dt roadmap --check` exits 0. A stage may split into several milestones. Rows map by Source (incremental: `brief` is stage 1, and an idea file belongs to the stage that was current when it first appeared). In all-at-once, where every row cites the brief, they map by the stage `keywords` in `scenarios.json` matched against the row's name and outline |
+| `first_planned_rest_designed` | Both modes: the first milestone has a plan and every later milestone is at least Designed (task plans are written for the next milestone only), so the final roadmaps of the two modes compare like for like |
 | `brief_goals_stage_neutral` | 5 goals or fewer, none worded per stage |
 | `quant_grow_at_features` | Incremental: the shape first becomes multi-package in the features_ml stage. All-at-once: the final shape is multi-package |
 | `no_code_during_planning` | Nothing under `src/`, `tests/intent/` or `tests/unit/` in any turn, beyond empty or docstring-only files |
@@ -129,9 +128,9 @@ Quant only (projects with reference files), all through `dt`:
 | id | Check |
 |---|---|
 | `refs_indexed_approved` | Every file in `references/` has an RF entry, `references_unindexed`/`_changed`/`_missing` are empty, and `docs/references.md` is Approved |
-| `refs_milestones` | By file name: `market_decomposition.py` on the structure_portfolios milestone, both TFT files on forecasting_agents's (`—` while that stage has no roadmap row) |
+| `refs_milestones` | By file name: `market_decomposition.py` on at least one structure_portfolios milestone, and both TFT files on at least one of forecasting_agents's. Later milestones that reuse a file may list it too (`—` while that stage has no roadmap row) |
 | `refs_skills_routed` | For every planned milestone, each of its references is in a task's `Read:` and each roadmap `**Skills:**` entry is on a task, unless the plan's Open questions names it; the same for dt's `references_unrouted` and `skills_unrouted` (active and queued plans) |
-| `skills_on_structure_tasks` | The structure_portfolios milestone's `**Skills:**` line names data-analysis and null-hypothesis-testing, and each is on at least one of its tasks (all-at-once, no plan for it yet: the line only) |
+| `skills_on_structure_tasks` | The structure_portfolios milestones' `**Skills:**` lines name data-analysis and null-hypothesis-testing, and each is on at least one of their tasks (no plan for them yet: the lines only) |
 | `reference_intake_invoked`, `intake_subagent_per_file` | reference-intake ran, and its turns launched one Agent per reference file (each launch names exactly one file; none batched) |
 | `no_reference_imports` | Nothing under `src/` or `tests/` imports `references` or adds it to `sys.path` (CR-08; matters once evals cover building) |
 

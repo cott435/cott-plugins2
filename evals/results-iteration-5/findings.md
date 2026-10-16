@@ -6,24 +6,22 @@
 
 | Run | Checks | Turns | Agent cost | Wall clock | Stop |
 |---|---|---|---|---|---|
-| rl incremental | 43/46 | 44 | $23.22 | 76 min | finished (re-run on the fixed driver) |
-| rl all-at-once | 42/46 | 18 | $11.28 | 30 min | finished |
-| quant incremental | 50/57 | 64 | $39.92 | 70 min | killed at turn 64, stuck in a finish loop (see H3) |
-| quant all-at-once | 50/57 | 17 | $12.45 | 33 min | finished |
+| rl incremental | 45/46 | 44 | $23.22 | 76 min | finished (re-run on the fixed driver) |
+| rl all-at-once | 43/46 | 18 | $11.28 | 30 min | finished |
+| quant incremental | 52/57 | 64 | $39.92 | 70 min | killed at turn 64, stuck in a finish loop (see H3) |
+| quant all-at-once | 52/57 | 17 | $12.45 | 33 min | finished |
 
 - **Total cost:** about $104 including the discarded first rl incremental run ($16.73, 26 turns). That's near the bottom of the expected $85–175.
 - **Turns:** within the expected ranges, except quant incremental at 64, which includes 18 empty loop turns.
-- **Scores:** graded with the fixed `gate_discipline` (G1).
+- **Scores:** graded with the grader fixes G1 and G2.
 
 | Failing check | rl inc | rl aao | quant inc | quant aao | Finding |
 |---|---|---|---|---|---|
-| `roadmap_rows` | 7 rows / 3 stages | 4 / 3 | 5 / 4 | 5 / 4 | S1 |
-| `incremental_all_planned` / `upfront_m1_planned` | M2–M7 unplanned | M2, M3 Specced | M2–M5 unplanned | M2–M5 Specced | S2, S3 |
+| `first_planned_rest_designed` | | M2, M3 Specced | M5 Idea | M2–M5 Specced | S3 |
 | `doc_budgets` | ✗ | ✗ | | ✗ | S5 |
 | `gate_discipline` | | turn 14 | | turn 14 | S4 |
 | `spec_on_pipeline_or_deferred` | | | 3 IDs | 16 IDs | S3, S6 |
 | `quant_grow_at_features` | | | grew at structure | never grew | S3, S7 |
-| `refs_milestones`, `skills_on_structure_tasks` | | | ✗ | ✗ | S1, S2 |
 | `brief_goals_stage_neutral` | | | 1 goal | | S6 |
 | `finished` | | | ✗ (killed) | | H3 |
 
@@ -38,17 +36,20 @@
 - **G1. `gate_discipline` counted pipeline-design's `Used by:` appends to `contract.md` as architecture edits.** pipeline-design is allowed to make those edits, so this produced 4 false positives across the two incremental runs.
   - **Fix:** `Used by:` lines are no longer counted. Re-grading leaves only the real breaches (S4).
 
-All four fixes were tested on `fake_claude.py`. The dry run still passes 44 of 57 checks.
+- **G2. The grader assumed one milestone per stage** (S1, S2). `roadmap_rows`, `refs_milestones` and `skills_on_structure_tasks` found a stage's milestone by its position. Incremental runs also had to plan every milestone, which the design deliberately doesn't do.
+  - **Fix:** rows map to stages by Source (incremental) or by stage keywords (all-at-once), and a stage may have several rows. Both modes are now graded on `first_planned_rest_designed`, so their final roadmaps compare like for like. A reference must be on at least one milestone of its own stage, and later milestones that reuse it may list it too.
+
+The driver fixes were tested on `fake_claude.py`. With G2 the dry run passes 45 of 57 checks (M2 Designed without a plan now passes).
 
 ## Skill and design findings (not fixed)
 
 **S1. Stages split into several milestones.** This happened in all four runs; rl incremental turned 3 stages into 7 milestones.
 - **Cause:** build-planning's size rule, "about 5–15 tasks. Bigger means two milestones" ([SKILL.md:72](../../skills/build-planning/SKILL.md)). Each stage here holds 18–20 tasks, so the agent proposes a split and the simulated user accepts. quant splits forecasting + agents, the stage the evals deliberately merged.
-- **Grader side:** `roadmap_rows`, `refs_milestones` and `skills_on_structure_tasks` assume one milestone per stage, numbered in stage order.
-- **Decision needed:** either the grader accepts N ≥ 1 milestones per stage, mapped by Source (incremental) and by outline (all-at-once), or build-planning keeps a stage as one milestone and splits only on the user's request.
+- **Grader side:** fixed (G2). Splitting a stage is allowed.
+- **Skill side:** the size rule is applied unevenly. rl's snake stage split four ways, while quant's data milestone kept 24 tasks. Only one milestone is active at a time, and parallel work happens inside a milestone through `**Parallel:** G<n>` groups, so splitting independent tracks into separate milestones makes them run one after the other. Enforcing the size rule is in progress.
 
 **S2. Incremental runs plan only the active milestone.** This follows the design: "task-level plans only for the next milestone", with queued plans written only when the user asks ([planning-stage.md:20](../../design/planning-stage.md)). But `incremental_all_planned` and the README expect every milestone to have a plan.
-- **Recommendation:** grade incremental runs like all-at-once: M1 planned, and every later milestone at least Designed. Have the simulated user ask for a queued plan only if queued plans are meant to be tested.
+- **Resolved (G2):** both modes are graded at the same bar. Whether incremental and all-at-once produce milestones of similar quality is a question for the blind judge, which should be run once S3 is fixed. Until then, all-at-once has no designed milestones after M1 to compare.
 
 **S3. All-at-once leaves later milestones below Designed.** There are two causes:
 - **quant:** spec-writing wrote "Initial spec: M1 in full, M2–M5 outlined". No skill tells it to do this, and it contradicts "design everything known". With M2+ only outlined, nothing downstream designed them: 16 spec IDs (every STRUCT, PORT, FEAT, FCST and AGENT requirement) sit on no pipeline, and the architecture never grew past one package.
@@ -68,8 +69,8 @@ All four fixes were tested on `fake_claude.py`. The dry run still passes 44 of 5
 | rl all-at-once | 280 | 202 | 211 |
 | quant all-at-once | 94 | 141 | 127 (also `tasks/plan.md` at 417 lines, budget 400) |
 
-rl keeps every stage in one package, and with one section per symbol a 60-line contract holds only about 10 symbols.
-- **Decision needed:** either these budgets apply per milestone (or scale with the number of symbols and pipelines), or single-package projects are pushed to Grow sooner.
+**Diagnosis: the budgets are too low for the content, not padded by the skill.** The cost per unit is steady across all seven package docs: about 4–6 lines per contract symbol, 21–32 per pipeline (step table included) and 5–8 per test case. The overshoot tracks how much one package holds: rl keeps 13 pipelines, 54 test cases and 22 symbols in one package. quant incremental stays in budget only because it Grew into four packages, and even then three docs sit exactly at the limit (60/60, 120/120, 119/120), which suggests content squeezed to fit. The design also contradicts itself: [planning-stage.md:77](../../design/planning-stage.md) says one contract section per component, while dt and pipeline-design need one per symbol. A 60-line contract holds about 10 symbols.
+- **Proposed fix:** budget per unit instead of per file. Roughly: contract ≤ 8 lines per symbol, pipelines ≤ 35 per pipeline plus the layout, tests ≤ 10 per case. Keep a per-file ceiling as the point where architecture-design should consider a Grow.
 
 **S6. Small misses (quant incremental):**
 - DATA-06, LOAD-04 and LOAD-06 sit on no pipeline and aren't Deferred.

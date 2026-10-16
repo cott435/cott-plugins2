@@ -58,7 +58,7 @@ if repo.roadmap:
     for ms in model.milestones(repo.roadmap):
         rows.append({"id": ms.id, "name": ms.name, "source": md.strip_md(ms.source), "packages": ms.packages,
                      "pipelines": ms.pipelines, "derived": roadmap_cmd.milestone_status(repo, ms),
-                     "skills": getattr(ms, "skills", [])})
+                     "skills": getattr(ms, "skills", []), "outline": md.strip_md(ms.fields.get("Outline", ""))})
 # docs/references.md entries (dt versions before the references feature have none).
 refs = [{"id": r.id, "title": r.title, "file": r.file, "hash": r.hash, "kind": r.kind, "milestones": r.milestones}
         for r in (model.all_references(repo) if hasattr(model, "all_references") else [])]

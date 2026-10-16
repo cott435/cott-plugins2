@@ -195,20 +195,45 @@ big = {k: v for k, v in packets.items() if v >= 2000}
 check("context_packets_small", "`dt context` packets are under 2,000 lines", packets and not big,
       f"max {max(packets.values()) if packets else 0} lines over {len(packets)} packets; over: {big}")
 
+# A stage may become several milestones (build-planning splits a stage too big for one), so milestones map to
+# stages, not by position. Incremental: a row sourced from the brief is stage 1, and an idea file belongs to the
+# stage that was current when it first appeared. All-at-once rows all cite the brief: match the row's name and
+# outline against each stage's keywords (scenarios.json), the name counting triple.
+stage_names = [s_["name"] for s_ in stages]
+idea_stage = {}
+for t in turns:
+    for line in t.get("status", "").splitlines():
+        mm = re.match(r"(docs/ideas/[^:\s]+\.md):", line)
+        if mm and mm.group(1) not in idea_stage and t.get("stage") in stage_names:
+            idea_stage[mm.group(1)] = stage_names.index(t["stage"])
+
+def row_stage(r):
+    files = ["docs/" + re.sub(r"^(\.\./|\./|docs/)+", "", f) for f in re.findall(r"[\w./-]+\.md", r.get("source", ""))]
+    files = [f for f in files if not f.endswith("/brief.md")]
+    hits = {idea_stage[f] for f in files if f in idea_stage}
+    if len(hits) == 1:
+        return hits.pop()
+    if mode == "incremental" and not files:
+        return 0
+    name, outline = r.get("name", "").lower(), r.get("outline", "").lower()
+    score = [sum(3 * name.count(k) + outline.count(k) for k in s_.get("keywords", [])) for s_ in stages]
+    return max(range(len(stages)), key=lambda i: score[i]) if max(score) > 0 else None
+
+reached = summary.get("stages_reached", len(stages)) if mode == "incremental" else len(stages)
+stage_rows = {i: [r for r in facts["roadmap"] if row_stage(r) == i] for i in range(len(stages))}
+unmapped = [r["id"] for r in facts["roadmap"] if row_stage(r) is None]
+no_row = [stage_names[i] for i in range(reached) if not stage_rows[i]]
 rc_rm, out_rm, _ = dtrun.run(proj, "roadmap", "--check", dt=DT)
-want_rows = summary.get("stages_reached", len(stages)) if mode == "incremental" else len(stages)
-check("roadmap_rows", "One roadmap row per stage, with derived status (`dt roadmap --check` exits 0)",
-      len(facts["roadmap"]) == want_rows and rc_rm == 0,
-      f"{len(facts['roadmap'])} rows for {want_rows} stages: {[(r['id'], r['derived']) for r in facts['roadmap']]}; roadmap --check rc={rc_rm} {out_rm.strip()[:120]}")
-if mode == "incremental":
-    unplanned = [r["id"] for r in facts["roadmap"] if r["derived"] not in ("Planned", "Building", "Done")]
-    check("incremental_all_planned", "Incremental: every revealed stage's milestone has a build plan (active or queued)",
-          facts["roadmap"] and not unplanned, f"not planned: {unplanned}")
-else:
-    first = facts["roadmap"][0]["derived"] if facts["roadmap"] else None
-    rest = [r["id"] for r in facts["roadmap"][1:] if r["derived"] in ("Idea", "Specced")]
-    check("upfront_m1_planned", "All-at-once: M1 has a build plan and every later milestone is at least Designed",
-          first in ("Planned", "Building") and not rest, f"M1={first}; below Designed: {rest}")
+check("roadmap_rows", "Every stage has at least one roadmap row and every row maps to a stage, with derived status (`dt roadmap --check` exits 0)",
+      facts["roadmap"] and not no_row and not unmapped and rc_rm == 0,
+      f"{ {stage_names[i]: [r['id'] for r in rs] for i, rs in stage_rows.items() if rs} }; stages with no row: {no_row}; "
+      f"unmapped rows: {unmapped}; derived: {[(r['id'], r['derived']) for r in facts['roadmap']]}; roadmap --check rc={rc_rm} {out_rm.strip()[:120]}")
+# Both modes end at the same bar, so their final roadmaps compare like for like: the first milestone has a
+# build plan, and every later one is at least Designed (task plans are written for the next milestone only).
+first = facts["roadmap"][0] if facts["roadmap"] else {}
+rest = [r["id"] for r in facts["roadmap"][1:] if r["derived"] in ("Idea", "Specced")]
+check("first_planned_rest_designed", "The first milestone has a build plan and every later milestone is at least Designed",
+      first.get("derived") in ("Planned", "Building") and not rest, f"{first.get('id')}={first.get('derived')}; below Designed: {rest}")
 
 # Shape per turn, from the architecture header at each turn's commit.
 shapes = []
@@ -375,12 +400,14 @@ if ref_stage:
 
     rows_ = facts["roadmap"]
     def want_ms(f):
-        i = ref_stage[f]
-        return [rows_[i]["id"]] if i < len(rows_) else []  # its stage has no milestone yet: `—`
+        return [r["id"] for r in stage_rows[ref_stage[f]]]  # empty while its stage has no milestone: `—`
+    def ms_ok(f):  # later milestones that reuse it (PCA residuals in the features stage) may list it too
+        got, want = by_file[f]["milestones"], want_ms(f)
+        return bool(set(got) & set(want)) if want else not got
     graded = [f for f in expected if f in ref_stage]
     wrong = {f: (by_file[f]["milestones"] if f in by_file else "no entry", want_ms(f)) for f in graded
-             if f not in by_file or sorted(by_file[f]["milestones"]) != want_ms(f)}
-    check("refs_milestones", "Each reference is assigned to the milestone of the stage it serves (`—` while that stage has no milestone)",
+             if f not in by_file or not ms_ok(f)}
+    check("refs_milestones", "Each reference is assigned to at least one milestone of the stage it serves (`—` while that stage has no milestone)",
           graded and not wrong, f"{ {f: by_file.get(f, {}).get('milestones') for f in graded} }; wrong (got, want): {wrong}")
 
     def open_questions(rel):
@@ -407,19 +434,21 @@ if ref_stage:
           plans and not unrouted and not dt_open and all(isinstance(v, list) for v in dt_unrouted.values()),
           f"unrouted by milestone: {unrouted}; dt build-planning: {dt_unrouted}")
 
-    si = next(i for i, s_ in enumerate(stages) if s_["name"] == "structure_portfolios")
+    # Across the stage's milestones: their **Skills:** lines name both skills, and each lands on a task of a
+    # planned one. Only the first milestone gets a plan, so an unplanned stage is graded on the lines alone.
+    sms = stage_rows[stage_names.index("structure_portfolios")]
     want_sk = ["data-analysis", "null-hypothesis-testing"]
-    if si < len(rows_):
-        ms = rows_[si]
-        ms_tasks = [t for p in plans if p["milestone"] == ms["id"] for t in p["tasks"]]
-        line_ok = all(k in ms.get("skills", []) for k in want_sk)
+    if sms:
+        line_sk = {k for ms in sms for k in ms.get("skills", [])}
+        ms_tasks = [t for ms in sms for p in plans if p["milestone"] == ms["id"] for t in p["tasks"]]
         on_task = {k: [t["id"] for t in ms_tasks if k in t.get("skills", [])] for k in want_sk}
-        ok = line_ok and (not ms_tasks or all(on_task.values())) and (ms_tasks or mode == "all_at_once")
-        ev = f"{ms['id']} **Skills:** {ms.get('skills')}; " + (f"tasks carrying each: {on_task}" if ms_tasks else "no plan for it (roadmap line only)")
+        ok = all(k in line_sk for k in want_sk) and (not ms_tasks or all(on_task.values()))
+        ev = (f"{[ms['id'] for ms in sms]} **Skills:** {sorted(line_sk)}; "
+              + (f"tasks carrying each: {on_task}" if ms_tasks else "no plan for them (roadmap lines only)"))
     else:
         ok, ev = False, "no structure_portfolios milestone"
-    check("skills_on_structure_tasks", "The structure & classical-portfolios milestone routes data-analysis and null-hypothesis-testing "
-          "(its roadmap **Skills:** line, and at least one of its tasks each when it has a plan)", ok, ev)
+    check("skills_on_structure_tasks", "The structure & classical-portfolios milestones route data-analysis and null-hypothesis-testing "
+          "(their roadmap **Skills:** lines, and at least one task each when one of them has a plan)", ok, ev)
 
     intake = [t for t in turns if "reference-intake" in [dtrun.skill_name(x) for x in t["skills"]]]
     check("reference_intake_invoked", "reference-intake ran", bool(intake), f"turns: {[t['turn'] for t in intake]}")

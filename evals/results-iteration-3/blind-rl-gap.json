@@ -1,0 +1,120 @@
+{
+ "winner": "A",
+ "reasoning": "Set A is a tight, internally consistent plan. It follows the user's stated success criteria exactly: each world must significantly beat both the random and the scripted baseline, has a replay, and has a written note. It names a clear build order (modules per world, each world gated on its done report) and stays short enough for a terse solo learner. Its weaknesses are second-order RL and specification gaps: tank and predator-prey speeds and radii are never given, so it is unclear whether the scripted baselines can be beaten; the 11-fact Snake DQN must beat a greedy agent that sees exactly the same information, and this risk is not flagged; the interface zeroes next_obs on time-outs that are supposed to bootstrap; and the self-play sampling contradicts its own reason for rejecting alternating freeze. Set B shows deeper RL design and teaching value: ablation ladders for DQN, PG and co-evolution, exact physical parameters, a heading-up board view, careful handling of truncation and frozen segments, honest power analysis and confound flags, and very concrete numeric acceptance tests. But it carries clear patch residue: tombstoned goals ('Merged into Goal 3'), Snake-only bets, idea files that still cite the superseded 'new Goal 6', Snake-only wording inside the multi-environment BASE feature, and the same long ID lists repeated across changelogs. It is about twice A's length. It also drops the user's 'beat the scripted baseline' success criterion (to 'at least 75% of scripted') and excludes reward experiments, although reward shaping is one of the target concepts. A's coherence, fidelity and right-sizing outweigh B's extra depth under this rubric.",
+ "rubric": {
+  "A": {
+   "content": {
+    "rl_soundness": 4,
+    "completeness_three_envs": 4,
+    "cross_doc_consistency": 4,
+    "testability": 4,
+    "right_sizing": 4
+   },
+   "structure": {
+    "organization": 4,
+    "readability_for_solo_learner": 4,
+    "what_to_build_next": 4
+   },
+   "content_score": 4.0,
+   "structure_score": 4.0,
+   "overall_score": 8.0
+  },
+  "B": {
+   "content": {
+    "rl_soundness": 5,
+    "completeness_three_envs": 4,
+    "cross_doc_consistency": 2,
+    "testability": 5,
+    "right_sizing": 2
+   },
+   "structure": {
+    "organization": 3,
+    "readability_for_solo_learner": 3,
+    "what_to_build_next": 3
+   },
+   "content_score": 3.6,
+   "structure_score": 3.0,
+   "overall_score": 6.6
+  }
+ },
+ "output_quality": {
+  "A": {
+   "score": 8,
+   "strengths": [
+    "Faithful to the user's success criteria: significant wins over random and scripted baselines, a saved replay and a written note per world (EVAL-04, EVAL-06, NOTE)",
+    "Concise and decisive across brief, spec and architecture, with a single changelog entry each and no history residue",
+    "Clear build order: modules listed per world, and each world gated on the previous world's done report",
+    "Sound standard method choices: DQN with target network and Double-DQN, PPO with a shared per-role policy, self-play against a snapshot pool, swept-collision catches",
+    "Predator design (1.2x speed, 0.5x turn rate) gives prey a real evasion strategy, which supports co-evolution",
+    "Well-specified significance procedure (paired sign-flip permutation, Holm per world, named families of 2/2/10 tests)"
+   ],
+   "weaknesses": [
+    "Tank and predator-prey physics are under-specified (no fish or ball speeds, radii or spawn gaps), so it is unclear whether the scripted baselines can be beaten",
+    "Not flagged as a risk: the 11-fact Snake DQN must significantly beat a greedy agent that uses the same features",
+    "Interface bug: time-outs are 'finished', and next_obs is zeroed for finished agents, so truncation bootstrapping has no real state to bootstrap from",
+    "Self-play sampling wastes about 25% of rollouts and halves each side's learning, which contradicts the stated reason for rejecting alternating freeze",
+    "Some acceptance tests are vague (TANK-08 '(and others)', EVAL-02 'behaves as the world section describes', POL-03 'on average')",
+    "Reward shaping is never treated as a concept to study"
+   ]
+  },
+  "B": {
+   "score": 6,
+   "strengths": [
+    "Excellent teaching design: NET, PG and COEV ladders each add one fix, so each effect can be isolated",
+    "Fully parameterized worlds (radii, speeds, vision, spawn gaps), with an explicit argument for the fish/ball speed ratio",
+    "Strong RL detail: a heading-up view for relative moves, truncated vs terminated, end_segment bootstrapping for frozen stretches, matched SB3 settings (normalize_advantage=False, VecNormalize)",
+    "Honest statistics: 5-seed permutation power analysis (1/252 vs 0.05/8), one-sided directions fixed in advance, and the learning-volume confound flagged",
+    "Highly concrete, numeric acceptance tests (BASE-01 shares, TANK-10 independence, EVAL-08 worked example)",
+    "An interactive viewer showing Q-values and policy spread suits a learner"
+   ],
+   "weaknesses": [
+    "Patch residue: tombstoned goals 4 and 6, Snake-only bets, a stale 'extracted when environment 2 needs them', and idea files citing the superseded 'new Goal 6'",
+    "Roughly twice A's length, with long ID lists repeated across idea headers and both changelogs",
+    "Drops the user's 'beat the scripted baseline' success criterion in favor of reaching at least 75% of scripted",
+    "Excludes 'Experiments with alternative rewards', although reward shaping is one of the lab's target concepts",
+    "Confusing stage/step naming ('PG stage 2' vs 'PG step 2') and an interleaved feature order (Tank between Snake and Snake's learners; CORE last)",
+    "Very large scope (tabular learner, two 4-step ladders, tank stages, compass stretch, 4-step COEV, switching stretch, cross-play, 5 seeds each) with no check against 'a few weeks per environment'",
+    "No explicit module build order; what to build first must be inferred from the ladders"
+   ]
+  }
+ },
+ "defects": {
+  "A": [
+   "architecture.md: 'next_obs: np.ndarray        # zeros for agents that finished' with 'finished ... True also for time-outs' — time-outs are meant to bootstrap ('truncated ... time-out (bootstrap)'), but their next observation is zeroed, and StepResult.obs drops finished agents",
+   "spec.md TANK-03: 'Each is limited to a fixed range' — fish top speed, ball speed and body radii are never specified, so whether the flee-from-ball scripted fish (TANK-09) can be beaten for POL-06 is undetermined",
+   "spec.md VAL-05: 'rejects H0 against both the random and the hand-written Snake agents' — the 11-fact observation (SNAKE-07) holds exactly the information the greedy agent (SNAKE-09) uses, so beating it significantly is a real risk that Risks does not mention",
+   "architecture.md AD-07: 'Alternating freeze ... halves each side's learning time' — the chosen per-side 50/50 sampling also has each side playing its current policy in only 50% of rollouts, and 25% of rollouts have no learner",
+   "architecture.md AD-06: 'the defaults above match SB3's' — SB3 PPO's default minibatch is 64, not 256; AD-08 'Settings are matched to AD-05' is also inaccurate, because SB3 DQN has no Double-DQN option",
+   "architecture.md Risks: 'the cloud-computing fallback in the brief applies before any spec change' — QR-01 requires 'at most 60 minutes ... on the learner's laptop CPU', so a cloud run would fail the done report without a spec change",
+   "spec.md TANK-08: 'Given fish that survived 1,000, 1,000 and 400 steps (and others)' — the acceptance example is not concrete",
+   "spec.md EVAL-02: 'then it behaves as the world section describes' — tautological acceptance test",
+   "spec.md PRED-11: 'rejects H0 each time against the matching snapshot of the prey' — hard to parse what is compared with what",
+   "spec.md PRED-04: 'prey: pellets, the predator, and nearby prey' — no count of sensed items (unlike TANK-05's 'up to 3 nearest'), so the observation shape is undefined",
+   "spec.md TANK-01: 'start positions and directions set by the seed' — no minimum spawn distance, so a fish can start touching the ball",
+   "spec.md SNAKE-06: 'has not eaten for 300 steps, when the next step completes' — off by one against 'after 100 × current length steps without eating'",
+   "brief.md Goals: no goal or requirement treats reward shaping as a concept to study, although it is one of the lab's stated topics"
+  ],
+  "B": [
+   "brief.md Goals: '4. *(Merged into Goal 3.)*' and '6. *(Merged into Goal 1.)*' — superseded goals kept as tombstones",
+   "brief.md What we're betting on: 'A Snake agent can learn well within an hour' / 'not to slow down Snake' — every bet is about Snake; there are none for the tank or predator-prey",
+   "brief.md Not doing: 'shared parts are extracted when environment 2 needs them' — stale framing; the architecture already designs the full three-environment core (schedules, snapshots, PettingZoo)",
+   "brief.md Not doing: 'Requiring the agent to clearly beat the scripted player' — contradicts the user's success criterion (beat random and a scripted baseline); the spec only requires at least 75% of scripted (NET-08, PG-10, COEV-05)",
+   "spec.md Out of scope: 'Experiments with alternative rewards' — excludes reward shaping, one of the concepts the lab is meant to teach",
+   "ideas/fish-tank.md: 'Serves: new Goal 6' and 'Goal 6 added' — Goal 6 is now merged into Goal 1, so this is a superseded reference",
+   "ideas/fish-tank.md: 'Not Doing narrowed (environments beyond the tank, simple physics); answered open question removed' — history residue that no longer matches the brief",
+   "brief.md: 'Training must finish in about an hour per environment' vs spec.md QR-01: 'All 5 seeds of any one setup finish training within 60 minutes' — each environment has about 6-10 setups",
+   "spec.md BASE-01: 'The random player picks one of the three moves' — Snake-only wording (BASE-02/03 likewise) inside a feature that now covers three environments",
+   "spec.md REF-03: 'its NET stage 4, PG stage 2 or COEV step 1 learner' — 'PG stage 2' (tank vision stage) vs 'PG step 2' (baseline step) naming is confusing",
+   "spec.md Changelog / ideas headers / architecture.md Changelog: 'BASE-04, EVAL-01–EVAL-06, REPLAY-02, REPLAY-04, REPLAY-05, REF-01–REF-03, CORE-01–CORE-04 ...' — the same long ID lists are repeated four times",
+   "spec.md Assumptions: 'the predator is 1.25 times faster than the prey' — with instant-turning, momentum-free pushes, a faster pursuer can always run down a prey it sees in a bounded disc, so co-evolution may be one-sided; this is only partly covered by 'Instability may not show'",
+   "architecture.md AD-07: 'Matching the network and hyperparameters means a gap points to an implementation difference' — SB3 DQN has no Double-DQN, yet it is compared with NET stage 4, which uses double correction",
+   "ideas/predator-prey.md: 'EVAL-01–EVAL-06: per-side scores and the cross-play table' — the cross-play table is EVAL-07",
+   "spec.md Features order: 'Snake game', 'Fish tank', 'Baseline players', 'Lookup-table learner', 'Staged network learner' — the tank section sits between Snake and Snake's learners, and the shared core comes last",
+   "spec.md Summary: 'built in four stages', 'four-step policy-gradient ladder', 'four-step ladder' plus stretch goals, all with 5 seeds — no assessment of whether this fits 'a few weeks per environment'"
+  ]
+ },
+ "key": {
+  "A": "all-v2",
+  "B": "inc-v3"
+ }
+}

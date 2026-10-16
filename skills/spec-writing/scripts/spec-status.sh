@@ -6,6 +6,7 @@ set -e
 #   - brief and spec status
 #   - idea files and their status; "ready" lists ideas that are Accepted (waiting to be specced)
 #   - for each requirement prefix in the spec (e.g. SAVE, QR, DATA): the highest ID used and the next free one
+#   - skills: other skills installed in this project (.claude/skills), which may own steps the spec names
 # IDs are never reused, so "next" counts removed (struck-through) requirements too.
 
 DOCS_DIR="${1:-docs}"
@@ -44,5 +45,13 @@ if [ -d "$IDEAS_DIR" ]; then
   done
 fi
 
+SKILLS=""
+for f in .claude/skills/*/SKILL.md; do
+  [ -e "$f" ] || continue
+  name=$(basename "$(dirname "$f")")
+  case "$name" in idea-refine|spec-writing|architecture-design) continue ;; esac
+  SKILLS="${SKILLS:+$SKILLS, }\"$name\""
+done
+
 echo "Mode: $MODE (brief: $BRIEF_STATUS, spec: $SPEC_STATUS)" >&2
-echo "{\"mode\": \"$MODE\", \"brief\": {\"path\": \"$BRIEF\", \"status\": \"$BRIEF_STATUS\"}, \"spec\": {\"path\": \"$SPEC\", \"status\": \"$SPEC_STATUS\"}, \"ideas\": [$IDEAS], \"ready\": [$READY], \"ids\": {$IDS}}"
+echo "{\"mode\": \"$MODE\", \"brief\": {\"path\": \"$BRIEF\", \"status\": \"$BRIEF_STATUS\"}, \"spec\": {\"path\": \"$SPEC\", \"status\": \"$SPEC_STATUS\"}, \"ideas\": [$IDEAS], \"ready\": [$READY], \"ids\": {$IDS}, \"skills\": [$SKILLS]}"

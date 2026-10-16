@@ -9,11 +9,17 @@ next stage only after the current one has been fully planned.
 After every turn the project's docs/ are git-committed so doc evolution can be diffed.
 
 Usage: driver.py <trajectory-id> <out-dir>
+
+Env: SKILLS_SRC (skills to install; default: this repo's skills/), CLAUDE_BIN (default: claude),
+AGENT_MODEL, USER_MODEL. Both sessions load project/local settings only and no CLAUDE.md files, so the
+host's user-level instructions, skills and plugins don't leak into the trajectory.
 """
 import json, os, re, subprocess, sys, time, uuid, shutil, pathlib
 
 HERE = pathlib.Path(__file__).resolve().parent
-SKILLS_SRC = pathlib.Path("/home/claude/dev-team2/skills")
+SKILLS_SRC = pathlib.Path(os.environ.get("SKILLS_SRC", HERE.parents[1] / "skills"))
+CLAUDE_BIN = os.environ.get("CLAUDE_BIN", "claude")
+ISOLATE = ["--setting-sources", "project,local"]
 AGENT_MODEL = os.environ.get("AGENT_MODEL", "claude-opus-5-5")
 USER_MODEL = os.environ.get("USER_MODEL", "sonnet")
 
@@ -21,6 +27,7 @@ STRIP_ENV = ["CLAUDE_CODE_SESSION_ID", "CLAUDE_CODE_REMOTE_SESSION_ID", "CLAUDE_
              "CLAUDE_CODE_MESSAGING_SOCKET", "CLAUDE_CODE_MESSAGING_TOKEN", "CLAUDE_CODE_DIAGNOSTICS_FILE",
              "CLAUDECODE"]
 ENV = {k: v for k, v in os.environ.items() if k not in STRIP_ENV}
+ENV["CLAUDE_CODE_DISABLE_CLAUDE_MDS"] = "1"  # --setting-sources alone still loads the host's ~/.claude/CLAUDE.md
 
 
 def sh(cmd, cwd, **kw):
@@ -40,8 +47,8 @@ def doc_status(proj):
 
 
 def agent_turn(proj, sid, msg, first, log_path):
-    cmd = ["claude", "-p", msg, "--model", AGENT_MODEL, "--output-format", "stream-json", "--verbose",
-           "--permission-mode", "bypassPermissions", "--disallowedTools", "AskUserQuestion"]
+    cmd = [CLAUDE_BIN, "-p", msg, "--model", AGENT_MODEL, "--output-format", "stream-json", "--verbose",
+           "--permission-mode", "bypassPermissions", "--disallowedTools", "AskUserQuestion", *ISOLATE]
     cmd += ["--session-id", sid] if first else ["--resume", sid]
     t0 = time.time()
     r = sh(cmd, proj, timeout=1800)
@@ -107,8 +114,8 @@ ASSISTANT'S LATEST MESSAGE:
 
 Decide your reply. If the assistant asked questions, answer them all briefly and consistently with your facts. If it presented a draft for review, accept/approve it explicitly (or request one specific fix if it contradicts your facts). If it is waiting with nothing to answer, tell it to continue to the next step. Never instruct it which skill to use. Planning ends at an approved architecture: never ask for an implementation plan, tasks, or code. When you approve something and also introduce the next stage, put the approval first in the same message ("Approved. Next idea: ...").
 Return ONLY a JSON object: {{"action": "reply" | "next_stage" | "finish", "message": "<what you say to the assistant>"}}"""
-    r = sh(["claude", "-p", prompt, "--model", USER_MODEL, "--tools", "", "--output-format", "json",
-            "--no-session-persistence"], HERE, timeout=600)
+    r = sh([CLAUDE_BIN, "-p", prompt, "--model", USER_MODEL, "--tools", "", "--output-format", "json",
+            "--no-session-persistence", *ISOLATE], HERE, timeout=600)
     try:
         txt = json.loads(r.stdout)["result"]
         m = re.search(r"\{.*\}", txt, re.S)

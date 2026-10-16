@@ -162,7 +162,10 @@ if project == "quant":
           bool(re.search(r"min(imum)?[- ]variance", spec, re.I)) and bool(re.search(r"risk parity", spec, re.I)), "")
     m = re.search(r"(PPO|agent|forecast[- ]driven|ML[- ]driven).{0,600}(min(imum)?[- ]variance|classical|HRP|risk parity)", spec, re.S | re.I)
     check("ML/PPO portfolios must beat the classical portfolios out of sample", bool(m), m.group(0)[:200] if m else "")
-    check("Real-money / live trading is explicitly out of scope", bool(re.search(r"(Out of scope|Not doing).{0,1500}(live|real[- ]money|brokerage)", brief + spec, re.S | re.I)), "")
+    # Whole spec Out-of-scope list and brief Not-doing section; a fixed-size window missed items deep in a long list.
+    excluded = "".join(m.group(0) for t, start in ((spec, r"\*\*Out of scope"), (brief, r"^## Not doing"))
+                       for m in [re.search(start + r".*?(?=^## |\Z)", t, re.S | re.M)] if m)
+    check("Real-money / live trading is explicitly out of scope", bool(re.search(r"live|real[- ]money|brokerage", excluded, re.I)), "")
     check("Out-of-sample / held-out evaluation is required for features and models",
           len(re.findall(r"out[- ]of[- ]sample|held[- ]out|walk[- ]forward", spec, re.I)) >= 3, f"{len(re.findall(r'out[- ]of[- ]sample|held[- ]out|walk[- ]forward', spec, re.I))} mentions")
 else:
@@ -171,7 +174,7 @@ else:
     check("Architecture has a shared core reused by all environments", bool(re.search(r"(shared|common|core)", arch_all, re.I)) and bool(re.search(r"interface|protocol|abc|class", arch_all, re.I)), "")
     check("Each environment's learning criterion beats a random or scripted baseline",
           len(re.findall(r"random|scripted|heuristic", spec, re.I)) >= 3, f"{len(re.findall(r'random|scripted|heuristic', spec, re.I))} mentions")
-    check("CPU training-time budget (~1 hour) is a quality requirement", bool(re.search(r"(hour|60 min|minutes).{0,120}(CPU|laptop)|(CPU|laptop).{0,120}(hour|60 min|minutes)", spec, re.I)), "")
+    check("CPU training-time budget (~1 hour) is a quality requirement", bool(re.search(r"(hour|60 min|minutes).{0,120}(CPU|laptop|MacBook|processor)|(CPU|laptop|MacBook|processor).{0,120}(hour|60 min|minutes)", spec, re.I)), "")
     check("Proof-of-concept stays single package (no premature monorepo)", "Single" in ((st.get("architecture") or {}).get("shape") or ""), (st.get("architecture") or {}).get("shape"))
 
 passed = sum(r["passed"] for r in R)

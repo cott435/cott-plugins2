@@ -1,13 +1,16 @@
 #!/usr/bin/env python3
 """Arrange finished trajectory runs into the skill-creator benchmark layout:
 bench/eval-<project>/<mode>/run-1/{outputs/, grading.json, timing.json}
-"""
-import json, shutil, subprocess, pathlib, sys
 
-WS = pathlib.Path("/home/claude/dev-team2-workspace")
+Usage: package.py [iteration-dir]  (relative to $EVAL_WS, default: a dev-team2-workspace next to the repo)
+"""
+import json, os, shutil, subprocess, pathlib, sys
+
+HERE = pathlib.Path(__file__).resolve().parent
+WS = pathlib.Path(os.environ.get("EVAL_WS", HERE.parents[2] / "dev-team2-workspace"))
 it = WS / sys.argv[1] if len(sys.argv) > 1 else WS / "iteration-1"
 bench = it / "bench"
-scn = json.loads((WS / "harness/scenarios.json").read_text())
+scn = json.loads((HERE / "scenarios.json").read_text())
 
 for i, project in enumerate(["rl", "quant"]):
     ev = bench / f"eval-{i}-{project}"

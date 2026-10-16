@@ -1,0 +1,97 @@
+{
+  "winner": "A",
+  "reasoning": "Both sets are thorough, single-package plans that cover all three stages in the spec, architecture, contract and tests, and both use sound RL designs. A proves DQN on CartPole and PPO on Pendulum against Stable-Baselines3, bootstraps on truncation, uses a sign-flip permutation test with Holm correction and a 20% margin, and co-trains with an opponent pool plus cross-play. B uses DQN part-removal runs, REINFORCE vs PPO with clip and value-baseline removals, alternating frozen-copy co-evolution with cross-play, and a one-fish library check. A wins on pipeline clarity: small single-owner steps with clean entry sketches, a spine baseline of online one-step TD, and a layout that follows the step owners. B's PL-01 hides most of training inside one branching `run_episodes` step. A's main weakness is milestone quality. M1 never produces a 'does the agent beat its baselines' verdict, because that was carved into M4 to meet a task-count limit. That makes the build order M1→M4→M2→M3, against the IDs, and M2–M4 have no Exit criteria. B's milestones are better: M1 is a real vertical slice ending in the full Snake experiment, and every milestone has checkable Exit criteria. But B's M3 (one pipeline) is lopsided, and M4's dependence on M3 rather than M2 is debatable. B also carries more stale text (a struck AGENT-01, retired contract entries). Its split-task packets cite internal functions that were retired from the contract, and several statistical tests use an 'at most 1 of 20' tolerance that a correct 5% test fails about 26% of the time. Task packets are about equally buildable. A's are missing type definitions (EvalResult, DQNConfig); B's are missing TestResult, EpisodeRecord, the memory API and the Snake start rules. On balance A edges B on content (4.0 vs 3.9); structure ties at 4.0, giving 8.0 vs 7.9.",
+  "rubric": {
+    "A": {
+      "content": {"rl_soundness": 5, "stage_completeness": 5, "internal_consistency": 4, "right_sizing": 4, "milestone_quality": 2, "pipeline_clarity": 5, "task_buildability": 3},
+      "structure": {"organization": 4, "readability_for_solo_learner": 4, "ease_of_finding_next_build_step": 3, "layout_sensibility": 5},
+      "content_score": 4.0,
+      "structure_score": 4.0,
+      "overall_score": 8.0
+    },
+    "B": {
+      "content": {"rl_soundness": 5, "stage_completeness": 5, "internal_consistency": 4, "right_sizing": 3, "milestone_quality": 3, "pipeline_clarity": 4, "task_buildability": 3},
+      "structure": {"organization": 4, "readability_for_solo_learner": 4, "ease_of_finding_next_build_step": 4, "layout_sensibility": 4},
+      "content_score": 3.9,
+      "structure_score": 4.0,
+      "overall_score": 7.9
+    }
+  },
+  "output_quality": {
+    "A": {
+      "score": 8,
+      "strengths": [
+        "Each hand-written algorithm is proven on a standard easy task (CartPole, Pendulum) against Stable-Baselines3 before its results are trusted, with a normalized score and 'unverified' marking",
+        "Pipeline step tables are small, single-owner and readable; entry sketches follow directly from the tables; the DQN spine is a real online-TD baseline",
+        "Statistics are carefully specified (sign-flip permutation, Holm, 20% margin over the scripted baseline), and the TC-19 tolerance is justified correctly from the binomial tail",
+        "The tank World is designed as configurable body kinds, so predator-prey extends it (TANK-10) instead of copying it",
+        "The replay viewer is interactive (step back, 0.25x–8x speed, sight circle) and also exports animations"
+      ],
+      "weaknesses": [
+        "M1 ends without any 'agent beats baselines' verdict; the learning check and report were split into M4 to fit a task-count limit",
+        "Roadmap build order is M1→M4→M2→M3, against the IDs; M2–M4 have no Exit criteria",
+        "The todo and plan list M1-T24 between T21 and T22",
+        "EvalResult and CheckResult are used but never defined in the contract",
+        "Split-task packets (e.g. T13) omit needed settings contracts and have no golden-case oracle"
+      ]
+    },
+    "B": {
+      "score": 7,
+      "strengths": [
+        "M1 is a full vertical slice: train, removal runs, evaluate with a hypothesis test, replays, charts and a full Snake experiment task",
+        "Pedagogically strong part-removal design: DQN without memory or target copy, REINFORCE vs PPO without clip or value baseline, and an opponent pool for co-evolution",
+        "Every milestone has checkable Exit criteria, and the build order matches the milestone IDs",
+        "Very concrete spec numbers and golden cases with worked values (TC-26 returns, TC-41 observation vectors)",
+        "The game protocol is role-aware from M1, so later stages don't rework Snake"
+      ],
+      "weaknesses": [
+        "PL-01's `run_episodes` step bundles the co-evolution and single-learner loops into one branching step",
+        "Several statistical test tolerances ('at most 1 of 20') are mis-justified and fail by chance about 26% of the time",
+        "The library check is a lopsided one-pipeline milestone, and predator-prey depends on it rather than on the tank milestone",
+        "Stale text is kept: the struck-through AGENT-01, a Retired list in the contract, and replan notes",
+        "Internal step functions were retired from the contract, so split-mode testers lack the APIs they must test; TestResult and EpisodeRecord are undefined",
+        "DQN is never checked against a reference, only PPO"
+      ]
+    }
+  },
+  "unbuildable_tasks": {
+    "A": [
+      "M1-T05: EvalResult is returned by eval.evaluate but never defined; the packet also lacks core.Agent/RandomAgent, which the acceptance's random-agent evaluation needs",
+      "M1-T13: the DQNConfig contract (buffer_size, batch_size, learning_starts) is missing, no replay-memory API is given, and there is no golden case, so the split-mode tester has nothing concrete to test against",
+      "M1-T16: acceptance requires `snake-grid` to be registered and pass check-env, but the packet has no EnvSpec or register_env contract"
+    ],
+    "B": [
+      "M1-T21: compare_to_baselines was retired from the contract and TestResult is undefined, so the split tester has no function signature to call; TC-14's tolerance makes the test flaky",
+      "M1-T15: TC-07 needs a standalone memory with size and sampling (batch of 101 raises ValueError), but the contract only exposes ValueAgent.observe; there is no memory interface for the tester",
+      "M1-T01: acceptance says 'full SNAKE rules', but the packet doesn't include SNAKE-01 (start length, centred, heading right) or the tail-cell edge case",
+      "M1-T08: the packet lacks the RandomPlayer, scripted_for and RunStore.load_player contracts that score_set calls, and TestResult is undefined"
+    ]
+  },
+  "defects": {
+    "A": [
+      "roadmap.md: \"| M2 | Fish tank | ... | M4 | Designed |\": the build order is M1→M4→M2→M3, which reads confusingly against the IDs",
+      "roadmap.md: the M2, M3 and M4 sections have only an Outline and Skills, with no Exit line, so the planned milestones lack checkable exit criteria",
+      "ideas__snake-verified-report.md: \"about eighteen setup tasks, well past the fifteen-task limit one stage can hold\": M4 was carved off to cut size, leaving M1 without its learning verdict",
+      "tasks__plan.md: \"**Skills:** none in M1\" vs roadmap M1 \"**Skills:** null-hypothesis-testing, dataviz\": the plan itself admits the mismatch in Open questions",
+      "tasks__plan.md: M1-T05 \"**Step:** PL-04.evaluate\": PL-04 (reference) is deferred to M4; the evaluator belongs to eval and is used by PL-01/PL-03",
+      "tasks__todo.md: \"M1-T24 Training runs offline\" is listed between T21 and T22, out of order",
+      "contract.md: \"-> EvalResult\" and \"-> CheckResult\" are used throughout, but neither type is defined",
+      "context__M1-T13.md: \"src/rllab/dqn/learner.py (new)\": the file was already created by M1-T06, so the '(new)' marker is stale",
+      "tests.md TC-24: \"logged clipped fraction 0.8 ... four of five here, though only two are cut off by the min\": a confusing oracle for what the clip-fraction metric means",
+      "M1-T16 Verify: runs \"rllab train snake-features dqn\", not the grid view it is adding"
+    ],
+    "B": [
+      "spec.md: \"**AGENT-01** ~~Written by hand~~ *Removed 2026-10-16: replaced by QR-03.*\": stale struck-through requirement kept in place",
+      "tests.md TC-14: \"at most 1 of the 20 seeds may reject, since the family-wise error rate is α = 0.05\": P(≥2 of 20) is about 26% under a correct test, so the tolerance is wrong and flaky; the same error is in TC-31, TC-32 and TC-47",
+      "tasks__plan.md Scope: \"**Deferred:** TANK-01... (to M2) ... HUNT-01... (to M4)\": LIB-01–LIB-05 (M3) are missing from the deferred list",
+      "roadmap.md: \"| M4 | Predator and prey | ... | M3 |\": the hunt needs the tank (M2), not the library check; the dependency is questionable",
+      "roadmap.md: \"| M3 | Library check | ... | PL-07 |\": a one-pipeline milestone, lopsided next to the others",
+      "contract.md snake.SnakeGame: \"`terminated` on death or a full board\": StepResult has no `terminated` field (only done/over/truncated)",
+      "contract.md train.train_run: \"writes the four checkpoints\": co-evolution runs write r00–r10 instead",
+      "contract.md: \"## Retired - ~~evaluate.score_set...~~\": these are steps that split tasks (T13, T21, T22) still target, but their signatures are gone from the contract",
+      "pipelines.md PL-04 sketch: \"compare_to_baselines(scores)\": the result is discarded and never passed to write_report",
+      "pipelines.md PL-01 step 4 `run_episodes`: \"two learning roles → `coev.run_rounds` ... one learning role → the method table's collection loop\": one step hides two whole training loops",
+      "brief.md: 'What success looks like' covers only Snake and 'the second game'; the fish tank and predator-prey goals live only in the idea files"
+    ]
+  }
+}

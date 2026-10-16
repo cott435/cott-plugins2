@@ -573,7 +573,7 @@ dev-team2/
 - **Hooks** use `${CLAUDE_PLUGIN_ROOT}/scripts/dt.py`.
 - **Stdlib only**, so it runs in any project without installing anything.
 - **Caveat:** installing a single skill copies only `skills/<name>/`. agent-skills has the same gap with `references/` (their issue #361). dev-team2 must be installed as a whole plugin.
-- **Existing bug:** today's skills call `skills/<name>/scripts/...` relative to the current folder. That only works when run from inside dev-team2, so these calls move to the plugin-relative form.
+- **Existing bug (fixed 2026-10-16):** the skills called `skills/<name>/scripts/...` relative to the current folder. That only works when run from inside dev-team2, so these calls move to the plugin-relative form.
 
 ### Write matrix
 
@@ -601,7 +601,7 @@ One parser means every skill, hook and agent sees the same IDs, statuses and sec
 
 | Command | Used by | Does |
 |---|---|---|
-| `dt status [--skill X] [--summary]` | every skill, SessionStart hook | Mode; upstream gates; coverage gaps (spec IDs on no component, pipeline or task, unless Deferred); pipelines with no spine task; stale or retired references; skills referenced but not installed; contract freshness (`contract.md` vs the git date of the contract module); Grow triggers. Replaces `idea-refine.sh`, `spec-status.sh` and `arch-status.py` over time |
+| `dt status [--skill X] [--summary]` | every skill, SessionStart hook | Mode; upstream gates; coverage gaps (spec IDs on no component, pipeline or task, unless Deferred); pipelines with no spine task; stale or retired references; skills referenced but not installed; contract freshness (`contract.md` vs the git date of the contract module); Grow triggers. Replaced `idea-refine.sh`, `spec-status.sh` and `arch-status.py` (removed 2026-10-16 once `dt` matched their output) |
 | `dt next-id <prefix>` | every writing skill | Next free `AD`, `PL`, `TC`, `CODE` etc., counting retired IDs |
 | `dt section <ID>…` | everyone | Prints those sections from any doc |
 | `dt context <task>` | orchestrator → builder | Every `Read:` section, then the file list, then the task section last (active material goes last, per agent-skills `context-engineering`); warns over 2,000 lines |
@@ -682,7 +682,7 @@ Each step ends green on its own tests, or on an eval run.
    - `.claude-plugin/plugin.json`
    - `scripts/dt.py`
    - `scripts/devteam/`: stdlib-only parser for the doc format below, with unit tests on sample docs
-2. **First commands:** `dt status`, `next-id`, `section` and `lint` on today's docs (brief, ideas, spec, architecture). Point the existing skills at `../../scripts/dt.py`. Keep the old scripts until `dt` matches their output.
+2. **First commands:** `dt status`, `next-id`, `section` and `lint` on today's docs (brief, ideas, spec, architecture). Point the existing skills at `../../scripts/dt.py`. Keep the old scripts until `dt` matches their output. (Done: matched and removed 2026-10-16.)
 3. **Existing skills:** the `architecture-design` changes (contract.md, `docs/packages/`, system pipelines, Grow triggers, stop after approval) and the `idea-refine` roadmap row.
 4. **`pipeline-design`**, plus `dt layout`.
 5. **`test-planning`.**

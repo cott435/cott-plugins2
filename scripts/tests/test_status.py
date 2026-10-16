@@ -22,7 +22,6 @@ from devteam.commands import status  # noqa: E402
 from devteam.status.tomlread import parse_toml  # noqa: E402
 
 QUANT = HERE / "fixtures" / "quant"
-ARCH_STATUS = HERE.parents[1] / "skills" / "architecture-design" / "scripts" / "arch-status.py"
 HAS_GIT = shutil.which("git") is not None
 
 # Keys each skill promises to print (scripts/README.md, dt status table).
@@ -224,24 +223,8 @@ class ArchitectureTest(Base):
                          {"TANK-01": "added", "TANK-02": "added", "QR-03": "changed", "CORE-04": "changed"})
 
 
-@unittest.skipUnless(ARCH_STATUS.is_file(), "arch-status.py not present")
-class ArchStatusParityTest(Base):
-    """dt status --skill architecture-design reports what arch-status.py reported, on the same docs."""
-
-    def compare(self):
-        old = json.loads(subprocess.run([sys.executable, str(ARCH_STATUS), str(self.root / "docs"), str(self.root)],
-                                        capture_output=True, text=True, check=True).stdout)
-        new = self.status("architecture-design")
-        for k in ("mode", "uncovered", "changed_since", "spec_rows_pending", "stale", "next_decision",
-                  "packages_found", "skills"):
-            self.assertEqual(new[k], old[k], k)
-        self.assertEqual(new["spec"]["live_requirements"], old["spec"]["live_requirements"])
-        self.assertEqual([Path(p).name for p in new["package_docs"]], old["package_docs"])
-        self.assertEqual([b.rsplit("/", 1)[-1] for b in new["broken_fences"] if "contract.md" not in b],
-                         [b.rsplit("/", 1)[-1] for b in old["broken_fences"]])
-
-    def test_fixture(self):
-        self.compare()
+class ArchitectureChangelogTest(Base):
+    """Changelog matching and fence checks (ported from arch-status.py, whose output dt matched before it was removed)."""
 
     def test_pending_rounds_and_fences(self):
         self.edit("docs/spec.md", "| PORT-01, PORT-02; DATA-03 (removed) |",
@@ -251,9 +234,12 @@ class ArchStatusParityTest(Base):
         self.edit("docs/spec.md", "### Quality", "- **PORT-03** More.\n\n### Quality")
         self.edit("docs/architecture.md", "## Risks", "```\n## Not a heading\n```\n\n## Risks")
         self.write("docs/architecture/data.md", "# data\n\n**Package:** data · **Status:** Draft\n\nPORT-03 lives here.\n")
-        (self.root / "pyproject.toml").write_text("[project]\nname = 'q'\n", encoding="utf-8")
-        self.compare()
-        self.assertEqual(self.status("architecture-design")["changed_since"], ["QR-01", "STAT-02", "STAT-03"])
+        st = self.status("architecture-design")
+        self.assertEqual(st["changed_since"], ["QR-01", "STAT-02", "STAT-03"])
+        self.assertEqual(len(st["spec_rows_pending"]), 2)
+        self.assertEqual(st["uncovered"], [])
+        self.assertTrue(any(b.startswith("docs/architecture.md:") for b in st["broken_fences"]), st["broken_fences"])
+        self.assertEqual([Path(p).name for p in st["package_docs"]], ["data.md"])
 
 
 class PipelineDesignTest(Base):

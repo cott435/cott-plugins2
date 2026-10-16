@@ -55,12 +55,20 @@ STATUS ─→ WORKFLOWS (ask) ─→ STEPS ─→ LAYOUT ─→ CHECK ─→ WRI
 
 ### Step 1: Ask Which Workflows the User Will Actually Run
 
-A pipeline exists because someone runs it. Don't derive workflows from the component list. Ask, one question at a time, each with your guess and the default you'll use if they don't care (agent-skills `interview-me`):
+A pipeline exists because someone runs it. Don't derive workflows from the component list: propose candidates from the spec and the milestone, and let the user pick.
+
+1. **Show the whole candidate list in your message first,** numbered, one line each: the trigger (command or call), what it does, and its milestone. Say plainly that nothing is written until they confirm. Never refer to a draft the user can't see.
+2. **Confirm it with one question** (`AskUserQuestion`), with the workflows that fit this milestone as the recommended default:
+   - 2–4 candidates: one multi-select question, one option per workflow.
+   - More than 4: the numbered list stays in the message. Ask one question whose options are "All of them (Recommended)" and "The core set only (1, 2, 4)"; the user can name other numbers instead.
+3. **Then ask separately only about a workflow that is genuinely unclear:** whether two candidates are one workflow, or what a trigger takes. One question at a time, each with your guess and a default (agent-skills `interview-me`).
 
 ```
-Q:       Which commands will you actually run in M1?
-GUESS:   `load` to pull prices for a date range, then `cov-report` to see PCA and cleaning.
-DEFAULT: those two; the backtest waits for M2.
+Candidates for M1 (nothing is written until you confirm):
+1. `load` — pull prices for a universe and date range                M1
+2. `cov-report` — PCA and MP cleaning on loaded returns               M1
+3. `backtest` — min-variance vs equal weight out of sample            M2 (later)
+Q: Which will you actually run in M1?   Default: 1 and 2.
 ```
 
 Ask only what the user must decide: which workflows exist, which belong to this milestone, and scope cuts. Infer the rest (names, triggers, types, step order, module split) and list it under ASSUMPTIONS at the gate. Each confirmed workflow becomes one pipeline.
@@ -140,7 +148,7 @@ Then present:
 
 ## Extend Mode
 
-New spec IDs or components arrived. Take `uncovered_ids` and `components_unowned` from `dt status`. For each ID: an existing step covers it (add it to Covers), an existing step changes its In → Out (edit that row; check the contract still matches, else route to `architecture-design` Revise), or a new workflow or step is needed. Ask about new workflows exactly as in New mode. New pipelines get new IDs and their own entry sketch; existing IDs, rows and step names don't change. Append new PL IDs to the `Used by:` lines of the contract symbols they call.
+New spec IDs or components arrived. Take `uncovered_ids` and `components_unowned` from `dt status`. For each ID: an existing step covers it (add it to Covers), an existing step changes its In → Out (edit that row; check the contract still matches, else route to `architecture-design` Revise), or a new workflow or step is needed. Confirm new workflows exactly as in New mode (Step 1): show the candidate list, the existing pipelines they sit beside, then one question. New pipelines get new IDs and their own entry sketch; existing IDs, rows and step names don't change. Append new PL IDs to the `Used by:` lines of the contract symbols they call.
 
 **Layout in Extend.** A `## Planned layout (pre-build — removed by spine task)` section lives only while some pipeline in the doc is unbuilt; `dt lint` flags `prebuild-left` once every pipeline is built. So:
 - **A new, unbuilt pipeline:** add its modules to the planned layout. If the spine already removed it, write a new one holding only the new modules, marked against the existing tree from `dt layout <pkg>`.
@@ -195,6 +203,7 @@ Never rewrite the table to match code that breaks a readability rule.
 ## Red Flags
 
 - A pipeline the user never confirmed, or one invented from the component list
+- Workflows confirmed one per turn, or a question about a candidate list the user hasn't been shown
 - A step with two owners, or an owner that isn't a component in the architecture
 - Logic in the entry sketch: a loop, branch or computation instead of a named step
 - A spine version that says mock, stub, TODO, "returns zeros" or "hard-coded"

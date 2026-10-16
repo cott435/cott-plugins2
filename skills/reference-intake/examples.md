@@ -101,15 +101,15 @@ milestones: M1 Data + stats, M2 Structure + classical portfolios
 
 **Write.** RF-01 (`next_id`), write it, then `dt next-id RF` → RF-02, then RF-03. Run `dt references --stamp`, then `dt lint docs/references.md` (clean).
 
-**Milestones**, one question per file:
+**Milestones**, the whole list and one question:
 
-> `references/market_decomposition.py` (RF-01) → M2 Structure + classical portfolios? It removes the market mode and the top factors from returns, which the structure step needs. [yes / other milestone / not yet]
+> 1. `references/market_decomposition.py` (RF-01) → M2 Structure + classical portfolios: it removes the market mode and the top factors from returns, which the structure step needs.
+> 2. `references/tft_targets.py` (RF-02) → not yet: there's no forecasting stage on the roadmap. `idea-refine` will offer it when that stage is added.
+> 3. `references/tft_dataset.py` (RF-03) → not yet: same reason.
+>
+> Assign as listed? [all as listed / change some]
 
-User: "yes."
-
-> `references/tft_targets.py` (RF-02) → not yet: there's no forecasting stage on the roadmap. `idea-refine` will offer it when that stage is added. [ok / pick a milestone]
-
-User: "ok." The same goes for RF-03.
+User: "all as listed."
 
 **The index:**
 

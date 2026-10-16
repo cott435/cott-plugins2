@@ -109,7 +109,7 @@ tasks/
 
 - **Read-only toward code.** A planning skill writes only its row of the write matrix (§10). It never creates or runs anything under `src/`, `tests/intent/` or `tests/unit/`. Fixtures are data, so `test-planning` may write them. "Approved, go ahead" means *start the next planning skill*, never *start coding*.
 - **Start with `dt status --skill <name>`.** Take the mode, gaps and next IDs from its output.
-- **Interview one question at a time**, each with a guess and a default (agent-skills `interview-me`). Ask only about what the user must decide: workflows, oracles, scope cuts. Infer everything else and list it as an assumption.
+- **Interview one question at a time**, each with a guess and a default (agent-skills `interview-me`). Ask only about what the user must decide: workflows, oracles, scope cuts. Infer everything else and list it as an assumption. When the decision is which items of a list to keep (workflows, deferred IDs, reference milestones), show the whole list first and confirm it with one question, not one item per turn.
 - **Every review gate lists:**
   - what was written
   - **ASSUMPTIONS:** names, triggers, types, order and sizes the skill chose
@@ -152,7 +152,7 @@ tasks/
 
 **Process**
 1. Run `dt status --skill pipeline-design`: mode, packages in scope, spec IDs and components not yet on any pipeline.
-2. **Ask which workflows the user will actually run.** Confirm them; don't invent them. Each workflow becomes a pipeline with one entry function.
+2. **Ask which workflows the user will actually run.** Show the candidates as a list and confirm them with one question; don't invent them. Each workflow becomes a pipeline with one entry function.
 3. For each pipeline: entry (file and function), trigger (CLI or call), step table, entry sketch.
 4. Derive the planned layout from the pipelines: one entry module per package; one module per step owner. In a single package, each component gets its own subfolder and exports its contract from `__init__`, with cross-component imports only through it. That makes Grow a folder move.
 5. Check the readability rules (below).

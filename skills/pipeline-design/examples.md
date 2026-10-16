@@ -71,13 +71,15 @@ misplaced: none
 
 A package with no `pipelines.md` has nothing to check yet, so `uncovered_ids` and `components_unowned` stay empty in New mode; the scope comes from the architecture's Covers (M1's IDs above). They count at the gate's re-run.
 
-**Interview** (one question per turn):
+**Interview.** The candidate list first, in the message, then one confirming question; a follow-up only where something is unclear:
 
 ```
-Q:       Which commands will you actually run in M1?
-GUESS:   `load` to pull prices for a universe and date range, then `cov-report` to see PCA and cleaning on them.
-DEFAULT: those two.
-User:    Yes. And the report should be runnable on its own; it can load prices itself.
+Candidates for M1 (nothing is written until you confirm):
+1. `load` — pull prices for a universe and date range                 M1
+2. `cov-report` — PCA and MP cleaning on loaded returns                M1
+3. `backtest` — min-variance vs equal weight out of sample             M2 (later)
+Q:       Which will you actually run in M1?   (multi-select; recommended: 1, 2)
+User:    1 and 2. And the report should be runnable on its own; it can load prices itself.
 
 Q:       Should `cov-report` read prices saved by `load`, or call the loader directly?
 GUESS:   call it directly; a separate cache step is more than M1 needs.
@@ -195,10 +197,12 @@ The turn ends there.
 **Interview:**
 
 ```
-Q:       Which things will you actually run for Snake?
-GUESS:   `train snake` to train a DQN agent and save the run, and `replay <run>` to watch it.
-DEFAULT: those two.
-User:    Yes. Training should also show it beats random and the scripted snake.
+Candidates for Snake (nothing is written until you confirm):
+1. `train snake` — train a DQN agent and save the run
+2. `replay <run>` — watch a saved run
+3. `compare <run>` — learning curve against random and scripted baselines
+Q:       Which will you actually run?   (multi-select; recommended: 1, 2, 3)
+User:    1 and 2. Training should also show it beats random and the scripted snake.
 
 Q:       Should the baseline comparison run inside `train`, or as its own command?
 GUESS:   inside `train`, so every saved run carries its learning curve and baseline scores.

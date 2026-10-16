@@ -46,7 +46,7 @@ If `docs/roadmap.md` is missing or has no row for the milestone, stop and route 
 
 - **Write only your row of the write matrix:** `tasks/plan.md`, `tasks/todo.md`, `tasks/queued/**`, roadmap fill-ins (Packages, Pipelines, Depends cells, which `idea-refine` leaves `—`; the milestone section's `**Exit:**`, `**Plan:**` and outcome text), and the AGENTS.md doc map. Never anything under `src/`, `tests/`, `scripts/`, or another skill's docs. Never the roadmap `Status*` column: run `dt roadmap`. Never `todo.md` checkboxes: `dt tick` owns them.
 - **`tasks/plan.md` is never missing.** Between milestones it holds the stub `dt archive` writes. Replace it only with a new plan.
-- **Interview one question at a time**, each with your guess and a default. Ask only what the user must decide: what the milestone covers and defers, its exit criteria, writing queued plans, a missing skill, a mode override. Infer order, sizes, groups and file lists, and list them as ASSUMPTIONS.
+- **Interview one question at a time**, each with your guess and a default. Ask only what the user must decide: what the milestone covers and defers, its exit criteria, writing queued plans, a missing skill, a mode override. Infer order, sizes, groups and file lists, and list them as ASSUMPTIONS. Choosing from a list (what to defer, which tasks to drop): show the whole list, then ask once.
 - **No live user:** don't invent confirmations. Write the plan, put the open decisions under Open questions, leave it Draft.
 - **References waiting:** if `references_unindexed`, `references_changed` or `references_missing` is non-empty, stop and route to `reference-intake` before planning. A changed reference may change what a task should read.
 

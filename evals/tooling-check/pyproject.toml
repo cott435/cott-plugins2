@@ -1,0 +1,165 @@
+[project]
+name = "quantcheck"
+version = "0.1.0"
+requires-python = ">=3.11"
+dependencies = [
+    "numpy",
+    "pandas",
+]
+
+[build-system]
+requires = ["uv_build>=0.11,<0.12"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "ruff",
+    "mypy",
+    "pyright",
+    "pytest",
+    "pytest-cov",
+    "hypothesis",
+    "deptry",
+    "vulture",
+    "typos",
+    "import-linter",
+    "pip-audit",
+    "pandas-stubs",
+]
+
+# ================================================================ Ruff
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+src = ["src", "tests"]
+output-prefer-rule-codes = true # preview mode prints rule names; noqa and CONSTRAINTS.md use codes
+
+[tool.ruff.lint]
+preview = true                  # needed for PLR0914 / PLR1702 / PLR0904 below
+explicit-preview-rules = true   # ...but only turn on preview rules I name
+
+select = [
+    # Core bug-finders and modernisers
+    "E", "F", "I", "B", "UP", "SIM", "C4", "RUF",
+    # Quality
+    "A", "RET", "PTH", "PERF", "PGH", "G", "TRY",
+    "PLE", "PLW",               # only the Pylint error/warning groups
+    # Security and tests
+    "S", "PT",
+    # Domain: dates, NumPy, pandas
+    "DTZ", "NPY", "PD",
+    # Complexity and size (see ruff_complexity.md)
+    "C901",                     # cyclomatic complexity
+    "PLR0911",                  # too many returns
+    "PLR0912",                  # too many branches
+    "PLR0913",                  # too many arguments
+    "PLR0915",                  # too many statements (function length)
+    "PLR0917",                  # too many positional arguments
+    "PLR0914",                  # too many locals          (preview)
+    "PLR1702",                  # too many nested blocks   (preview)
+    "PLR0904",                  # too many public methods  (preview)
+]
+ignore = [
+    "E501",     # line length is handled by the formatter
+    "TRY003",   # long messages in exception constructors: too noisy
+]
+
+[tool.ruff.lint.mccabe]
+max-complexity = 10
+
+[tool.ruff.lint.pylint]
+max-args = 5
+max-positional-args = 4
+max-branches = 10
+max-returns = 5
+max-statements = 40
+max-locals = 12
+max-nested-blocks = 4
+max-public-methods = 20
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**"    = ["S101", "S105", "S106",                      # asserts and fake secrets are fine
+                 "C901", "PLR0912", "PLR0913", "PLR0915", "PLR0917"]  # fixtures and parametrize are long
+"__init__.py" = ["F401"]                                      # re-exports
+
+[tool.ruff.lint.isort]
+known-first-party = ["quantcheck"]
+
+[tool.ruff.format]
+quote-style = "double"
+
+# ============================================================ Size limits
+# Read by scripts/check_size.py (Ruff has no module-length rule)
+[tool.size_limits]
+max_module_lines = 500          # code lines per file
+min_module_lines = 3            # __init__.py is skipped
+max_function_lines = 60         # code lines per function or method
+
+# ================================================================= mypy
+[tool.mypy]
+python_version = "3.11"
+files = ["src"]
+strict = true
+show_error_codes = true
+pretty = true
+
+[[tool.mypy.overrides]]
+module = "tests.*"
+disallow_untyped_defs = false
+
+# =============================================================== pyright
+# Use ONE of mypy/pyright as the hard gate. check.sh gates on mypy and runs
+# pyright only in the reviewer's `full` pass.
+[tool.pyright]
+include = ["src"]
+pythonVersion = "3.11"
+typeCheckingMode = "standard"
+reportUnnecessaryTypeIgnoreComment = true
+
+# ======================================================= pytest + coverage
+[tool.pytest.ini_options]
+minversion = "8.0"
+testpaths = ["tests"]
+addopts = "-ra --strict-markers --strict-config --import-mode=importlib"
+xfail_strict = true
+markers = [
+    "intent: tester-written specification tests",
+    "unit: implementer-written unit tests",
+    "slow: skipped in the fast loop",
+]
+
+[tool.coverage.run]
+source = ["src"]
+branch = true
+
+[tool.coverage.report]
+skip_covered = true
+show_missing = true
+exclude_also = ["if TYPE_CHECKING:", "raise NotImplementedError"]
+fail_under = 80                 # check.sh full reads this; keep in sync with CONSTRAINTS.md
+
+# =============================================================== deptry
+[tool.deptry]
+known_first_party = ["quantcheck"]
+
+# ======================================================== import-linter
+[tool.importlinter]
+root_package = "quantcheck"
+
+[[tool.importlinter.contracts]]
+name = "Layers: portfolio > stats > data"
+type = "layers"
+layers = [
+    "quantcheck.portfolio",
+    "quantcheck.stats",
+    "quantcheck.data",
+]
+
+# ============================================================== vulture
+[tool.vulture]
+paths = ["src"]
+min_confidence = 80
+
+# ================================================================ typos
+[tool.typos.default]
+extend-ignore-identifiers-re = ["^[A-Z]{1,5}$"]   # stock tickers

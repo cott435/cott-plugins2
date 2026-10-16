@@ -21,17 +21,21 @@ from ..status.common import available_skills
 
 # code → severity (E fails the run, W doesn't)
 SEVERITY = {
-    "dup-id": "E", "missing-ref": "E", "retired-ref": "E", "budget": "W", "approved-edit": "W",
+    "dup-id": "E", "missing-ref": "E", "retired-ref": "E", "budget": "W", "grow-size": "W", "approved-edit": "W",
     "prebuild-left": "E", "task-size": "E", "task-acceptance": "E", "task-title": "E", "task-fields": "E",
-    "task-step": "W", "depends": "E", "parallel": "E", "verify-smoke": "E", "todo-mismatch": "E",
+    "task-step": "W", "depends": "E", "milestone-size": "E", "parallel": "E", "verify-smoke": "E", "todo-mismatch": "E",
     "finding-disposition": "E", "foreign-plan": "W", "broken-fence": "E", "header": "E",
-    "unreadable": "E", "internal": "W", "pipeline-fields": "E", "spine-mock": "W",
+    "unreadable": "E", "internal": "W", "pipeline-fields": "E", "spine-mock": "W", "contract-heading": "E",
     "fixture-size": "W",                # missing fixture files are reported as E
     "ref-file": "E", "ref-hash": "W", "ref-large": "W", "ref-prefix": "E", "roadmap-skill": "W",
 }
 
-# Size budgets (planning-stage.md §3), in lines.
-BUDGETS = {"contract": 60, "pipelines": 120, "tests": 120, "plan": 400, "queued-plan": 400}
+# Size budgets (planning-stage.md §3), in lines. Package docs are budgeted per unit (lines per unit × units +
+# an allowance for the header, groups and Retired lines); pipelines.md's pre-build layout section is extra.
+BUDGETS = {"plan": 400, "queued-plan": 400}
+UNIT_BUDGETS = {"contract": (8, 12, "symbol"), "pipelines": (35, 10, "pipeline"), "tests": (10, 15, "test case")}
+# Past these a package holds too much for one set of docs: consider a Grow.
+GROW_CEILINGS = {"contract": 200, "pipelines": 300, "tests": 300}
 ROADMAP_SECTION_MAX = 6
 AGENTS_DOC_MAP_MAX = 25
 
@@ -39,6 +43,7 @@ FIXTURE_MAX_BYTES = 100 * 1024
 SPINE_MOCK = re.compile(r"\b(mock|stub|fake|todo|placeholder)", re.IGNORECASE)
 
 SIZE_FILES = {"XS": (1, 1), "S": (1, 2), "M": (3, 5)}
+TRACK_MAX = 15        # Phase 0 tasks + the longest Depends-on chain after them
 REQUIRED_TASK_FIELDS = ("Package", "Step", "Size", "Mode", "Read", "Acceptance", "Verify")
 
 # Fields and table columns whose IDs must resolve. `Depends on` is checked by `depends`.
@@ -220,11 +225,36 @@ def check_retired_ref(ctx: Context):
 
 # ---- per-doc checks -------------------------------------------------------------------------------
 
+def _units(doc) -> int:
+    if doc.kind == "contract":
+        return len(model.symbols(doc))
+    if doc.kind == "pipelines":
+        return len(model.pipelines(doc))
+    return len(model.test_cases(doc))
+
+
+def _unit_budget(doc) -> tuple[int, str]:
+    """(budget in lines, how it was worked out) for a contract, pipelines or tests doc."""
+    per, allowance, unit = UNIT_BUDGETS[doc.kind]
+    n = _units(doc)
+    layout = sum(h.end - h.line for h in doc.prebuild_sections() if h.level == 2) if doc.kind == "pipelines" else 0
+    how = f"{per} per {unit} × {n} + {allowance}" + (f" + {layout} layout" if layout else "")
+    return per * n + allowance + layout, how
+
+
 def check_budget(ctx: Context):
     for doc in ctx.scoped_docs:
         limit = BUDGETS.get(doc.kind)
         if limit and len(doc.lines) > limit:
             yield _p(doc, 0, "budget", f"{len(doc.lines)} lines, budget {limit} ({doc.kind})")
+        if doc.kind in UNIT_BUDGETS:
+            limit, how = _unit_budget(doc)
+            if len(doc.lines) > limit:
+                yield _p(doc, 0, "budget", f"{len(doc.lines)} lines, budget {limit} ({how})")
+            ceiling = GROW_CEILINGS[doc.kind]
+            if len(doc.lines) > ceiling:
+                yield _p(doc, 0, "grow-size", f"{len(doc.lines)} lines, over the {ceiling}-line ceiling for one "
+                         f"package's {doc.kind} doc: architecture-design should consider a Grow")
         if doc.kind == "roadmap":
             for h in doc.headings:
                 if h.id and re.fullmatch(md.MILESTONE_ID, h.id):
@@ -298,6 +328,28 @@ def check_prebuild_left(ctx: Context):
             elif pls and all(built.values()):
                 yield _p(doc, h.line, "prebuild-left",
                          "every pipeline here is built; run `dt prebuild-clear` for the last one")
+
+
+SYMBOL_LEAD = re.compile(rf"^{md.SYMBOL_ID}")
+NAME_SEP = re.compile(r"\s*(?:/|,|·|&|\+|\band\b)\s*")
+
+
+def check_contract_heading(ctx: Context):
+    """A contract heading that starts with a symbol but isn't `<pkg>.<symbol>: <title>`, most often one that
+    names several (`### train.train / train.train_seeds: …`). dt resolves a symbol only from its own heading."""
+    for doc in ctx.scoped_docs:
+        if doc.kind != "contract":
+            continue
+        for h in doc.headings:
+            if h.id or h.level not in (2, 3) or not SYMBOL_LEAD.match(h.text):
+                continue
+            names = [n for n in NAME_SEP.split(h.text.split(":", 1)[0]) if n]
+            if len(names) > 1:
+                yield _p(doc, h.line, "contract-heading",
+                         f"heading names {len(names)} symbols ({', '.join(names)}): give each its own "
+                         "`### <pkg>.<symbol>: <title>` section")
+            else:
+                yield _p(doc, h.line, "contract-heading", "heading isn't `### <pkg>.<symbol>: <title>`, so dt can't resolve it")
 
 
 # ---- pipeline and test-case checks ----------------------------------------------------------------
@@ -564,6 +616,38 @@ def _cycles(graph: dict[str, list[str]]) -> list[list[str]]:
     return out
 
 
+def _longest_chain(tasks: list[model.Task]) -> list[str]:
+    """The longest Depends-on chain among `tasks` (IDs, first to last). Dependencies outside `tasks` and
+    cycles (reported by `depends`) are ignored."""
+    graph = {t.id: [d for d in t.depends_on if d != t.id] for t in tasks}
+    best: dict[str, list[str]] = {}
+
+    def chain(node: str, path: frozenset) -> list[str]:
+        if node in best:
+            return best[node]
+        prev = [chain(d, path | {node}) for d in graph[node] if d in graph and d not in path]
+        best[node] = max(prev, key=len, default=[]) + [node]
+        return best[node]
+
+    return max((chain(t.id, frozenset()) for t in tasks), key=len, default=[])
+
+
+def check_milestone_size(ctx: Context):
+    """A milestone's track is its Phase 0 tasks plus the longest Depends-on chain after them. Parallel
+    tracks don't add up, so the plan's total task count isn't capped (the plan's line budget bounds it)."""
+    for doc in ctx.plan_docs:
+        tasks = model.tasks(doc)
+        spine = [t for t in tasks if t.is_spine]
+        chain = _longest_chain([t for t in tasks if not t.is_spine])
+        n = len(spine) + len(chain)
+        if n > TRACK_MAX:
+            line = doc.header_line if doc.header_line is not None else 0
+            yield _p(doc, line, "milestone-size",
+                     f"track is {n} tasks, cap {TRACK_MAX}: Phase 0 {len(spine)} + chain {' → '.join(chain)} "
+                     f"({len(chain)}). Shorten the chain, or split the milestone where a later part needs an "
+                     "earlier part's outputs; never split independent tracks")
+
+
 def check_parallel(ctx: Context):
     for doc in ctx.plan_docs:
         groups: dict[str, list[model.Task]] = {}
@@ -660,12 +744,12 @@ def check_unreadable(ctx: Context):
 
 
 CHECKS = [
-    check_unreadable, check_header, check_broken_fence,
+    check_unreadable, check_header, check_broken_fence, check_contract_heading,
     check_pipeline_fields, check_spine_mock, check_fixture_size,
     check_dup_id, check_missing_ref, check_retired_ref,
     check_budget, check_approved_edit, check_prebuild_left,
     check_task_fields, check_task_size, check_task_acceptance, check_task_title, check_task_step,
-    check_depends, check_parallel, check_verify_smoke,
+    check_depends, check_milestone_size, check_parallel, check_verify_smoke,
     check_todo_mismatch, check_finding_disposition, check_foreign_plan,
     check_ref_file, check_ref_hash, check_ref_large, check_ref_prefix, check_roadmap_skill,
 ]

@@ -36,7 +36,7 @@ Decide the shape first and record it in the header (`**Shape:** Single package` 
 | Interfaces | `contract.md`, one `## <component>` group per component | Each package's `contract.md`; the root lists cross-package contracts and System pipelines |
 | Dependencies | Third-party libraries | Package dependency graph and layering rules, plus third-party libraries |
 | Decisions | In `docs/architecture.md` | All in the root doc, each tagged with a scope (`system` or a package id) |
-| Typical length | 1-3 pages; contract ≤ 1 page | Root 2-4 pages; each package doc 1-3 pages, contract ≤ 1 page |
+| Typical length | 1-3 pages; contract ≤ ~8 lines per symbol | Root 2-4 pages; each package doc 1-3 pages, contract ≤ ~8 lines per symbol |
 
 **Choose multi-package only when there is a real boundary:** parts that are installed, versioned, or deployed separately; different runtimes or languages; different owners; or a dependency direction worth enforcing with tooling. Otherwise choose single package. **A proof of concept is almost always a single package.**
 
@@ -84,9 +84,10 @@ Split the system into components (modules or packages). For each, give one respo
 Write `docs/packages/<pkg>/contract.md`: the provider's promise to its consumers. Consumers read only this page, so it stands alone.
 
 - **One `###` section per public symbol** (function, class, or a type consumers see), headed `### <id>.<symbol>: <title>`. `<id>` is the package id. In a single package it is the component id, with sections grouped under `## <component>` (multi-package contracts drop that level and link the `architecture.md` beside them). The ID survives Grow, because the component id becomes the package id.
+- **One symbol per heading.** Never `### train.train / train.train_seeds: …` or `### baselines.RandomAgent / ScriptedSnake: …`, however alike the symbols are: dt resolves `Read:` IDs and `dt context` packets only from a symbol's own heading. `dt lint` errors on these (`contract-heading`).
 - **Each section:** the signature in the project's language, then **Invariants** (shapes, ranges, guarantees), **Errors** (what fails and how it's reported), and **Used by** (consuming components or packages, plus `PL-NN` IDs once those pipelines exist).
 - **Contract first:** the contract is defined before either side is built. **The provider owns it.**
-- **Public only, ≤ 1 page.** Helpers, modules and call order belong in the package's architecture or its `pipelines.md`. A retired symbol collapses to one line under `## Retired`: `- ~~stats.foo: Title~~ Retired YYYY-MM-DD: reason`.
+- **Public only, ≤ ~8 lines per symbol.** Helpers, modules and call order belong in the package's architecture or its `pipelines.md`. A retired symbol collapses to one line under `## Retired`: `- ~~stats.foo: Title~~ Retired YYYY-MM-DD: reason`.
 
 ````markdown
 # [pkg] — Contract
@@ -197,7 +198,7 @@ tests/                   → folders only; files are planned in pipelines.md
 
 ### Step 6: Review Gate (CRITICAL)
 
-Before presenting the Draft, run `dt status` again. `uncovered`, `changed_since` and `stale` should be empty, or each gap should be listed under Risks and open questions. `broken_fences`, `contracts_missing` and `legacy_layout` must be empty: for a broken fence, move lines added after a block's closing fence inside it and delete the stray fence. Also check two things by hand:
+Before presenting the Draft, run `dt status` again. `uncovered`, `changed_since` and `stale` should be empty, or each gap should be listed under Risks and open questions. `broken_fences`, `contracts_missing` and `legacy_layout` must be empty: for a broken fence, move lines added after a block's closing fence inside it and delete the stray fence. `dt lint docs/` must report no errors (`contract-heading` among them). Also check two things by hand:
 
 - A superseded decision is cited only by its own line, the decision that replaced it, and the Changelog.
 - No Accepted decision, Overview sentence or contract contradicts a newer decision. Search for the counts, ranges and names this round changed.
@@ -227,7 +228,7 @@ The spec gained requirements (usually from a specced idea) or changed some.
 2. **Grow check.** Check every trigger, and say at the gate which (if any) fired. `grow_triggers` reports the measurable ones; judge the rest from the spec and idea file.
    - The new requirements bring a dependency stack the rest shouldn't carry (torch, gym).
    - A one-way dependency is worth enforcing (data must never import models, to prevent leakage).
-   - A package exceeds ~3 pipelines or ~12 modules, or its docs no longer fit a 2,000-line agent context.
+   - A package exceeds ~3 pipelines or ~12 modules, or its docs no longer fit a 2,000-line agent context, or `dt lint` warns `grow-size` on one of them.
    - A part runs or deploys on its own (a paper-trading service).
 
    If one fires, propose Grow to the user (one question, with your recommendation) before placing anything.
@@ -265,7 +266,7 @@ The code and the doc disagree, or there's code with no doc. Document what *is* f
 | "It's a proof of concept, it doesn't need an architecture" | It needs a short one. One page that names the contracts and the three choices that matter saves the rewrite. |
 | "We'll need a monorepo eventually, so start with one" | Packages you don't need yet cost tooling, versioning, and boundary friction every day. Name the seams; split when a Grow trigger fires. |
 | "It's one more component, no need for the Grow check" | No eval run ever entered Grow; it was never checked. Check the four triggers every Extend. |
-| "Consumers can read the architecture for the API" | They then read internals too, and depend on them. The contract is the whole promise, on one page. |
+| "Consumers can read the architecture for the API" | They then read internals too, and depend on them. The contract is the whole promise, in one doc. |
 | "The decision is obvious, no need to record it" | Obvious today, mysterious in six months. A three-line decision entry is enough. |
 | "I'll pick the data vendor myself, it's a technical detail" | Paid services and data sources are expensive to reverse. Check them against DATA- requirements and ask the user. |
 | "I'll just update the old decision with the new choice" | If the choice is reversed, the reason for the original, and why it changed, is lost. Supersede it: the new decision's Context records both, and the old one shrinks to one line. |
@@ -284,7 +285,7 @@ The code and the doc disagree, or there's code with no doc. Document what *is* f
 - A shared decision that lists each stage's members, or is revised in every round
 - A Changelog row that doesn't cite the idea file of the spec rows it absorbed, leaving `changed_since` non-empty
 - A step an installed skill owns, designed as a home-made procedure instead of routed to the skill
-- A contract in prose only, a section with no Errors, internals in `contract.md`, or an Interfaces section that restates the contract
+- A contract in prose only, a heading naming several symbols, a section with no Errors, internals in `contract.md`, or an Interfaces section that restates the contract
 - A system pipeline that names functions or files; a Project layout that lists files; package docs still under `docs/architecture/`
 - An Extend round with no Grow check
 - Data sources or model types chosen without checking the spec's DATA- and model-quality requirements
@@ -297,7 +298,8 @@ Before pointing to `pipeline-design`:
 - [ ] Spec is `Approved` and linked; the shape is recorded and justified
 - [ ] `dt status` reports no uncovered, changed or stale requirements (or each gap is listed under Risks and open questions), no broken fences, no missing contracts and no legacy layout
 - [ ] Dependency direction is one-way with no cycles; multi-package has written dependency rules and System pipelines for every cross-package flow
-- [ ] Every package has a `contract.md` with one section per public symbol: signature, invariants, errors, used by
+- [ ] Every package has a `contract.md` with one section per public symbol, headed by that symbol alone: signature, invariants, errors, used by
+- [ ] `dt lint docs/` reports no errors
 - [ ] Every expensive-to-reverse choice has an `AD-NN` entry with alternatives and consequences; in data and ML projects, sources and model approach are decisions checked against the spec's DATA- and model-quality requirements
 - [ ] Extend: the Grow triggers were checked and reported at the gate
 - [ ] Changes after the first approval: a one-line Changelog row citing the spec rows' source files, superseded decisions collapsed to one line with nothing else citing them, decisions changed in part revised (with the Overview and contracts), Risks consolidated, Status back to Draft until approved

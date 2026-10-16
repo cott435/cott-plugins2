@@ -49,6 +49,8 @@ Goal 2 (no extra daily work for owner) → Regulars setup, Order notifications
 Goal 3 (owner keeps full value)        → Direct payment
 ```
 
+**Every stage the brief lists is specced in full.** When the brief and roadmap name every stage up front, this New-mode round writes features, requirements, criteria and edge cases for all of them: never "M1 in full, M2–M5 outlined". Later skills design only what the spec holds, so an outlined stage is never designed.
+
 Every feature must serve at least one goal. A feature that serves no goal is either missing from the brief (go back to `idea-refine`) or shouldn't be built. Every goal must have at least one feature.
 
 Give each feature a short, stable **feature code** — 2-5 capital letters (`SAVE`, `TEXT`, `PAY`). `RF` is reserved for references (`dt lint` reports `ref-prefix`). Codes are chosen once and never renamed; requirement IDs depend on them.
@@ -222,6 +224,7 @@ After that, don't edit the file again, even when a later round changes what it d
 | Rationalization | Reality |
 |---|---|
 | "The brief is clear enough — I'll skip the acceptance check" | The gate exists so *why* is agreed before *what*. Ask. |
+| "I'll spec M1 in full and outline the later stages" | Architecture and pipelines design only what the spec holds. An outlined stage stays undesigned, its IDs sit on no pipeline, and the shape never grows for it. |
 | "Acceptance criteria are obvious from the requirement" | If they're obvious, they take ten seconds to write. If they're not, you just found a gap. |
 | "I'll add the tech stack so the architecture goes faster" | Mixing design into requirements locks in decisions before anyone reviewed them. Keep the spec about behavior. |
 | "Renumbering makes the spec tidier" | Plans, tests, and PRs reference IDs. Renumbering silently breaks every one of them. |
@@ -237,6 +240,7 @@ After that, don't edit the file again, even when a later round changes what it d
 ## Red Flags
 
 - Writing a spec with no accepted brief, or adding a feature from an idea file still in Draft
+- New mode, up front: a stage the brief lists only outlined, or left for later
 - A feature with no `Serves:` goal, or a brief goal with no feature
 - Requirements with no Given/When/Then criteria
 - Vague words in requirements: "fast", "easy", "intuitive", "robust", "etc."
@@ -258,6 +262,7 @@ Before handing off to `architecture-design`:
 
 - [ ] `docs/brief.md` is `Accepted` and linked from the spec header (and, in extend mode, the idea file is `Accepted`)
 - [ ] Every brief goal maps to at least one feature; every feature lists the goals it serves
+- [ ] New mode, up front: every stage on the roadmap is specced in full, with criteria and edge cases
 - [ ] Every requirement has a permanent ID and at least one Given/When/Then criterion
 - [ ] Edge cases and error behavior are written for each feature
 - [ ] Out of scope includes everything on the brief's Not Doing list

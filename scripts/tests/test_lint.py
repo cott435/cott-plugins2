@@ -96,6 +96,41 @@ class BudgetChecks(LintCase):
         code, _ = run_main("--root", str(self.p.root), "lint")
         self.assertEqual(code, 0)
 
+    def _add_symbols(self, n: int):
+        self.p.edit(CONTRACT, "## portfolio", "".join(
+            f"### stats.extra{k}: Extra {k}\n`def extra{k}() -> None`\n- **Invariants:** none\n"
+            f"- **Errors:** none\n- **Used by:** PL-02\n\n" for k in range(n)) + "## portfolio")
+
+    def budget_messages(self, rel):
+        return [p.message for p in self.problems() if p.path == rel and p.code in ("budget", "grow-size")]
+
+    def test_contract_budget_is_per_symbol(self):
+        self._add_symbols(10)       # 93 lines, well past the old fixed 60, at 6 lines a symbol
+        self.assertEqual(self.budget_messages(CONTRACT), [])
+        self.p.edit(CONTRACT, "- **Used by:** PL-03", "- **Used by:** PL-03\n" + "filler\n" * 90)
+        self.assertEqual(self.budget_messages(CONTRACT), ["184 lines, budget 124 (8 per symbol × 14 + 12)"])
+
+    def test_pipelines_budget_is_per_pipeline(self):
+        self.p.edit(PIPES, "**Covers:** PORT-01, PORT-02", "**Covers:** PORT-01, PORT-02\n" + "filler\n" * 70)
+        self.assertEqual(self.budget_messages(PIPES), ["135 lines, budget 127 (35 per pipeline × 3 + 10 + 12 layout)"])
+
+    def test_pipelines_layout_section_is_extra(self):
+        layout = "## Planned layout (pre-build — removed by spine task)"
+        self.p.edit(PIPES, layout, layout + "\n" + "- line\n" * 100)
+        self.assertEqual(self.budget_messages(PIPES), [])
+
+    def test_tests_budget_is_per_case(self):
+        self.p.edit("docs/packages/quant/tests.md", "## Open questions", "filler\n" * 20 + "## Open questions")
+        self.assertCode("docs/packages/quant/tests.md", "budget")
+
+    def test_grow_ceiling_is_a_separate_warning(self):
+        self._add_symbols(30)
+        self.assertEqual(self.budget_messages(CONTRACT), [
+            "213 lines, over the 200-line ceiling for one package's contract doc: architecture-design should "
+            "consider a Grow"])
+        code, _ = run_main("--root", str(self.p.root), "lint")
+        self.assertEqual(code, 0)
+
     def test_plan_over_budget(self):
         self.p.edit(PLAN, "## Replan notes", "## Replan notes\n" + "- note\n" * 400)
         self.assertCode(PLAN, "budget")
@@ -306,6 +341,35 @@ class TaskChecks(LintCase):
         msgs = [p.message for p in self.problems() if p.code == "depends"]
         self.assertIn("cycle: M1-T01 → M1-T02 → M1-T01", msgs)
 
+    def _add_tasks(self, n: int, depends):
+        """n XS tasks M1-T07… before the exit checkpoint; `depends(k)` gives task k's Depends on."""
+        blocks = []
+        for k in range(7, 7 + n):
+            blocks.append(f"### M1-T{k:02d}: Extra step {k}\n"
+                          "**Package:** quant · **Step:** PL-02.pca · **Size:** XS · **Mode:** solo\n"
+                          "**Read:** PL-02\n**Acceptance:**\n- [ ] TC-03 passes\n"
+                          "**Verify:** `python -m quant.stats cov-report --smoke`\n"
+                          f"**Depends on:** {depends(k)} · **Files likely:** src/quant/stats/x{k}.py\n\n")
+        self.p.edit(PLAN, "### Checkpoint: milestone exit", "".join(blocks) + "### Checkpoint: milestone exit")
+
+    def size_messages(self):
+        return [p.message for p in self.problems() if p.code == "milestone-size"]
+
+    def test_milestone_size_counts_spine_plus_longest_chain(self):
+        self._add_tasks(12, lambda k: "M1-T05" if k == 7 else f"M1-T{k - 1:02d}")
+        chain = " → ".join(f"M1-T{k:02d}" for k in [4, 5] + list(range(7, 19)))
+        self.assertEqual(self.size_messages(), [
+            f"track is 16 tasks, cap 15: Phase 0 2 + chain {chain} (14). Shorten the chain, or split the milestone "
+            "where a later part needs an earlier part's outputs; never split independent tracks"])
+
+    def test_milestone_size_at_cap_is_fine(self):
+        self._add_tasks(11, lambda k: "M1-T05" if k == 7 else f"M1-T{k - 1:02d}")
+        self.assertEqual(self.size_messages(), [])
+
+    def test_parallel_tracks_do_not_add_up(self):
+        self._add_tasks(20, lambda k: "M1-T02")
+        self.assertEqual(self.size_messages(), [])
+
     def test_parallel_shared_file(self):
         self.p.edit(PLAN, "src/quant/stats/rmt.py, tests/unit/quant/test_rmt.py", "src/quant/stats/rmt.py, src/quant/data/steps.py")
         msgs = [p.message for p in self.problems() if p.code == "parallel"]
@@ -377,6 +441,21 @@ class FormatChecks(LintCase):
     def test_header_without_status(self):
         self.p.edit(CONTRACT, "**Status:** Approved · ", "")
         self.assertCode(CONTRACT, "header")
+
+    def test_contract_heading_naming_several_symbols(self):
+        self.p.edit(CONTRACT, "### stats.clean_eigen: Random-matrix cleaning",
+                    "### stats.clean_eigen / shrink, stats.ledoit_wolf: Cleaning")
+        found = [p.message for p in self.problems() if p.code == "contract-heading"]
+        self.assertEqual(found, ["heading names 3 symbols (stats.clean_eigen, shrink, stats.ledoit_wolf): "
+                                 "give each its own `### <pkg>.<symbol>: <title>` section"])
+
+    def test_contract_heading_without_title(self):
+        self.p.edit(CONTRACT, "### stats.clean_eigen: Random-matrix cleaning", "### stats.clean_eigen")
+        self.assertCode(CONTRACT, "contract-heading")
+
+    def test_contract_heading_check_is_contract_only(self):
+        self.p.edit(ARCH, "## Interfaces", "### stats.a / stats.b: Two\n\n## Interfaces")
+        self.assertNotIn((ARCH, "contract-heading"), self.found())
 
     def test_roadmap_and_todo_need_no_status(self):
         self.assertNotIn(("docs/roadmap.md", "header"), self.found())

@@ -17,12 +17,12 @@ The brief (`docs/brief.md`) says **why** the project exists; idea files (`docs/i
 
 **Not for:**
 - Ideas that are still vague, or projects with no brief (use `idea-refine` first)
-- Technical design or architecture (use `architecture-design` after the spec is approved), or task breakdown (a planning skill)
+- Technical design or architecture (use `architecture-design` after the spec is approved), or pipelines and task breakdown (`pipeline-design`, `build-planning`)
 - One-line fixes where the expected behavior is obvious
 
 ## Preconditions
 
-Run `bash skills/spec-writing/scripts/spec-status.sh` first. It reports the mode, brief and spec status, which ideas are `Accepted` and waiting to be specced, and the next free requirement ID for each prefix — use those IDs rather than counting by hand.
+Run `python3 ../../scripts/dt.py status --skill spec-writing` first. The path is relative to this skill's folder: resolve it from where this SKILL.md lives, and run the command from the project root. It reports the mode, brief and spec status, which ideas are `Accepted` and waiting to be specced (`ideas_ready`), and the next free requirement ID for each prefix (`prefixes`) — use those IDs rather than counting by hand.
 
 1. Read `docs/brief.md`. If it doesn't exist, stop and route to `idea-refine`.
 2. Decide the mode:
@@ -31,7 +31,7 @@ Run `bash skills/spec-writing/scripts/spec-status.sh` first. It reports the mode
 3. Check the input's Status. If it is `Draft`, ask the user whether they accept it; proceed only once they do (and set it to `Accepted`). In extend mode, also check the brief: if the idea edited it, the brief must be `Accepted` too.
 4. Extend mode with no idea file (the user just describes a feature): route to `idea-refine` first — unless the change is small and fully clear, in which case confirm with the user and add it directly, noting "no idea file" in the Changelog row.
 5. If inside a codebase, scan for existing behavior the spec must respect (current features, data, integrations). Ground requirements in what exists.
-6. Check which other skills are installed. `spec-status.sh` lists the project's skills under `skills`; your context lists any others. If one owns a step this spec needs, such as testing a hypothesis, a security review or a data workflow, the requirement for that step names the skill. It uses the skill's installed name, and says what the skill is given and what result counts as a pass: "Each candidate feature is tested with the `<skill name>` skill on held-out residual returns; it passes only if the null is rejected at 5% after correction." Don't write your own version of a procedure an installed skill owns. Do this check in every mode and every extend round, not just the first.
+6. Check which other skills are installed. `dt status` lists the project's skills under `skills`; your context lists any others. If one owns a step this spec needs, such as testing a hypothesis, a security review or a data workflow, the requirement for that step names the skill. It uses the skill's installed name, and says what the skill is given and what result counts as a pass: "Each candidate feature is tested with the `<skill name>` skill on held-out residual returns; it passes only if the null is rejected at 5% after correction." Don't write your own version of a procedure an installed skill owns. Do this check in every mode and every extend round, not just the first.
 
 ## The Process
 
@@ -172,11 +172,13 @@ Then:
 2. Ask the user to approve the spec or request changes.
 3. **STOP YOUR TURN.** Do not start the architecture or code in the same turn.
 
+**No live user** (a headless run): don't invent confirmations. Write the spec, put the assumptions and questions you couldn't confirm under Open questions, leave it Draft, and stop.
+
 **Handling the reply.** Requested edits are the whole turn. Never edit this spec and draft the architecture in the same turn.
 
 | The user says | Do | Then |
 |---|---|---|
-| Approved, nothing to change | Set `**Status:** Approved`, update the date, mark the idea file `Specced` and freeze it (extend mode; see below) | Hand off to `architecture-design` |
+| Approved, nothing to change | Set `**Status:** Approved`, update the date, mark the idea file `Specced` and freeze it (extend mode; see below). Offer to commit the spec and idea file; commit only on a yes | Hand off to `architecture-design` |
 | Approved, with a change ("approved, but make QR-02 ≤ 5 minutes") | Make exactly that edit. If the user fully specified it, set Approved. If it needs your judgment, keep Draft. | **Stop.** List what you changed. The architecture starts next turn, after the user has seen the edit. |
 | Changes requested | Edit, keep Draft | Repeat this gate |
 
@@ -198,9 +200,9 @@ Run Steps 1-5 for the idea only, with these rules:
 1. **Check for conflicts first.** Start with the IDs under *Touches*, then search the rest of the spec for anything else the idea contradicts. List conflicts for the user before writing — "Shared editing changes **EDIT-03** (only the owner can edit). Proposed: owner *or invited editors* can edit."
 2. **Keep IDs stable, keep the text current.** IDs are never renumbered or reused. Old text does not stay in the spec once it stops being true; git keeps it.
    - New feature → new `### Feature (CODE)` section with a new code and IDs starting at `-01`.
-   - New behavior in an existing feature → next unused number in that feature (if `SAVE-04` is the highest, add `SAVE-05`, even if `SAVE-02` was removed). `spec-status.sh` reports it.
+   - New behavior in an existing feature → next unused number in that feature (if `SAVE-04` is the highest, add `SAVE-05`, even if `SAVE-02` was removed). `dt status` reports it under `prefixes`.
    - **Widen, don't bolt on.** If an existing requirement already covers this concern for an earlier part of the project, rewrite it to cover the new part too, instead of adding a near-duplicate. A training-time limit written for the first game becomes a limit for every game. A summary that says "the first milestone" is rewritten.
-   - Changed requirement → rewrite it in place and keep its ID. Put no marker on it. Instead, list it as `(changed)` in this round's Changelog row, with the reason in the row's Change text. `arch-status.py` reads those Changelog marks to find what the architecture must revisit, so list every changed ID.
+   - Changed requirement → rewrite it in place and keep its ID. Put no marker on it. Instead, list it as `(changed)` in this round's Changelog row, with the reason in the row's Change text. `architecture-design` reads those Changelog marks (through `dt status`) to find what the architecture must revisit, so list every changed ID.
    - Removed requirement → collapse it to one struck line and delete its criteria and edge cases: `- **CODE-03** ~~[short name]~~ *Removed YYYY-MM-DD: [reason, or "replaced by CODE-07"].*` Never delete the ID line; the ID stays retired.
 3. **Link back to the idea.** Add `**Source:** [ideas/<slug>.md](ideas/<slug>.md)` under the `Serves:` line of each new feature section, so readers can find the full why.
 4. **Update everything it touches, and consolidate.** Summary (rewritten for the whole spec, not appended to), Users, Serves lines. Scope stays one deduplicated list per side: merge new out-of-scope items into it, and drop or narrow anything the new features bring into scope (the hygiene check's *Out of scope* item). Remove assumptions and open questions that are answered or no longer apply.
@@ -263,7 +265,7 @@ Before handing off to `architecture-design`:
 - [ ] Steps owned by an installed skill name that skill, with its inputs and pass condition
 - [ ] Data/ML projects: data needs are `DATA-` requirements with testable guarantees; model criteria name metric, held-out data, threshold, and baseline
 - [ ] Assumptions were confirmed by the user; open questions are listed
-- [ ] The turn ended after the Draft was saved; approval came in a later turn
+- [ ] The turn ended after the Draft was saved; approval came in a later turn (headless: left Draft, confirmations under Open questions); a commit only on the user's yes
 - [ ] Extend mode: no IDs renumbered or reused, changes rewritten in place with no marker, removed requirements collapsed to one struck line, conflicts raised with the user
 - [ ] Extend mode: one one-line Changelog row, listing every changed ID as `(changed)`
 - [ ] Extend mode: Summary, Scope and quality requirements describe the whole spec as it now stands, with no duplicates and no out-of-scope line that a feature now contradicts

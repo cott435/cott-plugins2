@@ -1,0 +1,21 @@
+# Written by dev-team2 build-setup (only on request). Runs the full checks on every push and
+# pull request, and nightly so pip-audit sees new advisories against unchanged code (CR-26).
+name: check
+on:
+  push:
+    branches: [{{default_branch}}]
+  pull_request:
+  schedule:
+    - cron: "0 5 * * *"
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0              # floor_guard diffs against the target branch
+      - uses: astral-sh/setup-uv@v6
+      - run: uv sync --frozen
+      - run: bash scripts/check.sh full
+      - if: github.event_name == 'pull_request'
+        run: bash scripts/floor_guard.sh --base "origin/${{ github.base_ref }}"

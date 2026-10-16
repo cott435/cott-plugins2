@@ -1,0 +1,83 @@
+# Multi-package: the root of a uv workspace. It holds the shared tool config and the dev
+# tools; each package's own dependencies live in packages/<id>/pyproject.toml
+# (template: package.pyproject.toml). Sections not shown here are copied unchanged from the
+# single-package pyproject.toml: [tool.ruff.lint] select/ignore, mccabe, pylint,
+# per-file-ignores, [tool.ruff.format], [tool.size_limits], [tool.pytest.ini_options],
+# [tool.typos.default]. Only the sections below differ.
+[project]
+name = "{{project_name}}-workspace"
+version = "0.1.0"
+requires-python = ">={{python_version}}"
+dependencies = [
+{{workspace_members}}
+]
+
+[tool.uv]
+package = false                 # the root is not built; it installs every member
+
+[tool.uv.workspace]
+members = ["packages/*"]
+
+[tool.uv.sources]
+{{workspace_sources}}
+
+[dependency-groups]
+dev = [
+    "ruff",
+    "mypy",
+    "pyright",
+    "pytest",
+    "pytest-cov",
+    "hypothesis",
+    "deptry",
+    "vulture",
+    "typos",
+    "import-linter",
+    "pip-audit",
+{{stub_packages}}
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "{{python_target}}"
+src = [{{src_dirs_quoted}}, "tests"]
+output-prefer-rule-codes = true # preview mode prints rule names; noqa and CONSTRAINTS.md use codes
+extend-exclude = ["scripts/vulture_whitelist.py"]
+
+[tool.ruff.lint.isort]
+known-first-party = [{{pkgs_quoted}}]
+
+[tool.mypy]
+python_version = "{{python_version}}"
+files = [{{src_dirs_quoted}}]
+strict = true
+show_error_codes = true
+pretty = true
+
+[tool.pyright]
+include = [{{src_dirs_quoted}}]
+pythonVersion = "{{python_version}}"
+typeCheckingMode = "standard"
+reportUnnecessaryTypeIgnoreComment = true
+enableTypeIgnoreComments = false
+
+[tool.coverage.run]
+source_pkgs = [{{pkgs_quoted}}]
+branch = true
+
+[tool.coverage.report]
+skip_covered = true
+show_missing = true
+exclude_also = ["if TYPE_CHECKING:", "raise NotImplementedError"]
+fail_under = {{coverage_floor}}
+
+# Contracts between packages (from the architecture's dependency rules); optional
+# contracts inside a package go here too.
+[tool.importlinter]
+root_packages = [{{pkgs_quoted}}]
+
+{{import_contracts}}
+
+[tool.vulture]
+paths = [{{src_dirs_quoted}}, "scripts/vulture_whitelist.py"]
+min_confidence = 60

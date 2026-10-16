@@ -1,79 +1,150 @@
 #!/usr/bin/env python3
-"""Multi-turn trajectory driver for dev-team2 planning skills.
+"""Multi-turn trajectory driver for the dev-team2 planning skills, idea through build-setup.
 
-An agent session (claude -p, resumed each turn) works in a fresh project dir with the
-dev-team2 skills installed under .claude/skills. A simulated user (separate claude -p,
-no tools) answers questions, accepts drafts, and — in incremental mode — reveals the
-next stage only after the current one has been fully planned.
+An agent session (claude -p, resumed each turn) works in a fresh project dir with the whole dev-team2 plugin
+loaded via --plugin-dir (skills, scripts/dt.py, hooks), staged into <out>/plugin/. A simulated user (separate
+claude -p, no tools) answers questions, approves drafts, and — in incremental mode — reveals the next stage
+only after the current one has been planned through its build plan.
 
-After every turn the project's docs/ are git-committed so doc evolution can be diffed.
+After every turn the whole project is git-committed ("turn N") so doc evolution, and any code written during
+planning, can be diffed.
 
 Usage: driver.py <trajectory-id> <out-dir>
 
-Env: SKILLS_SRC (skills to install; default: this repo's skills/), CLAUDE_BIN (default: claude),
-AGENT_MODEL, USER_MODEL. Both sessions load project/local settings only and no CLAUDE.md files, so the
-host's user-level instructions, skills and plugins don't leak into the trajectory.
+Env: PLUGIN_SRC / SKILLS_SRC (see plugin.py), CLAUDE_BIN (default: claude; fake_claude.py for a no-cost
+loop test), AGENT_MODEL, USER_MODEL, COST_CAP_USD (stop once the agent session has cost this much; default
+150), MAX_TURNS (override the scenario's turn budget, e.g. 1 for a smoke run), PERMISSION_PROMPTS=0 (don't
+answer the oracle guard's "ask" prompts; see permission_mcp.py). Both sessions load project/local settings
+only, no CLAUDE.md files and no MCP servers but the eval's own, so the host's user-level instructions, skills,
+plugins and MCP servers don't leak into the trajectory.
+
+Agent frontmatter hooks (the .claude/agents/*.md files build-setup writes) don't fire in a headless run unless
+the agents are passed with --agents or installed user-level; planning never runs those agents, so this harness
+doesn't need them.
 """
 import json, os, re, subprocess, sys, time, uuid, shutil, pathlib
 
 HERE = pathlib.Path(__file__).resolve().parent
-SKILLS_SRC = pathlib.Path(os.environ.get("SKILLS_SRC", HERE.parents[1] / "skills"))
+sys.path.insert(0, str(HERE))
+import dtrun, plugin  # noqa: E402
+
 CLAUDE_BIN = os.environ.get("CLAUDE_BIN", "claude")
 ISOLATE = ["--setting-sources", "project,local"]
 AGENT_MODEL = os.environ.get("AGENT_MODEL", "claude-opus-5-5")
 USER_MODEL = os.environ.get("USER_MODEL", "sonnet")
+COST_CAP = float(os.environ.get("COST_CAP_USD", "150"))
+MAX_TURNS = int(os.environ["MAX_TURNS"]) if os.environ.get("MAX_TURNS") else None
+PERMISSION_PROMPTS = os.environ.get("PERMISSION_PROMPTS", "1") != "0"
 
 STRIP_ENV = ["CLAUDE_CODE_SESSION_ID", "CLAUDE_CODE_REMOTE_SESSION_ID", "CLAUDE_CODE_TEE_SDK_STDOUT",
              "CLAUDE_CODE_MESSAGING_SOCKET", "CLAUDE_CODE_MESSAGING_TOKEN", "CLAUDE_CODE_DIAGNOSTICS_FILE",
-             "CLAUDECODE"]
+             "CLAUDECODE", "CLAUDE_PLUGIN_ROOT", "CLAUDE_PROJECT_DIR"]
 ENV = {k: v for k, v in os.environ.items() if k not in STRIP_ENV}
 ENV["CLAUDE_CODE_DISABLE_CLAUDE_MDS"] = "1"  # --setting-sources alone still loads the host's ~/.claude/CLAUDE.md
+DRAFT = ("Draft", "Proposed")
+# The last layer of a stage may still be Draft when the user approves it and moves on in the same message.
+LAST_LAYER = re.compile(r"^(tasks/plan\.md|tasks/queued/.*|CONSTRAINTS\.md)$")
+CACHE_DIRS = [".venv/", "__pycache__/", "*.py[cod]", ".pytest_cache/", ".mypy_cache/", ".ruff_cache/",
+              ".hypothesis/", ".import_linter_cache/", ".coverage", "node_modules/", ".claude/.stop_attempts_*"]
 
 
 def sh(cmd, cwd, **kw):
     return subprocess.run(cmd, cwd=cwd, env=ENV, capture_output=True, text=True, **kw)
 
 
-def doc_status(proj):
-    out = []
-    docs = proj / "docs"
-    if not docs.exists():
-        return "(no docs/ yet)"
-    for p in sorted(docs.rglob("*.md")):
-        txt = p.read_text(errors="ignore")
-        m = re.search(r"\*\*Status:\*\*\s*([A-Za-z ]+?)(?:\s*·|\n|$)", txt)
-        out.append(f"{p.relative_to(proj)}: {m.group(1).strip() if m else 'unknown'} ({len(txt.split())} words)")
-    return "\n".join(out) or "(docs/ empty)"
+def commit(proj, msg):
+    sh(["git", "add", "-A"], proj)
+    sh(["git", "-c", "user.email=e@e", "-c", "user.name=eval", "commit", "-q", "--allow-empty", "--no-verify", "-m", msg], proj)
 
 
-def agent_turn(proj, sid, msg, first, log_path):
+def snapshot(proj, dt):
+    """Doc statuses (from dt's parser) plus derived roadmap rows."""
+    facts = dtrun.probe(proj, dt)
+    lines = []
+    for rel, st in facts["docs"].items():
+        if rel.endswith(("todo.md", "AGENTS.md", "CLAUDE.md", "roadmap.md")):
+            continue
+        words = len((proj / rel).read_text(errors="ignore").split())
+        lines.append(f"{rel}: {st or 'unknown'} ({words} words)")
+    for r in facts["roadmap"]:
+        lines.append(f"roadmap {r['id']} {r['name']}: {r['derived']}")
+    return facts, "\n".join(lines) or "(no docs yet)"
+
+
+def readiness(facts, stage_no, mode):
+    """Why the user can't move on yet ([] = may move on). Lenient by design: statuses only; the sim user and
+    the grader judge the content. The current stage's last layer (plan / queued plan / CONSTRAINTS) may still
+    be Draft, since the approving message is the one that moves on."""
+    docs = facts["docs"]
+    why = [f"{rel} is {st}" for rel, st in docs.items() if st in DRAFT and not LAST_LAYER.match(rel)]
+    why += [f"{rel} not yet specced" for rel, st in docs.items() if rel.startswith("docs/ideas/") and st in ("Draft", "Accepted")]
+    if not any(p["dev_team"] and p["kind"] == "plan" for p in facts["plans"]):
+        why.append("no build plan yet")
+    if "CONSTRAINTS.md" not in docs:
+        why.append("no CONSTRAINTS.md yet (build setup)")
+    if mode == "incremental" and len(facts["roadmap"]) < stage_no:
+        why.append(f"roadmap has {len(facts['roadmap'])} rows for {stage_no} stages")
+    return why
+
+
+def all_approved(facts):
+    return not any(st in DRAFT for st in facts["docs"].values())
+
+
+def mcp_args(out):
+    """--mcp-config for the eval's own permission-prompt server only (--strict-mcp-config keeps the host's out)."""
+    cfg = {"mcpServers": {}}
+    if PERMISSION_PROMPTS:
+        cfg["mcpServers"]["evalperm"] = {"command": sys.executable, "args": [str(HERE / "permission_mcp.py")],
+                                         "env": {"EVALPERM_LOG": str(out / "permission_prompts.jsonl")}}
+    (out / "mcp.json").write_text(json.dumps(cfg, indent=1))
+    args = ["--mcp-config", str(out / "mcp.json"), "--strict-mcp-config"]
+    return args + (["--permission-prompt-tool", "mcp__evalperm__approve"] if PERMISSION_PROMPTS else [])
+
+
+def agent_turn(proj, sid, msg, first, log_path, plugin_root, extra):
     cmd = [CLAUDE_BIN, "-p", msg, "--model", AGENT_MODEL, "--output-format", "stream-json", "--verbose",
-           "--permission-mode", "bypassPermissions", "--disallowedTools", "AskUserQuestion", *ISOLATE]
+           "--permission-mode", "bypassPermissions", "--disallowedTools", "AskUserQuestion",
+           "--plugin-dir", str(plugin_root), *extra, *ISOLATE]
     cmd += ["--session-id", sid] if first else ["--resume", sid]
     t0 = time.time()
     r = sh(cmd, proj, timeout=1800)
     dt = time.time() - t0
     with open(log_path, "a") as f:
         f.write(r.stdout)
-    result, usage, tools, skills = "", {}, [], []
+    result, usage, tools, skills, errors, hooks, init = "", {}, [], [], [], 0, {}
     for line in r.stdout.splitlines():
         try:
             d = json.loads(line)
         except Exception:
             continue
+        if d.get("type") == "system" and d.get("subtype") == "init" and not init:
+            # What the session actually loaded: proves the plugin, its skills and the permission server are live.
+            init = {k: d.get(k) for k in ("plugins", "skills", "mcp_servers", "slash_commands") if k in d}
+        if d.get("type") == "system" and "hook" in str(d.get("subtype", "")):
+            hooks += 1
         if d.get("type") == "assistant":
             for c in d["message"].get("content", []):
                 if c.get("type") == "tool_use":
                     tools.append(c["name"])
                     if c["name"] == "Skill":
-                        skills.append(c["input"].get("skill"))
+                        skills.append(dtrun.skill_name(c["input"].get("skill")))
+        if d.get("type") == "user":
+            for c in (d.get("message") or {}).get("content", []) or []:
+                if isinstance(c, dict) and c.get("type") == "tool_result" and c.get("is_error"):
+                    txt = c.get("content")
+                    txt = txt if isinstance(txt, str) else json.dumps(txt)
+                    errors.append(txt[:300])
         if d.get("type") == "result":
             result = d.get("result", "")
             usage = {"cost_usd": d.get("total_cost_usd"), "duration_ms": d.get("duration_ms"),
                      "usage": d.get("usage"), "num_turns": d.get("num_turns")}
     if not result and r.returncode != 0:
         result = f"[agent error rc={r.returncode}] {r.stderr[-500:]}"
-    return result, usage, tools, skills, dt
+    return result, usage, tools, skills, dt, errors, hooks, init
+
+
+PLANNING_CHAIN = """For each stage the assistant takes you through several planning documents, one at a time, each needing your approval: the idea/brief, the spec, the architecture, the pipelines (the workflows you will run and the planned file layout), optionally a test plan with golden test cases, and the build plan (the tasks for that milestone). Before the first build it also sets up the build tooling and quality bar (CONSTRAINTS.md, checks, agent roles); approve that too."""
 
 
 def sim_user(scn, traj, revealed, next_stage, history_tail, agent_msg, status):
@@ -87,13 +158,15 @@ def sim_user(scn, traj, revealed, next_stage, history_tail, agent_msg, status):
 {stage_txt}
 {nxt}
 Rules: Only talk about revealed stages. If asked about plans beyond them, say you're focusing on the current stage for now and haven't decided what comes next (do not hint at future stages).
-A stage is fully planned when its idea/brief, the spec covering it, and the architecture covering it have all been written AND you have accepted/approved each.
-When the current stage is fully planned (the architecture covering it was just approved, nothing pending) and there is a next stage, set action to "next_stage" and write a message introducing the next stage as a new idea for this same project, in your own words (2-4 sentences, include its key content).
+{PLANNING_CHAIN}
+A stage is fully planned when its build plan has been written and you approved it (for the first stage, the build setup / quality bar too). A later stage's build plan may be queued behind the current milestone because nothing is built yet; that's fine.
+When the current stage is fully planned (its build plan was just presented for approval, or approved, and nothing else is pending) and there is a next stage, set action to "next_stage" and write a message that approves what is pending and then introduces the next stage as a new idea for this same project, in your own words (2-4 sentences, include its key content).
 When the last stage is fully planned, set action to "finish"."""
     else:
         mode_rules = f"""You told the assistant ALL goals up front in your first message:
 {stage_txt}
-When the brief, spec and architecture have all been written and you approved the architecture, set action to "finish"."""
+{PLANNING_CHAIN}
+With everything known up front, expect all stages to be specced, designed and given pipelines, but a detailed build plan only for the first milestone. When the build setup / quality bar has been presented and you approved it, set action to "finish"."""
     prompt = f"""{scn['persona']}
 
 PROJECT FACTS (your ground truth; only use facts relevant to revealed stages):
@@ -101,7 +174,7 @@ PROJECT FACTS (your ground truth; only use facts relevant to revealed stages):
 
 {mode_rules}
 
-Current document statuses on disk:
+Current document statuses on disk (roadmap lines show each milestone's derived status):
 {status}
 
 Recent conversation (oldest first):
@@ -112,7 +185,7 @@ ASSISTANT'S LATEST MESSAGE:
 {agent_msg[-9000:]}
 >>>
 
-Decide your reply. If the assistant asked questions, answer them all briefly and consistently with your facts. If it presented a draft for review, accept/approve it explicitly (or request one specific fix if it contradicts your facts). If it is waiting with nothing to answer, tell it to continue to the next step. Never instruct it which skill to use. Planning ends at an approved architecture: never ask for an implementation plan, tasks, or code. When you approve something and also introduce the next stage, put the approval first in the same message ("Approved. Next idea: ...").
+Decide your reply. If the assistant asked questions, answer them all briefly and consistently with your facts. If it presented a draft for review, approve it explicitly (or request one specific fix if it contradicts your facts). If it offers golden test cases or a test plan, say yes. If it offers to commit approved documents, say yes. If it asks you to choose options or defaults (for example for tooling), take its recommendation. If it is waiting with nothing to answer, tell it to continue to the next planning step. Never instruct it which skill to use, and never write code, documents or tests yourself. Planning ends at an approved build setup: never ask it to write code or tests or to start building, and if it offers to start building, say planning is done for now. When you approve something and also introduce the next stage, put the approval first in the same message ("Approved. Next idea: ...").
 Return ONLY a JSON object: {{"action": "reply" | "next_stage" | "finish", "message": "<what you say to the assistant>"}}"""
     r = sh([CLAUDE_BIN, "-p", prompt, "--model", USER_MODEL, "--tools", "", "--output-format", "json",
             "--no-session-persistence", *ISOLATE], HERE, timeout=600)
@@ -121,7 +194,7 @@ Return ONLY a JSON object: {{"action": "reply" | "next_stage" | "finish", "messa
         m = re.search(r"\{.*\}", txt, re.S)
         return json.loads(m.group(0))
     except Exception:
-        return {"action": "reply", "message": "Looks good, accepted. Please continue."}
+        return {"action": "reply", "message": "Looks good, approved. Please continue."}
 
 
 def opening(scn, traj):
@@ -129,14 +202,39 @@ def opening(scn, traj):
     st = proj["stages"]
     if traj["project"] == "rl":
         intro = ("I want to start a small ML project: an RL lab of little 2D environments where agents learn a "
-                 "concept through reinforcement learning, so I can learn RL by building. Let's refine the idea and plan it.")
+                 "concept through reinforcement learning, so I can learn RL by building. Let's refine the idea and "
+                 "plan it until it's ready to build.")
     else:
         intro = ("I want to start a personal quant research platform for market research on US equities, built in stages. "
-                 "Let's refine the idea and plan it.")
+                 "Let's refine the idea and plan it until it's ready to build.")
     if traj["mode"] == "incremental":
         return f"{intro}\n\nI'm starting with just the first piece: {st[0]['reveal']}", 1
     goals = "\n".join(f"{i+1}. {s['reveal']}" for i, s in enumerate(st))
     return f"{intro}\n\nHere is everything I eventually want it to do:\n{goals}", len(st)
+
+
+def setup_project(out):
+    """Fresh project dir plus the staged plugin; returns (project, plugin root)."""
+    proj = out / "project"
+    if proj.exists():
+        shutil.rmtree(proj)
+    root = plugin.stage(out / "plugin")
+    probs = plugin.check(root)
+    if probs:
+        sys.exit("plugin staging failed:\n" + "\n".join(probs))
+    (proj / ".claude" / "skills").mkdir(parents=True)
+    nh = proj / ".claude" / "skills" / "null-hypothesis-testing"  # a project skill, as the user would have it
+    nh.mkdir()
+    shutil.copy(HERE / "stub_null_hypothesis_SKILL.md", nh / "SKILL.md")
+    if os.environ.get("SKILLS_SRC"):
+        # Older skill snapshots call `skills/<name>/scripts/...` from the project root; keep those paths resolving.
+        os.symlink(root / "skills", proj / "skills")
+    sh(["git", "init", "-q"], proj)
+    # build-setup runs `check.sh gate` once, which creates a venv and tool caches; keep them out of the
+    # per-turn commits without putting a .gitignore where the agent would see it.
+    (proj / ".git" / "info" / "exclude").write_text("\n".join(CACHE_DIRS) + "\n")
+    commit(proj, "turn 0")
+    return proj, root
 
 
 def main():
@@ -144,72 +242,74 @@ def main():
     scn = json.loads((HERE / "scenarios.json").read_text())
     traj = next(t for t in scn["trajectories"] if t["id"] == tid)
     stages = scn["projects"][traj["project"]]["stages"]
-    proj = out / "project"
-    if proj.exists():
-        shutil.rmtree(proj)
-    (proj / ".claude" / "skills").mkdir(parents=True)
-    for s in ["idea-refine", "spec-writing", "architecture-design"]:
-        shutil.copytree(SKILLS_SRC / s, proj / ".claude" / "skills" / s)
-    # Skills reference `skills/<name>/scripts/...`; mirror the dev-team2 layout so those paths resolve.
-    os.symlink(".claude/skills", proj / "skills")
-    nh = proj / ".claude" / "skills" / "null-hypothesis-testing"
-    nh.mkdir()
-    shutil.copy(HERE / "stub_null_hypothesis_SKILL.md", nh / "SKILL.md")
-    sh(["git", "init", "-q"], proj)
-    sh(["git", "-c", "user.email=e@e", "-c", "user.name=eval", "commit", "-q", "--allow-empty", "-m", "turn 0"], proj)
+    out.mkdir(parents=True, exist_ok=True)
+    proj, plugin_root = setup_project(out)
+    dt = plugin_root / "scripts" / "dt.py"
+    extra = mcp_args(out)
 
     sid = str(uuid.uuid4())
     msg, n_revealed = opening(scn, traj)
     turns, history = [], []
     stage_log = [{"turn": 1, "stage": stages[0]["name"] if traj["mode"] == "incremental" else "all"}]
     t_start = time.time()
-    closing = False
-    for t in range(1, traj["max_turns"] + 1):
-        reply, usage, tools, skills, dt = agent_turn(proj, sid, msg, t == 1, out / "agent_stream.jsonl")
-        sh(["git", "add", "-A", "docs"], proj)
-        sh(["git", "-c", "user.email=e@e", "-c", "user.name=eval", "commit", "-q", "--allow-empty", "-m", f"turn {t}"], proj)
+    closing, stop_reason = False, "max_turns"
+    for t in range(1, (MAX_TURNS or traj["max_turns"]) + 1):
+        reply, usage, tools, skills, dt_s, errors, hooks, init = agent_turn(
+            proj, sid, msg, t == 1, out / "agent_stream.jsonl", plugin_root, extra)
+        commit(proj, f"turn {t}")
         changed = sh(["git", "show", "--stat", "--format=", "HEAD"], proj).stdout.strip()
+        facts, status = snapshot(proj, dt)
         rec = {"turn": t, "user": msg, "assistant": reply, "skills": skills, "tools": tools,
-               "seconds": round(dt, 1), "usage": usage, "docs_changed": changed, "status": doc_status(proj),
-               "stage": stage_log[-1]["stage"]}
+               "seconds": round(dt_s, 1), "usage": usage, "docs_changed": changed, "status": status,
+               "stage": stage_log[-1]["stage"], "tool_errors": errors, "hook_events": hooks}
+        if t == 1:
+            rec["session_init"] = init
+            own = [s for s in json.dumps(init.get("skills") or init.get("slash_commands") or []).split('"') if "pipeline-design" in s]
+            if init and not own:
+                print(f"[{tid}] WARNING: session init lists no dev-team2 skills; is the plugin loading? {json.dumps(init)[:400]}", flush=True)
         turns.append(rec)
         history.append(f"USER: {msg[:1500]}\nASSISTANT: {reply[:1500]}")
         (out / "turns.json").write_text(json.dumps(turns, indent=1))
-        print(f"[{tid}] turn {t} stage={rec['stage']} {dt:.0f}s skills={skills} changed={changed.splitlines()[-1] if changed else '-'}", flush=True)
+        print(f"[{tid}] turn {t} stage={rec['stage']} {dt_s:.0f}s skills={skills} changed={changed.splitlines()[-1] if changed else '-'}", flush=True)
 
         if closing:
             turns[-1]["sim_user_final"] = "(closing approval delivered)"
             (out / "turns.json").write_text(json.dumps(turns, indent=1))
+            stop_reason = "finished"
+            break
+        if (usage.get("cost_usd") or 0) > COST_CAP:
+            stop_reason = f"cost cap {COST_CAP} USD"
             break
         revealed = stages[:n_revealed]
         nxt = stages[n_revealed] if traj["mode"] == "incremental" and n_revealed < len(stages) else None
-        u = sim_user(scn, traj, revealed, nxt, "\n\n".join(history[-4:-1]), reply, rec["status"])
-        # Guard: only advance/finish when the spec is Approved, an architecture exists, and no idea is still open.
-        st = rec["status"]
-        ready = ("docs/spec.md: Approved" in st and "docs/architecture.md:" in st and
-                 not re.search(r"docs/ideas/\S+: (Draft|Accepted)", st) and "docs/brief.md: Draft" not in st)
-        if u.get("action") in ("finish", "next_stage") and not ready:
+        u = sim_user(scn, traj, revealed, nxt, "\n\n".join(history[-4:-1]), reply, status)
+        why = readiness(facts, n_revealed, traj["mode"])
+        rec["readiness"] = why
+        if u.get("action") in ("finish", "next_stage") and why:
             u["action"] = "reply"
         if u.get("action") == "finish":
-            if "docs/architecture.md: Approved" in st or closing:
+            if all_approved(facts):
                 turns[-1]["sim_user_final"] = u.get("message")
+                stop_reason = "finished"
                 break
-            # Send the closing approval so the agent can mark the architecture Approved; stop after that turn.
+            # Send the closing approval so the agent can mark the last doc Approved; stop after that turn.
             closing = True
             u["action"] = "reply"
         if u.get("action") == "next_stage" and nxt:
             n_revealed += 1
             stage_log.append({"turn": t + 1, "stage": nxt["name"]})
-        msg = u.get("message") or "Accepted. Continue."
-        # Write the unsent sim-user message on the final iteration so the record is complete.
+        msg = u.get("message") or "Approved. Continue."
+        (out / "turns.json").write_text(json.dumps(turns, indent=1))
     summary = {"trajectory": tid, "turns": len(turns), "stages_reached": n_revealed, "stage_log": stage_log,
                "total_seconds": round(time.time() - t_start, 1),
-               "agent_cost_usd": round(sum((x["usage"].get("cost_usd") or 0) for x in turns), 3),
+               # total_cost_usd is cumulative over a resumed session, so the last turn's value is the run's cost.
+               "agent_cost_usd": round(max([(x["usage"].get("cost_usd") or 0) for x in turns] or [0]), 3),
                "agent_output_tokens": sum(((x["usage"].get("usage") or {}).get("output_tokens") or 0) for x in turns),
-               "finished": any("sim_user_final" in x for x in turns)}
+               "finished": any("sim_user_final" in x for x in turns), "stop_reason": stop_reason,
+               "agent_model": AGENT_MODEL, "user_model": USER_MODEL}
     (out / "summary.json").write_text(json.dumps(summary, indent=1))
-    sh(["git", "log", "--stat", "--format=== %s"], proj).stdout and (out / "doc_history.txt").write_text(
-        sh(["git", "log", "--reverse", "-p", "--format=========== %s", "--", "docs"], proj).stdout)
+    (out / "doc_history.txt").write_text(
+        sh(["git", "log", "--reverse", "-p", "--format=========== %s", "--", "docs", "tasks", "CONSTRAINTS.md"], proj).stdout)
     print(json.dumps(summary), flush=True)
 
 

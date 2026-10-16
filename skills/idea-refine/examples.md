@@ -199,6 +199,7 @@ Small teams (2-5 people) working on one document, usually each in their own sect
 - **Serves:** Goal 2 (finish documents without emailing drafts)
 - **Touches:** EDIT-03 (only the owner can edit) must change; SAVE-01 (autosave) must handle several editors
 - **Brief changes:** None
+- **Milestone:** New M4 (roadmap row on acceptance)
 
 ## Recommended direction
 When someone starts editing a block, it's reserved for them. Everyone else sees who is in it ("Alex is editing") and can edit any other block freely. When they click away, the block is released.
@@ -366,6 +367,21 @@ A small research team (1-3 people) testing US stock strategies that trade weekly
 
 *Notice what's **not** in the brief: a data API. The brief records data **needs** (daily, US, includes delisted companies, under budget) as constraints and bets. `spec-writing` turns them into data requirements, and the provider is chosen in the architecture against those requirements.*
 
+**On acceptance.** In Phase 2 the user agreed to build in two stages: the trustworthy data layer first, then vectorized backtests. The stages are not goals: Goals 1-4 hold whichever stage is being built. The skill sets the brief to Accepted, creates `docs/roadmap.md` with a row per stage (IDs from `dt next-id M`), and runs `dt roadmap` to fill Status:
+
+```markdown
+| Milestone | Name | Source | Packages | Pipelines | Depends | Status* |
+|---|---|---|---|---|---|---|
+| M1 | Point-in-time data | brief | — | — | — | Idea |
+| M2 | Vectorized backtests | brief | — | — | — | Idea |
+
+## M1: Point-in-time data
+**Outline:** Load daily US prices as they were known on any date, including companies that later failed.
+
+## M2: Vectorized backtests
+**Outline:** Turn a date-by-stock signal table into a backtest report with costs, comparable across strategies.
+```
+
 ---
 
 ## Example 5: ML Feature in an Existing Product (Extend Mode)
@@ -426,6 +442,7 @@ Lab scientists doing plate QC, during their weekly review.
 - **Serves:** Goal 2 (bad data caught before analysis)
 - **Touches:** QC-01 (Z′ is calculated per plate), QC-03 (scientist marks pass/fail)
 - **Brief changes:** None
+- **Milestone:** New M3 (roadmap row on acceptance)
 
 ## Recommended direction
 Each new plate gets a risk score from a model trained on three years of past pass/fail decisions. The review screen sorts plates riskiest first. Scientists still make every pass/fail call; the model only sets the order.
@@ -493,4 +510,6 @@ The Z′ rule is the baseline. If the model doesn't clearly beat "sort by Z′",
 
 12. **Every ML idea names its baseline.** "Sort by Z′" and "the old notebook results" are what success is measured against. Without a baseline, any result looks like success.
 
-13. **Data needs, not data vendors.** Briefs and idea files say what data is needed and where it comes from if that's fixed. Choosing APIs, datasets, and models happens in the architecture, after the spec.
+13. **Stages go in the roadmap, not the brief.** Factor Lab's two stages are roadmap rows; its goals describe the whole project. Each later idea adds one row on acceptance, and the goals stay at five or fewer.
+
+14. **Data needs, not data vendors.** Briefs and idea files say what data is needed and where it comes from if that's fixed. Choosing APIs, datasets, and models happens in the architecture, after the spec.

@@ -3,7 +3,8 @@
 
 Measures what eval iteration 1 found growing in incremental runs: total words, struck
 (removed) requirements and how long they stay, "(changed ...)" markers, superseded
-decisions kept in full, Risks size, and docs written past the architecture (plan.md).
+decisions kept in full, Risks size, and the size of the docs past the architecture (pipelines, test plans,
+contracts, build plans, CONSTRAINTS.md) against their §3 line budgets.
 
 Usage: docstats.py <docs-dir>   (a project's docs/, or a dir of final__*.md files from package.py)
 """
@@ -25,6 +26,12 @@ def globbed(sub):
     return [p.read_text() for p in hits]
 
 
+def matching(docs_glob, final_glob, root=None):
+    """(name, text) of docs matching a glob under docs/ (or root), or the packaged final__ equivalent."""
+    hits = sorted((root or d).glob(docs_glob)) or sorted(d.glob(final_glob))
+    return [(p.name if p.name.startswith("final__") else str(p.relative_to(root or d)), p.read_text()) for p in hits]
+
+
 def words(t):
     return len(t.split())
 
@@ -41,7 +48,13 @@ def section(t, heading):
 
 
 brief, spec, arch = load("brief.md"), load("spec.md"), load("architecture.md")
-pkgs, ideas = globbed("architecture"), globbed("ideas")
+pkgs = globbed("architecture") + [t for _, t in matching("packages/*/architecture.md", "final__packages__*__architecture.md")]
+ideas = globbed("ideas")
+# Line budgets from design/planning-stage.md §3, as `dt lint` applies them.
+BUDGETS = {"contract": 60, "pipelines": 120, "tests": 120, "plan": 400}
+later = {k: matching(f"packages/*/{k}.md", f"final__packages__*__{k}.md") for k in ("contract", "pipelines", "tests")}
+later["plan"] = matching("tasks/plan.md", "final__tasks__plan.md", d.parent) + matching("tasks/queued/*.md", "final__tasks__queued__*.md", d.parent)
+constraints = matching("CONSTRAINTS.md", "final__CONSTRAINTS.md", d.parent)
 arch_all = "\n".join([arch] + pkgs)
 
 # Each requirement block runs from its "- **ID**" line to the next one (or next heading).
@@ -80,7 +93,9 @@ out = {
                                             and not re.search(r"^> Record of why", t, re.M)),
               "specced_with_open_questions": sum(1 for t in ideas if re.search(r"\*\*Status:\*\*\s*Specced", t)
                                                  and re.search(r"^## Open questions\n+\s*- ", t, re.M))},
-    "past_architecture": sorted(p.name for p in [d / "plan.md", d / "final__plan.md"] if p.exists())
-                         + (["tasks/"] if (d.parent / "tasks").is_dir() else []),
+    "planning": {k: {"docs": len(v), "lines": [len(t.splitlines()) for _, t in v],
+                     "over_budget": [n for n, t in v if len(t.splitlines()) > BUDGETS[k]]} for k, v in later.items()}
+                | {"constraints_lines": sum(len(t.splitlines()) for _, t in constraints),
+                   "tasks": sum(len(re.findall(r"^### M\d+-T\d{2,}:", t, re.M)) for _, t in later["plan"])},
 }
 print(json.dumps(out, indent=1))

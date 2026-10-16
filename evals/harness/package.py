@@ -2,11 +2,17 @@
 """Arrange finished trajectory runs into the skill-creator benchmark layout:
 bench/eval-<project>/<mode>/run-1/{outputs/, grading.json, timing.json}
 
+outputs/ holds every final planning doc as final__<path with / as __> (docs/**, tasks/**, CONSTRAINTS.md,
+AGENTS.md), a fixtures listing, one context__<task>.md per task (its `dt context` packet, which the blind judge
+reads to decide whether the task is buildable from it alone), the transcript and the doc-evolution table.
+
 Usage: package.py [iteration-dir]  (relative to $EVAL_WS, default: a dev-team2-workspace next to the repo)
 """
 import json, os, shutil, subprocess, pathlib, sys
 
 HERE = pathlib.Path(__file__).resolve().parent
+sys.path.insert(0, str(HERE))
+import dtrun  # noqa: E402
 WS = pathlib.Path(os.environ.get("EVAL_WS", HERE.parents[2] / "dev-team2-workspace"))
 it = WS / sys.argv[1] if len(sys.argv) > 1 else WS / "iteration-1"
 bench = it / "bench"
@@ -19,7 +25,8 @@ for i, project in enumerate(["rl", "quant"]):
     (ev / "eval_metadata.json").write_text(json.dumps({
         "eval_id": i, "eval_name": f"{project}-planning-trajectory",
         "prompt": f"{project.upper()} project planned with dev-team2 skills. INCREMENTAL = user reveals one stage at a time "
-                  f"({' → '.join(s['name'] for s in stages)}), each going brief/idea → spec → architecture. "
+                  f"({' → '.join(s['name'] for s in stages)}), each going brief/idea → spec → architecture → pipelines → "
+                  f"test plan (optional) → build plan, with build setup before the first build. "
                   f"ALL_AT_ONCE = user states every stage in the first message.",
         "assertions": []}, indent=1))
     for mode in ["incremental", "all_at_once"]:
@@ -31,9 +38,20 @@ for i, project in enumerate(["rl", "quant"]):
             shutil.rmtree(run)
         out = run / "outputs"
         out.mkdir(parents=True)
-        docs = src / "project" / "docs"
+        proj = src / "project"
+        docs = proj / "docs"
         for p in sorted(docs.rglob("*.md")):
             shutil.copy(p, out / ("final__" + str(p.relative_to(docs)).replace("/", "__")))
+        for p in sorted([*proj.glob("tasks/**/*.md"), *proj.glob("CONSTRAINTS.md"), *proj.glob("AGENTS.md")]):
+            shutil.copy(p, out / ("final__" + str(p.relative_to(proj)).replace("/", "__")))
+        fx = sorted(str(p.relative_to(proj)) for p in proj.glob("tests/fixtures/**/*") if p.is_file())
+        (out / "fixtures.txt").write_text("\n".join(fx) + "\n")
+        dt = dtrun.dt_path(src)
+        facts = dtrun.probe(proj, dt)
+        for plan in facts["plans"]:
+            for t in plan["tasks"]:
+                rc, packet, err = dtrun.run(proj, "context", t["id"], dt=dt)
+                (out / f"context__{t['id']}.md").write_text(packet if rc == 0 else f"(dt context failed: {err.strip()})\n")
         turns = json.loads((src / "turns.json").read_text())
         md = [f"# Transcript — {project} / {mode}\n"]
         for t in turns:

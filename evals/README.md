@@ -40,7 +40,7 @@ CLAUDE_BIN=$PWD/evals/harness/fake_claude.py \
 
 The dry run replays the fixture's `references/` and `docs/references.md` as a reference-intake turn (with one fake Agent launch per file) before the M2 idea. To exercise the driver's reference copying and Agent parsing, run the fake loop on `quant-all-at-once` with `MAX_TURNS=5`: turn 4 is the intake layer and should record one launch per file.
 
-On the dry run, 45 of 57 checks pass. The 12 failures are expected, because the sample is a two-milestone project that is mid-build, not a finished four-stage run:
+On the dry run, 46 of 58 checks pass. The 12 failures are expected, because the sample is a two-milestone project that is mid-build, not a finished four-stage run:
 - There is no features milestone, so no Grow.
 - M1-T01's code is already in `src/`.
 - The brief is already Accepted when the replay first shows it.
@@ -115,6 +115,7 @@ These are the §13 assertions. Each is a named check in `grading.json`.
 | `context_packets_small` | Every `dt context` packet is under 2,000 lines |
 | `doc_budgets` | No `dt lint` budget warnings, and the brief is 500 words or fewer |
 | `roadmap_rows` | Every stage has at least one roadmap row, every row maps to a stage, and `dt roadmap --check` exits 0. A stage may split into several milestones. Rows map by Source (incremental: `brief` is stage 1, and an idea file belongs to the stage that was current when it first appeared). In all-at-once, where every row cites the brief, they map by the stage `keywords` in `scenarios.json` matched against the row's name and outline |
+| `milestone_depends` | Every milestone after the first has a Depends line naming existing milestones, with no cycles |
 | `first_planned_rest_designed` | Both modes: the first milestone has a plan and every later milestone is at least Designed (task plans are written for the next milestone only), so the final roadmaps of the two modes compare like for like |
 | `brief_goals_stage_neutral` | 5 goals or fewer, none worded per stage |
 | `quant_grow_at_features` | Incremental: the shape first becomes multi-package in the features_ml stage. All-at-once: the final shape is multi-package |
@@ -156,7 +157,8 @@ python3 evals/harness/judge_prompt.py quant <bench/.../outputs A> <bench/.../out
 
 Hand the prompt to a fresh agent session. Shuffle A and B yourself, and keep the key.
 
-The rubric adds three items:
+The rubric adds four items:
+- `milestone_quality`: each milestone is one runnable capability with its outcome stated, splits follow dependency lines (no leftover milestones carved off for size), sizes are balanced, Depends are right, and planned milestones have checkable Exit criteria.
 - `pipeline_clarity`: pipelines read as clear call paths.
 - `layout_sensibility`: the layouts make sense.
 - `task_buildability`: each task can be built from its `context__<task>.md` packet alone. The judge reads at least three packets per set.

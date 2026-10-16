@@ -6,18 +6,19 @@
 
 | Run | Checks | Turns | Agent cost | Wall clock | Stop |
 |---|---|---|---|---|---|
-| rl incremental | 45/46 | 44 | $23.22 | 76 min | finished (re-run on the fixed driver) |
-| rl all-at-once | 43/46 | 18 | $11.28 | 30 min | finished |
-| quant incremental | 52/57 | 64 | $39.92 | 70 min | killed at turn 64, stuck in a finish loop (see H3) |
-| quant all-at-once | 52/57 | 17 | $12.45 | 33 min | finished |
+| rl incremental | 46/47 | 44 | $23.22 | 76 min | finished (re-run on the fixed driver) |
+| rl all-at-once | 43/47 | 18 | $11.28 | 30 min | finished |
+| quant incremental | 52/58 | 64 | $39.92 | 70 min | killed at turn 64, stuck in a finish loop (see H3) |
+| quant all-at-once | 53/58 | 17 | $12.45 | 33 min | finished |
 
 - **Total cost:** about $104 including the discarded first rl incremental run ($16.73, 26 turns). That's near the bottom of the expected $85–175.
 - **Turns:** within the expected ranges, except quant incremental at 64, which includes 18 empty loop turns.
-- **Scores:** graded with the grader fixes G1 and G2.
+- **Scores:** graded with the grader fixes G1 and G2, and the `milestone_depends` check added afterwards.
 
 | Failing check | rl inc | rl aao | quant inc | quant aao | Finding |
 |---|---|---|---|---|---|
 | `first_planned_rest_designed` | | M2, M3 Specced | M5 Idea | M2–M5 Specced | S3 |
+| `milestone_depends` | | M3 (predator–prey) has none | M5 (PPO agents) has none | | S8 |
 | `doc_budgets` | ✗ | ✗ | | ✗ | S5 |
 | `gate_discipline` | | turn 14 | | turn 14 | S4 |
 | `spec_on_pipeline_or_deferred` | | | 3 IDs | 16 IDs | S3, S6 |
@@ -52,7 +53,7 @@ The driver fixes were tested on `fake_claude.py`. With G2 the dry run passes 45 
 - **Resolved (G2):** both modes are graded at the same bar. Whether incremental and all-at-once produce milestones of similar quality is a question for the blind judge, which should be run once S3 is fixed. Until then, all-at-once has no designed milestones after M1 to compare.
 
 **S3. All-at-once leaves later milestones below Designed.** There are two causes:
-- **quant:** spec-writing wrote "Initial spec: M1 in full, M2–M5 outlined". No skill tells it to do this, and it contradicts "design everything known". With M2+ only outlined, nothing downstream designed them: 16 spec IDs (every STRUCT, PORT, FEAT, FCST and AGENT requirement) sit on no pipeline, and the architecture never grew past one package.
+- **quant:** spec-writing wrote "Initial spec: M1 in full, M2–M5 outlined". The agent proposed this itself in idea-refine's handoff (turn 5: "I'd go deep on M1 and keep the later stages short"), and the simulated user agreed. No skill tells it to do this, and it contradicts "design everything known". With M2+ only outlined, nothing downstream designed them: 16 spec IDs (every STRUCT, PORT, FEAT, FCST and AGENT requirement) sit on no pipeline, and the architecture never grew past one package.
   - **Fix:** spec-writing states that when the user gives every stage up front, every stage is specced in full.
 - **rl:** the pipelines really do cover fish and foraging (PL-01 Covers TANK-01–07 and HUNT-01–07), but dt can't attribute them. Every row's Source is `brief`, the only Changelog row says IDs `all`, and dt doesn't expand `all`. So `inferred_pipelines` is empty for M2 and M3, and build-planning New filled only M1's Pipelines cell, even though its own reply listed what it deferred to M2 and M3.
   - **Fix:** in up-front mode, build-planning New fills Packages and Pipelines for every designed row, not only M1. Expanding `all` in dt alone would mark every brief row Designed off M1's pipelines.
@@ -77,6 +78,13 @@ The driver fixes were tested on `fake_claude.py`. With G2 the dry run passes 45 
 - One brief goal is worded for a stage: "Fast, stable access… daily returns load in seconds" is about the data stage.
 
 **S7. quant incremental grew at the structure stage, not features.** `qrisk` became its own package at turn 22. The check encodes §13's expectation that the shape grows at features. Read AD-xx before deciding whether the check or the skill is wrong.
+
+**S8. Milestone quality was never judged.** The grader checked milestone structure, and the blind-judge rubric had no milestone item. A manual read:
+- **quant: good in both modes.** Each milestone is one runnable capability in dependency order, and splitting the PPO agents off is clean. Flaw: quant incremental's M5 has no Depends.
+- **rl incremental: good content, over-split.** Snake became four milestones; M4 (a 5-seed tabular study) is mostly M1 again. Rows are never renumbered, so the build order reads M1 → M4 → M2 → M3, and M2–M4 have no Exit lines.
+- **rl all-at-once: weakest.** M4 ("Snake replays + reference") is a leftover carved off M1 only to cut its size. M3 (predator–prey "in the same tank") has no Depends on M2.
+- **Pattern:** splits made at build-planning to hit a size number leave leftover milestones. Splits from the user's own stages at idea-refine come out clean.
+- **Added:** a `milestone_depends` grader check, which catches both Depends flaws, and a `milestone_quality` item in the blind-judge rubric.
 
 ## Not done
 

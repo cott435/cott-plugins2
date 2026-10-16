@@ -235,6 +235,18 @@ rest = [r["id"] for r in facts["roadmap"][1:] if r["derived"] in ("Idea", "Specc
 check("first_planned_rest_designed", "The first milestone has a build plan and every later milestone is at least Designed",
       first.get("derived") in ("Planned", "Building") and not rest, f"{first.get('id')}={first.get('derived')}; below Designed: {rest}")
 
+# Depends drives build order: every milestone after the first names what it builds on, by an existing ID, acyclically.
+ids = [r["id"] for r in facts["roadmap"]]
+deps = {r["id"]: r.get("depends", []) for r in facts["roadmap"]}
+no_dep = [i for i in ids[1:] if not deps[i]]
+unknown = {i: [d for d in deps[i] if d not in ids] for i in ids if any(d not in ids for d in deps[i])}
+def cyclic(i, seen=()):
+    return i in seen or any(cyclic(d, seen + (i,)) for d in deps.get(i, []) if d in deps)
+cycles = [i for i in ids if cyclic(i)]
+check("milestone_depends", "Every milestone after the first has a Depends line naming existing milestones, with no cycles",
+      ids and not no_dep and not unknown and not cycles,
+      f"depends: {deps}; missing: {no_dep}; unknown: {unknown}; in a cycle: {cycles}")
+
 # Shape per turn, from the architecture header at each turn's commit.
 shapes = []
 for n in sorted(turn_commit):

@@ -29,6 +29,7 @@ SCRIPTS = [
 PROTECTED = [
     "tests/intent/**", "tests/fixtures/**", "tests/conftest.py", "pyproject.toml", "uv.lock",
     "CONSTRAINTS.md", "scripts/**", ".claude/agents/**", ".claude/settings.json", "references/**",
+    "tests/contracts/**",
 ]
 
 

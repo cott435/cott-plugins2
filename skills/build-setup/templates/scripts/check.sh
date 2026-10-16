@@ -9,6 +9,9 @@
 #   scripts/check.sh full [--pkg ID]     checkpoints, milestone exit, CI (reviewer)
 #   scripts/check.sh protected           print the protected-path globs  (path_guard.sh deny --protected)
 #
+# tests/contracts/** in the protected list means the boundary contracts frozen at the base (CR-09);
+# a contract folder new since the base belongs to the contract task freezing it, which may write it.
+#
 # --pkg ID runs the tests of package ID and of every package that depends on it (multi-package:
 # deptry too). Lint, types, size and boundaries always cover the whole repo; they take seconds.
 # FILE paths are absolute or relative to the project root.
@@ -85,6 +88,29 @@ run_tests() {
 # `git update-ref refs/checks/base HEAD`. Without it, HEAD, which misses changes already committed.
 base_commit() {
   git rev-parse -q --verify refs/checks/base 2>/dev/null || git rev-parse -q --verify HEAD 2>/dev/null
+}
+
+# A boundary contract is frozen once its folder exists at the base (CR-09): each folder under
+# tests/contracts/ at the base, and any file directly in it. A folder new since the base is the
+# contract task freezing it, so that task may write it; the next task's base freezes it.
+CONTRACTS_GLOB="tests/contracts/**"
+frozen_contracts() {
+  local base meta path
+  base=$(base_commit) || return 0
+  git ls-tree "$base" -- tests/contracts/ 2>/dev/null | while IFS=$'\t' read -r meta path; do
+    case "$meta" in
+      *" tree "*) echo "$path/**" ;;
+      *) echo "$path" ;;
+    esac
+  done
+}
+
+# The protected list as enforced: PROTECTED, with tests/contracts/** narrowed to the frozen contracts.
+protected_globs() {
+  local g
+  for g in "${PROTECTED[@]}"; do
+    if [ "$g" = "$CONTRACTS_GLOB" ]; then frozen_contracts; else echo "$g"; fi
+  done
 }
 
 # Fail if anything matching the given pathspecs changed since the base, untracked files included.
@@ -181,7 +207,9 @@ case "$mode" in
     # shellcheck disable=SC2086  # one directory per word, by construction
     [ -n "$dirs" ] && run_tests $dirs --no-cov -q -x
     step bash scripts/floor_guard.sh
-    unchanged_since_base "protected files" "${PROTECTED[@]}"
+    protected=()
+    while IFS= read -r g; do protected+=("$g"); done < <(protected_globs)
+    unchanged_since_base "protected files" "${protected[@]}"
     ;;
   full)
     static_checks
@@ -197,7 +225,7 @@ case "$mode" in
     [ -n "$dirs" ] && HYPOTHESIS_PROFILE=ci run_tests $dirs --cov -q
     ;;
   protected)
-    printf '%s\n' "${PROTECTED[@]}"
+    protected_globs
     ;;
   *)
     echo "unknown mode: $mode (fast | collect | gate | full | protected)" >&2

@@ -83,7 +83,8 @@ Don't ask about CI: write `.github/workflows/check.yml` only if the user asks (d
 
 ### Step 4: Generate
 1. Derive every value per the placeholder table in `examples.md`. The ones that matter most:
-   - **Protected list**: written once into `check.sh`'s `PROTECTED` (`path_guard.sh deny --protected` reads it from there) and copied into CONSTRAINTS.md: `tests/intent/**`, `tests/fixtures/**`, `tests/conftest.py`, `pyproject.toml`, `uv.lock`, `CONSTRAINTS.md`, `scripts/**`, `.claude/agents/**`, `.claude/settings.json`, `references/**`. Multi-package adds `packages/*/pyproject.toml`.
+   - **Protected list**: written once into `check.sh`'s `PROTECTED` (`path_guard.sh deny --protected` reads it from there) and copied into CONSTRAINTS.md: `tests/intent/**`, `tests/fixtures/**`, `tests/conftest.py`, `pyproject.toml`, `uv.lock`, `CONSTRAINTS.md`, `scripts/**`, `.claude/agents/**`, `.claude/settings.json`, `references/**`, `tests/contracts/**`. Multi-package adds `packages/*/pyproject.toml`.
+   - **Frozen contracts** (CR-09): `check.sh` narrows `tests/contracts/**` to the contract folders that exist at `refs/checks/base`, so the Phase 0 contract task (`**Step:** contract`, run as the implementer) can write the new `tests/contracts/<pkg>.<symbol>/` it freezes, and from the next task's base nothing can change it. A frozen contract changes only through `architecture-design` Revise, then a new contract task re-freezes it in the main session (the implementer's guard blocks a folder frozen at the base); outside an open contract task naming the folder, the plugin's `dt guard` asks before any edit under `tests/contracts/`.
    - **Import contracts**: from the dependency rules (`references/tools/import_linter.md`). A module that doesn't exist yet is optional: `"(pkg.component)"`.
    - **`pkg_scope`** in `check.sh`: each package (single: component) and every package that depends on it, from the dependency graph.
    - **Domain rule families and stubs** from the tech stack ADs (`DTZ`, `NPY` + numpy, `PD` + `pandas-stubs`); pandera only when a DataFrame crosses a contract.
@@ -104,6 +105,7 @@ Then the Review Gate.
 At kickoff, after the next plan is approved. Run `dt status`, then apply only the deltas:
 - **Dependencies (default, design open item 1 option a):** add the milestone's dependencies, each with a `[tool.deptry.per_rule_ignores] DEP002` entry and an Exceptions row expiring `M<n> exit`. A dependency nobody planned blocks its task and comes back through Revise. (Option b, letting the implementer edit `[project.dependencies]`, is not used.)
 - **New packages or components:** contracts, `pkg_scope`, deptry config, `known-first-party`, test dirs in the protected list.
+- **Frozen contracts**, on a bar written before them (`protected_gaps` names `tests/contracts/**` once the project is multi-package or has `tests/contracts/`): copy the template's `frozen_contracts` and `protected_globs` functions into `check.sh` and its `protected` and `gate` lines, `tests/contracts/**` in both protected lists, CR-09 and the role-table row. A tightening.
 - **New stack:** stubs and rule families.
 - **Grow:** rewrite component contracts as package contracts; the rules don't change.
 - Remove parentheses from optional layers whose module now exists.
@@ -161,6 +163,7 @@ No live user: write everything, list the confirmations needed under open questio
 - An exception with no owner or expiry, or a `per-file-ignores` / `per_rule_ignores` entry with no Exceptions row
 - `check.sh` steps or hook commands edited by hand, a relative hook command, or a check removed to get green
 - Protected list missing a test directory, or `check.sh` and the agent files disagreeing about it
+- A frozen contract under `tests/contracts/` edited to make a test pass, or `tests/contracts/**` left off the protected list of a multi-package bar
 - A loosening approved by a hedge, or committed without the user's yes
 - Anything written under `src/**`, `tests/intent/**` or `tests/unit/**`
 - Every constraint judged by the project's own tests (no external check)
@@ -170,7 +173,7 @@ No live user: write everything, list the confirmations needed under open questio
 - [ ] `dt status --skill build-setup` shows empty (or explained) `config_mismatches`, `contract_mismatches`, `optional_layers_existing`, `deptry_missing`, `protected_gaps`, `ignores_without_exception`, `agents_missing`, `hooks_missing`, `not_executable` and `tools_missing`; `pkg_scope` matches `dependents`
 - [ ] No `{{placeholder}}` left in any written file
 - [ ] Every CR rule with a number names its config key, and the two agree
-- [ ] `PROTECTED` and CONSTRAINTS.md's protected list are the same ten globs (Step 4), plus `packages/*/pyproject.toml` in multi-package
+- [ ] `PROTECTED` and CONSTRAINTS.md's protected list are the same eleven globs (Step 4), plus `packages/*/pyproject.toml` in multi-package
 - [ ] Contracts match the architecture's dependency rules; missing modules are optional layers
 - [ ] Every exception has an owner and an expiry; every config ignore has a row
 - [ ] `check.sh gate` passed once on the committed skeleton, inside the time budget

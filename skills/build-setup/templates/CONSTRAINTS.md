@@ -12,6 +12,7 @@ The standing quality bar. `pyproject.toml` and `scripts/check.sh` enforce it; ev
 - **CR-06** The implementer never changes `tests/intent/**`
 - **CR-07** This file, `pyproject.toml` tool config, `scripts/` and `.claude/agents/` are not weakened to make a change pass
 - **CR-08** Nothing imports from `references/` or adds it to `sys.path` (or `PYTHONPATH`, pytest `pythonpath`). References are outside the tooling, so imported code would bypass the bar; `floor_guard.sh` checks the diff for both. Code copied from a reference is project code and meets the same bar
+- **CR-09** A boundary contract (`tests/contracts/<pkg>.<symbol>/`: schema, fixtures, fake) is frozen once its folder exists at the task's base. Only the contract task freezing it (`**Step:** contract`) writes a new folder; a frozen one changes only through `architecture-design` Revise, never to make a test pass
 
 ## Readability
 - **CR-10** One entry function per pipeline; it reads top to bottom as its named steps (reviewer + `dt layout`)
@@ -44,10 +45,10 @@ The standing quality bar. `pyproject.toml` and `scripts/check.sh` enforce it; ev
 | Role | May edit | May not edit | Stop gate |
 |---|---|---|---|
 | tester | `tests/intent/**` | everything else; reads no source | `check.sh collect` |
-| implementer / solo | `src/**`, `tests/unit/**` | the protected list | `check.sh gate` + protected-path diff against `refs/checks/base` |
+| implementer / solo | `src/**`, `tests/unit/**`; a contract task also its new `tests/contracts/<pkg>.<symbol>/` | the protected list | `check.sh gate` + protected-path diff against `refs/checks/base` |
 | reviewer | nothing (the orchestrator records findings with `dt finding`) | everything | runs `check.sh full` by hand |
 
-**Protected list** (`PROTECTED` in `scripts/check.sh`; `path_guard.sh deny --protected` reads the same list): {{protected_globs_md}}.
+**Protected list** (`PROTECTED` in `scripts/check.sh`; `path_guard.sh deny --protected` reads the same list): {{protected_globs_md}}. `tests/contracts/**` covers the contract folders that exist at the task's base (CR-09).
 
 ## Review
 Run by the reviewer agent at every checkpoint and at milestone exit, over the diff since the checkpoint's base.

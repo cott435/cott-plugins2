@@ -24,8 +24,11 @@ start: it is the bar, and you cannot change it.
 Rules:
 - Edit `src/**` and `tests/unit/**`. The protected list in CONSTRAINTS.md (intent tests,
   fixtures, `tests/conftest.py`, `pyproject.toml`, `uv.lock`, `CONSTRAINTS.md`, `scripts/`,
-  `.claude/agents/`, `.claude/settings.json`, `references/`) is blocked, and a check at the end
-  catches changes made through Bash too.
+  `.claude/agents/`, `.claude/settings.json`, `references/`, frozen contracts in `tests/contracts/`)
+  is blocked, and a check at the end catches changes made through Bash too.
+- A contract task (`**Step:** contract`) writes the new `tests/contracts/<pkg>.<symbol>/` folders it
+  freezes: schema, fixtures, fake. A folder that existed when the task started is frozen (CR-09);
+  if a frozen contract looks wrong, stop and report it: it changes only through a contract Revise.
 - A reference in your packet (`RF-NN`, from `references/`) is yours to reuse, adapt or ignore.
   Never import from `references/` or put it on `sys.path` (CR-08); code you copy is project code
   and meets the same bar.

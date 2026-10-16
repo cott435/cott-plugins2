@@ -35,7 +35,8 @@ KEYS = {
     "test-planning": ["packages", "pipelines_no_smoke", "pipelines_no_golden", "cases_no_source",
                       "cases_no_tolerance", "fixtures_missing", "fixtures_orphan", "skills"],
     "build-planning": ["milestone", "progress", "next_task", "blocked_tasks", "uncovered", "no_spine",
-                       "mode_violations", "draft_pipelines", "changed_since_plan", "stage_to_cut", "pipelines_inferred",
+                       "mode_violations", "boundaries_unfrozen", "draft_pipelines", "changed_since_plan", "stage_to_cut",
+                       "pipelines_inferred",
                        "milestone_references", "milestone_skills", "references_unrouted", "skills_unrouted",
                        "stage_unrouted", "skills_missing", "skills_available",
                        "grow_triggers", "drift", "stale_contracts", "queued", "base"],
@@ -360,6 +361,22 @@ class BuildPlanningTest(Base):
         self.assertEqual(d["no_spine"], ["PL-02"])
         self.assertEqual(d["uncovered"], ["STAT-03"])
 
+    def test_boundaries_unfrozen(self):
+        self.write("docs/packages/feed/contract.md",
+                   "# feed — Contract\n\n**Package:** feed · **Status:** Approved · **Last updated:** 2026-10-15\n\n"
+                   "### feed.quotes: Quotes\n`def quotes() -> Quotes`\n"
+                   "- **Boundary:** quant · **Fixtures:** tests/contracts/feed.quotes/ · **Cases:** one day\n\n"
+                   "### feed.depth: Depth\n`def depth() -> Depth`\n"
+                   "- **Boundary:** web · **Fixtures:** tests/contracts/feed.depth/ · **Cases:** one book\n")
+        self.assertEqual(self.status("build-planning")["boundaries_unfrozen"], ["feed.quotes (quant)"])
+        self.write("tests/contracts/feed.quotes/schema.json", "{}")        # frozen by an earlier milestone
+        self.assertEqual(self.status("build-planning")["boundaries_unfrozen"], [])
+        (self.root / "tests/contracts/feed.quotes/schema.json").unlink()
+        (self.root / "tests/contracts/feed.quotes").rmdir()
+        self.edit("tasks/plan.md", "**Step:** PL-02 · **Covers:** STAT-04", "**Step:** contract · **Covers:** —")
+        self.edit("tasks/plan.md", "**Read:** PL-02, stats.estimate_cov, STAT-04", "**Read:** feed.quotes")
+        self.assertEqual(self.status("build-planning")["boundaries_unfrozen"], [])
+
     def test_reason_overrides_mode_rule(self):
         self.edit("tasks/plan.md", "**Size:** XS · **Mode:** split", "**Size:** XS · **Mode:** solo\n**Reason:** doc-only")
         self.assertEqual(self.status("build-planning")["mode_violations"], [])
@@ -583,6 +600,8 @@ class BuildSetupTest(Base):
         self.assertEqual(d["ignores_without_exception"], ["src/quant/stats/rmt.py (C901)"])
         self.assertEqual(d["protected_gaps"], ["tests/fixtures/** not in check.sh",
                                                "check.sh and CONSTRAINTS.md differ: tests/fixtures/**"])
+        self.write("tests/contracts/feed.quotes/schema.json", "{}")       # a boundary to freeze: required
+        self.assertIn("tests/contracts/** not in check.sh", self.status("build-setup")["protected_gaps"])
         self.write("src/quant/portfolio/__init__.py", "")
         self.assertEqual(self.status("build-setup")["optional_layers_existing"], ["quant.portfolio"])
 

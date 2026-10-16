@@ -96,6 +96,7 @@ agent-skills format, so its `/review`, `/build` and `/ship` read it unchanged, p
 - **CR-05** Oracle files (`tests/fixtures/**/expected.json`) change only with user approval
 - **CR-06** The implementer never changes `tests/intent/**`
 - **CR-07** This file, `pyproject.toml` tool config, `scripts/` and `.claude/agents/` are not weakened to make a change pass
+- **CR-09** A boundary contract (`tests/contracts/<pkg>.<symbol>/`) is frozen once its folder exists at the task's base; only the contract task freezing it writes a new folder, and a frozen one changes only through `architecture-design` Revise
 
 ## Readability
 - **CR-10** One entry function per pipeline; it reads top to bottom as its named steps (reviewer + `dt layout`)
@@ -127,10 +128,10 @@ agent-skills format, so its `/review`, `/build` and `/ship` read it unchanged, p
 | Role | May edit | May not edit | Stop gate |
 |---|---|---|---|
 | tester | `tests/intent/**` | everything else | `check.sh collect` |
-| implementer / solo | `src/**`, `tests/unit/**` | the protected list | `check.sh gate` + protected-path diff against `refs/checks/base` |
+| implementer / solo | `src/**`, `tests/unit/**`; a contract task also its new `tests/contracts/<pkg>.<symbol>/` | the protected list | `check.sh gate` + protected-path diff against `refs/checks/base` |
 | reviewer | nothing (the orchestrator records findings with `dt finding`) | everything | runs `check.sh full` by hand |
 
-**Protected list** (one generated list feeds both the `path_guard.sh deny` globs and `check.sh`'s `PROTECTED`): `tests/intent/**`, `tests/fixtures/**`, `tests/conftest.py`, `pyproject.toml`, `CONSTRAINTS.md`, `scripts/**`, `.claude/agents/**`.
+**Protected list** (one generated list feeds both the `path_guard.sh deny` globs and `check.sh`'s `PROTECTED`): `tests/intent/**`, `tests/fixtures/**`, `tests/conftest.py`, `pyproject.toml`, `CONSTRAINTS.md`, `scripts/**`, `.claude/agents/**`, `tests/contracts/**` (narrowed by `check.sh` to the contract folders that exist at the base, so the Phase 0 contract task can create the one it freezes).
 
 ## Review
 (checkpoint checklist, §7)

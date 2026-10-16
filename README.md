@@ -105,6 +105,8 @@ In a multi-package milestone, Phase 0 doesn't queue every package behind one sys
 
 A boundary fake generated from an approved contract is allowed, because both sides are tested against the same fixtures. Mocking a step inside a package is still forbidden: every spine step is a real baseline.
 
+Once the contract task is done, its folder is frozen (CR-09): `build-setup`'s protected list covers every `tests/contracts/` folder that exists at a task's base, so only the contract task creating it can write it, and the plugin's `dt guard` asks before any edit no open contract task covers. A frozen contract changes only through `architecture-design` Revise and a new contract task.
+
 ### Finishing a milestone (Advance)
 
 ```

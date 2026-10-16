@@ -19,7 +19,7 @@ Templates use `{{name}}`. After filling, `grep -rn '{{[a-z_]*}}'` over the writt
 | `deptry_ignores` | pyproject | `[tool.deptry.per_rule_ignores]` + `DEP002 = [...]`, or empty | dependencies no code imports yet; one Exceptions row each |
 | `import_contracts` | pyproject | `[[tool.importlinter.contracts]]` blocks | `Depends on` (single) or the package dependency rules (multi); missing modules in `(…)` |
 | `typos_ignore_identifiers` | pyproject | `"^[A-Z]{1,5}$"` for tickers, else empty | domain |
-| `protected_globs` | check.sh | `'tests/intent/**' 'tests/fixtures/**' …` (quoted) | the fixed ten globs below (SKILL.md Step 4); multi adds `'packages/*/pyproject.toml'` |
+| `protected_globs` | check.sh | `'tests/intent/**' 'tests/fixtures/**' …` (quoted) | the fixed eleven globs below (SKILL.md Step 4); multi adds `'packages/*/pyproject.toml'` |
 | `src_dirs`, `packages_dir` | check.sh | `src` and empty · `packages/a/src packages/b/src` and `packages` | shape |
 | `type_gate` | check.sh, CONSTRAINTS | `mypy` or `pyright` | question 2 |
 | `pkg_scope_cases` | check.sh | `    data) echo "data stats portfolio" ;;` per id | dependency graph: the id plus everything that depends on it, directly or not |
@@ -42,7 +42,7 @@ Architecture: `quant` with components `data` (depends on nothing), `stats` (→ 
 
 **Values**
 ```bash
-PROTECTED=('tests/intent/**' 'tests/fixtures/**' 'tests/conftest.py' 'pyproject.toml' 'uv.lock' 'CONSTRAINTS.md' 'scripts/**' '.claude/agents/**' '.claude/settings.json' 'references/**')
+PROTECTED=('tests/intent/**' 'tests/fixtures/**' 'tests/conftest.py' 'pyproject.toml' 'uv.lock' 'CONSTRAINTS.md' 'scripts/**' '.claude/agents/**' '.claude/settings.json' 'references/**' 'tests/contracts/**')
 pkg_scope() {
   case "$1" in
     data) echo "data stats portfolio" ;;
@@ -88,7 +88,7 @@ Proof run, after the skeleton commit: ruff --show-settings ok; check.sh gate pas
 
 ASSUMPTIONS:
 - Single package `quant`; components data < stats < portfolio; portfolio is an optional layer until M2
-- Protected list: the ten globs above
+- Protected list: the eleven globs above
 - Rule families DTZ, NPY, PD; stubs: pandas-stubs
 - numpy, pandas declared now with a DEP002 exception expiring at M1 exit
 - Coverage floor 0 (no code yet); Ratchet sets it at M1 exit. vulture whitelist: 0 entries

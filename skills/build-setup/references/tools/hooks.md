@@ -31,7 +31,7 @@ Loaded when build-setup writes or changes `.claude/agents/*.md` or `scripts/hook
 | implementer (and solo) | `path_guard.sh deny --protected` | `post_edit.sh` | `stop_gate.sh gate` |
 | reviewer | none: `tools: Read, Grep, Glob, Bash`, no Edit or Write | — | — |
 
-`--protected` reads the list from `scripts/check.sh protected`, so the guard and the Stop-time diff can't drift apart.
+`--protected` reads the list from `scripts/check.sh protected`, so the guard and the Stop-time diff can't drift apart. That output narrows `tests/contracts/**` to the contract folders at `refs/checks/base` (CR-09): a contract task may write the folder it creates; the next task's base freezes it.
 
 ## Two layers
 

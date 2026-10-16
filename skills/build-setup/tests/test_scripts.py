@@ -102,8 +102,46 @@ class SingleProject(unittest.TestCase):
         self.assertIn("FAILED: bash scripts/floor_guard.sh", result.stderr)  # the noqa
 
     def test_protected_list_is_printed(self) -> None:
+        # tests/contracts/** stands for the contract folders at the base: none yet.
         result = check(self.root, "protected")
-        self.assertEqual(result.stdout.split(), project.PROTECTED)
+        self.assertEqual(result.stdout.split(), [g for g in project.PROTECTED if g != "tests/contracts/**"])
+
+    # ------------------------------------------------------------- frozen contracts (CR-09)
+    def test_contract_task_writes_a_new_contract_then_it_is_frozen(self) -> None:
+        r = self.root
+        schema = "tests/contracts/feed.quotes/schema.json"
+        write(r, schema, "{}\n")  # the contract task, before its commit: a folder new since the base
+        self.assertEqual(hook(r, "path_guard.sh", edit_input(r, schema), "deny", "--protected").returncode, 0)
+        result = check(r, "gate")
+        self.assertNotIn("protected files changed", result.stderr)
+        self.assertEqual(result.returncode, 0, result.stderr[-2000:])
+
+        commit(r, "contract task")  # the next task's base: frozen from here
+        self.assertIn("tests/contracts/feed.quotes/**", check(r, "protected").stdout.split())
+        result = hook(r, "path_guard.sh", edit_input(r, schema), "deny", "--protected")
+        self.assertEqual(result.returncode, 2)
+        self.assertIn("frozen boundary contract (CR-09)", result.stderr)
+        new_contract = "tests/contracts/feed.depth/schema.json"
+        self.assertEqual(hook(r, "path_guard.sh", edit_input(r, new_contract), "deny", "--protected").returncode, 0)
+        routes = {
+            "edited": lambda: append(r, schema, "\n"),
+            "new file": lambda: write(r, "tests/contracts/feed.quotes/case_2.json", "{}\n"),
+            "deleted": lambda: (r / schema).unlink(),
+        }
+        for name, change in routes.items():
+            with self.subTest(route=name):
+                sh(r, "git", "checkout", "-q", "--", ".")
+                sh(r, "git", "clean", "-q", "-fd", "tests/contracts")
+                change()
+                result = check(r, "gate")
+                self.assertEqual(result.returncode, 1, name)
+                self.assertIn("FAILED: protected files changed", result.stderr)
+
+    def test_tester_may_not_write_a_contract(self) -> None:
+        write(self.root, "tests/contracts/feed.quotes/schema.json", "{}\n")
+        result = check(self.root, "collect")
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("FAILED: files outside tests/intent changed", result.stderr)
 
     # ---------------------------------------------------------------------------- --pkg
     def test_pkg_scopes_tests_to_package_and_dependents(self) -> None:

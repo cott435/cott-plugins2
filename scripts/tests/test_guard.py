@@ -4,7 +4,7 @@ from __future__ import annotations
 import json
 import unittest
 
-from dt_helpers import run_main
+from dt_helpers import FixtureCopy, run_main
 
 
 def decision(out: str):
@@ -46,6 +46,41 @@ class GuardTest(unittest.TestCase):
         self.assertEqual((code, decision(out)), (0, "ask"))
         self.assertEqual(decision(run_main("--root", "/proj", "guard", "--path", "tasks/archive/M1.md")[1]), "deny")
         self.assertEqual(run_main("--root", "/proj", "guard", "--path", "src/a.py"), (0, ""))
+
+
+class ContractGuardTest(FixtureCopy):
+    """tests/contracts/** is frozen (ask) except while an unticked contract task of the plan covers it."""
+
+    def setUp(self):
+        super().setUp()
+        self.replace("tasks/plan.md", "**Step:** PL-02 · **Covers:** STAT-04", "**Step:** contract · **Covers:** —")
+        self.replace("tasks/plan.md", "**Files likely:** src/quant/stats/pipeline.py,",
+                     "**Files likely:** tests/contracts/feed.quotes/fake.py, src/quant/stats/pipeline.py,")
+
+    def decide(self, rel):
+        event = {"tool_name": "Write", "cwd": str(self.root / "src"),
+                 "tool_input": {"file_path": str(self.root / rel)}}
+        return decision(run_main("guard", stdin=json.dumps(event))[1])
+
+    def test_open_contract_task_may_write_its_folders(self):
+        self.assertIsNone(self.decide("tests/contracts/stats.estimate_cov/schema.json"))  # in Read:
+        self.assertIsNone(self.decide("tests/contracts/feed.quotes/cases/a.json"))         # in Files likely
+        self.assertIsNone(self.decide("tests/contracts/conftest.py"))                     # shared support
+
+    def test_folder_no_open_task_covers_asks(self):
+        code, out = run_main("--root", str(self.root), "guard", "--path", "tests/contracts/data.load_prices/schema.json")
+        self.assertEqual((code, decision(out)), (0, "ask"))
+        self.assertIn("Frozen contract: tests/contracts/data.load_prices/schema.json",
+                      json.loads(out)["hookSpecificOutput"]["permissionDecisionReason"])
+
+    def test_ticked_contract_task_freezes(self):
+        self.replace("tasks/todo.md", "- [ ] M1-T02", "- [x] M1-T02")
+        self.assertEqual(self.decide("tests/contracts/stats.estimate_cov/schema.json"), "ask")
+        self.assertEqual(self.decide("tests/contracts/conftest.py"), "ask")
+
+    def test_no_plan_asks(self):
+        code, out = run_main("--root", "/proj", "guard", "--path", "tests/contracts/a.b/schema.json")
+        self.assertEqual((code, decision(out)), (0, "ask"))
 
 
 if __name__ == "__main__":

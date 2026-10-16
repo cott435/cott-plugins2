@@ -30,7 +30,7 @@ It plans; it never builds. It writes no code, runs no code, and stops at every g
 
 ## Modes
 
-Run `dt status --skill build-planning` first. It prints `mode`, `milestone`, `base`, `progress`, `next_task`, `blocked_tasks`, `uncovered`, `no_spine`, `mode_violations`, `draft_pipelines`, `changed_since_plan`, `stage_to_cut`, `pipelines_inferred`, `skills_missing`, `skills_available`, `milestone_skills`, `milestone_references`, `skills_unrouted`, `references_unrouted`, `stage_unrouted`, `grow_triggers`, `drift`, `stale_contracts`, `queued`, `references_unindexed`, `references_changed`, `references_missing` and `next ids`.
+Run `dt status --skill build-planning` first. It prints `mode`, `milestone`, `base`, `progress`, `next_task`, `blocked_tasks`, `uncovered`, `no_spine`, `mode_violations`, `boundaries_unfrozen`, `draft_pipelines`, `changed_since_plan`, `stage_to_cut`, `pipelines_inferred`, `skills_missing`, `skills_available`, `milestone_skills`, `milestone_references`, `skills_unrouted`, `references_unrouted`, `stage_unrouted`, `grow_triggers`, `drift`, `stale_contracts`, `queued`, `references_unindexed`, `references_changed`, `references_missing` and `next ids`.
 
 | Mode | When | Do |
 |---|---|---|
@@ -121,7 +121,7 @@ Every spine task (b and c):
 - builds every step at its spine version (a real baseline), so the pipeline runs end to end on fixture or synthetic data
 - commits the smoke command, and replaces the pipeline's pre-build sections with a `dt layout` pointer (`dt tick` prompts `dt prebuild-clear`)
 
-**Fakes.** A boundary fake generated from an approved contract is allowed: both sides are tested against the same fixtures (the provider asserts its output validates, the consumer consumes the fixtures), so neither can drift from the contract unseen. Mocking a step inside a package is still forbidden: a spine step is the real baseline from the step table. Changing a frozen schema or fixture is a contract change: `architecture-design` Revise, never an edit to make a test pass.
+**Fakes.** A boundary fake generated from an approved contract is allowed: both sides are tested against the same fixtures (the provider asserts its output validates, the consumer consumes the fixtures), so neither can drift from the contract unseen. Mocking a step inside a package is still forbidden: a spine step is the real baseline from the step table. Changing a frozen schema or fixture is a contract change: `architecture-design` Revise, never an edit to make a test pass. The bar enforces it (CR-09): once a contract folder exists at a task's base, the implementer can't write it and `dt guard` asks before any edit no open contract task covers. The re-freeze after a Revise is a new contract task naming the symbol in `Read:`; it runs in the main session, since the implementer's guard blocks a folder frozen at the base.
 
 ### 5. Thicken
 
@@ -190,7 +190,7 @@ No next milestone: if the next stage is designed (`stage_to_cut`), cut it (step 
 
 Before presenting the Draft:
 - `dt lint tasks/ docs/roadmap.md AGENTS.md` is clean. It checks sizes, acceptance count, titles, fields, depends, parallel groups, smoke in Verify, todo vs plan, budgets.
-- `dt status --skill build-planning`: `uncovered`, `no_spine` and `mode_violations` are empty (or each is explained on the task or under Open questions); `skills_missing` is listed for the user.
+- `dt status --skill build-planning`: `uncovered`, `no_spine`, `mode_violations` and `boundaries_unfrozen` (a `**Boundary:**` symbol with a consumer in the milestone, not yet frozen, in no contract task's `Read:`) are empty (or each is explained on the task or under Open questions); `skills_missing` is listed for the user.
 - `references_unrouted` (milestone references in no task's `Read:`), `skills_unrouted` (milestone skills on no task) and `stage_unrouted` (stage skills and references on no milestone) are empty, or each item has a one-line reason under Open questions.
 - `dt context` resolves for every task, under 2,000 lines. A contract symbol that doesn't resolve (often a heading naming several) routes to `architecture-design`; never fix the contract yourself.
 - Every plan header field is set and `tasks/plan.md` is ≤ ~400 lines.

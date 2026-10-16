@@ -132,6 +132,22 @@ def milestone_packages(repo: Repo, row: model.Milestone | None, pipelines: list[
     return sorted(pkgs)
 
 
+def boundaries_unfrozen(repo: Repo, pkgs: list[str], tasks: list[model.Task]) -> list[str]:
+    """Boundaries the milestone crosses that no contract task freezes: a contract symbol whose `**Boundary:**`
+    line names a consumer among the milestone's packages, in no contract task's `Read:`, with no fixtures folder
+    yet (an earlier milestone froze it). Items read `features.screen (portfolio)`."""
+    frozen = {md.strip_md(i).split(" (")[0].strip() for t in tasks if t.is_contract for i in t.read}
+    out = []
+    for doc in repo.docs("contract"):
+        for sym in model.symbols(doc):
+            fields = md.bullet_fields(doc.lines, sym.start + 1, sym.end)
+            consumers = [c for c in map(md.strip_md, md.split_list(fields.get("Boundary", ""))) if c in pkgs]
+            folder = md.strip_md(fields.get("Fixtures", "")) or f"tests/contracts/{sym.id}/"
+            if consumers and sym.id not in frozen and not (repo.root / folder).is_dir():
+                out.append(f"{sym.id} ({', '.join(consumers)})")
+    return out
+
+
 def revising(repo: Repo, pkgs: list[str], drafts: list[str]) -> list[str]:
     """Docs a Revise round has open: Draft pipelines.md/tests.md of the milestone's packages, plus any doc
     that defines a Draft milestone or task pipeline (a system pipeline's architecture.md)."""
@@ -230,6 +246,7 @@ def build_planning(repo: Repo, r: Report) -> None:
     r.add("uncovered", uncovered(repo, active, tasks, milestone_pls) if active else [])
     r.add("no_spine", [p for p in milestone_pls if p not in spined])
     r.add("mode_violations", mode_violations(tasks))
+    r.add("boundaries_unfrozen", boundaries_unfrozen(repo, pkgs, tasks) if active else [])
     r.add("draft_pipelines", drafts)
     r.add("changed_since_plan", changed)
     r.add("stage_to_cut", f"{focus.id} {focus.name}" if isinstance(focus, model.Stage) else "none")

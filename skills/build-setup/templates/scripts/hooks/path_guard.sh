@@ -56,7 +56,11 @@ for g in ${globs[@]+"${globs[@]}"}; do
 done
 
 if [ "$mode" = deny ] && [ $match = 1 ]; then
-  echo "BLOCKED: $rel is protected from this agent (CONSTRAINTS.md, Roles and protected paths)." >&2
+  if [[ $rel == tests/contracts/* ]]; then
+    echo "BLOCKED: $rel is a frozen boundary contract (CR-09). It changes only through architecture-design Revise; stop and report it." >&2
+  else
+    echo "BLOCKED: $rel is protected from this agent (CONSTRAINTS.md, Roles and protected paths)." >&2
+  fi
   exit 2
 fi
 if [ "$mode" = allow ] && [ $match = 0 ]; then

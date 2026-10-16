@@ -15,6 +15,8 @@ from .packages import closure, is_multi, known_packages
 from .tomlread import load_toml
 
 REQUIRED_PROTECTED = ("tests/intent/**", "tests/fixtures/**")
+# Frozen boundary contracts (CR-09), required once there can be a boundary to freeze.
+CONTRACTS_GLOB = "tests/contracts/**"
 STANDING_IGNORES = {"tests/**", "__init__.py"}
 
 
@@ -138,13 +140,17 @@ def protected_lists(repo: Repo) -> dict[str, list[str]]:
 
 
 def protected_gaps(repo: Repo) -> list[str] | None:
-    """Required test paths a protected list doesn't cover, and the two lists disagreeing."""
+    """Required test paths a protected list doesn't cover (`tests/contracts/**` once the project is
+    multi-package or has `tests/contracts/`), and the two lists disagreeing."""
     lists = protected_lists(repo)
     if not lists:
         return None
+    required = list(REQUIRED_PROTECTED)
+    if is_multi(repo) or (repo.root / "tests" / "contracts").is_dir():
+        required.append(CONTRACTS_GLOB)
     out = []
     for source, globs in lists.items():
-        for req in REQUIRED_PROTECTED:
+        for req in required:
             sample = req.replace("**", "pkg/test_x.py")
             if not any(g == req or fnmatch(sample, g) for g in globs):
                 out.append(f"{req} not in {source}")

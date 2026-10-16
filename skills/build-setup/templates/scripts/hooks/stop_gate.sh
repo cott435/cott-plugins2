@@ -4,8 +4,10 @@
 # Blocks by printing {"decision": "block", "reason": ...} and exiting 0, not by exit 2:
 # Claude Code treats an exit-2 Stop hook whose stderr mentions a missing file
 # ("No such file or directory") as non-blocking, and test output often does.
-# Loop guard: after MAX_TRIES failed attempts the agent may stop and the user gets a
-# systemMessage. The parent agent is not told, so the orchestrator re-runs the gate itself.
+# Loop guard: after MAX_TRIES failed attempts the agent may stop. The last block tells it to
+# start its report with "GATE FAILED", because that report is all the parent sees: a
+# SubagentStop systemMessage doesn't reach the main view (checked live, Claude Code 2.1.292).
+# The orchestrator still re-runs the gate itself after every subagent.
 # --warn never blocks: a failing gate only leaves a systemMessage (CONSTRAINTS.md says when).
 # For gate and full, .claude/.check_pkg (written by the orchestrator, optional) holds the
 # task's package and becomes --pkg.
@@ -63,5 +65,11 @@ if [ "$tries" -gt "$MAX_TRIES" ]; then
   say_user "Gate '$mode' still failing after $MAX_TRIES attempts; the agent stopped so a human can look. Run scripts/check.sh $mode."
 fi
 
+last=""
+if [ "$tries" -eq "$MAX_TRIES" ]; then
+  last="
+This was the last attempt. If you can't fix it now, finish anyway and start your report with
+\"GATE FAILED: scripts/check.sh $mode\", then list what is still failing."
+fi
 say_block "Gate '$mode' failed (attempt $tries/$MAX_TRIES). Fix these before finishing:
-$(echo "$out" | tail -60)"
+$(echo "$out" | tail -60)$last"

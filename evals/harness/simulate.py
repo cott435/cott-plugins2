@@ -3,8 +3,9 @@
 finished trajectory's project and assert the modes `dt status` reports. No model calls.
 
 Replan:  edit a step of a pipeline the active milestone uses and put its pipelines.md back to Draft (what
-         pipeline-design Revise does) → pipeline-design `revise`, build-planning `replan`; re-approve it with a
-         task still Blocked → `replan`; unblock → back to the starting mode.
+         pipeline-design Revise does) → pipeline-design `revise`, build-planning `blocked` (waiting for approval);
+         re-approve it with a later Last updated → build-planning `replan`, the doc in `changed_since_plan`;
+         a task Blocked as well → `replan`, task listed; both files restored → back to the starting mode.
 Advance: tick every todo item with `dt tick` → not yet `advance` (exit checkpoint open); tick the exit
          checkpoint → `advance`; `dt archive` → plan stubbed, milestone derived Done, lint clean.
 
@@ -88,6 +89,15 @@ def edit_first_step(path, pid):
     return None
 
 
+def set_last_updated(path, date):
+    lines = path.read_text().splitlines(keepends=True)
+    for i, l in enumerate(lines):
+        if "**Last updated:**" in l:
+            lines[i] = re.sub(r"(\*\*Last updated:\*\*\s*)\d{4}-\d{2}-\d{2}", rf"\g<1>{date}", l, count=1)
+            break
+    path.write_text("".join(lines))
+
+
 def add_blocked(path, task_id, reason):
     lines = path.read_text().splitlines(keepends=True)
     for i, l in enumerate(lines):
@@ -149,20 +159,26 @@ def simulate(src, dt=None):
             check(f"Replan simulation: editing {p['id']} step `{step}` (pipelines.md back to Draft) → pipeline-design Revise",
                   s_pd.get("mode") == "revise" and pkg_mode == "revise",
                   f"mode={s_pd.get('mode')} packages={s_pd.get('packages')} {s_pd.get('_error', '')}")
-            check(f"Replan simulation: while {p['id']} is Draft → build-planning Replan",
-                  s_bp.get("mode") == "replan", f"mode={s_bp.get('mode')} draft_pipelines={s_bp.get('draft_pipelines')} {s_bp.get('_error', '')}")
-            # Pipeline re-approved, but the task on the changed step is still paused.
+            check(f"Replan simulation: while {p['id']} is Draft → build-planning blocked (waiting for approval)",
+                  s_bp.get("mode") == "blocked", f"mode={s_bp.get('mode')} draft_pipelines={s_bp.get('draft_pipelines')} {s_bp.get('_error', '')}")
+            # Re-approved after the plan was written: the plan must catch up.
             set_status(doc, "Draft", "Approved")
-            git(proj, "commit", "-qam", "re-approve", "--no-verify")
+            set_last_updated(doc, "2099-01-01")
+            s_bp = bp(proj, dt)
+            changed = s_bp.get("changed_since_plan") or []
+            check(f"Replan simulation: {p['id']} re-approved after the plan → build-planning Replan, doc listed",
+                  s_bp.get("mode") == "replan" and any(p["doc"] in str(x) for x in changed),
+                  f"mode={s_bp.get('mode')} changed_since_plan={changed}")
+            # A task on the changed step is paused as well.
             task = next((t["id"] for t in steps_of(p["id"])), None) or next(iter(sorted(todo)), None)
             add_blocked(proj / plan["doc"], task, f"{p['id']} step revised")
             s_bp = bp(proj, dt)
-            check(f"Replan simulation: pipeline re-approved, {task} Blocked → build-planning Replan, task listed",
+            check(f"Replan simulation: {task} Blocked → build-planning Replan, task listed",
                   s_bp.get("mode") == "replan" and any(str(x).startswith(str(task)) for x in s_bp.get("blocked_tasks", [])),
                   f"mode={s_bp.get('mode')} blocked_tasks={s_bp.get('blocked_tasks')}")
-            git(proj, "checkout", "--", plan["doc"])
+            git(proj, "checkout", "HEAD", "--", plan["doc"], p["doc"])
             s_bp = bp(proj, dt)
-            check(f"Replan simulation: unblocked → build-planning back to `{start_mode}`", s_bp.get("mode") == start_mode,
+            check(f"Replan simulation: both files restored → build-planning back to `{start_mode}`", s_bp.get("mode") == start_mode,
                   f"mode={s_bp.get('mode')}")
 
         # ---- Advance

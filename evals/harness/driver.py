@@ -18,9 +18,9 @@ answer the oracle guard's "ask" prompts; see permission_mcp.py). Both sessions l
 only, no CLAUDE.md files and no MCP servers but the eval's own, so the host's user-level instructions, skills,
 plugins and MCP servers don't leak into the trajectory.
 
-Agent frontmatter hooks (the .claude/agents/*.md files build-setup writes) don't fire in a headless run unless
-the agents are passed with --agents or installed user-level; planning never runs those agents, so this harness
-doesn't need them.
+Agent frontmatter hooks (the .claude/agents/*.md files build-setup writes) don't fire in a headless run in an
+untrusted folder (checked live: skipped silently) unless the agents are passed with --agents or installed
+user-level; planning never runs those agents, so this harness doesn't need them.
 """
 import json, os, re, subprocess, sys, time, uuid, shutil, pathlib
 
@@ -103,8 +103,9 @@ def mcp_args(out):
 
 
 def agent_turn(proj, sid, msg, first, log_path, plugin_root, extra):
+    # --include-hook-events: without it the stream carries only SessionStart and Stop hook events.
     cmd = [CLAUDE_BIN, "-p", msg, "--model", AGENT_MODEL, "--output-format", "stream-json", "--verbose",
-           "--permission-mode", "bypassPermissions", "--disallowedTools", "AskUserQuestion",
+           "--include-hook-events", "--permission-mode", "bypassPermissions", "--disallowedTools", "AskUserQuestion",
            "--plugin-dir", str(plugin_root), *extra, *ISOLATE]
     cmd += ["--session-id", sid] if first else ["--resume", sid]
     t0 = time.time()

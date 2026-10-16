@@ -326,6 +326,7 @@ class SingleProject(unittest.TestCase):
             self.assertEqual(answer["decision"], "block")
             self.assertIn(f"attempt {attempt}/3", answer["reason"])
             self.assertIn("FAILED: mypy", answer["reason"])
+            self.assertEqual(attempt == 3, "GATE FAILED" in answer["reason"], "the last try says how to report")
         result = hook(r, "stop_gate.sh", payload, "gate")
         self.assertIn("still failing after 3 attempts", json.loads(result.stdout)["systemMessage"])
         self.assertFalse((r / ".claude/.stop_attempts_agent-1").exists())

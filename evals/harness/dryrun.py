@@ -4,7 +4,7 @@ sample project (scripts/tests/fixtures/quant, a valid single-package project mid
 
 The fixture is replayed one planning layer per turn (brief → spec → architecture → pipelines → tests → plan →
 build setup), then the M1 code it already contains lands as a final "build" turn. So most assertions should
-pass; the expected failures are the ones the fixture can't meet (it isn't a finished six-stage quant run).
+pass; the expected failures are the ones the fixture can't meet (it isn't a finished four-stage quant run).
 
 Usage: dryrun.py [out-dir]   (default: a fresh temp dir; printed at the end)
 """
@@ -60,7 +60,7 @@ def main():
         _, status = driver.snapshot(proj, dt)
         turns.append({"turn": n, "user": "Approved." if n > 1 else "Plan my quant lab.", "assistant": "(replayed)",
                       "skills": [f"dev-team2:{skill}"] if skill else [], "tools": [], "seconds": 0,
-                      "usage": {}, "docs_changed": "", "status": status, "stage": "data" if n < 4 else "statistics"})
+                      "usage": {}, "docs_changed": "", "status": status, "stage": "data" if n < 4 else "structure_portfolios"})
     (run / "turns.json").write_text(json.dumps(turns, indent=1))
     (run / "summary.json").write_text(json.dumps({"trajectory": "quant-incremental (dry run)", "turns": len(turns),
                                                   "stages_reached": 2, "finished": True, "stop_reason": "dry run"}))

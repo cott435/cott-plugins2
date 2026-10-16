@@ -180,7 +180,7 @@ Enforcing component boundaries inside a single package is what makes Grow cheap:
 
 **Stop-hook behaviour (verified):**
 - A Stop hook blocks with JSON `decision: "block"`.
-- After 3 failed tries, `stop_gate.sh` lets the agent stop and leaves a `systemMessage` for the user. The parent agent is *not* told, so the orchestrator re-runs `check.sh gate` after every subagent returns (or adds a PostToolUse hook on the `Agent` tool).
+- After 3 failed tries, `stop_gate.sh` lets the agent stop and leaves a `systemMessage`, which the main view doesn't show for a subagent (live check, 2.1.292). So the third block tells the agent to start its report with `GATE FAILED: scripts/check.sh <mode>`, and the orchestrator still re-runs `check.sh gate` after every subagent returns (or adds a PostToolUse hook on the `Agent` tool).
 
 ---
 
@@ -269,6 +269,6 @@ Every finding needs a disposition: a fix task or a reason. `dt lint` flags any f
 2. **CI.** Generate `.github/workflows/check.yml` by default, or only on request?
 
 **Follow-ups before `build-setup` ships:**
-- A live smoke test in a real Claude Code session: the Stop JSON block, `systemMessage`, and `cwd` in a worktree subagent.
+- ~~A live smoke test in a real Claude Code session~~ done 2026-10-16; results in `skills/build-setup/references/tools/hooks.md` (Verified live). It changed `stop_gate.sh` (GATE FAILED report) and `gitignore.additions` (`.claude/worktrees/`).
 - Write and test `floor_guard.sh` and `check.sh --pkg`, neither of which exists yet.
-- Eval runs through the headless harness won't fire agent frontmatter hooks unless the agents are passed with `--agents` or installed user-level.
+- Eval runs through the headless harness won't fire agent frontmatter hooks unless the agents are passed with `--agents`, installed user-level, or the project folder is trusted first (verified: an untrusted `-p` run skips them silently).

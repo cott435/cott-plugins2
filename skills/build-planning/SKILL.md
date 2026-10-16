@@ -73,7 +73,7 @@ From the roadmap row and the pipelines: the spec IDs, packages, pipelines and ex
 
 **Up front, fill every row in New mode.** When the brief lists every stage, each row's Source is `brief` and the spec's only Changelog row says IDs `all`, so `dt` can't tell which pipelines belong to which row and `pipelines_inferred` comes back empty. Assign each approved pipeline to the row whose stage it delivers, by its Covers, and write Packages and Pipelines for every row. A row left `—` stays below Designed, even when its pipelines are approved.
 
-One milestone is one working capability end to end, about 5–15 tasks. Bigger means two milestones; a single task belongs in an existing one.
+One milestone is one working capability end to end. **Size is counted per track:** the Phase 0 spine plus the longest chain of `Depends on` tasks after it, at most about 15 (`dt lint` errors `milestone-size` above 15). Tasks in different parallel groups that don't depend on each other don't add up, so independent tracks (prices and technicals beside financials and fundamentals) stay in one milestone as parallel groups, whatever the plan's total. Only one milestone is active at a time, so splitting independent tracks into milestones serializes them. Split only along a dependency line, where a later part needs an earlier part's outputs. A single task belongs in an existing milestone.
 
 Every spec ID the milestone's pipelines cover lands on a task or under `**Deferred:**` with a target and reason (`PORT-07 (to M4: needs forecasts)`). `uncovered` must end empty.
 
@@ -194,6 +194,7 @@ Then present:
 
 - A split task testing a symbol nothing has built yet
 - Parallel tasks sharing a file or a contract symbol
+- A track (spine plus longest `Depends on` chain) over 15 tasks, or independent tracks split into sequential milestones
 - A task over M, more than 3 acceptance bullets, or "and" in a title
 - A new pipeline with no Phase 0 task, or a spine that mocks a step
 - A post-spine `Verify:` without the smoke command
@@ -217,6 +218,7 @@ Then present:
 - [ ] Every task: resolvable `Read:` IDs, size M or smaller, ≤ 3 test-backed acceptance bullets, a Verify step, Mode by rule (or a Reason), skills routed
 - [ ] `skills_unrouted` and `references_unrouted` empty or explained; references cited by `RF-NN`, with selectors for long files
 - [ ] Dependencies ordered backward with no cycles; checkpoints every 2–3 tasks plus the exit
+- [ ] The track (Phase 0 plus the longest `Depends on` chain) is ≤ 15 tasks; any split follows a dependency line, never one between independent tracks
 - [ ] `dt context` packets under 2,000 lines; plan ≤ ~400 lines; AGENTS.md doc map ≤ 25 lines
 - [ ] Only the write-matrix files changed; no existing plan overwritten without the user's say
 - [ ] The turn ended at the gate; the user approved in a later turn; nothing was built

@@ -23,7 +23,7 @@ from ..status.common import available_skills
 SEVERITY = {
     "dup-id": "E", "missing-ref": "E", "retired-ref": "E", "budget": "W", "approved-edit": "W",
     "prebuild-left": "E", "task-size": "E", "task-acceptance": "E", "task-title": "E", "task-fields": "E",
-    "task-step": "W", "depends": "E", "parallel": "E", "verify-smoke": "E", "todo-mismatch": "E",
+    "task-step": "W", "depends": "E", "milestone-size": "E", "parallel": "E", "verify-smoke": "E", "todo-mismatch": "E",
     "finding-disposition": "E", "foreign-plan": "W", "broken-fence": "E", "header": "E",
     "unreadable": "E", "internal": "W", "pipeline-fields": "E", "spine-mock": "W", "contract-heading": "E",
     "fixture-size": "W",                # missing fixture files are reported as E
@@ -39,6 +39,7 @@ FIXTURE_MAX_BYTES = 100 * 1024
 SPINE_MOCK = re.compile(r"\b(mock|stub|fake|todo|placeholder)", re.IGNORECASE)
 
 SIZE_FILES = {"XS": (1, 1), "S": (1, 2), "M": (3, 5)}
+TRACK_MAX = 15        # Phase 0 tasks + the longest Depends-on chain after them
 REQUIRED_TASK_FIELDS = ("Package", "Step", "Size", "Mode", "Read", "Acceptance", "Verify")
 
 # Fields and table columns whose IDs must resolve. `Depends on` is checked by `depends`.
@@ -586,6 +587,38 @@ def _cycles(graph: dict[str, list[str]]) -> list[list[str]]:
     return out
 
 
+def _longest_chain(tasks: list[model.Task]) -> list[str]:
+    """The longest Depends-on chain among `tasks` (IDs, first to last). Dependencies outside `tasks` and
+    cycles (reported by `depends`) are ignored."""
+    graph = {t.id: [d for d in t.depends_on if d != t.id] for t in tasks}
+    best: dict[str, list[str]] = {}
+
+    def chain(node: str, path: frozenset) -> list[str]:
+        if node in best:
+            return best[node]
+        prev = [chain(d, path | {node}) for d in graph[node] if d in graph and d not in path]
+        best[node] = max(prev, key=len, default=[]) + [node]
+        return best[node]
+
+    return max((chain(t.id, frozenset()) for t in tasks), key=len, default=[])
+
+
+def check_milestone_size(ctx: Context):
+    """A milestone's track is its Phase 0 tasks plus the longest Depends-on chain after them. Parallel
+    tracks don't add up, so the plan's total task count isn't capped (the plan's line budget bounds it)."""
+    for doc in ctx.plan_docs:
+        tasks = model.tasks(doc)
+        spine = [t for t in tasks if t.is_spine]
+        chain = _longest_chain([t for t in tasks if not t.is_spine])
+        n = len(spine) + len(chain)
+        if n > TRACK_MAX:
+            line = doc.header_line if doc.header_line is not None else 0
+            yield _p(doc, line, "milestone-size",
+                     f"track is {n} tasks, cap {TRACK_MAX}: Phase 0 {len(spine)} + chain {' → '.join(chain)} "
+                     f"({len(chain)}). Shorten the chain, or split the milestone where a later part needs an "
+                     "earlier part's outputs; never split independent tracks")
+
+
 def check_parallel(ctx: Context):
     for doc in ctx.plan_docs:
         groups: dict[str, list[model.Task]] = {}
@@ -687,7 +720,7 @@ CHECKS = [
     check_dup_id, check_missing_ref, check_retired_ref,
     check_budget, check_approved_edit, check_prebuild_left,
     check_task_fields, check_task_size, check_task_acceptance, check_task_title, check_task_step,
-    check_depends, check_parallel, check_verify_smoke,
+    check_depends, check_milestone_size, check_parallel, check_verify_smoke,
     check_todo_mismatch, check_finding_disposition, check_foreign_plan,
     check_ref_file, check_ref_hash, check_ref_large, check_ref_prefix, check_roadmap_skill,
 ]

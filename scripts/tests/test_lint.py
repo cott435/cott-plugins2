@@ -306,6 +306,35 @@ class TaskChecks(LintCase):
         msgs = [p.message for p in self.problems() if p.code == "depends"]
         self.assertIn("cycle: M1-T01 → M1-T02 → M1-T01", msgs)
 
+    def _add_tasks(self, n: int, depends):
+        """n XS tasks M1-T07… before the exit checkpoint; `depends(k)` gives task k's Depends on."""
+        blocks = []
+        for k in range(7, 7 + n):
+            blocks.append(f"### M1-T{k:02d}: Extra step {k}\n"
+                          "**Package:** quant · **Step:** PL-02.pca · **Size:** XS · **Mode:** solo\n"
+                          "**Read:** PL-02\n**Acceptance:**\n- [ ] TC-03 passes\n"
+                          "**Verify:** `python -m quant.stats cov-report --smoke`\n"
+                          f"**Depends on:** {depends(k)} · **Files likely:** src/quant/stats/x{k}.py\n\n")
+        self.p.edit(PLAN, "### Checkpoint: milestone exit", "".join(blocks) + "### Checkpoint: milestone exit")
+
+    def size_messages(self):
+        return [p.message for p in self.problems() if p.code == "milestone-size"]
+
+    def test_milestone_size_counts_spine_plus_longest_chain(self):
+        self._add_tasks(12, lambda k: "M1-T05" if k == 7 else f"M1-T{k - 1:02d}")
+        chain = " → ".join(f"M1-T{k:02d}" for k in [4, 5] + list(range(7, 19)))
+        self.assertEqual(self.size_messages(), [
+            f"track is 16 tasks, cap 15: Phase 0 2 + chain {chain} (14). Shorten the chain, or split the milestone "
+            "where a later part needs an earlier part's outputs; never split independent tracks"])
+
+    def test_milestone_size_at_cap_is_fine(self):
+        self._add_tasks(11, lambda k: "M1-T05" if k == 7 else f"M1-T{k - 1:02d}")
+        self.assertEqual(self.size_messages(), [])
+
+    def test_parallel_tracks_do_not_add_up(self):
+        self._add_tasks(20, lambda k: "M1-T02")
+        self.assertEqual(self.size_messages(), [])
+
     def test_parallel_shared_file(self):
         self.p.edit(PLAN, "src/quant/stats/rmt.py, tests/unit/quant/test_rmt.py", "src/quant/stats/rmt.py, src/quant/data/steps.py")
         msgs = [p.message for p in self.problems() if p.code == "parallel"]

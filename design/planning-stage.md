@@ -429,7 +429,7 @@ A milestone delivers one working capability end to end: a pipeline you can run, 
 - **One package, several milestones.** In a quant repo, `data` might carry M1 prices, M2 financials, and later M5 point-in-time store.
 - **One milestone, several packages.** A stats milestone that needs survivorship-free sampling adds tasks to `data`, each tagged `Package: data`. If `data`'s contract changes, that's an architecture Revise during the milestone's planning, and `data/pipelines.md` gets an Extend.
 - **Slice by pipeline, not by layer.** "Prices → financials → cleaning → storage" mixes the two. Prices and financials are pipelines, so they can be milestones. Cleaning and storage are *steps* inside those pipelines: M1's spine ships prices with naive cleaning and plain files, and later tasks thicken those steps. A storage overhaul becomes its own milestone only when it's large and delivers something testable on its own (e.g. "point-in-time queries pass the leak cases").
-- **Size:** about 5–15 tasks. Bigger means two milestones. A single task isn't a milestone; it belongs in an existing one.
+- **Size, per track:** the Phase 0 spine plus the longest `Depends on` chain after it, at most about 15 tasks (`dt lint` `milestone-size`). Parallel groups that don't depend on each other don't add up, so independent tracks stay in one milestone however many tasks the plan holds; the plan's ~400-line budget bounds the total. Only one milestone is active at a time, so splitting independent tracks would serialize them. Split only where a later part needs an earlier part's outputs. A single task isn't a milestone; it belongs in an existing one.
 
 ---
 

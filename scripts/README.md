@@ -202,6 +202,7 @@ Checks (code: severity):
   - `task-fields` E — missing Package, Step, Size, Mode, Read, Acceptance or Verify; Mode not split/solo
   - `task-step` W — Step `PL-NN.<name>` names a step that isn't in that pipeline's table
   - `depends` E — a `Depends on` task that isn't defined, comes at or after the task **in plan order** (position in the file, not ID number: Replan reorders without renumbering), or a cycle (reported once). A task from another plan or the archive resolves
+  - `milestone-size` E — the plan's track is over 15 tasks: its Phase 0 tasks plus the longest `Depends on` chain among the rest (dependencies on other plans ignored). The message names the chain. Parallel tracks don't add up, so the total task count isn't capped; the plan's line budget bounds it
   - `parallel` E — two tasks with the same `Parallel` group sharing a `Files likely` path or a `Read:` contract symbol (`pkg.symbol`)
   - `verify-smoke` E — a task outside Phase 0 whose `Verify:` lacks its Step pipeline's smoke command (tests.md Strategy `Smoke` cell, else the pipeline's Trigger + ` --smoke`)
   - `finding-disposition` E — a finding under a checkpoint with no `→ <disposition>`

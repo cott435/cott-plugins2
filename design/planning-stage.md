@@ -1,6 +1,6 @@
 # Planning Stage — Design
 
-**Status:** Ready to build · **Last updated:** 2026-10-15
+**Status:** Ready to build · **Last updated:** 2026-10-16 · **Start here:** §13 Implementation handoff
 
 Covers what happens after `architecture-design` is approved and before any code: pipelines, file layout, test plans, build plans, skill routing, and how all of it evolves across new, extend, grow, replan, rebuild and debug. Building itself is agent-skills' `/build`; this design only makes sure builders get small, correct inputs.
 
@@ -13,13 +13,14 @@ Inputs to this design: agent-skills `planning-and-task-breakdown`, `incremental-
 1. **Three new skills after architecture:** `pipeline-design` → `test-planning` (optional) → `build-planning`. Each stops at a review gate.
 2. **One folder per package:** `docs/packages/<pkg>/` holds everything about a package, in single *and* multi-package repos. Grow then moves sections between folders; it never rewrites paths.
 3. **Intent until code exists, then code is truth.** Planned layout and entry-function sketches are *pre-build sections*: the spine task replaces them with a pointer to `dt layout`. Contracts stay as docs but are checked against code.
-4. **Build plans are per milestone, not per package.** `tasks/plan.md` is always the active milestone, so `/build` and `/build auto` work unchanged. Every task names its package.
+4. **Build plans are per milestone, not per package.** `tasks/plan.md` is always the active milestone, in agent-skills' `/build` format (plan.md plus todo.md). Every task names its package. Solo tasks can run under `/build` as-is; split tasks need the build-phase orchestrator (`build-phase-notes.md`).
 5. **Repo-unique ID on every addressable unit.** Agents read by ID (`dt section PL-02 TC-06`), not by file. Each task lists the IDs it needs, and `dt context <task>` assembles them.
 6. **New repo doc `docs/roadmap.md`** holds milestone order. Stages live there, not in brief goals. That fixes eval root cause #1, "the brief never re-aims".
 7. **No review-plan file.** The standing bar is agent-skills' `CONSTRAINTS.md` plus a Definition of Done, written once. Checkpoints live in the plan.
 8. **Depth:** design everything known, but write task-level plans only for the next milestone. Later milestones go into `tasks/queued/` only when the user asks. Either way, every milestone starts with a **kickoff check** that revalidates the docs against the code.
 9. **Deterministic by default.** One shared CLI (`dt`) in the plugin's `scripts/` parses every doc. Status, IDs, coverage, context packets and lint come from it, not from an agent reading and counting. Plugin hooks run it at session start, guard oracle files, and lint doc edits (§10).
 10. **Milestones are capabilities, not packages.** A package can span several milestones, and a milestone can touch several packages (§6).
+11. **Planning never writes or runs code.** Each skill and build role writes only the paths in its row of the write matrix (§10). Mechanical edits to approved docs go through `dt`.
 
 ---
 
@@ -30,7 +31,7 @@ Inputs to this design: agent-skills `planning-and-task-breakdown`, `incremental-
 | Contract | **Keep**, per package, written by `architecture-design` | Consumers of a package read only this, not its whole architecture. Moved out of the architecture doc's Interfaces section. |
 | Planned file structure | **Keep, as a section of `pipelines.md`** | The layout follows from the pipelines (entry module plus step owners), so it's approved alongside them. It's a pre-build section: the spine task swaps it for `dt layout`. |
 | Spine plan | **Drop as a file** | The spine is a *Spine version* column in the pipeline step table plus Phase 0 of the milestone plan. A separate file would restate both. |
-| Review plan | **Drop as a file** | Review criteria are repo-wide and stable, so they go in `CONSTRAINTS.md` + DoD. Checkpoint blocks sit in the plan where builders hit them. |
+| Review plan | **Drop as a file** | Review criteria are repo-wide and stable, so they go in the Review section of `CONSTRAINTS.md` (see [build-setup.md](build-setup.md)). Checkpoint blocks sit in the plan where builders hit them. |
 | Test plan | **Keep**, optional, per package | `tests.md` is the index and strategy; fixtures live in `tests/fixtures/`. |
 | Build plan | **Keep, per milestone** in `tasks/` | Milestones cross packages (the system spine always does). Per-package plans would split one milestone's ordering across files. A package-scoped agent filters tasks by `Package:`. |
 | Pipeline plan | **Keep**, `pipelines.md` per package | System pipelines that cross packages stay general and live in the root architecture. |
@@ -41,7 +42,7 @@ Inputs to this design: agent-skills `planning-and-task-breakdown`, `incremental-
 
 ```
 AGENTS.md / CLAUDE.md          doc map + how to read sections + project skills (≤ 25 lines)
-CONSTRAINTS.md                 standing quality bar, incl. pipeline readability rules (agent-skills /constraints)
+CONSTRAINTS.md                 standing quality bar, incl. pipeline readability rules + Done   build-setup
 docs/
   brief.md                     why                                  idea-refine
   ideas/<idea>.md              why, per addition                    idea-refine
@@ -55,6 +56,9 @@ docs/
     pipelines.md               NEW  pipelines + pre-build layout      pipeline-design
     tests.md                   NEW  test strategy + case index        test-planning (optional)
 tests/fixtures/<pkg>/TC-NN/    source/, input.json, expected.json    test-planning
+tests/intent/<pkg>/            intent tests from TC cases + acceptance  tester (build)
+tests/unit/<pkg>/              unit tests                            implementer (build)
+scripts/check.sh, scripts/hooks/, .claude/agents/                    build-setup (see build-setup.md)
 tasks/
   plan.md                      active milestone (agent-skills /build format, extended)   build-planning
   todo.md                      active milestone checklist
@@ -86,6 +90,9 @@ tasks/
 | Step | `PL-NN.<function>` | pipelines step table | The step name *is* the function the entry calls |
 | Test case | `TC-NN` | `tests.md` | Repo-unique; also the fixture folder name |
 | Milestone / task | `M<n>`, `M<n>-T<nn>` | roadmap / plan | |
+| Review finding | `M<n>-R<nn>` | plan, under its checkpoint | Needs a disposition (fix task or reason) |
+| Contract symbol | `<pkg>.<symbol>` | `contract.md` heading (`### stats.estimate_cov: Covariance estimate`) | Lets `Read:` point at one function's contract |
+| Constraint rule | `CR-NN` | CONSTRAINTS.md | See [build-setup.md](build-setup.md) |
 
 **Rules**
 - Every ID is a heading (`## PL-02: Covariance report`), or a bold line in the spec. `dt section <ID>…` prints only those sections, searching all docs. Because IDs are repo-unique, no path is needed.
@@ -97,6 +104,22 @@ tasks/
 ---
 
 ## 5. Skills
+
+### 5.0 Shared rules for every planning skill
+
+- **Read-only toward code.** A planning skill writes only its row of the write matrix (§10). It never creates or runs anything under `src/`, `tests/intent/` or `tests/unit/`. Fixtures are data, so `test-planning` may write them. "Approved, go ahead" means *start the next planning skill*, never *start coding*.
+- **Start with `dt status --skill <name>`.** Take the mode, gaps and next IDs from its output.
+- **Interview one question at a time**, each with a guess and a default (agent-skills `interview-me`). Ask only about what the user must decide: workflows, oracles, scope cuts. Infer everything else and list it as an assumption.
+- **Every review gate lists:**
+  - what was written
+  - **ASSUMPTIONS:** names, triggers, types, order and sizes the skill chose
+  - open questions
+  - anything left uncovered
+
+  Then the turn stops.
+- **Approval is an unambiguous yes** in the user's own words. A hedge ("looks fine I guess") on an oracle, a loosening or a dropped task is not approval; ask again. Approval sets `Status: Approved`.
+- **Commits:** on approval, offer to commit the approved docs and fixtures; commit only on a yes. At milestone kickoff the plan header records `**Base:** <sha>`. `build-setup`'s guard-the-bar diff and protected-path check compare against it.
+- **No live user** (a headless run): don't invent confirmations. Write the doc, put the needed confirmations under Open questions, and leave it at Draft.
 
 ### 5.1 `architecture-design`: small changes
 
@@ -110,6 +133,18 @@ tasks/
   - A package exceeds ~3 pipelines or ~12 modules, or its docs no longer fit a 2k-line agent context.
   - A part runs or deploys on its own (a paper-trading service).
 - After approval: stop, then point to `pipeline-design`. Eval: "Approved, go ahead" led straight to an improvised plan and code.
+
+**`contract.md` template.** There is one `###` section per public symbol. A single package groups symbols under `## <component>`.
+````markdown
+# stats — Contract
+**Package:** stats · **Status:** Approved · **Last updated:** 2026-10-15 · **Architecture:** [../../architecture.md](../../architecture.md)
+
+### stats.estimate_cov: Covariance estimate
+`def estimate_cov(returns: Returns, *, method: CovMethod = "sample") -> Cov`
+- **Invariants:** N×N for T×N input; symmetric; positive semi-definite; no NaN out when none in
+- **Errors:** `ValueError` if T < 2 or the input contains NaN
+- **Used by:** PL-02, PL-03
+````
 
 ### 5.2 `pipeline-design`
 
@@ -164,8 +199,11 @@ src/quant/stats/
   __init__.py   contract exports only
   pipeline.py   PL-02, PL-03 entry functions
   cov.py  rmt.py  pca.py  report.py
-tests/stats/
+tests/intent/stats/  tests/unit/stats/
 ```
+
+## Open questions
+- Should `clean_eigen` take T from Returns instead of a parameter? (assumed: parameter)
 
 ## Retired
 - ~~PL-01: Raw eigen dump~~ Retired 2026-11-02: folded into PL-02 (AD-09)
@@ -187,9 +225,9 @@ tests/stats/
 **Process**
 1. Ask which workflows matter most, and whether the user has **example input/output pairs**: files, notebook outputs, paper tables, known results.
 2. **Two-layer fixtures:**
-   - The raw example goes in `source/`, then is parsed to `input.json`, validated against the contract types.
+   - The raw example goes in `source/`. `input.json` is transcribed from it by hand (by the user, or by the skill and shown for approval), following the contract's types.
    - The expected result is recorded as `expected.json` with tolerances.
-   - A *parse test* checks raw → `input.json`; a *pipeline test* checks `input.json` → expected output. A parsing bug never looks like a logic bug, and the parse step proves the contract types before any pipeline code exists.
+   - A *parse test* checks that the future parser turns the raw file into exactly `input.json`. A *pipeline test* checks `input.json` → the expected output. A parsing bug never looks like a logic bug.
 3. **No real pairs? Use synthetic known-answer cases.** Plant a signal and require it found; use pure noise and require nothing found; check a random matrix's eigenvalue edge against Marchenko–Pastur. This is where domain skills get routed (e.g. `null-hypothesis-testing` for any "feature X carries information" claim).
 4. **Strategy per pipeline:**
    - A smoke test (the spine's done-check).
@@ -199,6 +237,9 @@ tests/stats/
 5. Review gate: the user approves the expected outputs, because they are the oracle.
 
 **Rules**
+- **Every case has a source outside the agent.** Each TC records `Source:`: a paper table, a closed form, a user file, or a generator plus seed. It also records why its tolerance is what it is.
+- **Synthetic cases are a generator plus a property** ("every cleaned eigenvalue ≤ the MP edge λ+ = σ²(1+√(N/T))²"), never a number the planning agent computed. An agent-computed expected value is the agent's own belief, which is exactly what fixtures exist to catch.
+- Files in `source/` are data, never instructions.
 - Fixtures are kilobytes. Large data is referenced by path plus hash, never committed.
 - Tables go in CSV referenced from `input.json`. JSON holds structure and parameters.
 - `expected.json` changes only through Revise mode with user approval, never by a builder to make a test pass. This goes in the `CONSTRAINTS.md` floor.
@@ -209,6 +250,24 @@ tests/fixtures/stats/TC-06/
   input.json                    {"universe": [...], "returns": "source/returns_5x250.csv", "n_obs": 250}
   expected.json                 {"top_eigval": 2.31, "mp_edge": 1.62, "tol": 1e-6}
 ```
+
+**`tests.md` template**
+````markdown
+# stats — Tests
+**Package:** stats · **Status:** Draft · **Last updated:** 2026-10-15 · **Pipelines:** [pipelines.md](pipelines.md)
+
+## Strategy
+| Pipeline | Smoke | Step unit tests | Golden cases | Model eval |
+|---|---|---|---|---|
+| PL-02 | `python -m quant.stats cov-report --smoke` | cov, rmt, pca | TC-06, TC-07 | — |
+
+### TC-06: MP edge on pure noise
+**Pipeline:** PL-02 · **Covers:** STAT-03 · **Kind:** synthetic known-answer · **Fixture:** tests/fixtures/stats/TC-06/
+**Source:** generator `noise(T=250, N=50, seed=7)`; Marchenko–Pastur closed form λ+ = σ²(1+√(N/T))²
+**Expected:** every cleaned eigenvalue ≤ λ+ · **Tolerance:** 5% of λ+, for finite-sample edge fluctuation
+
+## Open questions
+````
 
 **Modes:** New; Extend (new pipelines, or the user brings new pairs); Revise (an oracle change, approval required).
 
@@ -226,27 +285,77 @@ tests/fixtures/stats/TC-06/
    - The pipeline runs end to end on fixture or synthetic data.
    - A smoke test is committed.
    - The pre-build sections are replaced with a `dt layout` pointer.
-5. **Thicken:** one task per step upgrade, riskiest first. In ML that means data loading, leak checks and evaluation before any model.
-6. **Route skills.** Read the descriptions of project skills (`.claude/skills/*/SKILL.md`) and installed plugin skills, then assign them per task. The plan header lists skills in use. A task needing a skill that doesn't exist is flagged, not silently built without it. Eval: the `null-hypothesis-testing` hand-off happened only by chance.
-7. **Checkpoints** every 2-3 tasks, plus a milestone exit checkpoint.
-8. **Parallel groups:** after the spine, tasks in different packages or steps with no dependency between them are marked as able to run in parallel.
-9. Review gate. Stop.
+5. **Thicken:** one task per step upgrade, riskiest first. In ML that means data loading, leak checks and evaluation before any model. **Split a task** when:
+   - it needs more than one session
+   - it has more than 3 acceptance bullets
+   - it touches two packages or two steps
+   - its title contains "and"
 
-**Task template** (extends agent-skills' template)
+   (agent-skills `planning-and-task-breakdown`.)
+6. **Route skills.** Read the descriptions of project skills (`.claude/skills/*/SKILL.md`) and installed plugin skills, then assign them per task. The plan header lists skills in use. A task needing a skill that doesn't exist is flagged, not silently built without it. Eval: the `null-hypothesis-testing` hand-off happened only by chance.
+7. **Set each task's build mode** by rule:
+   - `split` (tester, then implementer) when the task adds or changes behavior with a checkable outcome: anything a TC case, Given/When/Then criterion or model criterion covers.
+   - `solo` (one agent plus the gate hooks) for spine, refactor, glue and doc-sync tasks.
+   - `dt status` flags a task whose mode breaks the rule. Overriding it needs a one-line reason on the task.
+8. **Checkpoints** every 2-3 tasks, plus a milestone exit checkpoint. Each one is reviewed by a separate read-only reviewer agent.
+9. **Dependencies and parallel groups:**
+   - `Depends on` must resolve, be acyclic and point only backward.
+   - After the spine, independent tasks get `**Parallel:** G<n>`. Tasks that share a file in `Files likely` or a contract symbol can't share a group.
+   - A split task may only test symbols that already exist (from the spine or an earlier solo task), so the tester never writes against a guess.
+   - Contract changes come first, then the tasks that depend on them.
+10. Review gate. Stop.
+
+**Sizing** (lint-enforced; agent-skills caps tasks at about 5 files):
+| Size | `Files likely` | Other limits |
+|---|---|---|
+| XS | 1 | |
+| S | 1–2 | |
+| M | 3–5 | |
+
+Every task also has at most 3 acceptance bullets, one Package and one Step (or a reason on the task), and no "and" in its title. After Phase 0, every `Verify:` includes its pipeline's smoke command, so each task leaves the system working.
+
+**Task template** (extends agent-skills' template). `**Blocked:** <reason>` is added when Revise pauses a task. `dt status --summary` shows blocked tasks.
 
 ```markdown
 ### M2-T03: Ledoit-Wolf shrinkage behind `estimate_cov`
-**Package:** stats · **Step:** PL-02.estimate_cov · **Covers:** STAT-02, QR-02 · **Size:** S
+**Package:** stats · **Step:** PL-02.estimate_cov · **Covers:** STAT-02, QR-02 · **Size:** S · **Mode:** split
 **Skills:** data-science
-**Read:** PL-02, TC-06, STAT-02, contract.md#estimate_cov
+**Read:** PL-02, TC-06, STAT-02, stats.estimate_cov
 **Acceptance:**
 - [ ] TC-06 passes within tolerance; sample-cov baseline remains selectable for comparison
 - [ ] PL-02 smoke test still passes
-**Verify:** `pytest tests/stats -k cov` · `python -m quant.stats cov-report --smoke`
-**Depends on:** M2-T01 · **Files likely:** src/quant/stats/cov.py, tests/stats/test_cov.py
+**Verify:** `pytest tests/intent/stats tests/unit/stats -k cov` · `python -m quant.stats cov-report --smoke` · `scripts/check.sh gate --pkg stats`
+**Depends on:** M2-T01 · **Parallel:** G1 · **Files likely:** src/quant/stats/cov.py, tests/unit/stats/test_cov.py
 ```
 
-**Checkpoint block**
+**`plan.md` skeleton.** Tasks and checkpoints use the blocks above and below. Tasks stay in markdown, not an external tracker, because `dt` parses them.
+````markdown
+# M2: Classical portfolios — Plan
+**Milestone:** M2 · **Status:** Approved · **Base:** 3f2c1ab · **Last updated:** 2026-11-03 · **Roadmap:** [../docs/roadmap.md](../docs/roadmap.md)
+
+## Scope
+**Exit:** min-var, risk parity and HRP backtests beat equal weight on Sharpe out of sample; PL-03 golden cases pass.
+**Covers:** PORT-01–PORT-06, QR-04 · **Deferred:** PORT-07 (to M4: needs forecasts)
+**Skills:** data-science (stats steps)
+
+## Phase 0: Spine
+### M2-T01: …
+## Phase 1: Thicken
+### M2-T02: …
+### Checkpoint after M2-T03
+## Risks
+| Risk | Impact | Mitigation |
+|---|---|---|
+| HRP clustering unstable on short windows | wrong weights | TC-12 pins a known dendrogram |
+
+## Open questions
+## Replan notes
+- 2026-11-05: split M2-T04 (too large); dropped none
+````
+
+**`todo.md`** holds task state: one line per task, `- [ ] M2-T03 Ledoit-Wolf shrinkage (stats, S, split)`. Status reads come from here. `dt lint` checks that its task IDs match `plan.md`'s.
+
+**Checkpoint block** (run by the reviewer agent against CONSTRAINTS.md's Review section; findings are recorded under the block, see [build-setup.md §7](build-setup.md))
 
 ```markdown
 ### Checkpoint after M2-T04
@@ -256,23 +365,38 @@ tests/fixtures/stats/TC-06/
 - [ ] No new abstraction without a second implementation or an AD
 - [ ] contract.md matches the contract code (`dt status` freshness check)
 - [ ] `dt layout` output reviewed; Definition of Done holds
+- [ ] `scripts/check.sh full` passes; Review checklist done; every finding has a disposition
 ```
 
 **Modes**
 | Mode | When | Does |
 |---|---|---|
-| New | No roadmap/plan | Roadmap, plus the M1 plan |
+| New | No roadmap or plan | Roadmap, plus the M1 plan. **If `tasks/plan.md` exists with no dev-team2 header** (from agent-skills' `/plan`, say) and has unchecked tasks: stop and ask. Never overwrite it |
 | Extend | A new idea is specced and designed | Adds the milestone. If a milestone is active, the new one is queued, never merged into the active plan unless the user asks |
 | Replan | Something learned during the build, or a major bug | Reorders, splits or adds tasks. Never drops an unchecked task silently: drops are listed for approval. One-line replan note in the plan |
-| Advance | All tasks and the exit checkpoint done | Archives the plan, writes a 1-2 line outcome on the roadmap, runs the **kickoff check**, and promotes or writes the next milestone's plan |
+| Advance | All tasks and the exit checkpoint done | Runs the sequence below. `tasks/plan.md` is never left missing: until the next plan is approved, it holds a stub with `Status: Between milestones`, so agent-skills' `/build auto` can't start its own planner |
 
-**Kickoff check** (part of Advance, and on every first entry into a milestone):
-1. Re-run every status script.
-2. Sync `pipelines.md` and `contract.md` against the code.
-3. Review the queued plan (if any) against what the last milestone changed.
-4. Confirm the plan with the user.
+**Advance and kickoff sequence.** Each [gate] ends a turn.
+1. Exit checkpoint: the reviewer's findings are all dispositioned, then you approve the milestone [gate].
+2. `build-setup` Ratchet: record measured values, offer tightenings [gate].
+3. `dt archive`: move the plan to `tasks/archive/`, write the stub, add the roadmap outcome line.
+4. **Kickoff check:** `dt status`; Sync `pipelines.md` and `contract.md` against the code [gate if mismatches]; review the queued plan, if any, against what changed.
+5. Write the next milestone's plan (Extend), recording `Base` [gate].
+6. `build-setup` Extend for new packages, dependencies or Grow [gate].
+7. Build.
 
 This is what makes up-front and sequential planning land in the same place.
+
+### 5.5 Anatomy seeds
+
+Content for each skill's agent-skills anatomy sections. The description says *when* to use the skill, never the workflow.
+
+| Skill | Use when / Not for | Rationalizations → reality | Red flags | Verification |
+|---|---|---|---|---|
+| pipeline-design | Architecture approved and a package has no or stale `pipelines.md`. Not for choosing technologies (architecture) or ordering work (build-planning) | "I can infer the workflows" → ask · "A registry keeps it extensible" → needs an AD · "The spine step can be a mock" → it must be a real baseline | A step with two owners · logic in the entry sketch · a layout module on no step | `dt status` shows no uncovered IDs · every PL has entry, trigger and spine column · workflows confirmed by the user · assumptions listed |
+| test-planning | Pipelines approved and you want golden cases. Not for writing test code | "A quick script gives the expected value" → circular · "No real data, so no golden cases" → use known-answer cases | An expected value with no source · no parse layer · an oracle approved by a hedge | Smoke test plus ≥ 1 golden case per PL · a source and tolerance reason per TC |
+| build-planning | Pipelines approved and the next milestone needs tasks. Not for agent-skills `/plan` output | "The old plan is stale, I'll overwrite it" → stop and ask · "I'll detail every milestone" → perishable · "No skill fits, I'll build without one" → flag it | A split task testing a missing symbol · parallel tasks sharing files · a task over M | §13 assertions plus agent-skills' planning verification list |
+| build-setup | Plan approved, before the first build of a milestone. Not for changing rules mid-task | Reuse agent-skills `constraint-driven-development` rationalizations | Same | Same, plus `check.sh gate` passed once on the committed skeleton |
 
 ---
 
@@ -334,6 +458,7 @@ idea-refine (New) → brief + roadmap M1 ─ accept
 → pipeline-design (New): PL-01 load/clean data, PL-02 cov report, planned layout ─ approve
 → test-planning (New, optional): TC-01..TC-08, fixtures ─ approve expected outputs
 → build-planning (New): Phase 0 spine for PL-01, PL-02 → thicken → checkpoints ─ approve
+→ build-setup (New): CONSTRAINTS.md, tool config, check scripts, agent roles ─ approve
 → /build
 ```
 
@@ -380,7 +505,7 @@ Old implementation keeps running until the new spine passes the existing golden 
 ```
 The golden cases are what make a rebuild safe.
 
-**H. Advance:** milestone exit checkpoint → archive the plan → roadmap outcome line → kickoff check → next plan.
+**H. Advance:** exit checkpoint [gate] → build-setup Ratchet [gate] → `dt archive` (stub plan + roadmap outcome) → kickoff check → next plan [gate] → build-setup Extend [gate] → build.
 
 **State × skill matrix**
 
@@ -416,6 +541,7 @@ Target: a builder's context is under 2,000 lines (agent-skills `context-engineer
 **AGENTS.md doc map** (written by `build-planning` New, kept current by Grow and Advance). It holds no script paths; the hook supplies them.
 ```markdown
 ## Docs
+- Plan with dev-team2's `build-planning`, not agent-skills' `/plan`.
 - Your task's context: `dt context <M#-T##>`. Read only what it prints.
 - Any section by ID: `dt section <ID>...` (e.g. PL-02 TC-06 STAT-02 AD-07)
 - Package docs: `docs/packages/<pkg>/{architecture,contract,pipelines,tests}.md`
@@ -431,7 +557,7 @@ Target: a builder's context is under 2,000 lines (agent-skills `context-engineer
 
 ### Where they live
 
-dev-team2 ships as a plugin with a root `scripts/` folder, the same way agent-skills ships `references/`. Nothing is copied into the project repo.
+dev-team2 ships as a plugin with a root `scripts/` folder, the same way agent-skills ships `references/`. Doc tooling is never copied into the project repo. Code tooling (`check.sh`, agent files) is project-owned; see [build-setup.md](build-setup.md).
 
 ```
 dev-team2/
@@ -449,6 +575,26 @@ dev-team2/
 - **Caveat:** installing a single skill copies only `skills/<name>/`. agent-skills has the same gap with `references/` (their issue #361). dev-team2 must be installed as a whole plugin.
 - **Existing bug:** today's skills call `skills/<name>/scripts/...` relative to the current folder. That only works when run from inside dev-team2, so these calls move to the plugin-relative form.
 
+### Write matrix
+
+Who may write what. `build-setup` turns the build-role rows into path guards. Planning skills follow theirs as a rule, and `dt lint` reports violations.
+
+| Skill / role | May write | Never |
+|---|---|---|
+| idea-refine | `docs/brief.md`, `docs/ideas/**`, roadmap rows | everything else |
+| spec-writing | `docs/spec.md`, idea Status lines | |
+| architecture-design | `docs/architecture.md`, `docs/packages/*/architecture.md`, `docs/packages/*/contract.md` | |
+| pipeline-design | `docs/packages/*/pipelines.md` | `src/**`, tests code |
+| test-planning | `docs/packages/*/tests.md`, `tests/fixtures/**` | `src/**`, tests code |
+| build-planning | `tasks/plan.md`, `tasks/todo.md`, `tasks/queued/**`, roadmap fill-ins, AGENTS.md doc map | `src/**`, tests code |
+| build-setup | CONSTRAINTS.md, tool config in `pyproject.toml`, `scripts/**`, `.claude/agents/**`, CI | `src/**` |
+| tester (build) | `tests/intent/**` | everything else |
+| implementer / solo (build) | `src/**`, `tests/unit/**` | protected paths (build-setup §4) |
+| reviewer (build) | nothing; the orchestrator records findings with `dt finding` | everything |
+| `dt` (mechanical) | `dt prebuild-clear` (removes pre-build sections when a spine task is checked), `dt archive`, `dt finding`, `dt roadmap`, `todo.md` checkboxes | — |
+
+`dt` writes files itself rather than through Edit or Write, so the Edit/Write guards don't fire, and its mechanical edits don't reset an Approved doc to Draft.
+
 ### `dt` commands
 
 One parser means every skill, hook and agent sees the same IDs, statuses and sections.
@@ -458,18 +604,19 @@ One parser means every skill, hook and agent sees the same IDs, statuses and sec
 | `dt status [--skill X] [--summary]` | every skill, SessionStart hook | Mode; upstream gates; coverage gaps (spec IDs on no component, pipeline or task, unless Deferred); pipelines with no spine task; stale or retired references; skills referenced but not installed; contract freshness (`contract.md` vs the git date of the contract module); Grow triggers. Replaces `idea-refine.sh`, `spec-status.sh` and `arch-status.py` over time |
 | `dt next-id <prefix>` | every writing skill | Next free `AD`, `PL`, `TC`, `CODE` etc., counting retired IDs |
 | `dt section <ID>…` | everyone | Prints those sections from any doc |
-| `dt context <task>` | orchestrator → builder | Task section + every `Read:` section + file list; warns over 2,000 lines |
+| `dt context <task>` | orchestrator → builder | Every `Read:` section, then the file list, then the task section last (active material goes last, per agent-skills `context-engineering`); warns over 2,000 lines |
 | `dt layout <pkg>` | spine task, reviewers, pipeline-design Sync | Real tree, each module annotated with its docstring's first line; flags entry functions whose calls don't match the step table |
-| `dt lint [paths]` | PostToolUse hook, checkpoints | Duplicate IDs, references to missing or retired IDs, size budgets, an Approved doc edited without going back to Draft, a pre-build section still present after the spine is done |
+| `dt lint [paths]` | PostToolUse hook, checkpoints | Duplicate IDs; references to missing or retired IDs; size budgets; an Approved doc edited without going back to Draft; a leftover pre-build section; task sizing, `Depends on` and parallel-group rules; `Verify:` missing the smoke command; `todo.md`/`plan.md` ID mismatch; findings without a disposition; a foreign `tasks/plan.md` |
 | `dt roadmap` | build-planning, Advance | Rewrites the derived Status column |
 | `dt guard <path>` | PreToolUse hook | Decides whether a write needs a human (below) |
+| `dt prebuild-clear <PL>` · `dt archive` · `dt finding <checkpoint> <severity> <text>` | spine task, Advance, orchestrator | The mechanical edits in the write matrix |
 
 ### Hooks
 
 | Event | Runs | Effect |
 |---|---|---|
-| SessionStart | `dt status --summary` | Injects active milestone, next task, blocked gates, resolved `dt` path |
-| PreToolUse (Edit, Write) | `dt guard <path>` | `tests/fixtures/**/expected.json` → **ask**: the user must approve every oracle change. `tasks/archive/**` → **deny** |
+| SessionStart | `dt status --summary` | Injects active milestone, next task, blocked tasks and gates, resolved `dt` path. It doesn't reach subagents; those get `dt context` in their prompt, or `SubagentStart` if needed |
+| PreToolUse (Edit, Write) | `dt guard <path>` | `tests/fixtures/**/expected.json` → **ask**: the user must approve every oracle change. `tasks/archive/**` → **deny** (only `dt archive` writes there). Plugin hooks also fire on subagent tool calls, so this covers tester and implementer too |
 | PostToolUse (Edit, Write on `docs/**`, `tasks/**`) | `dt lint <path>` | Feeds problems straight back to the agent that made the edit |
 | Stop (optional) | `dt lint --changed` | Reports, never blocks, so a turn can't loop |
 
@@ -488,10 +635,107 @@ Statuses like Approved stay a human decision. Hooks check the *format* and prote
 - Task lists are written for the next milestone only. Later milestones stay as 3–6 line roadmap outlines. `tasks/queued/` is used only when the user asks.
 - `idea-refine` adds a roadmap row (milestone id, name, source) when a stage is accepted. `build-planning` fills in packages, pipelines, exit criteria, outcome and the plan link. `dt roadmap` writes the Status column.
 
-**Open:** none.
+- Build model: hybrid (§5.4 step 7; build-setup.md).
+- Gap review against agent-skills (`planning-gap-review.md`) folded in 2026-10-16.
+
+**Open:** none for planning. `build-setup` has two open items (dependency arrival, CI) in [build-setup.md §11](build-setup.md).
 
 ## 12. Fixes to existing skills found in the eval
 
-Iterations 2–3 (branch `claude/iter2-residual-fixes`, not merged) fixed the change markers, out-of-scope contradictions, vendor leakage, the `arch-status` name and the review-gate stops. Still open:
+Iterations 2–4 (merged into `master` 2026-10-16) fixed the change markers, out-of-scope contradictions, vendor leakage, the `arch-status` name and the review-gate stops. Still open:
 - Brief goals grow with each stage (7 goals RL, 6 quant). The roadmap is meant to fix this.
 - Script paths are relative to the current folder, not the plugin (§10).
+
+---
+
+## 13. Implementation handoff
+
+For the chat that implements these skills. The build-phase skills (task orchestration, `/build` wrapping) are **out of scope**; see `build-phase-notes.md`.
+
+### Before starting
+1. **Eval-fix branches: merged into `master` on 2026-10-16** (`cc9cd2c`, `4cf56f9`). Start from `master`.
+2. **Read:**
+   - this doc and [build-setup.md](build-setup.md)
+   - `README.md`
+   - the three existing skills, as the format reference
+   - agent-skills `docs/skill-anatomy.md`
+3. **Background, already folded in:**
+   - `design/planning-gap-review.md`: gaps against agent-skills' planning phase, now in this doc
+   - `design/tooling-verification.md`: verified tool config; its fixed scripts in `evals/tooling-check/` are the `build-setup` templates
+
+### Scope
+**In scope:**
+- the `dt` CLI and plugin hooks
+- plugin packaging
+- the `architecture-design` changes (§5.1)
+- the `idea-refine` roadmap row
+- the `pipeline-design`, `test-planning`, `build-planning` and `build-setup` skills
+- README lifecycle and doc tables
+- eval harness extension
+
+**Out of scope:** how tasks get built.
+
+### Build order
+Each step ends green on its own tests, or on an eval run.
+
+1. **Plugin skeleton and parser:**
+   - `.claude-plugin/plugin.json`
+   - `scripts/dt.py`
+   - `scripts/devteam/`: stdlib-only parser for the doc format below, with unit tests on sample docs
+2. **First commands:** `dt status`, `next-id`, `section` and `lint` on today's docs (brief, ideas, spec, architecture). Point the existing skills at `../../scripts/dt.py`. Keep the old scripts until `dt` matches their output.
+3. **Existing skills:** the `architecture-design` changes (contract.md, `docs/packages/`, system pipelines, Grow triggers, stop after approval) and the `idea-refine` roadmap row.
+4. **`pipeline-design`**, plus `dt layout`.
+5. **`test-planning`.**
+6. **`build-planning`**, plus `dt context` and `dt roadmap`.
+7. **`build-setup`**, after the tooling verification.
+8. **Hooks:** `hooks/hooks.json` with SessionStart, guard and lint.
+9. **README:** lifecycle diagrams, document table, statuses.
+10. **Evals:** below.
+
+### Doc format contract (what `dt` parses)
+- **Header:** the first non-blank line after the H1 holds `**Key:** value` pairs joined by ` · `. Existing docs put it on line 3, new templates on line 2; both parse.
+  - Known keys: Status, Last updated, Last reviewed, Shape, Package, Spec, Contract, Architecture, Pipelines, Milestone, Base, Roadmap. Unknown keys are kept, not rejected.
+  - Status values per doc are as in §3.
+- **ID sections:** a heading `## <ID>: <Title>` or `### <ID>: <Title>`. A section runs to the next heading of the same or higher level.
+  - ID forms: `PL-\d{2,}`, `TC-\d{2,}`, `AD-\d{2,}`, `CR-\d{2,}`, `M\d+`, `M\d+-T\d{2,}`, `M\d+-R\d{2,}`, `<pkg>.<symbol>`.
+- **Spec requirements:** bold-led lines, `**CODE-NN**` (existing convention). Ranges in Covers fields use an en dash (`STAT-01–STAT-04`) and expand to every ID in between.
+- **Retired:** `- ~~<ID>: <title>~~ Retired YYYY-MM-DD: <reason>`. Retired IDs count for `next-id` and fail on reference.
+- **Task fields:** bold-key lines (`**Package:** … · **Mode:** split`).
+  - `**Read:**` is a comma-separated list of IDs or repo paths.
+  - `Mode` is `split` or `solo`.
+  - `Size` is XS–M, matched against the `Files likely` count (§5.4 sizing). L or larger fails lint.
+  - Optional fields: `Parallel` (`G<n>`), `Blocked` (reason).
+- **Pre-build sections:** a heading containing `(pre-build`. `dt lint` flags one that's still present after that pipeline's spine task is checked.
+
+### Skill format
+Match the existing dev-team2 skills and agent-skills' anatomy:
+- frontmatter `name` and `description` ("Use when…")
+- Overview, When to Use, Modes table, Process, Review Gate, Common Rationalizations, Red Flags, Verification checklist
+- SKILL.md at about 250 lines or fewer; templates and long examples in `examples.md`
+- every skill starts by running `dt status --skill <name>` and stops its turn at the review gate
+
+### Validation
+- **Scenarios:**
+  - the existing `rl` and `quant` scenarios
+  - the user's upcoming test projects
+  - all of them extended past architecture through pipeline-design, test-planning, build-planning and build-setup, in both all-at-once and incremental modes
+- **Programmatic assertions** (mostly via `dt`):
+  - `dt lint` is clean
+  - every live spec ID sits on a pipeline step, or is Deferred
+  - every new pipeline has a Phase 0 spine task
+  - every task has resolvable `Read:` IDs, size M or smaller, and a `Mode` that follows the rule
+  - `dt context` packets are under 2,000 lines
+  - doc size budgets hold
+  - there's one roadmap row per stage, with derived status
+  - brief goals stay at 5 or fewer and stage-neutral
+  - quant triggers Grow at the features milestone
+  - no source code is written during planning
+  - every skill stops at its gate
+- **Replan and Advance:** simulate with a scripted state change (edit a step, tick all tasks) and assert the right modes run.
+- **Blind judge:** pipelines read as clear call paths; layouts are sensible; each task could be built from its `dt context` packet alone.
+
+### Done means
+- All planning skills and `dt` commands exist, with passing tests.
+- The eval assertions pass on rl, quant and at least one user project, in both modes.
+- The README describes the full Define → Design → Plan → Build-setup flow.
+

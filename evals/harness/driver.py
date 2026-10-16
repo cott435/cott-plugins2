@@ -39,6 +39,7 @@ USER_MODEL = os.environ.get("USER_MODEL", "sonnet")
 COST_CAP = float(os.environ.get("COST_CAP_USD", "150"))
 MAX_TURNS = int(os.environ["MAX_TURNS"]) if os.environ.get("MAX_TURNS") else None
 PERMISSION_PROMPTS = os.environ.get("PERMISSION_PROMPTS", "1") != "0"
+STALL_LIMIT = 4  # blocked moves in a row with no doc change before the run stops as stalled
 
 STRIP_ENV = ["CLAUDE_CODE_SESSION_ID", "CLAUDE_CODE_REMOTE_SESSION_ID", "CLAUDE_CODE_TEE_SDK_STDOUT",
              "CLAUDE_CODE_MESSAGING_SOCKET", "CLAUDE_CODE_MESSAGING_TOKEN", "CLAUDE_CODE_DIAGNOSTICS_FILE",
@@ -157,7 +158,7 @@ def agent_turn(proj, sid, msg, first, log_path, plugin_root, extra):
 PLANNING_CHAIN = """For each stage the assistant takes you through several planning documents, one at a time, each needing your approval: the idea/brief, the spec, the architecture, the pipelines (the workflows you will run and the planned file layout), optionally a test plan with golden test cases, and the build plan (the tasks for that milestone). Before the first build it also sets up the build tooling and quality bar (CONSTRAINTS.md, checks, agent roles); approve that too."""
 
 
-def sim_user(scn, traj, revealed, next_stage, history_tail, agent_msg, status, refs):
+def sim_user(scn, traj, revealed, next_stage, history_tail, agent_msg, status, refs, note=""):
     proj = scn["projects"][traj["project"]]
     mode = traj["mode"]
     stage_txt = "\n".join(f"- {s['reveal']}" for s in revealed)
@@ -178,6 +179,10 @@ When the last stage is fully planned, set action to "finish"."""
 {PLANNING_CHAIN}
 With everything known up front, expect all stages to be specced, designed and given pipelines, but a detailed build plan only for the first milestone. When the build setup / quality bar has been presented and you approved it, set action to "finish"."""
     refs_txt = (f"Reference files you have put in references/ so far: {', '.join(refs)}\n" if refs else "")
+    build_rule = ("If it offers to start building, say not yet: approve what is pending and introduce the next stage."
+                  if mode == "incremental" and next_stage else
+                  "Planning ends at an approved build setup: if it offers to start building, say planning is done for now.")
+    note_txt = f"\nNOTE FROM THE EVAL HARNESS: {note}\n" if note else ""
     prompt = f"""{scn['persona']}
 
 PROJECT FACTS (your ground truth; only use facts relevant to revealed stages):
@@ -195,8 +200,8 @@ ASSISTANT'S LATEST MESSAGE:
 <<<
 {agent_msg[-9000:]}
 >>>
-
-Decide your reply. If the assistant asked questions, answer them all briefly and consistently with your facts. If it presented a draft for review, approve it explicitly (or request one specific fix if it contradicts your facts). If it offers golden test cases or a test plan, say yes. If it asks which stage or milestone a reference file serves, or which skills to route to a stage, answer from your facts. If it offers to commit approved documents, say yes. If it asks you to choose options or defaults (for example for tooling), take its recommendation. If it is waiting with nothing to answer, tell it to continue to the next planning step. Never instruct it which skill to use, and never write code, documents or tests yourself. Planning ends at an approved build setup: never ask it to write code or tests or to start building, and if it offers to start building, say planning is done for now. When you approve something and also introduce the next stage, put the approval first in the same message ("Approved. Next idea: ...").
+{note_txt}
+Decide your reply. If the assistant asked questions, answer them all briefly and consistently with your facts. If it presented a draft for review, approve it explicitly (or request one specific fix if it contradicts your facts). If it offers golden test cases or a test plan, say yes. If it asks which stage or milestone a reference file serves, or which skills to route to a stage, answer from your facts. If it offers to commit approved documents, say yes. If it asks you to choose options or defaults (for example for tooling), take its recommendation. If it is waiting with nothing to answer, tell it to continue to the next planning step. Never instruct it which skill to use, and never write code, documents or tests yourself. Never ask it to write code or tests or to start building. {build_rule} When you approve something and also introduce the next stage, put the approval first in the same message ("Approved. Next idea: ...").
 Return ONLY a JSON object: {{"action": "reply" | "next_stage" | "finish", "message": "<what you say to the assistant>"}}"""
     r = sh([CLAUDE_BIN, "-p", prompt, "--model", USER_MODEL, "--tools", "", "--output-format", "json",
             "--no-session-persistence", *ISOLATE], HERE, timeout=600)
@@ -281,6 +286,7 @@ def main():
     stage_log = [{"turn": 1, "stage": stages[0]["name"] if traj["mode"] == "incremental" else "all"}]
     t_start = time.time()
     closing, stop_reason = False, "max_turns"
+    stalled = 0  # consecutive turns where the user wanted to move on, readiness blocked it, and no doc changed
     for t in range(1, (MAX_TURNS or traj["max_turns"]) + 1):
         reply, usage, tools, skills, dt_s, errors, hooks, init, agents = agent_turn(
             proj, sid, msg, t == 1, out / "agent_stream.jsonl", plugin_root, extra)
@@ -310,11 +316,29 @@ def main():
             break
         revealed = stages[:n_revealed]
         nxt = stages[n_revealed] if traj["mode"] == "incremental" and n_revealed < len(stages) else None
-        u = sim_user(scn, traj, revealed, nxt, "\n\n".join(history[-4:-1]), reply, status, refs)
+        ask = lambda note="": sim_user(scn, traj, revealed, nxt, "\n\n".join(history[-4:-1]), reply, status, refs, note)
+        u = ask()
         why = readiness(facts, n_revealed, traj["mode"])
         rec["readiness"] = why
+        rec["sim_action"] = u.get("action")
+        # A blocked move is re-asked, never downgraded in place: the message may already introduce the next stage.
         if u.get("action") in ("finish", "next_stage") and why:
-            u["action"] = "reply"
+            stalled = 0 if changed else stalled + 1
+            if stalled >= STALL_LIMIT:
+                stop_reason = f"stalled: {'; '.join(why)}"
+                break
+            u = ask(f"The current stage is not fully planned yet ({'; '.join(why)}). Set action to \"reply\": answer "
+                    "or approve what the assistant just asked, and do not introduce the next stage or finish.")
+            if u.get("action") != "reply":
+                u = {"action": "reply", "message": "Approved. Please continue to the next planning step."}
+        else:
+            stalled = 0
+        if u.get("action") == "finish" and nxt and not why:
+            u = ask("There is still a next stage. Set action to \"next_stage\": approve what is pending, then "
+                    "introduce the next stage.")
+            if u.get("action") != "next_stage":
+                u = {"action": "next_stage", "message": f"Approved. Next idea for this same project: {nxt['reveal']}"}
+        rec["sim_action_final"] = u.get("action")
         if u.get("action") == "finish":
             if all_approved(facts):
                 turns[-1]["sim_user_final"] = u.get("message")

@@ -284,9 +284,16 @@ def layers_changed(n):
         parts = line.split("\t")
         if len(parts) != 3 or not parts[0].isdigit():
             continue
-        k = layer(parts[2].split(" => ")[-1].rstrip("}"))
+        path = parts[2].split(" => ")[-1].rstrip("}")
+        k = layer(path)
+        n_added = int(parts[0])
+        if path.endswith("/contract.md"):
+            # pipeline-design may append PL IDs to `Used by:` lines without touching the contract layer
+            diff = git("diff", "-U0", prev, turn_commit[n], "--", path)
+            n_added = sum(1 for l in diff.splitlines()
+                          if l.startswith("+") and not l.startswith("+++") and "**Used by:**" not in l)
         if k:
-            added[k] = added.get(k, 0) + int(parts[0])
+            added[k] = added.get(k, 0) + n_added
     return {k for k, v in added.items() if v >= 12}  # status flips and small fixes don't count
 
 multi = [(n, sorted(ks)) for n in sorted(turn_commit) if n and len(ks := layers_changed(n)) > 1]

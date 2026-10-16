@@ -120,6 +120,18 @@ def fields_in(lines: list[str], start: int, end: int) -> dict[str, str]:
     return out
 
 
+def bullet_fields(lines: list[str], start: int, end: int) -> dict[str, str]:
+    """Bold-key fields on list items in [start, end): `- **Purpose:** text` → {"Purpose": "text"}.
+    Later lines don't override."""
+    out: dict[str, str] = {}
+    for line in lines[start:end]:
+        m = re.match(r"^\s*[-*]\s+(\*\*.*)$", line)
+        if m:
+            for k, v in split_fields(m.group(1)).items():
+                out.setdefault(k, v)
+    return out
+
+
 def field_line(lines: list[str], start: int, end: int, key: str) -> int | None:
     """Index of the line in [start, end) that holds `**key:**`."""
     pat = f"**{key}:**"

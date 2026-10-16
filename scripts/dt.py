@@ -21,6 +21,8 @@ COMMANDS = {
     "section": "section",
     "context": "context",
     "layout": "layout",
+    "outline": "outline",
+    "references": "references",
     "lint": "lint",
     "roadmap": "roadmap",
     "guard": "guard",

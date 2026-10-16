@@ -347,6 +347,17 @@ class Milestone:
     def source(self) -> str:
         return self.row.get("Source", "")
 
+    @property
+    def skills(self) -> list[str]:
+        """The section's `**Skills:**` line (idea-refine writes it): skills routed to this milestone."""
+        return skill_names(self.fields.get("Skills", ""))
+
+
+def skill_names(value: str) -> list[str]:
+    """`data-analysis, null-hypothesis-testing (claims)` → names; `—`/none → []."""
+    out = [md.strip_md(s).split(" (")[0].strip() for s in md.split_list(value)]
+    return [s for s in out if s and s.lower() not in ("—", "-", "none")]
+
 
 def milestones(doc: Doc) -> list[Milestone]:
     out: dict[str, Milestone] = {}
@@ -370,6 +381,84 @@ def status_column(head: list[str]) -> str | None:
         if h.lower().startswith("status"):
             return h
     return None
+
+
+# ---- references -----------------------------------------------------------------------------
+
+REFERENCE_ID = r"RF-\d{2,}"
+
+
+@dataclass
+class Reference:
+    """An `RF-NN` section of docs/references.md: `**File:** … · **Hash:** … · **Kind:** … · **Milestones:** …`
+    plus bullet fields (Purpose, Key parts, In → Out, Use for, Caveats)."""
+    id: str
+    title: str
+    doc: Doc
+    start: int
+    end: int
+    fields: dict[str, str]
+
+    def _get(self, key: str) -> str:
+        v = md.strip_md(self.fields.get(key, ""))
+        return "" if v.lower() in ("—", "-", "none") else v
+
+    @property
+    def file(self) -> str:
+        return self._get("File")
+
+    @property
+    def hash(self) -> str:
+        return self._get("Hash")
+
+    @property
+    def kind(self) -> str:
+        return self._get("Kind").lower()
+
+    @property
+    def milestones(self) -> list[str]:
+        """`M<n>` IDs, `["all"]`, or [] (`—`: not assigned yet)."""
+        value = self._get("Milestones")
+        if value.lower() == "all":
+            return ["all"]
+        return list(dict.fromkeys(re.findall(r"\bM\d+\b", value)))
+
+    def serves(self, milestone: str) -> bool:
+        return "all" in self.milestones or milestone in self.milestones
+
+    @property
+    def caveats(self) -> str:
+        return self.fields.get("Caveats", "").strip()
+
+    @property
+    def text(self) -> str:
+        return "\n".join(self.doc.lines[self.start:self.end]).rstrip() + "\n"
+
+
+def references(doc: Doc) -> list[Reference]:
+    """Live RF sections (retired entries are one struck line, not sections)."""
+    out = []
+    for h in doc.headings:
+        if h.id and re.fullmatch(REFERENCE_ID, h.id) and "~~" not in h.title:
+            fields = dict(md.bullet_fields(doc.lines, h.line + 1, h.end))
+            fields.update(md.fields_in(doc.lines, h.line + 1, h.end))
+            out.append(Reference(h.id, h.title, doc, h.line, h.end, fields))
+    return out
+
+
+def all_references(repo: Repo) -> list[Reference]:
+    return references(repo.references) if repo.references else []
+
+
+def milestone_references(repo: Repo, milestone: str) -> list[str]:
+    """The RF IDs whose `Milestones` field names this milestone (or `all`): derived, never listed twice."""
+    return [r.id for r in all_references(repo) if r.serves(milestone)]
+
+
+def split_ref(item: str) -> tuple[str, str]:
+    """A `Read:` item `RF-01:pca_factors` → ("RF-01", "pca_factors"); anything else → (item, "")."""
+    m = re.fullmatch(rf"({REFERENCE_ID}):(.+)", item.strip())
+    return (m.group(1), m.group(2).strip()) if m else (item.strip(), "")
 
 
 # ---- contract and architecture ---------------------------------------------------------------

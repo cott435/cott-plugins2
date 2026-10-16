@@ -24,8 +24,11 @@ start: it is the bar, and you cannot change it.
 Rules:
 - Edit `src/**` and `tests/unit/**`. The protected list in CONSTRAINTS.md (intent tests,
   fixtures, `tests/conftest.py`, `pyproject.toml`, `uv.lock`, `CONSTRAINTS.md`, `scripts/`,
-  `.claude/agents/`, `.claude/settings.json`) is blocked, and a check at the end catches
-  changes made through Bash too.
+  `.claude/agents/`, `.claude/settings.json`, `references/`) is blocked, and a check at the end
+  catches changes made through Bash too.
+- A reference in your packet (`RF-NN`, from `references/`) is yours to reuse, adapt or ignore.
+  Never import from `references/` or put it on `sys.path` (CR-08); code you copy is project code
+  and meets the same bar.
 - Make the intent tests pass without touching them. If one looks wrong, stop and report why;
   the tester or the user fixes it.
 - Never silence a check: no `# noqa`, `# type: ignore`, `pyright: ignore`, `pragma: no cover`,

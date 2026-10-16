@@ -30,7 +30,7 @@ Run `python3 ../../scripts/dt.py status --skill spec-writing` first. The path is
    - **Extend mode** — `docs/spec.md` exists. The input is an idea file in `docs/ideas/`. Read the spec fully, then see [Extend Mode](#extend-mode-adding-an-idea-to-an-existing-spec).
 3. Check the input's Status. If it is `Draft`, ask the user whether they accept it; proceed only once they do (and set it to `Accepted`). In extend mode, also check the brief: if the idea edited it, the brief must be `Accepted` too.
 4. Extend mode with no idea file (the user just describes a feature): route to `idea-refine` first — unless the change is small and fully clear, in which case confirm with the user and add it directly, noting "no idea file" in the Changelog row.
-5. If inside a codebase, scan for existing behavior the spec must respect (current features, data, integrations). Ground requirements in what exists.
+5. If inside a codebase, scan for existing behavior the spec must respect (current features, data, integrations). Ground requirements in what exists. Read the summaries in `docs/references.md` for behavior worth requiring (if `dt status` lists `references_unindexed`, `references_changed` or `references_missing`, route to `reference-intake` first). The spec states the behavior, never the reference, its file or its functions.
 6. Check which other skills are installed. `dt status` lists the project's skills under `skills`; your context lists any others. If one owns a step this spec needs, such as testing a hypothesis, a security review or a data workflow, the requirement for that step names the skill. It uses the skill's installed name, and says what the skill is given and what result counts as a pass: "Each candidate feature is tested with the `<skill name>` skill on held-out residual returns; it passes only if the null is rejected at 5% after correction." Don't write your own version of a procedure an installed skill owns. Do this check in every mode and every extend round, not just the first.
 
 ## The Process
@@ -51,7 +51,7 @@ Goal 3 (owner keeps full value)        → Direct payment
 
 Every feature must serve at least one goal. A feature that serves no goal is either missing from the brief (go back to `idea-refine`) or shouldn't be built. Every goal must have at least one feature.
 
-Give each feature a short, stable **feature code** — 2-5 capital letters (`SAVE`, `TEXT`, `PAY`). Codes are chosen once and never renamed; requirement IDs depend on them.
+Give each feature a short, stable **feature code** — 2-5 capital letters (`SAVE`, `TEXT`, `PAY`). `RF` is reserved for references (`dt lint` reports `ref-prefix`). Codes are chosen once and never renamed; requirement IDs depend on them.
 
 ### Step 2: Surface Assumptions
 
@@ -162,7 +162,7 @@ Write `docs/spec.md` with this template:
 
 Before presenting the Draft, run the **hygiene check** on everything above the Changelog. In extend mode, check the whole spec, not just the new section:
 
-- **Implementation names.** Search for library, framework, vendor, dataset, file-format, database and model-type names, including names the user, the brief or the idea file used. Rewrite each one as the behavior or guarantee it stands for: "within 10% of Stable-Baselines3" becomes "within 10% of an established reference implementation", and "NumPy only" becomes "written from basic array operations". The only exception is a source the brief makes a fixed constraint.
+- **Implementation names.** Search for library, framework, vendor, dataset, file-format, database and model-type names, file and function names (a reference's included), including names the user, the brief or the idea file used. Rewrite each one as the behavior or guarantee it stands for: "within 10% of Stable-Baselines3" becomes "within 10% of an established reference implementation", and "NumPy only" becomes "written from basic array operations". The only exception is a source the brief makes a fixed constraint.
 - **Out of scope** (extend mode). Read every out-of-scope line against the features this round added. Drop a line the new features bring into scope. Narrow a line that is now only partly true to the part still excluded, and name the stage it applies to. Once a neural-network stage exists, "deep learning" is no longer out of scope. Once a trading stage uses return forecasts, "no return forecasts — the portfolio stage is variance-only" becomes "the variance-only portfolios use no return forecasts". Then merge duplicates.
 - **Leftovers** (extend mode). The Summary describes the whole spec as it now stands. No requirement is still worded for one stage when it now covers several. Removed requirements are one line each. No `(changed …)` marker or other change note appears above the Changelog.
 

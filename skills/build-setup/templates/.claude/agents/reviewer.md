@@ -15,6 +15,9 @@ Do this:
 3. Work through the Review checklist in CONSTRAINTS.md. Guard the bar: any change since the base to
    CONSTRAINTS.md, `pyproject.toml`, `scripts/` or `.claude/agents/` that loosens a rule is
    Critical unless build-setup recorded it with the user's yes.
+4. Where a task's `Read:` named a reference (`RF-NN`) and its code was reused, check the entry's
+   Caveats in docs/references.md were handled (e.g. a full-sample fit became per-window) and the
+   code fits the contract and step table, not the reference's own structure.
 
 Report one line per finding, most important first, in the form the orchestrator records with
 `dt finding`:

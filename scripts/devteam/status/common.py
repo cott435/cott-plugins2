@@ -7,12 +7,13 @@ import re
 from pathlib import Path
 
 from .. import git, md, model, specdocs
+from .. import references as refs
 from ..commands import roadmap as roadmap_cmd
 from ..repo import Doc, Repo
 
 # dev-team2's own skills: never reported as project skills to route steps to.
 OWN_SKILLS = {"idea-refine", "spec-writing", "architecture-design", "pipeline-design", "test-planning",
-              "build-planning", "build-setup"}
+              "build-planning", "build-setup", "reference-intake"}
 SUMMARY_DOCS = ("docs/brief.md", "docs/spec.md", "docs/roadmap.md", "tasks/plan.md")
 
 
@@ -55,11 +56,16 @@ def fmt(value) -> str:
 
 
 def add_common(repo: Repo, r: Report) -> None:
-    """The `docs` and `next ids` lines every report prints after its mode."""
+    """The `docs` and `next ids` lines every report prints after its mode, then the reference files waiting
+    for reference-intake."""
     docs = docs_summary(repo)
     r.add("docs", docs, " · ".join(f"{k} {v}" for k, v in docs.items()))
     ids = next_ids(repo)
     r.add("next_ids", ids, " ".join(ids))
+    state = refs.state(repo)
+    r.add("references_unindexed", state.unindexed)
+    r.add("references_changed", state.changed)
+    r.add("references_missing", state.missing)
 
 
 # ---- docs line and next IDs ------------------------------------------------------------------
@@ -233,6 +239,10 @@ def summary(repo: Repo) -> list[str]:
         out.append(f"draft (waiting for approval): {fmt(shown)}")
     if repo.roadmap and roadmap_cmd.status_table(repo.roadmap) and roadmap_cmd.differences(repo):
         out.append("roadmap: Status* column stale (run dt roadmap)")
+    waiting = refs.state(repo).waiting
+    if waiting:
+        out.append(f"references: {waiting} waiting → reference-intake")
     dt = Path(__file__).resolve().parents[2] / "dt.py"
+    out = out[:7]
     out.append(f"dt: python3 {dt}")
-    return out[:8]
+    return out

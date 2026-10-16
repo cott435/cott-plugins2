@@ -377,10 +377,14 @@ A small research team (1-3 people) testing US stock strategies that trade weekly
 
 ## M1: Point-in-time data
 **Outline:** Load daily US prices as they were known on any date, including companies that later failed.
+**Skills:** —
 
 ## M2: Vectorized backtests
 **Outline:** Turn a date-by-stock signal table into a backtest report with costs, comparable across strategies.
+**Skills:** —
 ```
+
+The project has no skills installed yet, so the gate asked "No installed skill fits either stage, so both get `Skills: —`. OK?" and the user said yes.
 
 ---
 
@@ -481,6 +485,37 @@ The Z′ rule is the baseline. If the model doesn't clearly beat "sort by Z′",
 **Skill then says:** "The idea is at `docs/ideas/plate-qc-ranking.md`. The brief is unchanged: this serves Goal 2. The biggest risk is label consistency. I'd measure scientist agreement on ~100 plates before anyone trains anything. Accept it or tell me what to change." *(Turn ends.)*
 
 *An idea file for an ML feature adds a **Data** section. It names the data, where it lives, and how it will be evaluated. It still says nothing about model type or libraries; those are decided in the architecture.*
+
+---
+
+## Example 6: Stage Skills and References (Quant, Extend Mode)
+
+**State:** Quant Lab has M1 Data + stats. The project has two skills, `data-analysis` and `null-hypothesis-testing`. `docs/references.md` indexes RF-01 (market decomposition, `Milestones: M2`, assigned during intake while M2's row was being drafted) and RF-02, RF-03 (TFT targets and dataset, `Milestones: —`).
+
+```
+$ python3 ../../scripts/dt.py status --skill idea-refine
+…
+references_unindexed: none
+references_changed: none
+references_missing: none
+references_unassigned: RF-02, RF-03
+```
+
+Nothing is waiting for intake. **The idea** is the structure-and-portfolios stage. The idea file's *Recommended direction* cites RF-01 as prior art ("the market-mode removal in RF-01, fitted per window"), never the path.
+
+**Gate message (end):**
+
+> On acceptance I'll add **M2: Structure + classical portfolios** to the roadmap with `**Skills:** data-analysis, null-hypothesis-testing`: data-analysis for the covariance and PCA work, null-hypothesis-testing for the "the structure is real" claims. Route those two? [yes / edit]. RF-02 and RF-03 (TFT) don't serve this stage, so they stay unassigned.
+
+*(Turn ends.)* **User:** "Accepted, yes." Set the idea file to Accepted and add the row and section:
+
+```markdown
+## M2: Structure + classical portfolios
+**Outline:** PCA and MP-cleaned covariance feed min-var, risk parity and HRP, compared out of sample.
+**Skills:** data-analysis, null-hypothesis-testing
+```
+
+**Months later, M4 Forecasting & agents.** `references_unassigned` still lists RF-02 and RF-03. The gate adds "RF-02 (TFT targets) and RF-03 (TFT dataset) look like they serve M4. Assign them? [yes / edit]". On a yes, both entries' `**Milestones:** —` becomes `**Milestones:** M4`. The index keeps its Status: the user's yes at this gate is the confirmation.
 
 ---
 

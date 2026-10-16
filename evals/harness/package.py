@@ -44,6 +44,9 @@ for i, project in enumerate(["rl", "quant"]):
             shutil.copy(p, out / ("final__" + str(p.relative_to(docs)).replace("/", "__")))
         for p in sorted([*proj.glob("tasks/**/*.md"), *proj.glob("CONSTRAINTS.md"), *proj.glob("AGENTS.md")]):
             shutil.copy(p, out / ("final__" + str(p.relative_to(proj)).replace("/", "__")))
+        for p in sorted(proj.glob("references/**/*")):
+            if p.is_file():
+                shutil.copy(p, out / ("reference__" + str(p.relative_to(proj / "references")).replace("/", "__")))
         fx = sorted(str(p.relative_to(proj)) for p in proj.glob("tests/fixtures/**/*") if p.is_file())
         (out / "fixtures.txt").write_text("\n".join(fx) + "\n")
         dt = dtrun.dt_path(src)

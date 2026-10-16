@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import shutil
 import subprocess
 import tempfile
@@ -261,6 +262,93 @@ class SingleProject(unittest.TestCase):
         self.assertEqual(self.floor("--base", "HEAD~1").returncode, 1)
         self.assertEqual(self.floor("--base", "no-such-ref").returncode, 2)
 
+    # -------------------------------------------------------------- references (CR-08)
+    def test_floor_guard_catches_references_on_the_import_path(self) -> None:
+        cases = {
+            "from": ("src/tinyq/stats/ref.py", '"""Ref."""\n\nfrom references.market import residualize\n'),
+            "import": ("src/tinyq/stats/ref.py", '"""Ref."""\n\nimport os, references.market\n'),
+            "import_module": ("src/tinyq/stats/ref.py",
+                              '"""Ref."""\nimport importlib\n\nm = importlib.import_module("references.market")\n'),
+            "sys.path": ("tests/unit/conftest.py",
+                         '"""Paths."""\nimport sys\nfrom pathlib import Path\n\nsys.path.insert(\n'
+                         '    0,\n    str(Path(__file__).parents[2] / "references"),\n)\n'),
+            "PYTHONPATH": ("run.sh", 'export PYTHONPATH="$PWD/references:$PYTHONPATH"\n'),
+        }
+        for name, (rel, text) in cases.items():
+            with self.subTest(case=name):
+                reset(self.root)
+                write(self.root, rel, text)
+                result = self.floor()
+                self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+                rule = "references-import" if name in {"from", "import", "import_module"} else "references-path"
+                self.assertIn(f"{rel}:", result.stdout)
+                self.assertIn(f"[{rule}]", result.stdout)
+
+    def test_floor_guard_references_lookalikes_and_exceptions(self) -> None:
+        write(self.root, "src/tinyq/data/references.py", '"""Citations."""\n\nSOURCES = ["references"]\n')
+        write(self.root, "src/tinyq/data/cite.py",
+              '"""Cite."""\n\nfrom tinyq.data.references import SOURCES\n\nfrom .references import SOURCES as S\n')
+        write(self.root, "docs/build.md", "Never set PYTHONPATH to include references/.\n")
+        result = self.floor()
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        write(self.root, "src/tinyq/stats/ref.py", '"""Ref."""\n\nfrom references.market import residualize\n')
+        append(self.root, "CONSTRAINTS.md",
+               "| EX-01 | CR-08 | `src/tinyq/stats/ref.py` | spike, removed in M2 | @t | 2099-01-01 |\n")
+        commit(self.root, "exception approved")
+        self.assertEqual(self.floor("--base", "HEAD~1").stdout.count("[references-import]"), 0,
+                         "an Exceptions row allows a CR-08 finding")
+
+    def test_floor_guard_allows_code_copied_from_a_reference(self) -> None:
+        # The reference itself is not judged: its noqa and stub are the user's, not the builder's.
+        write(self.root, "references/market.py",
+              "import numpy as np  # noqa: F401\n\n\ndef residualize(xs, beta):\n"
+              "    mean = sum(xs) / len(xs)\n    return [x - beta * mean for x in xs]\n\n\n"
+              "def later():\n    pass\n")
+        write(self.root, "src/tinyq/stats/residuals.py",
+              '"""Residuals, adapted from RF-01."""\n\n\ndef residualize(xs: list[float], beta: float) -> list[float]:\n'
+              '    """Subtract beta times the mean from each value."""\n'
+              "    mean = sum(xs) / len(xs)\n    return [x - beta * mean for x in xs]\n")
+        result = self.floor()
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+    def test_tooling_ignores_references(self) -> None:
+        write(self.root, "references/bad.py",
+              "import os, sys\nimport torch\ndef f(x):\n  return undefined_name  +1   # teh\n")
+        write(self.root, "references/test_bad.py", "def test_fails():\n    assert False\n")
+        commit(self.root, "user adds references")  # protected: committed before the task starts
+        result = check(self.root, "gate")
+        self.assertEqual(result.returncode, 0, result.stderr[-3000:])
+        for tool in (["vulture"], ["typos"], ["ruff", "check", "references/bad.py"],
+                     ["pytest", ".", "--collect-only", "-q", "--no-cov"]):
+            with self.subTest(tool=tool[0]):
+                out = sh(self.root, "uv", "run", "--frozen", "--quiet", *tool, check=False)
+                self.assertEqual(out.returncode, 0, out.stdout + out.stderr)
+                self.assertNotIn("references", out.stdout)
+
+    def test_adding_reference_excludes_is_not_a_loosening(self) -> None:
+        path = self.root / "pyproject.toml"
+        current = path.read_text()
+        # Ruff, mypy, deptry and vulture excludes are the lists the guard watches (CR-07).
+        older = re.sub(r'(?m)^(exclude = \["\^?references/"\]|extend_exclude = \["references"\])\n', "",
+                       current.replace(', "references"]', "]"))
+        self.assertEqual(older.count("references/\"]") + older.count('"references"'), 1)  # typos only
+        path.write_text(older)
+        commit(self.root, "a bar from before references")
+        path.write_text(current)  # Extend adds them back
+        result = self.floor()
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+    def test_the_bar_itself_passes_the_floor_guard(self) -> None:
+        """Every skeleton file, as if newly added, is clean (the CR-08 patterns don't match the guard)."""
+        files = sh(self.root, "git", "ls-files").stdout
+        tmp = Path(self.tmp.name)
+        (tmp / "all.txt").write_text(files)
+        (tmp / "empty").write_text("")
+        result = sh(self.root, "uv", "run", "--frozen", "--quiet", "python", "scripts/floor_guard.py",
+                    "--diff", str(tmp / "empty"), "--untracked", str(tmp / "all.txt"),
+                    "--old-pyproject", str(tmp / "empty"), check=False)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
     # --------------------------------------------------------------------------- hooks
     def test_path_guard(self) -> None:
         r = self.root
@@ -276,6 +364,8 @@ class SingleProject(unittest.TestCase):
             (["deny", "--protected"], ".claude/agents/implementer.md", 2),
             (["deny", "--protected"], "CONSTRAINTS.md", 2),
             (["deny", "--protected"], "uv.lock", 2),
+            (["deny", "--protected"], "references/x.py", 2),
+            (["deny", "--protected"], "References/notes/a.md", 2),
             (["deny", "--protected"], "src/tinyq/x.py", 0),
             (["deny", "--protected"], "tests/unit/data/test_x.py", 0),
             (["deny", "src/**"], "src/tinyq/data/prices.py", 2),

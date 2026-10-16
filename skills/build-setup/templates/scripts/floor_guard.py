@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Diff-scoped floor checks for CONSTRAINTS.md (CR-01 to CR-04, CR-07).
+"""Diff-scoped floor checks for CONSTRAINTS.md (CR-01 to CR-04, CR-07, CR-08).
 
 Called by scripts/floor_guard.sh, which writes the diff, the untracked-file list and the
 base commit's pyproject.toml. Prints one line per finding and exits 1 if there are any:
@@ -15,13 +15,17 @@ Rules (CONSTRAINTS.md ID in brackets):
     assertion-removed [CR-03]      a test file lost more assertion lines than it gained
     test-without-assertion [CR-03] a changed test function that asserts nothing
     secret [CR-04]                 a credential pattern (the value is never printed)
+    references-import [CR-08]      an import from the references folder
+    references-path [CR-08]        the references folder put on an import path (sys.path,
+                                   an environment variable, pytest or type-checker config)
     bar-loosened [CR-07]           pyproject.toml tool config weakened, or a new config file
     rule-removed [CR-07]           a CR rule gone from CONSTRAINTS.md
     new-exception [CR-07]          a new row in CONSTRAINTS.md's Exceptions table
 
-A CR-01 to CR-03 finding is allowed when an unexpired row in CONSTRAINTS.md's Exceptions
-table names that rule and a path glob matching the file. Secrets and CR-07 never are.
+A CR-01 to CR-03 or CR-08 finding is allowed when an unexpired row in CONSTRAINTS.md's
+Exceptions table names that rule and a path glob matching the file. Secrets and CR-07 never are.
 Files under scripts/ are skipped for code checks: they are the bar, protected separately.
+Files under references/ are inputs, not project code: only the secret check reads them.
 """
 
 from __future__ import annotations
@@ -55,6 +59,12 @@ SECRETS = {
     "api-key": re.compile(r"\bsk-[A-Za-z0-9_-]{20,}"),
     "google-api-key": re.compile(r"\bAIza[0-9A-Za-z_-]{35}\b"),
 }
+# CR-08. The folder as a path or module word: "references", "../references/x", "references.x".
+REFERENCES = re.compile(r"(?<![\w.-])references(?![\w-])")
+# Settings that put a folder on the import path, outside Python code (shell, TOML, CI, .env).
+IMPORT_PATH_SETTING = re.compile(r"\b(PYTHONPATH|mypy_path|extraPaths)\b", re.IGNORECASE)
+DOC_SUFFIXES = (".md", ".rst", ".txt")
+SYS_PATH_CALLS = {"insert", "append", "extend"}
 RULE_IDS = {
     "suppression": "CR-01",
     "stub": "CR-02",
@@ -63,6 +73,8 @@ RULE_IDS = {
     "test-deleted": "CR-03",
     "assertion-removed": "CR-03",
     "test-without-assertion": "CR-03",
+    "references-import": "CR-08",
+    "references-path": "CR-08",
 }
 CONFIG_FILES = {
     "ruff.toml", ".ruff.toml", "mypy.ini", ".mypy.ini", "pytest.ini", "setup.cfg", "tox.ini",
@@ -145,23 +157,34 @@ def add_untracked(diff: Diff, paths: list[str]) -> None:
 
 
 # --------------------------------------------------------------------------- line checks
+def is_reference(path: str) -> bool:
+    return path.startswith("references/")
+
+
 def is_python(path: str) -> bool:
-    return path.endswith((".py", ".pyi")) and not path.startswith("scripts/")
+    return path.endswith((".py", ".pyi")) and not path.startswith(("scripts/", "references/"))
 
 
 def is_test_file(path: str) -> bool:
     parts = Path(path).parts
     name = parts[-1] if parts else ""
-    return "tests" in parts and (name.startswith("test_") or name.endswith("_test.py"))
+    return (
+        "tests" in parts
+        and (name.startswith("test_") or name.endswith("_test.py"))
+        and not is_reference(path)
+    )
 
 
 def line_findings(diff: Diff) -> list[Finding]:
     found: list[Finding] = []
     for path, lines in diff.added.items():
         python, test = is_python(path), is_test_file(path)
+        path_settings = not is_reference(path) and not path.endswith(DOC_SUFFIXES)
         for n, text in lines:
             if python and SUPPRESSION.search(text):
                 found.append(Finding("suppression", path, n, "new suppression comment"))
+            if path_settings and IMPORT_PATH_SETTING.search(text) and REFERENCES.search(text):
+                found.append(Finding("references-path", path, n, "references/ on an import path"))
             if test and SKIP.search(text):
                 found.append(Finding("test-skipped", path, n, "test skipped or marked xfail"))
             if Path(path).name not in LOCKFILES:
@@ -245,6 +268,63 @@ def _exempt_functions(tree: ast.Module) -> set[ast.AST]:
     return exempt
 
 
+def _is_reference_module(name: str | None) -> bool:
+    return name is not None and (name == "references" or name.startswith("references."))
+
+
+def _mentions_references(node: ast.AST) -> bool:
+    return any(
+        isinstance(n, ast.Constant) and isinstance(n.value, str) and REFERENCES.search(n.value)
+        for n in ast.walk(node)
+    )
+
+
+def _is_sys_path(node: ast.AST) -> bool:
+    return (
+        isinstance(node, ast.Attribute)
+        and node.attr == "path"
+        and isinstance(node.value, ast.Name)
+        and node.value.id == "sys"
+    )
+
+
+def _imported_modules(node: ast.AST) -> list[str | None]:
+    """Absolute module names an import statement or an import_module call brings in."""
+    if isinstance(node, ast.Import):
+        return [alias.name for alias in node.names]
+    if isinstance(node, ast.ImportFrom):
+        return [node.module] if node.level == 0 else []
+    if isinstance(node, ast.Call) and _name(node.func) in {"import_module", "__import__"}:
+        first = node.args[0] if node.args else None
+        if isinstance(first, ast.Constant) and isinstance(first.value, str):
+            return [first.value]
+    return []
+
+
+def _changes_sys_path(node: ast.AST) -> bool:
+    """sys.path.insert/append/extend, site.addsitedir, or an assignment to sys.path."""
+    if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute):
+        func = node.func
+        return func.attr == "addsitedir" or (
+            func.attr in SYS_PATH_CALLS and _is_sys_path(func.value)
+        )
+    if isinstance(node, ast.Assign):
+        return any(_is_sys_path(target) for target in node.targets)
+    if isinstance(node, ast.AugAssign):
+        return _is_sys_path(node.target)
+    return False
+
+
+def _references_finding(path: str, node: ast.AST) -> Finding | None:
+    """CR-08: an import from references/, or references/ added to sys.path."""
+    line = getattr(node, "lineno", 0)
+    if any(_is_reference_module(name) for name in _imported_modules(node)):
+        return Finding("references-import", path, line, "import from references/")
+    if _changes_sys_path(node) and _mentions_references(node):
+        return Finding("references-path", path, line, "references/ added to sys.path")
+    return None
+
+
 def _asserts(func: ast.AST) -> bool:
     for node in ast.walk(func):
         if isinstance(node, ast.Assert):
@@ -267,6 +347,8 @@ def ast_findings(path: str, lines: set[int]) -> list[Finding]:
     for node in ast.walk(tree):
         if not _touches(node, lines):
             continue
+        if reference := _references_finding(path, node):
+            found.append(reference)
         if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
             if node not in exempt and not path.endswith(".pyi") and _is_trivial(node.body):
                 found.append(
@@ -305,6 +387,8 @@ NO_GROW = (
     "tool.deptry.extend_exclude", "tool.deptry.ignore", "tool.vulture.ignore_names",
     "tool.vulture.exclude", "tool.mypy.exclude",
 )  # fmt: skip
+# Excluding the references folder is not a loosening: it is not project code (CR-08).
+REFERENCES_EXCLUDE = re.compile(r"\^?references/?\*{0,2}")
 NO_GROW_TABLES = ("tool.ruff.lint.per-file-ignores", "tool.deptry.per_rule_ignores")
 MUST_MATCH = ("tool.importlinter", "tool.mypy.overrides", "tool.pyright")
 STRICT_FLAGS = ("--strict-markers", "--strict-config")
@@ -353,7 +437,9 @@ def _loosened(was: Any, now: Any, direction: int) -> bool:
 
 def _list_findings(old: dict[str, Any], new: dict[str, Any]) -> list[str]:
     out = [f"{k} lost {sorted(_as_set(_get(old, k)) - _as_set(_get(new, k)))}" for k in NO_SHRINK]
-    out += [f"{k} gained {sorted(_as_set(_get(new, k)) - _as_set(_get(old, k)))}" for k in NO_GROW]
+    for k in NO_GROW:
+        gained = _as_set(_get(new, k)) - _as_set(_get(old, k))
+        out.append(f"{k} gained {sorted(g for g in gained if not REFERENCES_EXCLUDE.fullmatch(g))}")
     for table in NO_GROW_TABLES:
         was, now = _get(old, table) or {}, _get(new, table) or {}
         out += [

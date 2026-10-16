@@ -45,7 +45,7 @@ Start every run with `dt status --skill pipeline-design`. It prints the mode per
 
 `dt status` reports every mode. Two cases need judgment: a Revise starts from what the build found (the `revise` mode then holds until re-approval), and right after an architecture Grow the new packages show `new` while the old `pipelines.md` still holds their pipelines; that is Grow, not New.
 
-**In scope:** the next milestone's packages, or every package when the user plans up front. **Read:** the root and package architecture, each package's `contract.md`, the spec IDs in scope (`dt section STAT-01 STAT-02 …`, not the whole spec), and `dt layout <pkg>` once code exists. **Don't read** other packages' `pipelines.md`; their `contract.md` is all a step needs.
+**In scope:** the next milestone's packages, or every package when the user plans up front. **Read:** the root and package architecture, each package's `contract.md`, the spec IDs in scope (`dt section STAT-01 STAT-02 …`, not the whole spec), `dt layout <pkg>` once code exists, and the `docs/references.md` entries whose `**Milestones:**` include the milestone (if `dt status` lists `references_unindexed`, `references_changed` or `references_missing`, route to `reference-intake` first). **Don't read** other packages' `pipelines.md`; their `contract.md` is all a step needs.
 
 ## The Process (New Mode)
 
@@ -76,8 +76,9 @@ For each pipeline, take an ID from `dt next-id PL` (write the section before ask
   - **Step** is the function name. `PL-NN.<function>` is its ID; tasks cite it.
   - **Owner** is one component (`stats`) or component and module (`stats.cov`). The part before the dot must be a component or package in the architecture. A step with two owners is two steps.
   - **In → Out** uses the contract's types (`Returns → Cov`).
-  - **Spine version** is real and minimal (see the rules below). A step another pipeline already provides says so: `PL-01 as built`.
+  - **Spine version** is real and minimal (see the rules below). A step another pipeline already provides says so: `PL-01 as built`. One that follows a reference cites its ID: `as RF-01, per-window fit`.
   - **Covers** lists the spec IDs that step satisfies.
+- **References** (optional): `**References:** RF-01 (remove_market)` on its own line after the pipeline's `**Covers:**`, naming each reference that informs a step, by ID, with the step. Never a `references/` path; whether code is reused is the builder's call.
 - **Entry sketch** (pre-build): the entry function in the project's language, nothing but calls to the steps, in table order, and a return. A loop, branch or computation in the sketch is a missing step.
 
 **Multi-package:** pipelines that cross packages are *system pipelines*. `architecture-design` writes them in the root architecture as package → package steps over contracts. This skill writes the package-local pipelines. A package-local pipeline that is one segment of a system pipeline names it on its Entry line: `**Entry:** … · **Trigger:** … · **Part of:** PL-05`. Never edit the root.

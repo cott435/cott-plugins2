@@ -15,7 +15,9 @@ from functools import cached_property
 from pathlib import Path
 
 from .. import git, md, model
+from .. import references as refs
 from ..repo import Repo
+from ..status.common import available_skills
 
 # code → severity (E fails the run, W doesn't)
 SEVERITY = {
@@ -25,7 +27,7 @@ SEVERITY = {
     "finding-disposition": "E", "foreign-plan": "W", "broken-fence": "E", "header": "E",
     "unreadable": "E", "internal": "W", "pipeline-fields": "E", "spine-mock": "W",
     "fixture-size": "W",                # missing fixture files are reported as E
-
+    "ref-file": "E", "ref-hash": "W", "ref-large": "W", "ref-prefix": "E", "roadmap-skill": "W",
 }
 
 # Size budgets (planning-stage.md §3), in lines.
@@ -40,7 +42,7 @@ SIZE_FILES = {"XS": (1, 1), "S": (1, 2), "M": (3, 5)}
 REQUIRED_TASK_FIELDS = ("Package", "Step", "Size", "Mode", "Read", "Acceptance", "Verify")
 
 # Fields and table columns whose IDs must resolve. `Depends on` is checked by `depends`.
-REF_FIELDS = {"Read", "Covers", "Step", "Pipeline", "Used by", "Part of"}
+REF_FIELDS = {"Read", "Covers", "Step", "Pipeline", "Used by", "Part of", "References"}
 REF_COLUMNS = {"covers", "pipeline", "pipelines", "used by", "read"}
 PATH_LIKE = re.compile(r"\.(md|py|toml|json|ya?ml|txt|csv|cfg|ini|sh|ipynb|lock|j2|html|parquet)$")
 NONE_VALUES = ("", "—", "-", "none")
@@ -118,10 +120,11 @@ def _inside(i: int, ranges) -> bool:
 
 
 def _read_ids(value: str) -> list[str]:
-    """IDs in a `Read:` value; repo paths and free text are skipped. `PL-02.step` → `PL-02`."""
+    """IDs in a `Read:` value; repo paths and free text are skipped. `PL-02.step` → `PL-02`,
+    `RF-01:pca_factors` → `RF-01`."""
     out = []
     for item in md.split_list(value):
-        item = md.strip_md(item.split(" (")[0])
+        item = model.split_ref(md.strip_md(item.split(" (")[0]))[0]
         if item.lower() in NONE_VALUES or "/" in item or PATH_LIKE.search(item):
             continue
         m = re.fullmatch(rf"({md.REQ_ID})\.\w+", item)
@@ -247,14 +250,18 @@ def _body_without_header(lines: list[str]) -> list[str]:
 
 
 USED_BY_LINE = re.compile(r"^\s*(?:[-*]\s+)?\*\*Used by:?\*\*", re.IGNORECASE)
+HASH_VALUE = re.compile(r"(\*\*Hash:\*\*)[^·]*")
 
 
 def _approved_body(doc_kind: str, lines: list[str]) -> list[str]:
     """The text approved-edit compares: no header line, no trailing blank lines, and for contract.md no
-    `**Used by:**` lines (pipeline-design appends PL IDs there without a Revise)."""
+    `**Used by:**` lines (pipeline-design appends PL IDs there without a Revise), and for references.md no
+    Hash values (`dt references --stamp` writes them)."""
     body = _body_without_header(lines)
     if doc_kind == "contract":
         body = [line for line in body if not USED_BY_LINE.match(line)]
+    if doc_kind == "references":
+        body = [HASH_VALUE.sub(r"\1 ", line) for line in body]
     return body
 
 
@@ -376,6 +383,71 @@ def check_fixture_size(ctx: Context):
             size = _folder_bytes(folder)
             if size > FIXTURE_MAX_BYTES:
                 yield Problem(rel + "/", 0, "fixture-size", f"{size // 1024} KB (budget 100 KB)")
+
+
+# ---- reference checks -----------------------------------------------------------------------------
+
+def check_ref_file(ctx: Context):
+    """An RF entry with no File, or whose file is gone (reference-intake retires it)."""
+    for e in model.all_references(ctx.repo):
+        if not e.file:
+            yield _p(e.doc, e.start, "ref-file", f"{e.id} has no **File:**")
+        elif not (ctx.repo.root / e.file).is_file():
+            yield _p(e.doc, e.start, "ref-file", f"{e.id} file {e.file} is missing (run reference-intake)")
+
+
+def check_ref_hash(ctx: Context):
+    """An RF entry whose Hash isn't the file's current one (or is unstamped)."""
+    for e in model.all_references(ctx.repo):
+        current = refs.file_hash(ctx.repo.root / e.file) if e.file else None
+        if current is not None and current != e.hash.lower():
+            what = f"Hash {e.hash} is stale (file now {current})" if e.hash else "has no Hash"
+            yield _p(e.doc, e.start, "ref-hash", f"{e.id} {what}: run reference-intake, then `dt references --stamp`")
+
+
+def check_ref_large(ctx: Context):
+    """A task reads a reference over 300 lines with no selector (it would get only the outline)."""
+    entries = {e.id: e for e in model.all_references(ctx.repo)}
+    sizes: dict[str, int] = {}
+    for t in ctx.tasks:
+        line = md.field_line(t.doc.lines, t.start, t.end, "Read")
+        for item in t.read:
+            rid, selector = model.split_ref(md.strip_md(item.split(" (")[0]))
+            e = entries.get(rid)
+            if e is None or selector or not e.file:
+                continue
+            if e.file not in sizes:
+                sizes[e.file] = refs.line_count(ctx.repo, e.file)
+            if sizes[e.file] > refs.LARGE_LINES:
+                yield _p(t.doc, t.start if line is None else line, "ref-large",
+                         f"{t.id} reads {rid} ({e.file}, {sizes[e.file]} lines) whole: name a part, "
+                         f"{rid}:<symbol>, {rid}:<heading> or {rid}:outline")
+
+
+def check_ref_prefix(ctx: Context):
+    """`RF` is reserved for reference entries: a spec requirement must not use it."""
+    spec = ctx.repo.spec
+    if spec is None:
+        return
+    for b in md.bold_leads(spec.lines, spec.mask):
+        if b.id.startswith("RF-"):
+            yield _p(spec, b.line, "ref-prefix", f"{b.id}: the RF prefix is reserved for docs/references.md")
+
+
+def check_roadmap_skill(ctx: Context):
+    """A roadmap milestone's `**Skills:**` names a skill that isn't installed."""
+    roadmap = ctx.repo.roadmap
+    if roadmap is None:
+        return
+    available = set(available_skills(ctx.repo))
+    for ms in model.milestones(roadmap):
+        if ms.section is None:
+            continue
+        missing = [s for s in ms.skills if s not in available]
+        if missing:
+            line = md.field_line(roadmap.lines, ms.section.line + 1, ms.section.end, "Skills")
+            yield _p(roadmap, ms.section.line if line is None else line, "roadmap-skill",
+                     f"{ms.id} Skills names {', '.join(missing)}: not installed (.claude/skills or the plugin)")
 
 
 # ---- task checks ----------------------------------------------------------------------------------
@@ -595,6 +667,7 @@ CHECKS = [
     check_task_fields, check_task_size, check_task_acceptance, check_task_title, check_task_step,
     check_depends, check_parallel, check_verify_smoke,
     check_todo_mismatch, check_finding_disposition, check_foreign_plan,
+    check_ref_file, check_ref_hash, check_ref_large, check_ref_prefix, check_roadmap_skill,
 ]
 
 

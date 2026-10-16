@@ -1,5 +1,5 @@
 """Byte-preserving file edits for dt's mechanical commands (prebuild-clear, archive, finding, tick, roadmap,
-base).
+base, references --stamp).
 
 Lines keep their own endings, so everything an edit doesn't touch is written back exactly as read.
 Line indices match `Doc.lines`, so a command can locate a section with the parser and splice here.

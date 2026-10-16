@@ -4,6 +4,9 @@ from __future__ import annotations
 from ..repo import Repo
 from .common import Report, add_common, available_skills, fmt
 
+# Planning ID prefixes: a spec requirement must not use them (`RF` collides with reference entries).
+RESERVED_PREFIXES = ["AD", "CR", "EX", "PL", "RF", "TC"]
+
 
 def spec_writing(repo: Repo, r: Report) -> None:
     brief, spec = repo.doc("docs/brief.md"), repo.spec
@@ -20,4 +23,5 @@ def spec_writing(repo: Repo, r: Report) -> None:
             ids = repo.ids_with_prefix(p)
             prefixes[p] = {"highest": ids[-1] if ids else "", "next": repo.next_id(p)}
     r.add("prefixes", prefixes, fmt([f"{v['highest']}→{v['next']}" for v in prefixes.values()]))
+    r.add("reserved_prefixes", RESERVED_PREFIXES)
     r.add("skills", available_skills(repo))

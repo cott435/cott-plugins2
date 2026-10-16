@@ -27,8 +27,8 @@ HAS_GIT = shutil.which("git") is not None
 
 # Keys each skill promises to print (scripts/README.md, dt status table).
 KEYS = {
-    "idea-refine": ["brief_words", "brief_goals", "ideas", "roadmap_rows"],
-    "spec-writing": ["ideas_ready", "prefixes", "skills"],
+    "idea-refine": ["brief_words", "brief_goals", "ideas", "roadmap_rows", "references_unassigned"],
+    "spec-writing": ["ideas_ready", "prefixes", "reserved_prefixes", "skills"],
     "architecture-design": ["uncovered", "changed_since", "spec_rows_pending", "stale", "package_docs",
                             "packages_found", "skills", "broken_fences", "contracts_missing", "legacy_layout",
                             "grow_triggers", "stale_contracts", "next_decision"],
@@ -37,12 +37,16 @@ KEYS = {
                       "cases_no_tolerance", "fixtures_missing", "fixtures_orphan", "skills"],
     "build-planning": ["milestone", "progress", "next_task", "blocked_tasks", "uncovered", "no_spine",
                        "mode_violations", "draft_pipelines", "changed_since_plan", "pipelines_inferred",
+                       "milestone_references", "milestone_skills", "references_unrouted", "skills_unrouted",
                        "skills_missing", "skills_available",
                        "grow_triggers", "drift", "stale_contracts", "queued", "base"],
     "build-setup": ["constraints", "config_mismatches", "contract_mismatches", "optional_layers_existing",
                     "deptry_missing", "protected_gaps", "ignores_without_exception", "agents_missing", "hooks_missing",
                     "not_executable", "expired_exceptions", "tools_missing", "dependents", "base"],
+    "reference-intake": ["index", "files_to_read", "outline_first", "next_id", "milestones"],
 }
+# Every skill's report also carries these (reference files waiting for reference-intake).
+COMMON_KEYS = ["references_unindexed", "references_changed", "references_missing"]
 
 
 def run_dt(root: Path, *args: str) -> tuple[int, str]:
@@ -105,10 +109,10 @@ class CommonTest(Base):
     def test_every_key_printed_even_when_empty(self):
         for skill, keys in KEYS.items():
             data = self.status(skill)
-            for k in ["skill", "mode", "blocked", "docs", "next_ids"] + keys:
+            for k in ["skill", "mode", "blocked", "docs", "next_ids"] + COMMON_KEYS + keys:
                 self.assertIn(k, data, f"{skill}: {k}")
             _, text = run_dt(self.root, "status", "--skill", skill)
-            for k in keys:
+            for k in COMMON_KEYS + keys:
                 self.assertRegex(text, rf"(?m)^{k}: \S", f"{skill}: {k}")
 
     def test_no_skill(self):

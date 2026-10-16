@@ -43,7 +43,8 @@ def plan_facts(doc):
                    "spine_pipeline": model.spine_pipeline(t), "package": t.package, "step": t.step,
                    "size": t.size, "mode": t.mode, "expected_mode": expected_mode(t),
                    "reason": md.strip_md(t.get("Reason")), "read": t.read, "files_likely": t.files_likely,
-                   "covers": t.covers, "blocked": t.blocked} for t in model.tasks(doc)],
+                   "covers": t.covers, "blocked": t.blocked, "skills": getattr(t, "skills", [])}
+                  for t in model.tasks(doc)],
     }
 
 
@@ -56,10 +57,14 @@ rows = []
 if repo.roadmap:
     for ms in model.milestones(repo.roadmap):
         rows.append({"id": ms.id, "name": ms.name, "source": md.strip_md(ms.source), "packages": ms.packages,
-                     "pipelines": ms.pipelines, "derived": roadmap_cmd.milestone_status(repo, ms)})
+                     "pipelines": ms.pipelines, "derived": roadmap_cmd.milestone_status(repo, ms),
+                     "skills": getattr(ms, "skills", [])})
+# docs/references.md entries (dt versions before the references feature have none).
+refs = [{"id": r.id, "title": r.title, "file": r.file, "hash": r.hash, "kind": r.kind, "milestones": r.milestones}
+        for r in (model.all_references(repo) if hasattr(model, "all_references") else [])]
 print(json.dumps({
     "live_spec": sorted(live), "removed_spec": sorted(removed),
-    "pipelines": pipelines, "plans": plans, "roadmap": rows,
+    "pipelines": pipelines, "plans": plans, "roadmap": rows, "references": refs,
     "docs": {d.rel: d.status for d in sorted(repo.docs(), key=lambda d: d.rel)},
     "packages": repo.packages(),
 }))

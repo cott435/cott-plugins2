@@ -23,6 +23,7 @@ def idea_refine(repo: Repo, r: Report) -> None:
             rows.append({"id": ms.id, "name": ms.name, "source": md.strip_md(ms.source),
                          "status": md.strip_md(ms.row.get(col[1], "")) if col else ""})
     r.add("roadmap_rows", rows, fmt([f"{x['id']} {x['name']} [{x['source'] or '—'}]" for x in rows]))
+    r.add("references_unassigned", [e.id for e in model.all_references(repo) if not e.milestones])
 
 
 def _goal_count(lines: list[str], headings: list[md.Heading]) -> int:

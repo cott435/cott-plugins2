@@ -14,6 +14,7 @@ The template, two New rounds (a quant single package and an RL lab), then Revise
 ## PL-NN: <Workflow name>
 **Entry:** `src/<path>/pipeline.py::run_<workflow>` · **Trigger:** `python -m <module> <command>`
 **Covers:** <spec IDs, ranges with an en dash>
+**References:** <optional: RF-NN (step) for each reference that informs a step>
 
 | # | Step | Owner | In → Out | Spine version | Covers |
 |---|---|---|---|---|---|

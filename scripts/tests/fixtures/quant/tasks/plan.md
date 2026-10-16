@@ -71,7 +71,7 @@
 ### M1-T06: Planted-factor PCA check
 **Package:** quant · **Step:** PL-02.pca · **Covers:** STAT-01, QR-01 · **Size:** XS · **Mode:** split
 **Skills:** data-science
-**Read:** PL-02, TC-03, STAT-01, QR-01
+**Read:** PL-02, TC-03, STAT-01, QR-01, RF-01:pca_factors
 **Acceptance:**
 - [ ] TC-03 passes with a fixed seed
 **Verify:** `pytest tests/intent/quant -k pca` · `python -m quant.stats cov-report --smoke` · `scripts/check.sh gate`

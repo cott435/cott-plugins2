@@ -1,6 +1,6 @@
 # Build Planning Examples
 
-Templates first, then worked examples on the quant project: New (M1), Advance into M2, Replan, a foreign plan, and a multi-package system spine.
+Templates first, then worked examples on the quant project: New (M1), Advance into M2, Replan, a foreign plan, a multi-package system spine, and routing milestone skills and references.
 
 `dt` below means `python3 ../../scripts/dt.py`, run from the project root.
 
@@ -90,8 +90,8 @@ Status runs Draft → Approved → In progress → Done, then `dt archive` repla
 | `Covers` | Spec IDs the task satisfies |
 | `Size` | XS = 1 file, S = 1–2, M = 3–5 in `Files likely` (`task-size`) |
 | `Mode` | `split` for checkable behavior, `solo` for spine, refactor, glue, doc-sync |
-| `Skills` | Skill names, or `—`. A missing skill is still named |
-| `Read` | IDs and repo paths, comma-separated. Everything the builder needs, nothing more (`missing-ref`) |
+| `Skills` | Skill names, or `—`. Every skill on the roadmap section's `**Skills:**` line lands on at least one task (`skills_unrouted`). A missing skill is still named |
+| `Read` | IDs and repo paths, comma-separated. Everything the builder needs, nothing more (`missing-ref`). References by ID with an optional selector: `RF-01:residualize`, `RF-01:outline`, `RF-03:<heading>`; a long one with none warns (`ref-large`). Every milestone reference lands on at least one task (`references_unrouted`) |
 | `Acceptance` | ≤ 3 checkbox bullets, each test-backed (`task-acceptance`) |
 | `Verify` | Backticked commands joined by ` · `. After Phase 0, includes the smoke command (`verify-smoke`) |
 | `Depends on` | Task IDs earlier in the plan, or `—` (`depends`) |
@@ -208,14 +208,21 @@ changed_since_plan: none
 pipelines_inferred: PL-01, PL-02
 skills_missing: none
 skills_available: data-science
+milestone_skills: data-science
+milestone_references: none
+skills_unrouted: none
+references_unrouted: none
 grow_triggers: none
 drift: none
 stale_contracts: none
 queued: none
 base: pending
+references_unindexed: none
+references_changed: none
+references_missing: none
 ```
 
-With no plan yet, `uncovered` and `no_spine` have nothing to check; they count at the gate's re-run. M1's row lists no pipelines, so `dt` inferred PL-01 and PL-02 from its Source (the brief's spec IDs). Task IDs start at `dt next-id M1-T` (M1-T01).
+With no plan yet, `uncovered`, `no_spine` and the two unrouted lists have nothing to check; they count at the gate's re-run. `milestone_skills` comes from M1's roadmap section (`**Skills:** data-science`); M1 has no references. M1's row lists no pipelines, so `dt` inferred PL-01 and PL-02 from its Source (the brief's spec IDs). Task IDs start at `dt next-id M1-T` (M1-T01).
 
 **Grow check:** no measurable trigger; numpy and pandas only; nothing deploys on its own. Passes.
 
@@ -453,3 +460,39 @@ After `architecture-design` Grow split quant into `data`, `stats`, `portfolio` a
 The system spine's Package is `data`, the owner of PL-05's first step (system pipelines have no Entry). `--pkg data` scopes the gate to data and everything that depends on it, which here is every package. PL-05 is in the root, which has no pre-build sections; PL-06's spine (M3-T02) clears `features`' planned layout. Moving the code under `packages/` (the drift `pipeline-design` Grow listed) is its own solo task, omitted here.
 
 Multi-package Verify lines scope the gate with `--pkg`. Phase 1 tasks for PL-06's null test name `null-hypothesis-testing` in `Skills:`. If it isn't installed, it's still named, `dt status` lists it under `skills_missing`, and the gate asks the user whether to install it or accept the gap.
+
+---
+
+## Example 6: Routing milestone skills and references
+
+A variant of M2, Structure + classical portfolios, where PL-03 runs a `remove_market` step before `estimate_cov`. `idea-refine` wrote the roadmap section's `**Skills:** data-analysis, null-hypothesis-testing`, and `reference-intake` assigned RF-01 (market decomposition) to M2.
+
+```
+$ dt status --skill build-planning
+mode: extend
+…
+milestone_skills: data-analysis, null-hypothesis-testing
+milestone_references: RF-01
+references_unindexed: none
+references_changed: none
+references_missing: none
+```
+
+Nothing is waiting for intake, so plan. `dt section RF-01` gives the entry. *Use for* names the market-removal step, *Key parts* lists `residualize`, and *Caveats* says the reference fits PCA on the whole sample. The file is over 300 lines, so the task reads one function through a selector:
+
+```markdown
+### M2-T04: Per-window market removal
+**Package:** quant · **Step:** PL-03.remove_market · **Covers:** STRUCT-02 · **Size:** S · **Mode:** split
+**Skills:** data-analysis
+**Read:** PL-03, TC-09, stats.residualize, RF-01:residualize
+**Acceptance:**
+- [ ] TC-09 passes: the planted factor is removed within tolerance
+- [ ] Given a walk-forward split, when `remove_market` runs, then each window's factors are fit only on returns inside that window
+- [ ] PL-03 smoke test still passes
+**Verify:** `pytest tests/intent/quant tests/unit/quant -k residualize` · `python -m quant.portfolio backtest --smoke` · `scripts/check.sh gate`
+**Depends on:** M2-T01 · **Files likely:** src/quant/stats/residualize.py, tests/unit/quant/test_residualize.py
+```
+
+- The second bullet comes from TC-09 and the spec, not from the reference. Acceptance never says "reuse RF-01". Whether to reuse the residual arithmetic is the builder's call; `dt context M2-T04` prints the entry, the reference banner with its Caveats, and only `residualize`.
+- `null-hypothesis-testing` goes on M2-T06, the claims task that tests whether the residual structure beats noise. The Scope reads `**Skills:** data-analysis (remove_market, estimate_cov), null-hypothesis-testing (claims)`.
+- At the gate, `references_unrouted` and `skills_unrouted` are both `none`. Had a milestone item stayed off every task, it would need a reason under Open questions, such as `- RF-01 unrouted: the per-window fit is specified fully by TC-09; the reference adds nothing`. The user then decides at the gate.

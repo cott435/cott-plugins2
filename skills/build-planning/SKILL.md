@@ -29,7 +29,7 @@ It plans; it never builds. It writes no code, runs no code, and stops at every g
 
 ## Modes
 
-Run `dt status --skill build-planning` first. It prints `mode`, `milestone`, `base`, `progress`, `next_task`, `blocked_tasks`, `uncovered`, `no_spine`, `mode_violations`, `draft_pipelines`, `changed_since_plan`, `pipelines_inferred`, `skills_missing`, `skills_available`, `grow_triggers`, `drift`, `stale_contracts`, `queued` and `next ids`.
+Run `dt status --skill build-planning` first. It prints `mode`, `milestone`, `base`, `progress`, `next_task`, `blocked_tasks`, `uncovered`, `no_spine`, `mode_violations`, `draft_pipelines`, `changed_since_plan`, `pipelines_inferred`, `skills_missing`, `skills_available`, `milestone_skills`, `milestone_references`, `skills_unrouted`, `references_unrouted`, `grow_triggers`, `drift`, `stale_contracts`, `queued`, `references_unindexed`, `references_changed`, `references_missing` and `next ids`.
 
 | Mode | When | Do |
 |---|---|---|
@@ -48,14 +48,15 @@ If `docs/roadmap.md` is missing or has no row for the milestone, stop and route 
 - **`tasks/plan.md` is never missing.** Between milestones it holds the stub `dt archive` writes. Replace it only with a new plan.
 - **Interview one question at a time**, each with your guess and a default. Ask only what the user must decide: what the milestone covers and defers, its exit criteria, writing queued plans, a missing skill, a mode override. Infer order, sizes, groups and file lists, and list them as ASSUMPTIONS.
 - **No live user:** don't invent confirmations. Write the plan, put the open decisions under Open questions, leave it Draft.
+- **References waiting:** if `references_unindexed`, `references_changed` or `references_missing` is non-empty, stop and route to `reference-intake` before planning. A changed reference may change what a task should read.
 
 ## Process (New, Extend)
 
 ```
-STATUS ─→ GROW CHECK ─→ SCOPE ─→ SPINE ─→ THICKEN ─→ ROUTE SKILLS ─→ MODES ─→ CHECKPOINTS ─→ ORDER ─→ WRITE ─→ [gate]
+STATUS ─→ GROW CHECK ─→ SCOPE ─→ SPINE ─→ THICKEN ─→ ROUTE SKILLS + REFERENCES ─→ MODES ─→ CHECKPOINTS ─→ ORDER ─→ WRITE ─→ [gate]
 ```
 
-Read only: `dt status`, the roadmap, the milestone packages' `pipelines.md`, `contract.md` headings and `tests.md`, the spec sections in their Covers, and the skill list. Not the archive.
+Read only: `dt status`, the roadmap, the milestone packages' `pipelines.md`, `contract.md` headings and `tests.md`, the spec sections in their Covers, the skill list, and the index entries of `milestone_references` (`dt section RF-01 …`). Not the archive, and not the reference files themselves.
 
 ### 1. Grow check
 
@@ -89,9 +90,11 @@ A system spine crosses packages by design. System pipelines have no Entry, so it
 
 **Acceptance is test-backed.** Each bullet is checkable: a `TC-NN` passes, a Given/When/Then, a model criterion by ID, the smoke command. With no `tests.md`, write the criterion so a tester can encode it.
 
-### 5. Route skills
+### 5. Route skills and references
 
-Read the descriptions of project skills (`.claude/skills/*/SKILL.md`) and installed plugin skills (`skills_available`). Put each task's skills in `**Skills:**` and list the skills in use in the plan's Scope. A task that needs a skill that isn't installed names it anyway (`dt status` reports it under `skills_missing`) and goes under Open questions. Never quietly plan the step without it.
+**Skills.** Start from `milestone_skills` (the roadmap section's `**Skills:**` line): each goes on the `**Skills:**` of every task it fits, and at least one. Then add others whose descriptions fit a task (project `.claude/skills/*/SKILL.md`, `skills_available`). The plan's Scope lists the milestone's skills. A task that needs a skill that isn't installed names it anyway (`dt status` reports it under `skills_missing`) and goes under Open questions. Never quietly plan the step without it.
+
+**References.** Each `RF-NN` in `milestone_references` goes in the `Read:` of the tasks whose step it informs; its entry's *Use for* and *Key parts* say which. Cite the ID, never the `references/` path. Over 300 lines, add a selector so the packet stays small: `RF-01:residualize` (one function or class), `RF-01:outline`, or `RF-03:<heading>` for a doc. With no selector a long file prints as its outline and `dt lint` warns `ref-large`. Whether to reuse the code is the builder's call; don't write it into Acceptance.
 
 ### 6. Build mode
 
@@ -109,7 +112,7 @@ Read the descriptions of project skills (`.claude/skills/*/SKILL.md`) and instal
 - `**Depends on:**` resolves, points only backward (to a task earlier in the plan; position counts, not ID number) and is acyclic.
 - After the spine, independent tasks get `**Parallel:** G<n>`. Tasks that share a `Files likely` path or a `Read:` contract symbol never share a group.
 - **Every `Verify:` after Phase 0 includes its pipeline's smoke command** (tests.md Strategy, else the Trigger plus ` --smoke`), so each task leaves the system working. Add the focused tests and `scripts/check.sh gate` (`--pkg <pkg>` in multi-package). Only the modes `fast`, `gate` and `full` exist.
-- `**Read:**` lists the IDs and paths a builder needs, and nothing else. Check each packet with `dt context <task>`: it must resolve and stay under 2,000 lines.
+- `**Read:**` lists the IDs (references as `RF-NN[:selector]`) and paths a builder needs, and nothing else. Check each packet with `dt context <task>`: it must resolve and stay under 2,000 lines.
 
 ### 9. Write
 
@@ -147,12 +150,13 @@ No next milestone designed: leave the stub, say so, and name the skill that come
 Before presenting the Draft:
 - `dt lint tasks/ docs/roadmap.md AGENTS.md` is clean. It checks sizes, acceptance count, titles, fields, depends, parallel groups, smoke in Verify, todo vs plan, budgets.
 - `dt status --skill build-planning`: `uncovered`, `no_spine` and `mode_violations` are empty (or each is explained on the task or under Open questions); `skills_missing` is listed for the user.
+- `references_unrouted` (milestone references in no task's `Read:`) and `skills_unrouted` (milestone skills on no task) are empty, or each item has a one-line reason under Open questions.
 - `dt context` resolves for every task, under 2,000 lines.
 - Every plan header field is set and `tasks/plan.md` is ≤ ~400 lines.
 
 Then present:
 1. **What was written:** files, the milestone's scope and exit, phases with task counts, checkpoints.
-2. **ASSUMPTIONS:** order, sizes, modes and overrides, parallel groups, skill routing, `Read:` choices.
+2. **ASSUMPTIONS:** order, sizes, modes and overrides, parallel groups, skill and reference routing, `Read:` choices.
 3. **Open questions:** missing skills, mode overrides to confirm, anything Deferred.
 4. **Uncovered:** each Deferred ID with its target.
 5. Ask the user to approve or request changes. **STOP YOUR TURN.**
@@ -174,6 +178,7 @@ Then present:
 | "The old `tasks/plan.md` is stale, I'll overwrite it" | Its unchecked tasks may be mid-build elsewhere. Stop and ask. |
 | "I'll detail every milestone now" | Task lists are the most perishable doc. Plan the next milestone; outline the rest. |
 | "No skill fits, I'll build without one" | Flag it. The user decides whether to install one or accept the gap. |
+| "The builder will find the reference" | Only what's in `Read:` reaches the packet. An unrouted reference is invisible at build time; `references_unrouted` catches it. |
 | "The spine can stub this step" | A spine step is the real baseline from the step table, or upgrades have nothing to beat. |
 | "This task is M-and-a-bit, close enough" | Over five files or three bullets is two tasks. Lint will fail it anyway. |
 | "The tester can write the test before the function exists" | It then tests a guess. Split tasks test symbols the spine or a solo task already made. |
@@ -191,6 +196,7 @@ Then present:
 - A `Depends on` pointing forward or in a cycle
 - A mode override with no `**Reason:**`
 - A task needing a skill that isn't installed, with no flag
+- A milestone skill or reference on no task with no reason; a `references/` path in `Read:`; a long reference with no selector
 - Spec IDs on no task and not Deferred
 - Task plans written for more than the next milestone without being asked
 - A foreign `tasks/plan.md` overwritten, or `tasks/plan.md` deleted
@@ -203,9 +209,10 @@ Then present:
 - [ ] `dt lint` clean on `tasks/`, the roadmap and AGENTS.md; plan header has `**Base:** —` until `dt base` sets it
 - [ ] Every live spec ID in scope is on a task or Deferred; every new pipeline has a Phase 0 spine task
 - [ ] Every task: resolvable `Read:` IDs, size M or smaller, ≤ 3 test-backed acceptance bullets, a Verify step, Mode by rule (or a Reason), skills routed
+- [ ] `skills_unrouted` and `references_unrouted` empty or explained; references cited by `RF-NN`, with selectors for long files
 - [ ] Dependencies ordered backward with no cycles; checkpoints every 2–3 tasks plus the exit
 - [ ] `dt context` packets under 2,000 lines; plan ≤ ~400 lines; AGENTS.md doc map ≤ 25 lines
 - [ ] Only the write-matrix files changed; no existing plan overwritten without the user's say
 - [ ] The turn ended at the gate; the user approved in a later turn; nothing was built
 
-Read `examples.md` in this skill directory for the templates, the AGENTS.md doc map, and worked New, Advance, Replan and foreign-plan examples.
+Read `examples.md` in this skill directory for the templates, the AGENTS.md doc map, and worked New, Advance, Replan, foreign-plan and skill-and-reference routing examples.

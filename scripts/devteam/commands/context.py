@@ -7,6 +7,8 @@ import re
 import sys
 
 from .. import code, model
+from .. import outline as ol
+from .. import references as refs
 from .layout import tree_lines
 
 BUDGET = 2000          # lines; agent-skills context-engineering target for one builder
@@ -57,6 +59,47 @@ def _file_block(repo, rel: str) -> tuple[str, bool]:
     return f"### {rel}\n{fence}{lang}\n{body}{fence}\n", True
 
 
+BANNER = ("> Reference, not part of the project. Reuse what fits the contract and step table as is, adapt it, "
+          "or ignore it: your call.\n"
+          "> Never import from references/. Anything you bring over meets the same bar as the rest of the code.\n")
+
+
+def _reference_block(repo, entry: model.Reference, selector: str) -> tuple[str, dict, str | None]:
+    """The banner and the reference file (whole, one selected part, or its outline): (block, read info,
+    problem). A selector that names nothing in the file is a problem; a missing file is only noted."""
+    rel = entry.file
+    head = f"### Reference {entry.id}: {rel or '(no File)'}\n{BANNER}"
+    if entry.caveats:
+        head += f"> Caveats: {entry.caveats}\n"
+    info = {"file": rel, "selector": selector, "shown": "missing"}
+    path = repo.root / rel if rel else None
+    text = ol.read(path) if path is not None and path.is_file() else None
+    if text is None:
+        return head + "(missing: the entry's file isn't in references/; run reference-intake)\n", info, None
+    n = len(text.splitlines())
+    if selector.lower() == "outline" or (not selector and n > refs.LARGE_LINES):
+        o = ol.outline(path, text)
+        why = "outline" if selector else f"{n} lines, so outline only; name a part: {entry.id}:<symbol or heading>"
+        info["shown"] = "outline"
+        return head + f"({why})\n" + _fenced("\n".join(o.items) + "\n", ""), info, None
+    if not selector:
+        info["shown"] = "whole"
+        return head + _fenced(text, LANGS.get(path.suffix.lower(), "")), info, None
+    span = ol.select(path, text, selector)
+    if span is None:
+        return "", info, f"Read: {entry.id}:{selector} names nothing in {rel} (a def, class or heading)"
+    a, b = span
+    info["shown"] = "part"
+    part = "\n".join(text.splitlines()[a - 1:b]) + "\n"
+    return head + f"({selector} · lines {a}–{b} of {n})\n" + _fenced(part, LANGS.get(path.suffix.lower(), "")), \
+        info, None
+
+
+def _fenced(body: str, lang: str) -> str:
+    fence = _fence(body)
+    return f"{fence}{lang}\n{body}{fence}\n"
+
+
 def _layout_block(repo, pkg: str) -> str:
     """The package's real tree (as `dt layout`), since built pipelines point there instead of a planned layout."""
     if not pkg:
@@ -77,9 +120,23 @@ def run(args, repo) -> int:
     blocks: list[str] = []
     reads: list[dict] = []
     problems: list[str] = []
+    entries = {e.id: e for e in model.all_references(repo)}
+    shown: set[str] = set()
     for raw in task.read:
         ref = _ref(raw)
-        d = repo.lookup(ref, archive=False)
+        rid, selector = model.split_ref(ref)
+        if rid in entries:
+            entry = entries[rid]
+            block, info, problem = _reference_block(repo, entry, selector)
+            if problem:
+                problems.append(problem)
+                continue
+            where = f"{entry.doc.rel}:{entry.start + 1}"
+            reads.append({"ref": ref, "kind": "reference", "where": where, **info})
+            blocks.append(block if rid in shown else f"<!-- {where} -->\n{entry.text}\n{block}")
+            shown.add(rid)
+            continue
+        d = repo.lookup(rid if selector else ref, archive=False)
         if d is not None:
             if d.retired:
                 problems.append(f"Read: {ref} is retired ({d.retired_note}) at {d.where}")

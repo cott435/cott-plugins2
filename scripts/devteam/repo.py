@@ -25,6 +25,7 @@ KINDS = [
     (r"docs/packages/[^/]+/contract\.md", "contract"),
     (r"docs/packages/[^/]+/pipelines\.md", "pipelines"),
     (r"docs/packages/[^/]+/tests\.md", "tests"),
+    (r"docs/references\.md", "references"),
     (r"CONSTRAINTS\.md", "constraints"),
     (r"(AGENTS|CLAUDE)\.md", "agents"),
     (r"tasks/plan\.md", "plan"),
@@ -213,6 +214,10 @@ class Repo:
     @property
     def roadmap(self) -> Doc | None:
         return self.doc("docs/roadmap.md")
+
+    @property
+    def references(self) -> Doc | None:
+        return self.doc("docs/references.md")
 
     @property
     def plan(self) -> Doc | None:

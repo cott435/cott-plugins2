@@ -9,7 +9,7 @@ import argparse, json, pathlib
 
 HERE = pathlib.Path(__file__).resolve().parent
 COMMON_CONTENT = ["stage_completeness", "internal_consistency", "right_sizing", "pipeline_clarity", "task_buildability"]
-CONTENT = {"quant": ["quant_soundness", "null_hypothesis_handoff"] + COMMON_CONTENT,
+CONTENT = {"quant": ["quant_soundness", "null_hypothesis_handoff", "reference_use"] + COMMON_CONTENT,
            "rl": ["rl_soundness"] + COMMON_CONTENT}
 STRUCTURE = ["organization", "readability_for_solo_learner", "ease_of_finding_next_build_step", "layout_sensibility"]
 

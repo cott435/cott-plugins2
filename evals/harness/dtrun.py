@@ -44,7 +44,7 @@ def probe(proj, dt=None):
         return json.loads(r.stdout)
     except Exception:
         return {"_error": r.stderr.strip()[-600:], "live_spec": [], "removed_spec": [], "pipelines": [],
-                "plans": [], "roadmap": [], "docs": {}, "packages": []}
+                "plans": [], "roadmap": [], "references": [], "docs": {}, "packages": []}
 
 
 def skill_name(s):

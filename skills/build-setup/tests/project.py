@@ -28,7 +28,7 @@ SCRIPTS = [
 ]
 PROTECTED = [
     "tests/intent/**", "tests/fixtures/**", "tests/conftest.py", "pyproject.toml", "uv.lock",
-    "CONSTRAINTS.md", "scripts/**", ".claude/agents/**", ".claude/settings.json",
+    "CONSTRAINTS.md", "scripts/**", ".claude/agents/**", ".claude/settings.json", "references/**",
 ]
 
 
@@ -217,7 +217,7 @@ def make_multi(root: Path) -> dict[str, str]:
 
 SHARED = ("[tool.ruff.lint]", "[tool.ruff.lint.mccabe]", "[tool.ruff.lint.pylint]",
           "[tool.ruff.lint.per-file-ignores]", "[tool.ruff.format]", "[tool.size_limits]",
-          "[tool.pytest.ini_options]", "[tool.typos.default]")
+          "[tool.pytest.ini_options]", "[tool.typos.files]", "[tool.typos.default]")
 
 
 def shared_sections(single: str) -> str:

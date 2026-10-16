@@ -54,7 +54,7 @@ Start with `python3 ../../scripts/dt.py status --skill architecture-design`. The
 | **Grow** | A Grow trigger fires, or the user wants a package split | Split into packages (see [Grow](#grow-single-package-to-multi-package)) |
 | **Sync** | The code differs from the doc or a contract, or code exists with no doc | Document what *is*, mark gaps, then decide which side changes |
 
-**Preconditions:** `docs/spec.md` must be `Approved`. If it's `Draft`, ask the user to approve it first. Read the brief for constraints (budget, platform, team) and the spec in full. In a codebase, read the existing structure, dependency files, and any existing ADRs.
+**Preconditions:** `docs/spec.md` must be `Approved`. If it's `Draft`, ask the user to approve it first. Read the brief for constraints (budget, platform, team) and the spec in full. In a codebase, read the existing structure, dependency files, and any existing ADRs. Read the `docs/references.md` entries whose `**Milestones:**` include the milestone in scope; if `dt status` lists `references_unindexed`, `references_changed` or `references_missing`, route to `reference-intake` before relying on them.
 
 **Old layout.** If `legacy_layout` or `contracts_missing` is non-empty, fix it in this round: `git mv` each `docs/architecture/<pkg>.md` to `docs/packages/<pkg>/architecture.md`, fix the links, and move each Interfaces section (root or package) into the matching `contract.md`, leaving a link.
 
@@ -110,9 +110,9 @@ Make the choices the spec deliberately left open: language and versions, key lib
 2. Check each against the requirements that constrain it. Data sources are checked against the spec's `DATA-` requirements; model approaches against the model-quality criteria and baseline.
 3. Recommend one with a reason. **Ask the user** (see *Asking*) about decisions that are expensive to reverse or that they may have opinions on: language, framework, paid services, infrastructure.
 
-Record each as a decision (`AD-NN`) in the template format. Small, easily reversed choices (a formatting tool) go in the tech stack table without a decision entry.
+Record each as a decision (`AD-NN`) in the template format. When a reference informed the choice, the Context cites its ID, never its path: "RF-01 fits PCA on the full sample; AD-14 fits per window". Small, easily reversed choices (a formatting tool) go in the tech stack table without a decision entry.
 
-**Route steps to installed skills.** `dt status` lists the project's other skills under `skills`, and your context lists any others. If one owns a step the design contains, such as a hypothesis test or a security review, the component that runs that step names the skill. Its contract takes what the skill needs: for a hypothesis test, the hypothesis, the statistic, the null construction and the data split. Don't design a replacement procedure. If the spec names a skill for a step, the design must route to it.
+**Route steps to installed skills.** Start from the `**Skills:**` line of the milestone's roadmap section: name each skill there on the component that runs its step. `dt status` lists the project's other skills under `skills`, and your context lists any others. If one owns a step the design contains, such as a hypothesis test or a security review, the component that runs that step names the skill. Its contract takes what the skill needs: for a hypothesis test, the hypothesis, the statistic, the null construction and the data split. Don't design a replacement procedure. If the spec names a skill for a step, the design must route to it.
 
 **If the repo already has ADRs** (for example `docs/decisions/` or `docs/adr/`), follow that convention instead: write the ADR files there and list them in the Decisions section with links.
 
@@ -301,7 +301,7 @@ Before pointing to `pipeline-design`:
 - [ ] Every expensive-to-reverse choice has an `AD-NN` entry with alternatives and consequences; in data and ML projects, sources and model approach are decisions checked against the spec's DATA- and model-quality requirements
 - [ ] Extend: the Grow triggers were checked and reported at the gate
 - [ ] Changes after the first approval: a one-line Changelog row citing the spec rows' source files, superseded decisions collapsed to one line with nothing else citing them, decisions changed in part revised (with the Overview and contracts), Risks consolidated, Status back to Draft until approved
-- [ ] Steps owned by an installed skill are routed to it by name
+- [ ] Steps owned by an installed skill are routed to it by name, including every skill on the milestone's `**Skills:**` line; decisions learned from a reference cite its `RF-NN`
 - [ ] The gate listed ASSUMPTIONS and open questions; the turn ended after the Draft was saved; approval was an unambiguous yes in a later turn; nothing was designed past the architecture after approval
 
 Read `examples.md` in this skill directory for a single-package proof of concept with its contract, and a multi-package platform with System pipelines.

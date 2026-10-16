@@ -1,6 +1,8 @@
 # Single package. build-setup writes [build-system], [dependency-groups] and every [tool.*]
 # section; [project] dependencies come from the plan (Extend adds each milestone's).
 # CONSTRAINTS.md cites these keys: change a number in both, through build-setup.
+# references/ (reference files from docs/references.md) is not project code: every tool below
+# excludes it, it is protected, and nothing imports from it (CR-08).
 [project]
 name = "{{project_name}}"
 version = "0.1.0"
@@ -35,7 +37,8 @@ line-length = 100
 target-version = "{{python_target}}"
 src = ["src", "tests"]
 output-prefer-rule-codes = true # preview mode prints rule names; noqa and CONSTRAINTS.md use codes
-extend-exclude = ["scripts/vulture_whitelist.py"]
+extend-exclude = ["scripts/vulture_whitelist.py", "references"]
+force-exclude = true            # excluded even when a path is passed explicitly (check.sh fast)
 
 [tool.ruff.lint]
 preview = true                  # needed for PLR0914 / PLR1702 / PLR0904 below
@@ -103,6 +106,7 @@ max_function_lines = 60         # code lines per function or method
 [tool.mypy]
 python_version = "{{python_version}}"
 files = ["src"]
+exclude = ["^references/"]
 strict = true
 show_error_codes = true
 pretty = true
@@ -120,6 +124,7 @@ enableTypeIgnoreComments = false  # a used `type: ignore[code]` still fails here
 [tool.pytest.ini_options]
 minversion = "8.0"
 testpaths = ["tests"]
+norecursedirs = [".*", "*.egg", "build", "dist", "node_modules", "venv", "references"]
 addopts = "-ra --strict-markers --strict-config --import-mode=importlib"
 xfail_strict = true
 markers = [
@@ -131,6 +136,7 @@ markers = [
 
 [tool.coverage.run]
 source = ["src"]
+omit = ["references/*"]
 branch = true
 
 [tool.coverage.report]
@@ -142,6 +148,7 @@ fail_under = {{coverage_floor}}   # CR-40; check.sh full reads it; Ratchet raise
 # =============================================================== deptry (CR-25)
 [tool.deptry]
 known_first_party = ["{{pkg}}"]
+extend_exclude = ["references"]
 {{deptry_ignores}}
 
 # ======================================================== import-linter (CR-24)
@@ -157,8 +164,12 @@ root_package = "{{pkg}}"
 # New and Ratchet regenerate it from `uv run vulture --make-whitelist`.
 [tool.vulture]
 paths = ["src", "scripts/vulture_whitelist.py"]
+exclude = ["references/"]
 min_confidence = 60
 
 # ================================================================ typos
+[tool.typos.files]
+extend-exclude = ["references/"]
+
 [tool.typos.default]
 extend-ignore-identifiers-re = [{{typos_ignore_identifiers}}]

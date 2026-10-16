@@ -83,11 +83,12 @@ Don't ask about CI: write `.github/workflows/check.yml` only if the user asks (d
 
 ### Step 4: Generate
 1. Derive every value per the placeholder table in `examples.md`. The ones that matter most:
-   - **Protected list**: written once into `check.sh`'s `PROTECTED` (`path_guard.sh deny --protected` reads it from there) and copied into CONSTRAINTS.md: `tests/intent/**`, `tests/fixtures/**`, `tests/conftest.py`, `pyproject.toml`, `uv.lock`, `CONSTRAINTS.md`, `scripts/**`, `.claude/agents/**`, `.claude/settings.json`. Multi-package adds `packages/*/pyproject.toml`.
+   - **Protected list**: written once into `check.sh`'s `PROTECTED` (`path_guard.sh deny --protected` reads it from there) and copied into CONSTRAINTS.md: `tests/intent/**`, `tests/fixtures/**`, `tests/conftest.py`, `pyproject.toml`, `uv.lock`, `CONSTRAINTS.md`, `scripts/**`, `.claude/agents/**`, `.claude/settings.json`, `references/**`. Multi-package adds `packages/*/pyproject.toml`.
    - **Import contracts**: from the dependency rules (`references/tools/import_linter.md`). A module that doesn't exist yet is optional: `"(pkg.component)"`.
    - **`pkg_scope`** in `check.sh`: each package (single: component) and every package that depends on it, from the dependency graph.
    - **Domain rule families and stubs** from the tech stack ADs (`DTZ`, `NPY` + numpy, `PD` + `pandas-stubs`); pandera only when a DataFrame crosses a contract.
    - **Dependencies**: the milestone's, each with a `DEP002` exception expiring at milestone exit (below).
+   - **References** (`design/references.md` §7): nothing to derive. The templates exclude `references/` from Ruff, mypy, pytest, coverage, deptry, vulture and typos; it is protected (so reference files are committed before a task starts); CR-08 forbids importing it or putting it on `sys.path`, and `floor_guard` checks the diff. Copying from a reference is the builder's call: there is no copy check, and copied code meets the normal bar.
 2. Fill the templates; then `grep -rn '{{[a-z_]*}}'` over the written files must print nothing. `chmod +x scripts/*.sh scripts/hooks/*.sh`. Append the `.gitignore` lines.
 3. `uv lock && uv sync`, then write the vulture whitelist: the template header plus `uv run --frozen vulture --make-whitelist`.
 4. Keep the numbers in `CONSTRAINTS.md` and their config keys identical.
@@ -106,6 +107,7 @@ At kickoff, after the next plan is approved. Run `dt status`, then apply only th
 - **New stack:** stubs and rule families.
 - **Grow:** rewrite component contracts as package contracts; the rules don't change.
 - Remove parentheses from optional layers whose module now exists.
+- **References**, on a bar written before them: the `references/` excludes, `references/**` in both protected lists, CR-08 and Review item 7. A tightening; the floor guard doesn't count the `references` excludes as loosening.
 
 Then the Review Gate, showing the diff of the bar.
 
@@ -168,7 +170,7 @@ No live user: write everything, list the confirmations needed under open questio
 - [ ] `dt status --skill build-setup` shows empty (or explained) `config_mismatches`, `contract_mismatches`, `optional_layers_existing`, `deptry_missing`, `protected_gaps`, `ignores_without_exception`, `agents_missing`, `hooks_missing`, `not_executable` and `tools_missing`; `pkg_scope` matches `dependents`
 - [ ] No `{{placeholder}}` left in any written file
 - [ ] Every CR rule with a number names its config key, and the two agree
-- [ ] `PROTECTED` and CONSTRAINTS.md's protected list are the same nine globs (Step 4), plus `packages/*/pyproject.toml` in multi-package
+- [ ] `PROTECTED` and CONSTRAINTS.md's protected list are the same ten globs (Step 4), plus `packages/*/pyproject.toml` in multi-package
 - [ ] Contracts match the architecture's dependency rules; missing modules are optional layers
 - [ ] Every exception has an owner and an expiry; every config ignore has a row
 - [ ] `check.sh gate` passed once on the committed skeleton, inside the time budget

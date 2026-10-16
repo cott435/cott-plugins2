@@ -46,8 +46,9 @@ def uncovered(repo: Repo, plan: Doc, tasks: list[model.Task], pipelines: list[st
     return sorted(left & live if live else left)
 
 
-def skills_missing(plan: Doc | None, tasks: list[model.Task], available: list[str]) -> list[str]:
-    referenced = []
+def skills_missing(plan: Doc | None, tasks: list[model.Task], available: list[str],
+                   milestone_skills: list[str] = ()) -> list[str]:
+    referenced = list(milestone_skills)
     if plan:
         scope_skills = md.fields_in(plan.lines, 0, len(plan.lines)).get("Skills", "")
         referenced += [md.strip_md(s).split(" (")[0].strip() for s in md.split_list(scope_skills)]
@@ -55,6 +56,32 @@ def skills_missing(plan: Doc | None, tasks: list[model.Task], available: list[st
             referenced += t.skills
     return sorted({s for s in referenced if s and s not in ("—", "-", "none")
                    and s not in available and s not in OWN_SKILLS})
+
+
+def planned_milestones(repo: Repo) -> list[tuple[str, list[model.Task]]]:
+    """(milestone, its tasks) for the active plan and each queued plan."""
+    out = []
+    active = roadmap_cmd.active_plan(repo)
+    if active:
+        out.append((model.milestone_of(active), model.tasks(active)))
+    for d in sorted(repo.docs("queued-plan"), key=lambda d: d.rel):
+        mid = roadmap_cmd._plan_milestone(d)
+        if mid:
+            out.append((mid, model.tasks(d)))
+    return out
+
+
+def unrouted(repo: Repo) -> tuple[list[str], list[str]]:
+    """(references, skills) of each planned milestone that no task carries: an RF ID in no task's `Read:`
+    (selector ignored), a roadmap `**Skills:**` skill on no task's `**Skills:**`. Items read `RF-01 (M2)`."""
+    refs_out, skills_out = [], []
+    for mid, tasks in planned_milestones(repo):
+        read = {model.split_ref(md.strip_md(i.split(" (")[0]))[0] for t in tasks for i in t.read}
+        on_tasks = {s for t in tasks for s in t.skills}
+        refs_out += [f"{rid} ({mid})" for rid in model.milestone_references(repo, mid) if rid not in read]
+        row = milestone_row(repo, mid)
+        skills_out += [f"{s} ({mid})" for s in (row.skills if row else []) if s not in on_tasks]
+    return refs_out, skills_out
 
 
 def draft_pipelines(repo: Repo, tasks: list[model.Task], pipelines: list[str]) -> list[str]:
@@ -176,6 +203,8 @@ def build_planning(repo: Repo, r: Report) -> None:
     if focus is not None:
         pls, inferred = roadmap_cmd.milestone_pipelines(repo, focus)
         inferred_pls = pls if inferred else []
+    focus_skills = focus.skills if focus is not None else []
+    refs_unrouted, skills_unrouted = unrouted(repo)
 
     r.mode(mode, blocked)
     add_common(repo, r)
@@ -189,7 +218,11 @@ def build_planning(repo: Repo, r: Report) -> None:
     r.add("draft_pipelines", drafts)
     r.add("changed_since_plan", changed)
     r.add("pipelines_inferred", inferred_pls)
-    r.add("skills_missing", skills_missing(active, tasks, available))
+    r.add("milestone_references", model.milestone_references(repo, focus.id) if focus is not None else [])
+    r.add("milestone_skills", focus_skills)
+    r.add("references_unrouted", refs_unrouted)
+    r.add("skills_unrouted", skills_unrouted)
+    r.add("skills_missing", skills_missing(active, tasks, available, focus_skills))
     r.add("skills_available", available)
     r.add("grow_triggers", grow_triggers(repo))
     pl_drift = drift(repo, [p for p in model.all_pipelines(repo) if p.id in milestone_pls])

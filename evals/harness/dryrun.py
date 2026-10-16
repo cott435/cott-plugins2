@@ -3,7 +3,7 @@
 sample project (scripts/tests/fixtures/quant, a valid single-package project mid-M1) and grade it.
 
 The fixture is replayed one planning layer per turn (brief → spec → architecture → pipelines → tests → plan →
-build setup), then the M1 code it already contains lands as a final "build" turn. So most assertions should
+build setup, with reference intake before the M2 idea), then the M1 code it already contains lands as a final "build" turn. So most assertions should
 pass; the expected failures are the ones the fixture can't meet (it isn't a finished four-stage quant run).
 
 Usage: dryrun.py [out-dir]   (default: a fresh temp dir; printed at the end)
@@ -20,6 +20,7 @@ LAYERS = [
     ("idea-refine", ["docs/brief.md", "docs/roadmap.md"]),
     ("spec-writing", ["docs/spec.md"]),
     ("architecture-design", ["docs/architecture.md", "docs/packages/quant/contract.md"]),
+    ("reference-intake", ["references", "docs/references.md"]),  # M2's reference arrives with the M2 idea
     ("idea-refine", ["docs/ideas"]),
     ("pipeline-design", ["docs/packages/quant/pipelines.md"]),
     ("test-planning", ["docs/packages/quant/tests.md", "tests/fixtures"]),
@@ -27,6 +28,26 @@ LAYERS = [
     ("build-setup", ["CONSTRAINTS.md", ".claude"]),
     (None, ["src"]),  # M1-T01 already built: the fixture is mid-M1
 ]
+
+
+def copy_layer(fixture, proj, paths):
+    """Copy a layer's paths from the fixture; a path the fixture doesn't have (yet) is skipped."""
+    for p in paths:
+        src, dst = fixture / p, proj / p
+        if not src.exists():
+            continue
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        if src.is_dir():
+            shutil.copytree(src, dst, dirs_exist_ok=True)
+        else:
+            shutil.copy(src, dst)
+
+
+def intake_agents(proj):
+    """What reference-intake's stream would show: one read-only subagent per reference file."""
+    refs = sorted(p for p in (proj / "references").rglob("*") if p.is_file()) if (proj / "references").is_dir() else []
+    return [{"subagent_type": "general-purpose", "description": f"Summarize {p.name}",
+             "prompt": f"Read {p.relative_to(proj)} and draft its reference entry."} for p in refs]
 
 
 def main():
@@ -48,22 +69,20 @@ def main():
     subprocess.run(["git", "init", "-q"], cwd=proj)
     driver.commit(proj, "turn 0")
     turns = []
+    stage = "data"
     for n, (skill, paths) in enumerate(LAYERS, 1):
-        for p in paths:
-            src, dst = FIXTURE / p, proj / p
-            dst.parent.mkdir(parents=True, exist_ok=True)
-            if src.is_dir():
-                shutil.copytree(src, dst, dirs_exist_ok=True)
-            else:
-                shutil.copy(src, dst)
+        copy_layer(FIXTURE, proj, paths)
         driver.commit(proj, f"turn {n}")
         _, status = driver.snapshot(proj, dt)
+        stage = "structure_portfolios" if skill == "reference-intake" else stage
         turns.append({"turn": n, "user": "Approved." if n > 1 else "Plan my quant lab.", "assistant": "(replayed)",
                       "skills": [f"dev-team2:{skill}"] if skill else [], "tools": [], "seconds": 0,
-                      "usage": {}, "docs_changed": "", "status": status, "stage": "data" if n < 4 else "structure_portfolios"})
+                      "usage": {}, "docs_changed": "", "status": status, "stage": stage,
+                      "agents": intake_agents(proj) if skill == "reference-intake" else []})
     (run / "turns.json").write_text(json.dumps(turns, indent=1))
     (run / "summary.json").write_text(json.dumps({"trajectory": "quant-incremental (dry run)", "turns": len(turns),
-                                                  "stages_reached": 2, "finished": True, "stop_reason": "dry run"}))
+                                                  "stages_reached": 2, "finished": True, "stop_reason": "dry run",
+                                                  "references": [p.name for p in sorted((proj / "references").glob("*"))]}))
     r = subprocess.run([sys.executable, str(HERE / "grade.py"), str(run)], capture_output=True, text=True)
     print(r.stdout + r.stderr)
     print(f"run dir: {run}")

@@ -10,12 +10,13 @@ from .build_setup import build_setup
 from .common import Report, add_common
 from .idea_refine import idea_refine
 from .pipeline_design import pipeline_design
+from .reference_intake import reference_intake
 from .spec_writing import spec_writing
 from .testplanning import test_planning
 
 HANDLERS = {"idea-refine": idea_refine, "spec-writing": spec_writing, "architecture-design": architecture_design,
             "pipeline-design": pipeline_design, "test-planning": test_planning, "build-planning": build_planning,
-            "build-setup": build_setup}
+            "build-setup": build_setup, "reference-intake": reference_intake}
 SKILLS = list(HANDLERS)
 
 

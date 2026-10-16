@@ -11,6 +11,7 @@
 
 ## M1: Data + stats
 **Exit:** PCA and MP cleaning run on 10y of daily returns; PL-01 and PL-02 golden cases pass.
+**Skills:** data-science
 **Plan:** [../tasks/plan.md](../tasks/plan.md)
 
 ## M2: Classical portfolios

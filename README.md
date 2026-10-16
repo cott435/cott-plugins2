@@ -19,7 +19,9 @@ Every skill stops after writing a Draft and waits for your review. Nothing moves
 |---|---|---|---|
 | `docs/brief.md` | **Why** the project exists: problem, users, ≤ 5 stage-neutral goals, constraints, not doing | `idea-refine` | ≤ 1 page |
 | `docs/ideas/<idea>.md` | **Why** an addition is worth making | `idea-refine` | 300-700 words |
-| `docs/roadmap.md` | **In what order**: one row per milestone, a short outline each | `idea-refine` adds rows, `build-planning` fills them in, `dt roadmap` writes Status | 1 table + ≤ 6 lines per milestone |
+| `docs/roadmap.md` | **In what order**: one row per milestone, a short outline and the skills it routes to (`**Skills:**`) | `idea-refine` adds rows and Skills, `build-planning` fills them in, `dt roadmap` writes Status | 1 table + ≤ 6 lines per milestone |
+| `references/` | Your reference code and notes: how something has been done before. Never imported, excluded from tooling | You | — |
+| `docs/references.md` | What each reference is for (`RF-NN`), its caveats, and the milestone it serves | `reference-intake` | ≤ 8 lines per file |
 | `docs/spec.md` | **What** is built: requirements (`CODE-NN`), acceptance criteria, scope | `spec-writing` | As long as needed |
 | `docs/architecture.md` | **How**: components, dependencies, decisions (`AD-NN`); multi-package: system map and system pipelines | `architecture-design` | 1-3 pages (single); 2-4 (root) |
 | `docs/packages/<pkg>/architecture.md` | A package's internals (multi-package only) | `architecture-design` | 1-3 pages |
@@ -38,9 +40,13 @@ The **brief** is the stable foundation. **Idea files** carry each addition, so t
 
 **Intent until code exists, then code is truth.** Planned layout and entry sketches are *pre-build* sections; the spine task replaces them with a pointer to `dt layout`. Contracts stay as docs and are checked against the code.
 
+## References and skills per milestone
+
+Drop reference files (code or markdown) into `references/` whenever you have them: a dataset builder, a transform, notes. `dt status` reports new or changed files at session start, and `reference-intake` summarizes each one (`RF-NN`) and asks which milestone it serves. Each roadmap milestone also lists the project skills it routes to. The planning skills carry both down to tasks: a task's `Read:` names `RF-02:build_targets`, and `dt context` gives the builder that function under a "reference, your call what to reuse" banner. `build-planning` checks that every milestone reference and skill reaches a task. Design: [design/references.md](design/references.md).
+
 ## IDs and section reads
 
-Every addressable unit has a repo-unique ID that is never renumbered or reused: requirements `CODE-NN`, decisions `AD-NN`, pipelines `PL-NN` (steps `PL-NN.<function>`), test cases `TC-NN`, milestones `M<n>`, tasks `M<n>-T<nn>`, review findings `M<n>-R<nn>`, contract symbols `<component>.<symbol>`, constraint rules `CR-NN`. Agents read by ID, not by file:
+Every addressable unit has a repo-unique ID that is never renumbered or reused: requirements `CODE-NN`, decisions `AD-NN`, pipelines `PL-NN` (steps `PL-NN.<function>`), test cases `TC-NN`, milestones `M<n>`, tasks `M<n>-T<nn>`, review findings `M<n>-R<nn>`, contract symbols `<component>.<symbol>`, constraint rules `CR-NN`, references `RF-NN`. Agents read by ID, not by file:
 
 ```bash
 python3 <plugin>/scripts/dt.py section PL-02 TC-06 STAT-02
@@ -144,7 +150,8 @@ Code tooling (`check.sh`, Ruff, mypy, import-linter, the agent role files and th
 
 | Skill | Phase | Produces |
 |---|---|---|
-| [`idea-refine`](skills/idea-refine/SKILL.md) | Define | `docs/brief.md`, `docs/ideas/*.md`, roadmap rows |
+| [`idea-refine`](skills/idea-refine/SKILL.md) | Define | `docs/brief.md`, `docs/ideas/*.md`, roadmap rows and milestone Skills |
+| [`reference-intake`](skills/reference-intake/SKILL.md) | Any time | `docs/references.md` (one read-only agent per new or changed file) |
 | [`spec-writing`](skills/spec-writing/SKILL.md) | Define | `docs/spec.md` |
 | [`architecture-design`](skills/architecture-design/SKILL.md) | Design | `docs/architecture.md`, `docs/packages/*/{architecture,contract}.md` |
 | [`pipeline-design`](skills/pipeline-design/SKILL.md) | Design | `docs/packages/*/pipelines.md` |

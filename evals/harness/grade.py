@@ -261,6 +261,8 @@ def layer(path):
         return "brief"
     if path == "docs/spec.md":
         return "spec"
+    if path == "docs/references.md":
+        return "references"
     if path.endswith("/pipelines.md"):
         return "pipelines"
     if path.endswith("/tests.md") or path.startswith("tests/fixtures/"):
@@ -288,7 +290,7 @@ def layers_changed(n):
     return {k for k, v in added.items() if v >= 12}  # status flips and small fixes don't count
 
 multi = [(n, sorted(ks)) for n in sorted(turn_commit) if n and len(ks := layers_changed(n)) > 1]
-check("gate_discipline", "Every skill stops at its gate: no turn drafts two layers (brief/idea, spec, architecture, pipelines, tests, plan, setup) at once",
+check("gate_discipline", "Every skill stops at its gate: no turn drafts two layers (brief/idea, references, spec, architecture, pipelines, tests, plan, setup) at once",
       turn_commit and not multi, f"turns: {multi[:10]}")
 
 APPROVE = re.compile(r"\b(accept|accepted|approve|approved|looks good|lgtm|go ahead|yes)\b", re.I)
@@ -347,6 +349,90 @@ else:
     check("spec_cpu_budget", "CPU training-time budget (~1 hour) is a quality requirement", bool(re.search(r"(hour|60 min|minutes).{0,120}(CPU|laptop|MacBook|processor)|(CPU|laptop|MacBook|processor).{0,120}(hour|60 min|minutes)", spec, re.I)), "")
     check("rl_single_package", "Proof-of-concept stays single package (no premature monorepo)", "single" in shape.lower(), shape)
 
+# ---- references and stage-level skill routing (design/references.md §10), for projects that have reference files
+ref_stage = {f: i for i, s in enumerate(stages) for f in scn["projects"][project].get("references", {}).get(s["name"], [])}
+if ref_stage:
+    reached = summary.get("stages_reached", len(stages)) if mode == "incremental" else len(stages)
+    expected = summary.get("references", [f for f, i in ref_stage.items() if i < reached])
+    ref_dir = proj / "references"
+    present = sorted(str(p.relative_to(ref_dir)) for p in ref_dir.rglob("*") if p.is_file()) if ref_dir.is_dir() else []
+    entries = facts.get("references", [])
+    by_file = {pathlib.PurePath(e["file"]).name: e for e in entries if e.get("file")}
+    waiting = {k: st_ir.get(k) for k in ("references_unindexed", "references_changed", "references_missing")}
+    idx_status = facts["docs"].get("docs/references.md")
+    unindexed = [f for f in present if pathlib.PurePath(f).name not in by_file]
+    check("refs_indexed_approved", "Every reference file is indexed (an RF entry, hash current) and docs/references.md is Approved",
+          present and set(expected) <= {pathlib.PurePath(f).name for f in present} and not unindexed
+          and all(v == [] for v in waiting.values()) and idx_status == "Approved",
+          f"files {present} (expected {expected}); no entry: {unindexed}; dt {waiting}; index {idx_status}")
+
+    rows_ = facts["roadmap"]
+    def want_ms(f):
+        i = ref_stage[f]
+        return [rows_[i]["id"]] if i < len(rows_) else []  # its stage has no milestone yet: `—`
+    graded = [f for f in expected if f in ref_stage]
+    wrong = {f: (by_file[f]["milestones"] if f in by_file else "no entry", want_ms(f)) for f in graded
+             if f not in by_file or sorted(by_file[f]["milestones"]) != want_ms(f)}
+    check("refs_milestones", "Each reference is assigned to the milestone of the stage it serves (`—` while that stage has no milestone)",
+          graded and not wrong, f"{ {f: by_file.get(f, {}).get('milestones') for f in graded} }; wrong (got, want): {wrong}")
+
+    def open_questions(rel):
+        t = (proj / rel).read_text() if (proj / rel).exists() else ""
+        m = re.search(r"^#+ Open questions.*?(?=^#+ |\Z)", t, re.S | re.M | re.I)
+        return m.group(0) if m else ""
+    unrouted = {}
+    for ms in [r for r in rows_ if any(p["milestone"] == r["id"] for p in plans)]:
+        ms_plans = [p for p in plans if p["milestone"] == ms["id"]]
+        reads = {re.sub(r":.*$", "", i) for p in ms_plans for t in p["tasks"] for i in t["read"]}
+        task_skills = {s_ for p in ms_plans for t in p["tasks"] for s_ in t.get("skills", [])}
+        refs_ms = [e["id"] for e in entries if ms["id"] in e["milestones"] or "all" in e["milestones"]]
+        reasons = "\n".join(open_questions(p["doc"]) for p in ms_plans)
+        miss = [r for r in refs_ms if r not in reads] + [s_ for s_ in ms.get("skills", []) if s_ not in task_skills]
+        miss = [m for m in miss if m not in reasons]  # an item may stay unrouted with a reason under Open questions
+        if miss:
+            unrouted[ms["id"]] = miss
+    # dt lists items as `RF-01 (M2)` / `data-analysis (M2)` across the active and queued plans; reasoned ones are excused.
+    all_reasons = "\n".join(open_questions(p["doc"]) for p in plans)
+    dt_unrouted = {k: st_bp.get(k) for k in ("references_unrouted", "skills_unrouted")}
+    dt_open = [i for v in dt_unrouted.values() for i in (v if isinstance(v, list) else [v]) if i.split(" (")[0] not in all_reasons]
+    check("refs_skills_routed", "Every planned milestone routes its references (a task's Read:) and skills (a task's Skills:), "
+          "or gives a reason under Open questions; dt references_unrouted and skills_unrouted likewise",
+          plans and not unrouted and not dt_open and all(isinstance(v, list) for v in dt_unrouted.values()),
+          f"unrouted by milestone: {unrouted}; dt build-planning: {dt_unrouted}")
+
+    si = next(i for i, s_ in enumerate(stages) if s_["name"] == "structure_portfolios")
+    want_sk = ["data-analysis", "null-hypothesis-testing"]
+    if si < len(rows_):
+        ms = rows_[si]
+        ms_tasks = [t for p in plans if p["milestone"] == ms["id"] for t in p["tasks"]]
+        line_ok = all(k in ms.get("skills", []) for k in want_sk)
+        on_task = {k: [t["id"] for t in ms_tasks if k in t.get("skills", [])] for k in want_sk}
+        ok = line_ok and (not ms_tasks or all(on_task.values())) and (ms_tasks or mode == "all_at_once")
+        ev = f"{ms['id']} **Skills:** {ms.get('skills')}; " + (f"tasks carrying each: {on_task}" if ms_tasks else "no plan for it (roadmap line only)")
+    else:
+        ok, ev = False, "no structure_portfolios milestone"
+    check("skills_on_structure_tasks", "The structure & classical-portfolios milestone routes data-analysis and null-hypothesis-testing "
+          "(its roadmap **Skills:** line, and at least one of its tasks each when it has a plan)", ok, ev)
+
+    intake = [t for t in turns if "reference-intake" in [dtrun.skill_name(x) for x in t["skills"]]]
+    check("reference_intake_invoked", "reference-intake ran", bool(intake), f"turns: {[t['turn'] for t in intake]}")
+    names = sorted({pathlib.PurePath(f).name for f in present})
+    launches = [a for t in intake for a in t.get("agents", [])]
+    def named(a):
+        hit = [n for n in names if n in (a.get("description") or "")]
+        return hit or [n for n in names if n in (a.get("prompt") or "")]
+    per = {n: sum(1 for a in launches if named(a) == [n]) for n in names}
+    batched = [a.get("description") for a in launches if len(named(a)) > 1]
+    check("intake_subagent_per_file", "reference-intake sent one subagent per reference file (Agent calls in its turns, each naming one file)",
+          names and launches and all(per.values()) and not batched,
+          f"{len(launches)} Agent calls in intake turns {[t['turn'] for t in intake]}; per file: {per}; batched: {batched}")
+
+    IMPORT_REF = re.compile(r"^\s*(from\s+references\b|import\s+references\b)|sys\.path.*references", re.M)
+    imports = [str(p.relative_to(proj)) for d in ("src", "tests") for p in (proj / d).rglob("*.py")
+               if IMPORT_REF.search(p.read_text(errors="ignore"))]
+    check("no_reference_imports", "Nothing under src/ or tests/ imports from references/ or puts it on sys.path (CR-08)",
+          not imports, f"importing: {imports[:10]}")
+
 passed = sum(r["passed"] for r in R)
 tools = {}
 for t in turns:
@@ -373,6 +459,8 @@ out = {"expectations": R,
                  "context_lines_max": max(packets.values()) if packets else 0,
                  "lint": {"errors": lint.get("errors"), "warnings": lint.get("warnings")},
                  "roadmap": [(r["id"], r["derived"]) for r in facts["roadmap"]],
+                 "references": [(e["id"], e["file"], e["milestones"]) for e in facts.get("references", [])],
+                 "milestone_skills": {r["id"]: r.get("skills", []) for r in facts["roadmap"]},
                  "hook_events": sum(t.get("hook_events", 0) for t in turns),
                  "guard_tool_errors": guard_hits[:10], "oracle_prompts_approved": oracle_prompts[:20],
                  "session_init": (turns[0].get("session_init") if turns else None), "dt": str(DT)}}

@@ -96,6 +96,41 @@ class BudgetChecks(LintCase):
         code, _ = run_main("--root", str(self.p.root), "lint")
         self.assertEqual(code, 0)
 
+    def _add_symbols(self, n: int):
+        self.p.edit(CONTRACT, "## portfolio", "".join(
+            f"### stats.extra{k}: Extra {k}\n`def extra{k}() -> None`\n- **Invariants:** none\n"
+            f"- **Errors:** none\n- **Used by:** PL-02\n\n" for k in range(n)) + "## portfolio")
+
+    def budget_messages(self, rel):
+        return [p.message for p in self.problems() if p.path == rel and p.code in ("budget", "grow-size")]
+
+    def test_contract_budget_is_per_symbol(self):
+        self._add_symbols(10)       # 93 lines, well past the old fixed 60, at 6 lines a symbol
+        self.assertEqual(self.budget_messages(CONTRACT), [])
+        self.p.edit(CONTRACT, "- **Used by:** PL-03", "- **Used by:** PL-03\n" + "filler\n" * 90)
+        self.assertEqual(self.budget_messages(CONTRACT), ["184 lines, budget 124 (8 per symbol × 14 + 12)"])
+
+    def test_pipelines_budget_is_per_pipeline(self):
+        self.p.edit(PIPES, "**Covers:** PORT-01, PORT-02", "**Covers:** PORT-01, PORT-02\n" + "filler\n" * 70)
+        self.assertEqual(self.budget_messages(PIPES), ["135 lines, budget 127 (35 per pipeline × 3 + 10 + 12 layout)"])
+
+    def test_pipelines_layout_section_is_extra(self):
+        layout = "## Planned layout (pre-build — removed by spine task)"
+        self.p.edit(PIPES, layout, layout + "\n" + "- line\n" * 100)
+        self.assertEqual(self.budget_messages(PIPES), [])
+
+    def test_tests_budget_is_per_case(self):
+        self.p.edit("docs/packages/quant/tests.md", "## Open questions", "filler\n" * 20 + "## Open questions")
+        self.assertCode("docs/packages/quant/tests.md", "budget")
+
+    def test_grow_ceiling_is_a_separate_warning(self):
+        self._add_symbols(30)
+        self.assertEqual(self.budget_messages(CONTRACT), [
+            "213 lines, over the 200-line ceiling for one package's contract doc: architecture-design should "
+            "consider a Grow"])
+        code, _ = run_main("--root", str(self.p.root), "lint")
+        self.assertEqual(code, 0)
+
     def test_plan_over_budget(self):
         self.p.edit(PLAN, "## Replan notes", "## Replan notes\n" + "- note\n" * 400)
         self.assertCode(PLAN, "budget")

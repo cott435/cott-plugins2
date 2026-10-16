@@ -21,7 +21,7 @@ from ..status.common import available_skills
 
 # code → severity (E fails the run, W doesn't)
 SEVERITY = {
-    "dup-id": "E", "missing-ref": "E", "retired-ref": "E", "budget": "W", "approved-edit": "W",
+    "dup-id": "E", "missing-ref": "E", "retired-ref": "E", "budget": "W", "grow-size": "W", "approved-edit": "W",
     "prebuild-left": "E", "task-size": "E", "task-acceptance": "E", "task-title": "E", "task-fields": "E",
     "task-step": "W", "depends": "E", "milestone-size": "E", "parallel": "E", "verify-smoke": "E", "todo-mismatch": "E",
     "finding-disposition": "E", "foreign-plan": "W", "broken-fence": "E", "header": "E",
@@ -30,8 +30,12 @@ SEVERITY = {
     "ref-file": "E", "ref-hash": "W", "ref-large": "W", "ref-prefix": "E", "roadmap-skill": "W",
 }
 
-# Size budgets (planning-stage.md §3), in lines.
-BUDGETS = {"contract": 60, "pipelines": 120, "tests": 120, "plan": 400, "queued-plan": 400}
+# Size budgets (planning-stage.md §3), in lines. Package docs are budgeted per unit (lines per unit × units +
+# an allowance for the header, groups and Retired lines); pipelines.md's pre-build layout section is extra.
+BUDGETS = {"plan": 400, "queued-plan": 400}
+UNIT_BUDGETS = {"contract": (8, 12, "symbol"), "pipelines": (35, 10, "pipeline"), "tests": (10, 15, "test case")}
+# Past these a package holds too much for one set of docs: consider a Grow.
+GROW_CEILINGS = {"contract": 200, "pipelines": 300, "tests": 300}
 ROADMAP_SECTION_MAX = 6
 AGENTS_DOC_MAP_MAX = 25
 
@@ -221,11 +225,36 @@ def check_retired_ref(ctx: Context):
 
 # ---- per-doc checks -------------------------------------------------------------------------------
 
+def _units(doc) -> int:
+    if doc.kind == "contract":
+        return len(model.symbols(doc))
+    if doc.kind == "pipelines":
+        return len(model.pipelines(doc))
+    return len(model.test_cases(doc))
+
+
+def _unit_budget(doc) -> tuple[int, str]:
+    """(budget in lines, how it was worked out) for a contract, pipelines or tests doc."""
+    per, allowance, unit = UNIT_BUDGETS[doc.kind]
+    n = _units(doc)
+    layout = sum(h.end - h.line for h in doc.prebuild_sections() if h.level == 2) if doc.kind == "pipelines" else 0
+    how = f"{per} per {unit} × {n} + {allowance}" + (f" + {layout} layout" if layout else "")
+    return per * n + allowance + layout, how
+
+
 def check_budget(ctx: Context):
     for doc in ctx.scoped_docs:
         limit = BUDGETS.get(doc.kind)
         if limit and len(doc.lines) > limit:
             yield _p(doc, 0, "budget", f"{len(doc.lines)} lines, budget {limit} ({doc.kind})")
+        if doc.kind in UNIT_BUDGETS:
+            limit, how = _unit_budget(doc)
+            if len(doc.lines) > limit:
+                yield _p(doc, 0, "budget", f"{len(doc.lines)} lines, budget {limit} ({how})")
+            ceiling = GROW_CEILINGS[doc.kind]
+            if len(doc.lines) > ceiling:
+                yield _p(doc, 0, "grow-size", f"{len(doc.lines)} lines, over the {ceiling}-line ceiling for one "
+                         f"package's {doc.kind} doc: architecture-design should consider a Grow")
         if doc.kind == "roadmap":
             for h in doc.headings:
                 if h.id and re.fullmatch(md.MILESTONE_ID, h.id):

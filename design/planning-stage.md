@@ -69,12 +69,14 @@ tasks/
 | Doc | Size budget | Lifecycle |
 |---|---|---|
 | `roadmap.md` | 1 table + 3-6 lines per milestone | Rows only; status is derived by script |
-| `contract.md` | ≤ 1 page | Draft → Approved; Revise reopens it |
-| `pipelines.md` | ≤ 2 pages (pre-build sections included) | Draft → Approved |
-| `tests.md` | ≤ 2 pages; fixtures stay outside | Draft → Approved; expected outputs change only with approval |
+| `contract.md` | ≤ ~8 lines per symbol + 12 | Draft → Approved; Revise reopens it |
+| `pipelines.md` | ≤ ~35 lines per pipeline (step table and entry sketch included) + 10, plus the pre-build layout section | Draft → Approved |
+| `tests.md` | ≤ ~10 lines per test case + 15; fixtures stay outside | Draft → Approved; expected outputs change only with approval |
 | `tasks/plan.md` | ≤ ~400 lines | Draft → Approved → In progress → Done → archived |
 
-**Single package** uses the same tree: root `architecture.md` is the full doc, and there's one `docs/packages/<pkg>/` without an `architecture.md`. Its `contract.md` has one section per component. When a component later becomes a package, its section moves with it.
+Package docs are budgeted per unit because the cost per unit is steady (eval iteration 5: 4–6 lines per symbol, 21–32 per pipeline, 5–8 per test case) while the number of units grows with the package. A separate per-file ceiling (contract.md 200, pipelines.md 300, tests.md 300 lines) is a warning that the package holds too much: `architecture-design` considers a Grow.
+
+**Single package** uses the same tree: root `architecture.md` is the full doc, and there's one `docs/packages/<pkg>/` without an `architecture.md`. Its `contract.md` has one `### <component>.<symbol>` section per public symbol, grouped under one `## <component>` per component. When a component later becomes a package, its group moves with it.
 
 ---
 

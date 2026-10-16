@@ -36,7 +36,7 @@ Decide the shape first and record it in the header (`**Shape:** Single package` 
 | Interfaces | `contract.md`, one `## <component>` group per component | Each package's `contract.md`; the root lists cross-package contracts and System pipelines |
 | Dependencies | Third-party libraries | Package dependency graph and layering rules, plus third-party libraries |
 | Decisions | In `docs/architecture.md` | All in the root doc, each tagged with a scope (`system` or a package id) |
-| Typical length | 1-3 pages; contract ≤ 1 page | Root 2-4 pages; each package doc 1-3 pages, contract ≤ 1 page |
+| Typical length | 1-3 pages; contract ≤ ~8 lines per symbol | Root 2-4 pages; each package doc 1-3 pages, contract ≤ ~8 lines per symbol |
 
 **Choose multi-package only when there is a real boundary:** parts that are installed, versioned, or deployed separately; different runtimes or languages; different owners; or a dependency direction worth enforcing with tooling. Otherwise choose single package. **A proof of concept is almost always a single package.**
 
@@ -87,7 +87,7 @@ Write `docs/packages/<pkg>/contract.md`: the provider's promise to its consumers
 - **One symbol per heading.** Never `### train.train / train.train_seeds: …` or `### baselines.RandomAgent / ScriptedSnake: …`, however alike the symbols are: dt resolves `Read:` IDs and `dt context` packets only from a symbol's own heading. `dt lint` errors on these (`contract-heading`).
 - **Each section:** the signature in the project's language, then **Invariants** (shapes, ranges, guarantees), **Errors** (what fails and how it's reported), and **Used by** (consuming components or packages, plus `PL-NN` IDs once those pipelines exist).
 - **Contract first:** the contract is defined before either side is built. **The provider owns it.**
-- **Public only, ≤ 1 page.** Helpers, modules and call order belong in the package's architecture or its `pipelines.md`. A retired symbol collapses to one line under `## Retired`: `- ~~stats.foo: Title~~ Retired YYYY-MM-DD: reason`.
+- **Public only, ≤ ~8 lines per symbol.** Helpers, modules and call order belong in the package's architecture or its `pipelines.md`. A retired symbol collapses to one line under `## Retired`: `- ~~stats.foo: Title~~ Retired YYYY-MM-DD: reason`.
 
 ````markdown
 # [pkg] — Contract
@@ -228,7 +228,7 @@ The spec gained requirements (usually from a specced idea) or changed some.
 2. **Grow check.** Check every trigger, and say at the gate which (if any) fired. `grow_triggers` reports the measurable ones; judge the rest from the spec and idea file.
    - The new requirements bring a dependency stack the rest shouldn't carry (torch, gym).
    - A one-way dependency is worth enforcing (data must never import models, to prevent leakage).
-   - A package exceeds ~3 pipelines or ~12 modules, or its docs no longer fit a 2,000-line agent context.
+   - A package exceeds ~3 pipelines or ~12 modules, or its docs no longer fit a 2,000-line agent context, or `dt lint` warns `grow-size` on one of them.
    - A part runs or deploys on its own (a paper-trading service).
 
    If one fires, propose Grow to the user (one question, with your recommendation) before placing anything.
@@ -266,7 +266,7 @@ The code and the doc disagree, or there's code with no doc. Document what *is* f
 | "It's a proof of concept, it doesn't need an architecture" | It needs a short one. One page that names the contracts and the three choices that matter saves the rewrite. |
 | "We'll need a monorepo eventually, so start with one" | Packages you don't need yet cost tooling, versioning, and boundary friction every day. Name the seams; split when a Grow trigger fires. |
 | "It's one more component, no need for the Grow check" | No eval run ever entered Grow; it was never checked. Check the four triggers every Extend. |
-| "Consumers can read the architecture for the API" | They then read internals too, and depend on them. The contract is the whole promise, on one page. |
+| "Consumers can read the architecture for the API" | They then read internals too, and depend on them. The contract is the whole promise, in one doc. |
 | "The decision is obvious, no need to record it" | Obvious today, mysterious in six months. A three-line decision entry is enough. |
 | "I'll pick the data vendor myself, it's a technical detail" | Paid services and data sources are expensive to reverse. Check them against DATA- requirements and ask the user. |
 | "I'll just update the old decision with the new choice" | If the choice is reversed, the reason for the original, and why it changed, is lost. Supersede it: the new decision's Context records both, and the old one shrinks to one line. |

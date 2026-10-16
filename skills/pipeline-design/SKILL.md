@@ -109,7 +109,7 @@ An exception backed by a decision goes on the affected row or pipeline, citing i
 
 ### Step 5: Write the Draft
 
-Write `docs/packages/<pkg>/pipelines.md` from the template in `examples.md`: header line, one `## PL-NN: Title` section per pipeline with its Entry/Trigger/Covers lines, step table and `### Entry sketch (pre-build — removed by spine task)`, then `## Planned layout (pre-build — removed by spine task)`, `## Open questions` and `## Retired`. Keep the doc to two pages.
+Write `docs/packages/<pkg>/pipelines.md` from the template in `examples.md`: header line, one `## PL-NN: Title` section per pipeline with its Entry/Trigger/Covers lines, step table and `### Entry sketch (pre-build — removed by spine task)`, then `## Planned layout (pre-build — removed by spine task)`, `## Open questions` and `## Retired`. Keep each pipeline to about 35 lines, step table and entry sketch included (`dt lint` `budget`).
 
 **Contract `Used by:` lines.** For each contract symbol a step calls, append the calling PL IDs to that symbol's `Used by:` line in `contract.md`, after the consumer components `architecture-design` wrote: `- **Used by:** portfolio; PL-02, PL-03`. Symbol IDs are component-qualified even in a single package (`### stats.estimate_cov: …`). That append is the only edit this skill makes to `contract.md`, and it doesn't send an Approved contract back to Draft (`dt lint` ignores it). A step that needs a different signature, type or error is a contract change: list it and route to `architecture-design` Revise.
 

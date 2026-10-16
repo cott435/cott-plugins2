@@ -45,7 +45,7 @@ Start every run with `dt status --skill pipeline-design`. It prints the mode per
 
 `dt status` reports every mode. Two cases need judgment: a Revise starts from what the build found (the `revise` mode then holds until re-approval), and right after an architecture Grow the new packages show `new` while the old `pipelines.md` still holds their pipelines; that is Grow, not New.
 
-**In scope:** the next milestone's packages, or every package when the user plans up front. **Read:** the root and package architecture, each package's `contract.md`, the spec IDs in scope (`dt section STAT-01 STAT-02 …`, not the whole spec), `dt layout <pkg>` once code exists, and the `docs/references.md` entries whose `**Milestones:**` include the milestone (if `dt status` lists `references_unindexed`, `references_changed` or `references_missing`, route to `reference-intake` first). **Don't read** other packages' `pipelines.md`; their `contract.md` is all a step needs.
+**In scope:** the next milestone's packages, or, when the user plans up front, every package and every milestone's workflows (a single package gets the pipelines of every stage, not only M1's). **Read:** the root and package architecture, each package's `contract.md`, the spec IDs in scope (`dt section STAT-01 STAT-02 …`, not the whole spec), `dt layout <pkg>` once code exists, and the `docs/references.md` entries whose `**Milestones:**` include the milestone (if `dt status` lists `references_unindexed`, `references_changed` or `references_missing`, route to `reference-intake` first). **Don't read** other packages' `pipelines.md`; their `contract.md` is all a step needs.
 
 ## The Process (New Mode)
 
@@ -63,7 +63,7 @@ GUESS:   `load` to pull prices for a date range, then `cov-report` to see PCA an
 DEFAULT: those two; the backtest waits for M2.
 ```
 
-Ask only what the user must decide: which workflows exist, which belong to this milestone, and scope cuts. Infer the rest (names, triggers, types, step order, module split) and list it under ASSUMPTIONS at the gate. Each confirmed workflow becomes one pipeline.
+Ask only what the user must decide: which workflows exist, which milestone each belongs to, and scope cuts. Infer the rest (names, triggers, types, step order, module split) and list it under ASSUMPTIONS at the gate. Each confirmed workflow becomes one pipeline.
 
 ### Step 2: Steps
 
@@ -117,7 +117,7 @@ Then run `dt lint` on every file touched and fix what it reports.
 
 ## Review Gate (CRITICAL)
 
-Run `dt status --skill pipeline-design` again. `uncovered_ids` and `components_unowned` must be empty, or each gap is under Open questions with a reason (a spec ID deliberately left for a later milestone is fine; say which). `retired_refs` must be empty.
+Run `dt status --skill pipeline-design` again. `uncovered_ids` and `components_unowned` must be empty, or each gap is under Open questions with a reason (a spec ID deliberately left for a later milestone is fine when planning one milestone at a time; say which. Up front, every stage's IDs land on a pipeline). `retired_refs` must be empty.
 
 Then present:
 
@@ -209,6 +209,7 @@ Never rewrite the table to match code that breaks a readability rule.
 
 - [ ] `dt status --skill pipeline-design` was run first, and again at the gate; `uncovered_ids` and `components_unowned` are empty or each gap is explained under Open questions
 - [ ] Every workflow was confirmed by the user (or, headless, listed under Open questions)
+- [ ] Up front: every stage's workflows have pipelines, in every package, with no stage's spec IDs left for later
 - [ ] Every PL has Entry, Trigger, Covers, a step table with a real Spine version on every row, and (pre-build) an entry sketch of calls only
 - [ ] Every step has exactly one owner that exists in the architecture
 - [ ] The planned layout follows from the owners, and no module is planned past the size limits

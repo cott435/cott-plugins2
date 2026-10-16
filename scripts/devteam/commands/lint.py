@@ -25,7 +25,7 @@ SEVERITY = {
     "prebuild-left": "E", "task-size": "E", "task-acceptance": "E", "task-title": "E", "task-fields": "E",
     "task-step": "W", "depends": "E", "parallel": "E", "verify-smoke": "E", "todo-mismatch": "E",
     "finding-disposition": "E", "foreign-plan": "W", "broken-fence": "E", "header": "E",
-    "unreadable": "E", "internal": "W", "pipeline-fields": "E", "spine-mock": "W",
+    "unreadable": "E", "internal": "W", "pipeline-fields": "E", "spine-mock": "W", "contract-heading": "E",
     "fixture-size": "W",                # missing fixture files are reported as E
     "ref-file": "E", "ref-hash": "W", "ref-large": "W", "ref-prefix": "E", "roadmap-skill": "W",
 }
@@ -298,6 +298,28 @@ def check_prebuild_left(ctx: Context):
             elif pls and all(built.values()):
                 yield _p(doc, h.line, "prebuild-left",
                          "every pipeline here is built; run `dt prebuild-clear` for the last one")
+
+
+SYMBOL_LEAD = re.compile(rf"^{md.SYMBOL_ID}")
+NAME_SEP = re.compile(r"\s*(?:/|,|·|&|\+|\band\b)\s*")
+
+
+def check_contract_heading(ctx: Context):
+    """A contract heading that starts with a symbol but isn't `<pkg>.<symbol>: <title>`, most often one that
+    names several (`### train.train / train.train_seeds: …`). dt resolves a symbol only from its own heading."""
+    for doc in ctx.scoped_docs:
+        if doc.kind != "contract":
+            continue
+        for h in doc.headings:
+            if h.id or h.level not in (2, 3) or not SYMBOL_LEAD.match(h.text):
+                continue
+            names = [n for n in NAME_SEP.split(h.text.split(":", 1)[0]) if n]
+            if len(names) > 1:
+                yield _p(doc, h.line, "contract-heading",
+                         f"heading names {len(names)} symbols ({', '.join(names)}): give each its own "
+                         "`### <pkg>.<symbol>: <title>` section")
+            else:
+                yield _p(doc, h.line, "contract-heading", "heading isn't `### <pkg>.<symbol>: <title>`, so dt can't resolve it")
 
 
 # ---- pipeline and test-case checks ----------------------------------------------------------------
@@ -660,7 +682,7 @@ def check_unreadable(ctx: Context):
 
 
 CHECKS = [
-    check_unreadable, check_header, check_broken_fence,
+    check_unreadable, check_header, check_broken_fence, check_contract_heading,
     check_pipeline_fields, check_spine_mock, check_fixture_size,
     check_dup_id, check_missing_ref, check_retired_ref,
     check_budget, check_approved_edit, check_prebuild_left,

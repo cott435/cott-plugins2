@@ -35,7 +35,7 @@ Run `dt status --skill build-planning` first. It prints `mode`, `milestone`, `ba
 |---|---|---|
 | **blocked** | An upstream gate isn't met: a milestone package's `pipelines.md` is Draft or missing, or a Revise is open (a `pipelines.md` or `tests.md` the active milestone uses is Draft) | Name the skill or approval that must come first; tasks on the revised docs stay paused. Stop |
 | **foreign** | `tasks/plan.md` has no `**Milestone:**` header and has unchecked tasks | **Stop and ask.** Never overwrite, rename or delete it. Offer: finish it first, or the user moves or discards it themselves |
-| **New** | No active or archived plan; the roadmap has rows | Fill in the roadmap (Packages and Pipelines from `pipelines_inferred`), write the M1 plan and todo, write the AGENTS.md doc map |
+| **New** | No active or archived plan; the roadmap has rows | Fill in the roadmap (Packages and Pipelines for every designed row, not only M1's), write the M1 plan and todo, write the AGENTS.md doc map |
 | **Extend** | A milestone is newly designed | Fill in its roadmap entry. No active milestone: write its plan. Active milestone: plan it at kickoff, or in `tasks/queued/` if the user asks. Never merge it into the active plan unless asked |
 | **Replan** | A task is `Blocked`, or a revised doc was re-approved after the plan (`changed_since_plan`) | Reorder, split or add tasks. List every drop for approval |
 | **Advance** | All todo items and the exit checkpoint are ticked | Run the [Advance sequence](#advance) one gate per turn |
@@ -69,7 +69,11 @@ If one fires and no `AD-NN` already records the decision to stay single, **stop*
 
 ### 2. Scope the milestone
 
-From the roadmap row and the pipelines: the spec IDs, packages, pipelines and exit criteria. While the row's Pipelines cell is `—`, `dt` infers the milestone's pipelines from its Source's spec IDs and prints them as `pipelines_inferred`; confirm them and write them, with their packages, into the row. One milestone is one working capability end to end, about 5–15 tasks. Bigger means two milestones; a single task belongs in an existing one.
+From the roadmap row and the pipelines: the spec IDs, packages, pipelines and exit criteria. While the row's Pipelines cell is `—`, `dt` infers the milestone's pipelines from its Source's spec IDs and prints them as `pipelines_inferred`; confirm them and write them, with their packages, into the row.
+
+**Up front, fill every row in New mode.** When the brief lists every stage, each row's Source is `brief` and the spec's only Changelog row says IDs `all`, so `dt` can't tell which pipelines belong to which row and `pipelines_inferred` comes back empty. Assign each approved pipeline to the row whose stage it delivers, by its Covers, and write Packages and Pipelines for every row. A row left `—` stays below Designed, even when its pipelines are approved.
+
+One milestone is one working capability end to end, about 5–15 tasks. Bigger means two milestones; a single task belongs in an existing one.
 
 Every spec ID the milestone's pipelines cover lands on a task or under `**Deferred:**` with a target and reason (`PORT-07 (to M4: needs forecasts)`). `uncovered` must end empty.
 
@@ -151,7 +155,7 @@ Before presenting the Draft:
 - `dt lint tasks/ docs/roadmap.md AGENTS.md` is clean. It checks sizes, acceptance count, titles, fields, depends, parallel groups, smoke in Verify, todo vs plan, budgets.
 - `dt status --skill build-planning`: `uncovered`, `no_spine` and `mode_violations` are empty (or each is explained on the task or under Open questions); `skills_missing` is listed for the user.
 - `references_unrouted` (milestone references in no task's `Read:`) and `skills_unrouted` (milestone skills on no task) are empty, or each item has a one-line reason under Open questions.
-- `dt context` resolves for every task, under 2,000 lines.
+- `dt context` resolves for every task, under 2,000 lines. A contract symbol that doesn't resolve (often a heading naming several) routes to `architecture-design`; never fix the contract yourself.
 - Every plan header field is set and `tasks/plan.md` is ≤ ~400 lines.
 
 Then present:
@@ -198,6 +202,7 @@ Then present:
 - A task needing a skill that isn't installed, with no flag
 - A milestone skill or reference on no task with no reason; a `references/` path in `Read:`; a long reference with no selector
 - Spec IDs on no task and not Deferred
+- Up front: a roadmap row with approved pipelines whose Packages or Pipelines cell is still `—`
 - Task plans written for more than the next milestone without being asked
 - A foreign `tasks/plan.md` overwritten, or `tasks/plan.md` deleted
 - Code, tests or `src/` touched; `/build` started; more than one gate in a turn
@@ -208,6 +213,7 @@ Then present:
 - [ ] Grow triggers checked; none fired, or the skill routed to `architecture-design` Grow
 - [ ] `dt lint` clean on `tasks/`, the roadmap and AGENTS.md; plan header has `**Base:** —` until `dt base` sets it
 - [ ] Every live spec ID in scope is on a task or Deferred; every new pipeline has a Phase 0 spine task
+- [ ] New mode, up front: every designed roadmap row has its Packages and Pipelines filled in, and `dt roadmap` shows it Designed or later
 - [ ] Every task: resolvable `Read:` IDs, size M or smaller, ≤ 3 test-backed acceptance bullets, a Verify step, Mode by rule (or a Reason), skills routed
 - [ ] `skills_unrouted` and `references_unrouted` empty or explained; references cited by `RF-NN`, with selectors for long files
 - [ ] Dependencies ordered backward with no cycles; checkpoints every 2–3 tasks plus the exit

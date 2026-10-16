@@ -378,6 +378,21 @@ class FormatChecks(LintCase):
         self.p.edit(CONTRACT, "**Status:** Approved · ", "")
         self.assertCode(CONTRACT, "header")
 
+    def test_contract_heading_naming_several_symbols(self):
+        self.p.edit(CONTRACT, "### stats.clean_eigen: Random-matrix cleaning",
+                    "### stats.clean_eigen / shrink, stats.ledoit_wolf: Cleaning")
+        found = [p.message for p in self.problems() if p.code == "contract-heading"]
+        self.assertEqual(found, ["heading names 3 symbols (stats.clean_eigen, shrink, stats.ledoit_wolf): "
+                                 "give each its own `### <pkg>.<symbol>: <title>` section"])
+
+    def test_contract_heading_without_title(self):
+        self.p.edit(CONTRACT, "### stats.clean_eigen: Random-matrix cleaning", "### stats.clean_eigen")
+        self.assertCode(CONTRACT, "contract-heading")
+
+    def test_contract_heading_check_is_contract_only(self):
+        self.p.edit(ARCH, "## Interfaces", "### stats.a / stats.b: Two\n\n## Interfaces")
+        self.assertNotIn((ARCH, "contract-heading"), self.found())
+
     def test_roadmap_and_todo_need_no_status(self):
         self.assertNotIn(("docs/roadmap.md", "header"), self.found())
         self.assertNotIn((TODO, "header"), self.found())

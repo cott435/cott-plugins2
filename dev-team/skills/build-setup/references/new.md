@@ -19,34 +19,34 @@ PRECHECK → DETECT → 4 QUESTIONS → GENERATE → [commit yes] → PROVE → 
 
 **5. Prove.** Ask to commit the bar skeleton (default yes): the protected-path diff needs a commit. On a yes, commit and `git update-ref refs/checks/base HEAD`. Run `uv run --frozen ruff check --show-settings >/dev/null` and `time bash scripts/check.sh gate`; fix the config, never the check, until it passes within budget. Headless: don't commit; run the gate, report the protected-path step as expected to fail, leave Draft.
 
-## Example: quant, single package
+## Example: GridLoad, single package
 
-Architecture: `quant` with components `data` (depends on nothing), `stats` (→ data), `portfolio` (→ stats, data); pandas and NumPy (AD-02); `portfolio` arrives in M2. Plan M1 declares `numpy` and `pandas`.
+Architecture: `gridload` with components `data` (depends on nothing), `profile` (→ data), `reserve` (→ profile, data); pandas and NumPy (AD-02); `reserve` arrives in M2. Plan M1 declares `numpy` and `pandas`.
 
 **Values**
 ```bash
 PROTECTED=('tests/intent/**' 'tests/fixtures/**' 'tests/conftest.py' 'pyproject.toml' 'uv.lock' 'CONSTRAINTS.md' 'scripts/**' '.claude/agents/**' '.claude/settings.json' 'references/**' 'probes/**' 'tests/contracts/**')
 pkg_scope() {
   case "$1" in
-    data) echo "data stats portfolio" ;;
-    stats) echo "stats portfolio" ;;
-    portfolio) echo "portfolio" ;;
+    data) echo "data profile reserve" ;;
+    profile) echo "profile reserve" ;;
+    reserve) echo "reserve" ;;
     *) return 1 ;;
   esac
 }
 ```
 ```toml
 [[tool.importlinter.contracts]]
-name = "Layers: portfolio > stats > data"
+name = "Layers: reserve > profile > data"
 type = "layers"
-layers = ["(quant.portfolio)", "quant.stats", "quant.data"]
+layers = ["(gridload.reserve)", "gridload.profile", "gridload.data"]
 
 [tool.deptry.per_rule_ignores]
 DEP002 = ["numpy", "pandas"]
 ```
 ```markdown
 ## Boundaries (generated from architecture — do not edit)
-- `quant.data` imports nothing first-party · `quant.stats` → data · `quant.portfolio` → stats, data
+- `gridload.data` imports nothing first-party · `gridload.profile` → data · `gridload.reserve` → profile, data
 
 ## Exceptions
 | ID | Rule | Path | Reason | Owner | Expires |
@@ -70,7 +70,7 @@ Proof run, after the skeleton commit: ruff --show-settings ok; check.sh gate pas
 (fresh venv; budget 90 s).
 
 ASSUMPTIONS:
-- Single package `quant`; components data < stats < portfolio; portfolio is an optional layer until M2
+- Single package `gridload`; components data < profile < reserve; reserve is an optional layer until M2
 - Protected list: the twelve globs above
 - Rule families DTZ, NPY, PD; stubs: pandas-stubs
 - numpy, pandas declared now with a DEP002 exception expiring at M1 exit

@@ -18,14 +18,14 @@ Why: a misspelled name that is used consistently is harmless, but a misspelled n
 
 ## False positives
 
-Stock tickers, abbreviations and domain terms look like misspellings. Allow-list them:
+Region codes, abbreviations and domain terms look like misspellings. Allow-list them:
 
 ```toml
 [tool.typos.default]
-extend-ignore-identifiers-re = ["^[A-Z]{1,5}$"]   # short ALL-CAPS names, e.g. tickers
+extend-ignore-identifiers-re = ["^[A-Z]{1,5}$"]   # short ALL-CAPS names, e.g. region codes
 
 [tool.typos.default.extend-words]
 # word = "word"     # accept this spelling as correct
 ```
 
-Run: `typos` (check) or `typos --write-changes` (apply fixes). The template runs it per edit, in `collect` and in `full`; `gate` leaves it out (verified: a typo passes `gate` and fails `full`). The ticker regex above is a domain choice (`{{typos_ignore_identifiers}}`), not a default.
+Run: `typos` (check) or `typos --write-changes` (apply fixes). The template runs it per edit, in `collect` and in `full`; `gate` leaves it out (verified: a typo passes `gate` and fails `full`). The region-code regex above is a domain choice (`{{typos_ignore_identifiers}}`), not a default.

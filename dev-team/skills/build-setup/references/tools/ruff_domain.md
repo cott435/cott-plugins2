@@ -1,4 +1,4 @@
-# Ruff: domain rules (quant, dates, NumPy, pandas)
+# Ruff: domain rules (time series, dates, NumPy, pandas)
 
 Related: [ruff_core.md](ruff_core.md) · [pandera.md](pandera.md)
 
@@ -14,7 +14,7 @@ Related: [ruff_core.md](ruff_core.md) · [pandera.md](pandera.md)
 
 ---
 
-## DTZ: naive datetimes (very relevant for market data)
+## DTZ: naive datetimes (very relevant for meter data)
 
 **DTZ005 `datetime.now()` without tz**
 ```python
@@ -25,7 +25,7 @@ ts = datetime.now()                       # DTZ005 -> datetime.now(tz=UTC)
 ```python
 datetime.strptime(s, "%Y-%m-%d %H:%M")    # DTZ007
 ```
-Why: naive timestamps mix local time, UTC and exchange time (US/Eastern). Joins and bar alignment go wrong around DST changes.
+Why: naive timestamps mix local time, UTC and the meter's own clock. Joins and hourly alignment go wrong around DST changes.
 
 ## NPY: NumPy
 
@@ -34,7 +34,7 @@ Why: naive timestamps mix local time, UTC and exchange time (US/Eastern). Joins 
 np.random.seed(0)
 x = np.random.rand(10)   # NPY002 -> rng = np.random.default_rng(0)
 ```
-Why: global state makes backtests and simulations hard to reproduce, especially with parallel work.
+Why: global state makes forecasts and simulations hard to reproduce, especially with parallel work.
 
 **NPY201 NumPy 2.0 removals**
 ```python
@@ -53,17 +53,17 @@ Why: `inplace` rarely saves memory and breaks method chaining. It also causes Se
 
 **PD011 `.values`**
 ```python
-arr = df["close"].values # PD011 -> .to_numpy()
+arr = df["kwh"].values   # PD011 -> .to_numpy()
 ```
 Why: `.values` may return an array or an extension type, depending on dtype. `.to_numpy()` is explicit.
 
 
 ## Related rules from other families that matter for data code
 
-- **B905**: `zip(prices, timestamps)` without `strict=True`. See [ruff_core.md](ruff_core.md#b-flake8-bugbear-likely-bugs).
+- **B905**: `zip(readings, timestamps)` without `strict=True`. See [ruff_core.md](ruff_core.md#b-flake8-bugbear-likely-bugs).
 - **S301**: `pickle.load` on models or datasets. See [ruff_core.md](ruff_core.md#s-flake8-bandit-security).
 - **RUF012 / B006**: shared mutable state between runs.
 
 ## What Ruff can't catch for data work
 
-Ruff can't tell if a column has the wrong dtype or if prices are negative. That is runtime validation: see [pandera.md](pandera.md). With pandas, add `pandas-stubs` to the dev group too (mypy strict needs it; see [mypy.md](mypy.md)).
+Ruff can't tell if a column has the wrong dtype or if readings are negative. That is runtime validation: see [pandera.md](pandera.md). With pandas, add `pandas-stubs` to the dev group too (mypy strict needs it; see [mypy.md](mypy.md)).

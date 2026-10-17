@@ -9,9 +9,9 @@ Edit `CONSTRAINTS.md` and its config key together. A request to raise a limit "j
 ## Example: a loosening
 
 ```
-You asked to allow complexity 12 in stats/rmt.py.
+You asked to allow complexity 12 in profile/holidays.py.
 Loosening: CR-21 ≤ 10 per function → unchanged; new exception
-  EX-03 · CR-21 C901 · `src/quant/stats/rmt.py` · eigen-cleaning follows the paper's 12-branch case split · @connor · 2026-12-31
-  pyproject: [tool.ruff.lint.per-file-ignores] "src/quant/stats/rmt.py" = ["C901"]
+  EX-03 · CR-21 C901 · `src/gridload/profile/holidays.py` · observed-holiday rules follow the tariff's 12-branch case split · @connor · 2026-12-31
+  pyproject: [tool.ruff.lint.per-file-ignores] "src/gridload/profile/holidays.py" = ["C901"]
 This needs your explicit yes.
 ```

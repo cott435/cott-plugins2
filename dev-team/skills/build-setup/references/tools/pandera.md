@@ -25,7 +25,7 @@ schema = pa.DataFrameSchema({
 schema.validate(df)
 # SchemaError: Column 'close' failed validator: greater_than(0)
 ```
-Why: bad vendor data (zero or negative prices, missing columns, strings where numbers should be) breaks a model quietly, with no exception, just wrong output. Ruff and type checkers can't see this; they never see your data.
+Why: bad vendor data (negative meter readings, missing columns, strings where numbers should be) breaks a model quietly, with no exception, just wrong output. Ruff and type checkers can't see this; they never see your data.
 
 ## When build-setup adds it
 

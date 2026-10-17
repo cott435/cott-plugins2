@@ -40,8 +40,8 @@ Why: the crash happens only on inputs that don't match.
 
 **`reportArgumentType`: wrong argument type**
 ```python
-def sma(prices: list[float], n: int) -> float: ...
-sma([1.0], "20")    # error: Argument of type "Literal['20']" cannot be assigned to parameter "n" of type "int"
+def rolling_mean(loads: list[float], n: int) -> float: ...
+rolling_mean([1.0], "20")    # error: Argument of type "Literal['20']" cannot be assigned to parameter "n" of type "int"
 ```
 
 **`reportReturnType`: return doesn't match the signature**

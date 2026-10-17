@@ -49,18 +49,18 @@ Templates use `{{name}}`. After filling, `grep -rn '{{[a-z_]*}}'` over the writt
 | `coverage_floor` | pyproject | `0` on an empty skeleton, else today's measured value (measure and hold), or the user's target | measure with `check.sh full` |
 | `deptry_ignores` | pyproject | `[tool.deptry.per_rule_ignores]` + `DEP002 = [...]`, or empty | dependencies no code imports yet; one Exceptions row each |
 | `import_contracts` | pyproject | `[[tool.importlinter.contracts]]` blocks | `Depends on` (single) or the package dependency rules (multi); missing modules in `(…)` |
-| `typos_ignore_identifiers` | pyproject | `"^[A-Z]{1,5}$"` for tickers, else empty | domain |
+| `typos_ignore_identifiers` | pyproject | `"^[A-Z]{1,5}$"` for region codes, else empty | domain |
 | `protected_globs` | check.sh | `'tests/intent/**' 'tests/fixtures/**' …` (quoted) | the twelve globs of the Protected list above; multi adds `'packages/*/pyproject.toml'` |
 | `src_dirs`, `packages_dir` | check.sh | `src` and empty · `packages/a/src packages/b/src` and `packages` | shape |
 | `type_gate` | check.sh, CONSTRAINTS | `mypy` or `pyright` | the type-gate answer |
-| `pkg_scope_cases` | check.sh | `    data) echo "data stats portfolio" ;;` per id | dependency graph: the id plus everything that depends on it, directly or not |
+| `pkg_scope_cases` | check.sh | `    data) echo "data profile reserve" ;;` per id | dependency graph: the id plus everything that depends on it, directly or not |
 | `source_globs` | tester.md | `"src/**"` · `"packages/*/src/**"` | shape |
 | `date`, `owner` | CONSTRAINTS | today, `@user` | — |
 | `type_gate_key` | CONSTRAINTS | `tool.mypy.strict` · `tool.pyright.typeCheckingMode` | the type-gate answer |
 | `coverage_today`, `vulture_today` | CONSTRAINTS | `— (no code)` / `71.2%`; whitelist entry count | measured |
 | `readability_rules` | CONSTRAINTS | extra `- **CR-13** …` lines from pipeline-design, or empty | `pipelines.md` |
 | `extra_enforced_rows` | CONSTRAINTS | e.g. CR-27 repro, a frontend row, or empty | spec QRs; non-Python parts |
-| `boundary_rules` | CONSTRAINTS | one line, `` `pkg.data` imports nothing first-party · `pkg.stats` → data `` | same source as the contracts |
+| `boundary_rules` | CONSTRAINTS | one line, `` `pkg.data` imports nothing first-party · `pkg.profile` → data `` | same source as the contracts |
 | `protected_globs_md` | CONSTRAINTS | the protected list in backticks | same list as `protected_globs` |
 | `exception_rows` | CONSTRAINTS | `\| EX-01 \| … \|` rows, or empty | the `DEP002` and other exceptions |
 | `default_branch` | check.yml | `main` | `git symbolic-ref refs/remotes/origin/HEAD`, else `main` |

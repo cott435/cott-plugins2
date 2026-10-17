@@ -28,7 +28,7 @@ Every mode writes to this shape. `dt` parses it, so keep the field names and ord
 
 - **Title** states the claim ("Plaid Trial covers my institutions with 12–24 months of history"), so a fail reads as the claim being false.
 - **Folder** is `probes/PB-NN-<slug>/`, slug in lower-case kebab.
-- **Hash** stays `—` until `dt probes --stamp` writes it. Never type one. It covers every file in the folder except `evidence/`, `out/`, dot-files, `__pycache__/`, `*.pyc` and `*.md`, so an input such as `delisted_members.csv` counts and a README edit doesn't.
+- **Hash** stays `—` until `dt probes --stamp` writes it. Never type one. It covers every file in the folder except `evidence/`, `out/`, dot-files, `__pycache__/`, `*.pyc` and `*.md`, so an input such as `decommissioned_meters.csv` counts and a README edit doesn't.
 - **Milestones**: the stage or milestone whose plan waits on the probe, as in `docs/references.md`: `S<n>`, `M<n>`, `all` or `—`. `dt` routes the probe's code to that milestone's tasks like an `RF-NN` entry.
 - **Last run** is the `run_at` of the `results.json` that Record last read, copied verbatim (`2026-10-21T08:40:02Z`); `dt` compares the two.
 - **Informs** lists only IDs that exist (`probe-informs` lint). The contract types are the ones whose fields the evidence could change.
@@ -44,7 +44,7 @@ Every mode writes to this shape. `dt` parses it, so keep the field names and ord
 
 - A decision that cites a Ready probe stays `Proposed`. build-planning won't plan a milestone the probe reaches until it is Answered or Waived.
 - Waiving is only ever the user's call, in their words. The decision's Risks line stays.
-- A withdrawn probe collapses to one struck line under `## Retired`: `- ~~PB-04: EODHD lists reused tickers~~ Retired 2026-11-02: AD-04 dropped EODHD`. Its folder is deleted after the user agrees, and the ID is never reused. Omit the heading until the first retirement.
+- A withdrawn probe collapses to one struck line under `## Retired`: `- ~~PB-04: The weather API serves hourly history from 2015~~ Retired 2026-11-02: AD-04 dropped weather features`. Its folder is deleted after the user agrees, and the ID is never reused. Omit the heading until the first retirement.
 
 ## Folder
 

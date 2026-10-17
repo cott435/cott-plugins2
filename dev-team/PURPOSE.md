@@ -10,8 +10,8 @@ correct inputs, so what they build matches what was agreed.
 ## Who uses it, and when
 
 A developer starting a Python project, adding a stage to one, or finishing a milestone. They
-run a planning skill, review the Draft it writes, and approve it in their own words before
-the next skill starts. The `dt` tool and the hooks act on their own.
+run `/dev-team:plan`, which opens each skill run in its own session, or run skills
+themselves, and approve each Draft in their own words before the next skill starts. The `dt` tool and the hooks act on their own.
 
 ## What it does
 

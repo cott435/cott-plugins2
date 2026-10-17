@@ -18,7 +18,8 @@ exports its plan.json. The replays:
   against the fake Sharadar), and the api-probe fixture's `api-probe-good` and `-bad` (§10.2, probe_skill.py).
 Every check is pinned, pass or fail: the checks the sample can't meet (it isn't a finished four-stage quant run)
 fail in every replay, and in the broken replays dt itself (lint, `dt ready`, `dt archive`) catches the planted
-defects alongside the grader.
+defects alongside the grader. Before the replays it runs selftest/checks.py: a good and a bad case for each
+structural rule (dtrun.py) that the iteration-7 findings changed.
 
 Usage: dryrun.py [out-dir]   (default: a fresh temp dir; printed at the end). Exit 1 on any unexpected result.
 """
@@ -121,12 +122,19 @@ def break_shape(fx):
         "| M1-T05 clean_eigen spine | M1-T04 estimate_cov spine | data | stats.CovMatrix sample (M1-T01) |")
     sub(plan, "| M1-T06 pca spine | M1-T05 clean_eigen spine | data | stats.Cov sample (M1-T01) |",
         "| M1-T06 pca spine | M1-T05 clean_eigen spine | data | stats.clean_eigen fake (M1-T01) |")
-    sub(plan, "| M1-T10 universe | M1-T03 apply_universe spine | code | none: thickens the same module |",
-        "| M1-T10 universe | M1-T03 apply_universe spine | code | none: simpler this way |")
+    # A code edge between two different steps' tasks (unmitigated_reasoned judges structure, not wording).
+    task_line(plan, "M1-T12", "**Depends on:** M1-T04", "**Depends on:** M1-T04, M1-T05")
+    sub(plan, "| M1-T12 shrinkage | M1-T04 estimate_cov spine | code | none: thickens the same module |\n",
+        "| M1-T12 shrinkage | M1-T04 estimate_cov spine | code | none: thickens the same module |\n"
+        "| M1-T12 shrinkage | M1-T05 clean_eigen spine | code | none: simpler this way |\n")
     sub(plan, "| M1-T13 PCA check | M1-T06 pca spine | code | none: thickens the same module |\n",
         "| M1-T99 ghost | M1-T01 | data | none: same module |\n")
     sub(plan, "## Open questions", "\n".join(f"- filler risk line {i}" for i in range(300)) + "\n\n## Open questions")
-    sub(pls, "| 1 | `load_prices` | data | Universe, dates → Prices |", "| 1 | `load_prices` | data | Universe, dates → PriceFrame |")
+    # A type no contract section defines (types_in_contract), and a cross-owner boundary (load_prices' Prices into
+    # estimate_cov) whose type names no case (interface_coverage).
+    sub(pls, "| 3 | `compare` | portfolio | Weights, Returns → Comparison |", "| 3 | `compare` | portfolio | Weights, Returns → ComparisonFrame |")
+    sub(pls, "| 2 | `estimate_cov` | stats | Returns → Cov |", "| 2 | `estimate_cov` | stats | Prices → Cov |")
+    sub(fx / "docs" / "packages" / "quant" / "contract.md", "- **Sample:** tests/contracts/data.Prices/sample.json\n", "")
 
 
 def break_serial(fx):
@@ -231,7 +239,9 @@ def main():
     for s in plugin.skills_missing(root):
         print(f"  warning: skills/{s} has no SKILL.md yet")
     tmp = pathlib.Path(tempfile.mkdtemp(prefix="dt-dryrun-fx-"))
-    bad = []
+    sys.path.insert(0, str(HERE / "selftest"))
+    import checks  # noqa: E402  (the structural rules' good and bad cases, no dt)
+    bad = [f"selftest/checks.py: {c[0]} {c[1]}: {c[2]}" for c in checks.run()]
     try:
         _, res, summ = replay(out, "quant-incremental", FIXTURE, LAYERS)
         bad += verdict("quant-incremental", res, summ, CONTENT | {"no_code_during_planning"})  # the M1 code turn

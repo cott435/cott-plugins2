@@ -18,7 +18,7 @@ import json, pathlib, re, sys
 
 sys.path.insert(0, sys.argv[1])
 sys.path.insert(1, str(pathlib.Path(__file__).resolve().parent))
-import probefacts  # noqa: E402
+import dtrun, probefacts  # noqa: E402
 from devteam import md, model  # noqa: E402
 from devteam.repo import Repo  # noqa: E402
 from devteam.commands import roadmap as roadmap_cmd  # noqa: E402
@@ -137,6 +137,12 @@ def plan_facts(doc, done):
     }
 
 
+def depends_ids(ms):
+    """A milestone's Depends IDs: dt's own `Milestone.depends` when it has one, else the same `\\bM\\d+\\b` read."""
+    d = getattr(ms, "depends", None)
+    return list(d) if isinstance(d, (list, tuple)) else dtrun.depends_cell(md.strip_md(ms.row.get("Depends", "")))[0]
+
+
 def symbol_facts(doc):
     out = []
     for s in model.symbols(doc):
@@ -191,7 +197,9 @@ if repo.roadmap:
                      "stage": stage.id if stage else "", "stage_name": stage.name if stage else "",
                      "stage_outline": md.strip_md(stage.fields.get("Outline", "")) if stage else "",
                      "references": (model.milestone_references(repo, ms.id) if hasattr(model, "milestone_references") else []),
-                     "depends": [md.strip_md(d) for d in md.split_list(ms.row.get("Depends", "")) if md.strip_md(d) not in ("—", "-", "")]})
+                     # IDs as dt reads them (`ms.depends`), the skill's `M1 (stats.Cov, PL-01 output)` note kept
+                     # apart as what each one needs.
+                     "depends": depends_ids(ms), "needs": dtrun.depends_cell(md.strip_md(ms.row.get("Depends", "")))[1]})
 # docs/references.md entries (dt versions before the references feature have none).
 refs = [{"id": r.id, "title": r.title, "file": r.file, "hash": r.hash, "kind": r.kind, "milestones": r.milestones}
         for r in (model.all_references(repo) if hasattr(model, "all_references") else [])]

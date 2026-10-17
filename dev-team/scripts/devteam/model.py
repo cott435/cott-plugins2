@@ -531,10 +531,10 @@ class Milestone:
 
     @property
     def references(self) -> list[str] | None:
-        """The section's `**References:**` RF IDs, or None when it has no such line."""
+        """The section's `**References:**` RF and PB IDs, or None when it has no such line."""
         if "References" not in self.fields:
             return None
-        return re.findall(rf"\b{REFERENCE_ID}\b", self.fields["References"])
+        return re.findall(rf"\b{ROUTED_ID}\b", self.fields["References"])
 
 
 def skill_names(value: str) -> list[str]:
@@ -593,6 +593,9 @@ def status_column(head: list[str]) -> str | None:
 # ---- references -----------------------------------------------------------------------------
 
 REFERENCE_ID = r"RF-\d{2,}"
+PROBE_ID = r"PB-\d{2,}"
+# Routed to tasks like a reference (`Read:`, `milestone_references`): RF entries and probes (probes.md §4.6).
+ROUTED_ID = rf"(?:{REFERENCE_ID}|{PROBE_ID})"
 
 
 @dataclass
@@ -658,10 +661,10 @@ def all_references(repo: Repo) -> list[Reference]:
 
 
 def milestone_references(repo: Repo, milestone: str) -> list[str]:
-    """The RF IDs that serve a milestone or stage, derived and never listed twice: those whose `Milestones`
-    field names it (or `all`); for a milestone, also its section's `**References:**` line, or with no such
-    line, the references assigned to its stage."""
-    refs = all_references(repo)
+    """The RF and PB IDs that serve a milestone or stage, derived and never listed twice: those whose
+    `Milestones` field names it (or `all`); for a milestone, also its section's `**References:**` line, or with
+    no such line, the references assigned to its stage."""
+    refs: list[Reference | Probe] = all_references(repo) + all_probes(repo)
     out = [r.id for r in refs if r.serves(milestone)]
     ms = next((m for m in milestones(repo.roadmap) if m.id == milestone), None) if repo.roadmap else None
     if ms is not None:
@@ -674,9 +677,214 @@ def milestone_references(repo: Repo, milestone: str) -> list[str]:
 
 
 def split_ref(item: str) -> tuple[str, str]:
-    """A `Read:` item `RF-01:pca_factors` → ("RF-01", "pca_factors"); anything else → (item, "")."""
-    m = re.fullmatch(rf"({REFERENCE_ID}):(.+)", item.strip())
+    """A `Read:` item `RF-01:pca_factors` → ("RF-01", "pca_factors"), `PB-01:probe.py:sync_all` →
+    ("PB-01", "probe.py:sync_all"); anything else → (item, "")."""
+    m = re.fullmatch(rf"({ROUTED_ID}):(.+)", item.strip())
     return (m.group(1), m.group(2).strip()) if m else (item.strip(), "")
+
+
+# ---- probes (docs/probes.md, design/probes.md §4.2) --------------------------------------------
+
+PROBE_STATES = ("Draft", "Ready", "Answered", "Waived")
+CHECK_ID = r"C\d+"
+
+
+@dataclass
+class Check:
+    """One row of a probe's checks table: `| Check | What | How | Pass | Runner | Result |`."""
+    id: str                            # C4
+    row: dict[str, str]
+    line: int
+
+    def _get(self, key: str) -> str:
+        v = md.strip_md(_col(self.row, key))
+        return "" if v.lower() in ("—", "-", "none") else v
+
+    @property
+    def number(self) -> int:
+        return int(self.id[1:])
+
+    @property
+    def runner(self) -> str:
+        """`agent` or `user` (from `user (manual)`, `user (sandbox key)`, `user; plan: user (manual)`), or the
+        cell as written when it is neither ("" when empty)."""
+        cell = self._get("Runner")
+        m = re.match(r"(agent|user)\b", cell.lower())
+        return m.group(1) if m else cell
+
+    @property
+    def passes(self) -> str:
+        return self._get("Pass")
+
+    @property
+    def result(self) -> str:
+        return self._get("Result")
+
+
+@dataclass
+class Probe:
+    """A `PB-NN` section of docs/probes.md: `**Folder:** … · **Hash:** … · **Status:** … · **Milestones:** … ·
+    **Last run:** …`, bullet fields (Question, Informs, Spends, Checks, Verdict, Caveats) and a checks table.
+    Routed like a reference entry (§4.6)."""
+    id: str
+    title: str
+    doc: Doc
+    start: int
+    end: int
+    fields: dict[str, str]
+    checks: list[Check] = field(default_factory=list)
+    table_line: int | None = None      # the checks table's header line
+
+    def _get(self, key: str) -> str:
+        v = md.strip_md(self.fields.get(key, ""))
+        return "" if v.lower() in ("—", "-", "none") else v
+
+    @property
+    def folder(self) -> str:
+        """`probes/PB-01-plaid-coverage` (no trailing slash), or ""."""
+        return self._get("Folder").rstrip("/")
+
+    @property
+    def file(self) -> str:
+        """The folder, so code that treats a probe like a reference entry has a path to show."""
+        return self.folder
+
+    @property
+    def hash(self) -> str:
+        return self._get("Hash")
+
+    @property
+    def status(self) -> str:
+        return self.fields.get("Status", "").strip()
+
+    @property
+    def state(self) -> str:
+        """Draft, Ready, Answered or Waived (the Status's first word), or the Status as written."""
+        first = re.split(r"[\s·—]+", md.strip_md(self.status), maxsplit=1)[0] if self.status else ""
+        return next((s for s in PROBE_STATES if s.lower() == first.lower()), md.strip_md(self.status))
+
+    @property
+    def verdict(self) -> str:
+        """`pass` or `fail` once Answered (from the Status, else the Verdict line), else ""."""
+        for text in (self.status, self.fields.get("Verdict", "")):
+            m = re.search(r"\b(pass|fail)\b", md.strip_md(text).lower())
+            if m:
+                return m.group(1)
+        return ""
+
+    @property
+    def is_open(self) -> bool:
+        """Not Answered or Waived: Draft, Ready, or a Status dt can't read."""
+        return self.state not in ("Answered", "Waived")
+
+    @property
+    def milestones(self) -> list[str]:
+        value = self._get("Milestones")
+        if value.lower() == "all":
+            return ["all"]
+        return list(dict.fromkeys(re.findall(r"\b[SM]\d+\b", value)))
+
+    def serves(self, milestone: str) -> bool:
+        return "all" in self.milestones or milestone in self.milestones
+
+    @property
+    def last_run(self) -> str:
+        return self._get("Last run")
+
+    @property
+    def caveats(self) -> str:
+        return self.fields.get("Caveats", "").strip()
+
+    @property
+    def informs(self) -> list[str]:
+        """Every ID the Informs line names: decisions and requirements (ranges expanded), then contract symbols."""
+        value = self.fields.get("Informs", "")
+        return md.expand_refs(value) + [s for s in re.findall(rf"\b{md.SYMBOL_ID}\b", md.strip_md(value))]
+
+    @property
+    def decisions(self) -> list[str]:
+        return [i for i in self.informs if i.startswith("AD-")]
+
+    @property
+    def types(self) -> list[str]:
+        return [i for i in self.informs if re.fullmatch(md.SYMBOL_ID, i)]
+
+    @property
+    def text(self) -> str:
+        return "\n".join(self.doc.lines[self.start:self.end]).rstrip() + "\n"
+
+
+def probes(doc: Doc) -> list[Probe]:
+    """Live PB sections (a retired probe is one struck line under `## Retired`)."""
+    out = []
+    for h in doc.headings:
+        if not (h.id and re.fullmatch(PROBE_ID, h.id)) or "~~" in h.title:
+            continue
+        fields = dict(md.bullet_fields(doc.lines, h.line + 1, h.end))
+        fields.update(md.fields_in(doc.lines, h.line + 1, h.end))
+        p = Probe(h.id, h.title, doc, h.line, h.end, fields)
+        for line, head, rows in doc.tables(h.line + 1, h.end):
+            if head and md.strip_md(head[0]).lower() == "check":
+                p.table_line = line
+                for n, row in md.table_dicts(head, rows):
+                    cid = md.strip_md(row.get(head[0], ""))
+                    if re.fullmatch(CHECK_ID, cid):
+                        p.checks.append(Check(cid, row, n))
+                break
+        out.append(p)
+    return out
+
+
+def all_probes(repo: Repo) -> list[Probe]:
+    return probes(repo.probes) if repo.probes else []
+
+
+@dataclass
+class Citation:
+    """A decision's `**Probe:**` line: `PB-NN — <question>` or `none — <why the docs settle it>`."""
+    doc: Doc
+    line: int
+    decision: str          # the AD-NN whose section holds the line, or ""
+    value: str             # the field's text
+
+    @property
+    def probe(self) -> str:
+        m = re.match(rf"({PROBE_ID})\b", md.strip_md(self.value))
+        return m.group(1) if m else ""
+
+    @property
+    def is_none(self) -> bool:
+        return md.strip_md(self.value).lower().startswith("none")
+
+    @property
+    def reason(self) -> str:
+        """The text after `none` (dashes and colons dropped)."""
+        return re.sub(r"^none\b[\s—–:,-]*", "", md.strip_md(self.value), flags=re.IGNORECASE).strip()
+
+
+def probe_citations(repo: Repo) -> list[Citation]:
+    """Every `**Probe:**` line in the architecture docs, outside code fences and Changelog sections."""
+    out = []
+    for doc in repo.docs("architecture", "package-architecture"):
+        skip = [(h.line, h.end) for h in doc.headings if h.text.lower().startswith("changelog")]
+        for i, line in enumerate(doc.lines):
+            if doc.mask[i] or "**Probe:**" not in line or any(a <= i < b for a, b in skip):
+                continue
+            value = md.split_fields(line).get("Probe")
+            if value is None:
+                continue
+            ad = next((h.id for h in reversed(doc.headings)
+                       if h.line < i < h.end and h.id and h.id.startswith("AD-")), "")
+            out.append(Citation(doc, i, ad, value))
+    return out
+
+
+def decision_fields(repo: Repo, ad: str) -> dict[str, str] | None:
+    """A decision's field line (`**Status:** … · **Date:** … · **Scope:** …`), or None if it isn't defined."""
+    d = repo.lookup(ad, archive=False)
+    if d is None or d.how != "heading":
+        return None
+    return md.fields_in(d.doc.lines, d.start + 1, min(d.end, d.start + 3))
 
 
 # ---- contract and architecture ---------------------------------------------------------------

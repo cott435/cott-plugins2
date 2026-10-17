@@ -26,6 +26,7 @@ KINDS = [
     (r"docs/packages/[^/]+/pipelines\.md", "pipelines"),
     (r"docs/packages/[^/]+/tests\.md", "tests"),
     (r"docs/references\.md", "references"),
+    (r"docs/probes\.md", "probes"),
     (r"CONSTRAINTS\.md", "constraints"),
     (r"(AGENTS|CLAUDE)\.md", "agents"),
     (r"tasks/plan\.md", "plan"),
@@ -142,6 +143,17 @@ class Doc:
                 for n, cells in rows:
                     if cells and re.fullmatch(r"CR-\d{2,}", cells[0]):
                         out.append(Definition(cells[0], self, n, n + 1, "table"))
+        if self.kind == "probes":
+            # A probe's checks table: each row is addressable as `PB-NN.C<n>`.
+            for h in self.headings:
+                if not h.id or "~~" in h.title:
+                    continue
+                for _, head, rows in self.tables(h.line + 1, h.end):
+                    if head and md.strip_md(head[0]).lower() == "check":
+                        for n, cells in rows:
+                            if cells and re.fullmatch(r"C\d+", md.strip_md(cells[0])):
+                                out.append(Definition(f"{h.id}.{md.strip_md(cells[0])}", self, n, n + 1, "table",
+                                                      cells[1] if len(cells) > 1 else ""))
         if self.kind in ("plan", "queued-plan", "archived-plan"):
             for i, line in enumerate(self.lines):
                 m = re.match(rf"^\s*[-*]\s+({md.FINDING_ID})\b\s*(.*)$", line)
@@ -220,6 +232,10 @@ class Repo:
         return self.doc("docs/references.md")
 
     @property
+    def probes(self) -> Doc | None:
+        return self.doc("docs/probes.md")
+
+    @property
     def plan(self) -> Doc | None:
         return self.doc("tasks/plan.md")
 
@@ -295,6 +311,10 @@ class Repo:
         elif prefix == "S":
             for doc in self.docs("roadmap"):
                 found |= set(re.findall(r"\b(S\d+)\b", doc.text))
+        elif prefix == "PB":
+            # A decision's `**Probe:**` line cites its PB before api-probe writes the entry.
+            for doc in self.docs("architecture", "package-architecture"):
+                found |= set(re.findall(r"\b(PB-\d{2,})\b", doc.text))
         return sorted(found, key=lambda s: int(pat.match(s).group(1)))
 
     def next_id(self, prefix: str) -> str:

@@ -14,12 +14,13 @@ def add_arguments(parser):
                         help="write each entry's Hash (first 8 hex of the file's sha256); never changes Status")
 
 
-def _set_hash(line: str, value: str) -> str:
-    """Set `**Hash:** <value>` on a field line, inserting it after the File field when absent."""
+def _set_hash(line: str, value: str, after: str = "File") -> str:
+    """Set `**Hash:** <value>` on a field line, inserting it after the `after` field (File; a probe's Folder)
+    when absent."""
     if "**Hash:**" in line:
         return re.sub(r"(\*\*Hash:\*\*\s*)[^·]*?(\s*·|\s*$)", lambda m: f"{m.group(1)}{value}{m.group(2)}", line,
                       count=1)
-    new = re.sub(r"(\*\*File:\*\*[^·]*?)(\s*·|\s*$)", lambda m: f"{m.group(1)} · **Hash:** {value}{m.group(2)}",
+    new = re.sub(rf"(\*\*{after}:\*\*[^·]*?)(\s*·|\s*$)", lambda m: f"{m.group(1)} · **Hash:** {value}{m.group(2)}",
                  line, count=1)
     return new if new != line else f"{line} · **Hash:** {value}"
 

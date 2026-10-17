@@ -4,6 +4,7 @@ freshness and drift. The CLI is `commands/status.py`."""
 from __future__ import annotations
 
 from ..repo import Repo
+from .api_probe import api_probe
 from .architecture_design import architecture_design
 from .build_planning import build_planning
 from .build_setup import build_setup
@@ -16,7 +17,7 @@ from .testplanning import test_planning
 
 HANDLERS = {"idea-refine": idea_refine, "spec-writing": spec_writing, "architecture-design": architecture_design,
             "pipeline-design": pipeline_design, "test-planning": test_planning, "build-planning": build_planning,
-            "build-setup": build_setup, "reference-intake": reference_intake}
+            "build-setup": build_setup, "reference-intake": reference_intake, "api-probe": api_probe}
 SKILLS = list(HANDLERS)
 
 

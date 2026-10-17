@@ -7,6 +7,7 @@ from __future__ import annotations
 import re
 
 from .. import git, md, model
+from .. import probes as pb
 from ..commands import roadmap as roadmap_cmd
 from ..repo import Doc, Repo
 from .common import (OWN_SKILLS, Report, add_common, add_graph, advance_ready, available_skills, blocked_reason,
@@ -201,6 +202,22 @@ def interfaces_changed(repo: Repo, plan: Doc, tasks: list[model.Task], changed: 
     return out
 
 
+def probes_blocking(repo: Repo, ms: model.Milestone) -> list[str]:
+    """Open or failed probes the milestone meets (design/probes.md §3.3): its packages, its pipelines' packages
+    and step owners (a single package's components), and the types its steps pass."""
+    pls = [p for p in roadmap_cmd.milestone_pipelines(repo, ms)[0] if not repo.is_retired(p)]
+    names = set(milestone_packages(repo, ms, pls, []))
+    types: set[str] = set()
+    known = model.contract_types(repo)
+    for p in model.all_pipelines(repo):
+        if p.id in pls:
+            for s in p.steps:
+                names.add(s.owner)
+                types |= {ty.id for n in s.in_types + s.out_types if (ty := model.resolve_type(known, n))}
+    names.discard("")
+    return pb.blocking(repo, ms.id, names, types)
+
+
 def revising(repo: Repo, pkgs: list[str], drafts: list[str]) -> list[str]:
     """Docs a Revise round has open: Draft pipelines.md/tests.md of the milestone's packages, plus any doc
     that defines a Draft milestone or task pipeline (a system pipeline's architecture.md)."""
@@ -288,6 +305,11 @@ def build_planning(repo: Repo, r: Report) -> None:
     if focus is not None:
         pls, inferred = roadmap_cmd.milestone_pipelines(repo, focus)
         inferred_pls = pls if inferred else []
+    # A milestone to plan (New, Extend) waits for the probes it meets; cutting a stage doesn't.
+    blocking = probes_blocking(repo, focus) if isinstance(focus, model.Milestone) else []
+    if blocking and mode in ("new", "extend") and focus is not ms_row:
+        mode = "blocked"
+        blocked = f"waiting for {', '.join(dict.fromkeys(b.split(' ')[0] for b in blocking))}"
     focus_skills = focus.skills if focus is not None else []
     refs_unrouted, skills_unrouted = unrouted(repo)
 
@@ -304,6 +326,7 @@ def build_planning(repo: Repo, r: Report) -> None:
     r.add("draft_pipelines", drafts)
     r.add("changed_since_plan", changed)
     r.add("interfaces_changed", moved)
+    r.add("probes_blocking", blocking)
     r.add("stage_to_cut", f"{focus.id} {focus.name}" if isinstance(focus, model.Stage) else "none")
     r.add("pipelines_inferred", inferred_pls)
     r.add("milestone_references", model.milestone_references(repo, focus.id) if focus is not None else [])

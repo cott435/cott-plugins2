@@ -5,9 +5,11 @@ from __future__ import annotations
 import json
 import re
 import sys
+from pathlib import Path
 
-from .. import code, model
+from .. import code, md, model
 from .. import outline as ol
+from .. import probes as pb
 from .. import references as refs
 from .layout import tree_lines
 
@@ -95,6 +97,81 @@ def _reference_block(repo, entry: model.Reference, selector: str) -> tuple[str, 
         info, None
 
 
+PROBE_BANNER = ("> Reference, not part of the project. Reuse what fits the contract and step table as is, adapt it, "
+                "or ignore it: your call.\n"
+                "> Never import from probes/. Anything you bring over meets the same bar as the rest of the code.\n"
+                "> Probe code: written to answer {id}'s checks, not to production standard. "
+                "Its Verdict and Caveats follow.\n")
+
+
+def _probe_block(repo, entry: model.Probe, selector: str) -> tuple[str, dict, str | None]:
+    """The probe banner, then (design/probes.md §4.6): its files (no selector), every code file's outline
+    (`outline`), its redacted samples (`samples`), or one file, whole or outlined (`<file>`), or one part of it
+    (`<file>:<symbol or heading>`). `out/` and `.env` files are never shown."""
+    folder = pb.folder_of(repo, entry)
+    rel = entry.folder
+    verdict = md.strip_md(entry.fields.get("Verdict", "")) or "—"
+    head = PROBE_BANNER.format(id=entry.id) + f"> Verdict: {verdict}\n"
+    if entry.caveats:
+        head += f"> Caveats: {entry.caveats}\n"
+    info = {"file": rel, "selector": selector, "shown": "missing"}
+    if folder is None or not folder.is_dir():
+        return (f"### Reference {entry.id}: {rel or '(no Folder)'}\n{head}"
+                "(missing: the probe's folder isn't there; run api-probe)\n"), info, None
+    code = pb.code_files(folder)
+    if not selector:
+        info["shown"] = "files"
+        listing = [f"{f} ({pb.line_count(folder / f)} lines)" for f in code]
+        listing += [f"{f} (sample)" for f in pb.samples(folder)]
+        return (f"### Reference {entry.id}: {rel}/\n{head}(files; name a part: {entry.id}:<file>, "
+                f"{entry.id}:<file>:<symbol>, {entry.id}:samples, {entry.id}:outline)\n"
+                + _fenced("\n".join(listing) + "\n", "")), info, None
+    if selector.lower() == "outline":
+        info["shown"] = "outline"
+        parts = []
+        for f in code:
+            if f.endswith(pb.SOURCE_SUFFIXES):
+                text = ol.read(folder / f)
+                if text is not None:
+                    parts.append("\n".join(ol.outline(folder / f, text).items))
+        return (f"### Reference {entry.id}: {rel}/\n{head}(outline)\n"
+                + _fenced("\n\n".join(parts) + "\n", "")), info, None
+    if selector.lower() == "samples":
+        files = pb.samples(folder)
+        if not files:
+            return (f"### Reference {entry.id}: {rel}/evidence/samples/\n{head}"
+                    "(missing: no samples yet; the probe writes them when it runs)\n"), info, None
+        info["shown"] = "samples"
+        body = "".join(f"#### {rel}/{f}\n" + _fenced(ol.read(folder / f) or "", LANGS.get(Path(f).suffix, ""))
+                       for f in files)
+        return f"### Reference {entry.id}: {rel}/evidence/samples/\n{head}" + body, info, None
+    name, _, part = selector.partition(":")
+    name = name.strip()
+    if name.startswith(("/", "../", "out/")) or "/../" in name or Path(name).name.startswith(".env"):
+        return "", info, f"Read: {entry.id}:{selector} is never shown (out/ and .env stay with the user)"
+    path = folder / name
+    text = ol.read(path) if path.is_file() else None
+    if text is None:
+        return "", info, f"Read: {entry.id}:{selector} names no file in {rel}/"
+    lang = LANGS.get(path.suffix.lower(), "")
+    n = len(text.splitlines())
+    title = f"### Reference {entry.id}: {rel}/{name}\n{head}"
+    if not part and n > refs.LARGE_LINES:
+        info["shown"] = "outline"
+        return title + f"({n} lines, so outline only; name a part: {entry.id}:{name}:<symbol>)\n" + \
+            _fenced("\n".join(ol.outline(path, text).items) + "\n", ""), info, None
+    if not part:
+        info["shown"] = "whole"
+        return title + _fenced(text, lang), info, None
+    span = ol.select(path, text, part.strip())
+    if span is None:
+        return "", info, f"Read: {entry.id}:{selector} names nothing in {rel}/{name} (a def, class or heading)"
+    a, b = span
+    info["shown"] = "part"
+    return title + f"({part.strip()} · lines {a}–{b} of {n})\n" + \
+        _fenced("\n".join(text.splitlines()[a - 1:b]) + "\n", lang), info, None
+
+
 def _fenced(body: str, lang: str) -> str:
     fence = _fence(body)
     return f"{fence}{lang}\n{body}{fence}\n"
@@ -167,14 +244,15 @@ def run(args, repo) -> int:
     blocks: list[str] = []
     reads: list[dict] = []
     problems: list[str] = []
-    entries = {e.id: e for e in model.all_references(repo)}
+    entries = {e.id: e for e in model.all_references(repo) + model.all_probes(repo)}
     shown: set[str] = set()
     for raw in task.read:
         ref = _ref(raw)
         rid, selector = model.split_ref(ref)
         if rid in entries:
             entry = entries[rid]
-            block, info, problem = _reference_block(repo, entry, selector)
+            render = _probe_block if isinstance(entry, model.Probe) else _reference_block
+            block, info, problem = render(repo, entry, selector)
             if problem:
                 problems.append(problem)
                 continue

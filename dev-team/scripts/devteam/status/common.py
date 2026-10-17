@@ -7,13 +7,14 @@ import re
 from pathlib import Path
 
 from .. import git, graph, md, model, specdocs
+from .. import probes as pb
 from .. import references as refs
 from ..commands import roadmap as roadmap_cmd
 from ..repo import Doc, Repo
 
 # dev-team's own skills: never reported as project skills to route steps to.
 OWN_SKILLS = {"idea-refine", "spec-writing", "architecture-design", "pipeline-design", "test-planning",
-              "build-planning", "build-setup", "reference-intake"}
+              "build-planning", "build-setup", "reference-intake", "api-probe"}
 SUMMARY_DOCS = ("docs/brief.md", "docs/spec.md", "docs/roadmap.md", "tasks/plan.md")
 
 
@@ -256,6 +257,9 @@ def summary(repo: Repo) -> list[str]:
     waiting = refs.state(repo).waiting
     if waiting:
         out.append(f"references: {waiting} waiting → reference-intake")
+    probes_waiting = pb.state(repo).waiting
+    if probes_waiting:
+        out.append(f"probes: {probes_waiting} waiting → api-probe")
     dt = Path(__file__).resolve().parents[2] / "dt.py"
     out = out[:7]
     out.append(f"dt: python3 {dt}")

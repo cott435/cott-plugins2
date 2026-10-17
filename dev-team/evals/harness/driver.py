@@ -13,6 +13,12 @@ they serve is revealed (all of them up front in all-at-once mode), and the user'
 After every turn the whole project is git-committed ("turn N") so doc evolution, and any code written during
 planning, can be diffed.
 
+Probes (design/probes.md §10.1): a project's `fake_vendors` (scenarios.json) are served on 127.0.0.1 for the
+whole run (fakevendor/), and the agent is never told where. When the simulated user says "ran it", the driver
+runs each Ready probe as the user would: it writes the probe's .env from its .env.example (keys get the canary
+`sk-canary-<run id>`, base URLs the fake vendor), runs public.py with no environment at all, then probe.py with
+the fake vendor's environment, logs both to <out>/user_runs.jsonl and commits "user run before turn N".
+
 Usage: driver.py <trajectory-id> <out-dir>
 
 Env: PLUGIN_SRC / SKILLS_SRC (see plugin.py), CLAUDE_BIN (default: claude; fake_claude.py for a no-cost
@@ -30,7 +36,7 @@ import json, os, re, subprocess, sys, time, uuid, shutil, pathlib
 
 HERE = pathlib.Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
-import dtrun, planexport, plugin  # noqa: E402
+import dtrun, fakevendor, planexport, plugin, probefacts  # noqa: E402
 
 CLAUDE_BIN = os.environ.get("CLAUDE_BIN", "claude")
 ISOLATE = ["--setting-sources", "project,local"]
@@ -224,7 +230,7 @@ Return ONLY a JSON object: {{"action": "reply" | "next_stage" | "finish", "messa
 
 def opening(scn, traj):
     proj = scn["projects"][traj["project"]]
-    st = proj["stages"]
+    st = proj["stages"][:traj.get("stages") or None]
     if traj["project"] == "rl":
         intro = ("I want to start a small ML project: an RL lab of little 2D environments where agents learn a "
                  "concept through reinforcement learning, so I can learn RL by building. Let's refine the idea and "
@@ -277,24 +283,110 @@ def setup_project(out, project, ref_stages=()):
     return proj, root, refs
 
 
+def start_vendors(out, project, run_id):
+    """The project's fake vendors, each logging to <out>/vendor_<name>.jsonl: {name: {url, server, key, cfg}}."""
+    vendors = {}
+    for name, cfg in project.get("fake_vendors", {}).items():
+        key = f"sk-canary-{run_id}"
+        url, server = fakevendor.start(name, out / f"vendor_{name}.jsonl", expect_key=key)
+        vendors[name] = {"url": url + cfg.get("path", ""), "server": server, "key": key, "cfg": cfg}
+    return vendors
+
+
+def vendor_env(names, vendors):
+    """What the user puts in .env for these variable names: keys → the canary, base URLs → the fake vendor.
+    A name is matched to the vendor it mentions (or its aliases), else to the only vendor."""
+    env = {}
+    for v in vendors.values():
+        env.update({n: v["url"] for n in v["cfg"].get("base_env", [])})
+        env.update({n: v["key"] for n in v["cfg"].get("key_env", [])})
+    for n in names:
+        v = next((v for k, v in vendors.items() if any(a.upper() in n.upper() for a in [k, *v["cfg"].get("aliases", [])])),
+                 next(iter(vendors.values())) if len(vendors) == 1 else None)
+        if v is None:
+            continue
+        if re.search(r"URL|HOST|BASE", n, re.I):
+            env[n] = v["url"]
+        elif re.search(r"KEY|TOKEN|SECRET|PASSWORD", n, re.I):
+            env[n] = v["key"]
+        elif re.search(r"CLIENT_ID", n, re.I):
+            env[n] = "client-canary"
+        elif re.search(r"_ENV$", n, re.I):
+            env[n] = "sandbox"
+    return env
+
+
+def run_user_checks(proj, vendors, log_path, ids=None, timeout=600):
+    """The user's "ran it": every Ready probe (or just `ids`) is run as the user would run it. Returns one record
+    per script; the canary is scrubbed from what is kept, and `printed_key` says whether a script printed it."""
+    text = (proj / "docs" / "probes.md").read_text(errors="ignore") if (proj / "docs" / "probes.md").exists() else ""
+    runs, keys = [], [v["key"] for v in vendors.values()]
+    scrub = lambda t: re.sub("|".join(map(re.escape, keys)) or r"(?!)", "<canary>", t or "")
+    for e in probefacts.parse_probes(text)["entries"]:
+        if e["kind"] != "ready" or (ids is not None and e["id"] not in ids):
+            continue
+        folder = proj / e["folder"] if e["folder"] else next(iter(sorted(proj.glob(f"probes/{e['id']}-*"))), None)
+        if not folder or not folder.is_dir():
+            runs.append({"probe": e["id"], "script": None, "rc": None, "error": f"no folder {e['folder'] or e['id']}"})
+            continue
+        example = folder / ".env.example"
+        names = [l.split("=", 1)[0].strip().lstrip("# ") for l in example.read_text().splitlines() if "=" in l] if example.exists() else []
+        env = vendor_env(names, vendors)
+        dot = folder / ".env"
+        dot.write_text("".join(f"{k}={v}\n" for k, v in env.items() if k in names or not names))
+        dot.chmod(0o600)
+        for script, script_env in (("public.py", {}), ("probe.py", {**{k: os.environ[k] for k in ("PATH", "HOME") if k in os.environ}, **env})):
+            if not (folder / script).exists():
+                continue
+            head = (folder / script).read_text(errors="ignore")[:2000]
+            cmd = ["uv", "run", script] if "# /// script" in head and shutil.which("uv") and script == "probe.py" else [sys.executable, "-B", script]
+            t0 = time.time()
+            try:
+                r = subprocess.run(cmd, cwd=folder, env=script_env, capture_output=True, text=True, timeout=timeout)
+                rc, so, se = r.returncode, r.stdout, r.stderr
+            except subprocess.TimeoutExpired as ex:
+                rc, so, se = "timeout", str(ex.stdout or ""), str(ex.stderr or "")
+            runs.append({"probe": e["id"], "script": f"{folder.relative_to(proj)}/{script}", "rc": rc,
+                         "seconds": round(time.time() - t0, 1), "env": sorted(script_env) if script_env else [],
+                         "printed_key": any(k in so + se for k in keys), "stdout_tail": scrub(so)[-600:],
+                         "stderr_tail": scrub(se)[-600:]})
+    with open(log_path, "a") as f:
+        for r_ in runs:
+            f.write(json.dumps(r_) + "\n")
+    return runs
+
+
 def main():
     tid, out = sys.argv[1], pathlib.Path(sys.argv[2]).resolve()
     scn = json.loads((HERE / "scenarios.json").read_text())
     traj = next(t for t in scn["trajectories"] if t["id"] == tid)
     project = dict(scn["projects"][traj["project"]], id=traj["project"])
-    stages = project["stages"]
+    stages = project["stages"][:traj.get("stages") or None]  # a trajectory may stop at an early stage
+    project["stages"] = stages
     out.mkdir(parents=True, exist_ok=True)
     msg, n_revealed = opening(scn, traj)
     proj, plugin_root, refs = setup_project(out, project, [s["name"] for s in stages[:n_revealed]])
     msg += refs_note(refs)
     dt = plugin_root / "scripts" / "dt.py"
     extra = mcp_args(out)
+    run_id = uuid.uuid4().hex[:12]
+    vendors = start_vendors(out, project, run_id)
+    try:
+        run_loop(scn, traj, project, stages, out, proj, plugin_root, dt, extra, msg, n_revealed, refs, vendors)
+    finally:
+        for v in vendors.values():
+            v["server"].shutdown()
+
+
+def run_loop(scn, traj, project, stages, out, proj, plugin_root, dt, extra, msg, n_revealed, refs, vendors):
+    tid = traj["id"]
 
     sid = str(uuid.uuid4())
     turns, history = [], []
     stage_log = [{"turn": 1, "stage": stages[0]["name"] if traj["mode"] == "incremental" else "all"}]
     t_start = time.time()
     closing, stop_reason = False, "max_turns"
+    user_run = None  # what the user ran before this turn ("ran it")
     stalled = 0  # consecutive turns where the user wanted to move on, readiness blocked it, and no doc changed
     for t in range(1, (MAX_TURNS or traj["max_turns"]) + 1):
         reply, usage, tools, skills, dt_s, errors, hooks, init, agents = agent_turn(
@@ -305,6 +397,9 @@ def main():
         rec = {"turn": t, "user": msg, "assistant": reply, "skills": skills, "tools": tools,
                "seconds": round(dt_s, 1), "usage": usage, "docs_changed": changed, "status": status,
                "stage": stage_log[-1]["stage"], "tool_errors": errors, "hook_events": hooks, "agents": agents}
+        if user_run is not None:
+            rec["user_run"] = user_run
+            user_run = None
         if t == 1:
             rec["session_init"] = init
             own = [s for s in json.dumps(init.get("skills") or init.get("slash_commands") or []).split('"') if "pipeline-design" in s]
@@ -363,6 +458,9 @@ def main():
             new_refs = add_references(proj, project, [nxt["name"]])
             refs += new_refs
         msg = (u.get("message") or "Approved. Continue.") + refs_note(new_refs)
+        if vendors and re.search(r"\bran it\b", msg, re.I):
+            user_run = run_user_checks(proj, vendors, out / "user_runs.jsonl")
+            commit(proj, f"user run before turn {t + 1}")
         (out / "turns.json").write_text(json.dumps(turns, indent=1))
     summary = {"trajectory": tid, "turns": len(turns), "stages_reached": n_revealed, "stage_log": stage_log,
                "references": refs,
@@ -371,6 +469,8 @@ def main():
                "agent_cost_usd": round(max([(x["usage"].get("cost_usd") or 0) for x in turns] or [0]), 3),
                "agent_output_tokens": sum(((x["usage"].get("usage") or {}).get("output_tokens") or 0) for x in turns),
                "finished": any("sim_user_final" in x for x in turns), "stop_reason": stop_reason,
+               "fake_vendors": sorted(vendors), "probe_canary": next(iter(vendors.values()))["key"] if vendors else None,
+               "user_runs": sum(1 for x in turns if x.get("user_run") is not None),
                "agent_model": AGENT_MODEL, "user_model": USER_MODEL}
     (out / "summary.json").write_text(json.dumps(summary, indent=1))
     (out / "doc_history.txt").write_text(

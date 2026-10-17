@@ -13,6 +13,10 @@ Ready (interface-first plans, design/interface-first-design.md §9.1): on a fres
          isn't ready until all its spines are ticked.
 Contract change: edit a type the interface task froze and re-approve the contract → build-planning `replan`, with
          the tasks that read the type listed.
+Probe gate (design/probes.md §3.3, `simulate_probes`): with the active plan set aside, a probe whose Milestones
+         name that milestone set back to Ready → build-planning `blocked` with it in `probes_blocking`; the same
+         probe Answered → no longer blocking. Not applicable without a probe, or with a dt that has no
+         `probes_blocking` yet.
 
 Usage: simulate.py <project-dir> [<dt.py>]   prints one line per check; exit 1 if any fails
 """
@@ -20,7 +24,7 @@ import json, re, shutil, subprocess, sys, tempfile, pathlib
 
 HERE = pathlib.Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
-import dtrun  # noqa: E402
+import dtrun, probefacts  # noqa: E402
 
 GIT = ["git", "-c", "user.email=e@e", "-c", "user.name=sim"]
 
@@ -227,6 +231,58 @@ def interface_first(src, dt, tmp, plan, check):
           f"contract-change edges={cc[:3]}")
 
 
+def set_probe_status(path, pid, status):
+    """Rewrite one PB entry's header-line Status (a value may itself hold `·`: `Answered · pass · <date>`)."""
+    lines = path.read_text().splitlines(keepends=True)
+    for i, l in enumerate(lines):
+        if re.match(rf"^#{{2,3}} {re.escape(pid)}:", l):
+            for j in range(i + 1, min(i + 4, len(lines))):
+                if "**Status:**" in lines[j]:
+                    lines[j] = re.sub(r"(\*\*Status:\*\*\s*).*?(?=\s*·\s*\*\*[A-Z][\w ]*:\*\*|\s*$)",
+                                      lambda m: m.group(1) + status, lines[j], count=1)
+                    path.write_text("".join(lines))
+                    return True
+    return False
+
+
+def simulate_probes(src, dt=None):
+    """One record for plan_blocked_while_open: {text, passed, evidence}, or {text, na: True, evidence: why}."""
+    dt = dt or dtrun.REPO_DT
+    src = pathlib.Path(src).resolve()
+    text = "Probe simulation: with the plan set aside, a probe on its milestone Ready → build-planning blocked on it; Answered → not"
+    pb = src / "docs" / "probes.md"
+    entries = probefacts.parse_probes(pb.read_text(errors="ignore"))["entries"] if pb.exists() else []
+    if not entries:
+        return {"text": text, "na": True, "evidence": "no probes in docs/probes.md"}
+    tmp = pathlib.Path(tempfile.mkdtemp(prefix="dt-sim-probe-"))
+    try:
+        proj = copy_project(src, tmp / "probe")
+        facts = dtrun.probe(proj, dt)
+        plan = next((p for p in facts["plans"] if p["kind"] == "plan" and p["dev_team"] and p["milestone"]), None)
+        ms = plan["milestone"] if plan else (facts["roadmap"][0]["id"] if facts["roadmap"] else "")
+        stage = next((r.get("stage") for r in facts["roadmap"] if r["id"] == ms), "")
+        e = next((e for e in entries if ms in e["milestones"] or (stage and stage in e["milestones"])), entries[0])
+        for rel in ("tasks/plan.md", "tasks/todo.md"):
+            if (proj / rel).exists():
+                (proj / rel).unlink()
+        pb = proj / "docs" / "probes.md"
+        set_probe_status(pb, e["id"], "Ready")
+        open_ = bp(proj, dt)
+        if "probes_blocking" not in open_:
+            return {"text": text, "na": True, "evidence": f"dt has no probes_blocking yet (build-planning mode={open_.get('mode')} "
+                                                           f"{open_.get('_error', '')})"}
+        set_probe_status(pb, e["id"], "Answered · pass · 2099-01-01")
+        done = bp(proj, dt)
+        blocked = open_.get("mode") == "blocked" and e["id"] in json.dumps(open_.get("probes_blocking"))
+        freed = done.get("mode") != "blocked" and e["id"] not in json.dumps(done.get("probes_blocking"))
+        return {"text": text.replace("a probe", e["id"]).replace("its milestone", ms or "the first milestone"),
+                "passed": blocked and freed,
+                "evidence": f"{ms} plan set aside; {e['id']} Ready → mode={open_.get('mode')} probes_blocking={open_.get('probes_blocking')}; "
+                            f"Answered → mode={done.get('mode')} probes_blocking={done.get('probes_blocking')}"}
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
 def simulate(src, dt=None):
     """[{text, passed, evidence}] for the Replan and Advance checks, run on copies of <src>."""
     dt = dt or dtrun.REPO_DT
@@ -321,6 +377,7 @@ def simulate(src, dt=None):
 
 if __name__ == "__main__":
     res = simulate(sys.argv[1], sys.argv[2] if len(sys.argv) > 2 else None)
+    res.append(simulate_probes(sys.argv[1], sys.argv[2] if len(sys.argv) > 2 else None))
     for r in res:
-        print(("PASS " if r["passed"] else "FAIL ") + r["text"] + "  — " + r["evidence"][:200])
-    sys.exit(0 if all(r["passed"] for r in res) else 1)
+        print(("N/A  " if r.get("na") else "PASS " if r["passed"] else "FAIL ") + r["text"] + "  — " + r["evidence"][:200])
+    sys.exit(0 if all(r.get("na") or r["passed"] for r in res) else 1)

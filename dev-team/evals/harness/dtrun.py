@@ -46,7 +46,7 @@ def probe(proj, dt=None):
     except Exception:
         return {"_error": r.stderr.strip()[-600:], "live_spec": [], "removed_spec": [], "pipelines": [],
                 "plans": [], "roadmap": [], "stages": [], "references": [], "symbols": [], "tests": [], "docs": {},
-                "packages": []}
+                "packages": [], "probes": [], "probes_retired": [], "decisions": [], "dt_probes": None}
 
 
 def skill_name(s):

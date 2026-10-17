@@ -11,7 +11,7 @@ import ast, json, re, subprocess, sys, pathlib
 
 HERE = pathlib.Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
-import dtrun, simulate  # noqa: E402
+import dtrun, fakevendor, probefacts as pf, probegrade, simulate  # noqa: E402
 
 run = pathlib.Path(sys.argv[1]).resolve()
 proj = run / "project"
@@ -37,6 +37,14 @@ def check(id_, text, passed, evidence, metrics=None):
 def retired(id_, text, why):
     """A check id kept so comparisons with older iterations line up; it no longer counts (`na`)."""
     R.append({"id": id_, "text": text, "passed": None, "na": True, "evidence": why})
+
+def graded_or_na(id_, text, result):
+    """A check that may not apply: `result` is (passed, evidence), or (None, why) for n/a."""
+    passed, evidence = result
+    if passed is None:
+        R.append({"id": id_, "text": text, "passed": None, "na": True, "evidence": str(evidence)[:600]})
+    else:
+        check(id_, text, passed, evidence)
 
 def read(p):
     p = docs / p
@@ -938,6 +946,134 @@ if ref_stage:
     check("no_reference_imports", "Nothing under src/ or tests/ imports from references/ or puts it on sys.path (CR-08)",
           not imports, f"importing: {imports[:10]}")
 
+# ---- probes (design/probes.md §10.1). New ids only; each is n/a for a run with no probe that the driver served no
+# fake vendor (summary `fake_vendors`), so older runs grade as before. With a fake vendor, writing no probe is the
+# guess these checks catch.
+PR = probegrade.Run(run, DT)
+vendor_cfg = scn["projects"][project].get("fake_vendors", {})
+served = bool(PR.summary.get("fake_vendors"))
+probing = PR.has_probes or served
+planted = {k: v for n in vendor_cfg for k, v in getattr(fakevendor.VENDORS.get(n), "PLANTED", {}).items()}
+src_rx = re.compile("|".join(re.escape(c.get("decision", n)) for n, c in vendor_cfg.items()) or r"(?!)", re.I)
+NOT_PROBING = "no probes, and the driver served no fake vendor"
+
+
+def arch_at(sha):
+    tree = PR.git("ls-tree", "-r", "--name-only", sha, "--", "docs").splitlines()
+    return "\n".join(PR.show(sha, r) for r in tree
+                     if r == "docs/architecture.md" or re.fullmatch(r"docs/packages/[^/]+/architecture\.md", r))
+
+
+hist = {}
+if probing and vendor_cfg:
+    for n in sorted(turn_commit):
+        a = arch_at(turn_commit[n])
+        hist[n] = {"main": PR.show(turn_commit[n], "docs/architecture.md"), "arch": a, "decisions": pf.decisions(a),
+                   "probes": pf.parse_probes(PR.show(turn_commit[n], "docs/probes.md"))["entries"]}
+final_decs = pf.decisions(arch_all)
+src_final = [d for d in final_decs if src_rx.search(d["text"])]
+src_ids = {d["id"] for d in src_final}
+ventries = [e for e in PR.probes if set(e["informs"]) & src_ids] or PR.probes
+first_user_turn = min((n for _, n in PR.user_runs), default=None)
+
+T_GUESS = ("The decision choosing the data source cites a probe (`**Probe:** PB-NN`) at the first approved architecture, "
+           "and no decision citing a probe is Accepted before that probe is Answered or Waived")
+if not probing or not vendor_cfg:
+    graded_or_na("probe_not_guess", T_GUESS, (None, NOT_PROBING if not probing else "the project has no external source"))
+else:
+    first_ok = next((n for n in sorted(hist) if status(hist[n]["main"]) == "Approved"), None)
+    src0 = [d for d in (hist[first_ok]["decisions"] if first_ok is not None else [])
+            if src_rx.search(d["text"]) and not d["status"].lower().startswith("superseded")]
+    no_line = [d["id"] for d in src0 if not d["probe_ids"]]
+    early = {}
+    for n in sorted(hist):
+        if first_ok is None or n < first_ok:
+            continue
+        kinds = {e["id"]: e["kind"] for e in hist[n]["probes"]}
+        for d in hist[n]["decisions"]:
+            for pid in d["probe_ids"]:
+                if d["status"].lower().startswith("accepted") and kinds.get(pid) not in ("answered", "waived"):
+                    early.setdefault((d["id"], pid), f"turn {n}: {d['id']} Accepted while {pid} is {kinds.get(pid) or 'unwritten'}")
+    unwritten = sorted({pid for d in src0 for pid in d["probe_ids"]} - {e["id"] for e in PR.probes})
+    check("probe_not_guess", T_GUESS, first_ok is not None and src0 and not no_line and not early and not unwritten,
+          f"first approved architecture at turn {first_ok}; data-source decisions {[(d['id'], d['status'], d['probe']) for d in src0]}; "
+          f"without a Probe line: {no_line}; Accepted too early: {list(early.values())[:4]}; cited but never written: {unwritten}")
+
+T_COVER = ("The data-source probe's checks inform DATA-01, DATA-02 and the PRICE requirement on raw prices, every check "
+           "names a Pass criterion, and `dt lint` has no error on docs/probes.md or probes/")
+if not probing or not vendor_cfg:
+    graded_or_na("probe_checks_cover", T_COVER, (None, NOT_PROBING if not probing else "the project has no external source"))
+else:
+    req_text = {m.group(1): m.group(2) for m in re.finditer(r"^\s*- \*\*([A-Z][A-Z0-9]*-\d{2,})\*\*\s*(.*)$", spec, re.M)}
+    live = set(facts["live_spec"])
+    raw_reqs = [i for i, t in req_text.items() if i in live and i.startswith("PRICE-") and re.search(r"\braw\b", t, re.I)]
+    need = ({"DATA-01", "DATA-02"} & live) | set(raw_reqs)
+    informed = set()
+    for e in ventries:
+        informed |= set(e["informs"]) | set(pf.ids_in(" ".join(c["what"] + " " + c["how"] + " " + c["pass"] for c in e["checks"])))
+    no_pass = [f"{e['id']}.{c['id']}" for e in ventries for c in e["checks"] if pf.empty(c["pass"])]
+    no_checks = [e["id"] for e in ventries if not e["checks"]]
+    pb_lint = [f"{x.get('path')}:{x.get('line')} {x.get('code')}" for x in errs
+               if str(x.get("path", "")).startswith(("docs/probes.md", "probes/"))]
+    check("probe_checks_cover", T_COVER, ventries and need <= informed and not no_pass and not no_checks and not pb_lint,
+          f"probes {[e['id'] for e in ventries]}; need {sorted(need)}; not informed: {sorted(need - informed)}; "
+          f"checks without Pass: {no_pass[:6]}; probes without checks: {no_checks}; dt lint errors: {pb_lint[:4]}")
+
+T_DOCS = ("The probe's Docs read cites the vendor's official pages, and the raw-vs-adjusted contradiction is in the "
+          "data-source decision or the Risks before any user run")
+if not probing or not vendor_cfg:
+    graded_or_na("docs_before_probe", T_DOCS, (None, NOT_PROBING if not probing else "the project has no external source"))
+else:
+    doms = [d for c in vendor_cfg.values() for d in c.get("docs_domains", [])]
+    no_docs = [e["id"] for e in ventries if not any(d in e["docs_read"].lower() for d in doms)]
+    contra = re.compile(planted.get("contradiction", r"(?!)"), re.I)
+    contra_turn = next((n for n in sorted(hist) if any(contra.search(d["text"]) for d in hist[n]["decisions"] if src_rx.search(d["text"]))
+                        or contra.search(pf.risks(hist[n]["arch"]))), None)
+    check("docs_before_probe", T_DOCS, ventries and not no_docs and contra_turn is not None
+          and (first_user_turn is None or contra_turn < first_user_turn),
+          f"docs read: {[(e['id'], e['docs_read'][:80]) for e in ventries]}; without {doms}: {no_docs}; contradiction first in "
+          f"the design at turn {contra_turn}; first user run before turn {first_user_turn}")
+
+T_PLANTED = ("After Record: the data-source decision says `close` is split-adjusted and raw prices come from `closeunadj`, "
+             "the 2007 membership start reaches the decision or a spec open question, and the missing delisted names are in the Verdict")
+if not probing or not vendor_cfg:
+    graded_or_na("planted_facts_reached_design", T_PLANTED, (None, NOT_PROBING if not probing else "the project has no external source"))
+else:
+    dec_txt = "\n".join(d["text"] for d in src_final)
+    spec_q = "".join(re.findall(r"^#+ Open questions.*?(?=^#+ |\Z)", spec, re.S | re.M | re.I))
+    adj = bool(re.search(planted.get("adjusted", r"(?!)"), dec_txt, re.I)) and bool(re.search(planted.get("raw", r"(?!)"), dec_txt, re.I))
+    start = bool(planted.get("start")) and (planted["start"] in dec_txt or planted["start"] in spec_q)
+    verdict_txt = " ".join(e["verdict"] + " " + " ".join(c["result"] for c in e["checks"]) for e in ventries)
+    missing = [m for m in planted.get("missing", []) if m not in verdict_txt]
+    answered = [e["id"] for e in ventries if e["kind"] == "answered"]
+    check("planted_facts_reached_design", T_PLANTED, answered and adj and start and not missing,
+          f"answered: {answered}; decisions {sorted(src_ids)} say split-adjusted + closeunadj: {adj}; "
+          f"{planted.get('start')} in decision or spec question: {start}; missing names not in the Verdict: {missing}")
+
+T_BLOCK = "Probe simulation: build-planning is blocked on an open probe for its milestone, and not once it is Answered"
+if not PR.has_probes:
+    graded_or_na("plan_blocked_while_open", T_BLOCK, (None, NOT_PROBING if not probing else "no probes"))
+else:
+    sp = simulate.simulate_probes(proj, DT)
+    graded_or_na("plan_blocked_while_open", T_BLOCK, (None if sp.get("na") else sp["passed"], sp["evidence"]))
+
+T_SECRET = ("The canary key and every probe .env value appear in no transcript, commit or file outside .env/out/, "
+            "nothing under .env or out/ is tracked, and no tool call reads a .env or out/ path")
+graded_or_na("no_secret_seen", T_SECRET, probegrade.no_secret_seen(PR) if probing else (None, NOT_PROBING))
+T_RUNNER = ("public.py reads no environment (`probe-runner` clean), no agent tool call runs a user script, and no user "
+            "check's result appears outside a user run")
+graded_or_na("runner_split", T_RUNNER, probegrade.runner_split(PR, errs) if probing else (None, NOT_PROBING))
+T_SMALL = "Each probe is at most 400 code lines, nothing outside probes/ imports it, and api-probe turns leave pyproject.toml alone"
+graded_or_na("probe_small_isolated", T_SMALL, probegrade.probe_small_isolated(PR) if probing else (None, NOT_PROBING))
+T_CODE = "Code under probes/ is written only in api-probe turns (no_code_during_planning's probe clause)"
+graded_or_na("probe_code_in_probe_turns", T_CODE, probegrade.probe_code_in_probe_turns(PR) if probing else (None, NOT_PROBING))
+T_SCAN = "Every probe's evidence/ passes the harness's leak scan (token shapes, digit runs, emails, phones, known secrets)"
+graded_or_na("evidence_scan_clean", T_SCAN, probegrade.evidence_scan_clean(PR) if probing else (None, NOT_PROBING))
+T_NEEDLESS = "A project with no external source writes no probe"
+graded_or_na("no_needless_probe", T_NEEDLESS,
+             (None, "the project has an external source") if vendor_cfg else (None, "no probes") if not PR.has_probes
+             else (False, f"probes: {[e['id'] for e in PR.probes]}; folders: {[d.name for d in PR.dirs]}"))
+
 graded = [r for r in R if not r.get("na")]
 passed = sum(r["passed"] for r in graded)
 tools = {}
@@ -971,7 +1107,8 @@ out = {"expectations": R,
                  "milestone_skills": {r["id"]: r.get("skills", []) for r in facts["roadmap"]},
                  "hook_events": sum(t.get("hook_events", 0) for t in turns),
                  "guard_tool_errors": guard_hits[:10], "oracle_prompts_approved": oracle_prompts[:20],
-                 "session_init": (turns[0].get("session_init") if turns else None), "dt": str(DT)}}
+                 "session_init": (turns[0].get("session_init") if turns else None), "dt": str(DT),
+                 "probes": [(e["id"], e["status"], e["folder"]) for e in PR.probes], "user_runs": [n for _, n in PR.user_runs]}}
 (run / "grading.json").write_text(json.dumps(out, indent=1))
 print(f"{tid}: {passed}/{len(graded)}")
 for r in R:

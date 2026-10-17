@@ -8,13 +8,17 @@ Interface-first fields (task `kind` and `writes`, the `## Dependency graph` rows
 type sections) come from dt's parser when it has them (`Task.kind`, `Task.writes`, `model.graph_edges`) and
 are read from the raw task fields and tables otherwise, so old snapshots and new ones give the same facts.
 dt's own graph numbers (`devteam.graph`) are reported beside them as `dt_graph`, only for the grader's
-cross-check: the grader works the graph out itself.
+cross-check: the grader works the graph out itself. Probes (design/probes.md §4) are the same: `probes` and
+`decisions` come from the harness's own parse (probefacts.py), and dt's probes parser, once it has one, is
+reported beside them as `dt_probes`.
 
 Usage: dtprobe.py <scripts-dir> <project-dir>
 """
-import json, re, sys
+import json, pathlib, re, sys
 
 sys.path.insert(0, sys.argv[1])
+sys.path.insert(1, str(pathlib.Path(__file__).resolve().parent))
+import probefacts  # noqa: E402
 from devteam import md, model  # noqa: E402
 from devteam.repo import Repo  # noqa: E402
 from devteam.commands import roadmap as roadmap_cmd  # noqa: E402
@@ -191,10 +195,38 @@ if repo.roadmap:
 # docs/references.md entries (dt versions before the references feature have none).
 refs = [{"id": r.id, "title": r.title, "file": r.file, "hash": r.hash, "kind": r.kind, "milestones": r.milestones}
         for r in (model.all_references(repo) if hasattr(model, "all_references") else [])]
+
+
+def dt_probes(repo):
+    """dt's own parse of docs/probes.md (`model.all_probes` / `model.probes`), or None before dt has one."""
+    fn = getattr(model, "all_probes", None)
+    try:
+        items = fn(repo) if fn else None
+        if items is None and hasattr(model, "probes") and getattr(repo, "probes", None) is not None:
+            items = model.probes(repo.probes)
+        if items is None:
+            return None
+        return [{"id": getattr(e, "id", ""), "status": md.strip_md(str(getattr(e, "status", "") or "")),
+                 "folder": str(getattr(e, "folder", "") or ""), "hash": str(getattr(e, "hash", "") or ""),
+                 "checks": [getattr(c, "id", str(c)) for c in (getattr(e, "checks", None) or [])]} for e in items]
+    except Exception as ex:  # report, never fail the probe
+        return {"_error": repr(ex)[:200]}
+
+
+root = pathlib.Path(sys.argv[2])
+pb_text = (root / "docs" / "probes.md").read_text(errors="ignore") if (root / "docs" / "probes.md").exists() else ""
+probe_doc = probefacts.parse_probes(pb_text)
+decision_list = []
+for rel in ["docs/architecture.md", *sorted(str(p.relative_to(root)) for p in root.glob("docs/packages/*/architecture.md"))]:
+    if (root / rel).exists():
+        decision_list += [{**{k: v for k, v in d.items() if k != "text"}, "doc": rel}
+                          for d in probefacts.decisions((root / rel).read_text(errors="ignore"))]
 print(json.dumps({
     "live_spec": sorted(live), "removed_spec": sorted(removed),
     "pipelines": pipelines, "plans": plans, "roadmap": rows, "stages": stage_rows, "references": refs,
     "symbols": symbols, "tests": tests,
     "docs": {d.rel: d.status for d in sorted(repo.docs(), key=lambda d: d.rel)},
     "packages": repo.packages(),
+    "probes": [{k: v for k, v in e.items() if k != "text"} for e in probe_doc["entries"]],
+    "probes_retired": probe_doc["retired"], "decisions": decision_list, "dt_probes": dt_probes(repo),
 }))

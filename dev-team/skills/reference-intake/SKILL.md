@@ -5,7 +5,7 @@ description: Indexes the reference files a user drops into references/ (code or 
 
 # Reference Intake
 
-A reference is a file in `references/` showing how something is done (a TFT dataset builder, a derivation in markdown). It isn't project code: nothing imports it, and builders decide whether to reuse it.
+A reference is a file in `references/` showing how something is done (a boosting dataset builder, a derivation in markdown). It isn't project code: nothing imports it, and builders decide whether to reuse it.
 
 **Writes:** `docs/references.md` only. **IDs:** one `RF-NN` entry per file: what it is *for*, what not to trust in it (Caveats), and the stage it serves. Planning skills and tasks cite the ID, never the path; `dt context` shows the file to the builder. **Never** runs, edits, moves or imports a reference.
 

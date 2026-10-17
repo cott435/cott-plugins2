@@ -1,6 +1,6 @@
 # Extend mode: an idea file
 
-`docs/brief.md` exists, so the new idea gets its own file and must earn its place in the project. Examples: `examples-extend.md`, `examples-ml.md`, `examples-quant.md` (stage skills and references).
+`docs/brief.md` exists, so the new idea gets its own file and must earn its place in the project. Examples: `examples-extend.md`, `examples-ml.md`, `examples-data.md` (stage skills and references).
 
 **Read before asking anything:** `docs/brief.md`, `docs/spec.md`, `docs/roadmap.md` and open ideas in `docs/ideas/`. Their problem, goals, constraints, Not Doing list and requirements constrain the new idea. `Specced` ideas are frozen records; where one disagrees with the spec, the spec is current.
 
@@ -69,7 +69,7 @@
 - **More room than the brief, not unlimited.** Aim for 300-700 words. The extra space goes to *How it fits*, *Alternatives considered*, and *Open questions* — the context the spec needs.
 - **One idea per file.** If the conversation produced two separable ideas, write two files (ask the user which to do first).
 - **Write it as a record, in the brief's voice.** The file outlives the review. Notes to the user ("my proposed limit, for you to check") belong in the conversation. Questions belong under *Open questions*.
-- **Tool preferences live here, not in the spec.** If the user names a library, dataset or service ("hand-write PPO, then compare with Stable-Baselines3"), record it under *Recommended direction* or *Data*. `spec-writing` writes the behavior without the name, and `architecture-design` reads the name from here.
+- **Tool preferences live here, not in the spec.** If the user names a library, dataset or service ("hand-write the CNN, then compare with a torchvision model"), record it under *Recommended direction* or *Data*. `spec-writing` writes the behavior without the name, and `architecture-design` reads the name from here.
 - **Never paste the idea into the brief.** Brief edits are limited to the fit-check table above. Goal numbers stay stable; new goals take the next number. If a goal is dropped, tell the user which spec requirements referenced it.
 
 **Review Gate** (`../SKILL.md`): also say whether the brief changed and which sections.

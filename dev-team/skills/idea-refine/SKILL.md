@@ -41,7 +41,7 @@ Each arrow waits on the user. Everything is written as **Draft** and becomes **A
 
 ## Review Gate (CRITICAL)
 
-1. Say what was written and where, in three lines: the problem, the top goal (or the idea's direction), the biggest Not Doing item. Propose the roadmap stage(s) to add on acceptance (`S3: Classical portfolios`), each with its skills and references, as one question with your proposal as the default.
+1. Say what was written and where, in three lines: the problem, the top goal (or the idea's direction), the biggest Not Doing item. Propose the roadmap stage(s) to add on acceptance (`S3: Features & boosting`), each with its skills and references, as one question with your proposal as the default.
 2. Ask the user to **accept** or request changes.
 3. **STOP YOUR TURN.** Never start the spec in the same turn, and never edit the brief or idea and draft the spec in one turn.
 

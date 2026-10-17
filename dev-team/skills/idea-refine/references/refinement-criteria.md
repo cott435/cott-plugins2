@@ -72,7 +72,7 @@ What makes this genuinely different? Not better — *different*.
 - "We're faster/cheaper/prettier" without a structural reason why
 - The feature that differentiates is not the feature users care most about
 
-**Internal tools, research code, and personal projects:** "would someone switch?" becomes "is this better than the notebook/spreadsheet/script we use today?" For quant work, differentiation is the edge itself — and the question is whether it survives realistic costs, not whether it's novel.
+**Internal tools, research code, and personal projects:** "would someone switch?" becomes "is this better than the notebook/spreadsheet/script we use today?" For forecasting work, differentiation is the accuracy gain itself — and the question is whether it survives held-out data and inputs known at forecast time, not whether it's novel.
 
 ### 4. Data & ML Feasibility
 
@@ -91,20 +91,20 @@ Apply this when the idea depends on data or a learned model. For these projects 
 - What does it cost, now and at the scale we'd need?
 
 **Is the data trustworthy for this use?**
-- **Leakage / look-ahead:** would the model or backtest see anything that wasn't known at decision time?
-- **Survivorship and selection bias:** does the data quietly drop the failures (delisted stocks, churned users, failed runs)?
+- **Leakage / look-ahead:** would the model or its evaluation see anything that wasn't known at decision time?
+- **Selection bias:** does the data quietly drop the failures (decommissioned meters, churned users, failed runs)?
 - **Drift:** is the past a good guide to the future here? How fast does it go stale?
-- **Point-in-time:** for finance especially, can we reconstruct what was known *on each date*, including restatements?
+- **Point-in-time:** for time series especially, can we reconstruct what was known *at each time*, including later corrections?
 
 **Can we tell if it works?**
 - What metric, on what held-out data, compared to what baseline?
-- Can it be tested before it's trusted — offline evaluation, backtest, shadow mode, human review?
+- Can it be tested before it's trusted — offline evaluation, replay on history, shadow mode, human review?
 
 **Red flags:**
 - "We'll figure out the data later" — for ML, the data *is* the project
 - No baseline, so any result looks like success
 - Labels that nobody has checked for consistency
-- Backtest results that look too good (usually leakage, look-ahead, or unrealistic costs)
+- Offline results that look too good (usually leakage, look-ahead, or unrealistic costs)
 - Data you can't legally use for this purpose, or that costs more than the project's budget
 
 ## Assumption Audit

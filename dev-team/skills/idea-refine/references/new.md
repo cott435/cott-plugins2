@@ -1,6 +1,12 @@
-# The brief
+# New mode: the brief
 
-Read when writing or editing `docs/brief.md` (New mode). An example is in `../examples.md`.
+No `docs/brief.md` yet. Examples: `examples-new.md` (all phases), `examples-process.md` (a non-product idea), `examples-quant.md` (a data-dependent brief).
+
+1. **Phases 1-2** per `ideation.md`.
+2. **Phase 3: write the brief** from the template below. Check the word count (`wc -w docs/brief.md`) before presenting it.
+3. **Stages** per `roadmap.md`: one per outcome the user agreed in conversation, Source `brief`. If only the first is known, add just that one.
+
+## The brief
 
 Write `docs/brief.md` (create `docs/` if needed) from this template. The brief answers **why**, not **how** or **what exactly** — no requirements lists, no tech choices, no screens.
 
@@ -45,5 +51,3 @@ Write `docs/brief.md` (create `docs/` if needed) from this template. The brief a
 - **Goals are numbered** so `spec-writing` can trace requirements back to them ("serves Goal 2").
 - **3-5 goals, project-level and stage-neutral.** A goal is an outcome of the whole project ("Honest estimates of risk"), never a stage ("Stage 2: PCA works"). If the user describes the project in stages, the stages become roadmap stage rows (`roadmap.md`), and every goal stays true whichever stage is being built. More than five goals means the project isn't focused yet — go back to Phase 2.
 - **The Not Doing list is mandatory.** It is the most valuable part: it makes trade-offs explicit.
-
-Check the word count (`wc -w docs/brief.md`) before presenting it.

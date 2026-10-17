@@ -42,9 +42,7 @@ Given your architecture and the competitive context, I'd push you toward variati
 
 ---
 
-*Phase 2 would cluster into "minimum viable co-editing (1 or 3)" vs. "differentiated collaboration model (2 or 4)" — evaluating whether to check the competitive box quickly or invest in something that becomes a selling point.*
-
-*Phase 2 clusters into "minimum viable co-editing (1 or 3)" vs. "differentiated collaboration model (2 or 4)". The user picks block-level locking.*
+*Phase 2 clusters into "minimum viable co-editing (1 or 3)" vs. "differentiated collaboration model (2 or 4)", weighing whether to check the competitive box quickly or invest in something that becomes a selling point. The user picks block-level locking.*
 
 ### Phase 3: Write the Idea File (Extend Mode)
 

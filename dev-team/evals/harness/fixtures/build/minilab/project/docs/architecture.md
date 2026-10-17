@@ -13,7 +13,7 @@
 
 ## Dependency rules
 - `mdata` imports nothing internal.
-- `risk` imports only `mdata`'s public names (`mdata/__init__.py`), never its modules.
+- `risk` imports only `mdata`'s contract: `mdata.types` and `mdata.load_prices` (late-bound, so a fake can stand in), never its step modules.
 
 ## Cross-package contracts
 - `mdata.load_prices` → `mdata.Prices`, provided by `mdata`, used by `risk` (PL-02). [Contract](packages/mdata/contract.md)

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import math
 
-from mdata import Prices
+from mdata.types import Prices
 
 from .types import Returns
 

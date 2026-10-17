@@ -25,7 +25,7 @@ The standing quality bar. `pyproject.toml` and `scripts/check.sh` enforce it. On
 | CR-22 | Size | ≤ 500 lines/module, ≤ 60/function | check.sh sizes | — | edit, gate |
 
 ## Boundaries (generated from architecture — do not edit)
-- `mdata` imports nothing internal; `risk` imports only `mdata`'s public names
+- `mdata` imports nothing internal; `risk` imports only `mdata.types` and `mdata.load_prices`
 
 ## Roles and protected paths
 | Role | May edit | May not edit | Stop gate |

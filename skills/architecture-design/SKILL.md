@@ -87,6 +87,7 @@ Write `docs/packages/<pkg>/contract.md`: the provider's promise to its consumers
 - **One symbol per heading.** Never `### train.train / train.train_seeds: …` or `### baselines.RandomAgent / ScriptedSnake: …`, however alike the symbols are: dt resolves `Read:` IDs and `dt context` packets only from a symbol's own heading. `dt lint` errors on these (`contract-heading`).
 - **Each section:** the signature in the project's language, then **Invariants** (shapes, ranges, guarantees), **Errors** (what fails and how it's reported), and **Used by** (consuming components or packages, plus `PL-NN` IDs once those pipelines exist).
 - **Contract first:** the contract is defined before either side is built. **The provider owns it.**
+- **Boundaries (multi-package).** A symbol another package consumes adds one line: `- **Boundary:** <consumer packages> · **Fixtures:** tests/contracts/<pkg>.<symbol>/ · **Cases:** <the payloads a fixture must show>`. This section is the boundary's source of truth. `build-planning`'s Phase 0 contract task freezes it into executable artifacts in that folder: a schema (JSON Schema across languages or runtimes; a pandera schema for a dataframe between Python packages), one fixture per case, and a fixture-backed fake of the provider, so both sides build in parallel against the same fixtures. Name the cases; don't write the fixtures.
 - **Public only, ≤ ~8 lines per symbol.** Helpers, modules and call order belong in the package's architecture or its `pipelines.md`. A retired symbol collapses to one line under `## Retired`: `- ~~stats.foo: Title~~ Retired YYYY-MM-DD: reason`.
 
 ````markdown
@@ -113,7 +114,7 @@ Make the choices the spec deliberately left open: language and versions, key lib
 
 Record each as a decision (`AD-NN`) in the template format. When a reference informed the choice, the Context cites its ID, never its path: "RF-01 fits PCA on the full sample; AD-14 fits per window". Small, easily reversed choices (a formatting tool) go in the tech stack table without a decision entry.
 
-**Route steps to installed skills.** Start from the `**Skills:**` line of the milestone's roadmap section: name each skill there on the component that runs its step. `dt status` lists the project's other skills under `skills`, and your context lists any others. If one owns a step the design contains, such as a hypothesis test or a security review, the component that runs that step names the skill. Its contract takes what the skill needs: for a hypothesis test, the hypothesis, the statistic, the null construction and the data split. Don't design a replacement procedure. If the spec names a skill for a step, the design must route to it.
+**Route steps to installed skills.** Start from the `**Skills:**` line of the stage's roadmap section: name each skill there on the component that runs its step. `dt status` lists the project's other skills under `skills`, and your context lists any others. If one owns a step the design contains, such as a hypothesis test or a security review, the component that runs that step names the skill. Its contract takes what the skill needs: for a hypothesis test, the hypothesis, the statistic, the null construction and the data split. Don't design a replacement procedure. If the spec names a skill for a step, the design must route to it.
 
 **If the repo already has ADRs** (for example `docs/decisions/` or `docs/adr/`), follow that convention instead: write the ADR files there and list them in the Decisions section with links.
 
@@ -243,7 +244,7 @@ The spec gained requirements (usually from a specced idea) or changed some.
 
 ## Revise Mode
 
-A technical change with no spec change. Write a new decision whose Context explains what was learned ("the simulator is 40× too slow for QR-02 at 1M steps"). Then supersede the old decision if the new one reverses it, or revise it in place if the new one changes only part of it (Extend step 4). Update every section and contract the change touches (tech stack, components, Overview), and run the Review Gate. If a contract changes, list its consumers (its **Used by**): their pipelines and tasks need revisiting.
+A technical change with no spec change. Write a new decision whose Context explains what was learned ("the simulator is 40× too slow for QR-02 at 1M steps"). Then supersede the old decision if the new one reverses it, or revise it in place if the new one changes only part of it (Extend step 4). Update every section and contract the change touches (tech stack, components, Overview), and run the Review Gate. If a contract changes, list its consumers (its **Used by**): their pipelines and tasks need revisiting. A frozen boundary's schema, fixtures and fake change with it, in a task Replan adds.
 
 ## Grow: Single Package to Multi-Package
 
@@ -303,7 +304,7 @@ Before pointing to `pipeline-design`:
 - [ ] Every expensive-to-reverse choice has an `AD-NN` entry with alternatives and consequences; in data and ML projects, sources and model approach are decisions checked against the spec's DATA- and model-quality requirements
 - [ ] Extend: the Grow triggers were checked and reported at the gate
 - [ ] Changes after the first approval: a one-line Changelog row citing the spec rows' source files, superseded decisions collapsed to one line with nothing else citing them, decisions changed in part revised (with the Overview and contracts), Risks consolidated, Status back to Draft until approved
-- [ ] Steps owned by an installed skill are routed to it by name, including every skill on the milestone's `**Skills:**` line; decisions learned from a reference cite its `RF-NN`
+- [ ] Steps owned by an installed skill are routed to it by name, including every skill on the stage's `**Skills:**` line; decisions learned from a reference cite its `RF-NN`
 - [ ] The gate listed ASSUMPTIONS and open questions; the turn ended after the Draft was saved; approval was an unambiguous yes in a later turn; nothing was designed past the architecture after approval
 
 Read `examples.md` in this skill directory for a single-package proof of concept with its contract, and a multi-package platform with System pipelines.

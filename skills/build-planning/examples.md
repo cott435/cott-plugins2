@@ -1,6 +1,6 @@
 # Build Planning Examples
 
-Templates first, then worked examples on the quant project: New (M1), Advance into M2, Replan, a foreign plan, a multi-package system spine, and routing milestone skills and references.
+Templates first, then worked examples on the quant project: New (cut S1, plan M1), Advance into M2, Replan, a foreign plan, a contract-first Phase 0 across packages, routing milestone skills and references, and cutting a large multi-package stage.
 
 `dt` below means `python3 ../../scripts/dt.py`, run from the project root.
 
@@ -54,7 +54,7 @@ Status runs Draft → Approved → In progress → Done, then `dt archive` repla
 
 ### Task templates
 
-**Spine task** (Phase 0). Step is the whole pipeline; Mode is always `solo`.
+**Spine task** (Phase 0). Step is the whole pipeline; Mode is always `solo`. A contract task (multi-package) has Step `contract`; see Example 5.
 
 ```markdown
 ### M2-T01: PL-03 spine with equal weights
@@ -86,16 +86,16 @@ Status runs Draft → Approved → In progress → Done, then `dt archive` repla
 | Field | Rule (lint code) |
 |---|---|
 | `Package` | One package id (`task-fields`) |
-| `Step` | `PL-NN.<function>` from the step table (`task-step`); `PL-NN` on a spine task |
+| `Step` | `PL-NN.<function>` from the step table (`task-step`); `PL-NN` on a spine task; `contract` on a contract task |
 | `Covers` | Spec IDs the task satisfies |
 | `Size` | XS = 1 file, S = 1–2, M = 3–5 in `Files likely` (`task-size`) |
-| `Mode` | `split` for checkable behavior, `solo` for spine, refactor, glue, doc-sync |
-| `Skills` | Skill names, or `—`. Every skill on the roadmap section's `**Skills:**` line lands on at least one task (`skills_unrouted`). A missing skill is still named |
+| `Mode` | `split` for checkable behavior, `solo` for contract, spine, refactor, glue, doc-sync |
+| `Skills` | Skill names, or `—`. Every skill on the milestone's `**Skills:**` line (else its stage's) lands on at least one task (`skills_unrouted`). A missing skill is still named |
 | `Read` | IDs and repo paths, comma-separated. Everything the builder needs, nothing more (`missing-ref`). References by ID with an optional selector: `RF-01:residualize`, `RF-01:outline`, `RF-03:<heading>`; a long one with none warns (`ref-large`). Every milestone reference lands on at least one task (`references_unrouted`) |
 | `Acceptance` | ≤ 3 checkbox bullets, each test-backed (`task-acceptance`) |
 | `Verify` | Backticked commands joined by ` · `. After Phase 0, includes the smoke command (`verify-smoke`) |
 | `Depends on` | Task IDs earlier in the plan, or `—` (`depends`) |
-| `Parallel` | Optional `G<n>`. No shared file or contract symbol in a group (`parallel`) |
+| `Parallel` | Optional `G<n>`. No shared file or contract symbol in a group (`parallel`). Package spines carry one; the contract task and the system spine never do (they count in full toward `milestone-size`) |
 | `Files likely` | Comma-separated paths |
 | `Reason` | Optional one line: a mode override, or a second package or step |
 | `Blocked` | Added when a task is paused; Replan removes it once resolved |
@@ -152,19 +152,28 @@ Written by `dt archive`. Never deleted; replaced only by the next plan.
 **Status:** Between milestones · **Last updated:** 2026-11-02 · **Roadmap:** [../docs/roadmap.md](../docs/roadmap.md)
 ```
 
-### Roadmap fill-ins
+### Milestone rows
 
-`idea-refine` adds the row (Milestone, Name, Source). This skill fills Packages, Pipelines and Depends, and the section's `**Exit:**`, `**Plan:**` and outcome text. `dt roadmap` writes `Status*`; never edit it.
+`idea-refine` adds the stage (`S<n>`: Name, Source, and a section with Outline and Skills). When the stage's pipelines are approved, this skill cuts it: one milestone row per slice under the milestone table (add the table below the stage table if it's missing), and a section with the slice's `**Outline:**`, then `**Exit:**`, `**Plan:**` and outcome text once planned. `dt roadmap` writes both `Status*` columns; never edit them.
 
 ```markdown
-| M2 | Classical portfolios | ideas/classical-portfolios.md | quant | PL-03 | M1 | Planned |
+| Stage | Name | Source | Status* |
+|---|---|---|---|
+| S1 | Data + stats | brief | Building |
+| S2 | Classical portfolios | ideas/classical-portfolios.md | Planned |
+
+| Milestone | Stage | Name | Packages | Pipelines | Depends | Status* |
+|---|---|---|---|---|---|---|
+| M1 | S1 | Data + stats | quant | PL-01, PL-02 | — | Building |
+| M2 | S2 | Classical portfolios | quant | PL-03 | M1 | Planned |
 
 ## M2: Classical portfolios
+**Outline:** A walk-forward backtest compares min-var with equal weight.
 **Exit:** Min-var beats equal weight on out-of-sample variance; TC-04 passes.
 **Plan:** [../tasks/plan.md](../tasks/plan.md)
 ```
 
-Later milestones get only the row and a 3–6 line section (Exit, and Plan once a plan exists).
+A stage that fits one milestone gets one, and the milestone inherits the stage's Skills and references. A stage cut into several gives each milestone `**Skills:**` and `**References:**` lines from the stage's (Example 7). Later milestones get only the row and a 3–6 line section (Outline, Exit, and Plan once a plan exists).
 
 ### AGENTS.md doc map
 
@@ -188,14 +197,14 @@ Use real IDs from the project in the `dt section` example. List each project ski
 
 ## Example 1: New — quant M1
 
-**State:** brief Accepted, spec and architecture Approved (single package `quant`), `pipelines.md` Approved with PL-01 (load prices) and PL-02 (covariance report), `tests.md` Approved with TC-01–TC-03. `idea-refine` wrote roadmap rows M1 and M2, with Packages, Pipelines and Depends `—`. No `tasks/`.
+**State:** brief Accepted, spec and architecture Approved (single package `quant`), `pipelines.md` Approved with PL-01 (load prices) and PL-02 (covariance report), `tests.md` Approved with TC-01–TC-03. `idea-refine` wrote stages S1 Data + stats and S2 Classical portfolios; S2's idea isn't specced yet. No milestone rows, no `tasks/`.
 
 ```
 $ dt status --skill build-planning
 skill: build-planning
 mode: new
 docs: brief Accepted · spec Approved · architecture Approved (Single package) · roadmap ok · plan missing · constraints missing
-next ids: AD-04 PL-03 TC-04 M3
+next ids: AD-04 PL-03 TC-04 M1
 milestone: none
 progress: 0/0
 next_task: none
@@ -205,6 +214,7 @@ no_spine: none
 mode_violations: none
 draft_pipelines: none
 changed_since_plan: none
+stage_to_cut: S1 Data + stats
 pipelines_inferred: PL-01, PL-02
 skills_missing: none
 skills_available: data-science
@@ -212,6 +222,7 @@ milestone_skills: data-science
 milestone_references: none
 skills_unrouted: none
 references_unrouted: none
+stage_unrouted: none
 grow_triggers: none
 drift: none
 stale_contracts: none
@@ -222,7 +233,9 @@ references_changed: none
 references_missing: none
 ```
 
-With no plan yet, `uncovered`, `no_spine` and the two unrouted lists have nothing to check; they count at the gate's re-run. `milestone_skills` comes from M1's roadmap section (`**Skills:** data-science`); M1 has no references. M1's row lists no pipelines, so `dt` inferred PL-01 and PL-02 from its Source (the brief's spec IDs). Task IDs start at `dt next-id M1-T` (M1-T01).
+With no plan yet, `uncovered`, `no_spine` and the unrouted lists have nothing to check; they count at the gate's re-run. S1 has no milestone rows, so it is the stage to cut, and `dt` inferred its pipelines, PL-01 and PL-02, from its Source (the brief's spec IDs). `milestone_skills` comes from S1's section (`**Skills:** data-science`); S1 has no references.
+
+**Cut:** PL-02 needs PL-01's prices, but its spine runs on synthetic returns, so both spines fit one milestone: Phase 0 is 2 tasks and the longest chain after it about 3, far under 15. S1 becomes one milestone, M1 Data + stats (`dt next-id M`), which inherits S1's Skills. S2 isn't designed yet, so it stays uncut. Task IDs start at `dt next-id M1-T` (M1-T01).
 
 **Grow check:** no measurable trigger; numpy and pandas only; nothing deploys on its own. Passes.
 
@@ -235,12 +248,12 @@ With no plan yet, `uncovered`, `no_spine` and the two unrouted lists have nothin
 **Written:**
 - `tasks/plan.md`: Phase 0 with M1-T01 (PL-01 spine) and M1-T02 (PL-02 spine, which calls PL-01's `load_prices`, so it depends on M1-T01). Phase 1: M1-T03 delisting-aware universe (riskiest: survivorship bias poisons every later number), M1-T04 MP cleaning, checkpoint, M1-T05 shrinkage, M1-T06 planted-factor PCA, exit checkpoint. M1-T03 and M1-T04 share no file or contract symbol, so both are `Parallel: G1`.
 - `tasks/todo.md`: six unchecked lines.
-- Roadmap: M1 Packages `quant` and Pipelines `PL-01, PL-02` (from `pipelines_inferred`), Exit and Plan link. M2 keeps its outline only. Then `dt roadmap` (M1 → Planned).
+- Roadmap: the milestone table with row `| M1 | S1 | Data + stats | quant | PL-01, PL-02 | — | |`, and `## M1: Data + stats` with Outline, Exit and Plan link. S2 keeps its stage row only. Then `dt roadmap` (M1 → Planned, S1 → Planned).
 - `AGENTS.md`: the doc map, with `data-science — stats steps`.
 
 **Review gate message:**
 
-> Wrote the M1 plan (6 tasks: 2 spine, 4 thicken; checkpoints after M1-T04 and at exit), its todo, the M1 roadmap entry and the AGENTS.md doc map. `dt lint` is clean; `uncovered`, `no_spine` and `mode_violations` are empty; every `dt context` packet is under 2,000 lines.
+> Cut S1 into one milestone, M1 Data + stats (both pipelines, track 5 tasks). Wrote the M1 plan (6 tasks: 2 spine, 4 thicken; checkpoints after M1-T04 and at exit), its todo, the M1 roadmap row and the AGENTS.md doc map. `dt lint` is clean; `uncovered`, `no_spine` and `mode_violations` are empty; every `dt context` packet is under 2,000 lines.
 >
 > **ASSUMPTIONS:** universe before MP cleaning (survivorship bias is the biggest risk); M1-T03 and M1-T04 run in parallel (G1); spine tasks solo, the four thicken tasks split; data-science routed to the three stats tasks; M1-T02 is M (four files) since every PL-02 step needs a baseline module.
 >
@@ -282,7 +295,7 @@ Append the outcome and repoint M1's plan link:
 **Plan:** [../tasks/archive/M1-data-stats.md](../tasks/archive/M1-data-stats.md)
 **Outcome:** Done 2026-11-02 — shrinkage moved ahead of MP cleaning (Replan 2026-10-28).
 ```
-Run `dt roadmap` (M1 → Done). Kickoff check: `dt status --skill build-planning` prints `drift: none` and `stale_contracts: none`; no queued plan. No gate needed. Grow check for M2: the portfolio code adds no new dependency stack and deploys nothing on its own; passes.
+Run `dt roadmap` (M1 → Done, S1 → Done). Kickoff check: `dt status --skill build-planning` prints `drift: none`, `stale_contracts: none` and `stage_to_cut: S2 Classical portfolios`; no queued plan. No gate needed. Grow check for S2: the portfolio code adds no new dependency stack and deploys nothing on its own; passes. S2's one pipeline, PL-03, fits one milestone: cut it into M2 (Stage S2, Depends M1, since PL-03 reads M1's covariance).
 
 One scope question:
 
@@ -380,7 +393,7 @@ One scope question:
 
 Why this order: the comparison is the evaluation, so it's the riskiest step and is planned first (a leaky evaluation would make every later result meaningless). M2-T02 and M2-T03 share no file and no contract symbol, so they're `G1`. Both split tasks test functions the spine creates (`compare`, `min_variance` at equal weight), so neither tester writes against a guess. M2-T04 changes a default, which is behavior, so `solo` needs the `Reason` line.
 
-Fill in the roadmap (M2: Packages, Pipelines, Depends, Exit, Plan link) and run `dt roadmap` (M2 → Planned). Run the Review Gate and present it with ASSUMPTIONS (the order above, G1, the M2-T04 override, data-science routed to M2-T03 only). *(Turn ends.)*
+Write M2's row and section (Packages, Pipelines, Depends, Outline, Exit, Plan link) and run `dt roadmap` (M2 → Planned, S2 → Planned). Run the Review Gate and present it with ASSUMPTIONS (the order above, G1, the M2-T04 override, data-science routed to M2-T03 only). *(Turn ends.)*
 
 **Turn 5.** User: "Approved." Set Status `Approved`; offer the commit. "Next is `build-setup` Extend: M2 adds the `quant.portfolio` module, so its import contracts change. Once the bar is approved and committed, it sets the plan's `Base` with `dt base`." *(Turn ends.)*
 
@@ -435,27 +448,66 @@ mode: foreign
 
 ---
 
-## Example 5: Multi-package system spine (M3 after Grow)
+## Example 5: Contract-first Phase 0 across packages (M3 after Grow)
 
-After `architecture-design` Grow split quant into `data`, `stats`, `portfolio` and `features`, the root defines system pipeline PL-05 Research run (data → stats → features → portfolio, grown from PL-03). `pipeline-design` Grow kept PL-03 Min-variance backtest in `portfolio` as PL-05's portfolio segment (`**Part of:** PL-05`), and its Extend round added PL-06 Feature screening in `features`, also `Part of: PL-05`. The M3 row lists none of this, so its Packages and Pipelines come from `pipelines_inferred`. Phase 0 puts the system spine first:
+After `architecture-design` Grow split quant into `data`, `stats`, `portfolio` and `features`, the root defines system pipeline PL-05 Research run (data → stats → features → portfolio, grown from PL-03). `pipeline-design` Grow kept PL-03 Min-variance backtest in `portfolio` as PL-05's portfolio segment (`**Part of:** PL-05`), and its Extend round added PL-06 Feature screening in `features`, also `Part of: PL-05`. M3 builds PL-06 and PL-05; PL-03 already exists.
+
+`features.screen` is new and crosses a boundary: `portfolio` consumes it. Its contract section names the boundary:
+
+```markdown
+### features.screen: Screened feature panel
+`def screen(panel: FeaturePanel, *, max_features: int = 50) -> FeaturePanel`
+- **Invariants:** same index as the input; at most `max_features` columns; no column with NaN share > 5%
+- **Errors:** `ValueError` if the panel is empty
+- **Boundary:** portfolio · **Fixtures:** tests/contracts/features.screen/ · **Cases:** typical panel, one feature, all-NaN column dropped
+- **Used by:** portfolio; PL-05, PL-06
+```
+
+Phase 0 freezes that boundary first, then builds both packages side by side, then integrates:
 
 ```markdown
 ## Phase 0: Spine
 
-### M3-T01: PL-05 system spine across packages
-**Package:** data · **Step:** PL-05 · **Covers:** FEAT-01 · **Size:** M · **Mode:** solo
-**Reason:** system spine
-**Read:** PL-05, PL-03, data.load_prices, stats.estimate_cov, features.screen
+### M3-T01: Freeze the features.screen contract
+**Package:** features · **Step:** contract · **Covers:** — · **Size:** S · **Mode:** solo
+**Read:** features.screen
 **Acceptance:**
-- [ ] `python -m portfolio backtest --smoke` runs data → stats → features → portfolio on synthetic prices, each hand-off through its named contract
-- [ ] `features.screen` runs at its spine version (keeps every feature)
-- [ ] The smoke run is committed as PL-05's smoke test
-**Verify:** `python -m portfolio backtest --smoke` · `scripts/check.sh gate --pkg data`
-**Depends on:** — · **Files likely:** packages/features/src/features/__init__.py, packages/features/src/features/screen.py, packages/portfolio/src/portfolio/pipeline.py
+- [ ] A pandera schema for the screened panel; each case's sample frame validates against it
+- [ ] `portfolio`'s test support has a fake `screen` that returns the sample frames and nothing else
+**Verify:** `pytest tests/contracts/features.screen` · `scripts/check.sh gate --pkg features`
+**Depends on:** — · **Files likely:** packages/features/src/features/schemas.py, tests/contracts/features.screen/test_contract.py
 
 ### M3-T02: PL-06 spine with a univariate screen
-…
+**Package:** features · **Step:** PL-06 · **Covers:** FEAT-01 · **Size:** M · **Mode:** solo
+**Read:** PL-06, features.screen, FEAT-01
+**Acceptance:**
+- [ ] `python -m features screen --smoke` runs end to end on synthetic features; its output validates against the M3-T01 schema
+- [ ] PL-06 pre-build sections replaced by a `dt layout` pointer
+**Verify:** `python -m features screen --smoke` · `scripts/check.sh gate --pkg features`
+**Depends on:** M3-T01 · **Parallel:** G1 · **Files likely:** packages/features/src/features/__init__.py, packages/features/src/features/pipeline.py, packages/features/src/features/screen.py
+
+### M3-T03: PL-03 on screened features, against the contract fake
+**Package:** portfolio · **Step:** PL-03 · **Covers:** — · **Size:** S · **Mode:** solo
+**Read:** PL-03, features.screen
+**Acceptance:**
+- [ ] `python -m portfolio backtest --smoke` runs end to end on every `features.screen` fixture through the fake
+**Verify:** `python -m portfolio backtest --smoke` · `scripts/check.sh gate --pkg portfolio`
+**Depends on:** M3-T01 · **Parallel:** G1 · **Files likely:** packages/portfolio/src/portfolio/pipeline.py, packages/portfolio/tests/support/fake_screen.py
+
+### M3-T04: PL-05 system spine across packages
+**Package:** data · **Step:** PL-05 · **Covers:** — · **Size:** S · **Mode:** solo
+**Reason:** system spine
+**Read:** PL-05, data.load_prices, stats.estimate_cov, features.screen
+**Acceptance:**
+- [ ] `python -m portfolio research --smoke` runs data → stats → features → portfolio on synthetic prices with the real `screen`, no fake
+- [ ] The real `screen` output still validates against the M3-T01 schema; the smoke run is committed as PL-05's smoke test
+**Verify:** `python -m portfolio research --smoke` · `scripts/check.sh gate --pkg data`
+**Depends on:** M3-T02, M3-T03 · **Files likely:** packages/portfolio/src/portfolio/research.py
 ```
+
+M3-T02 and M3-T03 share no file, and the only contract symbol both read is the one M3-T01 froze, which is read-only for the rest of the milestone, so both run in G1 (`dt lint`'s `parallel` check skips symbols a contract task froze). The fake in M3-T03 is allowed because it is built from the contract's schema and fixtures, and both sides test against them: M3-T02 asserts its output validates, M3-T03 consumes the fixtures. Neither spine mocks a step of its own package.
+
+**Track:** the contract task and the system spine have no group, so they count in full (2); the chain through the rest is M3-T02 plus the longest thicken chain after it. With the old order (system spine first, then each package spine, all serial), Phase 0 alone would have counted 4.
 
 The system spine's Package is `data`, the owner of PL-05's first step (system pipelines have no Entry). `--pkg data` scopes the gate to data and everything that depends on it, which here is every package. PL-05 is in the root, which has no pre-build sections; PL-06's spine (M3-T02) clears `features`' planned layout. Moving the code under `packages/` (the drift `pipeline-design` Grow listed) is its own solo task, omitted here.
 
@@ -465,7 +517,7 @@ Multi-package Verify lines scope the gate with `--pkg`. Phase 1 tasks for PL-06'
 
 ## Example 6: Routing milestone skills and references
 
-A variant of M2, Structure + classical portfolios, where PL-03 runs a `remove_market` step before `estimate_cov`. `idea-refine` wrote the roadmap section's `**Skills:** data-analysis, null-hypothesis-testing`, and `reference-intake` assigned RF-01 (market decomposition) to M2.
+A variant of M2, Structure + classical portfolios, where PL-03 runs a `remove_market` step before `estimate_cov`. `idea-refine` wrote stage S2's `**Skills:** data-analysis, null-hypothesis-testing`, and `reference-intake` assigned RF-01 (market decomposition) to S2. S2 was cut into the single milestone M2, which inherits both.
 
 ```
 $ dt status --skill build-planning
@@ -496,3 +548,49 @@ Nothing is waiting for intake, so plan. `dt section RF-01` gives the entry. *Use
 - The second bullet comes from TC-09 and the spec, not from the reference. Acceptance never says "reuse RF-01". Whether to reuse the residual arithmetic is the builder's call; `dt context M2-T04` prints the entry, the reference banner with its Caveats, and only `residualize`.
 - `null-hypothesis-testing` goes on M2-T06, the claims task that tests whether the residual structure beats noise. The Scope reads `**Skills:** data-analysis (remove_market, estimate_cov), null-hypothesis-testing (claims)`.
 - At the gate, `references_unrouted` and `skills_unrouted` are both `none`. Had a milestone item stayed off every task, it would need a reason under Open questions, such as `- RF-01 unrouted: the per-window fit is specified fully by TC-09; the reference adds nothing`. The user then decides at the gate.
+
+---
+
+## Example 7: Cutting a large multi-package stage
+
+**State:** a spending tracker with three packages in three runtimes: `relay` (a serverless worker that talks to the bank aggregator), `core` (a library that syncs, categorizes and compares), `app` (the UI). Stage S1 See my spending covers linking, sync, categories, transfers, review, the transaction list and month comparison. Every `pipelines.md` is Approved: 29 pipelines (relay 7, core 13, app 9) and system pipelines PL-40 Sync (relay → core) and PL-41 Show (core → app).
+
+```
+stage_to_cut: S1 See my spending
+pipelines_inferred: PL-01, PL-02, …, PL-41
+milestone_skills: —
+```
+
+One milestone can't hold S1: Phase 0 alone would be a contract task, the longest package's spines (core: 13) and two system spines. Order the pipelines by dependency instead. Every later capability needs synced transactions; categories and transfers need the transaction list; the comparison needs categories. Then cut vertical slices along those lines:
+
+| Milestone | Slice (runs end to end) | Pipelines | Depends |
+|---|---|---|---|
+| M1 Walking skeleton | Link one account; it syncs through the relay and its transactions list in the app | relay PL-01 link, PL-02 sync; core PL-08 ingest; app PL-20 list; PL-40, PL-41 | — |
+| M2 Categories | Transactions get categories; the user corrects one and it sticks | core PL-09–PL-12; app PL-21, PL-22 | M1 |
+| M3 Transfers and review | Transfers between own accounts drop out of spending; the user reviews new items | relay PL-03; core PL-13–PL-15; app PL-23–PL-25 | M2 |
+| M4 Month comparison | This month vs last, by category | core PL-16–PL-20; app PL-26–PL-28 | M2 |
+| … | | | |
+
+Never one milestone per package: "all of the relay" runs nothing a user can see, and it queues `core` and `app` behind it. M3 and M4 both depend only on M2, so they could share a milestone as parallel tracks; they stay apart here because together their track would pass 15.
+
+M1's Phase 0 then has: two contract tasks, one per provider, freezing the boundaries M1 uses: `relay.sync_response` (consumed by `core`) and `core.transaction_list` (consumed by `app`). Each gets a JSON Schema (the three runtimes share no types), one JSON fixture per case the contract lists, and a fake: a fake relay endpoint in `core`'s test support, a fake `core` in `app`'s. Then the four package spines in parallel groups (relay's two chained, since they share files), `core` and `app` running against the fakes; then PL-40 and PL-41's system spines, which swap the fakes for the real relay and core. Track: 2 contract tasks + 2 system spines + the longest chain through the rest (core: PL-08's spine, then its thicken tasks), well under 15.
+
+**Roadmap:**
+
+```markdown
+| Milestone | Stage | Name | Packages | Pipelines | Depends | Status* |
+|---|---|---|---|---|---|---|
+| M1 | S1 | Walking skeleton | relay, core, app | PL-01, PL-02, PL-08, PL-20, PL-40, PL-41 | — | Planned |
+| M2 | S1 | Categories | core, app | PL-09–PL-12, PL-21, PL-22, PL-41 | M1 | Designed |
+| M3 | S1 | Transfers and review | relay, core, app | PL-03, PL-13–PL-15, PL-23–PL-25, PL-40 | M2 | Designed |
+| M4 | S1 | Month comparison | core, app | PL-16–PL-20, PL-26–PL-28, PL-41 | M2 | Designed |
+
+## M1: Walking skeleton
+**Outline:** One linked account syncs through the relay and its transactions list in the app.
+**Skills:** —
+**References:** —
+**Exit:** A sandbox account's transactions appear in the app list after one sync; PL-40 and PL-41 smoke tests pass.
+**Plan:** [../tasks/plan.md](../tasks/plan.md)
+```
+
+PL-41 appears in M2 and M4 again because those slices thicken it. Every pipeline of S1 lands in some milestone, and only M1 gets a plan; `dt roadmap` shows S1 Planned. At the gate, the cut is the first thing presented: the four slices, why each line falls where it does, and the boundaries M1 freezes.

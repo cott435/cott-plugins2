@@ -49,7 +49,7 @@ Goal 2 (no extra daily work for owner) → Regulars setup, Order notifications
 Goal 3 (owner keeps full value)        → Direct payment
 ```
 
-**Every stage the brief lists is specced in full.** When the brief and roadmap name every stage up front, this New-mode round writes features, requirements, criteria and edge cases for all of them: never "M1 in full, M2–M5 outlined". Later skills design only what the spec holds, so an outlined stage is never designed.
+**Every stage the brief lists is specced in full.** When the brief and roadmap name every stage up front, this New-mode round writes features, requirements, criteria and edge cases for all of them: never "S1 in full, S2–S5 outlined". Later skills design only what the spec holds, so an outlined stage is never designed.
 
 Every feature must serve at least one goal. A feature that serves no goal is either missing from the brief (go back to `idea-refine`) or shouldn't be built. Every goal must have at least one feature.
 

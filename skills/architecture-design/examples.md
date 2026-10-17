@@ -246,11 +246,25 @@ Packages are versioned together; one release tag for the repo.
 
 **Each package** gets a folder. `docs/packages/data/architecture.md` uses the single-package template for that package: its modules, its data layout and its folders, with Interfaces linking to `contract.md` beside it. It carries no Decisions or Changelog; those live in the root. `docs/packages/data/contract.md` holds `### data.PointInTimeStore: …` and the other public symbols, with signatures, invariants and errors. `pipeline-design` later adds each package's `pipelines.md` to the same folder.
 
+Each cross-package symbol names its boundary, so `build-planning` can freeze it before either side is built. `docs/packages/factors/contract.md`:
+
+```markdown
+### factors.Signal: Date × symbol score frame
+`Signal = DataFrame[SignalSchema]  # index (date, symbol), column score: float64`
+- **Invariants:** one row per (date, symbol) in the universe on that date; `score` finite; dates ascending
+- **Errors:** constructing one from a frame that fails `SignalSchema` raises `pandera.errors.SchemaError`
+- **Boundary:** backtest, execution · **Fixtures:** tests/contracts/factors.Signal/ · **Cases:** two dates × three symbols, a symbol delisted mid-sample, an all-equal cross-section
+- **Used by:** backtest, execution
+```
+
+Both sides are Python, so the schema is a pandera schema and the fixtures are sample frames. Between runtimes that share no types (a TypeScript service and a Swift app), the schema would be JSON Schema and the fixtures JSON payloads. The contract names the cases; the Phase 0 contract task writes the schema, one fixture per case and a fake `factors` that serves them.
+
 **Notice:**
 - The data provider decision is checked against specific `DATA-` requirements and the brief's budget. That's how "which API?" gets answered. The spec stayed vendor-neutral, and the decision lives here.
 - The dependency rules are enforceable, not aspirational.
 - The root doc stays a map. Detail lives in package docs, so each one stays a readable 1-3 pages.
 - System pipelines say which package hands what to which, through which contract. The functions and files inside each package are left to `pipelines.md`.
+- Each boundary's cases are named here, so `backtest` and `execution` can build against a fake `factors` in the same milestone instead of waiting for it.
 
 ---
 

@@ -277,13 +277,13 @@ tests/fixtures/stats/TC-06/
 
 ### 5.4 `build-planning`
 
-**Input:** approved `pipelines.md` for every package in the milestone, plus `tests.md` where one exists. **Output:** roadmap entry, `tasks/plan.md`, `tasks/todo.md`.
+**Input:** approved `pipelines.md` for every package in the stage or milestone, plus `tests.md` where one exists. **Output:** milestone rows (a stage cut into vertical slices), `tasks/plan.md`, `tasks/todo.md`.
 
 **Process**
 1. Run `dt status --skill build-planning` (§10).
 2. **Grow check** against the triggers in §5.1. If one fires, stop and route to `architecture-design` Grow.
-3. **Scope the milestone:** spec IDs, packages, pipelines, exit criteria. Spec IDs deliberately left for later are listed under Deferred, so coverage stays explicit.
-4. **Phase 0, Spine:** one task per new pipeline, with the system spine first in multi-package. Acceptance:
+3. **Cut the stage, then scope the milestone.** A stage (`S<n>`, idea-refine's) is an unsized outcome; once its pipelines exist, build-planning cuts it into milestones (`M<n>`) along dependency lines, each a vertical slice that runs end to end, the first a walking skeleton. Then the milestone's spec IDs, packages, pipelines, exit criteria. Spec IDs deliberately left for later are listed under Deferred, so coverage stays explicit.
+4. **Phase 0, contract first:** in multi-package, a solo contract task freezes each boundary the milestone uses (schema, fixture payloads, a fixture-backed fake of the provider); package spines then build in parallel groups, consumers against the fake; the system spine comes last and swaps in the real provider. A boundary fake from an approved contract is allowed; a mocked step inside a package is not. One spine task per new pipeline. Acceptance:
    - The pipeline runs end to end on fixture or synthetic data.
    - A smoke test is committed.
    - The pre-build sections are replaced with a `dt layout` pointer.
@@ -422,7 +422,7 @@ Content for each skill's agent-skills anatomy sections. The description says *wh
 ```
 
 - **Derived status:** Idea → Specced → Designed → Planned → Building → Done. `dt roadmap` reads it from the idea, spec, pipelines and plan statuses and rewrites the column.
-- **Ownership:** `idea-refine` adds a row when a stage is accepted. `build-planning` fills in packages, pipelines, exit criteria, outcome and the plan link.
+- **Ownership:** `idea-refine` adds a stage row (`S<n>`) when a stage is accepted. `build-planning` cuts it into milestone rows (`M<n>`, each naming its stage) once its pipelines are approved, and writes their packages, pipelines, exit criteria, outcome and plan link. (Superseded shape: the table above, one milestone row per stage with a Source column, is what roadmaps looked like before stages; `dt` still reads it.)
 
 ### What a milestone is
 
@@ -431,7 +431,7 @@ A milestone delivers one working capability end to end: a pipeline you can run, 
 - **One package, several milestones.** In a quant repo, `data` might carry M1 prices, M2 financials, and later M5 point-in-time store.
 - **One milestone, several packages.** A stats milestone that needs survivorship-free sampling adds tasks to `data`, each tagged `Package: data`. If `data`'s contract changes, that's an architecture Revise during the milestone's planning, and `data/pipelines.md` gets an Extend.
 - **Slice by pipeline, not by layer.** "Prices → financials → cleaning → storage" mixes the two. Prices and financials are pipelines, so they can be milestones. Cleaning and storage are *steps* inside those pipelines: M1's spine ships prices with naive cleaning and plain files, and later tasks thicken those steps. A storage overhaul becomes its own milestone only when it's large and delivers something testable on its own (e.g. "point-in-time queries pass the leak cases").
-- **Size, per track:** the Phase 0 spine plus the longest `Depends on` chain after it, at most about 15 tasks (`dt lint` `milestone-size`). Parallel groups that don't depend on each other don't add up, so independent tracks stay in one milestone however many tasks the plan holds; the plan's ~400-line budget bounds the total. Only one milestone is active at a time, so splitting independent tracks would serialize them. Split only where a later part needs an earlier part's outputs. A single task isn't a milestone; it belongs in an existing one.
+- **Size, per track:** the serial Phase 0 tasks (contract, system spine) plus the longest `Depends on` chain through the rest, package spines included, at most about 15 tasks (`dt lint` `milestone-size`). Parallel groups that don't depend on each other don't add up, so independent tracks stay in one milestone however many tasks the plan holds; the plan's ~400-line budget bounds the total. Only one milestone is active at a time, so splitting independent tracks would serialize them. Split only where a later part needs an earlier part's outputs. A single task isn't a milestone; it belongs in an existing one.
 
 ---
 
@@ -479,7 +479,7 @@ architecture-design (Extend → Grow trigger: new dependency stack, leak-proof d
 → pipeline-design (Grow): PL-NN sections move by owner; PL-05 crosses packages → system pipeline in root
 → pipeline-design (Extend): PL-06 feature screening in features
 → test-planning: TC-20 planted-signal, TC-21 pure-noise (null-hypothesis-testing routed)
-→ build-planning (Extend): M3 Phase 0 = system spine across packages first, then package spines
+→ build-planning (Extend): M3 Phase 0 = contract task freezing features.screen, package spines in parallel, system spine last
 ```
 
 **D. Up-front, all six stages**
@@ -583,7 +583,7 @@ Who may write what. `build-setup` turns the build-role rows into path guards. Pl
 
 | Skill / role | May write | Never |
 |---|---|---|
-| idea-refine | `docs/brief.md`, `docs/ideas/**`, roadmap rows | everything else |
+| idea-refine | `docs/brief.md`, `docs/ideas/**`, roadmap stage rows and sections | everything else |
 | spec-writing | `docs/spec.md`, idea Status lines | |
 | architecture-design | `docs/architecture.md`, `docs/packages/*/architecture.md`, `docs/packages/*/contract.md` | |
 | pipeline-design | `docs/packages/*/pipelines.md` | `src/**`, tests code |
@@ -635,7 +635,7 @@ Statuses like Approved stay a human decision. Hooks check the *format* and prote
 - Scripts ship in the plugin's `scripts/` folder, not copied into projects.
 - Records are structured and script-checked wherever possible (§10).
 - Task lists are written for the next milestone only. Later milestones stay as 3–6 line roadmap outlines. `tasks/queued/` is used only when the user asks.
-- `idea-refine` adds a roadmap row (milestone id, name, source) when a stage is accepted. `build-planning` fills in packages, pipelines, exit criteria, outcome and the plan link. `dt roadmap` writes the Status column.
+- `idea-refine` adds a roadmap stage row (stage id, name, source) when a stage is accepted. `build-planning` cuts it into milestone rows and fills in packages, pipelines, exit criteria, outcome and the plan link. `dt roadmap` writes both Status columns.
 
 - Build model: hybrid (§5.4 step 7; build-setup.md).
 - Gap review against agent-skills (`planning-gap-review.md`) folded in 2026-10-16.

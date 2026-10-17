@@ -1,4 +1,4 @@
-"""`dt status --skill idea-refine` (replaces idea-refine.sh): brief, ideas and roadmap rows."""
+"""`dt status --skill idea-refine` (replaces idea-refine.sh): brief, ideas and roadmap stage rows."""
 from __future__ import annotations
 
 import re
@@ -18,10 +18,13 @@ def idea_refine(repo: Repo, r: Report) -> None:
     r.add("ideas", {d.rel: doc_state(d) for d in sorted(repo.docs("idea"), key=lambda d: d.rel)})
     rows = []
     if repo.roadmap:
-        col = roadmap_cmd.status_table(repo.roadmap)
-        for ms in model.milestones(repo.roadmap):
-            rows.append({"id": ms.id, "name": ms.name, "source": md.strip_md(ms.source),
-                         "status": md.strip_md(ms.row.get(col[1], "")) if col else ""})
+        # Stages are idea-refine's rows. A roadmap from before stages has only milestone rows, each its own stage.
+        stages = model.stages(repo.roadmap)
+        first = "stage" if stages else "milestone"
+        col = roadmap_cmd.status_table(repo.roadmap, first)
+        for x in stages or [m for m in model.milestones(repo.roadmap) if not m.stage]:
+            rows.append({"id": x.id, "name": x.name, "source": md.strip_md(x.source),
+                         "status": md.strip_md(x.row.get(col[1], "")) if col else ""})
     r.add("roadmap_rows", rows, fmt([f"{x['id']} {x['name']} [{x['source'] or '—'}]" for x in rows]))
     r.add("references_unassigned", [e.id for e in model.all_references(repo) if not e.milestones])
 

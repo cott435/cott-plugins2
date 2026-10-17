@@ -1,5 +1,5 @@
 """`dt status --skill reference-intake`: the reference files to read (new or changed), entries whose file is
-gone, the next RF id, and the milestones a file can be assigned to."""
+gone, the next RF id, and the stages and milestones a file can be assigned to."""
 from __future__ import annotations
 
 from .. import md, model
@@ -20,5 +20,6 @@ def reference_intake(repo: Repo, r: Report) -> None:
     r.add("outline_first", [f for f in state.to_read
                             if f.endswith(".py") and refs.line_count(repo, f) > refs.INTAKE_OUTLINE_LINES])
     r.add("next_id", repo.next_id("RF"))
-    rows = [{"id": m.id, "name": m.name} for m in model.milestones(repo.roadmap)] if repo.roadmap else []
+    rows = ([{"id": x.id, "name": x.name} for x in model.stages(repo.roadmap) + model.milestones(repo.roadmap)]
+            if repo.roadmap else [])
     r.add("milestones", rows, fmt([f"{x['id']} {md.strip_md(x['name'])}" for x in rows]))

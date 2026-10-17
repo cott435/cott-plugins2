@@ -12,8 +12,9 @@ REQ_ID = r"[A-Z][A-Z0-9]*-\d{2,}"
 TASK_ID = r"M\d+-T\d{2,}"
 FINDING_ID = r"M\d+-R\d{2,}"
 MILESTONE_ID = r"M\d+"
+STAGE_ID = r"S\d+"
 SYMBOL_ID = r"[a-z][a-z0-9_-]*(?:\.[A-Za-z_][A-Za-z0-9_]*)+"
-HEADING_ID = rf"(?:{TASK_ID}|{FINDING_ID}|{MILESTONE_ID}|{REQ_ID}|{SYMBOL_ID})"
+HEADING_ID = rf"(?:{TASK_ID}|{FINDING_ID}|{MILESTONE_ID}|{STAGE_ID}|{REQ_ID}|{SYMBOL_ID})"
 
 HEADING_RE = re.compile(r"^(#{1,6})\s+(.*?)\s*#*\s*$")
 ID_HEADING_RE = re.compile(rf"^({HEADING_ID}):\s*(.*)$")

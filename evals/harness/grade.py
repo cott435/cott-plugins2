@@ -215,7 +215,9 @@ def row_stage(r):
         return hits.pop()
     if mode == "incremental" and not files:
         return 0
-    name, outline = r.get("name", "").lower(), r.get("outline", "").lower()
+    # A milestone cut from a roadmap stage also carries that stage's name and outline.
+    name = (r.get("name", "") + " " + r.get("stage_name", "")).lower()
+    outline = (r.get("outline", "") + " " + r.get("stage_outline", "")).lower()
     score = [sum(3 * name.count(k) + outline.count(k) for k in s_.get("keywords", [])) for s_ in stages]
     return max(range(len(stages)), key=lambda i: score[i]) if max(score) > 0 else None
 
@@ -411,15 +413,16 @@ if ref_stage:
           f"files {present} (expected {expected}); no entry: {unindexed}; dt {waiting}; index {idx_status}")
 
     rows_ = facts["roadmap"]
-    def want_ms(f):
-        return [r["id"] for r in stage_rows[ref_stage[f]]]  # empty while its stage has no milestone: `—`
+    def want_ms(f):  # the stage's roadmap stage or milestones; empty while it has neither: `—`
+        i = ref_stage[f]
+        return [r["id"] for r in stage_rows[i]] + [s_["id"] for s_ in facts.get("stages", []) if row_stage(s_) == i]
     def ms_ok(f):  # later milestones that reuse it (PCA residuals in the features stage) may list it too
         got, want = by_file[f]["milestones"], want_ms(f)
         return bool(set(got) & set(want)) if want else not got
     graded = [f for f in expected if f in ref_stage]
     wrong = {f: (by_file[f]["milestones"] if f in by_file else "no entry", want_ms(f)) for f in graded
              if f not in by_file or not ms_ok(f)}
-    check("refs_milestones", "Each reference is assigned to at least one milestone of the stage it serves (`—` while that stage has no milestone)",
+    check("refs_milestones", "Each reference is assigned to the stage it serves, or one of its milestones (`—` while that stage has no roadmap row)",
           graded and not wrong, f"{ {f: by_file.get(f, {}).get('milestones') for f in graded} }; wrong (got, want): {wrong}")
 
     def open_questions(rel):
@@ -431,7 +434,8 @@ if ref_stage:
         ms_plans = [p for p in plans if p["milestone"] == ms["id"]]
         reads = {re.sub(r":.*$", "", i) for p in ms_plans for t in p["tasks"] for i in t["read"]}
         task_skills = {s_ for p in ms_plans for t in p["tasks"] for s_ in t.get("skills", [])}
-        refs_ms = [e["id"] for e in entries if ms["id"] in e["milestones"] or "all" in e["milestones"]]
+        refs_ms = (ms["references"] if "references" in ms
+                   else [e["id"] for e in entries if ms["id"] in e["milestones"] or "all" in e["milestones"]])
         reasons = "\n".join(open_questions(p["doc"]) for p in ms_plans)
         miss = [r for r in refs_ms if r not in reads] + [s_ for s_ in ms.get("skills", []) if s_ not in task_skills]
         miss = [m for m in miss if m not in reasons]  # an item may stay unrouted with a reason under Open questions

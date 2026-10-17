@@ -277,10 +277,10 @@ class Repo:
         return bool(defs) and all(d.retired for d in defs)
 
     def ids_with_prefix(self, prefix: str, archive: bool = True) -> list[str]:
-        """Every ID ever defined with this prefix (`PL`, `TC`, `AD`, `M2-T`, `M2-R`, `M`), retired included."""
+        """Every ID ever defined with this prefix (`PL`, `TC`, `AD`, `M2-T`, `M2-R`, `M`, `S`), retired included."""
         defs = self.all_definitions if archive else [d for v in self.index.values() for d in v]
-        if prefix == "M":
-            pat = re.compile(r"M(\d+)$")
+        if prefix in ("M", "S"):
+            pat = re.compile(prefix + r"(\d+)$")
         elif re.fullmatch(r"M\d+-[TR]", prefix):
             pat = re.compile(re.escape(prefix) + r"(\d{2,})$")
         else:
@@ -292,14 +292,17 @@ class Repo:
                 for tok in re.findall(r"\b(M\d+(?:-T\d{2,})?)\b", doc.text):
                     if pat.match(tok):
                         found.add(tok)
+        elif prefix == "S":
+            for doc in self.docs("roadmap"):
+                found |= set(re.findall(r"\b(S\d+)\b", doc.text))
         return sorted(found, key=lambda s: int(pat.match(s).group(1)))
 
     def next_id(self, prefix: str) -> str:
         ids = self.ids_with_prefix(prefix)
         pat = re.compile(r"(\d+)$")
         n = max((int(pat.search(i).group(1)) for i in ids), default=0) + 1
-        if prefix == "M":
-            return f"M{n}"
+        if prefix in ("M", "S"):
+            return f"{prefix}{n}"
         if re.fullmatch(r"M\d+-[TR]", prefix):
             return f"{prefix}{n:02d}"
         return f"{prefix}-{n:02d}"

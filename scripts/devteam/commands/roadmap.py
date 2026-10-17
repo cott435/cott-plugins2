@@ -1,4 +1,5 @@
-"""Rewrite the roadmap's derived Status* column (Idea → Specced → Designed → Planned → Building → Done)."""
+"""Rewrite the roadmap's derived Status* columns: milestones Idea → Specced → Designed → Planned → Building →
+Done; stages the same, with Cut once build-planning has written their milestone rows."""
 from __future__ import annotations
 
 import re
@@ -9,6 +10,7 @@ from .. import edit, md, model, specdocs
 from ..repo import Doc, Repo
 
 ORDER = ["Idea", "Specced", "Designed", "Planned", "Building", "Done"]
+STAGE_ORDER = ["Idea", "Specced", "Designed", "Cut", "Planned", "Building", "Done"]
 
 
 def add_arguments(parser):
@@ -45,7 +47,7 @@ def source_files(source: str) -> list[str]:
     return list(dict.fromkeys(out))
 
 
-def is_specced(repo: Repo, ms: model.Milestone) -> bool:
+def is_specced(repo: Repo, ms: model.Milestone | model.Stage) -> bool:
     files = source_files(ms.source)
     if files:
         return all((repo.doc(f) is not None and (repo.doc(f).status or "") == "Specced") for f in files)
@@ -53,7 +55,7 @@ def is_specced(repo: Repo, ms: model.Milestone) -> bool:
     return bool(brief and brief.status == "Accepted" and spec and spec.status == "Approved")
 
 
-def inferred_pipelines(repo: Repo, ms: model.Milestone) -> list[str]:
+def inferred_pipelines(repo: Repo, ms: model.Milestone | model.Stage) -> list[str]:
     """The milestone's pipelines worked out from its Source: the spec Changelog rows that cite the row's idea
     files (or brief.md for a `brief` row) give the milestone's IDs (minus those marked removed); its pipelines
     are the live ones, package or system, whose Covers (else, with no Covers line, step Covers) include any."""
@@ -73,15 +75,16 @@ def inferred_pipelines(repo: Repo, ms: model.Milestone) -> list[str]:
     return sorted(out, key=lambda i: int(i.split("-")[1]))
 
 
-def milestone_pipelines(repo: Repo, ms: model.Milestone) -> tuple[list[str], bool]:
+def milestone_pipelines(repo: Repo, ms: model.Milestone | model.Stage) -> tuple[list[str], bool]:
     """(the milestone's pipelines, inferred?): the row's Pipelines cell when it names any, else
-    `inferred_pipelines` (idea-refine writes `—`; build-planning fills the cell in later)."""
+    `inferred_pipelines` from its (or its stage's) Source. A stage always infers: build-planning divides its
+    pipelines among the milestones it cuts."""
     if ms.pipelines:
         return ms.pipelines, False
     return inferred_pipelines(repo, ms), True
 
 
-def pipelines_approved(repo: Repo, ms: model.Milestone) -> bool:
+def pipelines_approved(repo: Repo, ms: model.Milestone | model.Stage) -> bool:
     """Every pipeline of the milestone (`milestone_pipelines`) is defined in an Approved pipelines.md or
     architecture."""
     live = [p for p in milestone_pipelines(repo, ms)[0] if not repo.is_retired(p)]
@@ -109,30 +112,74 @@ def milestone_status(repo: Repo, ms: model.Milestone) -> str:
     return "Specced" if is_specced(repo, ms) else "Idea"
 
 
-def status_table(doc: Doc) -> tuple[int, str] | None:
-    """(status column index, column name) of the roadmap's milestone table."""
+def stage_status(repo: Repo, st: model.Stage) -> str:
+    """Uncut: Idea → Specced → Designed (its inferred pipelines all Approved: ready to cut). Cut: Done when
+    every milestone is; Building when any is Building or Done; Planned when any is; else Cut."""
+    mss = model.stage_milestones(repo.roadmap, st.id) if repo.roadmap else []
+    if not mss:
+        if pipelines_approved(repo, st):
+            return "Designed"
+        return "Specced" if is_specced(repo, st) else "Idea"
+    got = [milestone_status(repo, m) for m in mss]
+    if all(g == "Done" for g in got):
+        return "Done"
+    if any(g in ("Building", "Done") for g in got):
+        return "Building"
+    return "Planned" if "Planned" in got else "Cut"
+
+
+def next_unit(repo: Repo) -> model.Milestone | model.Stage | None:
+    """What build-planning works on next: the first milestone below Planned, or the first stage with no
+    milestone rows yet (to cut), in roadmap order (pre-stage milestones first, then stage by stage)."""
+    doc = repo.roadmap
+    if not doc:
+        return None
+    mss = model.milestones(doc)
+    units: list = [m for m in mss if not m.stage]
+    for st in model.stages(doc):
+        cut = [m for m in mss if m.stage == st.id]
+        units += cut or [st]
+    for u in units:
+        if isinstance(u, model.Stage):
+            if stage_status(repo, u) in ("Idea", "Specced", "Designed"):
+                return u
+        elif milestone_status(repo, u) in ("Idea", "Specced", "Designed"):
+            return u
+    return None
+
+
+def status_table(doc: Doc, first: str = "milestone") -> tuple[int, str] | None:
+    """(status column index, column name) of the roadmap's milestone (or `first="stage"`: stage) table."""
     for _, head, _rows in doc.tables():
-        if head and head[0].lower() == "milestone":
+        if head and head[0].lower() == first:
             col = model.status_column(head)
             if col:
                 return head.index(col), col
     return None
 
 
-def differences(repo: Repo) -> list[tuple[model.Milestone, str, str]]:
-    """(milestone, current cell, derived status) for every row whose Status* cell is out of date."""
+def has_status_table(doc: Doc) -> bool:
+    return bool(status_table(doc) or status_table(doc, "stage"))
+
+
+def differences(repo: Repo) -> list[tuple[model.Milestone | model.Stage, str, str]]:
+    """(milestone or stage, current cell, derived status) for every row whose Status* cell is out of date."""
     doc = repo.roadmap
-    if not doc or not status_table(doc):
+    if not doc:
         return []
-    col = status_table(doc)[1]
     out = []
-    for ms in model.milestones(doc):
-        if ms.row_line is None:
+    for first, rows, derive in (("stage", model.stages(doc), lambda x: stage_status(repo, x)),
+                                ("milestone", model.milestones(doc), lambda x: milestone_status(repo, x))):
+        table = status_table(doc, first)
+        if not table:
             continue
-        current = md.strip_md(ms.row.get(col, ""))
-        derived = milestone_status(repo, ms)
-        if current != derived:
-            out.append((ms, current, derived))
+        for item in rows:
+            if item.row_line is None:
+                continue
+            current = md.strip_md(item.row.get(table[1], ""))
+            derived = derive(item)
+            if current != derived:
+                out.append((item, current, derived))
     return out
 
 
@@ -157,9 +204,8 @@ def run(args, repo) -> int:
     if not doc:
         print("dt roadmap: no docs/roadmap.md", file=sys.stderr)
         return 1
-    table = status_table(doc)
-    if not table:
-        print("dt roadmap: docs/roadmap.md has no milestone table with a Status column",
+    if not has_status_table(doc):
+        print("dt roadmap: docs/roadmap.md has no stage or milestone table with a Status column",
               file=sys.stderr)
         return 1
     diffs = differences(repo)
@@ -171,7 +217,12 @@ def run(args, repo) -> int:
     if args.check:
         print(f"roadmap: {len(diffs)} out of date (run dt roadmap)")
         return 1
-    edit.write_lines(doc.path, _rewrite(edit.read_lines(doc.path), table[0], {ms.row_line: d for ms, _, d in diffs}))
+    lines = edit.read_lines(doc.path)
+    for first, kind in (("stage", model.Stage), ("milestone", model.Milestone)):
+        changes = {x.row_line: d for x, _, d in diffs if isinstance(x, kind)}
+        if changes:
+            lines = _rewrite(lines, status_table(doc, first)[0], changes)
+    edit.write_lines(doc.path, lines)
     repo.reload(doc.rel)
     print(f"roadmap: updated {len(diffs)}")
     return 0

@@ -28,6 +28,7 @@ SEVERITY = {
     "unreadable": "E", "internal": "W", "pipeline-fields": "E", "spine-mock": "W", "contract-heading": "E",
     "fixture-size": "W",                # missing fixture files are reported as E
     "ref-file": "E", "ref-hash": "W", "ref-large": "W", "ref-prefix": "E", "roadmap-skill": "W",
+    "roadmap-stage": "E",
 }
 
 # Size budgets (planning-stage.md §3), in lines. Package docs are budgeted per unit (lines per unit × units +
@@ -41,9 +42,11 @@ AGENTS_DOC_MAP_MAX = 25
 
 FIXTURE_MAX_BYTES = 100 * 1024
 SPINE_MOCK = re.compile(r"\b(mock|stub|fake|todo|placeholder)", re.IGNORECASE)
+# A fake of another package generated from an approved contract is allowed; a mocked step is not.
+BOUNDARY_FAKE = re.compile(r"\b(contract|boundary)\s+fakes?\b", re.IGNORECASE)
 
 SIZE_FILES = {"XS": (1, 1), "S": (1, 2), "M": (3, 5)}
-TRACK_MAX = 15        # Phase 0 tasks + the longest Depends-on chain after them
+TRACK_MAX = 15        # serial Phase 0 tasks + the longest Depends-on chain through the rest
 REQUIRED_TASK_FIELDS = ("Package", "Step", "Size", "Mode", "Read", "Acceptance", "Verify")
 
 # Fields and table columns whose IDs must resolve. `Depends on` is checked by `depends`.
@@ -257,7 +260,7 @@ def check_budget(ctx: Context):
                          f"package's {doc.kind} doc: architecture-design should consider a Grow")
         if doc.kind == "roadmap":
             for h in doc.headings:
-                if h.id and re.fullmatch(md.MILESTONE_ID, h.id):
+                if h.id and re.fullmatch(rf"{md.MILESTONE_ID}|{md.STAGE_ID}", h.id):
                     n = sum(1 for line in doc.lines[h.line + 1:h.end] if line.strip())
                     if n > ROADMAP_SECTION_MAX:
                         yield _p(doc, h.line, "budget", f"{h.id} section is {n} lines, budget {ROADMAP_SECTION_MAX}")
@@ -391,7 +394,7 @@ def check_spine_mock(ctx: Context):
     for doc in ctx.repo.docs("pipelines"):      # system pipelines (architecture.md) have no spine versions
         for p in model.pipelines(doc):
             for s in p.steps:
-                m = SPINE_MOCK.search(s.spine)
+                m = SPINE_MOCK.search(BOUNDARY_FAKE.sub("", s.spine))
                 if m:
                     yield _p(doc, s.line, "spine-mock",
                              f"{p.id} step `{s.name}` spine version says {m.group(1)!r}: the spine must be a real baseline")
@@ -487,19 +490,40 @@ def check_ref_prefix(ctx: Context):
 
 
 def check_roadmap_skill(ctx: Context):
-    """A roadmap milestone's `**Skills:**` names a skill that isn't installed."""
+    """A roadmap stage's or milestone's own `**Skills:**` line names a skill that isn't installed."""
     roadmap = ctx.repo.roadmap
     if roadmap is None:
         return
     available = set(available_skills(ctx.repo))
-    for ms in model.milestones(roadmap):
-        if ms.section is None:
+    for x in model.stages(roadmap) + model.milestones(roadmap):
+        if x.section is None:
             continue
-        missing = [s for s in ms.skills if s not in available]
+        missing = [s for s in model.skill_names(x.fields.get("Skills", "")) if s not in available]
         if missing:
-            line = md.field_line(roadmap.lines, ms.section.line + 1, ms.section.end, "Skills")
-            yield _p(roadmap, ms.section.line if line is None else line, "roadmap-skill",
-                     f"{ms.id} Skills names {', '.join(missing)}: not installed (.claude/skills or the plugin)")
+            line = md.field_line(roadmap.lines, x.section.line + 1, x.section.end, "Skills")
+            yield _p(roadmap, x.section.line if line is None else line, "roadmap-skill",
+                     f"{x.id} Skills names {', '.join(missing)}: not installed (.claude/skills or the plugin)")
+
+
+def check_roadmap_stage(ctx: Context):
+    """Once the roadmap has stages, every milestone row names one that exists in its Stage cell (a row from
+    before stages keeps its own Source instead)."""
+    roadmap = ctx.repo.roadmap
+    if roadmap is None or not ctx.in_scope(roadmap.rel):
+        return
+    stage_ids = {s.id for s in model.stages(roadmap)}
+    if not stage_ids:
+        return
+    for ms in model.milestones(roadmap):
+        if ms.row_line is None:
+            continue
+        cell = md.strip_md(ms.row.get("Stage", ""))
+        if ms.stage and ms.stage not in stage_ids:
+            yield _p(roadmap, ms.row_line, "roadmap-stage", f"{ms.id} Stage {ms.stage}: no such stage row")
+        elif not ms.stage and cell not in NONE_VALUES:
+            yield _p(roadmap, ms.row_line, "roadmap-stage", f"{ms.id} Stage {cell!r}: not a stage ID (S<n>)")
+        elif not ms.stage and md.strip_md(ms.row.get("Source", "")) in NONE_VALUES:
+            yield _p(roadmap, ms.row_line, "roadmap-stage", f"{ms.id} names no stage: fill its Stage cell")
 
 
 # ---- task checks ----------------------------------------------------------------------------------
@@ -633,32 +657,40 @@ def _longest_chain(tasks: list[model.Task]) -> list[str]:
 
 
 def check_milestone_size(ctx: Context):
-    """A milestone's track is its Phase 0 tasks plus the longest Depends-on chain after them. Parallel
-    tracks don't add up, so the plan's total task count isn't capped (the plan's line budget bounds it)."""
+    """A milestone's track: Phase 0 tasks with no Parallel group run one after another and count in full
+    (the contract task, the system spine); the rest, package spines in parallel groups included, count as
+    the longest Depends-on chain through them. Parallel tracks don't add up, so the plan's total task count
+    isn't capped (the plan's line budget bounds it)."""
     for doc in ctx.plan_docs:
         tasks = model.tasks(doc)
-        spine = [t for t in tasks if t.is_spine]
-        chain = _longest_chain([t for t in tasks if not t.is_spine])
-        n = len(spine) + len(chain)
+        serial = {t.id for t in tasks if t.is_spine and t.parallel.lower() in NONE_VALUES}
+        chain = _longest_chain([t for t in tasks if t.id not in serial])
+        n = len(serial) + len(chain)
         if n > TRACK_MAX:
             line = doc.header_line if doc.header_line is not None else 0
             yield _p(doc, line, "milestone-size",
-                     f"track is {n} tasks, cap {TRACK_MAX}: Phase 0 {len(spine)} + chain {' → '.join(chain)} "
-                     f"({len(chain)}). Shorten the chain, or split the milestone where a later part needs an "
-                     "earlier part's outputs; never split independent tracks")
+                     f"track is {n} tasks, cap {TRACK_MAX}: serial Phase 0 {len(serial)} + chain "
+                     f"{' → '.join(chain)} ({len(chain)}). Shorten the chain, run package spines in parallel "
+                     "groups against the contract, or cut the stage into another milestone where a later part "
+                     "needs an earlier part's outputs; never split independent tracks")
 
 
 def check_parallel(ctx: Context):
+    """Two tasks in one group sharing a file or a contract symbol. A symbol the plan's contract task froze
+    (Step `contract`) is read-only for the rest of the milestone, so both sides of a boundary may share it."""
     for doc in ctx.plan_docs:
         groups: dict[str, list[model.Task]] = {}
-        for t in model.tasks(doc):
+        tasks = model.tasks(doc)
+        frozen = set().union(*(_contract_symbols(_read_ids(t.get("Read"))) for t in tasks if t.is_contract))
+        for t in tasks:
             if t.parallel.lower() not in NONE_VALUES:
                 groups.setdefault(t.parallel, []).append(t)
         for group, members in groups.items():
             for n, b in enumerate(members):
                 for a in members[:n]:
                     files = sorted(set(_files(a)) & set(_files(b)))
-                    syms = sorted(_contract_symbols(_read_ids(a.get("Read"))) & _contract_symbols(_read_ids(b.get("Read"))))
+                    syms = sorted((_contract_symbols(_read_ids(a.get("Read")))
+                                   & _contract_symbols(_read_ids(b.get("Read")))) - frozen)
                     shared = files + syms
                     if shared:
                         yield _p(doc, b.start, "parallel",
@@ -751,7 +783,7 @@ CHECKS = [
     check_task_fields, check_task_size, check_task_acceptance, check_task_title, check_task_step,
     check_depends, check_milestone_size, check_parallel, check_verify_smoke,
     check_todo_mismatch, check_finding_disposition, check_foreign_plan,
-    check_ref_file, check_ref_hash, check_ref_large, check_ref_prefix, check_roadmap_skill,
+    check_ref_file, check_ref_hash, check_ref_large, check_ref_prefix, check_roadmap_skill, check_roadmap_stage,
 ]
 
 

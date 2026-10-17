@@ -35,9 +35,9 @@ KEYS = {
     "test-planning": ["packages", "pipelines_no_smoke", "pipelines_no_golden", "cases_no_source",
                       "cases_no_tolerance", "fixtures_missing", "fixtures_orphan", "skills"],
     "build-planning": ["milestone", "progress", "next_task", "blocked_tasks", "uncovered", "no_spine",
-                       "mode_violations", "draft_pipelines", "changed_since_plan", "pipelines_inferred",
+                       "mode_violations", "draft_pipelines", "changed_since_plan", "stage_to_cut", "pipelines_inferred",
                        "milestone_references", "milestone_skills", "references_unrouted", "skills_unrouted",
-                       "skills_missing", "skills_available",
+                       "stage_unrouted", "skills_missing", "skills_available",
                        "grow_triggers", "drift", "stale_contracts", "queued", "base"],
     "build-setup": ["constraints", "config_mismatches", "contract_mismatches", "optional_layers_existing",
                     "deptry_missing", "protected_gaps", "ignores_without_exception", "agents_missing", "hooks_missing",
@@ -403,6 +403,27 @@ class BuildPlanningTest(Base):
         d = self.status("build-planning")
         self.assertEqual(d["mode"], "blocked")
         self.assertEqual(d["blocked"], "M1 pipelines not all Approved (PL-01, PL-02); run pipeline-design")
+
+    def test_staged_roadmap_cuts_the_next_stage(self):
+        # S1 is cut into M1 (building); S2 has no milestone rows yet, so it is the next unit to plan.
+        self.write("docs/roadmap.md", (HERE / "fixtures" / "staged-roadmap.md").read_text(encoding="utf-8"))
+        d = self.status("build-planning")
+        self.assertEqual((d["mode"], d["stage_to_cut"], d["pipelines_inferred"]),
+                         ("extend", "S2 Classical portfolios", ["PL-03"]))
+        self.assertEqual(d["stage_unrouted"], [])
+        self.assertEqual(d["next_ids"], ["AD-04", "PL-05", "TC-04", "S3", "M2", "M1-T07"])
+        self.edit("docs/roadmap.md", "**Skills:** data-science", "**Skills:** data-science, rmt-tools")
+        self.edit("docs/roadmap.md", "**Plan:** [../tasks", "**Skills:** data-science\n**Plan:** [../tasks")
+        self.assertEqual(self.status("build-planning")["stage_unrouted"], ["rmt-tools (S1)"])
+        self.edit("docs/roadmap.md", "| M1 | S1 | Prices to covariance | quant | PL-01, PL-02 | — | Building |",
+                  "| M1 | S1 | Prices to covariance | quant | PL-01, PL-02 | — | Building |\n"
+                  "| M2 | S2 | Equal weight vs min-var | quant | PL-03 | M1 | Designed |")
+        d = self.status("build-planning")
+        self.assertEqual((d["mode"], d["stage_to_cut"], d["pipelines_inferred"]), ("extend", "none", []))
+        self.assertEqual(self.status("idea-refine")["roadmap_rows"],
+                         [{"id": "S1", "name": "Data + stats", "source": "brief", "status": "Building"},
+                          {"id": "S2", "name": "Classical portfolios", "source": "ideas/classical-portfolios.md",
+                           "status": "Designed"}])
 
     def test_explicit_pipelines_cell_is_not_reported_as_inferred(self):
         (self.root / "tasks/plan.md").unlink()

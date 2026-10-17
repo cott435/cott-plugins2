@@ -359,12 +359,32 @@ class TaskChecks(LintCase):
         self._add_tasks(12, lambda k: "M1-T05" if k == 7 else f"M1-T{k - 1:02d}")
         chain = " → ".join(f"M1-T{k:02d}" for k in [4, 5] + list(range(7, 19)))
         self.assertEqual(self.size_messages(), [
-            f"track is 16 tasks, cap 15: Phase 0 2 + chain {chain} (14). Shorten the chain, or split the milestone "
-            "where a later part needs an earlier part's outputs; never split independent tracks"])
+            f"track is 16 tasks, cap 15: serial Phase 0 2 + chain {chain} (14). Shorten the chain, run package "
+            "spines in parallel groups against the contract, or cut the stage into another milestone where a later "
+            "part needs an earlier part's outputs; never split independent tracks"])
 
     def test_milestone_size_at_cap_is_fine(self):
         self._add_tasks(11, lambda k: "M1-T05" if k == 7 else f"M1-T{k - 1:02d}")
         self.assertEqual(self.size_messages(), [])
+
+    def test_grouped_package_spines_count_as_a_chain(self):
+        # Contract-first Phase 0: package spines in a parallel group count through the chain; a Phase 0 task
+        # with no group (the contract task, the system spine) counts in full.
+        self.p.edit(PLAN, "**Depends on:** — · **Files likely:** src/quant/data/pipeline.py",
+                    "**Depends on:** — · **Parallel:** G0 · **Files likely:** src/quant/data/pipeline.py")
+        self.p.edit(PLAN, "**Depends on:** M1-T01 · **Files likely:** src/quant/stats/pipeline.py",
+                    "**Depends on:** — · **Parallel:** G0 · **Files likely:** src/quant/stats/pipeline.py")
+        self._add_tasks(12, lambda k: "M1-T05" if k == 7 else f"M1-T{k - 1:02d}")
+        self.assertEqual(self.size_messages(), [])
+        contract = ("### M1-T19: Freeze the data-stats contract\n"
+                    "**Package:** quant · **Step:** contract · **Size:** S · **Mode:** solo\n"
+                    "**Read:** data.load_prices\n**Acceptance:**\n- [ ] Every fixture validates against the schema\n"
+                    "**Verify:** `pytest tests/contracts`\n"
+                    "**Depends on:** — · **Files likely:** tests/contracts/data.load_prices/schema.json\n\n")
+        self.p.edit(PLAN, "### M1-T01:", contract + "### M1-T01:")
+        msgs = self.size_messages()
+        self.assertEqual(len(msgs), 1)
+        self.assertTrue(msgs[0].startswith("track is 16 tasks, cap 15: serial Phase 0 1 + chain M1-T02 → M1-T04"), msgs)
 
     def test_parallel_tracks_do_not_add_up(self):
         self._add_tasks(20, lambda k: "M1-T02")
@@ -379,6 +399,19 @@ class TaskChecks(LintCase):
         self.p.edit(PLAN, "**Read:** PL-02, TC-02, STAT-03, stats.clean_eigen",
                     "**Read:** PL-02, TC-02, STAT-03, stats.clean_eigen, data.load_prices")
         self.assertCode(PLAN, "parallel")
+
+    def test_parallel_may_share_a_frozen_contract_symbol(self):
+        self.p.edit(PLAN, "**Read:** PL-02, TC-02, STAT-03, stats.clean_eigen",
+                    "**Read:** PL-02, TC-02, STAT-03, stats.clean_eigen, data.load_prices")
+        self.assertCode(PLAN, "parallel")
+        contract = ("### M1-T07: Freeze the data-stats contract\n"
+                    "**Package:** quant · **Step:** contract · **Size:** S · **Mode:** solo\n"
+                    "**Read:** data.load_prices\n**Acceptance:**\n- [ ] Every fixture validates against the schema\n"
+                    "**Verify:** `pytest tests/contracts`\n"
+                    "**Depends on:** — · **Files likely:** tests/contracts/data.load_prices/schema.json\n\n")
+        self.p.edit(PLAN, "### M1-T01:", contract + "### M1-T01:")
+        self.p.edit("tasks/todo.md", "- [x] M1-T01", "- [ ] M1-T07 Freeze the data-stats contract (quant, S, solo)\n- [x] M1-T01")
+        self.assertNotIn((PLAN, "parallel"), self.found())
 
     def test_parallel_different_groups_is_fine(self):
         self.p.edit(PLAN, "src/quant/stats/rmt.py, tests/unit/quant/test_rmt.py", "src/quant/stats/rmt.py, src/quant/data/steps.py")

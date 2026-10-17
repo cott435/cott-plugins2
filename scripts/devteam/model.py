@@ -80,7 +80,13 @@ class Task:
 
     @property
     def is_spine(self) -> bool:
+        """In Phase 0: a spine, or the contract task that freezes the milestone's boundaries."""
         return "spine" in self.phase.lower() or self.phase.lower().startswith("phase 0")
+
+    @property
+    def is_contract(self) -> bool:
+        """The Phase 0 contract task (`**Step:** contract`)."""
+        return self.is_spine and self.step.lower() == "contract"
 
     @property
     def text(self) -> str:
@@ -318,6 +324,43 @@ def strategy_rows(doc: Doc) -> list[dict[str, str]]:
 
 
 # ---- roadmap ---------------------------------------------------------------------------------
+#
+# Two tables. Stages (`S<n>`, written by idea-refine) are outcomes the user agreed: Name, Source, Status*,
+# and a `## S<n>` section with Outline and Skills. Milestones (`M<n>`, written by build-planning once the
+# stage's pipelines are approved) are build-sized vertical slices of one stage: Stage, Name, Packages,
+# Pipelines, Depends, Status*, and a `## M<n>` section. A roadmap from before stages has only the milestone
+# table, with a Source column and no Stage column: each of its milestones stands for its own stage.
+
+@dataclass
+class Stage:
+    id: str
+    row: dict[str, str]                # stage table row ({} if only a section exists)
+    row_line: int | None
+    section: md.Heading | None
+    fields: dict[str, str] = field(default_factory=dict)
+
+    @property
+    def name(self) -> str:
+        return self.row.get("Name") or (self.section.title if self.section else "")
+
+    @property
+    def source(self) -> str:
+        return self.row.get("Source", "")
+
+    @property
+    def skills(self) -> list[str]:
+        """The section's `**Skills:**` line (idea-refine writes it): skills routed to this stage."""
+        return skill_names(self.fields.get("Skills", ""))
+
+    @property
+    def pipelines(self) -> list[str]:
+        """A stage lists no pipelines: `dt` infers them from its Source until build-planning cuts it."""
+        return []
+
+    @property
+    def packages(self) -> list[str]:
+        return []
+
 
 @dataclass
 class Milestone:
@@ -326,10 +369,17 @@ class Milestone:
     row_line: int | None
     section: md.Heading | None
     fields: dict[str, str] = field(default_factory=dict)
+    stage_of: Stage | None = None      # the stage its Stage cell names (None on a pre-stage roadmap)
 
     @property
     def name(self) -> str:
         return self.row.get("Name") or (self.section.title if self.section else "")
+
+    @property
+    def stage(self) -> str:
+        """The `S<n>` its Stage cell names, or ""."""
+        m = re.search(rf"\b{md.STAGE_ID}\b", self.row.get("Stage", ""))
+        return m.group(0) if m else ""
 
     @property
     def packages(self) -> list[str]:
@@ -345,12 +395,26 @@ class Milestone:
 
     @property
     def source(self) -> str:
-        return self.row.get("Source", "")
+        """Its own Source cell (pre-stage roadmaps), else its stage's."""
+        own = self.row.get("Source", "")
+        if md.strip_md(own) not in ("", "—", "-"):
+            return own
+        return self.stage_of.source if self.stage_of else own
 
     @property
     def skills(self) -> list[str]:
-        """The section's `**Skills:**` line (idea-refine writes it): skills routed to this milestone."""
-        return skill_names(self.fields.get("Skills", ""))
+        """The section's `**Skills:**` line; with none, its stage's (build-planning narrows a stage's skills
+        per milestone when it cuts the stage into several)."""
+        if "Skills" in self.fields or self.stage_of is None:
+            return skill_names(self.fields.get("Skills", ""))
+        return self.stage_of.skills
+
+    @property
+    def references(self) -> list[str] | None:
+        """The section's `**References:**` RF IDs, or None when it has no such line."""
+        if "References" not in self.fields:
+            return None
+        return re.findall(rf"\b{REFERENCE_ID}\b", self.fields["References"])
 
 
 def skill_names(value: str) -> list[str]:
@@ -359,21 +423,44 @@ def skill_names(value: str) -> list[str]:
     return [s for s in out if s and s.lower() not in ("—", "-", "none")]
 
 
-def milestones(doc: Doc) -> list[Milestone]:
-    out: dict[str, Milestone] = {}
+def _id_rows(doc: Doc, first_col: str, id_pat: str) -> list[tuple[str, dict[str, str], int]]:
+    out = []
     for _, head, rows in doc.tables():
-        if not head or head[0].lower() != "milestone":
+        if not head or head[0].lower() != first_col:
             continue
         for n, row in md.table_dicts(head, rows):
-            mid = md.strip_md(row.get(head[0], ""))
-            if re.fullmatch(md.MILESTONE_ID, mid):
-                out[mid] = Milestone(mid, row, n, None)
+            rid = md.strip_md(row.get(head[0], ""))
+            if re.fullmatch(id_pat, rid):
+                out.append((rid, row, n))
+    return out
+
+
+def stages(doc: Doc) -> list[Stage]:
+    out: dict[str, Stage] = {rid: Stage(rid, row, n, None) for rid, row, n in _id_rows(doc, "stage", md.STAGE_ID)}
+    for h in doc.headings:
+        if h.id and re.fullmatch(md.STAGE_ID, h.id):
+            s = out.setdefault(h.id, Stage(h.id, {}, None, None))
+            s.section = h
+            s.fields = md.fields_in(doc.lines, h.line + 1, h.end)
+    return sorted(out.values(), key=lambda s: int(s.id[1:]))
+
+
+def milestones(doc: Doc) -> list[Milestone]:
+    out: dict[str, Milestone] = {rid: Milestone(rid, row, n, None)
+                                 for rid, row, n in _id_rows(doc, "milestone", md.MILESTONE_ID)}
     for h in doc.headings:
         if h.id and re.fullmatch(md.MILESTONE_ID, h.id):
             m = out.setdefault(h.id, Milestone(h.id, {}, None, None))
             m.section = h
             m.fields = md.fields_in(doc.lines, h.line + 1, h.end)
+    by_id = {s.id: s for s in stages(doc)}
+    for m in out.values():
+        m.stage_of = by_id.get(m.stage)
     return sorted(out.values(), key=lambda m: int(m.id[1:]))
+
+
+def stage_milestones(doc: Doc, stage: str) -> list[Milestone]:
+    return [m for m in milestones(doc) if m.stage == stage]
 
 
 def status_column(head: list[str]) -> str | None:
@@ -417,11 +504,11 @@ class Reference:
 
     @property
     def milestones(self) -> list[str]:
-        """`M<n>` IDs, `["all"]`, or [] (`—`: not assigned yet)."""
+        """`S<n>` (stage) and `M<n>` IDs, `["all"]`, or [] (`—`: not assigned yet)."""
         value = self._get("Milestones")
         if value.lower() == "all":
             return ["all"]
-        return list(dict.fromkeys(re.findall(r"\bM\d+\b", value)))
+        return list(dict.fromkeys(re.findall(r"\b[SM]\d+\b", value)))
 
     def serves(self, milestone: str) -> bool:
         return "all" in self.milestones or milestone in self.milestones
@@ -451,8 +538,19 @@ def all_references(repo: Repo) -> list[Reference]:
 
 
 def milestone_references(repo: Repo, milestone: str) -> list[str]:
-    """The RF IDs whose `Milestones` field names this milestone (or `all`): derived, never listed twice."""
-    return [r.id for r in all_references(repo) if r.serves(milestone)]
+    """The RF IDs that serve a milestone or stage, derived and never listed twice: those whose `Milestones`
+    field names it (or `all`); for a milestone, also its section's `**References:**` line, or with no such
+    line, the references assigned to its stage."""
+    refs = all_references(repo)
+    out = [r.id for r in refs if r.serves(milestone)]
+    ms = next((m for m in milestones(repo.roadmap) if m.id == milestone), None) if repo.roadmap else None
+    if ms is not None:
+        if ms.references is not None:
+            extra = ms.references
+        else:
+            extra = [r.id for r in refs if ms.stage and ms.stage in r.milestones]
+        out += [i for i in extra if i not in out]
+    return out
 
 
 def split_ref(item: str) -> tuple[str, str]:

@@ -45,7 +45,7 @@ Start every run with `dt status --skill pipeline-design`. It prints the mode per
 
 `dt status` reports every mode. Two cases need judgment: a Revise starts from what the build found (the `revise` mode then holds until re-approval), and right after an architecture Grow the new packages show `new` while the old `pipelines.md` still holds their pipelines; that is Grow, not New.
 
-**In scope:** the next milestone's packages, or, when the user plans up front, every package and every milestone's workflows (a single package gets the pipelines of every stage, not only M1's). **Read:** the root and package architecture, each package's `contract.md`, the spec IDs in scope (`dt section STAT-01 STAT-02 …`, not the whole spec), `dt layout <pkg>` once code exists, and the `docs/references.md` entries whose `**Milestones:**` include the milestone (if `dt status` lists `references_unindexed`, `references_changed` or `references_missing`, route to `reference-intake` first). **Don't read** other packages' `pipelines.md`; their `contract.md` is all a step needs.
+**In scope:** the next stage's packages, or, when the user plans up front, every package and every stage's workflows (a single package gets the pipelines of every stage, not only S1's). `build-planning` cuts each stage into milestones once its pipelines are approved. **Read:** the root and package architecture, each package's `contract.md`, the spec IDs in scope (`dt section STAT-01 STAT-02 …`, not the whole spec), `dt layout <pkg>` once code exists, and the `docs/references.md` entries whose `**Milestones:**` include the stage (or one of its milestones) (if `dt status` lists `references_unindexed`, `references_changed` or `references_missing`, route to `reference-intake` first). **Don't read** other packages' `pipelines.md`; their `contract.md` is all a step needs.
 
 ## The Process (New Mode)
 
@@ -111,7 +111,7 @@ These rules are standard for every project. `build-setup` copies them into the R
 - Each step is owned by one component, and its function lives there.
 - No registries, plugin dispatch or config-driven wiring unless an `AD-NN` says so.
 - A new abstraction needs a second real implementation or a seam the architecture named.
-- Every step's spine version is real and minimal, often the baseline (sample covariance, equal weight, TWAP, a random policy). Never a mock, stub or hard-coded return value. It stays in the code as the thing upgrades must beat.
+- Every step's spine version is real and minimal, often the baseline (sample covariance, equal weight, TWAP, a random policy). Never a mock, stub or hard-coded return value. It stays in the code as the thing upgrades must beat. The one exception is across packages: a step calling another package may run against that boundary's contract fake (generated from the approved contract's fixtures) until the system spine swaps in the real provider; say so as `contract fake` in the Spine version.
 
 An exception backed by a decision goes on the affected row or pipeline, citing it (`env lookup by name (AD-06)`), so `build-setup` and reviewers can see it.
 

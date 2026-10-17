@@ -13,7 +13,7 @@ HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE.parent))
 
 import dt  # noqa: E402
-from devteam import model  # noqa: E402
+from devteam import md, model  # noqa: E402
 from devteam.commands import roadmap  # noqa: E402
 from devteam.repo import Repo  # noqa: E402
 
@@ -27,7 +27,9 @@ def run_dt(root: Path, *args: str) -> tuple[int, str, str]:
     return code, out.getvalue(), err.getvalue()
 
 
-class RoadmapTest(unittest.TestCase):
+class QuantCopy(unittest.TestCase):
+    """A throwaway copy of the quant fixture at self.root."""
+
     def setUp(self):
         self.tmp = Path(tempfile.mkdtemp())
         self.root = self.tmp / "quant"
@@ -51,6 +53,8 @@ class RoadmapTest(unittest.TestCase):
         repo = Repo(self.root)
         return {m.id: roadmap.milestone_status(repo, m) for m in model.milestones(repo.roadmap)}
 
+
+class RoadmapTest(QuantCopy):
     def test_fixture_is_current(self):
         self.assertEqual(self.statuses(), {"M1": "Building", "M2": "Designed"})
         code, out, _ = run_dt(self.root, "roadmap", "--check")
@@ -158,6 +162,89 @@ class RoadmapTest(unittest.TestCase):
         code, _, err = run_dt(self.root, "roadmap", "--check")
         self.assertEqual(code, 1)
         self.assertIn("no docs/roadmap.md", err)
+
+
+STAGED = HERE / "fixtures" / "staged-roadmap.md"     # the quant roadmap with stages S1, S2 and S1 cut into M1
+
+
+class StagedRoadmapTest(QuantCopy):
+    """Stages (idea-refine's rows) cut into milestones (build-planning's rows)."""
+
+    def setUp(self):
+        super().setUp()
+        self.write("docs/roadmap.md", STAGED.read_text(encoding="utf-8"))
+
+    def stage_statuses(self) -> dict[str, str]:
+        repo = Repo(self.root)
+        return {s.id: roadmap.stage_status(repo, s) for s in model.stages(repo.roadmap)}
+
+    def cut_s2(self, stage: str = "S2") -> None:
+        self.edit("docs/roadmap.md", "| M1 | S1 | Prices to covariance | quant | PL-01, PL-02 | — | Building |",
+                  "| M1 | S1 | Prices to covariance | quant | PL-01, PL-02 | — | Building |\n"
+                  f"| M2 | {stage} | Equal weight vs min-var | quant | PL-03 | M1 | |")
+
+    def test_fixture_is_current(self):
+        self.assertEqual(self.statuses(), {"M1": "Building"})
+        self.assertEqual(self.stage_statuses(), {"S1": "Building", "S2": "Designed"})
+        code, out, _ = run_dt(self.root, "roadmap", "--check")
+        self.assertEqual((code, out.strip()), (0, "roadmap: ok"))
+
+    def test_milestone_inherits_stage_source_and_skills(self):
+        repo = Repo(self.root)
+        m1 = model.milestones(repo.roadmap)[0]
+        self.assertEqual((m1.stage, md.strip_md(m1.source), m1.skills), ("S1", "brief", ["data-science"]))
+        self.edit("docs/roadmap.md", "**Plan:** [../tasks", "**Skills:** —\n**Plan:** [../tasks")
+        self.assertEqual(model.milestones(Repo(self.root).roadmap)[0].skills, [])
+
+    def test_cut_stage_and_write_both_tables(self):
+        self.cut_s2()
+        self.assertEqual(self.stage_statuses()["S2"], "Cut")
+        code, out, _ = run_dt(self.root, "roadmap")
+        self.assertEqual(code, 0)
+        self.assertIn("S2: Designed → Cut", out)
+        self.assertIn("M2: — → Designed", out)
+        text = (self.root / "docs/roadmap.md").read_text(encoding="utf-8")
+        self.assertIn("| S2 | Classical portfolios | ideas/classical-portfolios.md | Cut |", text)
+        self.assertIn("| M2 | S2 | Equal weight vs min-var | quant | PL-03 | M1 | Designed |", text)
+        self.write("tasks/queued/M2-equal-weight.md", "# M2: Equal weight — Plan\n\n**Milestone:** M2 · **Status:** Approved\n")
+        self.assertEqual(self.stage_statuses()["S2"], "Planned")
+
+    def test_stage_done_when_every_milestone_is(self):
+        self.edit("docs/roadmap.md", "**Exit:** PCA", "**Outcome:** Done 2026-11-02\n**Exit:** PCA")
+        self.assertEqual(self.stage_statuses()["S1"], "Done")
+
+    def test_uncut_stage_specced_and_idea(self):
+        self.edit("docs/packages/quant/pipelines.md", "**Status:** Approved", "**Status:** Draft")
+        self.assertEqual(self.stage_statuses()["S2"], "Specced")
+        self.edit("docs/ideas/classical-portfolios.md", "**Status:** Specced", "**Status:** Accepted")
+        self.assertEqual(self.stage_statuses()["S2"], "Idea")
+
+    def test_next_unit_is_the_stage_to_cut(self):
+        repo = Repo(self.root)
+        unit = roadmap.next_unit(repo)
+        self.assertEqual((type(unit).__name__, unit.id), ("Stage", "S2"))
+        self.assertEqual(roadmap.milestone_pipelines(repo, unit), (["PL-03"], True))
+        self.cut_s2()
+        unit = roadmap.next_unit(Repo(self.root))
+        self.assertEqual((type(unit).__name__, unit.id), ("Milestone", "M2"))
+
+    def test_next_ids(self):
+        code, out, _ = run_dt(self.root, "next-id", "S", "M")
+        self.assertEqual((code, out.split()), (0, ["S3", "M2"]))
+
+    def test_stage_references_serve_its_milestones(self):
+        self.edit("docs/references.md", "**Milestones:** M1", "**Milestones:** S1")
+        repo = Repo(self.root)
+        self.assertEqual(model.milestone_references(repo, "M1"), ["RF-01"])
+        self.assertEqual(model.milestone_references(repo, "S1"), ["RF-01"])
+        self.edit("docs/roadmap.md", "**Plan:** [../tasks", "**References:** —\n**Plan:** [../tasks")
+        self.assertEqual(model.milestone_references(Repo(self.root), "M1"), [])
+
+    def test_lint_roadmap_stage(self):
+        self.cut_s2("S9")
+        code, out, _ = run_dt(self.root, "lint", "docs/roadmap.md")
+        self.assertEqual(code, 1)
+        self.assertIn("M2 Stage S9: no such stage row", out)
 
 
 if __name__ == "__main__":

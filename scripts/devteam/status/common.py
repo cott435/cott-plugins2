@@ -90,7 +90,7 @@ def plan_state(repo: Repo) -> str:
 def roadmap_state(repo: Repo) -> str:
     if repo.roadmap is None:
         return "missing"
-    if not roadmap_cmd.status_table(repo.roadmap):
+    if not roadmap_cmd.has_status_table(repo.roadmap):
         return "no status column"
     return "stale (run dt roadmap)" if roadmap_cmd.differences(repo) else "ok"
 
@@ -115,7 +115,8 @@ def next_decision(repo: Repo) -> str:
 
 
 def next_ids(repo: Repo) -> list[str]:
-    out = [next_decision(repo)] + [repo.next_id(p) for p in ("PL", "TC", "M")]
+    stages = bool(repo.roadmap and model.stages(repo.roadmap))     # roadmaps from before stages have none
+    out = [next_decision(repo)] + [repo.next_id(p) for p in ("PL", "TC") + (("S",) if stages else ()) + ("M",)]
     plan = roadmap_cmd.active_plan(repo)
     if plan:
         out.append(repo.next_id(f"{model.milestone_of(plan)}-T"))
@@ -237,7 +238,7 @@ def summary(repo: Repo) -> list[str]:
     if drafts:
         shown = drafts[:5] + ([f"+{len(drafts) - 5} more"] if len(drafts) > 5 else [])
         out.append(f"draft (waiting for approval): {fmt(shown)}")
-    if repo.roadmap and roadmap_cmd.status_table(repo.roadmap) and roadmap_cmd.differences(repo):
+    if repo.roadmap and roadmap_cmd.has_status_table(repo.roadmap) and roadmap_cmd.differences(repo):
         out.append("roadmap: Status* column stale (run dt roadmap)")
     waiting = refs.state(repo).waiting
     if waiting:

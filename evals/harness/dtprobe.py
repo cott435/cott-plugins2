@@ -53,19 +53,28 @@ pipelines = [{"id": p.id, "doc": p.doc.rel, "doc_status": p.doc.status, "system"
               "package": p.package, "covers": p.covers,
               "steps": [{"name": s.name, "owner": s.owner, "covers": s.covers} for s in p.steps]}
              for p in model.all_pipelines(repo)]
-rows = []
+rows, stage_rows = [], []
 if repo.roadmap:
+    # Stages (dt versions before stages have none): a milestone's source, skills and references fall back to its stage's.
+    for st in (model.stages(repo.roadmap) if hasattr(model, "stages") else []):
+        stage_rows.append({"id": st.id, "name": st.name, "source": md.strip_md(st.source), "skills": st.skills,
+                           "outline": md.strip_md(st.fields.get("Outline", "")),
+                           "derived": roadmap_cmd.stage_status(repo, st)})
     for ms in model.milestones(repo.roadmap):
+        stage = getattr(ms, "stage_of", None)
         rows.append({"id": ms.id, "name": ms.name, "source": md.strip_md(ms.source), "packages": ms.packages,
                      "pipelines": ms.pipelines, "derived": roadmap_cmd.milestone_status(repo, ms),
                      "skills": getattr(ms, "skills", []), "outline": md.strip_md(ms.fields.get("Outline", "")),
+                     "stage": stage.id if stage else "", "stage_name": stage.name if stage else "",
+                     "stage_outline": md.strip_md(stage.fields.get("Outline", "")) if stage else "",
+                     "references": (model.milestone_references(repo, ms.id) if hasattr(model, "milestone_references") else []),
                      "depends": [md.strip_md(d) for d in md.split_list(ms.row.get("Depends", "")) if md.strip_md(d) not in ("—", "-", "")]})
 # docs/references.md entries (dt versions before the references feature have none).
 refs = [{"id": r.id, "title": r.title, "file": r.file, "hash": r.hash, "kind": r.kind, "milestones": r.milestones}
         for r in (model.all_references(repo) if hasattr(model, "all_references") else [])]
 print(json.dumps({
     "live_spec": sorted(live), "removed_spec": sorted(removed),
-    "pipelines": pipelines, "plans": plans, "roadmap": rows, "references": refs,
+    "pipelines": pipelines, "plans": plans, "roadmap": rows, "stages": stage_rows, "references": refs,
     "docs": {d.rel: d.status for d in sorted(repo.docs(), key=lambda d: d.rel)},
     "packages": repo.packages(),
 }))

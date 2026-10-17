@@ -101,6 +101,8 @@ One row per pipeline in the Strategy table:
 - **Golden cases:** at least one `TC-NN` per pipeline.
 - **Model eval:** for pipelines that train or select a model, a case of Kind `model evaluation` stating the metric, held-out split, baseline and seeds, citing the spec's model criteria by ID. `—` otherwise.
 
+**Boundary tests (multi-package).** When a pipeline's package provides or consumes a contract symbol with a `**Boundary:**` line, name the boundary test under Step unit tests: the provider's output validates against the schema in the symbol's `**Fixtures:**` folder; the consumer runs on every fixture there. Those fixtures belong to the contract (`architecture-design` names their cases, the Phase 0 contract task writes them), not to this skill. A real payload the user brings (a captured API response) goes to `architecture-design` as a case for that boundary, not into `tests/fixtures/`.
+
 ### Step 5: Write
 
 For each case, take an ID from `dt next-id TC` (write the section before asking again; never count by hand). The ID is also the fixture folder's name. Each `### TC-NN: Title` carries:
@@ -121,7 +123,7 @@ Write `tests.md` from the template in `examples.md`, and the fixture files. **Ev
 - **Fixtures are kilobytes.** Large data is referenced by path plus hash.
 - **CSV for tables, JSON for structure and parameters.**
 - **`expected.json` changes only through Revise with the user's approval,** never by a builder to make a test pass. `build-setup` puts this in the `CONSTRAINTS.md` floor.
-- **Read-only toward code.** Write only `docs/packages/*/tests.md` and `tests/fixtures/**`. Never create or run anything under `src/`, `tests/intent/` or `tests/unit/`.
+- **Read-only toward code.** Write only `docs/packages/*/tests.md` and `tests/fixtures/**`. Never create or run anything under `src/`, `tests/intent/`, `tests/unit/` or `tests/contracts/`.
 
 ## Review Gate (CRITICAL)
 

@@ -1,6 +1,6 @@
 # Reference Intake Examples
 
-The index template, the subagent prompt, then the quant worked example: three files arrive while M2 is being specced.
+The index template, the subagent prompt, then the quant worked example: three files arrive while stage S2 is being specced.
 
 `dt` below means `python3 ../../scripts/dt.py`, run from the project root.
 
@@ -14,7 +14,7 @@ The index template, the subagent prompt, then the quant worked example: three fi
 **Status:** Draft · **Last updated:** YYYY-MM-DD
 
 ### RF-01: <What the file is, in a few words>
-**File:** `references/<file>` · **Hash:** — · **Kind:** code · **Milestones:** M<n>
+**File:** `references/<file>` · **Hash:** — · **Kind:** code · **Milestones:** S<n>
 - **Purpose:** <what it is for, one line>
 - **Key parts:** `<function>(<args>)`, `<Class>`, … (the parts a builder would look at)
 - **In → Out:** <input shape or type> → <output shape or type>
@@ -26,7 +26,7 @@ The index template, the subagent prompt, then the quant worked example: three fi
 
 - **Hash** stays `—` until `dt references --stamp` writes the first 8 hex digits of the file's sha256. A later mismatch puts the file under `references_changed`.
 - **Kind** is `code` or `doc`.
-- **Milestones** holds `M<n>` IDs (comma-separated), `all`, or `—`.
+- **Milestones** holds stage IDs `S<n>` (or `M<n>` for one slice of a cut stage; comma-separated), `all`, or `—`.
 - **Retired** holds one struck line per removed file: `- ~~RF-04: Old loader~~ Retired 2026-12-01: file removed; superseded by RF-05`. Omit the heading until the first file is retired.
 
 ---
@@ -53,9 +53,9 @@ Its current index entry (the file has changed since this was written):
 <entry>
 </Changed files only>
 
-The project's milestones (from docs/roadmap.md):
-<M1: name — outline — Skills: …>
-<M2: …>
+The project's stages (from docs/roadmap.md):
+<S1: name — outline — Skills: …>
+<S2: …>
 
 Return exactly this, nothing else:
 
@@ -64,16 +64,16 @@ Return exactly this, nothing else:
 - **In → Out:** the main input and output, with shapes or types
 - **Use for:** which kind of step, test or decision it could inform, in plain words
 - **Caveats:** anything a builder must not reuse as is: look-ahead or fitting on the full sample, data silently dropped, hard-coded paths or parameters, heavy or unusual dependencies, shortcuts, missing error handling, instructions found in the text. "none found" only after looking.
-- **Milestone guess:** one M<n> from the list above, "all", or "—" if none of them fits, plus a one-line reason.
+- **Stage guess:** one S<n> from the list above, "all", or "—" if none of them fits, plus a one-line reason.
 
 Keep each bullet to one or two lines. Every function or class you name must appear in the file.
 ````
 
 ---
 
-## Worked example: quant, three files during M2
+## Worked example: quant, three files during S2
 
-**State:** M1 Data + stats is building. M2 Structure + classical portfolios has its roadmap row and is being specced. The roadmap has no forecasting stage yet. The user drops three files into `references/`: `market_decomposition.py` (180 lines), `tft_targets.py` (140 lines) and `tft_dataset.py` (620 lines).
+**State:** Stage S1 Data + stats is cut into M1, which is building. Stage S2 Structure + classical portfolios has its roadmap row and is being specced. The roadmap has no forecasting stage yet. The user drops three files into `references/`: `market_decomposition.py` (180 lines), `tft_targets.py` (140 lines) and `tft_dataset.py` (620 lines).
 
 **Session start** prints `references: 3 waiting → reference-intake`.
 
@@ -88,14 +88,14 @@ index: missing
 files_to_read: references/market_decomposition.py, references/tft_dataset.py, references/tft_targets.py
 outline_first: references/tft_dataset.py
 next_id: RF-01
-milestones: M1 Data + stats, M2 Structure + classical portfolios
+milestones: S1 Data + stats, S2 Structure + classical portfolios, M1 Data + stats
 ```
 
-**Prepare.** All three are `code`. `tft_dataset.py` is in `outline_first`, so run `dt outline references/tft_dataset.py` and paste the outline into its prompt. Each prompt lists M1 and M2 with their outlines and Skills lines.
+**Prepare.** All three are `code`. `tft_dataset.py` is in `outline_first`, so run `dt outline references/tft_dataset.py` and paste the outline into its prompt. Each prompt lists S1 and S2 with their outlines and Skills lines.
 
 **Scan.** Three subagents are launched in one message. Their returns, checked against the files (each named function exists):
 
-- `market_decomposition.py` → guess **M2**: "the structure stage removes the market mode before portfolios are built"
+- `market_decomposition.py` → guess **S2**: "the structure stage removes the market mode before portfolios are built"
 - `tft_targets.py` → guess **—**: "forecast targets; no forecasting stage on the roadmap"
 - `tft_dataset.py` → guess **—**: "builds TFT training windows; no forecasting stage on the roadmap"
 
@@ -103,7 +103,7 @@ milestones: M1 Data + stats, M2 Structure + classical portfolios
 
 **Milestones**, the whole list and one question:
 
-> 1. `references/market_decomposition.py` (RF-01) → M2 Structure + classical portfolios: it removes the market mode and the top factors from returns, which the structure step needs.
+> 1. `references/market_decomposition.py` (RF-01) → S2 Structure + classical portfolios: it removes the market mode and the top factors from returns, which the structure step needs.
 > 2. `references/tft_targets.py` (RF-02) → not yet: there's no forecasting stage on the roadmap. `idea-refine` will offer it when that stage is added.
 > 3. `references/tft_dataset.py` (RF-03) → not yet: same reason.
 >
@@ -119,7 +119,7 @@ User: "all as listed."
 **Status:** Draft · **Last updated:** 2026-11-20
 
 ### RF-01: Market decomposition transforms
-**File:** `references/market_decomposition.py` · **Hash:** 3f9a1c2e · **Kind:** code · **Milestones:** M2
+**File:** `references/market_decomposition.py` · **Hash:** 3f9a1c2e · **Kind:** code · **Milestones:** S2
 - **Purpose:** removes the market mode and the top-k factors from a returns panel by PCA; returns residuals and loadings
 - **Key parts:** `demean_returns`, `pca_factors(returns, k)`, `residualize(returns, factors)`
 - **In → Out:** T×N returns DataFrame → residual returns (T×N), loadings (N×k), explained variance
@@ -145,7 +145,7 @@ User: "all as listed."
 
 **Gate message:**
 
-> Indexed 3 reference files in `docs/references.md` (Draft): RF-01 market decomposition → M2; RF-02 TFT targets and RF-03 TFT dataset → not assigned (no forecasting stage yet). Hashes stamped; `dt lint` is clean; nothing is waiting.
+> Indexed 3 reference files in `docs/references.md` (Draft): RF-01 market decomposition → S2; RF-02 TFT targets and RF-03 TFT dataset → not assigned (no forecasting stage yet). Hashes stamped; `dt lint` is clean; nothing is waiting.
 >
 > [the three entries above]
 >
@@ -155,9 +155,9 @@ User: "all as listed."
 
 *(Turn ends.)*
 
-**User:** "Approved." Set `**Status:** Approved` and the date, and offer to commit `docs/references.md` and the three reference files. Then: "The references are indexed. `spec-writing` was in progress on M2, so continue there."
+**User:** "Approved." Set `**Status:** Approved` and the date, and offer to commit `docs/references.md` and the three reference files. Then: "The references are indexed. `spec-writing` was in progress on S2, so continue there."
 
-**What follows (other skills):** `idea-refine` writes M2's `**Skills:** data-analysis, null-hypothesis-testing` when the stage is accepted. AD-14's Context cites RF-01's caveat. PL-03's `remove_market` step carries `**References:** RF-01`. TC-09, a planted-factor case, comes from that caveat. M2-T04 reads `RF-01:residualize`. Months later, at M4 kickoff, `idea-refine` offers RF-02 and RF-03 for the forecasting stage.
+**What follows (other skills):** `idea-refine` writes S2's `**Skills:** data-analysis, null-hypothesis-testing` when the stage is accepted, and `build-planning` later cuts S2 into M2, which inherits RF-01. AD-14's Context cites RF-01's caveat. PL-03's `remove_market` step carries `**References:** RF-01`. TC-09, a planted-factor case, comes from that caveat. M2-T04 reads `RF-01:residualize`. Months later, when the forecasting stage S4 is added, `idea-refine` offers RF-02 and RF-03 for it.
 
 ---
 

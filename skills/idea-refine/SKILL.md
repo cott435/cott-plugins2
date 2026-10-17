@@ -1,6 +1,6 @@
 ---
 name: idea-refine
-description: Refines raw ideas into a sharp direction through structured divergent and convergent thinking. For a new project it writes a one-page plain-English brief (docs/brief.md); for a new feature in an existing project it writes a focused idea file (docs/ideas/<idea>.md) and edits the brief only if the project's goals change. Each accepted stage becomes a row in docs/roadmap.md. Use when an idea is still vague, when starting a new project, when adding a new feature idea to a project that already has a brief, or when assumptions need stress-testing before committing. Triggers on "ideate", "refine this idea", "write a brief", "I have a new idea for this project", or "stress-test my plan".
+description: Refines raw ideas into a sharp direction through structured divergent and convergent thinking. For a new project it writes a one-page plain-English brief (docs/brief.md); for a new feature in an existing project it writes a focused idea file (docs/ideas/<idea>.md) and edits the brief only if the project's goals change. Each accepted stage becomes a stage row in docs/roadmap.md: an outcome, never sized into milestones. Use when an idea is still vague, when starting a new project, when adding a new feature idea to a project that already has a brief, or when assumptions need stress-testing before committing. Triggers on "ideate", "refine this idea", "write a brief", "I have a new idea for this project", or "stress-test my plan".
 ---
 
 # Idea Refine
@@ -11,10 +11,10 @@ Turns a raw idea into a focused direction and writes it down for the user to rea
 
 | Mode | Writes | Purpose |
 |---|---|---|
-| **New project** | `docs/brief.md`; on acceptance, a roadmap row per agreed stage | *Why the project exists* — a page or less, plain English, readable in two minutes |
-| **Extend** (brief already exists) | `docs/ideas/<idea-slug>.md`, plus brief edits only if needed; on acceptance, a roadmap row | *Why this feature, and how it fits* — focused on one idea, with the context `spec-writing` needs to add it to the spec |
+| **New project** | `docs/brief.md`; on acceptance, a roadmap stage row per agreed stage | *Why the project exists* — a page or less, plain English, readable in two minutes |
+| **Extend** (brief already exists) | `docs/ideas/<idea-slug>.md`, plus brief edits only if needed; on acceptance, a roadmap stage row | *Why this feature, and how it fits* — focused on one idea, with the context `spec-writing` needs to add it to the spec |
 
-The brief stays the stable "why" of the whole project. Ideas carry the detail for each addition. Stages live in `docs/roadmap.md`, never as brief goals, so the brief doesn't have to re-aim at each stage. `spec-writing` reads whichever was produced. No spec is written until the user accepts.
+The brief stays the stable "why" of the whole project. Ideas carry the detail for each addition. Stages live in `docs/roadmap.md`, never as brief goals, so the brief doesn't have to re-aim at each stage. A stage is an outcome; `build-planning` later cuts it into build-sized milestones. `spec-writing` reads whichever was produced. No spec is written until the user accepts.
 
 ## When to Use
 
@@ -39,7 +39,7 @@ Each arrow waits on the user. Everything is written as a **Draft**; it only beco
 
 ### Phase 0: Mode Check
 
-Run `python3 ../../scripts/dt.py status --skill idea-refine`. The path is relative to this skill's folder: resolve it from where this SKILL.md lives, and run the command from the project root. It reports the mode, the brief and spec status, the brief's word and goal counts (`brief_words`, `brief_goals`), each idea file with its status (`ideas`), the existing roadmap rows (`roadmap_rows`), and the reference files waiting for intake (`references_unindexed`, `references_changed`, `references_missing`) or with no milestone yet (`references_unassigned`). If any are waiting, offer `reference-intake` first (default: run it, then come back) before relying on a reference.
+Run `python3 ../../scripts/dt.py status --skill idea-refine`. The path is relative to this skill's folder: resolve it from where this SKILL.md lives, and run the command from the project root. It reports the mode, the brief and spec status, the brief's word and goal counts (`brief_words`, `brief_goals`), each idea file with its status (`ideas`), the existing roadmap stages (`roadmap_rows`), and the reference files waiting for intake (`references_unindexed`, `references_changed`, `references_missing`) or with no milestone yet (`references_unassigned`). If any are waiting, offer `reference-intake` first (default: run it, then come back) before relying on a reference.
 
 - **New mode** — no brief exists. Run the full process and write `docs/brief.md`.
 - **Extend mode** — a brief exists. Read `docs/brief.md`, `docs/spec.md` (if present), `docs/roadmap.md` (if present), and any open ideas in `docs/ideas/` *before* asking anything. The existing problem, goals, constraints, Not Doing list, and approved requirements are now constraints on the new idea. Follow [Extend Mode](#extend-mode-adding-an-idea-to-an-existing-project) for what to write.
@@ -125,7 +125,7 @@ In extend mode, skip to [Extend Mode](#extend-mode-adding-an-idea-to-an-existing
 - **Short sentences, short bullets.** One idea per bullet. No bullet longer than two lines.
 - **Data needs, not data vendors.** For ML and data projects, say what data the project depends on in plain terms ("10+ years of daily US stock prices, including companies that no longer exist") as a constraint or a bet. Name a specific source only if it's fixed (our own data, a required benchmark). Choosing APIs and datasets happens in the architecture, after the spec.
 - **Goals are numbered** so `spec-writing` can trace requirements back to them ("serves Goal 2").
-- **3-5 goals, project-level and stage-neutral.** A goal is an outcome of the whole project ("Honest estimates of risk"), never a stage ("Stage 2: PCA works"). If the user describes the project in stages, the stages become roadmap rows (see [Roadmap Rows](#roadmap-rows)), and every goal stays true whichever stage is being built. More than five goals means the project isn't focused yet — go back to Phase 2.
+- **3-5 goals, project-level and stage-neutral.** A goal is an outcome of the whole project ("Honest estimates of risk"), never a stage ("Stage 2: PCA works"). If the user describes the project in stages, the stages become roadmap stage rows (see [Roadmap Stages](#roadmap-stages)), and every goal stays true whichever stage is being built. More than five goals means the project isn't focused yet — go back to Phase 2.
 - **The Not Doing list is mandatory.** It is the most valuable part: it makes trade-offs explicit.
 
 Check the word count (`wc -w docs/brief.md`) before presenting it.
@@ -134,18 +134,18 @@ Check the word count (`wc -w docs/brief.md`) before presenting it.
 
 After saving the Draft (brief, or idea file plus any brief edits):
 
-1. Tell the user what was written and where, with a three-line summary: the problem, the top goal (or the idea's recommended direction), and the biggest thing on the Not Doing list. In extend mode, also say whether the brief changed and list the edited sections. Name the roadmap row(s) you'll add on acceptance (`M3: Classical portfolios`), each with its proposed skills and references (see [Roadmap Rows](#roadmap-rows)) as one question with your proposal as the default.
+1. Tell the user what was written and where, with a three-line summary: the problem, the top goal (or the idea's recommended direction), and the biggest thing on the Not Doing list. In extend mode, also say whether the brief changed and list the edited sections. Name the roadmap stage(s) you'll add on acceptance (`S3: Classical portfolios`), each with its proposed skills and references (see [Roadmap Stages](#roadmap-stages)) as one question with your proposal as the default.
 2. Ask them to read it and either **accept** it or request changes.
 3. **STOP YOUR TURN.** Do not start the spec in the same turn.
 
-**No live user** (a headless run): don't invent confirmations. Write the Draft, put what the user must confirm (the direction, goals, stages) under Open questions, leave it Draft, add no roadmap row, and stop.
+**No live user** (a headless run): don't invent confirmations. Write the Draft, put what the user must confirm (the direction, goals, stages) under Open questions, leave it Draft, add no roadmap stage, and stop.
 
 **Handling the reply.** Requested edits are the whole turn. Never edit the brief or idea file and draft the spec in the same turn.
 
 | The user says | Do | Then |
 |---|---|---|
-| Accepted, nothing to change | Change `**Status:** Draft` to `**Status:** Accepted` and update the date, on whichever of the brief and idea file were written or edited. Add the roadmap row(s) with their Skills lines, and the milestone on each reference assigned. Offer to commit them; commit only on a yes | Hand off to `spec-writing` to write or update `docs/spec.md` |
-| Accepted, with a change ("accepted, but drop the leaderboard") | Make exactly that edit. If the user fully specified it, set Accepted and add the roadmap row(s). If it needs your judgment, keep Draft. | **Stop.** List what you changed. The spec starts next turn, after the user has seen the edit. |
+| Accepted, nothing to change | Change `**Status:** Draft` to `**Status:** Accepted` and update the date, on whichever of the brief and idea file were written or edited. Add the roadmap stage(s) with their Skills lines, and the stage on each reference assigned. Offer to commit them; commit only on a yes | Hand off to `spec-writing` to write or update `docs/spec.md` |
+| Accepted, with a change ("accepted, but drop the leaderboard") | Make exactly that edit. If the user fully specified it, set Accepted and add the roadmap stage(s). If it needs your judgment, keep Draft. | **Stop.** List what you changed. The spec starts next turn, after the user has seen the edit. |
 | Changes requested | Edit, keep Draft | Repeat this gate |
 
 ## Extend Mode: Adding an Idea to an Existing Project
@@ -184,7 +184,7 @@ When `docs/brief.md` already exists, the new idea gets its own file and must ear
 - **Serves:** Goal 2 (and new Goal 4, if added)
 - **Touches:** [existing features and spec IDs this changes or depends on, e.g. EDIT-03]
 - **Brief changes:** [None — or the sections edited, in one line: "Goal 4 added; Not doing narrowed"]
-- **Milestone:** [New M3 (roadmap row on acceptance) — or "joins M2", when the user puts it in a stage not yet planned]
+- **Stage:** [New S3 (roadmap stage on acceptance) — or "joins S2", when the user puts it in a stage not yet being built]
 
 ## Recommended direction
 [1-3 paragraphs on how it should work from the user's point of view, and why this direction over the others.]
@@ -219,17 +219,17 @@ When `docs/brief.md` already exists, the new idea gets its own file and must ear
 
 **Idea status lifecycle:** `Draft` → `Accepted` (user approved here) → `Specced` (set by `spec-writing` once the spec is approved). Parked ideas get `Parked` with a one-line reason, so they aren't re-proposed blindly. **A `Specced` idea is frozen.** It records why the feature was added, as it stood that day. `spec-writing` adds a one-line banner saying so, and nobody edits the file afterwards. The spec is the current description. When a new idea changes what a `Specced` one describes, such as a narrowed holdout or a merged stage, the new idea gets its own file and names the old one under *Touches*. The old file is not edited.
 
-## Roadmap Rows
+## Roadmap Stages
 
-Stages live in `docs/roadmap.md`. A stage (milestone) delivers one working capability the user can run end to end, such as "Data + stats" or "Classical portfolios". `build-planning` later fills in its packages, pipelines and exit criteria.
+Stages live in `docs/roadmap.md`. A stage is an outcome the user agreed: what they can do when it's done, such as "Data + stats" or "See my spending". It is coarse and unsized. **Don't size it:** no task estimates, no pipeline counts, no splitting a stage because it looks big. Two stages differ by outcome, never by size. Once a stage's pipelines are approved, `build-planning` cuts it into build-sized milestones (`M<n>`), each a vertical slice it can run end to end, and owns those rows.
 
-**Add rows only when the user accepts** (Phase 4):
-- **New mode:** one row per stage the user agreed in conversation, Source `brief`. If only the first stage is known, add just that one.
-- **Extend mode:** one row for the idea, Source `ideas/<slug>.md`. Skip it only when the idea's *Milestone* line says it joins a stage not yet planned.
+**Add stages only when the user accepts** (Phase 4):
+- **New mode:** one stage per outcome the user agreed in conversation, Source `brief`. If only the first is known, add just that one.
+- **Extend mode:** one stage for the idea, Source `ideas/<slug>.md`. Skip it only when the idea's *Stage* line says it joins a stage not yet being built.
 
-Each row takes its ID from `python3 ../../scripts/dt.py next-id M`, a short name, and its Source. Packages, Pipelines and Depends get `—`, even when you can guess them: `build-planning` fills them, from the pipelines `dt` infers from the Source's spec IDs. Leave the Status* cell empty, then run `python3 ../../scripts/dt.py roadmap`, which fills it. Under the table, add a `## M<n>: <Name>` section with one plain-English `**Outline:**` line (what the user can do when the stage is done) and one `**Skills:**` line.
+Each stage takes its ID from `python3 ../../scripts/dt.py next-id S`, a short name, and its Source. Leave the Status* cell empty, then run `python3 ../../scripts/dt.py roadmap`, which fills it. Under the tables, add a `## S<n>: <Name>` section with one plain-English `**Outline:**` line (what the user can do when the stage is done) and one `**Skills:**` line. Packages, pipelines, dependencies and milestones are not yours: `build-planning` writes the milestone table and its `## M<n>` sections.
 
-**Stage skills and references.** The `**Skills:**` line is the one record of which skills serve a stage; later skills start from it and `build-planning` checks each one lands on a task. Propose the skills whose descriptions fit the stage (project `.claude/skills/*/SKILL.md` and the installed skills in your context), and ask once: "Route data-analysis and null-hypothesis-testing to M2? [yes / edit]". None fit → `**Skills:** —`. Also offer each `references_unassigned` entry that serves the stage ("RF-02 and RF-03 (TFT) → M4? [yes / edit]"). On acceptance, write the line and set `**Milestones:**` on each RF entry the user assigned (`—` becomes `M4`; otherwise append). Those two fields are all you write in the roadmap sections and `docs/references.md`.
+**Stage skills and references.** The `**Skills:**` line is the one record of which skills serve a stage; later skills start from it and `build-planning` checks each one lands on a milestone and then a task. Propose the skills whose descriptions fit the stage (project `.claude/skills/*/SKILL.md` and the installed skills in your context), and ask once: "Route data-analysis and null-hypothesis-testing to S2? [yes / edit]". None fit → `**Skills:** —`. Also offer each `references_unassigned` entry that serves the stage ("RF-02 and RF-03 (TFT) → S4? [yes / edit]"). On acceptance, write the line and set `**Milestones:**` on each RF entry the user assigned to the stage ID (`—` becomes `S4`; otherwise append). Those two fields are all you write in the roadmap sections and `docs/references.md`.
 
 If `docs/roadmap.md` doesn't exist, create it:
 
@@ -238,20 +238,20 @@ If `docs/roadmap.md` doesn't exist, create it:
 
 **Last updated:** YYYY-MM-DD
 
-| Milestone | Name | Source | Packages | Pipelines | Depends | Status* |
-|---|---|---|---|---|---|---|
-| M1 | [Name] | brief | — | — | — | |
+| Stage | Name | Source | Status* |
+|---|---|---|---|
+| S1 | [Name] | brief | |
 
 *Written by `dt roadmap` from doc statuses and todo checkboxes; never hand-edited.
 
-## M1: [Name]
+## S1: [Name]
 **Outline:** [What the user can do when this stage is done, in one sentence.]
 **Skills:** [skill names routed to this stage, comma-separated, or —]
 ```
 
-Add rows; never renumber, reorder or edit existing ones. Status* belongs to `dt roadmap`, and the other columns to `build-planning`.
+Add stages; never renumber, reorder or edit existing ones. Status* belongs to `dt roadmap`; the milestone table and `## M<n>` sections to `build-planning`. A roadmap from before stages has only a milestone table (with a Source column): add the stage table above it for the first new stage, and leave the old rows as they are.
 
-Read `examples.md` in this skill directory for examples of full sessions, finished briefs (including a quant package with its first roadmap rows), extend-mode idea files (including an ML feature), and stage skills and references.
+Read `examples.md` in this skill directory for examples of full sessions, finished briefs (including a quant package with its first roadmap stages), extend-mode idea files (including an ML feature), and stage skills and references.
 
 ## Common Rationalizations
 
@@ -263,6 +263,7 @@ Read `examples.md` in this skill directory for examples of full sessions, finish
 | The brief needs more detail to be useful | Detail belongs in the spec. A brief nobody finishes reading defines nothing. |
 | The user said "go", so I'll write the brief and spec together | The gate exists so the *why* is agreed before the *what*. Stop after the brief or idea file. |
 | This stage needs its own brief goal | Stages are roadmap rows. A goal per stage is how briefs grew to six or seven goals and stopped describing the project. |
+| This stage is big, I'll split it into two | Size is `build-planning`'s call, once pipelines exist: it cuts a stage into milestones. Split stages only when the outcomes differ. |
 | I'll just add the new feature to the brief | The brief is the whole project's why. Feature detail belongs in an idea file; the brief changes only if goals or constraints do. |
 | This feature is small, it doesn't need an idea file | Small ideas get short idea files. `spec-writing` still needs to know what it fits, what it touches, and what's out. |
 | The new idea is clearly good, no need for a fit check | Good ideas that serve a different user or problem dilute the project. Check fit first. |
@@ -273,7 +274,8 @@ Read `examples.md` in this skill directory for examples of full sessions, finish
 - No assumptions surfaced before committing to a direction
 - Brief over one page, full of jargon, file paths or tech choices, containing requirements, or with no Not Doing list
 - Goals that are features ("Add a dashboard") instead of outcomes ("Owners see weekly sales without logging in"), that name a stage, more than five of them, or one added per stage
-- A roadmap row added before acceptance, a Status* cell typed by hand, or an existing row edited
+- A roadmap stage added before acceptance, a Status* cell typed by hand, or an existing row edited
+- A stage sized or split for size, or given milestones, packages, pipelines or dependencies
 - A new stage with no `**Skills:**` line, skills or references routed without asking, or a reference cited by path
 - Spec work started before the brief or idea file was marked Accepted
 - Extend mode: feature detail written into the brief, existing goals renumbered, or the brief and spec not read first
@@ -288,7 +290,7 @@ Before handing off to `spec-writing`:
 - [ ] The target user and what success looks like are defined
 - [ ] Multiple directions were explored and the user chose one
 - [ ] The turn ended after the Draft was saved; acceptance came in a later turn, and Status reads `Accepted` only after the user said so (headless: left Draft)
-- [ ] On acceptance, each accepted stage has a roadmap row (ID from `dt next-id M`, Packages/Pipelines/Depends `—`, Status* filled by `dt roadmap`) and a section with Outline and the confirmed `**Skills:**`; assigned references carry its ID; a commit only on the user's yes
+- [ ] On acceptance, each accepted stage has a stage row (ID from `dt next-id S`, Source, Status* filled by `dt roadmap`; no milestone rows) and a section with Outline and the confirmed `**Skills:**`; assigned references carry its ID; a commit only on the user's yes
 - [ ] New mode: `docs/brief.md` follows the template, is under ~450 words, has 3-5 numbered outcome goals (not features or stages) and a Not Doing list with a reason per item
 - [ ] Extend mode: the fit check was answered and the user agreed with it
 - [ ] Extend mode: the idea file follows the template, covers one idea, has no requirements, and its *How it fits* names the goals served, spec IDs touched, and brief changes (or "None")

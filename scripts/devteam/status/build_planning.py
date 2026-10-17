@@ -1,6 +1,7 @@
 """`dt status --skill build-planning`: the active milestone, its coverage and task rules, and the mode
-(new · extend · replan · advance · foreign · current · blocked). A roadmap row with no Pipelines yet gets
-them inferred from its Source (`roadmap.milestone_pipelines`), printed as `pipelines_inferred`."""
+(new · extend · replan · advance · foreign · current · blocked). The next unit to plan is a milestone, or a
+stage with no milestone rows yet (`stage_to_cut`), whose pipelines are inferred from its Source
+(`roadmap.milestone_pipelines`) and printed as `pipelines_inferred` for build-planning to divide."""
 from __future__ import annotations
 
 import re
@@ -84,6 +85,23 @@ def unrouted(repo: Repo) -> tuple[list[str], list[str]]:
     return refs_out, skills_out
 
 
+def stage_unrouted(repo: Repo) -> list[str]:
+    """For each cut stage: a stage skill on none of its milestones' Skills, or a reference assigned to the
+    stage that none of its milestones serves. Items read `data-analysis (S1)`, `RF-02 (S1)`."""
+    if not repo.roadmap:
+        return []
+    out = []
+    for st in model.stages(repo.roadmap):
+        mss = model.stage_milestones(repo.roadmap, st.id)
+        if not mss:
+            continue
+        on = {s for m in mss for s in m.skills}
+        served = {r for m in mss for r in model.milestone_references(repo, m.id)}
+        out += [f"{s} ({st.id})" for s in st.skills if s not in on]
+        out += [f"{r} ({st.id})" for r in model.milestone_references(repo, st.id) if r not in served]
+    return out
+
+
 def draft_pipelines(repo: Repo, tasks: list[model.Task], pipelines: list[str]) -> list[str]:
     """The milestone's and the tasks' pipelines whose doc is back to Draft."""
     ids = set(pipelines) | {m.group(0) for t in tasks if (m := re.match(r"PL-\d{2,}", t.step))}
@@ -160,11 +178,8 @@ def build_planning(repo: Repo, r: Report) -> None:
     queued = sorted(f"{roadmap_cmd._plan_milestone(d) or '?'} ({d.rel})" for d in repo.docs("queued-plan"))
     available = available_skills(repo)
 
-    # The next milestone that still needs a plan.
-    target = None
-    if repo.roadmap:
-        target = next((ms for ms in model.milestones(repo.roadmap)
-                       if roadmap_cmd.milestone_status(repo, ms) in ("Idea", "Specced", "Designed")), None)
+    # The next milestone that still needs a plan, or the next stage that still needs cutting into milestones.
+    target = roadmap_cmd.next_unit(repo)
     blocked, focus = None, ms_row if active else None   # focus: the milestone this run plans or replans
     if plan is not None and not model.is_dev_team_plan(plan) and _has_unchecked(plan):
         mode = "foreign"
@@ -217,11 +232,13 @@ def build_planning(repo: Repo, r: Report) -> None:
     r.add("mode_violations", mode_violations(tasks))
     r.add("draft_pipelines", drafts)
     r.add("changed_since_plan", changed)
+    r.add("stage_to_cut", f"{focus.id} {focus.name}" if isinstance(focus, model.Stage) else "none")
     r.add("pipelines_inferred", inferred_pls)
     r.add("milestone_references", model.milestone_references(repo, focus.id) if focus is not None else [])
     r.add("milestone_skills", focus_skills)
     r.add("references_unrouted", refs_unrouted)
     r.add("skills_unrouted", skills_unrouted)
+    r.add("stage_unrouted", stage_unrouted(repo))
     r.add("skills_missing", skills_missing(active, tasks, available, focus_skills))
     r.add("skills_available", available)
     r.add("grow_triggers", grow_triggers(repo))

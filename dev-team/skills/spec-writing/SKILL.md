@@ -9,7 +9,7 @@ The brief (`docs/brief.md`) says **why** the project exists; idea files (`docs/i
 
 **Writes:** `docs/spec.md`, and the Status line of the brief or idea file it takes as input.
 
-**IDs:** each feature gets a stable **feature code** of 2-5 capitals (`SAVE`, `TEXT`), chosen once and never renamed; `RF` is reserved for references. Requirements are numbered under their code (`SAVE-01`), plus `DATA-NN` and `QR-NN`. Every feature serves a goal (else it's missing from the brief or shouldn't be built).
+**IDs:** each feature gets a stable **feature code** of 2-5 capitals (`SAVE`, `TEXT`), chosen once and never renamed; `RF` (references) and `PB` (probes) are reserved. Requirements are numbered under their code (`SAVE-01`), plus `DATA-NN` and `QR-NN`. Every feature serves a goal (else it's missing from the brief or shouldn't be built).
 
 **Not for:** vague ideas or projects with no brief (`idea-refine` first); technical design, pipelines or tasks; one-line fixes with obvious behavior.
 

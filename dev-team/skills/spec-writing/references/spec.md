@@ -51,7 +51,7 @@ Read before writing or extending `docs/spec.md`, and again for the hygiene check
 - [Assumptions the user confirmed]
 
 ## Open questions
-- [Unresolved items, each with who can answer it. Omit if none.]
+- [Unresolved items, each with who can answer it. Omit if none. A question about what an external source really returns is "answered by a probe during architecture".]
 
 ## Changelog
 | Date | Change | Source | IDs |

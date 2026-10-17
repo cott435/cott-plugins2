@@ -15,7 +15,7 @@ A milestone is planned from its pipelines' steps: each step has one owner, one m
 Phases name the usual waves; the dependency graph (`tasks.md` step 9) decides what may start. Tester halves of split tasks start right after the interface.
 
 **a. Interface task** (`**Kind:** interface`, `**Step:** contract`, solo, `**Depends on:** —`). It freezes, as code, every boundary in the milestone whose two sides belong to different tasks:
-- each contract `type` section the milestone's steps pass (`In → Out`), written into its owner's `types.py`, with a schema (pandera for a frame, JSON Schema across runtimes) and one sample per case in `tests/contracts/<component>.<Type>/`
+- each contract `type` section the milestone's steps pass (`In → Out`), written into its owner's `types.py`, with a schema (pandera for a frame, JSON Schema across runtimes) and one sample per case in `tests/contracts/<component>.<Type>/`. A case naming a probe sample (`PB-01 samples/sync_added.json#0`) puts `PB-01:samples` in `Read:`; the task derives the type's sample from it, never copies it
 - each new step's signature in its owner module, with the body `raise NotImplementedError("<task id>")` naming the task that replaces it
 - for each function a pipeline calls from another pipeline or package (its `**Boundary:**` line): a fixture-backed fake serving its fixtures, where the caller's tests load it
 - each component's `__init__.py` exports

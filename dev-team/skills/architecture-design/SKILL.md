@@ -9,7 +9,7 @@ The architecture (`docs/architecture.md`) says **how** the spec gets built: comp
 
 **Not for:** what or why (`spec-writing`, `idea-refine`); pipelines, file layout and tasks (`pipeline-design`, `build-planning`); API style rules (`api-and-interface-design` if available).
 
-It owns `docs/architecture.md`, each package's `contract.md` and, in a multi-package design, each package's `architecture.md`. It mints the `AD-NN` decision IDs, the System pipelines' `PL-NN` IDs, and the contract IDs `<id>.<symbol>`.
+It owns `docs/architecture.md`, each package's `contract.md` and, in a multi-package design, each package's `architecture.md`. It mints the `AD-NN` decision IDs, the System pipelines' `PL-NN` IDs, and the contract IDs `<id>.<symbol>`. It writes a decision's `**Probe:**` line, never `docs/probes.md` or `probes/` (`api-probe`'s).
 
 `dt` means `python3 ../../scripts/dt.py`, relative to this skill's folder, run from the project root.
 
@@ -23,7 +23,7 @@ Start with `dt status --skill architecture-design`. Take the mode, shape, gap ke
 |---|---|---|
 | **New** | No `docs/architecture.md` | `references/new.md` |
 | **Extend** | Uncovered or changed spec requirements | `references/extend.md` |
-| **Revise** | A technical change with no spec change | `references/revise.md` |
+| **Revise** | A technical change with no spec change, or probe results to fold in (`probes_answered`, `probes_failed`) | `references/revise.md` |
 | **Grow** | A Grow trigger fires, or the user wants a split | `references/grow.md` |
 | **Sync** | Code and doc disagree, or code has no doc | `references/sync.md` |
 
@@ -33,7 +33,7 @@ Start with `dt status --skill architecture-design`. Take the mode, shape, gap ke
 
 ## Review Gate (CRITICAL)
 
-Rerun `dt status`: `uncovered`, `changed_since` and `stale` empty, or each gap under Risks and open questions; `broken_fences` (move lines added after a closing fence inside it), `contracts_missing` and `legacy_layout` empty. `dt lint docs/` reports no errors. Check by hand that a superseded decision is cited only by its own line, its replacement and the Changelog, and that nothing Accepted contradicts a newer decision (search the counts, ranges and names changed).
+Rerun `dt status`: `uncovered`, `changed_since` and `stale` empty, or each gap under Risks and open questions; `broken_fences` (move lines added after a closing fence inside it), `contracts_missing`, `legacy_layout` and `probes_failed` empty. `dt lint docs/` reports no errors. Check by hand that a superseded decision is cited only by its own line, its replacement and the Changelog, and that nothing Accepted contradicts a newer decision (search the counts, ranges and names changed).
 
 Then:
 1. Summarize: files, shape, components or packages, decisions needing attention, uncovered requirements.
@@ -44,7 +44,7 @@ Approval is an unambiguous yes in the user's words; a hedge ("looks fine I guess
 
 | The user says | Do | Then |
 |---|---|---|
-| Approved, nothing to change | Set `Approved` on every doc and contract touched, `Proposed` decisions to `Accepted`, the date. Offer to commit; commit only on a yes | **Stop.** Next is `pipeline-design` |
+| Approved, nothing to change | Set `Approved` on every doc and contract touched, `Proposed` decisions to `Accepted`, the date. A decision whose `**Probe:**` names a probe not Answered or Waived stays `Proposed`, with its Risks line. Offer to commit; commit only on a yes | **Stop.** Next is `pipeline-design`, and `api-probe` for each probe with no entry yet |
 | Approved, with a change | Make exactly that edit. Fully specified and changing no decision or contract: set Approved. Otherwise keep Draft | **Stop.** List what you changed |
 | Changes requested | Edit, keep Draft | Repeat this gate |
 

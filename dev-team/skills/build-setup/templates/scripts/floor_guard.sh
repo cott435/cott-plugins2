@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Floor checks on the diff (CONSTRAINTS.md Floor, CR-01 to CR-04, CR-07, CR-08): new suppression
 # comments, stubs, weakened or assertion-free tests, secrets, a loosened tool config, and
-# imports from references/ or references/ put on an import path.
+# imports from references/ or probes/, or either folder put on an import path.
 # Diff-scoped, so code that was already there is not judged again.
 #
 #   scripts/floor_guard.sh                default base: refs/checks/base, else HEAD

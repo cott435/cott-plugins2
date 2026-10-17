@@ -11,7 +11,7 @@ The standing quality bar. `pyproject.toml` and `scripts/check.sh` enforce it; ev
 - **CR-05** Oracle files (`tests/fixtures/**/expected.json`) change only with the user's approval
 - **CR-06** The implementer never changes `tests/intent/**`
 - **CR-07** This file, `pyproject.toml` tool config, `scripts/` and `.claude/agents/` are not weakened to make a change pass
-- **CR-08** Nothing imports from `references/` or adds it to `sys.path` (or `PYTHONPATH`, pytest `pythonpath`). References are outside the tooling, so imported code would bypass the bar; `floor_guard.sh` checks the diff for both. Code copied from a reference is project code and meets the same bar
+- **CR-08** Nothing imports from `references/` or `probes/`, or adds either to `sys.path` (or `PYTHONPATH`, pytest `pythonpath`). References and probe scripts are outside the tooling, so imported code would bypass the bar; `floor_guard.sh` checks the diff for both. Code copied from either is project code and meets the same bar
 - **CR-09** A frozen interface (`tests/contracts/<id>.<symbol>/`: schema, samples, fake; and the types, signatures and exports the interface task wrote) is frozen once it exists at the task's base. Only the interface task freezing it (`**Kind:** interface`) writes a new folder, and no other task's `Writes:` names its `types.py` or `__init__.py`; a frozen interface changes only through `architecture-design` Revise, never to make a test pass
 
 ## Readability
@@ -58,7 +58,7 @@ Run by the reviewer agent at every checkpoint and at milestone exit, over the di
 4. **Tests:** no assertion-free tests, no weakened intent tests, golden cases still loaded from fixtures, Hypothesis on the `ci` profile.
 5. **Docs:** `dt lint` clean, contracts fresh, no pre-build sections left after the spine.
 6. **External check:** pip-audit ran, so the bar isn't made entirely of the agent's own tests.
-7. **References:** where reference code was reused, its Caveats (`docs/references.md`) were handled (e.g. a full-sample fit became per-window), and it fits the contract and step table rather than the reference's own structure.
+7. **References:** where reference or probe code was reused, its Caveats (`docs/references.md`, `docs/probes.md`) were handled (e.g. a full-sample fit became per-window), and it fits the contract and step table rather than the reference's own structure.
 
 Findings go under the checkpoint block in `tasks/plan.md` (`dt finding`), each with a fix task or a reason. Critical findings block the next checkpoint.
 

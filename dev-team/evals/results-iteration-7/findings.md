@@ -2,6 +2,13 @@
 
 **Skills:** branch `interface-first-design` at `41d2ebd` (interface-first planning; every skill restructured as its role plus one file per mode). **Grader:** the same commit. **Models:** Opus 5.5 agent, Sonnet simulated user, Opus 5.5 blind judge (both orders). n=1 per trajectory, no cost cap. Run on 2026-10-17. Raw runs are in `../../../../dev-team-workspace/iteration-7/`; the packaged runs are in `bench/` there.
 
+**Flow pages** (workflow-analyzer, drawn by `runviz.py` at the end of `run.sh`; 33 MB with the projects' file contents, so they stay in the workspace and are never committed):
+- all runs: `dev-team-workspace/iteration-7/runflow/index.html`
+- one run: `dev-team-workspace/iteration-7/<trajectory>/with_skill/flow/flow.html` (turn and agent pages in `turns/`, `units/`)
+- its plan map: `…/flow/plan/index.html`, the M1 build view `…/flow/plan/M1.html`
+
+Serve them with `python3 -m http.server 8765 --bind 127.0.0.1 --directory /Users/connorott/plugins/dev-team-workspace`.
+
 Before the run: `dryrun.py` was as pinned, `simulate.py` passed, and the one-turn smoke run cost $0.19 with all 8 `dev-team:*` skills listed and `evalperm` connected.
 
 Detail: [findings-interface.md](findings-interface.md) (the interface-first checks, F1–F13, R1–R5), [findings-flow.md](findings-flow.md) (the rl-incremental stall, missing milestone rows, the older checks, cost; its F1–F8 are cited here as flow-F1…), [findings-judge.md](findings-judge.md) (blind judge and mode comparison, H1–H4).

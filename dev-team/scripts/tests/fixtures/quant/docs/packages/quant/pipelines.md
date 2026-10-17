@@ -8,8 +8,8 @@
 
 | # | Step | Owner | In → Out | Spine version | Covers |
 |---|---|---|---|---|---|
-| 1 | `read_raw` | data | dates → raw rows | read a synthetic CSV | DATA-01 |
-| 2 | `apply_universe` | data | raw rows, dates → Prices | static universe, no delistings | DATA-02 |
+| 1 | `read_raw` | data | dates → RawPrices | read a synthetic CSV | DATA-01 |
+| 2 | `apply_universe` | data | RawPrices, dates → Prices | static universe, no delistings | DATA-02 |
 
 Layout: `dt layout quant`
 

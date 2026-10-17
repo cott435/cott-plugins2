@@ -49,7 +49,9 @@ class GuardTest(unittest.TestCase):
 
 
 class ContractGuardTest(FixtureCopy):
-    """tests/contracts/** is frozen (ask) except while an unticked contract task of the plan covers it."""
+    """tests/contracts/** is frozen (ask) except while an unticked contract task of the plan covers it (old-style
+    plan: `**Step:** contract`, `Files likely`)."""
+    legacy = True
 
     def setUp(self):
         super().setUp()
@@ -81,6 +83,28 @@ class ContractGuardTest(FixtureCopy):
     def test_no_plan_asks(self):
         code, out = run_main("--root", "/proj", "guard", "--path", "tests/contracts/a.b/schema.json")
         self.assertEqual((code, decision(out)), (0, "ask"))
+
+
+class InterfaceGuardTest(FixtureCopy):
+    """The interface task (`**Kind:** interface`) opens what its Read: and Writes: claim until it is ticked."""
+
+    def decide(self, rel):
+        return decision(run_main("--root", str(self.root), "guard", "--path", rel)[1])
+
+    def test_ticked_interface_task_freezes(self):
+        self.assertEqual(self.decide("tests/contracts/stats.Cov/sample.json"), "ask")
+
+    def test_open_interface_task_with_a_contracts_glob(self):
+        self.replace("tasks/todo.md", "- [x] M1-T01", "- [ ] M1-T01")
+        self.assertIsNone(self.decide("tests/contracts/stats.Cov/sample.json"))
+        self.assertIsNone(self.decide("tests/contracts/portfolio.Weights/sample.json"))
+
+    def test_open_interface_task_with_named_folders(self):
+        self.replace("tasks/todo.md", "- [x] M1-T01", "- [ ] M1-T01")
+        self.replace("tasks/plan.md", "src/quant/stats/**, tests/contracts/**", "src/quant/stats/**, tests/contracts/stats.Cov/**")
+        self.assertIsNone(self.decide("tests/contracts/stats.Cov/sample.json"))             # in Writes:
+        self.assertIsNone(self.decide("tests/contracts/data.load_prices/fake.py"))          # in Read:
+        self.assertEqual(self.decide("tests/contracts/portfolio.Weights/sample.json"), "ask")
 
 
 if __name__ == "__main__":

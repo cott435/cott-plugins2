@@ -6,17 +6,18 @@ from __future__ import annotations
 
 import re
 
-from .. import md, model
+from .. import git, md, model
 from ..commands import roadmap as roadmap_cmd
 from ..repo import Doc, Repo
-from .common import (OWN_SKILLS, Report, add_common, advance_ready, available_skills, blocked_reason,
+from .common import (OWN_SKILLS, Report, add_common, add_graph, advance_ready, available_skills, blocked_reason,
                      live_spec_ids, milestone_row, next_task, plan_base)
 from .packages import drift, grow_triggers, stale_contracts
 
 
 def expected_mode(task: model.Task) -> str:
-    """The build-mode rule: solo for spine tasks, split for behaviour with a checkable outcome, else solo."""
-    if task.is_spine:
+    """The build-mode rule: solo for skeleton tasks (interface, spine, wiring, system; with no Kind, Phase 0),
+    split for behaviour with a checkable outcome, else solo."""
+    if task.kind in ("interface", "spine", "wiring", "system") or (not task.kind and task.is_spine):
         return "solo"
     return "split" if task.covers or any(i.startswith("TC-") for i in task.read) else "solo"
 
@@ -26,7 +27,8 @@ def mode_violations(tasks: list[model.Task]) -> list[str]:
     for t in tasks:
         want = expected_mode(t)
         if t.mode in ("split", "solo") and t.mode != want and not md.strip_md(t.get("Reason")):
-            why = "spine" if t.is_spine else "covers behaviour" if want == "split" else "no checkable outcome"
+            skeleton = t.kind if t.kind and t.kind != "thicken" else "spine" if not t.kind and t.is_spine else ""
+            why = skeleton or ("covers behaviour" if want == "split" else "no checkable outcome")
             out.append(f"{t.id}: {t.mode}, expected {want} ({why})")
     return out
 
@@ -134,9 +136,13 @@ def milestone_packages(repo: Repo, row: model.Milestone | None, pipelines: list[
 
 def boundaries_unfrozen(repo: Repo, pkgs: list[str], tasks: list[model.Task]) -> list[str]:
     """Boundaries the milestone crosses that no contract task freezes: a contract symbol whose `**Boundary:**`
-    line names a consumer among the milestone's packages, in no contract task's `Read:`, with no fixtures folder
-    yet (an earlier milestone froze it). Items read `features.screen (portfolio)`."""
+    line names a consumer among the milestone's packages (in a single package, its components), in no contract
+    task's `Read:`, with no fixtures folder yet (an earlier milestone froze it). Items read
+    `features.screen (portfolio)`."""
     frozen = {md.strip_md(i).split(" (")[0].strip() for t in tasks if t.is_contract for i in t.read}
+    arch = repo.architecture
+    if pkgs and arch is not None and "single" in arch.header.get("Shape", "").lower():
+        pkgs = list(pkgs) + [c.id for c in model.components(arch)]
     out = []
     for doc in repo.docs("contract"):
         for sym in model.symbols(doc):
@@ -145,6 +151,53 @@ def boundaries_unfrozen(repo: Repo, pkgs: list[str], tasks: list[model.Task]) ->
             folder = md.strip_md(fields.get("Fixtures", "")) or f"tests/contracts/{sym.id}/"
             if consumers and sym.id not in frozen and not (repo.root / folder).is_dir():
                 out.append(f"{sym.id} ({', '.join(consumers)})")
+    return out
+
+
+def _sections(doc: Doc) -> dict[str, str]:
+    return {s.id: "\n".join(line.rstrip() for line in s.text.splitlines() if not USED_BY.match(line))
+            for s in model.symbols(doc)}
+
+
+USED_BY = re.compile(r"^\s*(?:[-*]\s+)?\*\*Used by:?\*\*", re.IGNORECASE)
+
+
+def interfaces_changed(repo: Repo, plan: Doc, tasks: list[model.Task], changed: list[str]) -> list[str]:
+    """Interfaces the plan froze whose contract section changed since the plan was last committed, each with the
+    tasks that build against it (its `Read:`, or a type their steps' `In → Out` cells name): `stats.Cov (M1-T04,
+    M1-T05)`. Outside git, or with the plan uncommitted, every frozen symbol of a contract.md in `changed` counts.
+    `**Used by:**` lines are ignored (pipeline-design appends to them)."""
+    frozen = model.frozen_symbols(tasks)
+    if not frozen:
+        return []
+    sha = git.last_commit(repo.root, plan.rel)
+    moved: set[str] = set()
+    for doc in repo.docs("contract"):
+        now = _sections(doc)
+        old_text = git.show_at(repo.root, sha, doc.rel) if sha else None
+        if old_text is None:
+            if doc.rel in changed:
+                moved |= {i for i in now if i in frozen}
+            continue
+        before = _sections(Doc(repo.root, doc.rel, old_text))
+        moved |= {i for i in now if i in frozen and i in before and before[i] != now[i]}
+    if not moved:
+        return []
+    types = model.contract_types(repo)
+    pipelines = {p.id: p for p in model.all_pipelines(repo)}
+    out = []
+    for sym in sorted(moved):
+        readers = []
+        for t in tasks:
+            if t.is_contract:
+                continue
+            reads = {md.strip_md(i.split(" (")[0]).strip() for i in t.read}
+            steps = [s for m in re.finditer(r"(PL-\d{2,})(?:\.(\w+))?", t.step) if m.group(1) in pipelines
+                     for s in pipelines[m.group(1)].steps if m.group(2) in (None, s.name)]
+            named = {ty.id for s in steps for n in s.in_types + s.out_types if (ty := model.resolve_type(types, n))}
+            if sym in reads or sym in named:
+                readers.append(t.id)
+        out.append(f"{sym} ({', '.join(readers) or 'no task'})")
     return out
 
 
@@ -191,6 +244,7 @@ def build_planning(repo: Repo, r: Report) -> None:
     pkgs = milestone_packages(repo, ms_row, milestone_pls, tasks) if active else []
     open_revise = revising(repo, pkgs, drafts) if active else []
     changed = changed_since_plan(repo, active, pkgs) if active else []
+    moved = interfaces_changed(repo, active, tasks, changed) if active else []
     queued = sorted(f"{roadmap_cmd._plan_milestone(d) or '?'} ({d.rel})" for d in repo.docs("queued-plan"))
     available = available_skills(repo)
 
@@ -205,7 +259,7 @@ def build_planning(repo: Repo, r: Report) -> None:
         elif open_revise:
             mode = "blocked"
             blocked = f"waiting for {', '.join(open_revise)} approval (Revise in progress)"
-        elif blocked_tasks or changed:
+        elif blocked_tasks or changed or moved:
             mode = "replan"
         elif target and roadmap_cmd.pipelines_approved(repo, target):
             mode, focus = "extend", target
@@ -249,6 +303,7 @@ def build_planning(repo: Repo, r: Report) -> None:
     r.add("boundaries_unfrozen", boundaries_unfrozen(repo, pkgs, tasks) if active else [])
     r.add("draft_pipelines", drafts)
     r.add("changed_since_plan", changed)
+    r.add("interfaces_changed", moved)
     r.add("stage_to_cut", f"{focus.id} {focus.name}" if isinstance(focus, model.Stage) else "none")
     r.add("pipelines_inferred", inferred_pls)
     r.add("milestone_references", model.milestone_references(repo, focus.id) if focus is not None else [])
@@ -264,3 +319,4 @@ def build_planning(repo: Repo, r: Report) -> None:
     r.add("stale_contracts", stale_contracts(repo))
     r.add("queued", queued)
     r.add("base", plan_base(active))
+    add_graph(repo, r)

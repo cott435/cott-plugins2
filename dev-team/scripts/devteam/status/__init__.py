@@ -7,7 +7,7 @@ from ..repo import Repo
 from .architecture_design import architecture_design
 from .build_planning import build_planning
 from .build_setup import build_setup
-from .common import Report, add_common
+from .common import Report, add_common, add_graph
 from .idea_refine import idea_refine
 from .pipeline_design import pipeline_design
 from .reference_intake import reference_intake
@@ -28,4 +28,5 @@ def report(repo: Repo, skill: str | None) -> Report:
     else:
         r.mode("—")
         add_common(repo, r)
+        add_graph(repo, r)
     return r

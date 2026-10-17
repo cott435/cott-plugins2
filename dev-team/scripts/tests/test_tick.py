@@ -16,13 +16,20 @@ class TickTest(unittest.TestCase):
 
     def test_tick_thicken_task(self):
         before = self.p.read("tasks/todo.md")
-        self.assertEqual(self.tick("M1-T03"), (0, "ticked: M1-T03\n"))
+        self.assertEqual(self.tick("M1-T10"), (0, "ticked: M1-T10\n"))
         after = self.p.read("tasks/todo.md")
-        self.assertIn("- [x] M1-T03 Delisting-aware universe", after)
-        self.assertEqual(before.replace("- [ ] M1-T03", "- [x] M1-T03"), after)
+        self.assertIn("- [x] M1-T10 Delisting-aware universe", after)
+        self.assertEqual(before.replace("- [ ] M1-T10", "- [x] M1-T10"), after)
 
-    def test_spine_task_prints_prebuild_clear(self):
-        code, out = self.tick("M1-T02")
+    def test_wiring_task_prints_prebuild_clear(self):
+        code, out = self.tick("M1-T09")
+        self.assertEqual((code, out), (0, "ticked: M1-T09\nnext: dt prebuild-clear PL-02\n"))
+        self.assertEqual(self.tick("M1-T05"), (0, "ticked: M1-T05\n"))       # a step spine builds no pipeline
+
+    def test_legacy_spine_task_prints_prebuild_clear(self):
+        p = Project(legacy=True)
+        self.addCleanup(p.cleanup)
+        code, out = run_main("--root", str(p.root), "tick", "M1-T02")
         self.assertEqual((code, out), (0, "ticked: M1-T02\nnext: dt prebuild-clear PL-02\n"))
 
     def test_undo(self):
@@ -37,9 +44,9 @@ class TickTest(unittest.TestCase):
     def test_crlf_kept(self):
         path = self.p.path("tasks/todo.md")
         path.write_bytes(path.read_bytes().replace(b"\n", b"\r\n"))
-        self.tick("M1-T05")
+        self.tick("M1-T12")
         data = path.read_bytes()
-        self.assertIn(b"- [x] M1-T05 Shrinkage covariance (quant, S, split)\r\n", data)
+        self.assertIn(b"- [x] M1-T12 Shrinkage covariance (quant, S, split)\r\n", data)
         self.assertNotIn(b"\r\r", data)
 
     def test_errors(self):

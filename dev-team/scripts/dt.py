@@ -20,6 +20,8 @@ COMMANDS = {
     "next-id": "next_id",
     "section": "section",
     "context": "context",
+    "ready": "ready",
+    "plan": "plan",
     "layout": "layout",
     "outline": "outline",
     "references": "references",

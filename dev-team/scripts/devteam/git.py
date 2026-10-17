@@ -48,3 +48,14 @@ def last_commit_time(root: Path, *paths: str) -> int | None:
     """Unix time of the newest commit touching any of the paths (finer than `last_commit_date`)."""
     out = _git(root, "log", "-1", "--format=%ct", "--", *paths)
     return int(out.strip()) if out and out.strip().isdigit() else None
+
+
+def last_commit(root: Path, *paths: str) -> str | None:
+    """Full sha of the newest commit touching any of the paths."""
+    out = _git(root, "log", "-1", "--format=%H", "--", *paths)
+    return out.strip() or None if out is not None else None
+
+
+def show_at(root: Path, rev: str, rel: str) -> str | None:
+    """The file's text at `rev`, or None if it isn't tracked there (`rel` relative to root, as `show_head`)."""
+    return _git(root, "show", f"{rev}:./{rel}")

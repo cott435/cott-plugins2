@@ -29,7 +29,7 @@ class PrebuildClearTest(FixtureCopy):
         code, out, _ = self.dt("prebuild-clear", "PL-02")
         self.assertEqual(code, 0)
         self.assertIn("removed PL-02 entry sketch", out)
-        self.assertIn("kept Planned layout (not built: PL-02, PL-03)", out)
+        self.assertIn("kept Planned layout (not built: PL-01, PL-02, PL-03)", out)
         self.assertEqual(self.read(PIPELINES), before.replace(SKETCH, "Layout: `dt layout quant`\n"))
 
     def test_idempotent(self):
@@ -49,7 +49,8 @@ class PrebuildClearTest(FixtureCopy):
         self.assertNotIn("\n\n\n", text)
 
     def test_planned_layout_removed_once_every_pipeline_is_built(self):
-        self.replace("tasks/todo.md", "- [ ] M1-T02", "- [x] M1-T02")
+        self.replace("tasks/todo.md", "- [ ] M1-T08", "- [x] M1-T08")      # a pipeline is built once wired
+        self.replace("tasks/todo.md", "- [ ] M1-T09", "- [x] M1-T09")
         self.write("src/quant/portfolio/pipeline.py", "def run_backtest(cfg):\n    pass\n")
         before = self.read(PIPELINES)
         code, out, _ = self.dt("prebuild-clear", "PL-02")
@@ -109,7 +110,7 @@ class ArchiveTest(FixtureCopy):
         code, out, _ = self.dt("archive")
         self.assertEqual(code, 1)
         self.assertEqual(self.read("tasks/plan.md"), stub)
-        self.assertEqual(self.dt("next-id", "M1-T")[1], "M1-T07\n")     # archive still counted
+        self.assertEqual(self.dt("next-id", "M1-T")[1], "M1-T15\n")     # archive still counted
 
     def test_existing_outcome_kept(self):
         self.check_all()
@@ -132,9 +133,9 @@ class ArchiveTest(FixtureCopy):
 class FindingTest(FixtureCopy):
     def test_creates_findings_label_then_appends(self):
         before = self.read("tasks/plan.md")
-        self.assertEqual(self.dt("finding", "M1-T04", "critical", "CR-21 · `rmt.py` complexity 14",
+        self.assertEqual(self.dt("finding", "M1-T13", "critical", "CR-21 · `rmt.py` complexity 14",
                                  "--disposition", "fix task M1-T09")[:2], (0, "M1-R01\n"))
-        self.assertEqual(self.dt("finding", "M1-T04", "Nit", "naming")[1], "M1-R02\n")
+        self.assertEqual(self.dt("finding", "M1-T13", "Nit", "naming")[1], "M1-R02\n")
         added = ("**Findings:**\n"
                  "- M1-R01 Critical · CR-21 · `rmt.py` complexity 14 → fix task M1-T09\n"
                  "- M1-R02 Nit · naming\n")
@@ -144,12 +145,12 @@ class FindingTest(FixtureCopy):
     def test_exit_checkpoint(self):
         code, out, _ = self.dt("finding", "exit", "Suggestion", "docs", "--disposition", "won't fix: fine")
         self.assertEqual((code, out), (0, "M1-R01\n"))
-        self.assertIn("**Findings:**\n- M1-R01 Suggestion · docs → won't fix: fine\n\n## Risks",
+        self.assertIn("**Findings:**\n- M1-R01 Suggestion · docs → won't fix: fine\n\n## Dependency graph",
                       self.read("tasks/plan.md"))
 
     def test_existing_findings_counted(self):
-        self.replace("tasks/plan.md", "### M1-T05", "**Findings:**\n- M1-R04 Nit · old → ok\n\n### M1-T05")
-        self.assertEqual(self.dt("finding", "M1-T04", "Important", "new")[1], "M1-R05\n")
+        self.replace("tasks/plan.md", "## Phase 3: System", "**Findings:**\n- M1-R04 Nit · old → ok\n\n## Phase 3: System")
+        self.assertEqual(self.dt("finding", "M1-T13", "Important", "new")[1], "M1-R05\n")
         self.assertIn("- M1-R04 Nit · old → ok\n- M1-R05 Important · new\n", self.read("tasks/plan.md"))
 
     def test_errors(self):

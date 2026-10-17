@@ -12,6 +12,7 @@ from devteam import md, model  # noqa: E402
 from devteam.repo import Doc, Repo  # noqa: E402
 
 QUANT = HERE / "fixtures" / "quant"
+LEGACY = HERE / "fixtures" / "legacy-plan"          # the old-style M1 plan: Phase 0 spines, Parallel, Files likely
 
 
 class MdTest(unittest.TestCase):
@@ -98,7 +99,7 @@ class RepoTest(unittest.TestCase):
         self.assertEqual(self.repo.next_id("TC"), "TC-04")
         self.assertEqual(self.repo.next_id("DATA"), "DATA-04")
         self.assertEqual(self.repo.next_id("M"), "M3")
-        self.assertEqual(self.repo.next_id("M1-T"), "M1-T07")
+        self.assertEqual(self.repo.next_id("M1-T"), "M1-T15")
 
 
 class ModelTest(unittest.TestCase):
@@ -108,24 +109,66 @@ class ModelTest(unittest.TestCase):
 
     def test_tasks(self):
         ts = model.tasks(self.repo.plan)
-        self.assertEqual([t.id for t in ts], [f"M1-T0{i}" for i in range(1, 7)])
-        t3 = ts[2]
-        self.assertEqual((t3.package, t3.step, t3.size, t3.mode), ("quant", "PL-01.apply_universe", "S", "split"))
-        self.assertEqual(t3.read, ["PL-01", "TC-01", "DATA-02", "data.load_prices"])
-        self.assertEqual(t3.depends_on, ["M1-T01"])
-        self.assertEqual(t3.parallel, "G1")
-        self.assertEqual(len(t3.acceptance), 2)
-        self.assertTrue(ts[0].is_spine)
-        self.assertFalse(t3.is_spine)
+        self.assertEqual([t.id for t in ts], [f"M1-T{i:02d}" for i in range(1, 15)])
+        t10 = ts[9]
+        self.assertEqual((t10.package, t10.step, t10.size, t10.mode, t10.kind),
+                         ("quant", "PL-01.apply_universe", "S", "split", "thicken"))
+        self.assertEqual(t10.read, ["PL-01", "TC-01", "DATA-02", "data.Prices"])
+        self.assertEqual(t10.depends_on, ["M1-T03"])
+        self.assertEqual(t10.writes, ["src/quant/data/universe.py", "tests/unit/quant/test_universe.py"])
+        self.assertEqual((t10.parallel, t10.files_likely), ("", []))
+        self.assertEqual(len(t10.acceptance), 2)
+        self.assertEqual([t.kind for t in ts], ["interface"] + ["spine"] * 6 + ["wiring"] * 2 + ["thicken"] * 4
+                         + ["system"])
+        self.assertTrue(ts[0].is_spine and ts[0].is_contract and ts[4].is_spine)
+        self.assertFalse(t10.is_spine or ts[7].is_spine)
+        self.assertEqual(ts[0].writes[-1], "tests/contracts/**")
         self.assertEqual(ts[0].depends_on, [])
-        self.assertIn("python -m quant.data load --smoke", t3.verify)
-        self.assertEqual(ts[3].skills, ["data-science"])
-        self.assertEqual(t3.skills, [])
+        self.assertIn("pytest tests/intent/quant tests/unit/quant -k universe", t10.verify)
+        self.assertEqual(ts[10].skills, ["data-science"])
+        self.assertEqual(t10.skills, [])
+        self.assertEqual([model.spine_pipeline(t) for t in ts if model.spine_pipeline(t)], ["PL-01", "PL-02"])
+
+    def test_legacy_tasks(self):
+        doc = Doc(LEGACY, "plan.md")
+        ts = model.tasks(doc)
+        t3 = ts[2]
+        self.assertEqual(t3.parallel, "G1")
+        self.assertEqual(t3.kind, "")
+        self.assertEqual(t3.writes, t3.files_likely)
+        self.assertEqual(t3.writes, ["src/quant/data/steps.py", "tests/unit/quant/test_universe.py"])
+        self.assertTrue(ts[0].is_spine)
+        self.assertFalse(t3.is_spine or ts[0].is_contract)
+        self.assertEqual(model.spine_pipeline(ts[1]), "PL-02")
+        self.assertFalse(model.is_interface_first(doc))
+        self.assertEqual(model.graph_edges(doc), [])
+
+    def test_graph_edges(self):
+        edges = model.graph_edges(self.repo.plan)
+        self.assertEqual(len(edges), 28)
+        self.assertTrue(model.is_interface_first(self.repo.plan))
+        call = next(e for e in edges if e.kind == "call")
+        self.assertEqual((call.src, call.dst, call.mitigated_by, call.reason),
+                         ("M1-T09", "M1-T08", "data.load_prices fake (M1-T01)", ""))
+        code = next(e for e in edges if e.src == "M1-T11" and e.dst == "M1-T05")
+        self.assertEqual((code.kind, code.mitigated_by, code.reason, code.mitigated),
+                         ("code", "", "thickens the same module", False))
+        self.assertEqual(self.repo.plan.lines[code.line].split("|")[1].strip(), "M1-T11 MP cleaning")
+
+    def test_graph_edge_cells(self):
+        doc = Doc(QUANT, "tasks/plan.md", "# M1: X — Plan\n**Milestone:** M1\n## Dependency graph\n"
+                  "| From | To | Kind | Mitigated by |\n|---|---|---|---|\n"
+                  "| `M1-T02` read | M1-T01 · M1-T03 | Code | None |\n| x | M1-T01 | order | — |\n"
+                  "| M1-T04 | M1-T01 | order | NONE: learn the API first |\n")
+        edges = model.graph_edges(doc)
+        self.assertEqual([(e.src, e.dst, e.kind, e.mitigated_by, e.reason) for e in edges],
+                         [("M1-T02", "M1-T01", "code", "", ""), ("", "M1-T01", "order", "", ""),
+                          ("M1-T04", "M1-T01", "order", "", "learn the API first")])
 
     def test_checkpoints(self):
         cps = model.checkpoints(self.repo.plan)
-        self.assertEqual([c.after for c in cps], ["M1-T04", ""])
-        self.assertEqual(len(cps[0].items), 7)
+        self.assertEqual([c.after for c in cps], ["M1-T13", ""])
+        self.assertEqual(len(cps[0].items), 5)
 
     def test_findings(self):
         doc = Doc(QUANT, "tasks/plan.md", "# M1: X — Plan\n**Milestone:** M1\n## Phase 1: T\n"
@@ -138,7 +181,7 @@ class ModelTest(unittest.TestCase):
 
     def test_todo(self):
         items = model.todo_items(self.repo.todo)
-        self.assertEqual(len(items), 6)
+        self.assertEqual(len(items), 14)
         self.assertTrue(items[0].checked)
         self.assertEqual(model.milestone_of(self.repo.plan), "M1")
         self.assertTrue(model.is_dev_team_plan(self.repo.plan))
@@ -151,6 +194,9 @@ class ModelTest(unittest.TestCase):
         self.assertEqual(p2.entry_function, "run_cov_report")
         self.assertEqual([s.name for s in p2.steps], ["load_prices", "estimate_cov", "clean_eigen", "pca", "write_report"])
         self.assertEqual(p2.steps[2].owner, "stats")
+        self.assertEqual((p2.steps[2].in_types, p2.steps[2].out_types), (["Cov"], ["Cov"]))
+        self.assertEqual(model.type_names("RawPrices, dates → `stats.Prices`; CSV, T, DataFrame"),
+                         ["RawPrices", "stats.Prices", "DataFrame"])
         self.assertEqual(p2.covers, ["STAT-01", "STAT-02", "STAT-03", "STAT-04", "QR-02"])
         self.assertEqual([h.text for h in self.repo.package_doc("quant", "pipelines").prebuild_sections()],
                          ["Entry sketch (pre-build — removed by spine task)",
@@ -173,8 +219,16 @@ class ModelTest(unittest.TestCase):
 
     def test_contract_and_components(self):
         syms = model.symbols(self.repo.package_doc("quant", "contract"))
-        self.assertEqual([s.id for s in syms], ["data.load_prices", "stats.estimate_cov", "stats.clean_eigen",
-                                                "portfolio.min_variance"])
+        self.assertEqual([s.id for s in syms if not s.is_type],
+                         ["data.load_prices", "stats.estimate_cov", "stats.clean_eigen", "portfolio.min_variance"])
+        types = [s for s in syms if s.is_type]
+        self.assertEqual([s.id for s in types], ["data.RawPrices", "data.Prices", "stats.Returns", "stats.Cov",
+                                                 "stats.Factors", "stats.CovReport", "portfolio.Weights",
+                                                 "portfolio.Comparison"])
+        self.assertEqual(types[3].sample, "tests/contracts/stats.Cov/")
+        by_name = model.contract_types(self.repo)
+        self.assertIs(model.resolve_type(by_name, "Cov"), model.resolve_type(by_name, "quant.stats.Cov"))
+        self.assertIsNone(model.resolve_type(by_name, "Loadings"))
         comps = {c.id: c for c in model.components(self.repo.architecture)}
         self.assertEqual(sorted(comps), ["data", "portfolio", "stats"])
         self.assertEqual(comps["portfolio"].depends_on, ["stats", "data"])

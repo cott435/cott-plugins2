@@ -26,15 +26,18 @@ class FixtureTest(unittest.TestCase):
 
 
 class LintCase(unittest.TestCase):
-    """Each test mutates its own copy of the fixture and asserts which codes appear where."""
+    """Each test mutates its own copy of the fixture and asserts which codes appear where. `legacy` swaps in the
+    old-style plan; its `deprecated` warnings are left out unless a test asks for them."""
     git = False
+    legacy = False
 
     def setUp(self):
-        self.p = Project(git=self.git)
+        self.p = Project(git=self.git, legacy=self.legacy)
         self.addCleanup(self.p.cleanup)
 
     def problems(self, scope=None):
-        return lint.lint(Repo(self.p.root), scope)
+        out = lint.lint(Repo(self.p.root), scope)
+        return [p for p in out if p.code != "deprecated"] if self.legacy else out
 
     def found(self, scope=None) -> set[tuple[str, str]]:
         return {(p.path, p.code) for p in self.problems(scope)}
@@ -105,10 +108,10 @@ class BudgetChecks(LintCase):
         return [p.message for p in self.problems() if p.path == rel and p.code in ("budget", "grow-size")]
 
     def test_contract_budget_is_per_symbol(self):
-        self._add_symbols(10)       # 93 lines, well past the old fixed 60, at 6 lines a symbol
+        self._add_symbols(10)       # 139 lines, well past the old fixed 60, at 6 lines a symbol
         self.assertEqual(self.budget_messages(CONTRACT), [])
-        self.p.edit(CONTRACT, "- **Used by:** PL-03", "- **Used by:** PL-03\n" + "filler\n" * 90)
-        self.assertEqual(self.budget_messages(CONTRACT), ["184 lines, budget 124 (8 per symbol × 14 + 12)"])
+        self.p.edit(CONTRACT, "- **Used by:** PL-03", "- **Used by:** PL-03\n" + "filler\n" * 57)
+        self.assertEqual(self.budget_messages(CONTRACT), ["195 lines, budget 188 (8 per symbol × 22 + 12)"])
 
     def test_pipelines_budget_is_per_pipeline(self):
         self.p.edit(PIPES, "**Covers:** PORT-01, PORT-02", "**Covers:** PORT-01, PORT-02\n" + "filler\n" * 70)
@@ -124,9 +127,10 @@ class BudgetChecks(LintCase):
         self.assertCode("docs/packages/quant/tests.md", "budget")
 
     def test_grow_ceiling_is_a_separate_warning(self):
-        self._add_symbols(30)
+        self._add_symbols(22)
+        self.p.edit(CONTRACT, "- **Used by:** PL-03", "- **Used by:** PL-03\nfiller\nfiller")
         self.assertEqual(self.budget_messages(CONTRACT), [
-            "213 lines, over the 200-line ceiling for one package's contract doc: architecture-design should "
+            "211 lines, over the 200-line ceiling for one package's contract doc: architecture-design should "
             "consider a Grow"])
         code, _ = run_main("--root", str(self.p.root), "lint")
         self.assertEqual(code, 0)
@@ -181,8 +185,8 @@ class ApprovedEdit(LintCase):
 
 
 class PrebuildLeft(LintCase):
-    def test_entry_sketch_after_spine_checked(self):
-        self.p.edit(TODO, "- [ ] M1-T02", "- [x] M1-T02")
+    def test_entry_sketch_after_wiring_checked(self):
+        self.p.edit(TODO, "- [ ] M1-T09", "- [x] M1-T09")
         lines = {(p.path, p.line) for p in self.problems() if p.code == "prebuild-left"}
         self.assertEqual(lines, {(PIPES, 28)})   # Planned layout stays: PL-03 has no spine task yet
 
@@ -190,7 +194,8 @@ class PrebuildLeft(LintCase):
         text = self.p.read(PIPES)
         start, end = text.index("## PL-03"), text.index("## Planned layout")
         self.p.write(PIPES, text[:start] + text[end:])
-        self.p.edit(TODO, "- [ ] M1-T02", "- [x] M1-T02")
+        self.p.edit(TODO, "- [ ] M1-T08", "- [x] M1-T08")
+        self.p.edit(TODO, "- [ ] M1-T09", "- [x] M1-T09")
         lines = {p.line for p in self.problems() if p.code == "prebuild-left"}
         self.assertEqual(len(lines), 2)
 
@@ -201,8 +206,18 @@ class PrebuildLeft(LintCase):
         self.p.write("src/quant/portfolio/pipeline.py", "def run_backtest(): ...\n")
         self.assertIn((PIPES, "prebuild-left"), self.found())
 
-    def test_unchecked_spine_is_fine(self):
+    def test_unchecked_wiring_is_fine(self):
+        self.p.edit(TODO, "- [ ] M1-T05", "- [x] M1-T05")          # a step spine doesn't build the pipeline
         self.assertNotIn((PIPES, "prebuild-left"), self.found())
+
+
+class PrebuildLeftLegacy(LintCase):
+    legacy = True
+
+    def test_entry_sketch_after_phase0_spine_checked(self):
+        self.p.edit(TODO, "- [ ] M1-T02", "- [x] M1-T02")
+        lines = {(p.path, p.line) for p in self.problems() if p.code == "prebuild-left"}
+        self.assertEqual(lines, {(PIPES, 28)})
 
 
 TESTS = "docs/packages/quant/tests.md"
@@ -278,15 +293,21 @@ class PipelineAndFixtureChecks(LintCase):
 
 
 class TaskChecks(LintCase):
+    """Task rules on the old-style plan (Phase 0 spines, `Parallel`, `Files likely`), which still parses."""
+    legacy = True
+
     def test_task_size_not_xs_to_m(self):
         self.p.edit(PLAN, "**Size:** XS", "**Size:** L")
         self.assertCode(PLAN, "task-size")
 
     def test_task_size_files_count(self):
+        # Test files don't count: S takes 1–2 source files.
         self.p.edit(PLAN, "src/quant/data/steps.py, tests/unit/quant/test_universe.py",
                     "src/quant/data/steps.py, tests/unit/quant/test_universe.py, src/quant/data/x.py")
+        self.assertNotIn((PLAN, "task-size"), self.found())
+        self.p.edit(PLAN, "src/quant/data/x.py", "src/quant/data/x.py, src/quant/data/y.py")
         msgs = [p.message for p in self.problems() if p.code == "task-size"]
-        self.assertEqual(msgs, ["M1-T03 Size S wants 1–2 Files likely, has 3"])
+        self.assertEqual(msgs, ["M1-T03 Size S wants 1–2 source files in Files likely, has 3"])
 
     def test_task_acceptance(self):
         self.p.edit(PLAN, "- [ ] PL-01 smoke test still passes", "- [ ] PL-01 smoke test still passes\n- [ ] c\n- [ ] d")
@@ -355,68 +376,41 @@ class TaskChecks(LintCase):
     def size_messages(self):
         return [p.message for p in self.problems() if p.code == "milestone-size"]
 
-    def test_milestone_size_counts_spine_plus_longest_chain(self):
+    def test_milestone_size_is_the_critical_path(self):
         self._add_tasks(12, lambda k: "M1-T05" if k == 7 else f"M1-T{k - 1:02d}")
-        chain = " → ".join(f"M1-T{k:02d}" for k in [4, 5] + list(range(7, 19)))
+        chain = " → ".join(f"M1-T{k:02d}" for k in [1, 2, 4, 5] + list(range(7, 19)))
         self.assertEqual(self.size_messages(), [
-            f"track is 16 tasks, cap 15: serial Phase 0 2 + chain {chain} (14). Shorten the chain, run package "
-            "spines in parallel groups against the contract, or cut the stage into another milestone where a later "
-            "part needs an earlier part's outputs; never split independent tracks"])
+            f"critical path is 16 tasks, cap 15: {chain}. Freeze an interface for an edge on it so both sides "
+            "start at once, or cut the stage into another milestone where a later part needs an earlier part's "
+            "outputs; never split independent tracks"])
 
     def test_milestone_size_at_cap_is_fine(self):
         self._add_tasks(11, lambda k: "M1-T05" if k == 7 else f"M1-T{k - 1:02d}")
         self.assertEqual(self.size_messages(), [])
 
-    def test_grouped_package_spines_count_as_a_chain(self):
-        # Contract-first Phase 0: package spines in a parallel group count through the chain; a Phase 0 task
-        # with no group (the contract task, the system spine) counts in full.
-        self.p.edit(PLAN, "**Depends on:** — · **Files likely:** src/quant/data/pipeline.py",
-                    "**Depends on:** — · **Parallel:** G0 · **Files likely:** src/quant/data/pipeline.py")
-        self.p.edit(PLAN, "**Depends on:** M1-T01 · **Files likely:** src/quant/stats/pipeline.py",
-                    "**Depends on:** — · **Parallel:** G0 · **Files likely:** src/quant/stats/pipeline.py")
-        self._add_tasks(12, lambda k: "M1-T05" if k == 7 else f"M1-T{k - 1:02d}")
-        self.assertEqual(self.size_messages(), [])
-        contract = ("### M1-T19: Freeze the data-stats contract\n"
-                    "**Package:** quant · **Step:** contract · **Size:** S · **Mode:** solo\n"
-                    "**Read:** data.load_prices\n**Acceptance:**\n- [ ] Every fixture validates against the schema\n"
-                    "**Verify:** `pytest tests/contracts`\n"
-                    "**Depends on:** — · **Files likely:** tests/contracts/data.load_prices/schema.json\n\n")
-        self.p.edit(PLAN, "### M1-T01:", contract + "### M1-T01:")
-        msgs = self.size_messages()
-        self.assertEqual(len(msgs), 1)
-        self.assertTrue(msgs[0].startswith("track is 16 tasks, cap 15: serial Phase 0 1 + chain M1-T02 → M1-T04"), msgs)
-
     def test_parallel_tracks_do_not_add_up(self):
         self._add_tasks(20, lambda k: "M1-T02")
         self.assertEqual(self.size_messages(), [])
 
-    def test_parallel_shared_file(self):
+    def test_files_likely_conflict_is_a_warning(self):
+        # M1-T04 and M1-T03 have no Depends-on path; Files likely is advisory, so sharing a file only warns.
         self.p.edit(PLAN, "src/quant/stats/rmt.py, tests/unit/quant/test_rmt.py", "src/quant/stats/rmt.py, src/quant/data/steps.py")
-        msgs = [p.message for p in self.problems() if p.code == "parallel"]
-        self.assertEqual(msgs, ["M1-T04 and M1-T03 are both in G1 but share src/quant/data/steps.py"])
+        found = [(p.severity, p.message) for p in self.problems() if p.code == "writes"]
+        self.assertEqual(found, [("W", "M1-T04 and M1-T03 both write src/quant/data/steps.py with no Depends on path "
+                                       "between them: move the shared part to the interface or wiring task, or "
+                                       "order them (and give the edge a graph row)")])
 
-    def test_parallel_shared_contract_symbol(self):
-        self.p.edit(PLAN, "**Read:** PL-02, TC-02, STAT-03, stats.clean_eigen",
-                    "**Read:** PL-02, TC-02, STAT-03, stats.clean_eigen, data.load_prices")
-        self.assertCode(PLAN, "parallel")
+    def test_files_likely_shared_along_a_path_is_fine(self):
+        # M1-T05 (cov.py) depends on M1-T04, which depends on M1-T02 (cov.py): one runs after the other.
+        self.assertNotIn((PLAN, "writes"), self.found())
 
-    def test_parallel_may_share_a_frozen_contract_symbol(self):
-        self.p.edit(PLAN, "**Read:** PL-02, TC-02, STAT-03, stats.clean_eigen",
-                    "**Read:** PL-02, TC-02, STAT-03, stats.clean_eigen, data.load_prices")
-        self.assertCode(PLAN, "parallel")
-        contract = ("### M1-T07: Freeze the data-stats contract\n"
-                    "**Package:** quant · **Step:** contract · **Size:** S · **Mode:** solo\n"
-                    "**Read:** data.load_prices\n**Acceptance:**\n- [ ] Every fixture validates against the schema\n"
-                    "**Verify:** `pytest tests/contracts`\n"
-                    "**Depends on:** — · **Files likely:** tests/contracts/data.load_prices/schema.json\n\n")
-        self.p.edit(PLAN, "### M1-T01:", contract + "### M1-T01:")
-        self.p.edit("tasks/todo.md", "- [x] M1-T01", "- [ ] M1-T07 Freeze the data-stats contract (quant, S, solo)\n- [x] M1-T01")
-        self.assertNotIn((PLAN, "parallel"), self.found())
-
-    def test_parallel_different_groups_is_fine(self):
-        self.p.edit(PLAN, "src/quant/stats/rmt.py, tests/unit/quant/test_rmt.py", "src/quant/stats/rmt.py, src/quant/data/steps.py")
-        self.p.edit(PLAN, "**Depends on:** M1-T02 · **Parallel:** G1", "**Depends on:** M1-T02 · **Parallel:** G2")
-        self.assertClean()
+    def test_old_fields_are_deprecated_warnings(self):
+        found = [p for p in lint.lint(Repo(self.p.root)) if p.code == "deprecated"]
+        self.assertEqual({p.severity for p in found}, {"W"})
+        self.assertIn("M1-T03 **Parallel:** is deprecated: groups are derived from Depends on (`dt ready`, `dt status` "
+                      "waves)", [p.message for p in found])
+        self.assertEqual(sum(1 for p in found if "Files likely" in p.message), 6)
+        self.assertEqual(run_main("--root", str(self.p.root), "lint")[0], 0)
 
     def test_verify_smoke(self):
         self.p.edit(PLAN, "**Verify:** `pytest tests/intent/quant tests/unit/quant -k cov` · `python -m quant.stats cov-report --smoke`",
@@ -436,14 +430,197 @@ class TaskChecks(LintCase):
         self.assertClean()
 
 
+class InterfaceFirstChecks(LintCase):
+    """`writes`, `edges`, `step-io-types` and the Kind/Writes task rules on the interface-first fixture plan."""
+
+    def messages(self, code):
+        return [p.message for p in self.problems() if p.code == code]
+
+    def test_fixture_plan_is_interface_first(self):
+        self.assertClean()
+
+    def test_kind_and_writes_required(self):
+        self.p.edit(PLAN, "**Step:** PL-02.pca · **Kind:** spine · ", "**Step:** PL-02.pca · ")
+        self.p.edit(PLAN, "**Depends on:** M1-T01 · **Writes:** src/quant/stats/report.py, tests/unit/quant/test_report.py",
+                    "**Depends on:** M1-T01")
+        self.assertEqual(self.messages("task-fields"), ["M1-T06 missing Kind", "M1-T07 missing Writes"])
+
+    def test_unknown_kind(self):
+        self.p.edit(PLAN, "**Kind:** spine · **Covers:** STAT-04", "**Kind:** stub · **Covers:** STAT-04")
+        self.assertEqual(self.messages("task-fields"),
+                         ["M1-T07 Kind 'stub': must be one of interface, spine, wiring, thicken, system"])
+
+    def test_spine_writes_owner_module_and_test_at_xs(self):
+        # XS counts source files only, so a spine's owner module plus its unit test is XS.
+        self.assertEqual(self.messages("task-size"), [])
+
+    def test_writes_conflict_without_a_path(self):
+        self.p.edit(PLAN, "**Writes:** src/quant/stats/pca.py, tests/intent/quant/test_pca.py",
+                    "**Writes:** src/quant/stats/pca.py, src/quant/stats/report.py, tests/intent/quant/test_pca.py")
+        found = [(p.severity, p.message) for p in self.problems() if p.code == "writes"]
+        self.assertEqual(found, [("E", "M1-T13 and M1-T07 both write src/quant/stats/report.py with no Depends on "
+                                       "path between them: move the shared part to the interface or wiring task, or "
+                                       "order them (and give the edge a graph row)")])
+
+    def test_writes_conflict_across_groups(self):
+        # Old Parallel groups don't matter: two tasks with no Depends-on path never share a file.
+        self.p.edit(PLAN, "**Depends on:** M1-T03 · **Writes:**", "**Depends on:** M1-T03 · **Parallel:** G1 · **Writes:**")
+        self.p.edit(PLAN, "**Depends on:** M1-T04 · **Writes:** src/quant/stats/cov.py,",
+                    "**Depends on:** M1-T04 · **Parallel:** G2 · **Writes:** src/quant/data/universe.py,")
+        self.assertEqual({m.split(" with")[0] for m in self.messages("writes")},
+                         {"M1-T12 and M1-T03 both write src/quant/data/universe.py",
+                          "M1-T12 and M1-T10 both write src/quant/data/universe.py"})
+        self.assertEqual(len(self.messages("deprecated")), 2)
+
+    def test_writes_folder_glob_overlaps(self):
+        self.p.edit(PLAN, "**Writes:** src/quant/stats/rmt.py, tests/unit/quant/test_rmt.py\n\n### M1-T06",
+                    "**Writes:** src/quant/stats/**, tests/unit/quant/test_rmt.py\n\n### M1-T06")
+        conflicts = {m.split(" both")[0] for m in self.messages("writes")}
+        self.assertEqual(conflicts, {"M1-T05 and M1-T04", "M1-T06 and M1-T05", "M1-T07 and M1-T05",
+                                     "M1-T12 and M1-T05", "M1-T13 and M1-T05"})
+
+    def test_shared_file_belongs_to_interface_or_wiring(self):
+        self.p.edit(PLAN, "**Writes:** src/quant/stats/rmt.py, tests/unit/quant/test_rmt.py\n\n### M1-T06",
+                    "**Writes:** src/quant/stats/rmt.py, src/quant/stats/types.py\n\n### M1-T06")
+        self.assertIn("M1-T05 (spine) writes the shared file src/quant/stats/types.py: only an interface, wiring or "
+                      "system task may", self.messages("writes"))
+
+    def test_entry_module_belongs_to_wiring(self):
+        self.p.edit(PLAN, "**Writes:** src/quant/stats/pca.py, tests/intent/quant/test_pca.py",
+                    "**Writes:** src/quant/stats/pipeline.py")
+        self.assertIn("M1-T13 (thicken) writes the shared file src/quant/stats/pipeline.py: only an interface, wiring "
+                      "or system task may", self.messages("writes"))
+
+    def test_depends_on_a_mitigated_edge(self):
+        self.p.edit(PLAN, "**Read:** PL-02, stats.Cov, stats.clean_eigen\n**Acceptance:**\n- [ ] `clean_eigen` returns its "
+                    "input on the stats.Cov sample; signature unchanged\n**Verify:** `pytest tests/unit/quant -k "
+                    "clean_eigen` · `scripts/check.sh gate`\n**Depends on:** M1-T01",
+                    "**Read:** PL-02, stats.Cov, stats.clean_eigen\n**Acceptance:**\n- [ ] `clean_eigen` returns its "
+                    "input on the stats.Cov sample; signature unchanged\n**Verify:** `pytest tests/unit/quant -k "
+                    "clean_eigen` · `scripts/check.sh gate`\n**Depends on:** M1-T01, M1-T04")
+        self.assertEqual(self.messages("edges"), [
+            "M1-T05 depends on M1-T04, but its graph row is mitigated by stats.Cov sample (M1-T01): a mitigated "
+            "edge doesn't order, drop the dependency"])
+
+    def test_missing_graph_row(self):
+        self.p.edit(PLAN, "| M1-T10 delisting universe | M1-T03 apply_universe spine | code | none: thickens the same module |\n", "")
+        self.assertEqual(self.messages("edges"),
+                         ["M1-T10 depends on M1-T03 with no graph row saying why (kind, `none: <reason>`)"])
+
+    def test_dependency_on_the_interface_task_needs_no_row(self):
+        self.assertNotIn("M1-T02 depends on M1-T01", " ".join(self.messages("edges")))
+
+    def test_no_graph_section(self):
+        text = self.p.read(PLAN)
+        self.p.write(PLAN, text[:text.index("## Dependency graph")] + text[text.index("## Risks"):])
+        msgs = self.messages("edges")
+        self.assertEqual(len(msgs), 16)
+        self.assertIn("M1-T08 depends on M1-T02 with no ## Dependency graph section saying why (kind, `none: <reason>`)", msgs)
+
+    def test_none_without_reason(self):
+        self.p.edit(PLAN, "| M1-T13 PCA check | M1-T06 pca spine | code | none: thickens the same module |",
+                    "| M1-T13 PCA check | M1-T06 pca spine | code | none |")
+        self.assertEqual(self.messages("edges"), ["graph row M1-T13 → M1-T06 is `none` with no reason (`none: <why>`)"])
+
+    def test_bad_edge_kind(self):
+        self.p.edit(PLAN, "| M1-T13 PCA check | M1-T06 pca spine | code |", "| M1-T13 PCA check | M1-T06 pca spine | blocks |")
+        self.assertEqual(self.messages("edges"), [
+            "graph row M1-T13 → M1-T06: Kind 'blocks' must be one of data, call, file, code, contract-change, order"])
+
+    def test_mitigation_the_interface_task_does_not_produce(self):
+        self.p.edit(PLAN, "stats.Cov, stats.Factors, stats.CovReport, data.load_prices", "stats.Cov, stats.CovReport, data.load_prices")
+        self.assertEqual(self.messages("edges"), [
+            "graph row M1-T07 → M1-T06: stats.Factors isn't frozen by an interface task (not in its Read: or a "
+            "tests/contracts/ folder it Writes)"])
+
+    def test_mitigation_from_a_contracts_folder_in_writes(self):
+        self.p.edit(PLAN, "stats.Cov, stats.Factors, stats.CovReport, data.load_prices", "stats.Cov, stats.CovReport, data.load_prices")
+        self.p.edit(PLAN, "src/quant/stats/**, tests/contracts/**",
+                    "src/quant/stats/**, tests/contracts/stats.Factors/sample.json, tests/contracts/**")
+        self.assertEqual(self.messages("edges"), [])
+
+    def test_mitigation_names_no_interface(self):
+        self.p.edit(PLAN, "| data | stats.Factors sample (M1-T01) |", "| data | a sample (M1-T01) |")
+        self.assertEqual(self.messages("edges"), [
+            "graph row M1-T07 → M1-T06: mitigation names no interface (`pkg.Symbol sample|fake`)"])
+
+    def test_edge_to_a_code_task_when_an_interface_exists(self):
+        self.p.edit(PLAN, "| data | stats.Cov sample (M1-T01) |\n| M1-T06", "| data | none: wants the real covariance |\n| M1-T06")
+        self.p.edit(PLAN, "clean_eigen` · `scripts/check.sh gate`\n**Depends on:** M1-T01",
+                    "clean_eigen` · `scripts/check.sh gate`\n**Depends on:** M1-T01, M1-T04")
+        self.assertEqual(self.messages("edges"), [
+            "M1-T05 waits on code task M1-T04 across stats.Cov, which an interface task freezes: mitigate the edge "
+            "and drop the dependency"])
+
+    def test_call_edge_covered_by_a_fake(self):
+        self.p.edit(PLAN, "| call | data.load_prices fake (M1-T01) |", "| call | none: needs PL-01 |")
+        self.p.edit(PLAN, "**Depends on:** M1-T04, M1-T05, M1-T06, M1-T07", "**Depends on:** M1-T04, M1-T05, M1-T06, M1-T07, M1-T08")
+        self.assertEqual(self.messages("edges"), [
+            "M1-T09 waits on code task M1-T08 across data.load_prices, which an interface task freezes: mitigate "
+            "the edge and drop the dependency"])
+
+    def test_milestone_size_ignores_mitigated_edges(self):
+        # Fourteen tasks, but the critical path is four: the mitigated edges don't order anything.
+        self.assertEqual(self.messages("milestone-size"), [])
+
+    def test_wiring_needs_smoke_spine_and_thicken_do_not(self):
+        self.p.edit(PLAN, "**Verify:** `python -m quant.data load --smoke` · `scripts/check.sh gate`\n**Depends on:** M1-T02",
+                    "**Verify:** `scripts/check.sh gate`\n**Depends on:** M1-T02")
+        self.assertEqual(self.messages("verify-smoke"),
+                         ["M1-T08 Verify lacks PL-01's smoke command `python -m quant.data load --smoke`"])
+
+    def test_thicken_after_the_wiring_needs_smoke(self):
+        # Smoke is due once a task's Depends on reaches its pipeline's wiring task.
+        self.p.edit(PLAN, "**Depends on:** M1-T06 · **Writes:**", "**Depends on:** M1-T06, M1-T09 · **Writes:**")
+        self.assertEqual(self.messages("verify-smoke"),
+                         ["M1-T13 Verify lacks PL-02's smoke command `python -m quant.stats cov-report --smoke`"])
+        self.p.edit(PLAN, "**Depends on:** M1-T06, M1-T09", "**Depends on:** M1-T06, M1-T08")    # PL-01's wiring
+        self.assertEqual(self.messages("verify-smoke"), [])
+
+    def test_files_likely_in_an_interface_first_plan(self):
+        self.p.edit(PLAN, "**Depends on:** M1-T06 · **Writes:**", "**Depends on:** M1-T06 · **Files likely:**")
+        self.assertEqual(self.messages("task-fields"), ["M1-T13 missing Writes"])
+        self.assertEqual(self.messages("deprecated"),
+                         ["M1-T13 **Files likely:** is deprecated: use **Writes:**, the task's exclusive claim"])
+
+
+class StepIoTypes(LintCase):
+    def messages(self):
+        return [(p.severity, p.message) for p in self.problems() if p.code == "step-io-types"]
+
+    def test_unknown_type(self):
+        self.p.edit(PIPES, "| Cov → Factors |", "| Cov → Loadings |")
+        self.assertEqual(self.messages(), [("E", "PL-02 step `pca` names Loadings, which no contract.md type section "
+                                                 "defines (`### <component>.Loadings: type`)")])
+
+    def test_qualified_type_resolves(self):
+        self.p.edit(PIPES, "| Cov → Factors |", "| stats.Cov → quant.stats.Factors |")
+        self.assertEqual(self.messages(), [])
+
+    def test_every_out_names_a_type(self):
+        self.p.edit(PIPES, "| dates → RawPrices |", "| dates → raw rows |")
+        self.p.edit(PIPES, "| RawPrices, dates → Prices |", "| raw rows, dates → Prices |")
+        self.assertEqual(self.messages(), [("E", "PL-01 step `read_raw`: its Out names no contract type")])
+
+    def test_entry_arguments_may_stay_plain(self):
+        self.p.edit(PIPES, "| RawPrices, dates → Prices |", "| RawPrices, dates, a universe file → Prices |")
+        self.assertEqual(self.messages(), [])
+
+    def test_project_without_types_gets_warnings(self):
+        text = self.p.read(CONTRACT)
+        self.p.write(CONTRACT, text.replace(": type\n", ": A shape\n"))
+        found = self.messages()
+        self.assertTrue(found and {sev for sev, _ in found} == {"W"}, found)
+
+
 class PlanChecks(LintCase):
     def test_todo_mismatch(self):
-        self.p.edit(TODO, "- [ ] M1-T06 Planted-factor PCA check (quant, XS, split)", "- [ ] M1-T09 Extra (quant, XS, split)")
+        self.p.edit(TODO, "- [ ] M1-T13 Planted-factor PCA check (quant, XS, split)", "- [ ] M1-T19 Extra (quant, XS, split)")
         self.assertEqual({(p.path, p.code) for p in self.problems()}, {(PLAN, "todo-mismatch"), (TODO, "todo-mismatch")})
 
     def test_finding_disposition(self):
-        self.p.edit(PLAN, "### M1-T05:", "**Findings:**\n- M1-R01 Critical · CR-21 · rmt.py complexity 14 → fix task M1-T05\n"
-                    "- M1-R02 Nit · naming\n\n### M1-T05:")
+        self.p.edit(PLAN, "## Phase 3: System", "**Findings:**\n- M1-R01 Critical · CR-21 · rmt.py complexity 14 → fix "
+                    "task M1-T11\n- M1-R02 Nit · naming\n\n## Phase 3: System")
         msgs = [p.message for p in self.problems() if p.code == "finding-disposition"]
         self.assertEqual(len(msgs), 1)
         self.assertTrue(msgs[0].startswith("M1-R02"))
@@ -509,7 +686,7 @@ class FormatChecks(LintCase):
 
 class Scope(LintCase):
     def test_paths_report_only_their_files_with_cross_doc_checks(self):
-        self.p.edit(TODO, "- [ ] M1-T02", "- [x] M1-T02")           # makes PL-02's sketch leftover
+        self.p.edit(TODO, "- [ ] M1-T09", "- [x] M1-T09")           # makes PL-02's sketch leftover
         self.p.edit(SPEC, "**Status:** Approved · ", "")             # header problem elsewhere
         self.assertEqual(self.found({PIPES}), {(PIPES, "prebuild-left")})
         self.assertEqual(self.found({TODO}), set())

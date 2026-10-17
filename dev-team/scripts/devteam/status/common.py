@@ -6,7 +6,7 @@ import os
 import re
 from pathlib import Path
 
-from .. import git, md, model, specdocs
+from .. import git, graph, md, model, specdocs
 from .. import references as refs
 from ..commands import roadmap as roadmap_cmd
 from ..repo import Doc, Repo
@@ -186,6 +186,19 @@ def next_task(items: list[model.TodoItem], tasks: dict[str, model.Task]) -> mode
             continue
         return it
     return None
+
+
+def add_graph(repo: Repo, r: Report) -> None:
+    """The active plan's derived build graph (interface-first-design.md §6.3): `critical_path`, `waves`, `width`,
+    `parallelism` (tasks ÷ critical path), and `graph_warning` when most waves have width 1. Empty without a plan."""
+    active = roadmap_cmd.active_plan(repo)
+    tasks = model.tasks(active) if active else []
+    m = graph.metrics(tasks)
+    r.add("critical_path", m["critical_path"], " → ".join(m["critical_path"]) or "none")
+    r.add("waves", m["waves"], " | ".join(", ".join(w) for w in m["waves"]) or "none")
+    r.add("width", m["width"])
+    r.add("parallelism", m["parallelism"])
+    r.add("graph_warning", graph.serial_warning(tasks) or None)
 
 
 def plan_base(plan: Doc | None) -> str:

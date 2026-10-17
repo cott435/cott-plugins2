@@ -43,9 +43,9 @@ class Base(FixtureCopy):
             self.assertEqual(self.dt("references", "--stamp", id_)[0], 0)
 
     def set_read(self, value: str) -> None:
-        """Replace M1-T06's Read line (the only task that reads RF-01 in the fixture)."""
+        """Replace M1-T13's Read line (the only task that reads RF-01 in the fixture)."""
         text = self.read(PLAN)
-        start = text.index("### M1-T06")
+        start = text.index("### M1-T13")
         line = re.search(r"\*\*Read:\*\*[^\n]*", text[start:])
         a, b = start + line.start(), start + line.end()
         self.write(PLAN, text[:a] + f"**Read:** {value}" + text[b:])
@@ -249,7 +249,7 @@ class StatusTest(Base):
 class ContextTest(Base):
     def context(self, read: str) -> tuple[int, str, str]:
         self.set_read(read)
-        return self.dt("context", "M1-T06")
+        return self.dt("context", "M1-T13")
 
     def test_symbol_selector(self):
         code, out, _ = self.context("PL-02, RF-01:pca_factors")
@@ -301,7 +301,7 @@ class ContextTest(Base):
 
     def test_json(self):
         self.set_read("RF-01:residualize")
-        data = json.loads(self.dt("context", "M1-T06", "--json")[1])
+        data = json.loads(self.dt("context", "M1-T13", "--json")[1])
         self.assertEqual(data["read"], [{"ref": "RF-01:residualize", "kind": "reference",
                                          "where": "docs/references.md:5", "file": MD_FILE,
                                          "selector": "residualize", "shown": "part"}])

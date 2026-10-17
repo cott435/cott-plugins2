@@ -1,5 +1,5 @@
-"""Print a task's whole builder context packet: its Read: sections and files, the package layout, the Files likely
-list, then the task."""
+"""Print a task's whole builder context packet: its Read: sections and files, the package layout, the frozen
+interfaces its steps cross, its Writes: (or Files likely), then the task."""
 from __future__ import annotations
 
 import json
@@ -111,6 +111,53 @@ def _layout_block(repo, pkg: str) -> str:
     return f"## Layout (`dt layout {pkg}`)\n{folder}/\n" + "".join(tree_lines(code.source_tree(root)))
 
 
+def _task_steps(repo, task: model.Task) -> list[model.Step]:
+    """The steps a task touches: `PL-02.pca` → that step; `PL-02` (wiring, system) → every step of PL-02."""
+    pipelines = {p.id: p for p in model.all_pipelines(repo)}
+    out = []
+    for m in re.finditer(r"(PL-\d{2,})(?:\.(\w+))?", task.step):
+        p = pipelines.get(m.group(1))
+        if p is not None:
+            out += [s for s in p.steps if m.group(2) in (None, s.name)]
+    return out
+
+
+def interfaces(repo, task: model.Task, shown: set[str]) -> list[model.Symbol]:
+    """The frozen interfaces the task's steps cross and that its `Read:` doesn't already show: the contract types
+    their `In → Out` cells name, and the contract symbols with a step's name (its signature)."""
+    types = model.contract_types(repo)
+    steps = _task_steps(repo, task)
+    out: dict[str, model.Symbol] = {}
+    for s in steps:
+        for name in s.in_types + s.out_types:
+            ty = model.resolve_type(types, name)
+            if ty is not None:
+                out.setdefault(ty.id, ty)
+    names = {s.name for s in steps}
+    for sym in model.all_symbols(repo):
+        if not sym.is_type and sym.name in names:
+            out.setdefault(sym.id, sym)
+    return [sym for i, sym in out.items() if i not in shown]
+
+
+def _interfaces_block(repo, syms: list[model.Symbol]) -> str:
+    parts = []
+    for sym in syms:
+        part = f"<!-- {sym.doc.rel}:{sym.start + 1} -->\n{sym.text}"
+        if sym.sample:
+            part += f"Sample: {sym.sample} ({'exists' if (repo.root / sym.sample).exists() else 'not written yet'})\n"
+        parts.append(part)
+    return "## Interfaces (frozen: build against these, never change them)\n" + "\n".join(parts)
+
+
+def _writes(repo, task: model.Task) -> list[dict]:
+    out = []
+    for w in task.writes:
+        folder = w.endswith(("/", "/*", "/**"))
+        out.append({"path": w, "exists": (repo.root / w.rstrip("*").rstrip("/")).exists(), "folder": folder})
+    return out
+
+
 def run(args, repo) -> int:
     task = _find_task(repo, args.task)
     if task is None:
@@ -156,13 +203,22 @@ def run(args, repo) -> int:
     layout = _layout_block(repo, task.package)
     if layout:
         blocks.append(layout)
+    shown_ids = {r["ref"] for r in reads if r["kind"] == "id"}
+    syms = interfaces(repo, task, shown_ids)
+    if syms:
+        blocks.append(_interfaces_block(repo, syms))
     files = [{"path": f, "exists": (repo.root / f).exists()} for f in task.files_likely]
-    if files:
+    writes = _writes(repo, task) if "Writes" in task.fields else []
+    if writes:
+        blocks.append("## Writes (edit only these files; the plan gives every other file to another task)\n" + "".join(
+            f"- {w['path']} ({'folder' if w['folder'] else 'exists' if w['exists'] else 'new'})\n" for w in writes))
+    elif files:
         blocks.append("## Files likely\n" + "".join(
             f"- {f['path']} ({'exists' if f['exists'] else 'new'})\n" for f in files))
     blocks.append(f"<!-- {task.doc.rel}:{task.start + 1} -->\n{task.text}")
 
-    preamble = (f"# Context for {task.id}: package {task.package or '—'} · mode {task.mode or '—'}\n"
+    kind = f" · kind {task.kind}" if task.kind else ""
+    preamble = (f"# Context for {task.id}: package {task.package or '—'} · mode {task.mode or '—'}{kind}\n"
                 "Read only what is below, plus CONSTRAINTS.md and the files you edit. "
                 "Your task is the last section.\n")
     text = "\n".join([preamble] + blocks)
@@ -172,8 +228,11 @@ def run(args, repo) -> int:
               file=sys.stderr)
 
     if args.json:
-        print(json.dumps({"task": task.id, "package": task.package, "mode": task.mode, "lines": lines,
-                          "read": reads, "files_likely": files, "text": text}, indent=2))
+        print(json.dumps({"task": task.id, "package": task.package, "mode": task.mode, "kind": task.kind,
+                          "lines": lines, "read": reads,
+                          "interfaces": [{"id": s.id, "where": f"{s.doc.rel}:{s.start + 1}", "type": s.is_type,
+                                          "sample": s.sample} for s in syms],
+                          "writes": writes, "files_likely": files, "text": text}, indent=2))
     else:
         print(text, end="")
     return 0

@@ -18,6 +18,8 @@ the next skill starts. The `dt` tool and the hooks act on their own.
 - Turns an idea into an accepted brief and roadmap stages.
 - Writes the spec, the architecture with its decisions and contracts, and the pipelines,
   each stopping for the user's approval.
+- Checks each unknown about an external API or dataset with a probe, and keeps its code and
+  redacted evidence for the build.
 - Plans golden test cases whose expected outputs come from outside the agent.
 - Cuts each designed stage into milestones and plans the next one task by task, contract
   first.
@@ -26,7 +28,10 @@ the next skill starts. The `dt` tool and the hooks act on their own.
 
 ## Non-goals
 
-- Writing or running the project's code: building is `/build`'s job.
+- Writing or running the project's code: building is `/build`'s job. A probe is not project
+  code: a small script under `probes/` that checks what an external API or dataset really
+  returns before a decision rests on it. Nothing imports it, and you run any probe that needs
+  your credentials.
 - Planning more than the next milestone in task detail.
 - Projects in languages other than Python.
 

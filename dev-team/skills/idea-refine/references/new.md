@@ -1,6 +1,6 @@
 # New mode: the brief
 
-No `docs/brief.md` yet. Examples: `examples-new.md` (all phases), `examples-process.md` (a non-product idea), `examples-quant.md` (a data-dependent brief).
+No `docs/brief.md` yet. Examples: `examples-new.md` (all phases), `examples-process.md` (a non-product idea), `examples-data.md` (a data-dependent brief).
 
 1. **Phases 1-2** per `ideation.md`.
 2. **Phase 3: write the brief** from the template below. Check the word count (`wc -w docs/brief.md`) before presenting it.
@@ -47,7 +47,7 @@ Write `docs/brief.md` (create `docs/` if needed) from this template. The brief a
 - **One page or less.** Aim for 250-450 words. If it's longer, cut — don't shrink the font.
 - **Plain English.** Write for a smart person outside the team. No acronyms without a definition, no jargon, no code, no file paths.
 - **Short sentences, short bullets.** One idea per bullet. No bullet longer than two lines.
-- **Data needs, not data vendors.** For ML and data projects, say what data the project depends on in plain terms ("10+ years of daily US stock prices, including companies that no longer exist") as a constraint or a bet. Name a specific source only if it's fixed (our own data, a required benchmark). Choosing APIs and datasets happens in the architecture, after the spec.
+- **Data needs, not data vendors.** For ML and data projects, say what data the project depends on in plain terms ("10 years of hourly meter readings, including meters since decommissioned") as a constraint or a bet. Name a specific source only if it's fixed (our own data, a required benchmark). Choosing APIs and datasets happens in the architecture, after the spec.
 - **Goals are numbered** so `spec-writing` can trace requirements back to them ("serves Goal 2").
-- **3-5 goals, project-level and stage-neutral.** A goal is an outcome of the whole project ("Honest estimates of risk"), never a stage ("Stage 2: PCA works"). If the user describes the project in stages, the stages become roadmap stage rows (`roadmap.md`), and every goal stays true whichever stage is being built. More than five goals means the project isn't focused yet — go back to Phase 2.
+- **3-5 goals, project-level and stage-neutral.** A goal is an outcome of the whole project ("Forecast errors we can trust"), never a stage ("Stage 2: the seasonal fit works"). If the user describes the project in stages, the stages become roadmap stage rows (`roadmap.md`), and every goal stays true whichever stage is being built. More than five goals means the project isn't focused yet — go back to Phase 2.
 - **The Not Doing list is mandatory.** It is the most valuable part: it makes trade-offs explicit.

@@ -31,18 +31,18 @@ Run these for the idea only:
 1. **Keep IDs stable, keep the text current.** IDs are never renumbered or reused. Old text does not stay in the spec once it stops being true; git keeps it.
    - New feature → new `### Feature (CODE)` section with a new code and IDs starting at `-01`.
    - New behavior in an existing feature → next unused number in that feature (if `SAVE-04` is the highest, add `SAVE-05`, even if `SAVE-02` was removed). `dt status` reports it under `prefixes`.
-   - **Widen, don't bolt on.** If an existing requirement already covers this concern for an earlier part of the project, rewrite it to cover the new part too, instead of adding a near-duplicate. A training-time limit written for the first game becomes a limit for every game. A summary that says "the first milestone" is rewritten.
+   - **Widen, don't bolt on.** If an existing requirement already covers this concern for an earlier part of the project, rewrite it to cover the new part too, instead of adding a near-duplicate. A training-time limit written for the first dataset becomes a limit for every dataset. A summary that says "the first milestone" is rewritten.
    - Changed requirement → rewrite it in place and keep its ID. Put no marker on it. Instead, list it as `(changed)` in this round's Changelog row, with the reason in the row's Change text. `architecture-design` reads those Changelog marks (through `dt status`) to find what the architecture must revisit, so list every changed ID.
    - Removed requirement → collapse it to one struck line and delete its criteria and edge cases: `- **CODE-03** ~~[short name]~~ *Removed YYYY-MM-DD: [reason, or "replaced by CODE-07"].*` Never delete the ID line; the ID stays retired.
 2. **Link back to the idea.** Add `**Source:** [ideas/<slug>.md](ideas/<slug>.md)` under the `Serves:` line of each new feature section, so readers can find the full why.
 3. **Update everything it touches, and consolidate.** Summary (rewritten for the whole spec, not appended to), Users, Serves lines. Scope stays one deduplicated list per side: merge new out-of-scope items into it, and drop or narrow anything the new features bring into scope (the gate's *Out of scope* step). Remove assumptions and open questions that are answered or no longer apply.
-4. **Add one Changelog row**, one line: the idea file as the source, a short description of the change, and the IDs as ranges in up to three `;`-separated groups: added, then changed, then removed (`TANK-01–TANK-12; QR-03, CORE-04 (changed); SNAKE-04 (removed)`). A `(changed)` or `(removed)` mark covers every ID in its group.
+4. **Add one Changelog row**, one line: the idea file as the source, a short description of the change, and the IDs as ranges in up to three `;`-separated groups: added, then changed, then removed (`FIELD-01–FIELD-12; CNN-03, CORE-04 (changed); CROP-04 (removed)`). A `(changed)` or `(removed)` mark covers every ID in its group.
 
 ## Gate steps
 
 Run the hygiene check on the whole spec, not just the new section, and add:
 
-- **Out of scope.** Read every out-of-scope line against the features this round added. Drop a line the new features bring into scope. Narrow a line that is now only partly true to the part still excluded, and name the stage it applies to. Once a neural-network stage exists, "deep learning" is no longer out of scope. Once a trading stage uses return forecasts, "no return forecasts — the portfolio stage is variance-only" becomes "the variance-only portfolios use no return forecasts". Then merge duplicates.
+- **Out of scope.** Read every out-of-scope line against the features this round added. Drop a line the new features bring into scope. Narrow a line that is now only partly true to the part still excluded, and name the stage it applies to. Once a neural-network stage exists, "deep learning" is no longer out of scope. Once a reserve-planning stage uses demand forecasts, "no demand forecasts — the reserve stage is an equal split" becomes "the equal-split reserves use no demand forecasts". Then merge duplicates.
 - **Leftovers.** The Summary describes the whole spec as it now stands. No requirement is still worded for one stage when it now covers several. Removed requirements are one line each. No `(changed …)` marker or other change note appears above the Changelog.
 
 ## On approval: close and freeze the idea

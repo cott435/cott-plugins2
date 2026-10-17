@@ -11,7 +11,7 @@ Define                      Design                                   Plan       
 idea-refine → spec-writing → architecture-design → pipeline-design → test-planning (optional) → build-planning → build-setup → /build
 ```
 
-Every skill stops after writing a Draft and waits for your review. Nothing moves forward until you approve it in your own words, and "approved, go ahead" starts the next *planning* skill, never code. Planning skills never write or run code.
+Every skill stops after writing a Draft and waits for your review. Nothing moves forward until you approve it in your own words, and "approved, go ahead" starts the next *planning* skill, never code. Planning skills never write or run project code. The one exception is `api-probe`: it writes small probe scripts under `probes/` to check an external API before a decision rests on it, runs only the checks that need no credentials, and leaves the rest for you to run.
 
 ## The documents
 
@@ -22,6 +22,7 @@ Every skill stops after writing a Draft and waits for your review. Nothing moves
 | `docs/roadmap.md` | **In what order**: stages (`S<n>`: outcomes the user agreed, with an outline and the skills they route to) and the milestones each is cut into (`M<n>`: build-sized vertical slices) | `idea-refine` adds stages, `build-planning` cuts them into milestone rows, `dt roadmap` writes Status | 2 tables + ≤ 6 lines per stage or milestone |
 | `references/` | Your reference code and notes: how something has been done before. Never imported, excluded from tooling | You | — |
 | `docs/references.md` | What each reference is for (`RF-NN`), its caveats, and the stage it serves | `reference-intake` | ≤ 8 lines per file |
+| `docs/probes.md` + `probes/PB-NN-*/` | What an external source **really returns** (`PB-NN`): the question, checks with pass criteria, what a run spends, the verdict; the probe script and its redacted evidence | `api-probe`; `evidence/` only by the probe's scripts | ≤ 8 lines + 1 per check |
 | `docs/spec.md` | **What** is built: requirements (`CODE-NN`), acceptance criteria, scope | `spec-writing` | As long as needed |
 | `docs/architecture.md` | **How**: components, dependencies, decisions (`AD-NN`); multi-package: system map and system pipelines | `architecture-design` | 1-3 pages (single); 2-4 (root) |
 | `docs/packages/<pkg>/architecture.md` | A package's internals (multi-package only) | `architecture-design` | 1-3 pages |
@@ -47,7 +48,7 @@ Drop reference files (code or markdown) into `references/` whenever you have the
 
 ## IDs and section reads
 
-Every addressable unit has a repo-unique ID that is never renumbered or reused: requirements `CODE-NN`, decisions `AD-NN`, pipelines `PL-NN` (steps `PL-NN.<function>`), test cases `TC-NN`, stages `S<n>`, milestones `M<n>`, tasks `M<n>-T<nn>`, review findings `M<n>-R<nn>`, contract symbols `<component>.<symbol>`, constraint rules `CR-NN`, references `RF-NN`. Agents read by ID, not by file:
+Every addressable unit has a repo-unique ID that is never renumbered or reused: requirements `CODE-NN`, decisions `AD-NN`, pipelines `PL-NN` (steps `PL-NN.<function>`), test cases `TC-NN`, stages `S<n>`, milestones `M<n>`, tasks `M<n>-T<nn>`, review findings `M<n>-R<nn>`, contract symbols `<component>.<symbol>`, constraint rules `CR-NN`, references `RF-NN`, probes `PB-NN` (checks `PB-NN.C<n>`). Agents read by ID, not by file:
 
 ```bash
 python3 <plugin>/scripts/dt.py section PL-02 TC-06 STAT-02
@@ -63,6 +64,7 @@ Each task lists the IDs a builder needs in its `Read:` field; `dt context M2-T03
 | Idea | `Draft` → `Accepted` → `Specced` (frozen), or `Parked` |
 | Spec, architecture, contract, pipelines, tests, CONSTRAINTS | `Draft` → `Approved`; editing an Approved doc sets it back to `Draft` (except mechanical `dt` edits and pipeline-design appending pipeline IDs to a contract's `Used by`) |
 | Decision | `Proposed` → `Accepted` → `Superseded by AD-NN` |
+| Probe | `Draft` → `Ready` → `Answered (pass\|fail)`, or `Waived` (your call, with your reason); a decision citing a probe stays `Proposed` until then, and no milestone the probe reaches can be planned |
 | Plan | `Draft` → `Approved` → `In progress` → `Done` → archived; a stub with `Between milestones` until the next plan is approved |
 | Stage (roadmap, derived by `dt roadmap`) | `Idea` → `Specced` → `Designed` → `Cut` (milestone rows written) → `Planned` → `Building` → `Done` |
 | Milestone (roadmap, derived by `dt roadmap`) | `Idea` → `Specced` → `Designed` → `Planned` → `Building` → `Done` |
@@ -146,6 +148,7 @@ Data decisions are spread across the stages on purpose:
 | Brief / idea (`idea-refine`) | Whether usable data **exists** and is affordable and legal. The non-ML baseline. | "Need daily US prices including delisted companies, under $100/month" |
 | Spec (`spec-writing`) | What the data must **contain and guarantee** (`DATA-` requirements). Model targets against a baseline. | "No value published after date D is visible to a backtest on D" |
 | Architecture (`architecture-design`) | **Which** API, vendor, or dataset, and which model type, each recorded as a decision | Candidates are checked against the `DATA-` requirements and the brief's budget |
+| Probes (`api-probe`) | What a chosen source **really returns**, checked before the build freezes types from it | "Sharadar's `close` is split-adjusted; raw prices are `closeunadj` only, with no raw open, high or low" |
 | Pipelines (`pipeline-design`) | The **spine** version of each step: a real baseline, never a mock (only a call to another pipeline or package may be faked, across a frozen interface) | Sample covariance before shrinkage; equal weight before min-variance |
 | Tests (`test-planning`) | **Known-answer** cases: planted signals, pure noise, closed forms, and the model evaluation protocol | Every cleaned eigenvalue ≤ the Marchenko–Pastur edge on pure noise |
 
@@ -160,7 +163,7 @@ The plugin's hooks run in every session, subagents included:
 | Event | Runs | Effect |
 |---|---|---|
 | SessionStart | `dt status --summary` | Active milestone, next task, blocked tasks and docs awaiting approval (silent outside dev-team projects) |
-| PreToolUse (Edit, Write) | `dt guard` | Asks you before any `tests/fixtures/**/expected.json` change; denies writes to `tasks/archive/**` |
+| PreToolUse (Read, Edit, Write) | `dt guard` | Asks you before any `tests/fixtures/**/expected.json` change; denies writes to `tasks/archive/**` and `probes/*/evidence/**`; denies any access to `.env` files and `probes/*/out/**` |
 | PostToolUse (Edit, Write) | `dt lint --hook` | Lint problems in docs and plans go straight back to the agent that made the edit |
 | Stop | `dt lint --hook` | Reports problems in changed docs; never blocks |
 
@@ -172,6 +175,7 @@ Code tooling (`check.sh`, Ruff, mypy, import-linter, the agent role files and th
 |---|---|---|
 | [`idea-refine`](skills/idea-refine/SKILL.md) | Define | `docs/brief.md`, `docs/ideas/*.md`, roadmap stages and their Skills |
 | [`reference-intake`](skills/reference-intake/SKILL.md) | Any time | `docs/references.md` (one read-only agent per new or changed file) |
+| [`api-probe`](skills/api-probe/SKILL.md) | Design, or any time | `docs/probes.md`, `probes/PB-NN-*/` (a probe script per unknown, from the official docs; you run any check that needs your keys) |
 | [`spec-writing`](skills/spec-writing/SKILL.md) | Define | `docs/spec.md` |
 | [`architecture-design`](skills/architecture-design/SKILL.md) | Design | `docs/architecture.md`, `docs/packages/*/{architecture,contract}.md` |
 | [`pipeline-design`](skills/pipeline-design/SKILL.md) | Design | `docs/packages/*/pipelines.md` |
@@ -179,4 +183,4 @@ Code tooling (`check.sh`, Ruff, mypy, import-linter, the agent role files and th
 | [`build-planning`](skills/build-planning/SKILL.md) | Plan | Roadmap milestone rows (each stage cut into slices), `tasks/plan.md` (tasks with `Writes:`, the dependency graph), `tasks/todo.md`, AGENTS.md doc map |
 | [`build-setup`](skills/build-setup/SKILL.md) | Bar | `CONSTRAINTS.md`, tool config, `scripts/`, `.claude/agents/` |
 
-Design notes: [design/planning-stage.md](design/planning-stage.md), [design/build-setup.md](design/build-setup.md), [design/interface-first-design.md](design/interface-first-design.md).
+Design notes: [design/planning-stage.md](design/planning-stage.md), [design/build-setup.md](design/build-setup.md), [design/interface-first-design.md](design/interface-first-design.md), [design/probes.md](design/probes.md).

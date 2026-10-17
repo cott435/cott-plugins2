@@ -472,3 +472,40 @@ Each stage ends at a go/no-go before money is spent on the next.
 **Done means:** the §9.1 thresholds hold in both modes; A3 meets every pre-registered effect over A1 and A2; A3 catches all three planted beliefs in at least 2 of 3 runs and A4 doesn't; no protected-test edits in split arms; red for the right reason ≥ 90%; A3's holdout pass rate ≥ A0's.
 
 **Releases:** the plan map is a workflow-analyzer minor. dev-team's is a minor if `dt` keeps parsing `Files likely` and `Parallel` in old plans (as warnings), a major if it drops them. Both go through `bump-version` on the user's yes.
+
+---
+
+## 13. Build interface (frozen for the parallel build of this design)
+
+The sessions building §12 stages 0–1 work at the same time in separate worktrees. These names are fixed so each side can be built against them before the other exists; change one only by telling every session.
+
+**Ownership** (each session writes only its own paths):
+
+| Session | Writes |
+|---|---|
+| dt-core | `dev-team/scripts/**` (incl. `scripts/tests/**` and the quant fixture) |
+| dt-skills | `dev-team/skills/**`, `dev-team/README.md` |
+| planmap | `workflow-analyzer/**` except `PURPOSE.md` |
+| plan-evals | `dev-team/evals/harness/` files `dtprobe.py dtrun.py grade.py simulate.py planexport.py modecmp.py runviz.py driver.py package.py judge_prompt.py blind_judge_prompt.md dryrun.py docstats.py`, and `dev-team/evals/README.md` |
+| build-evals | `dev-team/evals/harness/` files `build_driver.py grade_build.py dryrun_build.py run_build.sh permission_mcp.py fake_claude.py scenarios.json`, and `dev-team/evals/harness/fixtures/build/**` |
+| plan-flow-chart | `dev-team/design/plan-flow.html` |
+
+Nobody edits this design doc, `PURPOSE.md`, `CHANGELOG.md`, versions or the catalog; findings that need a design change go in the session's report.
+
+**`devteam.model`** (dt-core implements; others read with `getattr` fallbacks):
+- `TASK_FIELDS` gains `"Kind"` and `"Writes"`.
+- `Task.kind -> str`: one of `interface | spine | wiring | thicken | system`, lower-cased from `**Kind:**`; `""` when absent.
+- `Task.writes -> list[str]`: from `**Writes:**`, falling back to `files_likely` when absent.
+- `Edge` dataclass: `src: str, dst: str, kind: str, mitigated_by: str, reason: str`. `kind` ∈ `data call file code contract-change order`. `mitigated_by` is the interface text (e.g. `stats.Cov sample (M1-T01)`), `""` when the cell starts with `none`; `reason` is the text after `none:`.
+- `model.graph_edges(doc) -> list[Edge]`: parses the `## Dependency graph` table of a plan doc; From/To cells take their first `M<n>-T<nn>` token.
+
+**`devteam.graph`** (new module, dt-core): pure functions over `list[Task]`, ignoring mitigated edges (only `Depends on` orders):
+- `waves(tasks) -> list[list[str]]` (topological levels), `critical_path(tasks) -> list[str]`, `width(tasks) -> int` (largest wave), `ready(tasks, done: set[str]) -> list[str]`.
+
+**CLI** (dt-core):
+- `dt ready [--json]` → `[{"id", "title", "kind", "writes"}]` for the active plan.
+- `dt plan --json` → one `plan-map/1` snapshot body as in §8.3, without `turn`/`commit`/`skill`: `{"schema": "plan-map/1", "producer": "dt <version>", "nodes": [...], "edges": [...], "builds": [...]}`. Node levels: `stage milestone task pipeline step test type symbol`. Edge kinds: `depends implements verifies` plus the graph-table kinds with `mitigated_by`.
+- `dt status --json` gains, under the active plan, `critical_path`, `waves`, `width`, `parallelism`.
+- Lint check names: `writes`, `edges`, `step-io-types` (`parallel` removed; `Parallel` and `Files likely` still parse, with a deprecation warning).
+
+**`plan.json`** (plan-evals writes it, planmap reads it): `{"schema": "plan-map/1", "producer": "...", "levels": [...], "snapshots": [ {"turn": int, "commit": str, "ts": str, "skill": str, ...snapshot body} | {"turn": int, "same_as": int} ]}` at `<run>/flow/plan.json`. planmap's entry point: `planmap.write(out: Path) -> Path | None` (reads `out/plan.json`, writes `out/plan/*.html`, returns the index path or None when there is no plan.json). runviz calls it after `trace.build`.

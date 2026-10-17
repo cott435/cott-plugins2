@@ -71,6 +71,7 @@ Every boundary the milestone builds across, where the two sides belong to differ
 | Boundary | Frozen as | Unblocks |
 |---|---|---|
 | Step → next step in a pipeline (data) | The `Out` type as code + one sample payload | The downstream step's spine and tests run on the sample, not on the upstream code |
+| Step → step passing an object with behavior (a `typing.Protocol` or class, such as `core.Env` or `runstore.RunWriter`), or a call into another component's function (`load_agent` calling `make_env`) | The Protocol or signature as code + a fixture-backed replay double in `tests/contracts/<id>.<Type>/`, replaying a recorded interaction. The double is the type's sample, not a mock of a step | The consuming step's spine and tests run on the double, not on the provider's code |
 | Step signature | The function signature in its owner module (body: see 4.3) | Wiring and testers import it |
 | Pipeline → another pipeline or package (call) | Schema + fixtures + a fixture-backed fake (today's contract folder) | The calling pipeline's wiring and smoke test |
 | Shared modules (`types.py`, `__init__.py` exports) | Written whole by the interface task | No builder touches them |
@@ -79,9 +80,11 @@ Not frozen: helpers inside a step, private functions, anything one task owns end
 
 ### 4.2 Form
 
-- **Types become contract sections.** `### stats.Cov: type` sits beside function sections in `contract.md`, with fields, invariants and the sample fixture path. architecture-design writes them; pipeline-design checks every `In → Out` cell names one (a new `dt lint` rule: `step-io-types`).
+- **Types become contract sections.** `### stats.Cov: type` sits beside function sections in `contract.md`, with fields, invariants and its cases. architecture-design writes them; pipeline-design checks every `In → Out` cell names one (a new `dt lint` rule: `step-io-types`).
+- **Planning names the cases; the interface task writes the samples.** A type's section names each case it needs (a Protocol or class type's case is its replay double) and the folder it lands in. The sample files, like the types themselves, are build output: the milestone's interface task writes them.
 - **Code, not prose.** Dataclasses, `typing.Protocol`, or a pandera schema for a dataframe, in the owner's `types.py`.
-- **Folders:** `tests/contracts/<component>.<Type>/` holds the schema and samples; `tests/contracts/<pkg>.<symbol>/` keeps the fake for calls. Both frozen by CR-09 after the interface task, as contract folders are now.
+- **Folders:** `tests/contracts/<component>.<Type>/` holds the schema and samples, or the replay double for a Protocol or class; `tests/contracts/<pkg>.<symbol>/` keeps the fake for calls. CR-09 freezes both once the interface task lands, like every contract folder.
+- **Generated cross-runtime types.** When one runtime's types are generated from another's schema (TypeScript from the server's JSON Schema), the providing interface task runs the generator and writes the generated file, which its `Writes:` claims. Interface tasks never depend on each other: each is solo and first.
 - **`**Boundary:**` lines extend to component boundaries** in single-package repos, and `boundaries_unfrozen` (`status/build_planning.py:135-148`) reports any cross-owner boundary in the milestone with no interface task.
 
 ### 4.3 Signatures and the no-stub floor
@@ -139,9 +142,9 @@ wave 3  T14  system: PL-02 on real PL-01; both smokes; TC-01–TC-03
 
 14 tasks, critical path 4 (T01 → T05 → T11 → T14), 10 agents in wave 1, every task XS/S. The critical path is no shorter in tasks, but each task on it is smaller and each wave is wide. Whether that wins wall-clock time after merge cost is exactly what the build eval measures (§9.2); planning alone can't prove it.
 
-Two levers keep the task count down, both build-planning rules:
-- **Fold a step's spine into its thicken** when both are in the milestone and the step has a golden case: one split task whose acceptance keeps the baseline selectable. (Example: `clean_eigen` spine + MP cleaning → one task.) Open question §11.1.
-- **Fold trivial steps into wiring** when their spine is a pass-through or a print.
+Two folds keep the task count down, both build-planning rules. A fold is allowed only where it doesn't lengthen the critical path, and it is recorded on the task it produces as `**Reason:** fold: <rule>`, so reviewers and the grader see it in the plan:
+- **`spine into thicken`:** when a step's spine and thicken are both in the milestone and the step has a golden case, one split task replaces the stub itself; its acceptance keeps the baseline selectable. (Example: `clean_eigen` spine + MP cleaning → one task, `**Reason:** fold: spine into thicken`.) The pipeline's wiring then waits on that task instead of a spine, which is how a fold lengthens the path. Open question §11.1.
+- **`trivial into wiring`:** a step whose spine is a pass-through or a print is built by its pipeline's wiring task; its stub names the wiring task.
 
 ### 5.4 Milestone level
 
@@ -159,6 +162,7 @@ The same rules apply one level up. A milestone row's `Depends` names what it nee
 |---|---|---|---|
 | M1-T09 wire PL-02 | M1-T08 wire PL-01 | call | quant.load_prices fake (M1-T01) |
 | M1-T05 clean_eigen spine | M1-T04 estimate_cov spine | data | stats.Cov sample (M1-T01) |
+| M1-T09 wire PL-02 | M1-T05 clean_eigen spine | order | none: integration: the smoke runs it |
 | M1-T11 MP cleaning | M1-T05 clean_eigen spine | code | none: thickens the same module |
 | M1-T11 MP cleaning | M1-T12 shrinkage | data | stats.Cov sample (M1-T01): cleaning takes any Cov; today's T04 → T05 order disappears |
 ```
@@ -170,9 +174,9 @@ Edge kinds:
 | `data` | One step's output feeds another's input | Type + sample payload |
 | `call` | A pipeline calls another pipeline or package | Fake backed by fixtures |
 | `file` | Two tasks must write one file | Move the shared part to the interface or wiring task; else serial |
-| `code` | A task changes code another task wrote | None: serial |
+| `code` | A task *changes* code another task wrote: a thicken after its step's spine, two thickens of one module. Running or calling that code is not a `code` edge | None: serial. A spine never has a `code` edge to another step's task; it runs on that boundary's sample or replay double |
 | `contract-change` | A task changes a frozen interface | None: serial, plus a new interface task |
-| `order` | Risk or learning ("do X first to learn Y") | None: reason required |
+| `order` | Risk or learning ("do X first to learn Y"), or integration: a wiring or system task runs the steps it wires | None: reason required. A wiring or system task's edge to a step of a pipeline it wires or swaps in gives the reason `integration: <what runs it>` |
 
 A mitigated edge is documentation: it doesn't order the tasks and doesn't appear in `Depends on`. An unmitigated edge must appear in `Depends on`. The table is the reviewable argument for every serial step in the milestone.
 
@@ -188,7 +192,7 @@ A mitigated edge is documentation: it doesn't order the tasks and doesn't appear
 **Depends on:** M1-T01 · **Writes:** src/quant/stats/rmt.py, tests/unit/quant/test_rmt.py
 ```
 
-`**Parallel:** G<n>` goes away (derived). Within a split task the implementer always follows its tester; that order is implied, not an edge. `**Writes:**` is exact paths or one directory glob owned by the task.
+`**Parallel:** G<n>` goes away (derived). Within a split task the implementer always follows its tester; that order is implied, not an edge. `**Writes:**` is exact paths or one directory glob owned by the task. A step's owner may be a folder that holds its private helpers (`train/loop/**`): the step's spine and thicken tasks write that glob, and no other task writes inside it.
 
 ### 6.3 `dt` changes
 
@@ -302,20 +306,20 @@ New checks (planned scope):
 | `wave_width` | Ready set right after the interface task (spines + tester halves) | ≥ 0.8 × the milestone's step count |
 | `writes_disjoint` | No two tasks without a `Depends on` path share a `Writes:` path; a spine writes only its owner module and its unit test | 0 conflicts |
 | `edges_mitigated` | Cross-owner `data`/`call` edges whose mitigation names an interface the interface task produces | ≥ 0.9 |
-| `unmitigated_reasoned` | Every `none:` row has a reason of an allowed kind (same module, unsplittable shared file, real side-effect order) | 100% |
+| `unmitigated_reasoned` | Every `none:` row has a reason of an allowed kind (same module, unsplittable shared file, real side-effect order, integration: wiring and system tasks run the steps they wire) | 100% |
 | `no_edge_to_code_when_interface` | No `Depends on` to a code task across a boundary an interface covers | 0 |
 | `edge_table_consistent` | Every `Depends on` has a row; every row resolves | 100% |
 | `phase0_split` (replaces `phase0_spine`, `grade.py:172-178`) | Per new pipeline: interface coverage, one spine per step (or a fold rule applied), one wiring task writing the entry and smoke test | 100% |
 | `step_tasks_small` | Spine and thicken tasks are XS or S | 100% |
 | `tester_starts_early` | Split tasks whose `Read:` symbols are all declared by the interface task | ≥ 0.8 |
-| `fakes_only_cross_pipeline` | Fakes only where a pipeline calls another pipeline or package | 0 violations |
+| `fakes_only_cross_pipeline` | Fakes only where a pipeline calls another pipeline or package; a Protocol or class type's replay double is its sample, not a fake | 0 violations |
 | `tasks_not_editing_plan` | No `Writes:` under `tasks/**` | 0 |
 
 New checks (designed scope):
 
 | id | Check | Threshold |
 |---|---|---|
-| `interface_coverage` | Every cross-owner step boundary has its type as a contract section; in M1 also a sample under `tests/contracts/` | 100% |
+| `interface_coverage` | Every cross-owner step boundary has its type as a contract section that names its cases; in M1 also an interface task whose `Writes:` covers each type's sample path `tests/contracts/<id>.<Type>/`. Samples are build output, so the check never asks for the file on disk | 100% |
 | `types_in_contract` | Every type named in a step table resolves to a contract section (iteration-6's top buildability defect, `findings.md:143`) | 100% |
 | `frozen_interface_churn` | Times a type or contract folder M1 froze is revised by a later stage, walked over turn commits (`grade.py:127-129`) | Reported; expect all-at-once ≤ incremental |
 
@@ -326,7 +330,7 @@ New checks (designed scope):
 - `no_code_during_planning` (`grade.py:276-291`) adds `tests/contracts/` and `**/types.py`: types are written by the build's interface task, never by planning.
 - `doc_budgets`: plans hold more, smaller tasks; plan.md and contract.md budgets become per task and per type (also fixes `docstats.py:54`, handoff S5).
 - `milestone-size` reads the critical path from `graph_metrics`.
-- `gate_discipline` (`grade.py:294-311`): watch for pipeline-design finding missing types and revising the architecture in the same turn (iteration-6 N2).
+- `gate_discipline` (`grade.py:294-311`): watch for pipeline-design finding missing types and revising the architecture in the same turn (iteration-6 N2). A routed Revise round trip across two turns passes: one turn leaves the owner's doc Draft and asks for its Revise, the next runs the Revise and re-syncs the docs that use it. Both in one turn still fails.
 
 **Free replay checks** in `simulate.py`: on a fresh plan `dt ready` returns only the interface task; after ticking it, every spine and every tester half; wiring isn't ready until its pipeline's spines are ticked; editing a frozen type yields a `contract-change` edge and lists the dependent tasks for Replan.
 

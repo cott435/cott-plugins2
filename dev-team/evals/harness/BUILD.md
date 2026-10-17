@@ -54,4 +54,4 @@ CLAUDE_BIN=$PWD/evals/harness/fake_claude.py FAKE_MODE=build \
 evals/harness/run_build.sh iteration-b1 minilab A0 A3      # real: stage 4 (n=3 unless REPLICATES=1)
 ```
 
-Env: `AGENT_MODEL` (pinned; the Claude Code version is recorded), `COST_CAP_USD` (60 per run), `MAX_TURNS` (target's, 12), `TURN_TIMEOUT` (5400 s), `PRESSURE=1`.
+Env: `AGENT_MODEL` (pinned; the Claude Code version is recorded), `COST_CAP_USD` (per run, default none), `MAX_TURNS` (target's, 12), `TURN_TIMEOUT` (5400 s), `PRESSURE=1`.

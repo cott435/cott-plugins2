@@ -97,7 +97,7 @@ evals/harness/run.sh iteration-5 quant-incremental    # or just some of them
 - **Re-grade a run:** `python3 evals/harness/grade.py <run>`.
 - **Environment variables:**
   - `AGENT_MODEL` (default `claude-opus-5-5`), `USER_MODEL` (default `sonnet`)
-  - `COST_CAP_USD` (per run, default 150)
+  - `COST_CAP_USD` (per run, default none)
   - `MAX_TURNS`
   - `PLUGIN_SRC`, or `SKILLS_SRC` to overlay an older skill snapshot for an A/B run
   - `PERMISSION_PROMPTS=0` to leave the oracle prompts unanswered
@@ -152,7 +152,7 @@ Through build-setup, each stage adds 3–4 gates (pipelines, tests, plan, and se
 
 Reference intake adds about 2 turns each time files arrive (draft with milestone questions, then approval): twice in quant incremental (structure_portfolios, forecasting_agents), once in all-at-once. idea-refine's skill-routing question and offering unassigned references add about one more per quant stage when they can't ride on an existing answer. The intake subagents read 85–105-line files, so they cost cents; the extra cost is mostly the longer resumed context. Budgets stay at 150 and 50.
 
-Quant's four stages are roughly 4.4 six-stage-era stages of work: the two merged stages each take about 20% more turns (bigger spec and architecture rounds), but the per-stage gates (idea, spec, architecture, pipelines, tests, plan) are paid four times instead of six. A full four-run iteration costs about $85–175, plus a few dollars for the simulated user. Runs go in parallel, so wall clock is about the length of quant incremental. `COST_CAP_USD` stops a runaway.
+Quant's four stages are roughly 4.4 six-stage-era stages of work: the two merged stages each take about 20% more turns (bigger spec and architecture rounds), but the per-stage gates (idea, spec, architecture, pipelines, tests, plan) are paid four times instead of six. A full four-run iteration costs about $85–175, plus a few dollars for the simulated user. Runs go in parallel, so wall clock is about the length of quant incremental. Set `COST_CAP_USD` to stop a runaway; by default nothing caps a run.
 
 ## What `grade.py` checks
 

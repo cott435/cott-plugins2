@@ -17,7 +17,7 @@ Usage: driver.py <trajectory-id> <out-dir>
 
 Env: PLUGIN_SRC / SKILLS_SRC (see plugin.py), CLAUDE_BIN (default: claude; fake_claude.py for a no-cost
 loop test), AGENT_MODEL, USER_MODEL, COST_CAP_USD (stop once the agent session has cost this much; default
-150), MAX_TURNS (override the scenario's turn budget, e.g. 1 for a smoke run), PERMISSION_PROMPTS=0 (don't
+none), MAX_TURNS (override the scenario's turn budget, e.g. 1 for a smoke run), PERMISSION_PROMPTS=0 (don't
 answer the oracle guard's "ask" prompts; see permission_mcp.py). Both sessions load project/local settings
 only, no CLAUDE.md files and no MCP servers but the eval's own, so the host's user-level instructions, skills,
 plugins and MCP servers don't leak into the trajectory.
@@ -36,7 +36,7 @@ CLAUDE_BIN = os.environ.get("CLAUDE_BIN", "claude")
 ISOLATE = ["--setting-sources", "project,local"]
 AGENT_MODEL = os.environ.get("AGENT_MODEL", "claude-opus-5-5")
 USER_MODEL = os.environ.get("USER_MODEL", "sonnet")
-COST_CAP = float(os.environ.get("COST_CAP_USD", "150"))
+COST_CAP = float(os.environ.get("COST_CAP_USD") or "inf")
 MAX_TURNS = int(os.environ["MAX_TURNS"]) if os.environ.get("MAX_TURNS") else None
 PERMISSION_PROMPTS = os.environ.get("PERMISSION_PROMPTS", "1") != "0"
 STALL_LIMIT = 4  # blocked moves in a row with no doc change before the run stops as stalled

@@ -20,7 +20,7 @@ with no new tick. Then it draws the flow (runviz.py --run; plan map when planexp
 Usage: build_driver.py <target> <arm> <out-dir>      e.g. build_driver.py minilab A3 /tmp/b/minilab-A3-r1/with_skill
 
 Env: CLAUDE_BIN (fake_claude.py with FAKE_MODE=build for a no-cost loop), AGENT_MODEL, COST_CAP_USD
-(default 60), MAX_TURNS, TURN_TIMEOUT (seconds per turn, default 5400), PRESSURE=1, PLUGIN_SRC/SKILLS_SRC
+(default none), MAX_TURNS, TURN_TIMEOUT (seconds per turn, default 5400), PRESSURE=1, PLUGIN_SRC/SKILLS_SRC
 (see plugin.py), REPLICATE (recorded in summary.json).
 """
 from __future__ import annotations
@@ -41,7 +41,7 @@ import driver, plugin  # noqa: E402
 
 CLAUDE_BIN = os.environ.get("CLAUDE_BIN", "claude")
 AGENT_MODEL = os.environ.get("AGENT_MODEL", "claude-opus-5-5")
-COST_CAP = float(os.environ.get("COST_CAP_USD", "60"))
+COST_CAP = float(os.environ.get("COST_CAP_USD") or "inf")
 MAX_TURNS = int(os.environ["MAX_TURNS"]) if os.environ.get("MAX_TURNS") else None
 TURN_TIMEOUT = int(os.environ.get("TURN_TIMEOUT", "5400"))
 PRESSURE = os.environ.get("PRESSURE") == "1"

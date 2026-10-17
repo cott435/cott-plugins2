@@ -19,8 +19,9 @@ be changed later. Nothing runs until you have agreed to it.>
 
 ## Before you start
 
-1. Copy `.env.example` to `.env` in this folder and fill in your values. Don't paste them
-   anywhere else: the scripts read `.env` themselves, and they never print a key.
+1. Copy `.env.example` to `.env` in this folder and fill in your keys, and only keys. Don't
+   paste them anywhere else: the scripts read `.env` themselves, and they never print a key.
+   Settings such as `<VENDOR>_ENV` go in your shell: `export <VENDOR>_ENV=sandbox`.
 2. <Other prerequisites: an account, a plan, a file only you can write in `out/` such as
    `out/institutions.txt`.>
 3. Check that git ignores your keys: `git check-ignore probes/PB-NN-<slug>/.env probes/PB-NN-<slug>/out/`

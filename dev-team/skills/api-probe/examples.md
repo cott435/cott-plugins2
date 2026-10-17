@@ -55,7 +55,7 @@ Every check needs a key or a person, so there is no `public.py`. Even C10's sand
 
 ```python
 from probe_kit import allow, load_env, private, record, save_private, write_evidence
-import plaid_http as plaid   # urllib POST; base URL from PLAID_BASE_URL, else PLAID_ENV's host
+import plaid_http as plaid   # urllib POST; host from PLAID_BASE_URL, else os.environ.get("PLAID_ENV")
 
 def c2_coverage() -> bool:
     names = [n for n in private("institutions.txt").read_text().splitlines() if n.strip()]
@@ -72,7 +72,7 @@ def c2_coverage() -> bool:
     return ok
 
 def main():
-    load_env(["PLAID_CLIENT_ID", "PLAID_SECRET", "PLAID_ENV"], public=("PLAID_ENV",))
+    load_env(["PLAID_CLIENT_ID", "PLAID_SECRET"])         # keys only; PLAID_ENV is a shell setting
     if c2_coverage():
         ...                    # C3 is link_server.py; C4, C5, C8, C9, C11 from one collect run
     write_evidence(runner="user", env=plaid.ENV, base_url=plaid.BASE)
@@ -88,7 +88,7 @@ Contradictions: none.
 Spends: one Production Item per institution, for good (6 institutions → 6 of 10). Links with 730 days and
   Transactions, as AD-04 says. out/items.json is kept, so the service adopts these Items instead of linking again.
   Do you agree to that?
-Your steps: copy .env.example to .env and fill it in; list your institutions in out/institutions.txt;
+Your steps: copy .env.example to .env and fill in your keys; export PLAID_ENV=sandbox for step 1, production after; list your institutions in out/institutions.txt;
   1. python3 probes/PB-01-plaid-coverage/probe.py sandbox   ~2 min, spends nothing
   2. python3 probes/PB-01-plaid-coverage/probe.py coverage  ~1 min, spends nothing; stops if C2 fails
   3. python3 probes/PB-01-plaid-coverage/link_server.py      ~5 min per bank; spends one Item each
@@ -115,7 +115,7 @@ Three days later the user says "ran it, both days". `dt status --skill api-probe
 
 C3, C6–C8, C10 and C11 are recorded the same way (shortened here); C11 holds 25 masked lines.
 
-Result cells filled, for example C4 `pass: 13–24 months; a4: 3, opened 3 months ago` and C5 `pass: merchant_entity_id on 62%`. Last run 2026-10-21. Verdict `pass`.
+Result cells filled, for example C4 `pass: 13–24 months; a4: 3, opened 3 months ago` and C5 `pass: merchant_entity_id on 62%`. Last run `2026-10-21T08:40:02Z`. Verdict `pass`.
 
 **Record gate**, besides the entry:
 

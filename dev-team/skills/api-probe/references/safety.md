@@ -10,13 +10,13 @@ The agent never sees a secret, and the script redacts, never the agent. Every mo
 | **user** | The check needs any key the user holds, sandbox keys included; or the user's accounts; or it spends something | Plaid sandbox or production; a paid subscription's API |
 | **user (manual)** | Only a person can see the answer | A Dashboard's plan page; the licence terms for the user's plan |
 
-- The agent's checks go in `public.py` and the user's in `probe.py`. `public.py` contains no `os.environ`, `getenv`, `load_env` or `.env`, not even in a comment (`probe-runner` lint), so "the agent may run this" can be checked without trusting the agent. Run it with an empty environment: `env -i PATH="$PATH" python3 probes/PB-NN-<slug>/public.py`.
+- The agent's checks go in `public.py` and the user's in `probe.py`. `public.py` contains no `os.environ`, `environ`, `getenv`, `load_env`, `dotenv` or `.env`, docstrings included (`probe-runner` lint), so "the agent may run this" can be checked without trusting the agent. Run it with an empty environment: `env -i PATH="$PATH" python3 probes/PB-NN-<slug>/public.py`.
 - Sandbox keys stay with the user. One rule, "any key → the user runs it", can be checked.
 - The user runs their checks when they can, on their own time. When they're done they say "ran it". They paste nothing: Record reads `evidence/results.json`.
 
 ## Keys
 
-- Scripts read keys through `load_env()`: the environment, else the probe's `.env`. Never from command-line arguments, which end up in shell history. Never printed, logged or echoed in an error.
+- Scripts read keys through `load_env()`: the environment, else the probe's `.env`. `.env` holds keys only, because every value in it is treated as a secret. Settings (`PLAID_ENV`, a base URL) are read with `os.environ.get(name, default)` and set in the shell. Never from command-line arguments, which end up in shell history. Never printed, logged or echoed in an error.
 - The user writes `.env` from `.env.example`. Neither the skill nor the README asks them to paste a key into chat. If they paste one anyway, say it should be rotated, and don't repeat it.
 - `dt guard` denies Read, Edit and Write on `**/.env`, `**/.env.*` (not `.env.example`) and `probes/*/out/**`, and Edit and Write on `probes/*/evidence/**`. Through Bash, never `cat`, `grep`, `head`, `source`, `ls -la` or copy those paths either: the guard can't cover every shell command, so the rule is yours to keep.
 - `out/` is created `0700` and its files `0600`.
@@ -42,7 +42,7 @@ The gate runs `git check-ignore` on each probe's `.env` and `out/` and stops if 
 - **Ids** are salted hashes kept in `out/`, for checks that ids stay stable across runs. Evidence holds counts of ids, never ids.
 - **Samples.** `shape_sample(name, rows, keep=(enum fields…))` keeps field names, types, nulls and the named enum values. Numbers become `1` or `1.0` with the sign kept, strings `"<str:N>"`, id-like fields `"<id>"`, and dates move by whole weeks to 2001, keeping weekday and order. The real rows go to `out/<name>.raw.json`.
 - **Floats** in `observed` are rounded (4 places), so no long digit run reaches the scan.
-- **Scan, fail closed.** `write_evidence()` scans everything it is about to write for token shapes, long hex or base64 runs, runs of 8 or more digits and card-like groups, emails, phone numbers, and every value in `.env` except the ones the script passes as `public=` (`PLAID_ENV`, a base URL). On a hit, nothing reaches `evidence/`: the output goes to `out/evidence.rejected.json`, and the script names the pattern and exits 1. Fix the allow-list, never the pattern. `dt probes --scan` runs the same check on committed evidence (`evidence_leaks`).
+- **Scan, fail closed.** `write_evidence()` scans everything it is about to write for token shapes, secret keys (`sk-…`), credentials in URLs, hex runs of 24 or more, mixed base64 runs of 32 or more, runs of 8 or more digits and card-like groups, emails, phone numbers, and every value in `.env` or passed through `load_env()`. On a hit, nothing reaches `evidence/`: the output goes to `out/evidence.rejected.json`, and the script names the pattern and exits 1. Fix the allow-list, never the pattern. `dt probes --scan` runs the same check on committed evidence (`evidence_leaks`).
 - **Licensed data.** Vendor terms usually allow personal local storage and forbid redistribution. Market-data samples keep the shape and a few rows with values replaced, and real values stay in `out/`. Record the terms that were checked in Spends or Caveats.
 
 ## Spending

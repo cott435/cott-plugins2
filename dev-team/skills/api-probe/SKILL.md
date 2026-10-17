@@ -29,8 +29,8 @@ Start with `dt status --skill api-probe`. Take the mode, `probes_unwritten`, `pr
 | Mode | When | Do |
 |---|---|---|
 | **New** | `probes_unwritten`, or the user asks for a probe | `references/new.md` |
-| **Record** | `probes_results` | `references/record.md` |
 | **Revise** | `probes_stale`, or the user changes a check or the Spends | `references/revise.md` |
+| **Record** | `probes_results` | `references/record.md` |
 | **Waiting** | Only `probes_open` | Say which checks wait on whom, with each one's command from the probe's README. Stop |
 | **Current** | Nothing open | Say so, and name the skill that routed here. Stop |
 

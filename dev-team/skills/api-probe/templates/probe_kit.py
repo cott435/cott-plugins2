@@ -18,7 +18,6 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 EVIDENCE, OUT = HERE / "evidence", HERE / "out"
-SKIP_DIRS = {"evidence", "out", "__pycache__"}
 
 _secrets: set[str] = set()
 _checks: dict[str, dict] = {}
@@ -26,19 +25,21 @@ _samples: dict[str, object] = {}
 _schema: dict[str, dict] = {}
 
 PATTERNS = {
-    "token": re.compile(r"\b(?:access|public|link|processor)-(?:sandbox|development|production)-[\w-]+"
-                        r"|\b(?:sk|pk|rk)[-_][\w-]{8,}"),
-    "long hex": re.compile(r"\b[0-9a-fA-F]{32,}\b"),
-    "long base64": re.compile(r"(?<![\w+/-])(?=[\w+/=-]*\d)(?=[\w+/=-]*[A-Za-z])[\w+/=-]{40,}"),
+    "token": re.compile(r"\b(?:access|public|link|processor)-(?:sandbox|development|production)-[\w-]+"),
+    "secret key": re.compile(r"\b(?:sk|pk|rk)[-_][\w-]{8,}"),
+    "credential in URL": re.compile(r"://[^/\s:@\"]+:[^/\s@\"]+@|[?&](?:api_key|apikey|token|secret|key)=[^&\s\"]+"),
+    "hex run": re.compile(r"\b[0-9a-fA-F]{24,}\b"),
+    "base64 run": re.compile(r"(?<![\w+/-])(?=[\w+/=-]*\d)(?=[\w+/=-]*[A-Za-z])[\w+/=-]{32,}"),
     "digit run": re.compile(r"\d{8,}|\b\d{4}[ -]\d{4}[ -]\d{4}[ -]\d{1,7}\b"),
     "email": re.compile(r"[\w.+-]+@[\w-]+(?:\.[\w-]+)+"),
     "phone": re.compile(r"(?<!\d)(?:\+?1[ .-]?)?\(?\d{3}\)?[ .-]\d{3}[ .-]\d{4}(?!\d)"),
 }
 
 
-def load_env(names: list[str], public: tuple[str, ...] = ()) -> dict[str, str]:
-    """The named variables, from the environment else .env. Every value, and every other .env value,
-    is a secret to scan() for, except those named in `public` (PLAID_ENV, a base URL)."""
+def load_env(names: list[str]) -> dict[str, str]:
+    """The named keys, from the environment else .env. Every value, and every other .env value, is a
+    secret to scan() for, as `dt probes --scan` treats it. So .env holds keys only: read settings such
+    as PLAID_ENV or a base URL with os.environ.get(name, default), never through load_env or .env."""
     file = {}
     if (HERE / ".env").is_file():
         for line in (HERE / ".env").read_text().splitlines():
@@ -50,7 +51,7 @@ def load_env(names: list[str], public: tuple[str, ...] = ()) -> dict[str, str]:
     if missing:
         sys.exit(f"missing {', '.join(missing)}: set them in {HERE.name}/.env (see .env.example)")
     os.environ.update(values)
-    _secrets.update(v for k, v in {**file, **values}.items() if k not in public and len(v) >= 4)
+    _secrets.update(v for k, v in {**file, **values}.items() if len(v) >= 4)
     return values
 
 
@@ -91,9 +92,11 @@ def allow(obj, fields: list[str]):
     return kept
 
 
-def record(check: str, observed: object, passed: bool, note: str = "") -> None:
-    """One check's result: counts, booleans, months, enum values, field names. Never amounts or ids."""
-    _checks[check] = {"pass": bool(passed), "observed": observed, **({"note": note} if note else {})}
+def record(check: str, observed: object, passed: bool | None, note: str = "") -> None:
+    """One check's result: counts, booleans, months, enum values, field names. Never amounts or ids.
+    passed=None: measured, with the verdict left to Record against the entry's Pass cell."""
+    _checks[check] = {"pass": None if passed is None else bool(passed), "observed": observed,
+                      **({"note": note} if note else {})}
 
 
 DATE = re.compile(r"^(\d{4})-(\d{2})-(\d{2})")
@@ -156,24 +159,30 @@ def observe_schema(endpoint: str, rows: list) -> None:
 
 
 def scan(text: str) -> list[str]:
-    """The patterns `text` hits: token shapes, long hex or base64, 8+ digit runs, emails, phones,
-    and any .env value. Empty means clean."""
+    """The patterns `text` hits: token shapes, secret keys, credentials in URLs, long hex or base64
+    runs, 8+ digit runs, card numbers, emails, phones, and any .env value. Empty means clean."""
     hits = [name for name, pattern in PATTERNS.items() if pattern.search(text)]
     return hits + (["a .env value"] if any(s in text for s in _secrets) else [])
 
 
 def script_hash(folder: Path = HERE) -> str:
-    """First 8 hex of sha256 over the folder's *.py files (not evidence/, out/), by sorted path.
-    The same rule as `dt probes --stamp`."""
+    """First 8 hex of sha256 over the folder's code files, as `dt probes --stamp` computes it: every
+    file except top-level evidence/ and out/, dot-files and dot-folders, __pycache__/, *.pyc and *.md."""
+    files = []
+    for d, subs, names in os.walk(folder):
+        rel_d = os.path.relpath(d, folder).replace(os.sep, "/")
+        subs[:] = sorted(x for x in subs if not x.startswith(".") and x != "__pycache__"
+                         and not (rel_d == "." and x in ("evidence", "out")))
+        files += [os.path.normpath(os.path.join(rel_d, n)).replace(os.sep, "/") for n in names
+                  if not n.startswith(".") and not n.endswith((".pyc", ".md"))]
     h = hashlib.sha256()
-    files = sorted(p for p in folder.rglob("*.py") if not SKIP_DIRS & set(p.relative_to(folder).parts))
-    for p in files:
-        h.update(p.relative_to(folder).as_posix().encode() + b"\0" + p.read_bytes() + b"\0")
+    for rel in sorted(files):
+        h.update(rel.encode() + b"\0" + (Path(folder) / rel).read_bytes() + b"\0")
     return h.hexdigest()[:8]
 
 
 def write_evidence(runner: str = "user", env: str = "", base_url: str = "") -> None:
-    """Scan, then write evidence/results.json (§4.3 shape), samples/ and schema.json. A re-run of the
+    """Scan, then write evidence/results.json, samples/ and schema.json. A re-run of the
     same code keeps the checks it didn't record again (a day-2 run adds C6, C7); other code replaces them.
     On a scan hit nothing reaches evidence/: the output goes to out/evidence.rejected.json and we exit 1."""
     digest = script_hash()
@@ -219,22 +228,24 @@ def _self_test() -> None:
         probe = Path(tmp) / "PB-99-selftest"
         probe.mkdir()
         shutil.copy(__file__, probe / "probe_kit.py")
-        (probe / ".env").write_text("FAKE_SECRET=s3cr3t-value-0042\nFAKE_ENV=sandbox\n")
+        (probe / ".env").write_text("FAKE_SECRET=s3cr3t-value-0042\n")
+        (probe / "README.md").write_text("not code: no part of the hash\n")
         body = ("from probe_kit import *\n"
-                "load_env(['FAKE_SECRET', 'FAKE_ENV'], public=('FAKE_ENV',))\n"
+                "load_env(['FAKE_SECRET'])\n"
                 "record('C1', {'found': 3}, passed=True)\n"
                 "shape_sample('rows', [{'amount': -12.5, 'name': 'CANARY-ACCT-7731', 'date': '2026-10-19',"
                 " 'account_id': 'abc', 'type': 'depository'}], keep=('type',))\n"
                 "LEAK = {'none': None, 'secret': {'note': os.environ['FAKE_SECRET']},"
                 " 'card': {'note': 'card 4111 1111 1111 1111'}, 'email': {'note': 'me@example.com'},"
-                " 'digits': {'note': 'acct 12345678'}}[sys.argv[1]]\n"
+                " 'digits': {'note': 'acct 12345678'}, 'url': {'note': 'https://x.test/v1?api_key=abc123'}}[sys.argv[1]]\n"
                 "if LEAK: record('C2', LEAK, passed=True)\n"
-                "write_evidence(runner='agent', env='sandbox')\n")
+                "write_evidence(runner='agent', env=os.environ.get('FAKE_ENV', 'sandbox'))\n")
         (probe / "probe.py").write_text(body)
         run = lambda case: subprocess.run([sys.executable, "probe.py", case], cwd=probe,  # noqa: E731
-                                          capture_output=True, text=True, env={"PATH": os.environ["PATH"]})
+                                          capture_output=True, text=True,
+                                          env={"PATH": os.environ["PATH"], "FAKE_ENV": "sandbox"})
         failures = []
-        for case in ("secret", "card", "email", "digits"):
+        for case in ("secret", "card", "email", "digits", "url"):
             (probe / "out" / "evidence.rejected.json").unlink(missing_ok=True)
             r = run(case)
             if r.returncode == 0 or (probe / "evidence").exists():
@@ -259,7 +270,7 @@ def _self_test() -> None:
                 failures.append("out/ is not 0700")
     if failures:
         sys.exit("self-test FAILED:\n  " + "\n  ".join(failures))
-    print("self-test passed: planted secret, card, email and digit run each stopped the write; "
+    print("self-test passed: a planted .env secret, card, email, digit run and URL key each stopped the write; "
           "a clean run wrote results.json and a shape-faithful sample")
 
 

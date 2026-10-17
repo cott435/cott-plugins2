@@ -4,6 +4,12 @@ One entry per tagged release. The versioning policy — what triggers patch/mino
 how model and eval versioning relate to it — is in the `plugin-dev` plugin's `bump-version`
 skill. This repo's own decisions are in `VERSIONING.md`.
 
+## [0.2.0] - 2026-10-17
+
+### Added
+- Plan map: `scripts/planmap.py` renders a run's `plan.json` (schema `plan-map/1`) as `plan/index.html` (growth strip, node × turn matrix, change ledger), a page per turn and a build view per milestone (waves, lanes by task kind, critical path, interface edges).
+- `flow.html` links a Plan section when `plan.json` is present; turn pages link to their plan page and back.
+
 ## [0.1.1] - 2026-10-17
 
 ### Added

@@ -11,7 +11,7 @@ Choose multi-package only for a real boundary: separate install, versioning or d
 
 A single package grows into several when one of these fires. `grow_triggers` in `dt status` reports the measurable ones; judge the rest from the spec and idea file.
 
-- New requirements bring a dependency stack the rest shouldn't carry (torch, gym).
+- New requirements bring a dependency stack the rest shouldn't carry (torch, torchvision).
 - A one-way dependency is worth enforcing (data must never import models, to prevent leakage).
 - A package exceeds ~3 pipelines or ~12 modules, or its docs no longer fit a 2,000-line agent context, or `dt lint` warns `grow-size` on one of them.
-- A part runs or deploys on its own (a paper-trading service).
+- A part runs or deploys on its own (a day-ahead forecast service).

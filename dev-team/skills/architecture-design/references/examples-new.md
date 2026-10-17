@@ -2,102 +2,102 @@
 
 More: `examples-new-multi.md` (a multi-package platform with System pipelines).
 
-## Single Package — RL Execution Environment (Proof of Concept)
+## Single Package — LeafLab Training Loop (Proof of Concept)
 
-**Context:** The spec describes a reinforcement-learning environment where an agent sells a large stock position over a trading day, trying to beat a simple even-split (TWAP) baseline. Requirements include `ENV-01`–`ENV-05` (reset/step, observations, actions, reward, episode end), `BASE-01` (TWAP baseline agent), `DATA-01`–`DATA-02` (minute bars for price paths), `QR-01` (≥ 10,000 steps/second on a laptop), and `QR-02` (same seed → identical episode).
+**Context:** The spec describes a small image-classification lab where a model learns to tell plant-leaf diseases apart on a clean single-crop leaf set, trying to beat a majority-class and a logistic baseline. Requirements include `TRN-01`–`TRN-05` (batches, augmentation, model update, loss, run end), `BASE-01` (majority-class and logistic baselines), `DATA-01`–`DATA-02` (leaf images and labels), `QR-01` (≥ 500 images/second through training on a laptop CPU), and `QR-02` (same seed → identical run).
 
-**Step 1 — Shape:** "Single package. It's a proof of concept with one user, one install, and no separate deployments. I'll keep the data loader behind an interface so it can become its own package if this grows."
+**Step 1 — Shape:** "Single package. It's a proof of concept with one user, one install, and no separate deployments. I'll keep the image loader behind an interface so it can become its own package if this grows."
 
-**Step 4 — Decisions the skill asked the user about:** standard Gymnasium API vs. a custom one (affects which RL libraries work out of the box), and synthetic vs. historical price paths for the first version.
+**Step 4 — Decisions the skill asked the user about:** PyTorch vs. NumPy-only models (affects whether a CNN's backward pass is ours to write), and synthetic vs. real leaf images for the first version.
 
 **Result — `docs/architecture.md`:**
 
 ````markdown
-# ExecGym — Architecture
+# LeafLab — Architecture
 
 **Status:** Draft · **Shape:** Single package · **Last updated:** 2026-10-14 · **Spec:** [spec.md](spec.md)
 
 ## Overview
-An agent sells a fixed number of shares over one trading day in fixed time steps. Each step, the market module advances the price path and applies the price impact of the agent's sale. The reward is the cost saved versus selling at the arrival price. Price paths come from a `DataSource`: synthetic first, historical minute bars second.
+A model trains on batches of leaf images for a fixed number of epochs. Each batch, the batches module draws the next images from the dataset and augments them. The loss is class-weighted cross-entropy. Images come from a `Dataset`: synthetic first, the single-crop leaf set second.
 
 ```mermaid
 flowchart LR
-  Agent -->|action| env
-  env --> market
-  market --> impact
-  market --> data[DataSource]
-  env --> reward
-  baselines -.->|same API| env
+  Model -->|fit_batch| train
+  train --> batches
+  batches --> augment
+  batches --> data[Dataset]
+  train --> loss
+  baselines -.->|same API| train
 ```
 
 ## Tech stack
 | Area | Choice | Decision |
 |---|---|---|
 | Language | Python 3.12 | AD-01 |
-| Environment API | Gymnasium ≥ 1.0 | AD-02 |
+| Models | PyTorch ≥ 2.4, CPU wheels | AD-02 |
 | Numerics | NumPy ≥ 2.0 | AD-03 |
-| Storage | Parquet files via PyArrow | AD-04 |
+| Storage | Image folders plus a Parquet label index via PyArrow | AD-04 |
 | Tests | pytest | — |
 
 ## Components
 | Component | Responsibility | Covers | Depends on |
 |---|---|---|---|
-| `env` | Gymnasium environment: reset, step, spaces, episode end | ENV-01, ENV-02, ENV-03, ENV-05, QR-02 | `market`, `reward` |
-| `market` | Advances the price path one step and fills the agent's order | ENV-03 | `impact`, `data` |
-| `impact` | Price impact model (temporary + permanent) | ENV-03 | — |
-| `reward` | Implementation-shortfall reward | ENV-04 | — |
-| `data` | `DataSource` protocol; synthetic and Parquet implementations | DATA-01, DATA-02 | — |
-| `baselines` | TWAP agent using the same API as any RL agent | BASE-01 | `env` |
+| `train` | Training loop: epochs, batches, checkpoints, run end | TRN-01, TRN-03, TRN-05, QR-02 | `batches`, `loss` |
+| `batches` | Draws the next batch from the dataset and augments it | TRN-02 | `augment`, `core` |
+| `augment` | Image augmentation (flips, crops, colour jitter) | TRN-02 | — |
+| `loss` | Class-weighted cross-entropy | TRN-04 | — |
+| `core` | `Dataset` and `Model` protocols; synthetic and folder datasets | DATA-01, DATA-02 | — |
+| `baselines` | Majority-class and logistic models behind the same `Model` protocol | BASE-01 | `train` |
 
 ## Interfaces
-See [packages/execgym/contract.md](packages/execgym/contract.md).
+See [packages/leaflab/contract.md](packages/leaflab/contract.md).
 
 ## Data
-- `SyntheticSource`: geometric Brownian motion with volume curve; used for the first experiments (AD-04).
-- `ParquetSource`: one Parquet file per symbol per day with columns `ts, mid, volume`, written by `scripts/download_bars.py` (DATA-01). Days with missing minutes are skipped and logged (DATA-02).
+- `SyntheticSet`: coloured spots on a green disc, the class set by spot colour; used for the first experiments (AD-04).
+- `FolderSet`: one folder of JPEG images per class, with a Parquet index `path, label, split`, written by `scripts/download_leaves.py` (DATA-01). Unreadable images are skipped and logged (DATA-02).
 
 ## Cross-cutting concerns
-- **Speed (QR-01):** all per-step math is NumPy on preallocated arrays; no pandas inside `step`. Benchmarked in `tests/test_speed.py`.
-- **Reproducibility (QR-02):** one `np.random.Generator` per env, created from the `reset` seed and passed down; no global random state.
+- **Speed (QR-01):** images are decoded once into a preallocated uint8 array; each batch is augmented with plain NumPy array math, no per-image PIL calls inside the loop. Benchmarked in `tests/test_speed.py`.
+- **Reproducibility (QR-02):** one `np.random.Generator` and one `torch.Generator` per run, both created from the run seed and passed down; no global random state.
 
 ## Project layout
 ```
-src/execgym/      → env/ market/ impact/ reward/ data/ baselines/ — one folder per component; __init__ exports its contract
-scripts/          → bar download script (DATA-01)
+src/leaflab/      → train/ batches/ augment/ loss/ core/ baselines/ — one folder per component; __init__ exports its contract
+scripts/          → leaf image download script (DATA-01)
 tests/
 ```
 
 ## Decisions
 ### AD-01: Python 3.12
 **Status:** Proposed · **Date:** 2026-10-14 · **Scope:** system
-- **Context:** RL libraries and the user's existing tooling are Python.
+- **Context:** ML libraries and the user's existing tooling are Python.
 - **Decision:** Python 3.12.
-- **Alternatives:** 3.13 — some RL libraries lag on new versions.
+- **Alternatives:** 3.13 — some ML libraries lag on new versions.
 - **Consequences:** Pin `requires-python = ">=3.12,<3.13"` until the libraries catch up.
 
-### AD-02: Gymnasium API
+### AD-02: PyTorch for models
 **Status:** Proposed · **Date:** 2026-10-14 · **Scope:** system
-- **Context:** The agent side is undecided; we want to try off-the-shelf RL libraries without adapters.
-- **Decision:** Implement `gymnasium.Env`.
-- **Alternatives:** Custom API — simpler, but every RL library needs a wrapper. PettingZoo — multi-agent, not needed.
-- **Consequences:** Observation and action spaces must be fixed-shape. Vectorized envs come for free.
+- **Context:** Models start with logistic regression and move to a small CNN; we want standard layers and autograd without adapters.
+- **Decision:** Every model is a `torch.nn.Module` behind `core.Model`.
+- **Alternatives:** NumPy only — simpler, but the CNN's backward pass becomes the project. JAX — capable, less CPU tooling on a laptop.
+- **Consequences:** Batches must be fixed-shape tensors. Multi-worker data loading comes for free.
 
-### AD-03: Vectorized NumPy simulation, not event-driven
+### AD-03: Batched NumPy augmentation, not per-image PIL calls
 **Status:** Proposed · **Date:** 2026-10-14 · **Scope:** system
-- **Context:** QR-01 needs ≥ 10,000 steps/second. Fixed time steps; no order book.
-- **Decision:** Each step is array math on a precomputed price path.
-- **Alternatives:** Event-driven order-book simulation — realistic, far too slow and out of scope (spec Out of scope: order book).
-- **Consequences:** Impact is a formula, not emergent. Fine for a proof of concept; revisit if results depend on it.
+- **Context:** QR-01 needs ≥ 500 images/second. Images are a fixed 128×128; no learned augmentation.
+- **Decision:** Each batch is augmented as array math on a preallocated array.
+- **Alternatives:** Per-image PIL transforms — richer, far too slow and partly out of scope (spec Out of scope: learned augmentation).
+- **Consequences:** Augmentations are limited to what array math does well. Fine for a proof of concept; revisit if accuracy depends on it.
 
-### AD-04: Synthetic paths first, historical bars second
+### AD-04: Synthetic images first, the leaf set second
 **Status:** Proposed · **Date:** 2026-10-14 · **Scope:** data
-- **Context:** DATA-01 needs minute bars. A free sample covers a few symbols; full history costs money.
-- **Decision:** Ship `SyntheticSource` first and add `ParquetSource` from a free sample. Both behind `DataSource`.
-- **Alternatives:** Paid minute data now — premature before the environment proves useful.
-- **Consequences:** Early results are on synthetic paths; the brief's success measure needs historical days, so `ParquetSource` must land before evaluation.
+- **Context:** DATA-01 needs the single-crop leaf set. A public sample covers three classes; the full set needs a licence request.
+- **Decision:** Ship `SyntheticSet` first and add `FolderSet` from the public sample. Both behind `Dataset`.
+- **Alternatives:** Request the full set now — premature before the training loop proves useful.
+- **Consequences:** Early results are on synthetic images; the brief's success measure needs real leaves, so `FolderSet` must land before evaluation.
 
 ## Risks and open questions
-- The impact model's parameters are guesses. Agents may learn to exploit the formula. Mitigation: compare against TWAP under two different parameter sets.
+- The synthetic generator's spot colours are guesses. Models may learn the generator's shortcut. Mitigation: compare against the logistic baseline under two different generator settings.
 
 ## Changelog
 | Date | Change | Source | IDs |
@@ -105,46 +105,46 @@ tests/
 | 2026-10-14 | Initial architecture | spec.md | AD-01–AD-04 |
 ````
 
-**Result — `docs/packages/execgym/contract.md`:**
+**Result — `docs/packages/leaflab/contract.md`:**
 
 ````markdown
-# execgym — Contract
+# leaflab — Contract
 
-**Package:** execgym · **Status:** Draft · **Last updated:** 2026-10-14 · **Architecture:** [../../architecture.md](../../architecture.md)
+**Package:** leaflab · **Status:** Draft · **Last updated:** 2026-10-14 · **Architecture:** [../../architecture.md](../../architecture.md)
 
-## env
+## train
 
-### env.ExecutionEnv: Gymnasium execution environment
+### train.Trainer: Training loop
 ```python
-class ExecutionEnv(gymnasium.Env):
-    def reset(self, *, seed: int | None = None, options: dict | None = None) -> tuple[np.ndarray, dict]: ...
-    def step(self, action: np.ndarray) -> tuple[np.ndarray, float, bool, bool, dict]: ...
+class Trainer:
+    def __init__(self, model: Model, dataset: Dataset, *, seed: int, epochs: int) -> None: ...
+    def fit(self) -> RunLog: ...
 ```
-- **Invariants:** observation is `[time_left, inventory_left, price_vs_arrival, recent_volatility]`, float32; action is the fraction of remaining inventory to sell, `Box(0.0, 1.0)`; `terminated` when inventory is zero or the day ends (any remainder is sold at the close); same seed → identical episode
-- **Errors:** `ValueError` if the action is outside [0, 1]
-- **Used by:** baselines, any RL agent
+- **Invariants:** each epoch visits every training image once, in fixed-size batches; stops after `epochs` or when validation loss hasn't improved for 3 epochs; same seed → identical run
+- **Errors:** `ValueError` if `epochs` < 1
+- **Used by:** baselines, any model
 
-## data
+## core
 
-### data.DataSource: Price path provider
-`class DataSource(Protocol): def price_path(self, rng: np.random.Generator) -> PricePath`
-- **Invariants:** deterministic for a given `rng` state
-- **Errors:** `FileNotFoundError` if a Parquet day is missing (historical source only)
-- **Used by:** market
+### core.Dataset: Leaf image provider
+`class Dataset(Protocol): def batches(self, rng: np.random.Generator, size: int) -> Iterator[Batch]`
+- **Invariants:** deterministic for a given `rng` state; every image appears once per pass
+- **Errors:** `FileNotFoundError` if the image folder is missing (folder dataset only)
+- **Used by:** batches
 
-### data.PricePath: type
-`@dataclass(frozen=True) class PricePath: mid: np.ndarray; volume: np.ndarray`
-- **Invariants:** both arrays have one entry per step, same length as the episode; `mid` > 0
-- **Boundary:** market · **Fixtures:** tests/contracts/data.PricePath/ · **Cases:** one 390-step synthetic day
-- **Used by:** market
+### core.Batch: type
+`@dataclass(frozen=True) class Batch: images: np.ndarray; labels: np.ndarray`
+- **Invariants:** `images` is B×128×128×3 uint8; `labels` has B entries in `[0, n_classes)`
+- **Boundary:** batches · **Fixtures:** tests/contracts/core.Batch/ · **Cases:** one 8-image synthetic batch
+- **Used by:** batches
 
-## reward
+## loss
 
-### reward.implementation_shortfall: Cost saved versus arrival price
-`def implementation_shortfall(fills: Fills, arrival_price: float) -> float`
-- **Invariants:** 0 when every fill is at the arrival price; positive when the agent sold above it
-- **Errors:** `ValueError` if `arrival_price` ≤ 0
-- **Used by:** env
+### loss.weighted_cross_entropy: Class-weighted loss
+`def weighted_cross_entropy(logits: torch.Tensor, labels: torch.Tensor, weights: torch.Tensor) -> torch.Tensor`
+- **Invariants:** a scalar ≥ 0; near 0 when every image gets probability 1 on its label; equal weights give plain cross-entropy
+- **Errors:** `ValueError` if any weight is negative
+- **Used by:** train
 ````
 
-**About two pages plus a one-page contract.** No packages table, no dependency rules section, and no separate package docs. The seam that might become a package later (`DataSource`) is named and nothing more. Each component is a folder exporting only its contract section, so a later split moves `data/` and its `## data` group as they are. `PricePath` passes from `data` to `market`, so it is a `type` section with a `**Boundary:**` line: the build's interface task freezes it with one sample, and both components build against that sample at once (`Fills`, under `## market`, is omitted here). `Used by` names components: the pipelines that use each symbol don't exist until `pipeline-design` runs.
+**About two pages plus a one-page contract.** No packages table, no dependency rules section, and no separate package docs. The seam that might become a package later (`Dataset`) is named and nothing more. Each component is a folder exporting only its contract section, so a later split moves `core/` and its `## core` group as they are. `Batch` passes from `core` to `batches`, so it is a `type` section with a `**Boundary:**` line: the build's interface task freezes it with one sample, and both components build against that sample at once (`Model` and `RunLog` are omitted here). `Used by` names components: the pipelines that use each symbol don't exist until `pipeline-design` runs.

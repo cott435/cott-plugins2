@@ -20,7 +20,7 @@ Read when writing `docs/architecture.md` or a package's `architecture.md`. Fille
 ## Components
 | Component | Responsibility | Covers | Depends on |
 |---|---|---|---|
-| `env` | [one sentence] | ENV-01–ENV-04, QR-01 | `sim`, `reward` |
+| `train` | [one sentence] | TRN-01–TRN-04, QR-01 | `batches`, `loss` |
 
 ## Interfaces
 See [packages/<pkg>/contract.md](packages/<pkg>/contract.md).

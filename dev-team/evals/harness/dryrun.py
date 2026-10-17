@@ -8,8 +8,7 @@ pipelines → tests → plan → build setup), keeps the plan snapshot per turn 
 exports its plan.json. The replays:
 - `quant-incremental`: the sample as it is, then its M1 code as a final "build" turn.
 - `quant-incremental-ifd`: the sample with an interface-first M1 (§5.3 of design/interface-first-design.md):
-  selftest/quant-interface-first/ laid over it (dt-core's own fixture once it has `**Kind:**` tasks). No code.
-  Every interface-first check passes.
+  selftest/quant-interface-first/ laid over it. No code. Every interface-first check passes.
 - `quant-incremental-ifdbad`: the same plan broken once per check (shared Writes, a mitigated edge in Depends on,
   a `none:` without a valid reason, a missing row, an M-size spine, a fake on a data edge, a type missing from the
   contract, a types.py written during planning, a frozen type revised later, ...). Each of those checks fails.
@@ -26,7 +25,7 @@ HERE = pathlib.Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 import driver, dtrun, planexport, plugin  # noqa: E402
 
-FIXTURE = HERE.parents[1] / "scripts" / "tests" / "fixtures" / "quant"
+FIXTURE = plugin.PLUGIN_SRC / "scripts" / "tests" / "fixtures" / "quant"  # the sample of the dt being staged
 IFD_OVERLAY = HERE / "selftest" / "quant-interface-first"
 # (skill, paths) per turn, in planning order; the user approves each.
 LAYERS = [
@@ -86,9 +85,8 @@ def native_ifd():
 
 
 def ifd_fixture(tmp):
-    """The interface-first sample: dt-core's fixture when it is interface-first, else the overlay on it."""
-    if native_ifd():
-        return FIXTURE
+    """The interface-first sample: the overlay laid over dt's sample, whichever plan the sample has, so the
+    good, bad and serial replays (and their mutations) don't depend on the sample's own plan text."""
     fx = tmp / "fixture-ifd"
     shutil.copytree(FIXTURE, fx, ignore=shutil.ignore_patterns("src"))
     shutil.copytree(IFD_OVERLAY, fx, dirs_exist_ok=True)

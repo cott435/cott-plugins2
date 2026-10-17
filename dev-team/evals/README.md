@@ -27,7 +27,7 @@ The plans are graded as interface-first plans ([design/interface-first-design.md
 | `package.py` | Lays the runs out in the skill-creator benchmark format, including one `dt context` packet per task and the final plan snapshot. |
 | `judge_prompt.py`, `blind_judge_prompt.md` | Fill the blind-judge prompt for a pair of packaged runs, in both orders, and average the two verdicts. |
 | `dryrun.py`, `fake_claude.py` | Checks that cost nothing (below). |
-| `selftest/quant-interface-first/` | An interface-first M1 for dt's quant sample (the §5.3 plan: interface task, six step spines, two wiring tasks, four split thicken tasks, a system task), laid over the sample by the dry run when dt's own sample has an old-format plan. |
+| `selftest/quant-interface-first/` | An interface-first M1 for dt's quant sample (the §5.3 plan: interface task, six step spines, two wiring tasks, four split thicken tasks, a system task) with its contract types and typed pipelines. The dry run lays it over the sample for its interface-first replays, so their pinned results don't depend on the sample's own plan. |
 | `runviz.py` | The workflow analysis that ends every run: exports the run's plan (`planexport.py`), draws what the run did from its session transcripts and saves it in `<run>/flow/`, then draws the plan map when workflow-analyzer has `planmap.write` (below). Uses the `workflow-analyzer` plugin's scripts (`trace.py`, `flow.py`, `charts.py`, `compare.py`), found at `$WORKFLOW_ANALYZER_SCRIPTS`, in this marketplace's `workflow-analyzer/scripts`, or in the installed plugin. |
 | `run.sh` | Runs trajectories in parallel, then grades, measures, packages and draws them. |
 | `scenarios.json` | Persona, project facts, stages, turn budgets, and per project the skill stubs (`project_skills`) and reference files per stage (`references`). |
@@ -66,7 +66,13 @@ Expected failures in every replay, because the sample is a two-milestone project
 
 Beyond those, the old-format replay fails `no_code_during_planning` (M1-T01's code) and every interface-first check its plan has no fields for. The bad replay fails each of `graph_metrics` (a cycle), `writes_disjoint`, `edges_mitigated`, `unmitigated_reasoned`, `no_edge_to_code_when_interface`, `edge_table_consistent`, `phase0_split`, `step_tasks_small`, `tester_starts_early`, `fakes_only_cross_pipeline`, `tasks_not_editing_plan`, `interface_coverage`, `types_in_contract`, `tasks_well_formed`, `no_code_during_planning` and `doc_budgets`, and reports one `frozen_interface_churn` revision where the good replay reports none. The serial replay fails `plan_parallelism` and `wave_width`.
 
-Five checks wait on dt's interface-first parser and commands and are pinned as pending: `sim_ready_1`–`3` and `sim_contract_1` need `dt ready` and a contract change that lists its readers, and the interface-first replays fail `dt_lint_clean` while `task-size` counts `Files likely` instead of `Writes:`. They should pass once that dt is in the staged plugin. When dt's own quant sample carries `**Kind:**` tasks, the dry run uses it instead of the overlay.
+Five checks depend on the dt being staged and are pinned as pending: `sim_ready_1`–`3` and `sim_contract_1` need `dt ready` (with tester halves) and `interfaces_changed`, and the interface-first replays need `task-size` to count `Writes:`. With the interface-first dt they pass on the good replay. The dry run stages the plugin at `PLUGIN_SRC` and replays that checkout's sample, so it checks the harness against another branch's dt without merging it:
+
+```bash
+PLUGIN_SRC=<worktree>/dev-team python3 evals/harness/dryrun.py
+```
+
+When the sample's own plan is interface-first, the first replay grades it, and the interface-first checks on it are reported, not pinned.
 
 ## Smoke run (one turn, about $0.30)
 

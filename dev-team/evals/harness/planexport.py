@@ -197,6 +197,7 @@ def export(run, out=None):
             snaps.append({"turn": n, "same_as": last_turn})
             continue
         body.pop("producer", None)
+        body.pop("levels", None)
         snaps.append({"turn": n, "commit": sha, "ts": ts, "skill": skills.get(n, ""), **body})
         last_turn, last_digest = n, d
     doc = {"schema": SCHEMA, "producer": f"dev-team planexport (dt {dt_version(dt)}; {', '.join(sorted(source)) or 'no snapshots'})",

@@ -218,7 +218,7 @@ SHARED_FILE = re.compile(r"(^|/)(__init__|types|pipeline)\.py$")
 EDGE_KINDS = ("data", "call", "file", "code", "contract-change", "order")
 # The reasons an edge may stay unmitigated: same module, an unsplittable shared file, a real side-effect order.
 REASON_KINDS = {
-    "same module": r"same (module|file|step|function)|thickens|extends|replaces the (stub|baseline)",
+    "same module": r"same (module|file|step|function)|thickens|extends|replaces (its|the) (stub|baseline)",
     "shared file": r"shared (file|module|entry)|unsplittable|__init__|types\.py|entry (module|file)",
     "side-effect order": r"side[- ]effect|runs? the real|real (step|code|pipeline|provider|data)|end to end|"
                          r"swaps? the fake|on disk|must exist|reads? (its|the) output",
@@ -284,6 +284,11 @@ for pl in m_pls:
 step_info = {f"{pl['id']}.{s_['name']}": (pl, s_) for pl in facts["pipelines"] for s_ in pl["steps"]}
 iface_ids = set(active.get("interface_tasks", [])) if active else set()
 declared = set(active.get("interface_symbols", [])) if active else set()
+# An interface task that writes "every step signature" declares the milestone's step functions (§4.1) even when
+# its Read: names only the types.
+if any(re.search(r"signature", " ".join([t["title"]] + t.get("acceptance", [])), re.I) for t in m_tasks if t["id"] in iface_ids):
+    step_names = {n for _, n in m_steps}
+    declared |= {sym for t in m_tasks for sym in t.get("read_symbols", []) if sym.split(".")[-1] in step_names}
 declared_names = {d.split(".")[-1] for d in declared}
 deps = dtrun.deps_of(m_tasks)
 anc = dtrun.ancestors(m_tasks)

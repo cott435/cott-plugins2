@@ -23,7 +23,8 @@ Each stage goes idea/brief → spec → architecture → pipelines → test plan
 | `package.py` | Lays the runs out in the skill-creator benchmark format, including one `dt context` packet per task. |
 | `judge_prompt.py`, `blind_judge_prompt.md` | Fill the blind-judge prompt for an A/B pair of packaged runs. |
 | `dryrun.py`, `fake_claude.py` | Checks that cost nothing (below). |
-| `run.sh` | Runs trajectories in parallel, then grades, measures and packages them. |
+| `runviz.py` | The workflow analysis that ends every run: draws what the run did from its session transcripts and saves it in `<run>/flow/` (below). Uses the `workflow-analyzer` plugin's scripts (`trace.py`, `flow.py`, `charts.py`, `compare.py`), found at `$WORKFLOW_ANALYZER_SCRIPTS`, in this marketplace's `workflow-analyzer/scripts`, or in the installed plugin. |
+| `run.sh` | Runs trajectories in parallel, then grades, measures, packages and draws them. |
 | `scenarios.json` | Persona, project facts, stages, turn budgets, and per project the skill stubs (`project_skills`) and reference files per stage (`references`). |
 | `stub_*_SKILL.md` | Project skill stubs installed in the run's `.claude/skills/`: `null-hypothesis-testing` (both projects), `data-analysis` (quant). |
 | `references/quant/` | The user's reference code (never run): `market_decomposition.py` (PCA market removal, fit on the full sample: a deliberate look-ahead caveat) for structure_portfolios; `tft_dataset.py` and `tft_targets.py` for forecasting_agents. The driver copies them into the project's `references/` when that stage is revealed (all at the start in all-at-once) and says so in the user's message. |
@@ -75,6 +76,30 @@ evals/harness/run.sh iteration-5 quant-incremental    # or just some of them
   - `PLUGIN_SRC`, or `SKILLS_SRC` to overlay an older skill snapshot for an A/B run
   - `PERMISSION_PROMPTS=0` to leave the oracle prompts unanswered
 - **Prerequisites:** `claude`, `python3` ≥ 3.9, `uv` and `jq`. build-setup stops without `uv` and `jq`. It also runs `uv lock`/`uv sync`, so it needs network access.
+
+## Seeing what a run did
+
+Every eval run ends with its workflow analysis. `driver.py` builds `<run>/flow/` from the session transcripts when the trajectory ends, and `run.sh` rebuilds it with the grade after grading, plus the comparison with the previous iteration. A failure to draw is printed and never fails the eval. To view, serve the workspace (the pages link across iterations):
+
+```bash
+python3 -m http.server 8765 --bind 127.0.0.1 --directory ../../dev-team-workspace
+```
+
+Then open `http://127.0.0.1:8765/<iteration>/runflow/index.html`.
+
+- **`<iteration>/runflow/index.html`:** every trajectory with its checks, turns, working time, output tokens, peak context, agents, files changed and cost, each with its change from the previous iteration.
+- **`<run>/flow/flow.html`, one run:** stat tiles and failed checks; a timeline against wall time, one bar per main-thread turn and one per agent, stacked when agents ran at once; per turn the skill, time, tokens, peak context, cost and files read and written; a files × turns matrix; one page per turn (`turns/T<nn>.html`) and per agent (`units/U<nn>.html`) with every step in full. `eval.json` beside it holds the trajectory, its checks and per-turn cost.
+- **`<iteration>/runflow/<trajectory>-vs-<previous>.html`:** headline deltas, every check whose result changed, per-turn curves, and tokens and time per skill and per agent type.
+
+Other forms:
+
+```bash
+python3 evals/harness/runviz.py iteration-6 --against iteration-4    # another baseline
+python3 evals/harness/runviz.py --run ../../dev-team-workspace/iteration-6/rl-incremental/with_skill
+python3 evals/harness/runviz.py --compare <run-dir> <run-dir> --out cmp.html
+```
+
+With `workflow-analyzer` installed, its skills work on these runs too: `ask-run` answers questions about one with step ids, and `compare-runs` compares any sessions.
 
 ## Cost and turns
 

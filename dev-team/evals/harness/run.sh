@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Run trajectories in parallel, then grade, measure and package them.
+# Run trajectories in parallel, then grade, measure, package and draw them.
 #
 # Usage: evals/harness/run.sh <iteration-name> [trajectory-id ...]
 #   default trajectories: rl-incremental rl-all-at-once quant-incremental quant-all-at-once
@@ -26,3 +26,6 @@ for t in "${trajs[@]}"; do
   python3 "$here/docstats.py" "$run/project/docs" > "$ws/$iter/$t.docstats.json" || true
 done
 EVAL_WS="$ws" python3 "$here/package.py" "$iter"
+# The workflow analysis of every run, regraded, and the comparison with the previous iteration:
+# <run>/flow/flow.html and $ws/$iter/runflow/index.html
+EVAL_WS="$ws" python3 "$here/runviz.py" "$iter" || echo "runviz failed: no flow pages (the eval itself is fine)"

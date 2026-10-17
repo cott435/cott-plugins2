@@ -59,8 +59,7 @@ have installed. A release missing any one of them cannot answer it.
 `model: inherit` is the default for every agent, so a plugin follows the session's model
 instead of making cost and quality decisions behind the user's back. Set a model on an agent
 only when its stakes or workload differ from the session's, and record the agent, the model
-and the reason in the plugin's `VERSIONING.md`. Use a full model ID for an agent under
-evaluation, since an alias moves and a model change then looks like a prompt regression.
+and the reason in the plugin's `VERSIONING.md`.
 
 `VERSIONING.md` holds only those decisions and any exception to this policy. The policy
 itself is this file.

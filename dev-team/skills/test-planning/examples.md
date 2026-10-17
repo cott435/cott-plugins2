@@ -39,24 +39,24 @@ tests/fixtures/<pkg>/TC-NN/
   expected.json        {"<output>": <value>, "tol": <t>} or {"property": "<expression>", "tol_frac": <t>}
 ```
 
-Large data: `{"prices": {"path": "data/raw/<file>.parquet", "sha256": "<hash>"}}`. The file isn't committed.
+Large data: `{"readings": {"path": "data/raw/<file>.parquet", "sha256": "<hash>"}}`. The file isn't committed.
 
 ---
 
-## Example: A Routed Case (quant M3, feature screening)
+## Example: A Routed Case (GridLoad M3, feature screening)
 
-**Context:** PL-06 Feature screening in `features` (`Part of: PL-05`). Spec FEAT-03: "a feature is kept only if it carries information about next-day returns beyond chance". `null-hypothesis-testing` is installed, so both cases are designed with it.
+**Context:** PL-06 Feature screening in `features` (`Part of: PL-05`). Spec FEAT-03: "a feature is kept only if it carries information about next-day load beyond chance". `significance-check` is installed, so both cases are designed with it.
 
 ```markdown
 ### TC-20: Planted feature is kept
 **Pipeline:** PL-06 · **Covers:** FEAT-03 · **Kind:** synthetic known-answer · **Fixture:** tests/fixtures/features/TC-20/
-**Source:** generator `planted_feature(T=2000, N=50, ic=0.05, seed=11)`; H0 and null from null-hypothesis-testing: rank IC vs next-day return, null by shuffling dates in 20-day blocks
+**Source:** generator `planted_feature(days=2000, regions=50, corr=0.05, seed=11)`; H0 and null from significance-check: rank correlation vs next-day load residual, null by shuffling days in 7-day blocks
 **Expected:** the planted feature rejects H0 · **Tolerance:** α = 0.05 after Holm correction, the skill's default
-**Skills:** null-hypothesis-testing
+**Skills:** significance-check
 
 ### TC-21: Pure-noise features are all dropped
 **Pipeline:** PL-06 · **Covers:** FEAT-03 · **Kind:** synthetic known-answer · **Fixture:** tests/fixtures/features/TC-21/
-**Source:** generator `noise_features(T=2000, N=50, k=20)` on seeds 12–31; same H0, statistic and null as TC-20
+**Source:** generator `noise_features(days=2000, regions=50, k=20)` on seeds 12–31; same H0, statistic and null as TC-20
 **Expected:** no feature rejects H0 after Holm correction · **Tolerance:** at most 1 of the 20 seeds may reject, since the family-wise error rate is α = 0.05
-**Skills:** null-hypothesis-testing
+**Skills:** significance-check
 ```

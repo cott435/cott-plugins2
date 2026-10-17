@@ -10,13 +10,13 @@ A case that no longer applies collapses to one line under Retired (form in `../e
 
 ## Example: an oracle changes
 
-**Context:** TC-05 pinned the top eigenvalue from the user's notebook. Two weeks later the user found their notebook used unadjusted closes and re-ran it.
+**Context:** TC-05 pinned the daily amplitude from the user's notebook. Two weeks later the user found their notebook read MWh rows as kWh and re-ran it.
 
 ```
 Revise TC-05 (PL-02 · STAT-01):
-  old expected.json  {"top_eigval": 2.31, "tol": 1e-6}
-  new expected.json  {"top_eigval": 2.27, "tol": 1e-6}
-  Source: your notebook `cov_check.ipynb`, re-run 2026-11-04 on adjusted closes (cell 14 output attached in source/).
+  old expected.json  {"daily_amp": 2.31, "tol": 1e-6}
+  new expected.json  {"daily_amp": 2.27, "tol": 1e-6}
+  Source: your notebook `seasonality_check.ipynb`, re-run 2026-11-04 with units fixed (cell 14 output attached in source/).
   Tolerance unchanged: same data, same float64 arithmetic.
 Tasks citing TC-05: M1-T04. After approval, build-planning Replan if its acceptance changes.
 Do you approve the new expected output?

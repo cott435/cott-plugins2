@@ -200,6 +200,42 @@ class FeatureStageTest(FixtureCopy):
         return {n["id"]: (n["parent"], n["attrs"]["stages"], n["attrs"]["stage_via"])
                 for n in snap["nodes"] if n["level"] == "feature"}
 
+    def stage_lines(self, **stages: str):
+        for code, serves in (("DATA", "Goal 1"), ("STAT", "Goal 2"), ("PORT", "Goal 3")):
+            if code in stages:
+                self.replace("docs/spec.md", f"(`{code}`)\n**Serves:** {serves}\n",
+                             f"(`{code}`)\n**Serves:** {serves}\n**Stage:** {stages[code]}\n")
+
+    def lint_spec(self) -> tuple[int, str]:
+        code, out, _ = self.dt("lint", "docs/spec.md")
+        return code, out
+
+    def test_stage_line(self):
+        # Every stage cites the brief and PL-03 reuses STAT-02, so only the Stage line places STAT; it beats a heading.
+        self.roadmap("brief")
+        self.replace("docs/spec.md", "### Portfolios (`PORT`)", "### S1 — Everything\n\n### Portfolios (`PORT`)")
+        self.stage_lines(DATA="S1", STAT="S1 (data and statistics)", PORT="S2")
+        self.assertEqual(self.features(), {"DATA": ("S1", ["S1"], "Stage line"), "STAT": ("S1", ["S1"], "Stage line"),
+                                           "PORT": ("S2", ["S2"], "Stage line")})
+        self.assertEqual(self.lint_spec(), (0, "0 errors, 0 warnings\n"))
+
+    def test_lint_spec_stage(self):
+        self.roadmap("brief")
+        self.stage_lines(DATA="S9", STAT="Data")
+        code, out = self.lint_spec()
+        self.assertEqual(code, 1)
+        self.assertIn("docs/spec.md:9: spec-stage DATA Stage S9: no such stage row", out)
+        self.assertIn("STAT Stage 'Data': not a stage ID (S<n>)", out)
+        self.assertIn("docs/spec.md:32: spec-stage PORT names no stage: add a **Stage:** line", out)
+
+    def test_lint_spec_stage_needs_stages(self):
+        # A roadmap of milestones only has no stages to name; a stage heading also places a feature.
+        self.assertEqual(self.lint_spec()[0], 0)
+        self.roadmap("brief")
+        self.replace("docs/spec.md", "### Prices (`DATA`)", "### S1 — Data and statistics\n\n### Prices (`DATA`)")
+        self.replace("docs/spec.md", "### Portfolios (`PORT`)", "### S2: Portfolios\n\n### Portfolios (`PORT`)")
+        self.assertEqual(self.lint_spec(), (0, "0 errors, 0 warnings\n"))
+
     def test_spec_heading(self):
         self.roadmap("brief")
         self.replace("docs/spec.md", "### Prices (`DATA`)", "### S1 — Data and statistics\n\n### Prices (`DATA`)")

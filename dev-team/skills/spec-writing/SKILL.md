@@ -41,7 +41,7 @@ Run `python3 ../../scripts/dt.py status --skill spec-writing` first (path relati
 
 Run the hygiene check in `references/spec.md`, and the gate steps your mode file adds. Then:
 
-1. Summarize: feature and requirement counts, the goal → feature mapping, Open questions.
+1. Summarize: feature and requirement counts, the goal → feature and stage → feature mappings, Open questions.
 2. Ask the user to approve or request changes.
 3. **STOP YOUR TURN.** Never start the architecture or code in the same turn, and never edit the spec and draft the architecture in one turn.
 

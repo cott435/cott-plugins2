@@ -446,8 +446,9 @@ def strategy_rows(doc: Doc) -> list[dict[str, str]]:
 # ---- brief and spec --------------------------------------------------------------------------
 #
 # The brief's numbered `## Goals` are `G<n>`. A spec feature is a `### Name (`CODE`)` heading whose `**Serves:**`
-# line names goals; its requirements are the live `CODE-NN` lines in its section. A spec may group features under
-# a heading that starts with a stage ID (`### S2 — Risk structure`).
+# line names goals and whose `**Stage:**` line names its roadmap stage; its requirements are the live `CODE-NN` lines
+# in its section. A spec without Stage lines may group features under a heading that starts with a stage ID
+# (`### S2 — Risk structure`).
 
 
 @dataclass
@@ -482,8 +483,10 @@ class Feature:
     name: str
     serves: list[str]                  # G<n>
     source: str
-    stage: str                         # S<n> of the spec heading that groups it, or ""
+    stage: str                         # S<n> from its Stage line, else from the spec heading that groups it, or ""
     requirements: list[str]
+    stage_via: str = ""                # "Stage line", "spec heading", or ""
+    line: int = 0                      # its heading's line index
 
 
 FEATURE_HEADING = re.compile(r"^(.*?)\s*\(`([A-Z][A-Z0-9]*)`\)\s*$")
@@ -515,12 +518,14 @@ def spec_features(doc: Doc) -> tuple[list[Feature], list[Requirement]]:
             continue
         fields = md.fields_in(doc.lines, h.line + 1, h.end)
         serves = re.sub(r"\([^)]*\)", "", fields.get("Serves", ""))
-        mine = inside
-        for r in mine:
+        for r in inside:
             r.feature = fm.group(2)
+        own = re.match(rf"({md.STAGE_ID})\b(?!-)", md.strip_md(fields.get("Stage", "")))
         feats.append(Feature(fm.group(2), md.strip_md(fm.group(1)),
                              [f"G{n}" for n in re.findall(r"\d+", serves)] if "goal" in serves.lower() else [],
-                             md.strip_md(fields.get("Source", "")), stage, [r.id for r in mine]))
+                             md.strip_md(fields.get("Source", "")), own.group(1) if own else stage,
+                             [r.id for r in inside], "Stage line" if own else "spec heading" if stage else "",
+                             h.line))
     return feats, reqs
 
 

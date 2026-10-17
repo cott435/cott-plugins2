@@ -187,7 +187,7 @@ The plan as one `plan-map/2` snapshot body (design §8.3) for workflow-analyzer'
 - **Edges** `{from, to, kind}`: `serves` (feature → each goal on its Serves line), `covers` (pipeline, step, test case or task → each live requirement it covers), `depends` (task → each Depends on), `implements` (task → its Step: a step, or a pipeline), `verifies` (test case → its pipeline), and each dependency-graph row with its own kind plus `mitigated_by` and `reason`.
 - **Builds**, one per planned milestone: `{milestone, state (active|queued), tasks, critical_path, waves, width, parallelism}`.
 
-A feature's stages come from the first rule that finds any: a spec heading starting with the stage ID that groups it (`spec heading`); else, when stages' Sources add different IDs, the stages whose Source added its requirements, earliest first (`stage source`); else the stages whose milestones list a pipeline covering them (`milestone pipelines`, a parent only when that is one stage).
+A feature's stages come from the first rule that finds any: its `**Stage:** S<n>` line (`Stage line`); else a spec heading starting with the stage ID that groups it (`spec heading`); else, when stages' Sources add different IDs, the stages whose Source added its requirements, earliest first (`stage source`); else the stages whose milestones list a pipeline covering them (`milestone pipelines`, a parent only when that is one stage).
 
 Text output: node counts per level, how many requirements a pipeline, a test and a task cover, then each build with its waves.
 
@@ -265,6 +265,7 @@ Checks (code: severity):
   - `ref-large` W — a task reads an `RF-NN` whose file is over 300 lines with no selector (it would get only the outline)
   - `ref-prefix` E — a spec requirement uses the reserved `RF-` prefix
   - `roadmap-skill` W — a roadmap stage's or milestone's own `**Skills:**` names a skill that isn't installed (same list as `skills_available`)
+  - `spec-stage` E — once the roadmap has stages, a spec feature with no `**Stage:**` line (nor a stage heading grouping it), or one naming no stage row
   - `roadmap-stage` E — once the roadmap has stages, a milestone row whose Stage cell names no stage row, isn't an `S<n>`, or is empty on a row with no Source of its own
 - Probe checks (design/probes.md §4–§5):
   - `probe-fields` E — a PB entry with no Folder, Question or Informs, no checks table, a check with an empty Pass cell, a Status that isn't Draft, Ready, Answered · pass|fail or Waived, or (past Draft) a missing folder

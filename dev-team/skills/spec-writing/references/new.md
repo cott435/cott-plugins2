@@ -11,11 +11,11 @@ READ BRIEF ─→ SURFACE ASSUMPTIONS ─→ CLARIFY ─→ WRITE SPEC ─→ [u
 From the brief's numbered goals, propose features and show the mapping before writing:
 
 ```
-Goal 1 (regulars reorder in < 30s)     → Saved orders, Text reorder
-Goal 2 (no extra daily work for owner) → Regulars setup, Order notifications
+Goal 1 (regulars reorder in < 30s)     → Saved orders (S1), Text reorder (S2)
+Goal 2 (no extra daily work for owner) → Regulars setup (S1), Order notifications (S2)
 ```
 
-Every goal has a feature. **Every stage the brief and roadmap list is specced in full**: features, requirements, criteria and edge cases for all of them, never "S1 in full, the rest outlined". Later skills design only what the spec holds.
+Every goal has a feature, and every feature names its roadmap stage (`references/spec.md`). **Every stage the brief and roadmap list is specced in full**: features, requirements, criteria and edge cases for all of them, never "S1 in full, the rest outlined". Later skills design only what the spec holds.
 
 ## Steps 2-3: Surface assumptions, then clarify
 

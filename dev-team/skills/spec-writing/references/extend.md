@@ -10,6 +10,7 @@ The idea file is the main input. Its sections map onto the spec like this:
 | Idea file section | Used for |
 |---|---|
 | How it fits → Serves | `Serves:` line of each new feature |
+| How it fits → Stage | `Stage:` line of each new feature: the stage the idea added, or the one it joins |
 | How it fits → Touches | Which existing requirements to check, change, or extend |
 | Recommended direction | Feature Behavior and the requirements |
 | Not doing | Out of scope |
@@ -21,7 +22,7 @@ The idea file is the main input. Its sections map onto the spec like this:
 Run these for the idea only:
 
 1. **Check for conflicts first.** Start with the IDs under *Touches*, then search the rest of the spec for anything else the idea contradicts. List conflicts for the user before writing — "Shared editing changes **EDIT-03** (only the owner can edit). Proposed: owner *or invited editors* can edit."
-2. **Map the idea to features** and show the goal → feature mapping before writing.
+2. **Map the idea to features** and show the goal → feature mapping, with each feature's stage, before writing.
 3. **Surface assumptions, then clarify** (SKILL.md's Asking section).
 4. **Write the change** following `references/spec.md` and the rules below.
 5. **Set the spec Status back to Draft** and run the Review Gate (SKILL.md, plus the gate steps below), highlighting the changed IDs so the user reviews only what's new.
@@ -34,7 +35,7 @@ Run these for the idea only:
    - **Widen, don't bolt on.** If an existing requirement already covers this concern for an earlier part of the project, rewrite it to cover the new part too, instead of adding a near-duplicate. A training-time limit written for the first dataset becomes a limit for every dataset. A summary that says "the first milestone" is rewritten.
    - Changed requirement → rewrite it in place and keep its ID. Put no marker on it. Instead, list it as `(changed)` in this round's Changelog row, with the reason in the row's Change text. `architecture-design` reads those Changelog marks (through `dt status`) to find what the architecture must revisit, so list every changed ID.
    - Removed requirement → collapse it to one struck line and delete its criteria and edge cases: `- **CODE-03** ~~[short name]~~ *Removed YYYY-MM-DD: [reason, or "replaced by CODE-07"].*` Never delete the ID line; the ID stays retired.
-2. **Link back to the idea.** Add `**Source:** [ideas/<slug>.md](ideas/<slug>.md)` under the `Serves:` line of each new feature section, so readers can find the full why.
+2. **Link back to the idea.** Add `**Source:** [ideas/<slug>.md](ideas/<slug>.md)` under the `Stage:` line of each new feature section, so readers can find the full why.
 3. **Update everything it touches, and consolidate.** Summary (rewritten for the whole spec, not appended to), Users, Serves lines. Scope stays one deduplicated list per side: merge new out-of-scope items into it, and drop or narrow anything the new features bring into scope (the gate's *Out of scope* step). Remove assumptions and open questions that are answered or no longer apply.
 4. **Add one Changelog row**, one line: the idea file as the source, a short description of the change, and the IDs as ranges in up to three `;`-separated groups: added, then changed, then removed (`FIELD-01–FIELD-12; CNN-03, CORE-04 (changed); CROP-04 (removed)`). A `(changed)` or `(removed)` mark covers every ID in its group.
 

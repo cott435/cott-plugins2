@@ -63,8 +63,9 @@ def _task_steps(t: model.Task, pipelines: dict[str, model.Pipeline]) -> list[str
 def _feature_stages(repo, feats: list[model.Feature], stages: list[model.Stage], milestones: list[model.Milestone],
                     pipelines: dict[str, model.Pipeline]) -> dict[str, tuple[list[str], str]]:
     """code -> (the stages a feature belongs to, how that was found), from the first rule that places it:
-    the spec heading that groups it; else the stages whose Source added its requirements, earliest first, when
-    Sources tell stages apart; else the stages whose milestones' pipelines cover them."""
+    its spec Stage line, else the spec heading that groups it; else the stages whose Source added its
+    requirements, earliest first, when Sources tell stages apart; else the stages whose milestones' pipelines
+    cover them."""
     ids = [s.id for s in stages]
     added = {s.id: source_ids(repo, s, added_only=True) for s in stages}
     by_source = len({frozenset(v) for v in added.values()}) > 1
@@ -78,7 +79,7 @@ def _feature_stages(repo, feats: list[model.Feature], stages: list[model.Stage],
     for f in feats:
         reqs = set(f.requirements)
         if f.stage in ids:
-            out[f.code] = ([f.stage], "spec heading")
+            out[f.code] = ([f.stage], f.stage_via)
         elif by_source and (hit := [s for s in ids if reqs & added[s]]):
             out[f.code] = (hit, "stage source")
         elif hit := [s for s in ids if reqs & covered[s]]:

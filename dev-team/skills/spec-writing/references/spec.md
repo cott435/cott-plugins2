@@ -25,6 +25,7 @@ Read before writing or extending `docs/spec.md`, and again for the hygiene check
 
 ### [Feature name] (`CODE`)
 **Serves:** Goal 1, Goal 3
+**Stage:** S2
 **Source:** [ideas/<slug>.md](ideas/<slug>.md) *(extend mode only — omit for features from the original brief)*
 **Behavior:** [2-4 sentences or a short numbered flow describing what the user experiences.]
 
@@ -65,6 +66,7 @@ Read before writing or extending `docs/spec.md`, and again for the hygiene check
 - **Every requirement has at least one acceptance criterion** in Given/When/Then form. If you can't write one, the requirement isn't clear yet.
 - **Describe behavior, not implementation.** "The customer sees their usual order" — not "the app queries the orders table."
 - **Use exact numbers.** "≤ 2 seconds", "up to 50 regulars", never "fast" or "many".
+- **Every feature names one stage.** Its `**Stage:**` line holds only the ID of the roadmap stage that first builds it. `dt lint` fails a feature with no stage, or one naming no stage row.
 - **Requirement IDs are permanent.** `CODE-NN`, numbered within the feature, never reused or renumbered.
 - **Quality requirements only when measurable.** Leave out generic wishes ("should be secure"); keep checkable ones ("passwords are never shown in full"). Cost, licence and budget limits are `QR-` items ("data costs ≤ $50 a month"), never `DATA-` or feature requirements.
 - **No tech stack, libraries, vendors, schemas, endpoints, or file structure, even when the user names them.** Write the behavior the name stands for. The name itself belongs to `architecture-design`, which reads the idea file and the conversation.

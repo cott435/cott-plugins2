@@ -31,7 +31,7 @@ SEVERITY = {
     "unreadable": "E", "internal": "W", "pipeline-fields": "E", "spine-mock": "W", "contract-heading": "E",
     "fixture-size": "W",                # missing fixture files are reported as E
     "ref-file": "E", "ref-hash": "W", "ref-large": "W", "ref-prefix": "E", "roadmap-skill": "W",
-    "roadmap-stage": "E", "type-cases": "E", "task-ref": "E",
+    "roadmap-stage": "E", "spec-stage": "E", "type-cases": "E", "task-ref": "E",
     "probe-fields": "E", "probe-informs": "E", "probe-cite": "E", "probe-runner": "E", "probe-leak": "E",
     "probe-sample": "E", "probe-results": "E", "probe-stale": "W", "probe-large": "W",
 }
@@ -541,6 +541,29 @@ def check_roadmap_stage(ctx: Context):
             yield _p(roadmap, ms.row_line, "roadmap-stage", f"{ms.id} Stage {cell!r}: not a stage ID (S<n>)")
         elif not ms.stage and md.strip_md(ms.row.get("Source", "")) in NONE_VALUES:
             yield _p(roadmap, ms.row_line, "roadmap-stage", f"{ms.id} names no stage: fill its Stage cell")
+
+
+
+def check_spec_stage(ctx: Context):
+    """Once the roadmap has stages, every spec feature names one that exists on its `**Stage:**` line (a feature
+    grouped under a stage heading counts)."""
+    spec, roadmap = ctx.repo.spec, ctx.repo.roadmap
+    if spec is None or roadmap is None or not ctx.in_scope(spec.rel):
+        return
+    stage_ids = {s.id for s in model.stages(roadmap)}
+    if not stage_ids:
+        return
+    for f in model.spec_features(spec)[0]:
+        h = next(h for h in spec.headings if h.line == f.line)
+        line = md.field_line(spec.lines, f.line + 1, h.end, "Stage")
+        at = f.line if line is None else line
+        if f.stage and f.stage not in stage_ids:
+            yield _p(spec, at, "spec-stage", f"{f.code} Stage {f.stage}: no such stage row")
+        elif not f.stage and line is not None:
+            cell = md.strip_md(md.split_fields(spec.lines[line]).get("Stage", ""))
+            yield _p(spec, at, "spec-stage", f"{f.code} Stage {cell!r}: not a stage ID (S<n>)")
+        elif not f.stage:
+            yield _p(spec, at, "spec-stage", f"{f.code} names no stage: add a **Stage:** line")
 
 
 # ---- probe checks (design/probes.md §4, §5) --------------------------------------------------------
@@ -1162,6 +1185,7 @@ CHECKS = [
     check_step_io_types, check_type_cases, check_task_ref,
     check_todo_mismatch, check_finding_disposition, check_foreign_plan,
     check_ref_file, check_ref_hash, check_ref_large, check_ref_prefix, check_roadmap_skill, check_roadmap_stage,
+    check_spec_stage,
     check_probe_fields, check_probe_informs, check_probe_cite, check_probe_runner, check_probe_leak,
     check_probe_sample, check_probe_results, check_probe_stale, check_probe_large,
 ]

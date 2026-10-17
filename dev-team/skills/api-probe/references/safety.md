@@ -6,7 +6,7 @@ The agent never sees a secret, and the script redacts, never the agent. Every mo
 
 | Runner | Allowed when | Examples |
 |---|---|---|
-| **agent** | The check reads no credential, or only one the vendor publishes for everyone, and touches nothing of the user's | Public docs and pricing pages (WebFetch); keyless endpoints; EODHD's `demo` token on its demo tickers |
+| **agent** | The check reads no credential, or only one the vendor publishes for everyone, and touches nothing of the user's | Public docs and pricing pages (WebFetch); keyless endpoints; a weather API's published `demo` key on its sample city |
 | **user** | The check needs any key the user holds, sandbox keys included; or the user's accounts; or it spends something | Plaid sandbox or production; a paid subscription's API |
 | **user (manual)** | Only a person can see the answer | A Dashboard's plan page; the licence terms for the user's plan |
 

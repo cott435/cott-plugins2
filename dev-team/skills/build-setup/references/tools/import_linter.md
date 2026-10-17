@@ -52,13 +52,13 @@ Run: `lint-imports --no-logo` (the logo fills the agent's feedback tail).
 Contracts are generated, never hand-written (CONSTRAINTS.md Boundaries says "do not edit"):
 - **Source:** single package: each component's `Depends on` column. Multi-package: the package dependency rules. Contracts sit between component subfolders (`pkg.data`) in a single package and between packages in multi.
 - **Shape:** order the components so every dependency points down, then write one `layers` contract, top first. Components that don't depend on each other share a layer: `"pkg.a | pkg.b"` (independent siblings).
-- **Narrower rules:** if a component may import only some of the layers below it (`portfolio` → `stats`, never `data`), add a `forbidden` contract for that pair.
+- **Narrower rules:** if a component may import only some of the layers below it (`reserve` → `profile`, never `data`), add a `forbidden` contract for that pair.
 - **Not built yet:** wrap a module that doesn't exist in parentheses, `"(pkg.report)"`. The layer is optional while missing and enforced once it exists (verified). Without that, a fresh skeleton fails with `Missing layer`. `dt status` flags parentheses around a module that now exists; Extend removes them.
 - **Grow:** when a component becomes a package, Extend rewrites its component contract as a package contract. The rule is the same, so code that passed keeps passing.
 
 ```toml
 [[tool.importlinter.contracts]]
-name = "Layers: report > stats > data"
+name = "Layers: report > profile > data"
 type = "layers"
-layers = ["(quant.report)", "quant.stats", "quant.data"]
+layers = ["(gridload.report)", "gridload.profile", "gridload.data"]
 ```

@@ -45,8 +45,8 @@ Why: `re.match` returns `None` when there's no match, and this crashes with `Att
 
 **`arg-type`: wrong argument type**
 ```python
-def sma(prices: list[float], n: int) -> float: ...
-sma([1.0, 2.0], "20")     # error: Argument 2 has incompatible type "str"; expected "int"  [arg-type]
+def rolling_mean(loads: list[float], n: int) -> float: ...
+rolling_mean([1.0, 2.0], "20")     # error: Argument 2 has incompatible type "str"; expected "int"  [arg-type]
 ```
 Why: fails later and further away, usually as a `TypeError` inside the function.
 

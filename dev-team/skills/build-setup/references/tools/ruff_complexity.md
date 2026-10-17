@@ -64,7 +64,7 @@ Why: many paths means many hidden bugs and tests you need. Fix: a lookup table, 
 
 ```python
 # default max-args = 5
-def backtest(df, start, end, fast, slow, fee, slippage):   # 7 args -> PLR0913
+def forecast(df, start, end, horizon, lags, holidays, weather):   # 7 args -> PLR0913
     ...
 ```
 Why: long signatures are hard to call correctly and usually mean the function does too much or needs a config object. Fix: group related values into a dataclass.

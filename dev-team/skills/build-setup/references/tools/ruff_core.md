@@ -98,10 +98,10 @@ Why: the traceback can't tell "caused by" from "a second error occurred while ha
 
 **B905 zip without `strict=`** (needs target Python 3.10+)
 ```python
-for price, ts in zip(prices, timestamps):   # B905
+for kwh, ts in zip(readings, timestamps):   # B905
     ...
 ```
-Why: if the lists differ in length, `zip` silently truncates and your price and time series misalign. `strict=True` raises instead.
+Why: if the lists differ in length, `zip` silently truncates and your readings and timestamps misalign. `strict=True` raises instead.
 
 **B007 unused loop variable**
 ```python

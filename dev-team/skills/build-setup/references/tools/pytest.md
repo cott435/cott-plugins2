@@ -68,8 +68,8 @@ Coverage is not in `addopts` on purpose: gates pass `--no-cov` or `--cov` explic
 
 **A failing assertion**
 ```python
-def test_sma():
-    assert sma([1, 2, 3], 2) == 2.0
+def test_rolling_mean():
+    assert rolling_mean([1, 2, 3], 2) == 2.0
 # E  assert 2.5 == 2.0
 ```
 Why: pytest rewrites asserts so you see both values without writing a message.
@@ -78,7 +78,7 @@ Why: pytest rewrites asserts so you see both values without writing a message.
 ```python
 def test_rejects_zero_window():
     with pytest.raises(ValueError):
-        sma([1, 2, 3], 0)
+        rolling_mean([1, 2, 3], 0)
 # Failed: DID NOT RAISE <class 'ValueError'>
 ```
 Why: the code didn't validate input. Add `match="window"` too, or any `ValueError` passes (that's Ruff's `PT011`).
@@ -108,8 +108,8 @@ Why: one broken import stops the whole file from running. This is what the teste
 
 **Fixture not found**
 ```python
-def test_x(price_df): ...           # fixture not defined anywhere
-# E  fixture 'price_df' not found
+def test_x(load_df): ...            # fixture not defined anywhere
+# E  fixture 'load_df' not found
 ```
 
 ## Parametrize: many cases, one test
@@ -119,8 +119,8 @@ def test_x(price_df): ...           # fixture not defined anywhere
     ("window", "expected"),
     [(1, 3.0), (2, 2.5), (3, 2.0)],
 )
-def test_sma(window, expected):
-    assert sma([1, 2, 3], window) == pytest.approx(expected)
+def test_rolling_mean(window, expected):
+    assert rolling_mean([1, 2, 3], window) == pytest.approx(expected)
 ```
 Why: each case is reported separately. Use `pytest.approx` for floats, never `==`.
 

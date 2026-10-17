@@ -19,7 +19,7 @@ After approval and the commit, `dt base` runs as the Review Gate says.
 
 ```
 Bar changes for M2:
-- portfolio exists now: "(quant.portfolio)" → "quant.portfolio" in the layers contract
+- reserve exists now: "(gridload.reserve)" → "gridload.reserve" in the layers contract
 - New dependency scipy (M2-T03): added, with EX-02 CR-25 DEP002 `scipy`, expires M2 exit
 - EX-01 dropped: numpy and pandas are imported (that is a tightening)
 Loosenings: EX-02 is a new exception. Approve it?

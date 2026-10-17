@@ -1,6 +1,6 @@
 # New: a probe is written
 
-`probes_unwritten` lists a probe a decision cites with no entry yet (`PB-01 (AD-04)`), or the user asks a question about a service ("does Tiingo have delisted tickers?"). Use the shape in `entry.md` and the rules in `safety.md`. `../examples.md` shows the whole round for FinTrack's Plaid probe.
+`probes_unwritten` lists a probe a decision cites with no entry yet (`PB-01 (AD-04)`), or the user asks a question about a service ("does the weather API return hourly history back to 2015?"). Use the shape in `entry.md` and the rules in `safety.md`. `../examples.md` shows the whole round for FinTrack's Plaid probe.
 
 ## 1. Read what the probe serves
 
@@ -15,7 +15,7 @@
 | The docs are silent, vague ("up to 24 months"), or contradict the design | A check |
 | It depends on the user's account, plan, institutions or data | A user check |
 
-A contradiction between the docs and the decision (Sharadar's `close` is split-adjusted, and the decision says raw) goes to the gate summary at once, as a hand-off to architecture-design, before anything runs.
+A contradiction between the docs and the decision (the weather API's timestamps are UTC, and the decision says local time) goes to the gate summary at once, as a hand-off to architecture-design, before anything runs.
 
 ## 3. Write the entry
 

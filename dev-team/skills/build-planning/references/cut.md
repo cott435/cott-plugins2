@@ -1,6 +1,8 @@
 # Grow check, cutting a stage, scoping a milestone
 
-Read at the start of New and Extend, before any task is written. Examples: `examples-new.md`.
+Read before planning a milestone, before any task is written. Example: `examples-cut.md` (a large stage cut into slices).
+
+Read only `dt status`, the roadmap, the packages' `pipelines.md`, `contract.md` headings and `tests.md`, the spec sections they cover, the skill list and the `milestone_references` entries.
 
 ## 1. Grow check
 
@@ -13,7 +15,7 @@ If one fires and no `AD-NN` already records the decision to stay single, **stop*
 
 ## 2. Cut the stage into milestones
 
-When `stage_to_cut` names a stage, its pipelines are `pipelines_inferred`: the ones covering the stage's spec IDs. **Up front, cut every designed stage in New mode.** When the brief lists every stage, each stage's Source is `brief` and the spec's only Changelog row says IDs `all`, so `dt` can't tell which pipelines belong to which stage and `pipelines_inferred` comes back empty: assign each approved pipeline to the stage whose outcome it delivers, by its Covers.
+When `stage_to_cut` names a stage, its pipelines are `pipelines_inferred`: the ones covering the stage's spec IDs. When the brief lists every stage, each stage's Source is `brief` and the spec's only Changelog row says IDs `all`, so `dt` can't tell which pipelines belong to which stage and `pipelines_inferred` comes back empty: assign each approved pipeline to the stage whose outcome it delivers, by its Covers.
 
 - **Order by dependency.** Which pipeline needs another's outputs? A consumer needs its provider's *interface*, not its finished build: a boundary the interface task freezes lets both sides build in the same milestone.
 - **The first milestone is a walking skeleton:** the thinnest end-to-end path through every package the stage touches, one pipeline per package at spine version, joined across each boundary, so the user can run it end to end.

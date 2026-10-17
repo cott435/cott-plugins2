@@ -6,11 +6,16 @@
 #   scripts/check.sh fast FILE...        per edit, instant               (PostToolUse: tester, implementer)
 #   scripts/check.sh collect             tester's finish gate            (Stop: tester)
 #   scripts/check.sh gate [--pkg ID]     implementer's finish gate       (Stop: implementer and solo)
-#   scripts/check.sh full [--pkg ID]     checkpoints, milestone exit, CI (reviewer)
+#   scripts/check.sh full [--pkg ID]     checkpoints, CI                 (reviewer)
+#   scripts/check.sh full --exit         the milestone exit: also no interface stub left
 #   scripts/check.sh protected           print the protected-path globs  (path_guard.sh deny --protected)
 #
 # tests/contracts/** in the protected list means the boundary contracts frozen at the base (CR-09);
-# a contract folder new since the base belongs to the contract task freezing it, which may write it.
+# a contract folder new since the base belongs to the interface task freezing it, which may write it.
+#
+# collect runs the intent tests changed since the base and fails unless they are red for the right
+# reason (scripts/red_check.py): AssertionError or an interface stub's NotImplementedError, never
+# an ImportError or AttributeError.
 #
 # --pkg ID runs the tests of package ID and of every package that depends on it (multi-package:
 # deptry too). Lint, types, size and boundaries always cover the whole repo; they take seconds.
@@ -46,10 +51,12 @@ other_parts() {
 mode="${1:-gate}"
 shift || true
 pkg=""
+exit_check=()
 args=()
 while [ $# -gt 0 ]; do
   case "$1" in
     --pkg) pkg="${2:-}"; shift 2 || shift ;;
+    --exit) exit_check=(--exit); shift ;;
     *) args+=("$1"); shift ;;
   esac
 done
@@ -92,7 +99,7 @@ base_commit() {
 
 # A boundary contract is frozen once its folder exists at the base (CR-09): each folder under
 # tests/contracts/ at the base, and any file directly in it. A folder new since the base is the
-# contract task freezing it, so that task may write it; the next task's base freezes it.
+# interface task freezing it, so that task may write it; the next task's base freezes it.
 CONTRACTS_GLOB="tests/contracts/**"
 frozen_contracts() {
   local base meta path
@@ -135,6 +142,15 @@ only_intent_changed() {
   local specs=(tests "${SRC_DIRS[@]}" "${PROTECTED[@]}")
   [ -n "$PACKAGES_DIR" ] && specs+=("$PACKAGES_DIR")
   unchanged_since_base "files outside tests/intent" "${specs[@]}" ':(exclude)tests/intent'
+}
+
+# The intent test files the tester changed since the base, committed or not.
+changed_intent_tests() {
+  local base
+  base=$(base_commit) || return 0
+  { git diff --relative --name-only --diff-filter=d "$base" -- 'tests/intent/*.py'
+    git ls-files --others --exclude-standard -- 'tests/intent/*.py'; } | sort -u |
+    while IFS= read -r f; do case "${f##*/}" in test_*|*_test.py) echo "$f" ;; esac; done
 }
 
 # Test directories for this run: all of them, or the --pkg scope.
@@ -197,6 +213,9 @@ case "$mode" in
     run ruff format --check tests/intent
     run typos tests/intent
     run pytest tests/intent --collect-only -q --no-cov
+    changed=()
+    while IFS= read -r f; do changed+=("$f"); done < <(changed_intent_tests)
+    run python scripts/red_check.py ${changed[@]+"${changed[@]}"}
     step bash scripts/floor_guard.sh
     only_intent_changed
     ;;
@@ -218,7 +237,7 @@ case "$mode" in
     run vulture
     run typos
     run pip-audit --skip-editable   # the external opinion: a vulnerability database (CR-26)
-    step bash scripts/floor_guard.sh
+    step bash scripts/floor_guard.sh ${exit_check[@]+"${exit_check[@]}"}
     dirs=$(test_dirs)
     # Coverage threshold comes from [tool.coverage.report] fail_under (CR-40).
     # shellcheck disable=SC2086

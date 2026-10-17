@@ -27,11 +27,11 @@ Loaded when build-setup writes or changes `.claude/agents/*.md` or `scripts/hook
 
 | Agent | PreToolUse | PostToolUse | Stop |
 |---|---|---|---|
-| tester | `path_guard.sh allow "tests/intent/**"` on edits; `path_guard.sh deny <source globs>` on Read | `post_edit.sh` | `stop_gate.sh collect` |
-| implementer (and solo) | `path_guard.sh deny --protected` | `post_edit.sh` | `stop_gate.sh gate` |
+| tester | `path_guard.sh allow "tests/intent/**"` and `path_guard.sh writes` on edits; `path_guard.sh deny <source globs>` on Read | `post_edit.sh` | `stop_gate.sh collect` |
+| implementer (and solo) | `path_guard.sh deny --protected` and `path_guard.sh writes` | `post_edit.sh` | `stop_gate.sh gate` |
 | reviewer | none: `tools: Read, Grep, Glob, Bash`, no Edit or Write | — | — |
 
-`--protected` reads the list from `scripts/check.sh protected`, so the guard and the Stop-time diff can't drift apart. That output narrows `tests/contracts/**` to the contract folders at `refs/checks/base` (CR-09): a contract task may write the folder it creates; the next task's base freezes it.
+`--protected` reads the list from `scripts/check.sh protected`, so the guard and the Stop-time diff can't drift apart. That output narrows `tests/contracts/**` to the contract folders at `refs/checks/base` (CR-09): an interface task may write the folder it creates; the next task's base freezes it. `writes` reads `.claude/.task_writes` at the root (one `Writes:` path or folder glob a line, a trailing `/` meaning the folder), so a parallel builder edits only what its task claims; with no file it allows everything.
 
 ## Two layers
 
@@ -39,13 +39,13 @@ Every protection has two layers:
 1. **PreToolUse guard** stops the normal route (Edit, Write).
 2. **Stop-time diff** catches Bash writes (`sed -i`, `echo >`): `check.sh gate` diffs the whole protected list against `refs/checks/base` and lists untracked files; `check.sh collect` does the same for everything outside `tests/intent`.
 
-The orchestrator sets the base with `git update-ref refs/checks/base HEAD` when it commits the tester's work and at each task start. Without it the diff falls back to HEAD, which misses changes the agent already committed. It can also write the task's package to `.claude/.check_pkg`, which `stop_gate.sh` passes on as `--pkg`.
+The orchestrator sets the base with `git update-ref refs/checks/base HEAD` when it commits the tester's work and at each task start. Without it the diff falls back to HEAD, which misses changes the agent already committed. It can also write the task's package to `.claude/.check_pkg`, which `stop_gate.sh` passes on as `--pkg`, and, in each builder's worktree, the task's `Writes:` to `.claude/.task_writes`.
 
 ## The scripts
 
 | Script | Event | Does | Fails |
 |---|---|---|---|
-| `path_guard.sh` | PreToolUse | `allow`/`deny` globs relative to the root; `*` crosses `/`; case-insensitive; deny also matches the absolute path; blocks `..` | closed: bad input, no jq or no protected list → exit 2 |
+| `path_guard.sh` | PreToolUse | `allow`/`deny` globs relative to the root, or `writes` from `.claude/.task_writes`; `*` crosses `/`; case-insensitive; deny also matches the absolute path; blocks `..` | closed: bad input, no jq or no protected list → exit 2 |
 | `post_edit.sh` | PostToolUse | `check.sh fast <file>`: ruff `--fix`, format, typos, size; exit 2 with the output | bad input → exit 1 (reported; the Stop gate still runs) |
 | `stop_gate.sh` | Stop / SubagentStop | `check.sh <mode>`; blocks with JSON and the last 60 lines; `--warn` never blocks | closed: bad input still runs the gate on the fallback root; no jq → exit 2 with a fixed message |
 | `project_root.sh` | sourced | sets `$input` and `$root` | falls back to `CLAUDE_PROJECT_DIR`, then `$PWD` |

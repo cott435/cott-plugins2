@@ -6,6 +6,10 @@
 #
 #   scripts/floor_guard.sh                default base: refs/checks/base, else HEAD
 #   scripts/floor_guard.sh --base REF     e.g. the milestone's Base sha, or origin/main in CI
+#   scripts/floor_guard.sh --exit         the milestone exit: also fail on any interface stub left
+#
+# Interface stubs (`raise NotImplementedError("M1-T05")`) are judged over the whole project, not the
+# diff: each must name a task still open in tasks/todo.md (CR-02).
 #
 # Exit 0 clean · 1 at least one violation · 2 could not run (never read a 2 as clean).
 # Adapted from agent-skills constraint-driven-development references/floor-guard.md.
@@ -13,10 +17,12 @@ set -u
 cd "$(dirname "$0")/.." || exit 2
 
 base_ref=""
+exit_flag=()
 while [ $# -gt 0 ]; do
   case "$1" in
     --base) base_ref="${2:-}"; shift 2 || shift ;;
-    *) echo "usage: scripts/floor_guard.sh [--base REF]" >&2; exit 2 ;;
+    --exit) exit_flag=(--exit); shift ;;
+    *) echo "usage: scripts/floor_guard.sh [--base REF] [--exit]" >&2; exit 2 ;;
   esac
 done
 
@@ -43,9 +49,11 @@ trap 'rm -rf "$tmp"' EXIT
 git -c core.quotepath=off diff --relative --unified=0 --no-color --no-ext-diff "$base" -- . >"$tmp/diff" || exit 2
 git -c core.quotepath=off ls-files --others --exclude-standard -- . >"$tmp/untracked" || exit 2
 git show "$base:./pyproject.toml" >"$tmp/pyproject.base.toml" 2>/dev/null || : >"$tmp/pyproject.base.toml"
+git -c core.quotepath=off ls-files --cached --others --exclude-standard -- '*.py' >"$tmp/python" || exit 2
 
 uv run --frozen --quiet python scripts/floor_guard.py \
-  --diff "$tmp/diff" --untracked "$tmp/untracked" --old-pyproject "$tmp/pyproject.base.toml"
+  --diff "$tmp/diff" --untracked "$tmp/untracked" --old-pyproject "$tmp/pyproject.base.toml" \
+  --python "$tmp/python" ${exit_flag[@]+"${exit_flag[@]}"}
 status=$?
 # Anything but a clean 0 or a findings 1 means the guard itself broke.
 [ $status -le 1 ] || status=2

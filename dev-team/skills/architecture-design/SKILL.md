@@ -35,11 +35,11 @@ Start with `dt status --skill architecture-design`. Take the mode, shape, gap ke
 READ ─→ SHAPE ─→ COMPONENTS ─→ CONTRACTS ─→ DECISIONS ─→ WRITE ─→ [user approves] ─→ pipeline-design
 ```
 
-**1. Shape.** Read `references/shape.md`, propose single or multi-package with a one-line reason, and record it in the header. Multi-package: first propose the package ids, dependency direction and cross-package flows. A proof of concept is almost always a single package.
+**1. Shape.** Read `references/shape.md`, propose single or multi-package with a one-line reason, and record it in the header. Multi-package: first propose the package ids, dependency direction and cross-package flows.
 
 **2. Components.** Each: one responsibility in a sentence, the spec IDs it covers, what it depends on. Every live requirement (`QR-`, `DATA-` included) is covered, cross-cutting ones under Cross-cutting concerns. Dependencies point one way; two components needing each other are one, or miss an interface. Single package: one subfolder per component, its `__init__` exporting its contract.
 
-**3. Contracts.** Read `references/contracts.md`. One section per public symbol, headed by that symbol alone, with signature, Invariants, Errors and Used by; the provider owns it; multi-package boundaries name their fixture cases.
+**3. Contracts.** Read `references/contracts.md`. One section per public symbol: functions with signature, Invariants, Errors and Used by; each type passed between steps as a `type` section (`### stats.Cov: type`). A symbol consumed across components or packages gets a `**Boundary:**` line naming its fixture cases.
 
 **4. Decisions.** For each significant open choice (language, libraries, storage, deployment, data sources, model approach): 2-3 real options checked against the requirements that constrain them (`DATA-`; model criteria and baseline), and a recommendation. Ask about expensive-to-reverse ones. Record each as `AD-NN`, citing an informing reference by `RF-NN`, never its path. Small reversible choices go only in the tech stack table. A repo with its own ADRs keeps that convention.
 

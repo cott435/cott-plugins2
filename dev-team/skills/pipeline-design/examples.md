@@ -45,7 +45,7 @@ tests/intent/<pkg>/  tests/unit/<pkg>/
 ````
 
 - Multi-package segment of a system pipeline: add `· **Part of:** PL-NN` to the pipeline's Entry/Trigger line.
-- After the spine task, `dt prebuild-clear` replaces each entry sketch with `Layout: \`dt layout <pkg>\`` and drops the planned layout.
+- After the wiring task, `dt prebuild-clear` replaces each entry sketch with `Layout: \`dt layout <pkg>\`` and drops the planned layout.
 
 ---
 
@@ -80,7 +80,7 @@ DEFAULT: call it directly.
 User:    Directly.
 ```
 
-**`contract.md` after the write** (only `Used by:` changes):
+**`contract.md` after the write** (only `Used by:` changes; each step-table type already has its `type` section):
 
 ```markdown
 ### stats.estimate_cov: Covariance estimate
@@ -103,8 +103,8 @@ User:    Directly.
 
 | # | Step | Owner | In → Out | Spine version | Covers |
 |---|---|---|---|---|---|
-| 1 | `read_raw` | data.raw | dates → raw rows | read a synthetic CSV | DATA-01 |
-| 2 | `apply_universe` | data.universe | raw rows, dates → Prices | static universe, no delistings | DATA-02 |
+| 1 | `read_raw` | data.raw | dates → RawPrices | read a synthetic CSV | DATA-01 |
+| 2 | `apply_universe` | data.universe | RawPrices, dates → Prices | static universe, no delistings | DATA-02 |
 | 3 | `save_prices` | data.store | Prices → path | one Parquet file per run | DATA-01 |
 
 ### Entry sketch (pre-build — removed by spine task)
@@ -167,7 +167,7 @@ Wrote docs/packages/quant/pipelines.md (Draft).
 - PL-02 Covariance report · `python -m quant.stats cov-report` · load_prices → estimate_cov → clean_eigen → pca → write_report
 - Layout: data/ and stats/ subfolders, one module per step owner; contracts exported from each __init__.
 
-ASSUMPTIONS: names above; one Parquet file per run (AD-03); returns from `Prices.returns()`, not a step.
+ASSUMPTIONS: names above; one Parquet file per run (AD-03); returns via `Prices.returns()`.
 contract.md: PL IDs appended to Used by for data.load_prices, stats.estimate_cov, stats.clean_eigen.
 Open questions: the clean_eigen parameter (above).
 Uncovered: none. `portfolio` owns no step yet: it's M2.

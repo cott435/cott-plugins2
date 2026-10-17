@@ -107,16 +107,16 @@ class SingleProject(unittest.TestCase):
         self.assertEqual(result.stdout.split(), [g for g in project.PROTECTED if g != "tests/contracts/**"])
 
     # ------------------------------------------------------------- frozen contracts (CR-09)
-    def test_contract_task_writes_a_new_contract_then_it_is_frozen(self) -> None:
+    def test_interface_task_writes_a_new_contract_then_it_is_frozen(self) -> None:
         r = self.root
         schema = "tests/contracts/feed.quotes/schema.json"
-        write(r, schema, "{}\n")  # the contract task, before its commit: a folder new since the base
+        write(r, schema, "{}\n")  # the interface task, before its commit: a folder new since the base
         self.assertEqual(hook(r, "path_guard.sh", edit_input(r, schema), "deny", "--protected").returncode, 0)
         result = check(r, "gate")
         self.assertNotIn("protected files changed", result.stderr)
         self.assertEqual(result.returncode, 0, result.stderr[-2000:])
 
-        commit(r, "contract task")  # the next task's base: frozen from here
+        commit(r, "interface task")  # the next task's base: frozen from here
         self.assertIn("tests/contracts/feed.quotes/**", check(r, "protected").stdout.split())
         result = hook(r, "path_guard.sh", edit_input(r, schema), "deny", "--protected")
         self.assertEqual(result.returncode, 2)
@@ -190,6 +190,62 @@ class SingleProject(unittest.TestCase):
         result = check(self.root, "collect")
         self.assertEqual(result.returncode, 1)
         self.assertIn("tests/intent does not exist", result.stderr)
+
+    # ------------------------------------------- interface stubs (CR-02) and red for the right reason
+    STUB = ('"""Spread."""\n\n\ndef spread(raw: list[float]) -> float:\n'
+            '    """Max minus min."""\n    raise NotImplementedError("M1-T05")\n')
+
+    def interface(self, todo: str = "- [ ] M1-T05 spread spine (tinyq, XS, solo)\n") -> None:
+        """The interface task's work: a step signature whose stub names its spine task."""
+        write(self.root, "src/tinyq/stats/spread.py", self.STUB)
+        write(self.root, "tasks/todo.md", "# M1: Tiny — Todo\n\n" + todo)
+
+    def test_floor_guard_interface_stubs(self) -> None:
+        self.interface()
+        result = self.floor()
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)  # names an open task
+        result = self.floor("--exit")
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("src/tinyq/stats/spread.py:4: [stub-left]", result.stdout)
+        commit(self.root, "interface")  # the stub is no longer in the diff; it is still judged
+        write(self.root, "tasks/todo.md", "# M1: Tiny — Todo\n\n- [x] M1-T05 spread spine (tinyq, XS, solo)\n")
+        result = self.floor()
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("[stub-task]", result.stdout)
+        self.assertIn("M1-T05, which is not open", result.stdout)
+        self.assertEqual(check(self.root, "gate").returncode, 1)
+
+    def test_collect_wants_red_for_the_right_reason(self) -> None:
+        head = '"""Intent: spread."""\n\nimport pytest\n\n'
+        cases = {
+            "stub": (head + "from tinyq.stats.spread import spread\n\n\n@pytest.mark.intent\n"
+                     "def test_spread() -> None:\n    assert spread([1.0, 3.0]) == pytest.approx(2.0)\n", 0, ""),
+            "attribute": (head + "import tinyq.stats.spread as s\n\n\n@pytest.mark.intent\n"
+                          "def test_spread() -> None:\n    assert s.spred([1.0, 3.0]) == pytest.approx(2.0)\n",
+                          1, "fails for the wrong reason (call: AttributeError)"),
+            "never red": (head + "from tinyq.stats.spread import spread\n\n\n@pytest.mark.intent\n"
+                          "def test_spread() -> None:\n    assert callable(spread)\n", 1, "no test is red"),
+        }
+        for name, (text, want, says) in cases.items():
+            with self.subTest(case=name):
+                reset(self.root)
+                self.interface()
+                commit(self.root, "interface")  # the tester's base
+                write(self.root, "tests/intent/stats/test_spread.py", text)
+                result = check(self.root, "collect")
+                self.assertEqual(result.returncode, want, result.stdout[-2000:] + result.stderr[-2000:])
+                self.assertIn(says, result.stdout)
+
+    def test_path_guard_writes_holds_the_task_to_its_claim(self) -> None:
+        r = self.root
+        self.assertEqual(hook(r, "path_guard.sh", edit_input(r, "src/tinyq/x.py"), "writes").returncode, 0)
+        write(r, ".claude/.task_writes", "src/tinyq/stats/spread.py\ntests/unit/stats/\n")
+        for rel, want in [("src/tinyq/stats/spread.py", 0), ("tests/unit/stats/test_spread.py", 0),
+                          ("src/tinyq/stats/types.py", 2), ("tasks/todo.md", 2)]:
+            with self.subTest(file=rel):
+                result = hook(r, "path_guard.sh", edit_input(r, rel), "writes")
+                self.assertEqual(result.returncode, want, result.stderr)
+        self.assertIn("this task's Writes:", result.stderr)
 
     # ------------------------------------------------------------------- floor_guard.sh
     def floor(self, *args: str) -> subprocess.CompletedProcess[str]:

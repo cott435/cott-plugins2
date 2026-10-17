@@ -3,13 +3,16 @@
 #   path_guard.sh deny  GLOB...        block files matching any GLOB
 #   path_guard.sh deny  --protected    block the protected list (scripts/check.sh protected)
 #   path_guard.sh allow GLOB...        block files NOT matching any GLOB
+#   path_guard.sh writes               block files outside the task's Writes: list, which the
+#                                      orchestrator puts in .claude/.task_writes (one path or glob a
+#                                      line; a trailing / means the folder). No file: no limit
 # GLOBs are relative to the project root; * also matches across /.
 # Reads the hook JSON on stdin. Exit 2 = block the tool call; stderr goes to the agent.
 # Fails closed: if the input or the protected list can't be read, the call is blocked.
 mode="${1:-}"; shift
-if [ "$mode" != deny ] && [ "$mode" != allow ]; then
+if [ "$mode" != deny ] && [ "$mode" != allow ] && [ "$mode" != writes ]; then
   cat >/dev/null
-  echo "BLOCKED: path_guard mode must be allow or deny (got: '$mode')" >&2
+  echo "BLOCKED: path_guard mode must be allow, deny or writes (got: '$mode')" >&2
   exit 2
 fi
 source "$(dirname "$0")/project_root.sh"
@@ -24,6 +27,19 @@ if [[ $file == */../* || $file == */.. || $file == ../* ]]; then
 fi
 
 globs=()
+scope="this agent"
+if [ "$mode" = writes ]; then
+  [ -s "$root/.claude/.task_writes" ] || exit 0
+  while IFS= read -r line; do
+    line="${line%%[[:space:]]}"
+    [ -z "$line" ] && continue
+    [[ $line == */ ]] && line="${line}**"
+    globs+=("$line")
+  done <"$root/.claude/.task_writes"
+  mode=allow
+  scope="this task's Writes: (.claude/.task_writes)"
+  set --
+fi
 for g in "$@"; do
   if [ "$g" = --protected ]; then
     if ! list=$(bash "$root/scripts/check.sh" protected) || [ -z "$list" ]; then
@@ -64,7 +80,7 @@ if [ "$mode" = deny ] && [ $match = 1 ]; then
   exit 2
 fi
 if [ "$mode" = allow ] && [ $match = 0 ]; then
-  echo "BLOCKED: this agent may only edit: ${globs[*]}  (tried: $rel)" >&2
+  echo "BLOCKED: $scope may only edit: ${globs[*]}  (tried: $rel)" >&2
   exit 2
 fi
 exit 0

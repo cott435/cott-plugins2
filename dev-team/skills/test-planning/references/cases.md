@@ -32,12 +32,12 @@ If an installed skill owns the kind of claim a case checks, design the case with
 
 ## Strategy: one row per pipeline
 
-- **Smoke:** the pipeline's trigger plus `--smoke`, running end to end on fixture or synthetic data in seconds. It's the spine task's done-check. Every pipeline has one.
+- **Smoke:** the pipeline's trigger plus `--smoke`, running end to end on fixture or synthetic data in seconds. It's the wiring task's done-check. Every pipeline has one.
 - **Step unit tests:** the steps (or owner modules) that get unit tests.
-- **Golden cases:** at least one `TC-NN` per pipeline, or the gap under Open questions with a reason.
+- **Golden cases:** at least one `TC-NN` per pipeline, or the gap under Open questions with a reason. Each names the step boundaries it exercises: the contract type its input enters at, the steps it runs and the type its output leaves at, `TC-02 (Cov → clean_eigen → Cov)`, or `(whole pipeline)`. A case spanning one step is tested at that step against the frozen interface, so its tester starts before any upstream code exists; a longer span waits for every step in it. Prefer the narrowest span the source allows, and transcribe `input.json` in the entering type.
 - **Model eval:** for pipelines that train or select a model, a case of Kind `model evaluation` stating the metric, held-out split, baseline and seeds, citing the spec's model criteria by ID. `—` otherwise.
 
-**Boundary tests (multi-package).** When a pipeline's package provides or consumes a contract symbol with a `**Boundary:**` line, name the boundary test under Step unit tests: the provider's output validates against the schema in the symbol's `**Fixtures:**` folder; the consumer runs on every fixture there. Those fixtures belong to the contract (`architecture-design` names their cases, the Phase 0 contract task writes them), not to this skill. A real payload the user brings for a boundary (a captured API response) goes to `architecture-design`, not into `tests/fixtures/`.
+**Boundary tests.** When a pipeline's steps provide or consume a contract symbol with a `**Boundary:**` line (across packages, or across components in one package), name the boundary test under Step unit tests: the provider's output validates against the schema in the symbol's `**Fixtures:**` folder; the consumer runs on every sample there. Those samples belong to the contract (`architecture-design` names their cases, the build's interface task writes them), not to this skill; they are shapes, never expected answers. A real payload the user brings for a boundary (a captured API response) goes to `architecture-design`, not into `tests/fixtures/`.
 
 ## Case fields
 

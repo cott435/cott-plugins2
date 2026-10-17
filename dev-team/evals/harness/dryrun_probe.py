@@ -1,6 +1,7 @@
 """Probe replays for the dry run (design/probes.md §10), no model calls.
 
-- `quant-incremental-probe`: the interface-first sample with a Sharadar decision that cites PB-01 and stays Proposed;
+- `quant-incremental-probe`: the interface-first sample (its M1-T02 also reading `PB-01:samples`, since PB-01 is
+  routed to M1) with a Sharadar decision that cites PB-01 and stays Proposed;
   api-probe New writes PB-01 (selftest/quant-probe/); the user's "ran it" runs its probe.py against the fake Sharadar
   (fakevendor/) with a canary key, through driver.run_user_checks; api-probe Record answers it from the evidence;
   architecture-design Revise folds the planted facts into the decision and accepts it. Every probe check passes.
@@ -18,7 +19,7 @@
 import json, pathlib, re, shutil
 
 import driver, fakevendor, probe_skill, probefacts as pf
-from dryrun import CONTENT, PLANNING, USER_RUN, copy_layer, replay, verdict
+from dryrun import CONTENT, PLANNING, USER_RUN, copy_layer, replay, task_line, verdict
 
 HERE = pathlib.Path(__file__).resolve().parent
 OVERLAY = HERE / "selftest" / "quant-probe"
@@ -30,6 +31,11 @@ CANARY = "sk-canary-dryrun0000"
 DT_DEPENDENT = {"plan_blocked_while_open"}
 PROBE_FAIL = {"probe_not_guess", "probe_checks_cover", "docs_before_probe", "planted_facts_reached_design",
               "no_secret_seen", "runner_split", "probe_small_isolated", "probe_code_in_probe_turns", "evidence_scan_clean"}
+# dt lints the same planted defects (probe-fields, probe-leak, probe-runner), so its lint and the archived plan's
+# lint fail too in the broken run.
+PROBEBAD_DT_FAIL = {"dt_lint_clean", "sim_advance_3"}
+# PB-01 is routed to M1 (its Milestones), so a task of M1's plan reads its samples (refs_skills_routed).
+PROBE_READ = ("M1-T02", "**Read:** PL-01, data.Universe", "**Read:** PL-01, PB-01:samples, data.Universe")
 
 AD04 = """### AD-04: Sharadar SEP for daily prices
 **Status:** {status} · **Date:** 2026-10-15 · **Scope:** data
@@ -143,9 +149,19 @@ def stream(bad):
     return "\n".join(json.dumps(l) for l in lines) + "\n"
 
 
+def probe_fixture(tmp, good_fixture):
+    """The interface-first sample whose M1 plan reads PB-01's samples (the probe is routed to M1)."""
+    fx = tmp / "fixture-probe"
+    shutil.copytree(good_fixture, fx, dirs_exist_ok=True)
+    tid, old, new = PROBE_READ
+    task_line(fx / "tasks" / "plan.md", tid, old, new)
+    return fx
+
+
 def run(out, tmp, good_fixture):
     scn = json.loads((HERE / "scenarios.json").read_text())
     cfg = scn["projects"]["quant"]["fake_vendors"]["sharadar"]
+    good_fixture = probe_fixture(tmp, good_fixture)
     bad = []
     for name, broken in (("quant-incremental-probe", False), ("quant-incremental-probebad", True)):
         url, server = fakevendor.start("sharadar", out / f"{name}.vendor.jsonl", expect_key=CANARY)
@@ -164,7 +180,8 @@ def run(out, tmp, good_fixture):
         runs = [json.loads(l) for l in (out / f"{name}.user_runs.jsonl").read_text().splitlines() if l.strip()]
         if not any(r["script"].endswith("probe.py") and r["rc"] == 0 for r in runs):
             bad.append(f"{name}: the user run of probe.py failed: {runs}")
-        bad += verdict(name, res, summ, CONTENT | (PROBE_FAIL if broken else set()), either=DT_DEPENDENT if broken else ())
+        bad += verdict(name, res, summ, CONTENT | (PROBE_FAIL | PROBEBAD_DT_FAIL if broken else set()),
+                       either=DT_DEPENDENT if broken else ())
     for name, broken in (("api-probe-good", False), ("api-probe-bad", True)):
         g = probe_skill.replay(out, name, broken)
         res = {c["id"]: c for c in g["expectations"]}

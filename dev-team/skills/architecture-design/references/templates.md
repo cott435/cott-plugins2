@@ -1,6 +1,6 @@
 # Architecture templates
 
-Read when writing `docs/architecture.md` or a package's `architecture.md`. Filled examples: `../examples.md`, `examples-multi.md`. The writing rules are in `writing-rules.md`.
+Read when writing `docs/architecture.md` or a package's `architecture.md`. Filled examples: `examples-new.md`, `examples-new-multi.md`. The writing rules are in `writing-rules.md`.
 
 **Single package → `docs/architecture.md`**:
 

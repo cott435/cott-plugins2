@@ -1,6 +1,6 @@
 # Architecture Example: a single-package proof of concept
 
-More: `references/examples-multi.md` (a multi-package platform with System pipelines), `references/examples-modes.md` (Extend, Revise and Grow, short).
+More: `examples-new-multi.md` (a multi-package platform with System pipelines).
 
 ## Single Package — RL Execution Environment (Proof of Concept)
 

@@ -1,0 +1,3 @@
+# Architecture Example: Revise
+
+During the build, ExecGym runs at 3,000 steps/second, failing QR-01. The fix is to move the step loop into Numba. The skill writes `AD-05: JIT-compile the step loop with Numba`, with context "AD-03's NumPy step measured at 3k steps/s; QR-01 needs 10k". AD-03's choice (vectorized, not event-driven) still holds, so AD-05 doesn't supersede it. AD-03's text is still true, so it isn't revised either. Some other text is no longer true, and the skill rewrites it: the Speed line under Cross-cutting concerns said all per-step math is plain NumPy, and now names the compiled loop and AD-05. The tech stack gains Numba. One Changelog row; no spec change.

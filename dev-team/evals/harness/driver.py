@@ -4,7 +4,8 @@
 An agent session (claude -p, resumed each turn) works in a fresh project dir with the whole dev-team plugin
 loaded via --plugin-dir (skills, scripts/dt.py, hooks), staged into <out>/plugin/. A simulated user (separate
 claude -p, no tools) answers questions, approves drafts, and — in incremental mode — reveals the next stage
-only after the current one has been planned through its build plan.
+only after the current one is fully planned (pipelines approved and milestone rows on the roadmap; for the first
+stage, also an approved build plan and build setup).
 
 Project skill stubs (scenarios.json `project_skills`) are installed in the project's .claude/skills/. Reference files
 (scenarios.json `references`, from references/<project>/) are copied into the project's references/ when the stage
@@ -45,7 +46,7 @@ USER_MODEL = os.environ.get("USER_MODEL", "sonnet")
 COST_CAP = float(os.environ.get("COST_CAP_USD") or "inf")
 MAX_TURNS = int(os.environ["MAX_TURNS"]) if os.environ.get("MAX_TURNS") else None
 PERMISSION_PROMPTS = os.environ.get("PERMISSION_PROMPTS", "1") != "0"
-STALL_LIMIT = 4  # blocked moves in a row with no doc change before the run stops as stalled
+STALL_LIMIT = 4  # blocked moves in a row with nothing changed in the turn (the agent's own commits count) before the run stops as stalled
 
 STRIP_ENV = ["CLAUDE_CODE_SESSION_ID", "CLAUDE_CODE_REMOTE_SESSION_ID", "CLAUDE_CODE_TEE_SDK_STDOUT",
              "CLAUDE_CODE_MESSAGING_SOCKET", "CLAUDE_CODE_MESSAGING_TOKEN", "CLAUDE_CODE_DIAGNOSTICS_FILE",
@@ -86,24 +87,78 @@ def snapshot(proj, dt, keep=None):
             continue
         words = len((proj / rel).read_text(errors="ignore").split())
         lines.append(f"{rel}: {st or 'unknown'} ({words} words)")
+    rows = stage_rows(facts)
+    for s in facts.get("stages", []):
+        lines.append(f"roadmap stage {s['id']} {s['name']}: {s['derived']} (milestone rows: {', '.join(rows.get(s['id'], [])) or 'none'})")
     for r in facts["roadmap"]:
         lines.append(f"roadmap {r['id']} {r['name']}: {r['derived']}")
     return facts, "\n".join(lines) or "(no docs yet)"
 
 
+# dt's derived stage statuses, lowest first. dt renames `Cut` (the stage has milestone rows) to `Split`; both are read.
+STAGE_RANK = {s: i for i, s in enumerate(["Idea", "Specced", "Designed", "Cut", "Planned", "Building", "Done"])}
+STAGE_RANK["Split"] = STAGE_RANK["Cut"]
+UNCUT = ("Idea", "Specced", "Designed")
+
+
+def stage_rows(facts):
+    """{stage id: its milestone row IDs}. When no row names its stage (a dt without `stage_of`), a stage whose
+    derived status is Cut/Split or later counts as having rows."""
+    rows = facts.get("roadmap", [])
+    out = {}
+    for r in rows:
+        if r.get("stage"):
+            out.setdefault(r["stage"], []).append(r["id"])
+    if rows and not out:
+        out = {s["id"]: ["(rows)"] for s in facts.get("stages", []) if s.get("derived") not in UNCUT}
+    return out
+
+
+def ids(xs):
+    return xs[0] if len(xs) == 1 else ", ".join(xs[:-1]) + " and " + xs[-1]
+
+
 def readiness(facts, stage_no, mode):
-    """Why the user can't move on yet ([] = may move on). Lenient by design: statuses only; the sim user and
-    the grader judge the content. The current stage's last layer (plan / queued plan / CONSTRAINTS) may still
-    be Draft, since the approving message is the one that moves on."""
+    """Why the user can't move on yet, as (reason, ask) pairs ([] = may move on): the reason is logged and the
+    ask goes into the re-ask note. Lenient by design: statuses only; the sim user and the grader judge the
+    content. The current stage's last layer (plan / queued plan / CONSTRAINTS) may still be Draft, since the
+    approving message is the one that moves on.
+
+    Stages come from the probe facts (`facts["stages"]`), not row counts: one stage may have several milestone
+    rows, so every revealed stage must have a row of its own. All-at-once also needs every stage Designed
+    (its pipelines approved) before it can finish."""
     docs = facts["docs"]
-    why = [f"{rel} is {st}" for rel, st in docs.items() if st in DRAFT and not LAST_LAYER.match(rel)]
-    why += [f"{rel} not yet specced" for rel, st in docs.items() if rel.startswith("docs/ideas/") and st in ("Draft", "Accepted")]
+    why = [(f"{rel} is {st}", f"ask for {rel} to be finished and presented for approval")
+           for rel, st in docs.items() if st in DRAFT and not LAST_LAYER.match(rel)]
+    why += [(f"{rel} not yet specced", f"ask for the idea in {rel} to be written into the spec")
+            for rel, st in docs.items() if rel.startswith("docs/ideas/") and st in ("Draft", "Accepted")]
     if not any(p["dev_team"] and p["kind"] == "plan" for p in facts["plans"]):
-        why.append("no build plan yet")
+        why.append(("no build plan yet", "ask for the build plan of the first milestone"))
     if "CONSTRAINTS.md" not in docs:
-        why.append("no CONSTRAINTS.md yet (build setup)")
-    if mode == "incremental" and len(facts["roadmap"]) < stage_no:
-        why.append(f"roadmap has {len(facts['roadmap'])} rows for {stage_no} stages")
+        why.append(("no CONSTRAINTS.md yet (build setup)", "ask for the build setup (CONSTRAINTS.md, checks, agent roles)"))
+    stages = facts.get("stages") or []
+    if not stages and facts.get("roadmap"):  # a dt with no stage table: fall back to counting rows
+        if mode == "incremental" and len(facts["roadmap"]) < stage_no:
+            why.append((f"roadmap has {len(facts['roadmap'])} rows for {stage_no} stages",
+                        "ask for the current stage to be cut into milestone rows on the roadmap"))
+        return why
+    if mode == "incremental" and len(stages) < stage_no:
+        why.append((f"roadmap has {len(stages)} stages for {stage_no} revealed",
+                    "ask for the newest stage to be added to the roadmap"))
+    if mode != "incremental" and not stages:
+        why.append(("the roadmap has no stages yet", "ask for the roadmap, with every goal as a stage"))
+    rows = stage_rows(facts)
+    if mode != "incremental":
+        low = [s for s in stages if STAGE_RANK.get(s.get("derived"), 0) < STAGE_RANK["Designed"]]
+        if low:
+            named = ", ".join("%s (%s)" % (s["id"], s["derived"]) for s in low)
+            why.append((f"stages below Designed: {named}",
+                        f"ask for the pipelines of {ids([s['id'] for s in low])} to be designed now, "
+                        "so every stage is designed, not only the first"))
+    uncut = [s["id"] for s in stages if s["id"] not in rows]
+    if uncut:
+        why.append((f"stages with no milestone row: {', '.join(uncut)}",
+                    f"ask for {ids(uncut)} to be cut into milestone rows"))
     return why
 
 
@@ -185,14 +240,14 @@ def sim_user(scn, traj, revealed, next_stage, history_tail, agent_msg, status, r
 {nxt}
 Rules: Only talk about revealed stages. If asked about plans beyond them, say you're focusing on the current stage for now and haven't decided what comes next (do not hint at future stages).
 {PLANNING_CHAIN}
-A stage is fully planned when its build plan has been written and you approved it (for the first stage, the build setup / quality bar too). A later stage's build plan may be queued behind the current milestone because nothing is built yet; that's fine.
-When the current stage is fully planned (its build plan was just presented for approval, or approved, and nothing else is pending) and there is a next stage, set action to "next_stage" and write a message that approves what is pending and then introduces the next stage as a new idea for this same project, in your own words (2-4 sentences, include its key content).
+A stage is fully planned when its pipelines are approved and it has milestone rows on the roadmap (its "roadmap stage" line lists milestone rows); for the first stage, its build plan and the build setup / quality bar must be approved too. A later stage needs no build plan of its own yet (one may be queued behind the current milestone because nothing is built yet; that's fine).
+When the current stage is fully planned (what it last presented is approved, or is being approved in your message, and nothing else is pending) and there is a next stage, set action to "next_stage" and write a message that approves what is pending and then introduces the next stage as a new idea for this same project, in your own words (2-4 sentences, include its key content).
 When the last stage is fully planned, set action to "finish"."""
     else:
         mode_rules = f"""You told the assistant ALL goals up front in your first message:
 {stage_txt}
 {PLANNING_CHAIN}
-With everything known up front, expect all stages to be specced, designed and given pipelines, but a detailed build plan only for the first milestone. When the build setup / quality bar has been presented and you approved it, set action to "finish"."""
+With everything known up front, expect every stage to be specced, given approved pipelines and cut into milestone rows on the roadmap (each "roadmap stage" line lists milestone rows), but a detailed build plan only for the first milestone. When the build setup / quality bar has been presented and you approved it, set action to "finish"."""
     refs_txt = (f"Reference files you have put in references/ so far: {', '.join(refs)}\n" if refs else "")
     build_rule = ("If it offers to start building, say not yet: approve what is pending and introduce the next stage."
                   if mode == "incremental" and next_stage else
@@ -387,12 +442,15 @@ def run_loop(scn, traj, project, stages, out, proj, plugin_root, dt, extra, msg,
     t_start = time.time()
     closing, stop_reason = False, "max_turns"
     user_run = None  # what the user ran before this turn ("ran it")
-    stalled = 0  # consecutive turns where the user wanted to move on, readiness blocked it, and no doc changed
+    stalled = 0  # consecutive turns where the user wanted to move on, readiness blocked it, and nothing changed since the turn began
     for t in range(1, (MAX_TURNS or traj["max_turns"]) + 1):
+        # The commit the turn starts from (the previous turn's, or the user run's after it): diffing from it,
+        # not `git show HEAD`, counts the agent's own commits in this turn as changes.
+        base = sh(["git", "rev-parse", "HEAD"], proj).stdout.strip()
         reply, usage, tools, skills, dt_s, errors, hooks, init, agents = agent_turn(
             proj, sid, msg, t == 1, out / "agent_stream.jsonl", plugin_root, extra)
         commit(proj, f"turn {t}")
-        changed = sh(["git", "show", "--stat", "--format=", "HEAD"], proj).stdout.strip()
+        changed = sh(["git", "diff", "--stat", base, "HEAD"], proj).stdout.strip()
         facts, status = snapshot(proj, dt, keep=out / "plans" / f"T{t:03d}.json")
         rec = {"turn": t, "user": msg, "assistant": reply, "skills": skills, "tools": tools,
                "seconds": round(dt_s, 1), "usage": usage, "docs_changed": changed, "status": status,
@@ -422,7 +480,8 @@ def run_loop(scn, traj, project, stages, out, proj, plugin_root, dt, extra, msg,
         nxt = stages[n_revealed] if traj["mode"] == "incremental" and n_revealed < len(stages) else None
         ask = lambda note="": sim_user(scn, traj, revealed, nxt, "\n\n".join(history[-4:-1]), reply, status, refs, note)
         u = ask()
-        why = readiness(facts, n_revealed, traj["mode"])
+        blocked = readiness(facts, n_revealed, traj["mode"])
+        why = [r for r, _ in blocked]
         rec["readiness"] = why
         rec["sim_action"] = u.get("action")
         # A blocked move is re-asked, never downgraded in place: the message may already introduce the next stage.
@@ -431,10 +490,14 @@ def run_loop(scn, traj, project, stages, out, proj, plugin_root, dt, extra, msg,
             if stalled >= STALL_LIMIT:
                 stop_reason = f"stalled: {'; '.join(why)}"
                 break
-            u = ask(f"The current stage is not fully planned yet ({'; '.join(why)}). Set action to \"reply\": answer "
-                    "or approve what the assistant just asked, and do not introduce the next stage or finish.")
+            asks = [a for _, a in blocked]
+            rec["readiness_asks"] = asks
+            u = ask(f"The current stage is not fully planned yet ({'; '.join(why)}). Set action to \"reply\": approve "
+                    f"anything pending, then {'; '.join(asks)}. Ask for this even if the assistant recommended against "
+                    "it or said it can wait. Do not introduce the next stage or finish.")
             if u.get("action") != "reply":
-                u = {"action": "reply", "message": "Approved. Please continue to the next planning step."}
+                wants = "; and ".join(re.sub(r"^ask for ", "", a) for a in asks)
+                u = {"action": "reply", "message": f"Approved. Before we move on, I'd like {wants}."}
         else:
             stalled = 0
         if u.get("action") == "finish" and nxt and not why:

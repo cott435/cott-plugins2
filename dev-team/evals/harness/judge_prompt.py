@@ -3,17 +3,24 @@
 the two orders.
 
 Usage:
-  judge_prompt.py <project> <dir-1> <dir-2> <out-json> [--extra TEXT]
+  judge_prompt.py <project> <dir-1> <dir-2> <out-json> [--sets DIR] [--extra TEXT]
       Print one prompt with dir-1 as Set A. Shuffle the dirs yourself and keep the key.
   judge_prompt.py <project> <dir-1> <dir-2> <out-json> --both <prompt-dir> [--labels L1 L2] [--extra TEXT]
       Write <prompt-dir>/prompt-AB.md (dir-1 is A; the judge writes <out>.AB.json) and prompt-BA.md (dir-2 is A;
       <out>.BA.json), plus the key <out>.key.json. Labels (e.g. incremental all_at_once) go in the key only.
+      The folder of <out-json> is created if it doesn't exist.
   judge_prompt.py average <out-json>
       Read <out>.AB.json, <out>.BA.json and the key; write <out-json> with each dir's scores averaged over the
       two orders (keyed by label), the winner per order, and the items whose two scores differ by more than 1.
   dir-1 / dir-2: packaged outputs dirs (bench/eval-*/<mode>/run-1/outputs from package.py).
+
+Blinding: those paths name the mode, so the judge never sees them. Each dir is copied to a neutral folder, set-1
+(dir-1) and set-2 (dir-2), in <prompt-dir> (without --both: --sets DIR, default <out-json minus .json>-sets/),
+leaving out transcript.md and doc_evolution.md (older packaged runs kept them in outputs/). The prompt names only
+those copies and <out-json>. If any of those paths, or any copied file name, contains a mode word, nothing is
+written.
 """
-import argparse, json, pathlib, sys
+import argparse, json, pathlib, re, shutil, sys
 
 HERE = pathlib.Path(__file__).resolve().parent
 COMMON_CONTENT = ["stage_completeness", "internal_consistency", "right_sizing", "milestone_quality", "pipeline_clarity",
@@ -21,6 +28,8 @@ COMMON_CONTENT = ["stage_completeness", "internal_consistency", "right_sizing", 
 CONTENT = {"quant": ["quant_soundness", "null_hypothesis_handoff", "reference_use"] + COMMON_CONTENT,
            "rl": ["rl_soundness"] + COMMON_CONTENT}
 STRUCTURE = ["organization", "readability_for_solo_learner", "ease_of_finding_next_build_step", "layout_sensibility"]
+PROCESS_FILES = ("transcript.md", "doc_evolution.md")  # they name the mode and the process: never in a judge's set
+MODE_WORDS = re.compile(r"incremental|all[ _-]?at[ _-]?once|(?<![a-z])(inc|aao)(?![a-z])", re.I)
 
 
 def fill(project, dir_a, dir_b, out, extra):
@@ -39,6 +48,35 @@ def fill(project, dir_a, dir_b, out, extra):
 def sibling(out, tag):
     out = pathlib.Path(out)
     return out.with_name(f"{out.stem}.{tag}.json")
+
+
+def mode_leaks(paths=(), sets=()):
+    """Every given path, or file name inside a copied set, that contains a mode word."""
+    bad = [str(p) for p in paths if MODE_WORDS.search(str(p))]
+    bad += [str(f.relative_to(s.parent)) for s in sets for f in s.rglob("*") if MODE_WORDS.search(f.name)]
+    return bad
+
+
+def neutral_sets(dirs, root, prompt_paths):
+    """Copy each packaged outputs dir to <root>/set-<n> without the process files; returns the copies. Exits,
+    writing nothing more, when a path the prompt will name or a copied file name contains a mode word."""
+    root = pathlib.Path(root).resolve()
+    leaks = mode_leaks([root, *prompt_paths])
+    if leaks:
+        sys.exit(f"judge_prompt: a path the judge would see names the mode: {leaks}")
+    sets = []
+    for n, d in enumerate(dirs, 1):
+        dst = root / f"set-{n}"
+        if dst.exists():
+            shutil.rmtree(dst)
+        shutil.copytree(pathlib.Path(d).resolve(), dst, ignore=shutil.ignore_patterns(*PROCESS_FILES))
+        sets.append(dst)
+    leaks = mode_leaks(sets=sets)
+    if leaks:
+        for s in sets:
+            shutil.rmtree(s, ignore_errors=True)
+        sys.exit(f"judge_prompt: copied file names name the mode: {leaks[:10]}")
+    return sets
 
 
 def average(out):
@@ -83,17 +121,25 @@ def main():
     ap.add_argument("--extra", default="")
     ap.add_argument("--both", metavar="PROMPT_DIR", help="write both orders' prompts and the key")
     ap.add_argument("--labels", nargs=2, default=["1", "2"], help="names for dir-1 and dir-2, kept in the key only")
+    ap.add_argument("--sets", metavar="DIR", help="without --both: where the neutral copies go (default <out>-sets/)")
     a = ap.parse_args()
+    out = pathlib.Path(a.out).resolve()
     if not a.both:
-        print(fill(a.project, a.dir_1, a.dir_2, a.out, a.extra))
+        root = pathlib.Path(a.sets) if a.sets else out.with_name(f"{out.stem}-sets")
+        s1, s2 = neutral_sets([a.dir_1, a.dir_2], root, [out])
+        out.parent.mkdir(parents=True, exist_ok=True)
+        print(fill(a.project, s1, s2, out, a.extra))
         return
-    pdir = pathlib.Path(a.both)
-    pdir.mkdir(parents=True, exist_ok=True)
-    (pdir / "prompt-AB.md").write_text(fill(a.project, a.dir_1, a.dir_2, sibling(a.out, "AB"), a.extra))
-    (pdir / "prompt-BA.md").write_text(fill(a.project, a.dir_2, a.dir_1, sibling(a.out, "BA"), a.extra))
+    pdir = pathlib.Path(a.both).resolve()
+    ab, ba = sibling(out, "AB"), sibling(out, "BA")
+    s1, s2 = neutral_sets([a.dir_1, a.dir_2], pdir, [ab, ba])
+    out.parent.mkdir(parents=True, exist_ok=True)
+    (pdir / "prompt-AB.md").write_text(fill(a.project, s1, s2, ab, a.extra))
+    (pdir / "prompt-BA.md").write_text(fill(a.project, s2, s1, ba, a.extra))
     key = {"dirs": {"1": str(pathlib.Path(a.dir_1).resolve()), "2": str(pathlib.Path(a.dir_2).resolve())},
+           "sets": {"1": str(s1), "2": str(s2)},
            "labels": {"1": a.labels[0], "2": a.labels[1]}, "AB": {"A": "1", "B": "2"}, "BA": {"A": "2", "B": "1"}}
-    sibling(a.out, "key").write_text(json.dumps(key, indent=1))
+    sibling(out, "key").write_text(json.dumps(key, indent=1))
     print(pdir / "prompt-AB.md")
     print(pdir / "prompt-BA.md")
 

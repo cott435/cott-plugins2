@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
 """Arrange finished trajectory runs into the skill-creator benchmark layout:
-bench/eval-<project>/<mode>/run-1/{outputs/, grading.json, timing.json}
+bench/eval-<project>/<mode>/run-1/{outputs/, grading.json, timing.json, transcript.md, doc_evolution.md}
 
 outputs/ holds every final planning doc as final__<path with / as __> (docs/**, tasks/**, CONSTRAINTS.md,
 AGENTS.md), a fixtures listing, one context__<task>.md per task (its `dt context` packet, which the blind judge
 reads to decide whether the task is buildable from it alone), plan_snapshot.json (the final plan as one graph:
-`dt plan --json`, else planexport's build from dtprobe facts, with nothing that names the mode), the transcript
-and the doc-evolution table.
+`dt plan --json`, else planexport's build from dtprobe facts, with nothing that names the mode). The transcript
+and the doc-evolution table name the mode and the process, so they sit beside outputs/ in run-1/, never in it; the
+blind judge reads neutral copies of outputs/ (judge_prompt.py).
 
 Usage: package.py [iteration-dir]  (relative to $EVAL_WS, default: a dev-team-workspace next to the marketplace repo)
 """
@@ -65,17 +66,16 @@ for i, project in enumerate(["rl", "quant"]):
         for t in turns:
             md.append(f"## Turn {t['turn']} · stage `{t['stage']}` · skills {t['skills']} · {t['seconds']}s\n")
             md.append(f"**User:**\n\n{t['user']}\n\n**Assistant:**\n\n{t['assistant']}\n\n**Docs after turn:**\n```\n{t['status']}\n```\n")
-        (out / "transcript.md").write_text("\n".join(md))
+        (run / "transcript.md").write_text("\n".join(md))
         evo = ["| Turn | Stage | Skills | Docs changed | Statuses after |", "|---|---|---|---|---|"]
         for t in turns:
             ch = (t["docs_changed"].splitlines() or ["-"])
             files = ", ".join(l.split("|")[0].strip().replace("docs/", "") for l in ch if "|" in l) or "-"
             evo.append(f"| {t['turn']} | {t['stage']} | {', '.join(t['skills']) or '-'} | {files} | {t['status'].replace(chr(10), '<br>')} |")
-        (out / "doc_evolution.md").write_text("# How the docs evolved\n\n" + "\n".join(evo) + "\n")
+        (run / "doc_evolution.md").write_text("# How the docs evolved\n\n" + "\n".join(evo) + "\n")
         g = json.loads((src / "grading.json").read_text())
         shutil.copy(src / "grading.json", run / "grading.json")
         (run / "timing.json").write_text(json.dumps({
             "total_tokens": g["extra"]["output_tokens"], "duration_ms": g["extra"]["agent_seconds"] * 1000,
             "total_duration_seconds": g["extra"]["agent_seconds"], "cost_usd": g["extra"]["cost_usd"]}, indent=1))
-        (run / "transcript.md").write_text((out / "transcript.md").read_text())
         print("packaged", run)

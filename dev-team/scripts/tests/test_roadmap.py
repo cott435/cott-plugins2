@@ -198,13 +198,13 @@ class StagedRoadmapTest(QuantCopy):
 
     def test_cut_stage_and_write_both_tables(self):
         self.cut_s2()
-        self.assertEqual(self.stage_statuses()["S2"], "Cut")
+        self.assertEqual(self.stage_statuses()["S2"], "Split")
         code, out, _ = run_dt(self.root, "roadmap")
         self.assertEqual(code, 0)
-        self.assertIn("S2: Designed → Cut", out)
+        self.assertIn("S2: Designed → Split", out)
         self.assertIn("M2: — → Designed", out)
         text = (self.root / "docs/roadmap.md").read_text(encoding="utf-8")
-        self.assertIn("| S2 | Classical portfolios | ideas/classical-portfolios.md | Cut |", text)
+        self.assertIn("| S2 | Classical portfolios | ideas/classical-portfolios.md | Split |", text)
         self.assertIn("| M2 | S2 | Equal weight vs min-var | quant | PL-03 | M1 | Designed |", text)
         self.write("tasks/queued/M2-equal-weight.md", "# M2: Equal weight — Plan\n\n**Milestone:** M2 · **Status:** Approved\n")
         self.assertEqual(self.stage_statuses()["S2"], "Planned")
@@ -227,6 +227,73 @@ class StagedRoadmapTest(QuantCopy):
         self.cut_s2()
         unit = roadmap.next_unit(Repo(self.root))
         self.assertEqual((type(unit).__name__, unit.id), ("Milestone", "M2"))
+
+    def test_legacy_cut_reads_as_split(self):
+        # An older dt wrote `Cut`: --check accepts it, a write brings it up to date.
+        self.cut_s2()
+        self.edit("docs/roadmap.md", "| ideas/classical-portfolios.md | Designed |", "| ideas/classical-portfolios.md | Cut |")
+        self.edit("docs/roadmap.md", "| PL-03 | M1 | |", "| PL-03 | M1 | Designed |")
+        code, out, _ = run_dt(self.root, "roadmap", "--check")
+        self.assertEqual((code, out.strip()), (0, "roadmap: ok"))
+        code, out, _ = run_dt(self.root, "roadmap")
+        self.assertEqual((code, out.splitlines()), (0, ["S2: Cut → Split", "roadmap: updated 1"]))
+        self.assertIn("| S2 | Classical portfolios | ideas/classical-portfolios.md | Split |",
+                      (self.root / "docs/roadmap.md").read_text(encoding="utf-8"))
+
+    def add_port03(self) -> None:
+        """S2's idea adds PORT-03, which no pipeline covers yet."""
+        self.edit("docs/spec.md", "### Quality", "- **PORT-03** Risk-parity weights equalize risk contributions.\n"
+                  "  - Given a covariance, when risk parity runs, then contributions are equal.\n\n### Quality")
+        self.edit("docs/spec.md", "| PORT-01, PORT-02; DATA-03 (removed) |", "| PORT-01–PORT-03; DATA-03 (removed) |")
+
+    def test_uncut_stage_designed_only_when_its_ids_are_on_approved_pipelines(self):
+        self.add_port03()
+        repo = Repo(self.root)
+        s2 = model.stages(repo.roadmap)[1]
+        self.assertEqual(roadmap.milestone_pipelines(repo, s2), (["PL-03"], True))   # PL-03 is Approved…
+        self.assertEqual(roadmap.ids_off_approved(repo, s2), ["PORT-03"])           # …but PORT-03 is on none
+        self.assertEqual(self.stage_statuses()["S2"], "Specced")
+        self.assertIsNone(roadmap.stage_to_cut(repo))
+        self.edit("docs/packages/quant/pipelines.md", "| realized variance only | PORT-02 |",
+                  "| realized variance only | PORT-02 |\n| 4 | `risk_parity` | portfolio | Cov → Weights | equal weight | PORT-03 |")
+        self.assertEqual(self.stage_statuses()["S2"], "Designed")
+        # A removed ID needs no pipeline.
+        self.edit("docs/packages/quant/pipelines.md", "| equal weight | PORT-03 |", "| equal weight | — |")
+        self.edit("docs/spec.md", "- **PORT-03** Risk-parity", "- **PORT-03** ~~Risk-parity")
+        self.edit("docs/spec.md", "contributions.\n", "contributions.~~ Removed 2026-10-16: later.\n")
+        self.assertEqual(self.stage_statuses()["S2"], "Designed")
+
+    def test_changelog_all_adds_every_live_requirement(self):
+        self.edit("docs/spec.md", "| DATA-01–DATA-03, STAT-01–STAT-04, QR-01, QR-02 |", "| all |")
+        self.edit("docs/roadmap.md", "| S2 | Classical portfolios | ideas/classical-portfolios.md | Designed |",
+                  "| S2 | Classical portfolios | brief | Designed |")
+        repo = Repo(self.root)
+        s2 = model.stages(repo.roadmap)[1]
+        self.assertIn("PORT-01", roadmap.source_ids(repo, s2))
+        self.assertEqual(roadmap.milestone_pipelines(repo, s2), (["PL-01", "PL-02", "PL-03"], True))
+        self.add_port03()
+        self.assertEqual(roadmap.ids_off_approved(Repo(self.root), s2), ["PORT-03"])
+
+    def test_stage_to_cut_behind_waiting_milestones(self):
+        # F1a: M1 Planned, M2 Designed and S2 Designed with no rows: S2 is cut now, not after M2's plan.
+        self.edit("docs/roadmap.md", "| M1 | S1 | Prices to covariance | quant | PL-01, PL-02 | — | Building |",
+                  "| M1 | S1 | Prices | quant | PL-01 | — | Planned |\n"
+                  "| M2 | S1 | Covariance report | quant | PL-02 | M1 (data.Prices) | Designed |")
+        self.edit("docs/roadmap.md", "## M1: Prices to covariance", "## M2: Covariance report\n**Exit:** TC-01 passes.\n\n"
+                  "## M1: Prices to covariance")
+        (self.root / "tasks/todo.md").write_text(
+            (self.root / "tasks/todo.md").read_text(encoding="utf-8").replace("- [x]", "- [ ]"), encoding="utf-8")
+        self.assertEqual(self.statuses(), {"M1": "Planned", "M2": "Designed"})
+        self.assertEqual(self.stage_statuses(), {"S1": "Planned", "S2": "Designed"})
+        repo = Repo(self.root)
+        self.assertEqual(roadmap.next_unit(repo).id, "M2")
+        self.assertEqual(roadmap.stage_to_cut(repo).id, "S2")
+        code, out, _ = run_dt(self.root, "status", "--skill", "build-planning")
+        self.assertIn("stage_to_cut: S2 Classical portfolios\n", out)
+        self.assertIn("mode: extend\n", out)
+        self.edit("docs/roadmap.md", "| M1 (data.Prices) | Designed |",
+                  "| M1 (data.Prices) | Designed |\n| M3 | S2 | Equal weight vs min-var | quant | PL-03 | M2 | |")
+        self.assertIsNone(roadmap.stage_to_cut(Repo(self.root)))
 
     def test_next_ids(self):
         code, out, _ = run_dt(self.root, "next-id", "S", "M")

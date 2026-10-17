@@ -31,7 +31,7 @@ SEVERITY = {
     "unreadable": "E", "internal": "W", "pipeline-fields": "E", "spine-mock": "W", "contract-heading": "E",
     "fixture-size": "W",                # missing fixture files are reported as E
     "ref-file": "E", "ref-hash": "W", "ref-large": "W", "ref-prefix": "E", "roadmap-skill": "W",
-    "roadmap-stage": "E",
+    "roadmap-stage": "E", "type-cases": "E", "task-ref": "E",
     "probe-fields": "E", "probe-informs": "E", "probe-cite": "E", "probe-runner": "E", "probe-leak": "E",
     "probe-sample": "E", "probe-results": "E", "probe-stale": "W", "probe-large": "W",
 }
@@ -984,6 +984,81 @@ def check_step_io_types(ctx: Context):
                                   f"{p.id} step `{s.name}`: its Out names no contract type", sev)
 
 
+def _has_cases(sym: model.Symbol) -> bool:
+    bullets = md.bullet_fields(sym.doc.lines, sym.start + 1, sym.end)
+    value = md.strip_md(sym.fields.get("Cases", "") or bullets.get("Cases", ""))
+    return value.lower() not in NONE_VALUES
+
+
+def check_type_cases(ctx: Context):
+    """A contract type that crosses step owners has at least one case: pipeline steps of two or more owners name
+    it in their `In → Out` cells, or its `**Boundary:**` line names a consumer, and it has no `**Cases:**`. The
+    interface task writes one sample per case. E once any contract type names a case, W before."""
+    types = model.contract_types(ctx.repo)
+    owners: dict[str, set[str]] = {}
+    for p in ctx.pipelines.values():
+        for s in p.steps:
+            for n in s.in_types + s.out_types:
+                ty = model.resolve_type(types, n)
+                # A reused step (`PL-01 as built`) is owned where that pipeline defines it.
+                if ty is not None and s.owner and not re.match(r"PL-\d", s.owner):
+                    owners.setdefault(ty.id, set()).add(s.owner)
+    syms = [s for s in model.all_symbols(ctx.repo) if s.is_type]
+    sev = "" if any(_has_cases(s) for s in syms) else "W"
+    for sym in syms:
+        if _has_cases(sym):
+            continue
+        bullets = md.bullet_fields(sym.doc.lines, sym.start + 1, sym.end)
+        consumers = [c for c in map(md.strip_md, md.split_list(bullets.get("Boundary", "")))
+                     if c.lower() not in NONE_VALUES]
+        crossing = sorted(owners.get(sym.id, set()))
+        if len(crossing) < 2 and not consumers:
+            continue
+        why = (f"steps of {', '.join(crossing)} pass it" if len(crossing) >= 2
+               else f"its Boundary names {', '.join(consumers)}")
+        yield Problem(sym.doc.rel, sym.start + 1, "type-cases",
+                      f"{sym.id} crosses step owners ({why}) but names no case: add `**Cases:** <the payloads a "
+                      f"sample must show>` to its `- **Boundary:** … · **Fixtures:** tests/contracts/{sym.id}/` "
+                      "line", sev)
+
+
+BARE_TASK = re.compile(r"(?<![\w-])T\d{2,}\b")
+
+
+def _task_ids_in(text: str, milestone: str | None) -> list[str]:
+    """Task IDs a piece of text names: `M1-T05`, and a bare `T05` read as the plan's own milestone's."""
+    plain = md.strip_md(text)
+    out = re.findall(rf"\b{md.TASK_ID}\b", plain)
+    if milestone:
+        out += [f"{milestone}-{t}" for t in BARE_TASK.findall(plain)]
+    return list(dict.fromkeys(out))
+
+
+def check_task_ref(ctx: Context):
+    """A task ID in a task's Acceptance text or in a `## Dependency graph` row's Mitigated by cell (its mitigation
+    or its `none:` reason) that names no task: in this plan, another plan or the archive. A bare `T41` is read as
+    the plan's own milestone's."""
+    known = {t.id for t in ctx.tasks}
+    for doc in ctx.plan_docs:
+        mid = model.milestone_of(doc)
+
+        def stale(text: str) -> list[str]:
+            return [i for i in _task_ids_in(text, mid) if i not in known and not ctx.resolves(i)]
+
+        for t in model.tasks(doc):
+            acc = md.field_line(doc.lines, t.start + 1, t.end, "Acceptance")
+            items = ([(acc, md.split_fields(doc.lines[acc]).get("Acceptance", ""))] if acc is not None else [])
+            items += [(cb.line, cb.text) for cb in t.acceptance]
+            for line, text in items:
+                for i in stale(text):
+                    yield _p(doc, line, "task-ref", f"{t.id} Acceptance names {i}, which isn't a task")
+        for e in model.graph_edges(doc):
+            if len(e.cells) < 4:
+                continue
+            for i in stale(e.cells[3]):
+                yield _p(doc, e.line, "task-ref", f"graph row {e.src} → {e.dst} names {i}, which isn't a task")
+
+
 def _smoke_due(t: model.Task, pl: str, wired_before: dict[str, set[str]]) -> bool:
     """Whether the task's Verify must run pipeline `pl`'s smoke command. Wiring and system tasks do, and so does
     any other task whose `Depends on` reaches `pl`'s wiring task; interface and spine tasks, and thicken tasks
@@ -1084,7 +1159,7 @@ CHECKS = [
     check_budget, check_approved_edit, check_prebuild_left,
     check_task_fields, check_task_size, check_task_acceptance, check_task_title, check_task_step,
     check_depends, check_milestone_size, check_writes, check_edges, check_deprecated, check_verify_smoke,
-    check_step_io_types,
+    check_step_io_types, check_type_cases, check_task_ref,
     check_todo_mismatch, check_finding_disposition, check_foreign_plan,
     check_ref_file, check_ref_hash, check_ref_large, check_ref_prefix, check_roadmap_skill, check_roadmap_stage,
     check_probe_fields, check_probe_informs, check_probe_cite, check_probe_runner, check_probe_leak,

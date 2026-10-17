@@ -33,7 +33,7 @@ def run(args, repo) -> int:
         print(f"{verb}: {args.task}")
     if want:
         task = next((t for t in model.tasks(repo.plan) if t.id == args.task), None) if repo.plan else None
-        pl = model.spine_pipeline(task) if task else None
+        pl = model.spine_pipeline(task, model.system_pipeline_ids(repo)) if task else None
         if pl:
             print(f"next: dt prebuild-clear {pl}")
     return 0

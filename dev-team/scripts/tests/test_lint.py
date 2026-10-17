@@ -613,6 +613,67 @@ class StepIoTypes(LintCase):
         self.assertTrue(found and {sev for sev, _ in found} == {"W"}, found)
 
 
+class TypeCases(LintCase):
+    COV_BOUNDARY = "- **Boundary:** stats, portfolio · **Fixtures:** tests/contracts/stats.Cov/ · **Cases:** a 2×2 covariance\n"
+
+    def messages(self):
+        return [(p.severity, p.line, p.message) for p in self.problems() if p.code == "type-cases"]
+
+    def test_type_crossing_step_owners_needs_a_case(self):
+        # stats.Cov passes from stats' estimate_cov to portfolio's min_variance (PL-03).
+        self.p.edit(CONTRACT, self.COV_BOUNDARY, "- **Boundary:** stats, portfolio · **Fixtures:** tests/contracts/stats.Cov/\n")
+        line = self.p.read(CONTRACT).splitlines().index("### stats.Cov: type") + 1
+        self.assertEqual(self.messages(), [
+            ("E", line, "stats.Cov crosses step owners (steps of portfolio, stats pass it) but names no case: add "
+                        "`**Cases:** <the payloads a sample must show>` to its `- **Boundary:** … · **Fixtures:** "
+                        "tests/contracts/stats.Cov/` line")])
+        self.p.edit(CONTRACT, "- **Boundary:** stats, portfolio · **Fixtures:** tests/contracts/stats.Cov/\n", "")
+        self.assertEqual(len(self.messages()), 1)            # no Boundary line at all: the steps still cross
+
+    def test_one_owner_needs_no_case(self):
+        # portfolio.Weights passes between two portfolio steps only.
+        self.assertEqual(self.messages(), [])
+        self.p.edit(CONTRACT, "`@dataclass(frozen=True) class Weights: values: np.ndarray; tickers: tuple[str, ...]`\n",
+                    "`@dataclass(frozen=True) class Weights: values: np.ndarray; tickers: tuple[str, ...]`\n"
+                    "- **Boundary:** report · **Fixtures:** tests/contracts/portfolio.Weights/\n")
+        self.assertEqual([m[2].split(" but ")[0] for m in self.messages()],
+                         ["portfolio.Weights crosses step owners (its Boundary names report)"])
+
+    def test_cases_none_is_no_case(self):
+        self.p.edit(CONTRACT, "**Cases:** a 2×2 covariance", "**Cases:** —")
+        self.assertEqual([m[2].split()[0] for m in self.messages()], ["stats.Cov"])
+
+    def test_project_without_cases_gets_warnings(self):
+        text = self.p.read(CONTRACT)
+        self.p.write(CONTRACT, "\n".join(line.split(" · **Cases:**")[0] for line in text.splitlines()) + "\n")
+        found = self.messages()
+        self.assertTrue(found and {sev for sev, _, _ in found} == {"W"}, found)
+
+
+class TaskRefs(LintCase):
+    def messages(self):
+        return [(p.line, p.message) for p in self.problems() if p.code == "task-ref"]
+
+    def test_stale_task_in_acceptance(self):
+        old = "- [ ] Both smoke commands pass; TC-01–TC-03 pass"
+        self.p.edit(PLAN, old, "- [ ] Both smoke commands pass on the version T41 built; M1-T05 and T09 stay green")
+        line = self.p.read(PLAN).splitlines().index(
+            "- [ ] Both smoke commands pass on the version T41 built; M1-T05 and T09 stay green") + 1
+        self.assertEqual(self.messages(), [(line, "M1-T14 Acceptance names M1-T41, which isn't a task")])
+        self.p.edit(PLAN, "the version T41 built", "the version M2-T03 built")
+        self.assertEqual([m[1] for m in self.messages()], ["M1-T14 Acceptance names M2-T03, which isn't a task"])
+
+    def test_stale_task_in_graph_reason(self):
+        old = "| none: swaps the fake for the real PL-01 |"
+        self.p.edit(PLAN, old, "| none: swaps the fake for the real PL-01 that T41 built |")
+        self.assertEqual([m[1] for m in self.messages()],
+                         ["graph row M1-T14 → M1-T08 names M1-T41, which isn't a task"])
+
+    def test_tasks_of_the_plan_resolve(self):
+        self.p.edit(PLAN, "| none: swaps the fake for the real PL-01 |", "| none: swaps the fake for the real PL-01 (T08) |")
+        self.assertEqual(self.messages(), [])
+
+
 class PlanChecks(LintCase):
     def test_todo_mismatch(self):
         self.p.edit(TODO, "- [ ] M1-T13 Planted-factor PCA check (quant, XS, split)", "- [ ] M1-T19 Extra (quant, XS, split)")

@@ -12,7 +12,7 @@ from ..commands import roadmap as roadmap_cmd
 from ..repo import Doc, Repo
 from .common import (OWN_SKILLS, Report, add_common, add_graph, advance_ready, available_skills, blocked_reason,
                      live_spec_ids, milestone_row, next_task, plan_base)
-from .packages import drift, grow_triggers, stale_contracts
+from .packages import drift, grow_triggers, known_packages, stale_contracts
 
 
 def expected_mode(task: model.Task) -> str:
@@ -241,6 +241,28 @@ def changed_since_plan(repo: Repo, plan: Doc, pkgs: list[str]) -> list[str]:
             and (_date(d.last_updated) or "") > since]
 
 
+def brief_stages_undesigned(repo: Repo) -> list[str]:
+    """When every stage's Source is `brief` (an all-at-once project), the uncut stages still below Designed;
+    else []."""
+    sts = model.stages(repo.roadmap) if repo.roadmap else []
+    if not sts or any(roadmap_cmd.source_files(st.source) or not re.search(r"\bbrief\b", st.source, re.I)
+                      for st in sts):
+        return []
+    return [st.id for st in sts if roadmap_cmd.stage_status(repo, st) in ("Idea", "Specced")]
+
+
+def unit_blocked_reason(repo: Repo, unit: model.Milestone | model.Stage) -> str:
+    """Why the next unit can't be planned or cut yet: pipelines not all Approved, or (a stage) spec IDs its
+    Source adds that no Approved pipeline carries."""
+    pls, inferred = roadmap_cmd.milestone_pipelines(repo, unit)
+    if not roadmap_cmd.pipelines_approved(repo, unit):
+        listed = ", ".join(pls) or ("none inferred from its Source" if inferred else "none listed")
+        return f"{unit.id} pipelines not all Approved ({listed}); run pipeline-design"
+    off = roadmap_cmd.ids_off_approved(repo, unit)
+    shown = ", ".join(off[:8]) + (f" and {len(off) - 8} more" if len(off) > 8 else "")
+    return f"{unit.id} spec IDs on no Approved pipeline ({shown}); run pipeline-design"
+
+
 def build_planning(repo: Repo, r: Report) -> None:
     plan = repo.plan
     active = roadmap_cmd.active_plan(repo)
@@ -254,9 +276,10 @@ def build_planning(repo: Repo, r: Report) -> None:
     blocked_tasks = [f"{t.id} ({blocked_reason(t)})" for t in tasks if blocked_reason(t)]
     by_id = {t.id: t for t in tasks}
     nxt = next_task(items, by_id)
-    spined = {model.spine_pipeline(t) for t in tasks}
+    system = model.system_pipeline_ids(repo)
+    spined = {model.spine_pipeline(t, system) for t in tasks}
     for doc in repo.docs("archived-plan", archive=True):
-        spined |= {model.spine_pipeline(t) for t in model.tasks(doc)}
+        spined |= {model.spine_pipeline(t, system) for t in model.tasks(doc)}
     drafts = draft_pipelines(repo, tasks, milestone_pls)
     pkgs = milestone_packages(repo, ms_row, milestone_pls, tasks) if active else []
     open_revise = revising(repo, pkgs, drafts) if active else []
@@ -265,20 +288,42 @@ def build_planning(repo: Repo, r: Report) -> None:
     queued = sorted(f"{roadmap_cmd._plan_milestone(d) or '?'} ({d.rel})" for d in repo.docs("queued-plan"))
     available = available_skills(repo)
 
-    # The next milestone that still needs a plan, or the next stage that still needs cutting into milestones.
+    # The next milestone that still needs a plan, or the next stage that still needs cutting into milestones;
+    # and, on its own, the first designed stage with no milestone rows: it is cut now, whatever earlier
+    # milestones still wait for their plans.
     target = roadmap_cmd.next_unit(repo)
+    cut = roadmap_cmd.stage_to_cut(repo)
+    never_planned = plan is None and not repo.docs("archived-plan", archive=True)
     blocked, focus = None, ms_row if active else None   # focus: the milestone this run plans or replans
     if plan is not None and not model.is_dev_team_plan(plan) and _has_unchecked(plan):
         mode = "foreign"
+    elif active and advance_ready(repo, active):
+        mode = "advance"
+    elif active and open_revise:
+        mode = "blocked"
+        blocked = f"waiting for {', '.join(open_revise)} approval (Revise in progress)"
+    elif not active and never_planned and (undesigned := brief_stages_undesigned(repo)):
+        mode = "blocked"
+        no_pl = [pkg for pkg in known_packages(repo) if repo.package_doc(pkg, "pipelines") is None]
+        blocked = (f"{', '.join(undesigned)} below Designed: every stage comes from the brief, so all are "
+                   "designed before the first cut"
+                   + (f"; no pipelines.md for {', '.join(no_pl)}" if no_pl else "") + "; run pipeline-design")
+    elif cut is not None:
+        if not active and not queued and never_planned:
+            # New plans the first unit and cuts every designed stage; the first unit must be Designed too.
+            focus = target or cut
+            ready = (roadmap_cmd.pipelines_approved(repo, focus) if isinstance(focus, model.Milestone)
+                     else roadmap_cmd.stage_designed(repo, focus))
+            if not ready:
+                mode, blocked = "blocked", unit_blocked_reason(repo, focus)
+            else:
+                mode = "new"
+        else:
+            mode, focus = "extend", cut
     elif active:
-        if advance_ready(repo, active):
-            mode = "advance"
-        elif open_revise:
-            mode = "blocked"
-            blocked = f"waiting for {', '.join(open_revise)} approval (Revise in progress)"
-        elif blocked_tasks or changed or moved:
+        if blocked_tasks or changed or moved:
             mode = "replan"
-        elif target and roadmap_cmd.pipelines_approved(repo, target):
+        elif isinstance(target, model.Milestone) and roadmap_cmd.pipelines_approved(repo, target):
             mode, focus = "extend", target
         else:
             mode = "current"
@@ -286,14 +331,11 @@ def build_planning(repo: Repo, r: Report) -> None:
         mode = "extend"
     elif target is not None:
         focus = target
-        if roadmap_cmd.pipelines_approved(repo, target):
-            never_planned = plan is None and not repo.docs("archived-plan", archive=True)
+        if isinstance(target, model.Milestone) and roadmap_cmd.pipelines_approved(repo, target):
             mode = "new" if never_planned else "extend"
         else:
             mode = "blocked"
-            pls, inferred = roadmap_cmd.milestone_pipelines(repo, target)
-            listed = ", ".join(pls) or ("none inferred from its Source" if inferred else "none listed")
-            blocked = f"{target.id} pipelines not all Approved ({listed}); run pipeline-design"
+            blocked = unit_blocked_reason(repo, target)
     elif repo.roadmap is None:
         if any(d.status == "Approved" for d in repo.docs("pipelines")):
             mode = "new"
@@ -327,7 +369,7 @@ def build_planning(repo: Repo, r: Report) -> None:
     r.add("changed_since_plan", changed)
     r.add("interfaces_changed", moved)
     r.add("probes_blocking", blocking)
-    r.add("stage_to_cut", f"{focus.id} {focus.name}" if isinstance(focus, model.Stage) else "none")
+    r.add("stage_to_cut", f"{cut.id} {cut.name}" if cut is not None else "none")
     r.add("pipelines_inferred", inferred_pls)
     r.add("milestone_references", model.milestone_references(repo, focus.id) if focus is not None else [])
     r.add("milestone_skills", focus_skills)

@@ -548,6 +548,87 @@ class BuildPlanningModesTest(Base):
                           {"id": "S2", "name": "Classical portfolios", "source": "ideas/classical-portfolios.md",
                            "status": "Designed"}])
 
+    def staged(self, rows: str = "") -> None:
+        """The staged roadmap (S1 cut into M1, S2 uncut), with extra milestone rows after M1."""
+        self.write("docs/roadmap.md", (HERE / "fixtures" / "staged-roadmap.md").read_text(encoding="utf-8"))
+        if rows:
+            self.edit("docs/roadmap.md", "| PL-01, PL-02 | — | Building |\n", "| PL-01, PL-02 | — | Building |\n" + rows)
+
+    def add_port03(self) -> None:
+        """S2's idea adds PORT-03, which no pipeline covers."""
+        self.edit("docs/spec.md", "### Quality", "- **PORT-03** Risk-parity weights equalize risk contributions.\n"
+                  "  - Given a covariance, when risk parity runs, then contributions are equal.\n\n### Quality")
+        self.edit("docs/spec.md", "| PORT-01, PORT-02; DATA-03 (removed) |", "| PORT-01–PORT-03; DATA-03 (removed) |")
+
+    def test_stage_to_cut_behind_waiting_milestones(self):
+        # flow-F1a: M1 Planned, M2 Designed (waiting for its plan) and S2 Designed with no rows → S2 is cut now.
+        self.staged()
+        self.edit("docs/roadmap.md", "| M1 | S1 | Prices to covariance | quant | PL-01, PL-02 | — | Building |",
+                  "| M1 | S1 | Prices | quant | PL-01 | — | Planned |\n"
+                  "| M2 | S1 | Covariance report | quant | PL-02 | M1 | Designed |")
+        todo = self.root / "tasks/todo.md"
+        todo.write_text(todo.read_text(encoding="utf-8").replace("- [x]", "- [ ]"), encoding="utf-8")
+        d = self.status("build-planning")
+        self.assertEqual((d["mode"], d["stage_to_cut"], d["pipelines_inferred"]),
+                         ("extend", "S2 Classical portfolios", ["PL-03"]))
+        _, text = run_dt(self.root, "status", "--skill", "build-planning")
+        self.assertIn("stage_to_cut: S2 Classical portfolios\n", text)
+        # Whatever else the active milestone needs (here a replan), the designed stage is cut first.
+        self.edit("tasks/plan.md", "**Skills:** —\n", "**Skills:** —\n**Blocked:** waiting on PL-01 Revise\n")
+        d = self.status("build-planning")
+        self.assertEqual((d["mode"], d["stage_to_cut"]), ("extend", "S2 Classical portfolios"))
+        # Between milestones (M1 done, M2 waiting) too.
+        (self.root / "tasks/plan.md").unlink()
+        self.write("tasks/archive/M1-prices.md", "# M1: Prices — Plan\n\n**Milestone:** M1 · **Status:** Done\n")
+        d = self.status("build-planning")
+        self.assertEqual((d["mode"], d["stage_to_cut"]), ("extend", "S2 Classical portfolios"))
+
+    def test_stage_with_ids_off_approved_pipelines_is_not_cut(self):
+        # flow-F1b: PL-03 is Approved, but the PORT-03 S2 adds is on no pipeline yet.
+        self.staged()
+        self.add_port03()
+        d = self.status("build-planning")
+        self.assertEqual((d["mode"], d["stage_to_cut"]), ("current", "none"))
+        self.assertIn("S2: Designed → Specced", run_dt(self.root, "roadmap", "--check")[1])
+        (self.root / "tasks/plan.md").unlink()
+        (self.root / "tasks/todo.md").unlink()
+        self.write("tasks/archive/M1-prices.md", "# M1: Prices — Plan\n\n**Milestone:** M1 · **Status:** Done\n")
+        d = self.status("build-planning")
+        self.assertEqual((d["mode"], d["stage_to_cut"]), ("blocked", "none"))
+        self.assertEqual(d["blocked"], "S2 spec IDs on no Approved pipeline (PORT-03); run pipeline-design")
+
+    def test_all_at_once_new_waits_for_every_stage(self):
+        # flow-F3: every stage comes from the brief, so New waits until all of them are Designed.
+        (self.root / "tasks/plan.md").unlink()
+        (self.root / "tasks/todo.md").unlink()
+        self.write("docs/roadmap.md", "# Quant Lab — Roadmap\n\n**Last updated:** 2026-10-16\n\n"
+                   "| Stage | Name | Source | Status* |\n|---|---|---|---|\n"
+                   "| S1 | Data + stats | brief | Designed |\n| S2 | Classical portfolios | brief | Designed |\n\n"
+                   "## S1: Data + stats\n**Outline:** PCA.\n\n## S2: Classical portfolios\n**Outline:** Min-var.\n")
+        self.edit("docs/spec.md", "| ideas/classical-portfolios.md | PORT-01", "| brief.md | PORT-01")
+        d = self.status("build-planning")
+        self.assertEqual((d["mode"], d["stage_to_cut"]), ("new", "S1 Data + stats"))
+        self.add_port03()
+        self.write("docs/packages/web/contract.md", "# web — Contract\n\n**Package:** web · **Status:** Draft · "
+                   "**Last updated:** 2026-10-16\n")
+        d = self.status("build-planning")
+        self.assertEqual((d["mode"], d["stage_to_cut"]), ("blocked", "none"))
+        self.assertEqual(d["blocked"], "S1, S2 below Designed: every stage comes from the brief, so all are "
+                                       "designed before the first cut; no pipelines.md for web; run pipeline-design")
+        # One stage from an idea file: an incremental project, cut stage by stage.
+        self.edit("docs/roadmap.md", "| S2 | Classical portfolios | brief |", "| S2 | Classical portfolios | ideas/classical-portfolios.md |")
+        self.assertNotIn("from the brief", self.status("build-planning")["blocked"] or "")
+
+    def test_system_task_builds_a_system_pipeline(self):
+        # interface-F7: a system pipeline has no wiring task; its system task makes it run.
+        self.write("docs/architecture.md", (self.root / "docs/architecture.md").read_text(encoding="utf-8")
+                   + "\n## System pipelines\n### PL-09: Nightly report\n**Trigger:** cron, 06:00 · **Covers:** STAT-04\n"
+                   "1. `data` → `stats`: `data.load_prices`\n")
+        self.edit("docs/roadmap.md", "| quant | PL-01, PL-02 |", "| quant | PL-01, PL-02, PL-09 |")
+        self.assertEqual(self.status("build-planning")["no_spine"], ["PL-09"])
+        self.edit("tasks/plan.md", "**Step:** PL-02 · **Kind:** system", "**Step:** PL-09 · **Kind:** system")
+        self.assertEqual(self.status("build-planning")["no_spine"], [])
+
     def test_explicit_pipelines_cell_is_not_reported_as_inferred(self):
         (self.root / "tasks/plan.md").unlink()
         (self.root / "tasks/todo.md").unlink()

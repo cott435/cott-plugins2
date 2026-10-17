@@ -1,6 +1,6 @@
 # Test Planning Examples
 
-The template, then a quant round (a two-layer fixture pair and synthetic known-answer cases), an RL round (generator plus property, and a model evaluation protocol), a case routed to `null-hypothesis-testing`, and a Revise round. Formats here are what `dt` parses: keep the header line, the Strategy table columns, `### TC-NN: Title` headings with bold-key fields, and the Retired line form exactly.
+Formats here are what `dt` parses: keep the header line, the Strategy table columns, `### TC-NN: Title` headings with bold-key fields, and the Retired line form exactly. A Revise round is in `references/revise-grow.md`.
 
 ---
 
@@ -55,10 +55,7 @@ next ids: AD-04 PL-03 TC-01 M2
 packages: quant=new
 pipelines_no_smoke: PL-01, PL-02
 pipelines_no_golden: PL-01, PL-02
-cases_no_source: none
-cases_no_tolerance: none
-fixtures_missing: none
-fixtures_orphan: none
+cases_no_source: none  (and the other gap keys: none)
 ```
 
 **Interview:**
@@ -164,8 +161,6 @@ TC-03/input.json     {"generator": "one_factor", "T": 500, "N": 20, "beta": 1.0,
 TC-03/expected.json  {"property": "explained[0] >= 0.40"}
 ```
 
-Nobody computed λ+ for these parameters during planning. The test computes it from the closed form at run time and checks the property.
-
 ### Review gate message
 
 ```
@@ -184,8 +179,6 @@ Uncovered: STAT-02 and STAT-04 have step unit tests but no golden case (no trust
 
 Do you approve these expected outputs?
 ```
-
-If the user answers "seems ok I guess", the reply is: "Before I mark them Approved: are TC-01's dates and TC-03's 40% threshold right?" Status stays Draft until a clear yes.
 
 ---
 
@@ -216,7 +209,7 @@ If the user answers "seems ok I guess", the reply is: "Before I mark them Approv
 **Expected:** mean return over 100 held-out episodes (eval seeds 1000–1099, never used in training) is above the random and the scripted baseline's mean, for each of training seeds 0, 1, 2 · **Tolerance:** none, a strict comparison per training seed; seeds are fixed so the result reproduces
 ````
 
-`TC-01/input.json` is `{"generator": "corridor", "length": 5, "seed": 0, "episodes": 300, "eval_seeds": [0, 1, 2, 3, 4]}` and `expected.json` is `{"property": "greedy_path_len == length - 1", "tol": 0}`. The answer comes from how the corridor is built, not from a training run.
+`TC-01/input.json` is `{"generator": "corridor", "length": 5, "seed": 0, "episodes": 300, "eval_seeds": [0, 1, 2, 3, 4]}` and `expected.json` is `{"property": "greedy_path_len == length - 1", "tol": 0}`.
 
 Under **Open questions:** "EVAL-01 says 'beats'. No installed skill owns that claim, so TC-03 uses a strict per-seed comparison on 3 training seeds. Is that the bar you want, or should it be a statistical test?"
 
@@ -224,7 +217,7 @@ Under **Open questions:** "EVAL-01 says 'beats'. No installed skill owns that cl
 
 ## Example 3: A Routed Case (quant M3, feature screening)
 
-**Context:** PL-06 Feature screening in `features` (`Part of: PL-05`). Spec FEAT-03: "a feature is kept only if it carries information about next-day returns beyond chance". The project has `null-hypothesis-testing` installed, so both cases are designed with it: hypothesis, statistic, null construction and split come from that skill, not from a home-made test.
+**Context:** PL-06 Feature screening in `features` (`Part of: PL-05`). Spec FEAT-03: "a feature is kept only if it carries information about next-day returns beyond chance". `null-hypothesis-testing` is installed, so both cases are designed with it.
 
 ```markdown
 ### TC-20: Planted feature is kept
@@ -239,25 +232,3 @@ Under **Open questions:** "EVAL-01 says 'beats'. No installed skill owns that cl
 **Expected:** no feature rejects H0 after Holm correction · **Tolerance:** at most 1 of the 20 seeds may reject, since the family-wise error rate is α = 0.05
 **Skills:** null-hypothesis-testing
 ```
-
-`build-planning` sees `Skills:` on the cases and routes the screening task to the same skill.
-
----
-
-## Example 4: Revise (an oracle changes)
-
-**Context:** TC-05 pinned the top eigenvalue from the user's notebook. Two weeks later the user found their notebook used unadjusted closes and re-ran it.
-
-```
-Revise TC-05 (PL-02 · STAT-01):
-  old expected.json  {"top_eigval": 2.31, "tol": 1e-6}
-  new expected.json  {"top_eigval": 2.27, "tol": 1e-6}
-  Source: your notebook `cov_check.ipynb`, re-run 2026-11-04 on adjusted closes (cell 14 output attached in source/).
-  Tolerance unchanged: same data, same float64 arithmetic.
-Tasks citing TC-05: M1-T04. After approval, build-planning Replan if its acceptance changes.
-Do you approve the new expected output?
-```
-
-Writing `expected.json` brings up the `dt guard` permission prompt; that's the second check, not a substitute for the user's yes in chat. `tests.md` goes to Draft until they answer.
-
-**Not a Revise:** the build gets 2.29 and the test fails. Nothing says the oracle was wrong, so that's a bug for the build to find. Changing the expected value or widening the tolerance here would delete the evidence.

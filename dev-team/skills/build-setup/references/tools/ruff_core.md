@@ -10,7 +10,7 @@ Related: [ruff_complexity.md](ruff_complexity.md) · [ruff_domain.md](ruff_domai
 | **Hook tier** | Per-edit (PostToolUse) **and** end-of-work gate (Stop): every agent type |
 | **Check what a rule does** | `ruff rule B006` prints the docs and says whether it is preview-only |
 
-> **Verified** in `design/tooling-verification.md` (2026-10-16): ruff 0.17.1. The template config was accepted by `ruff check --show-settings`, and the planted violations in its §5 fired as listed. The examples below were not each run; check one with `ruff check --select B006 t.py`.
+> Template config verified against ruff 0.17.1 in `design/tooling-verification.md`. Check one example with `ruff check --select B006 t.py`.
 
 Rules with a fix can be applied with `ruff check --fix`. The per-edit hook (`check.sh fast`) uses `--fix`, so many of these never reach the agent as errors.
 
@@ -134,11 +134,6 @@ if a:
         go()
 ```
 
-**SIM118 `in dict.keys()`**
-```python
-if k in d.keys(): ...    # SIM118 -> if k in d:
-```
-
 **SIM115 file opened without context manager**
 ```python
 f = open("x.txt")        # SIM115
@@ -212,7 +207,7 @@ for x in xs:
     except ValueError:
         pass
 ```
-Why: costs time on older Pythons, and usually means validation belongs outside the loop. As I recall, Ruff skips this rule when the target is Python 3.11+, so it may not fire for you.
+Why: costs time before Python 3.11 (Ruff skips the rule for 3.11+ targets), and usually means validation belongs outside the loop.
 
 ## PL (selected): Pylint "likely error" and warning groups
 
@@ -318,11 +313,6 @@ assert a and b           # PT018 -> two asserts
 ```
 Why: when it fails, you can't tell which half was false.
 
-**PT006 parametrize names type**
-```python
-@pytest.mark.parametrize("a, b", [(1, 2)])   # PT006 -> ("a", "b")
-```
-
 ## RUF: Ruff-specific
 
 **RUF012 mutable class attribute**
@@ -338,11 +328,6 @@ def f(x: int = None): ... # RUF013 -> x: int | None = None
 ```
 Why: type checkers no longer accept this, and it lies about the type.
 
-**RUF005 list concatenation**
-```python
-a = [1] + rest           # RUF005 -> [1, *rest]
-```
-
 **RUF015 materialise just to take one**
 ```python
 first = list(it)[0]      # RUF015 -> next(iter(it))
@@ -353,7 +338,7 @@ Why: builds the entire list to read one element.
 ```python
 x = 1  # noqa: F401      # RUF100: nothing to suppress
 ```
-Why: stale suppressions rot. This keeps them honest, and it catches agents leaving behind `noqa` comments that no longer do anything.
+Why: stale suppressions rot, and agents leave behind `noqa` comments that no longer do anything.
 
 ---
 

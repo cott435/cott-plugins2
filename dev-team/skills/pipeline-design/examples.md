@@ -1,6 +1,6 @@
 # Pipeline Design Examples
 
-The template, two New rounds (a quant single package and an RL lab), then Revise and Grow rounds. Formats here are what `dt` parses: keep the header line, the `## PL-NN: Title` headings, the six step-table columns and the `(pre-build — removed by spine task)` headings exactly.
+Formats here are what `dt` parses: keep the header line, the `## PL-NN: Title` headings, the six step-table columns and the `(pre-build — removed by spine task)` headings exactly. Revise is in `references/modes.md`, Grow in `references/grow.md`.
 
 ---
 
@@ -45,8 +45,6 @@ tests/intent/<pkg>/  tests/unit/<pkg>/
 ````
 
 - Multi-package segment of a system pipeline: add `· **Part of:** PL-NN` to the pipeline's Entry/Trigger line.
-- Appending PL IDs to an Approved `contract.md`'s `Used by:` lines leaves it Approved (`dt lint` ignores that edit); the commit offer includes it.
-- A decision-backed exception to a readability rule goes in the row's Spine version or the pipeline's Covers line as a short note citing the `AD-NN`.
 - After the spine task, `dt prebuild-clear` replaces each entry sketch with `Layout: \`dt layout <pkg>\`` and drops the planned layout.
 
 ---
@@ -59,19 +57,14 @@ tests/intent/<pkg>/  tests/unit/<pkg>/
 $ dt status --skill pipeline-design
 skill: pipeline-design
 mode: new
-docs: brief Accepted · spec Approved · architecture Approved (Single package) · roadmap ok · plan missing · constraints missing
 next ids: AD-04 PL-01 TC-01 M3
 packages: quant=new
-uncovered_ids: none
-components_unowned: none
-drift: none
-retired_refs: none
-misplaced: none
+uncovered_ids: none  (and the other lists: none)
 ```
 
-A package with no `pipelines.md` has nothing to check yet, so `uncovered_ids` and `components_unowned` stay empty in New mode; the scope comes from the architecture's Covers (M1's IDs above). They count at the gate's re-run.
+In New mode the lists stay empty until the gate's re-run; the scope comes from the architecture's Covers.
 
-**Interview.** The candidate list first, in the message, then one confirming question; a follow-up only where something is unclear:
+**Interview:**
 
 ```
 Candidates for M1 (nothing is written until you confirm):
@@ -87,9 +80,7 @@ DEFAULT: call it directly.
 User:    Directly.
 ```
 
-Everything else (names, types, order, module split) is inferred and listed at the gate.
-
-**`contract.md` after the write** (only the `Used by:` lines change; the consumer components were already there):
+**`contract.md` after the write** (only `Used by:` changes):
 
 ```markdown
 ### stats.estimate_cov: Covariance estimate
@@ -176,23 +167,19 @@ Wrote docs/packages/quant/pipelines.md (Draft).
 - PL-02 Covariance report · `python -m quant.stats cov-report` · load_prices → estimate_cov → clean_eigen → pca → write_report
 - Layout: data/ and stats/ subfolders, one module per step owner; contracts exported from each __init__.
 
-ASSUMPTIONS: function and module names above; `save_prices` writes one Parquet file per run (AD-03);
-returns are computed by `Prices.returns()`, not a separate step; `clean_eigen` takes T as a parameter.
-contract.md: appended PL IDs to Used by — data.load_prices (PL-01, PL-02), stats.estimate_cov (PL-02),
-stats.clean_eigen (PL-02). No other contract edits.
+ASSUMPTIONS: names above; one Parquet file per run (AD-03); returns from `Prices.returns()`, not a step.
+contract.md: PL IDs appended to Used by for data.load_prices, stats.estimate_cov, stats.clean_eigen.
 Open questions: the clean_eigen parameter (above).
 Uncovered: none. `portfolio` owns no step yet: it's M2.
 
 Approve, or tell me what to change.
 ```
 
-The turn ends there.
-
 ---
 
 ## Example 2: RL Lab, Snake (New, single package, non-quant)
 
-**Context:** a learning lab of small 2D environments with a shared core. Architecture: single package `rllab`, components `core` (env interface, training loop, evaluation, run storage), `snake`, `agents`, `baselines`, `viewer`. AD-03 lets the CLI pick an environment by name from one dict in `core/envs.py`. Spec: ENV-01–ENV-04, AGT-01, TRN-01, EVAL-01, VIEW-01, QR-01 (under an hour on a laptop CPU), QR-02 (same seed, same run).
+**Context:** single package `rllab`, components `core` (env interface, training loop, evaluation, run storage), `snake`, `agents`, `baselines`, `viewer`. AD-03 lets the CLI pick an environment by name from one dict in `core/envs.py`. Spec: ENV-01–ENV-04, AGT-01, TRN-01, EVAL-01, VIEW-01, QR-01 (under an hour on a laptop CPU), QR-02 (same seed, same run).
 
 **Interview:**
 
@@ -202,15 +189,10 @@ Candidates for Snake (nothing is written until you confirm):
 2. `replay <run>` — watch a saved run
 3. `compare <run>` — learning curve against random and scripted baselines
 Q:       Which will you actually run?   (multi-select; recommended: 1, 2, 3)
-User:    1 and 2. Training should also show it beats random and the scripted snake.
-
-Q:       Should the baseline comparison run inside `train`, or as its own command?
-GUESS:   inside `train`, so every saved run carries its learning curve and baseline scores.
-DEFAULT: inside `train`.
-User:    Inside train.
+User:    1 and 2. Training should show it beats random and the scripted snake, inside `train`.
 ```
 
-**First draft caught at Step 2:** the entry sketch looped over episodes (`for ep in range(cfg.episodes): …`). That loop is logic, so it became the step `train`, owned by `core.train`. The entry now only calls steps.
+**Caught at Step 2:** the first entry sketch looped over episodes; that loop is logic, so it became the step `train` (`core.train`).
 
 **Result — `docs/packages/rllab/pipelines.md`** (excerpt):
 
@@ -267,85 +249,6 @@ tests/intent/rllab/  tests/unit/rllab/
 ````
 
 Notes:
-- The spine agent is a random policy and the spine renderer prints ASCII. Both are real, both run in seconds, and both stay as the floor DQN and the 2D viewer must beat.
-- The env lookup is a registry, allowed only because AD-03 names it; the row says so.
+- The random policy and ASCII renderer are real spines: the floor DQN and the 2D viewer must beat.
+- The env lookup is a registry, allowed only because AD-03 names it on the row.
 - The scripted-snake baseline is a later step upgrade of `run_baselines` (a task), not a new step.
-
----
-
-## Example 3: Revise (shrinkage before cleaning)
-
-**Context:** during M1 the build found MP cleaning of a raw sample covariance is unstable at T/N ≈ 2. `architecture-design` Revise added AD-07: shrink to a Ledoit–Wolf target before cleaning. PL-02's spine is built, so its entry sketch is already gone.
-
-**Before:**
-```markdown
-| 2 | `estimate_cov` | stats.cov | Returns → Cov | sample covariance | STAT-02 |
-| 3 | `clean_eigen` | stats.rmt | Cov, T → Cov | no cleaning (baseline) | STAT-03 |
-```
-
-**After** (`Status: Draft`):
-```markdown
-| 2 | `estimate_cov` | stats.cov | Returns → Cov | sample covariance | STAT-02 |
-| 3 | `shrink` | stats.shrink | Cov, T → Cov | no shrinkage (baseline; AD-07) | STAT-02 |
-| 4 | `clean_eigen` | stats.rmt | Cov, T → Cov | no cleaning (baseline) | STAT-03 |
-```
-
-Rows below shift down a number; step names and the PL ID don't change. `shrink` isn't a contract symbol (it's internal to `stats`), so `contract.md` is untouched; had it been, its `Used by:` line would gain PL-02. The new step's spine is "no shrinkage": `shrink` returns its input until a task upgrades it, which is a real baseline, not a mock. No entry sketch is recreated: the code now calls four steps where the table has five, so `dt layout quant` reports drift until the task lands.
-
-**Gate message (excerpt):**
-
-```
-Revised PL-02: new step `shrink` (stats.shrink) between estimate_cov and clean_eigen, per AD-07.
-Affected tasks: M1-T04 (Step: PL-02.clean_eigen; Read: PL-02). They pause until this is approved:
-while pipelines.md is Draft, build-planning's dt status says blocked (waiting for approval).
-After approval: build-planning Replan (its dt status says replan, changed_since_plan lists
-docs/packages/quant/pipelines.md) adds the `shrink` task. TC-02's expected output is unchanged
-(the MP-edge property holds either way), so no test-planning Revise.
-```
-
----
-
-## Example 4: Grow (quant M3 splits into packages)
-
-**Context:** at the end of M2, `quant/pipelines.md` holds PL-01 Load prices, PL-02 Covariance report, PL-03 Min-variance backtest (`estimate_cov` → `min_variance` → `compare`) and the retired line for PL-04. M3 brings feature engineering with torch. `architecture-design` Grow made the repo Multi-package (`data`, `stats`, `portfolio`, `features`, under `packages/<pkg>/src/<pkg>/`) and added one system pipeline, with a new ID from `dt next-id PL`, grown from PL-03:
-
-```markdown
-## System pipelines
-### PL-05: Research run
-**Trigger:** `python -m portfolio backtest` (PL-03's entry) · **Covers:** FEAT-01, PORT-01, PORT-02
-1. `data` → `stats`: `data.load_prices`
-2. `stats` → `features`: `stats.estimate_cov`
-3. `features` → `portfolio`: `features.screen`
-```
-
-`dt status --skill pipeline-design` reports the four new packages as `new`, but `quant/pipelines.md` still holds their pipelines and the architecture's Grow is approved, so this is Grow, not New. (Once a moved section's Entry points into another package's folder, `dt` reports `grow` itself, with the pipeline under `misplaced`.)
-
-**Moves:**
-
-| Section in `quant/pipelines.md` | Goes to | Why |
-|---|---|---|
-| PL-01 Load prices | `docs/packages/data/pipelines.md` | entry `run_load_prices` is owned by data |
-| PL-02 Covariance report | `docs/packages/stats/pipelines.md` | entry in stats; step `load_prices` stays a call to data's contract (stats → data is allowed) |
-| PL-03 Min-variance backtest | `docs/packages/portfolio/pipelines.md`, as PL-05's portfolio segment | entry in portfolio; keeps its ID, step table and Entry, and gains `· **Part of:** PL-05` |
-| `~~PL-04: Raw eigen dump~~` | `stats` Retired list | it was folded into PL-02 |
-
-Each moved section keeps its ID, title, table and Covers. Only the Entry path and the Trigger's module change, to the new source folder:
-
-```markdown
-## PL-03: Min-variance backtest
-**Entry:** `packages/portfolio/src/portfolio/pipeline.py::run_backtest` · **Trigger:** `python -m portfolio backtest` · **Part of:** PL-05
-```
-
-PL-03 is not deleted or merged into the root: TC-04 and M2's tasks cite it, and the root's PL-05 is a different ID, so no two live sections share one.
-
-**Other segments of PL-05:** data and stats each hand over one contract call (`data.load_prices`, `stats.estimate_cov`), so they need no segment pipeline. `features` has no pipeline yet, so the gate lists it as uncovered and the next round (Extend) asks the user about the feature-screening workflow and adds PL-06 with `**Part of:** PL-05`, plus a planned layout for it (it's new and unbuilt). The same round adds a `screen` row (owner features) to PL-03, so the portfolio segment calls `features.screen`; that new step needs no planned layout, since PL-03 is built.
-
-**Gate message (excerpt):**
-
-```
-Grow: moved PL-01 → data, PL-02 → stats, PL-03 → portfolio (now PL-05's portfolio segment,
-marked Part of: PL-05); PL-04's retired line moved to stats. Deleted docs/packages/quant/pipelines.md (empty).
-All three pipelines.md files are Draft.
-Drift until the code moves: every Entry path now points under packages/<pkg>/src/ (a build-planning task).
-Uncovered: features owns no pipeline; the feature-screening workflow needs your input (next: Extend).
-```

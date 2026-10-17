@@ -599,11 +599,11 @@ class MultiProject(unittest.TestCase):
 
 class Templates(unittest.TestCase):
     def test_every_placeholder_is_documented(self) -> None:
-        """examples.md explains how each value is derived; a new placeholder needs a row."""
+        """references/derive.md explains how each value is derived; a new placeholder needs a row."""
         skill = project.TEMPLATES.parent
         used = {m for f in project.TEMPLATES.rglob("*") if f.is_file()
                 for m in project.PLACEHOLDER.findall(f.read_text(encoding="utf-8"))}
-        documented = (skill / "examples.md").read_text(encoding="utf-8")
+        documented = (skill / "references" / "derive.md").read_text(encoding="utf-8")
         missing = sorted(name for name in used if f"`{name}`" not in documented)
         self.assertEqual(missing, [])
 

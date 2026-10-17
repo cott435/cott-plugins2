@@ -1,6 +1,6 @@
 # Deriving the bar's values
 
-Read when generating or extending the bar. Every `{{placeholder}}` and how its value is derived is in `../examples.md`; these are the values that matter most.
+Read when generating or extending the bar: the templates, the values that matter most, and where every `{{placeholder}}` comes from.
 
 ## Templates
 
@@ -30,3 +30,39 @@ Read when generating or extending the bar. Every `{{placeholder}}` and how its v
 - **Exceptions**: every one is an `EX-NN` row with a rule, path, reason, owner and expiry (a date, or `M<n> exit`); a Ruff exception is also a `per-file-ignores` entry, and every config ignore has a row.
 - **Numbers**: every CR rule with a number names its config key, and the two are identical. Every rule has a tool behind it, and at least one external check (pip-audit) runs in `full`.
 - **Non-Python parts** (a frontend): their rules come from agent-skills `constraint-driven-development`; record them here with that part's path, and `check.sh` calls its check command.
+
+## Placeholders: where each value comes from
+
+Templates use `{{name}}`. After filling, `grep -rn '{{[a-z_]*}}'` over the written files must print nothing (`${{ github.… }}` in the CI file is GitHub's own syntax and has spaces, so it doesn't match). `../tests/project.py` fills them the same way for the tests.
+
+| Placeholder | Where | Value | Derived from |
+|---|---|---|---|
+| `project_name` | pyproject | distribution name | existing `[project].name`, else the repo name |
+| `python_version`, `python_target` | pyproject | `3.11`, `py311` | `.python-version`, else the language AD |
+| `uv_build_requirement` | pyproject | `uv_build>=0.11,<0.12` | `uv --version` (major.minor, next minor) |
+| `dependencies` | pyproject | `    "numpy",` lines | the milestone's dependencies (plan, tech stack ADs) |
+| `stub_packages` | pyproject | `    "pandas-stubs",` | one per dependency without inline types (`tools/mypy.md`) |
+| `domain_rules` | pyproject | `    "DTZ", "NPY", "PD",` | tech stack ADs (`tools/ruff_domain.md`); empty if none |
+| `pkg` | pyproject | import name | the package id (multi: one file per package) |
+| `pkg_dist`, `package_sources` | package pyproject | dist name; `[tool.uv.sources]` with `{ workspace = true }` for each sibling it depends on | package dependency rules |
+| `workspace_members`, `workspace_sources`, `pkgs_quoted`, `src_dirs_quoted` | workspace pyproject | every package, as lists | the Packages table |
+| `coverage_floor` | pyproject | `0` on an empty skeleton, else today's measured value (measure and hold), or the user's target | measure with `check.sh full` |
+| `deptry_ignores` | pyproject | `[tool.deptry.per_rule_ignores]` + `DEP002 = [...]`, or empty | dependencies no code imports yet; one Exceptions row each |
+| `import_contracts` | pyproject | `[[tool.importlinter.contracts]]` blocks | `Depends on` (single) or the package dependency rules (multi); missing modules in `(…)` |
+| `typos_ignore_identifiers` | pyproject | `"^[A-Z]{1,5}$"` for tickers, else empty | domain |
+| `protected_globs` | check.sh | `'tests/intent/**' 'tests/fixtures/**' …` (quoted) | the eleven globs of the Protected list above; multi adds `'packages/*/pyproject.toml'` |
+| `src_dirs`, `packages_dir` | check.sh | `src` and empty · `packages/a/src packages/b/src` and `packages` | shape |
+| `type_gate` | check.sh, CONSTRAINTS | `mypy` or `pyright` | the type-gate answer |
+| `pkg_scope_cases` | check.sh | `    data) echo "data stats portfolio" ;;` per id | dependency graph: the id plus everything that depends on it, directly or not |
+| `source_globs` | tester.md | `"src/**"` · `"packages/*/src/**"` | shape |
+| `date`, `owner` | CONSTRAINTS | today, `@user` | — |
+| `type_gate_key` | CONSTRAINTS | `tool.mypy.strict` · `tool.pyright.typeCheckingMode` | the type-gate answer |
+| `coverage_today`, `vulture_today` | CONSTRAINTS | `— (no code)` / `71.2%`; whitelist entry count | measured |
+| `readability_rules` | CONSTRAINTS | extra `- **CR-13** …` lines from pipeline-design, or empty | `pipelines.md` |
+| `extra_enforced_rows` | CONSTRAINTS | e.g. CR-27 repro, a frontend row, or empty | spec QRs; non-Python parts |
+| `boundary_rules` | CONSTRAINTS | one line, `` `pkg.data` imports nothing first-party · `pkg.stats` → data `` | same source as the contracts |
+| `protected_globs_md` | CONSTRAINTS | the protected list in backticks | same list as `protected_globs` |
+| `exception_rows` | CONSTRAINTS | `\| EX-01 \| … \|` rows, or empty | the `DEP002` and other exceptions |
+| `default_branch` | check.yml | `main` | `git symbolic-ref refs/remotes/origin/HEAD`, else `main` |
+
+**Multi-package `pyproject.toml`:** the root is `pyproject.workspace.toml` followed by these sections of `pyproject.toml`, unchanged: `[tool.ruff.lint]` (select, ignore), `.mccabe`, `.pylint`, `.per-file-ignores`, `[tool.ruff.format]`, `[tool.size_limits]`, `[tool.pytest.ini_options]`, `[tool.typos.files]`, `[tool.typos.default]`. deptry lives in each package's file, never the root.

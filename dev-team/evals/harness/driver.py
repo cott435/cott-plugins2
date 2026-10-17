@@ -367,6 +367,14 @@ def main():
     (out / "doc_history.txt").write_text(
         sh(["git", "log", "--reverse", "-p", "--format=========== %s", "--", "docs", "tasks", "CONSTRAINTS.md"], proj).stdout)
     print(json.dumps(summary), flush=True)
+    # Every run ends with its workflow analysis: the flow drawn from the session transcripts, saved
+    # in <out>/flow/ (flow.html, index.json, turns/, units/). run.sh redraws it with the grade.
+    try:
+        r = subprocess.run([sys.executable, str(HERE / "runviz.py"), "--run", str(out)], timeout=600)
+        if r.returncode:
+            print(f"runviz: exit {r.returncode}, no flow for this run (the run itself is fine)", flush=True)
+    except (OSError, subprocess.TimeoutExpired) as e:
+        print(f"runviz: {e} (the run itself is fine)", flush=True)
 
 
 if __name__ == "__main__":

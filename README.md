@@ -7,7 +7,8 @@ cott-plugins2/
 ├── .claude-plugin/marketplace.json   the catalog: each plugin, its path and its version
 ├── .claude/settings.json             enables plugin-dev for sessions opened in this repo
 ├── plugin-dev/                       the rules the others are built under, run by hooks
-└── dev-team/                         takes a project from idea to an enforced build plan
+├── dev-team/                         takes a project from idea to an enforced build plan
+└── workflow-analyzer/                draws, questions and replays what a session did
 ```
 
 ## Use it
@@ -16,6 +17,7 @@ cott-plugins2/
 /plugin marketplace add cott435/cott-plugins2
 /plugin install plugin-dev@cott-plugins2
 /plugin install dev-team@cott-plugins2
+/plugin install workflow-analyzer@cott-plugins2
 ```
 
 After a `git pull`, `/plugin marketplace update cott-plugins2` picks up the change.

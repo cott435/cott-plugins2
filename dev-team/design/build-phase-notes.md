@@ -1,6 +1,6 @@
 # Build Phase — Reading Notes
 
-**Status:** Notes, not a design · **Last updated:** 2026-10-16 · **Purpose:** refresh memory and give the build-design chat its starting context. §4 records verified runtime behaviour.
+**Status:** Notes, not a design · **Last updated:** 2026-10-17 · **Purpose:** refresh memory and give the build-design chat its starting context. §4 records verified runtime behaviour. **Design:** [build-phase.md](build-phase.md) answers §5 (its §14).
 
 Sources: agent-skills (`/Users/connorott/dev/agent-skills`), [build-setup.md](build-setup.md), [planning-stage.md](planning-stage.md).
 

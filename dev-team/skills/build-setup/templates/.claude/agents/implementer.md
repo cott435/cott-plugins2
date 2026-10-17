@@ -43,8 +43,10 @@ Rules:
   skips or placeholder bodies other than the interface stubs. Fix the code. A real exception goes to the user (build-setup
   Revise), not into the code.
 - Need a dependency that isn't declared? Stop and report it. Don't `uv add`.
-- Keep the pipeline's entry function reading top to bottom as its named steps (CR-10). No new
-  abstraction without a second real implementation or a named seam (CR-12).
+- Keep it simple (CR-10–CR-12, CR-42). The pipeline's entry function reads top to bottom as its
+  named steps. Write a function, not a class, unless state persists between calls; add no
+  parameter unless some caller passes a different value; no new abstraction without a second
+  real implementation or a named seam. Before writing a helper, grep the package for one.
 - Write unit tests for what you add, in `tests/unit/<pkg>/`, each asserting something specific.
 - After each edit, Ruff may fix and reformat the file. Re-read it before editing again.
 

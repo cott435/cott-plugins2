@@ -20,8 +20,8 @@ then each milestone's build and its merge; between those the build runs unattend
 - Cuts stages into milestones and plans the next one task by task, contract first.
 - Sets and enforces the quality bar.
 - Keeps every document addressable by ID through `dt`, and guards oracles and archives.
-- Builds each milestone: testers blind to the code, implementers confined to
-  their files, read-only reviewers. A task lands only when its checks pass.
+- Builds milestones: testers blind to code, implementers confined to their files,
+  reviewers that land nothing. A task lands only when its checks pass.
 
 ## Non-goals
 

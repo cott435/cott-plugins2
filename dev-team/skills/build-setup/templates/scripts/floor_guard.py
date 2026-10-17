@@ -51,7 +51,8 @@ from typing import Any, NamedTuple
 
 SUPPRESSION = re.compile(
     r"#\s*(type:\s*ignore|pyright:\s*\w|mypy:\s*ignore|noqa|ruff:\s*noqa"
-    r"|pragma:\s*no\s*(cover|branch)|nosec)|@(typing\.)?no_type_check\b",
+    r"|pragma:\s*no\s*(cover|branch)|nosec|pylint:\s*(disable|skip-file))"
+    r"|@(typing\.)?no_type_check\b",
     re.IGNORECASE,
 )
 SKIP = re.compile(
@@ -92,7 +93,7 @@ RULE_IDS = {
 CONFIG_FILES = {
     "ruff.toml", ".ruff.toml", "mypy.ini", ".mypy.ini", "pytest.ini", "setup.cfg", "tox.ini",
     "pyrightconfig.json", ".coveragerc", ".importlinter", "typos.toml", "_typos.toml",
-    ".typos.toml", ".deptry.toml",
+    ".typos.toml", ".deptry.toml", "pylintrc", ".pylintrc", "pylintrc.toml",
 }  # fmt: skip
 LOCKFILES = {"uv.lock", "poetry.lock", "pdm.lock", "Pipfile.lock"}
 TASK_ID = re.compile(r"M\d+-T\d{2,}")
@@ -465,15 +466,18 @@ MAX_KEYS = (
     "tool.size_limits.max_module_lines",
     "tool.size_limits.max_function_lines",
     "tool.vulture.min_confidence",
+    "tool.pylint.similarities.min-similarity-lines",
 )
 MIN_KEYS = ("tool.coverage.report.fail_under", "tool.size_limits.min_module_lines")
 TRUE_KEYS = ("tool.mypy.strict", "tool.pytest.ini_options.xfail_strict")
+OFF_KEYS = ("tool.pylint.main.exit-zero",)  # turning one on silences a check
 NO_SHRINK = ("tool.ruff.lint.select", "tool.ruff.lint.extend-select")
 NO_GROW = (
     "tool.ruff.lint.ignore", "tool.ruff.lint.extend-ignore", "tool.ruff.exclude",
     "tool.ruff.extend-exclude", "tool.ruff.lint.exclude", "tool.deptry.exclude",
     "tool.deptry.extend_exclude", "tool.deptry.ignore", "tool.vulture.ignore_names",
-    "tool.vulture.exclude", "tool.mypy.exclude",
+    "tool.vulture.exclude", "tool.mypy.exclude", "tool.pylint.main.ignore-paths",
+    "tool.pylint.main.ignore", "tool.pylint.main.ignore-patterns",
 )  # fmt: skip
 # Excluding the references or probes folder is not a loosening: neither is project code (CR-08).
 OUTSIDE_EXCLUDE = re.compile(r"\^?(references|probes)/?\*{0,2}")
@@ -512,6 +516,7 @@ def _limit_findings(old: dict[str, Any], new: dict[str, Any]) -> list[str]:
     out += [
         f"{k} turned off" for k in TRUE_KEYS if _get(old, k) is True and _get(new, k) is not True
     ]
+    out += [f"{k} turned on" for k in OFF_KEYS if _get(new, k) is True and _get(old, k) is not True]
     return out
 
 

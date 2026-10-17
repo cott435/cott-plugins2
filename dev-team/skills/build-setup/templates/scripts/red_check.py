@@ -60,7 +60,8 @@ def main(paths: list[str]) -> int:
     # the product's imports, and this script is the bar's.
     pytest = importlib.import_module("pytest")
     recorder = Recorder()
-    pytest.main([*paths, "-q", "--no-header", "--no-cov", "-p", "no:cacheprovider"], [recorder])
+    # -m "": every marker, so a slow or perf intent test the default addopts deselect is judged too.
+    pytest.main([*paths, "-q", "--no-header", "--no-cov", "-m", "", "-p", "no:cacheprovider"], [recorder])
     results = recorder.results
     wrong = {n: r for n, r in results.items() if r.startswith("wrong")}
     for nodeid, why in sorted(wrong.items()):

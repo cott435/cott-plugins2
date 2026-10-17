@@ -83,6 +83,18 @@ class SingleProject(unittest.TestCase):
         self.assertIn("pyright", result.stderr)  # full runs the other type checker
         self.assertIn("Required test coverage of 80.0% reached", result.stdout)
 
+    def test_full_catches_a_copied_block(self) -> None:
+        body = ('    total = 0.0\n    for x in xs:\n        if x > 0:\n            total += x\n'
+                '        else:\n            total -= x\n        total *= 0.5\n    total += 1.0\n'
+                '    return total\n')
+        for name in ("one", "two"):
+            write(self.root, f"src/tinyq/stats/{name}.py",
+                  f'"""Copy {name}."""\n\n\ndef {name}(xs: list[float]) -> float:\n'
+                  f'    """Sum."""\n{body}')
+        result = check(self.root, "full")
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("duplicate-code", result.stdout + result.stderr)  # CR-42
+
     def test_fast_fixes_and_reports(self) -> None:
         write(self.root, "src/tinyq/data/extra.py", '"""Extra."""\nimport os\n\n\ndef f() -> int:\n    return 1\n')
         result = check(self.root, "fast", str(self.root / "src/tinyq/data/extra.py"))
@@ -225,11 +237,18 @@ class SingleProject(unittest.TestCase):
                           1, "fails for the wrong reason (call: AttributeError)"),
             "never red": (head + "from tinyq.stats.spread import spread\n\n\n@pytest.mark.intent\n"
                           "def test_spread() -> None:\n    assert callable(spread)\n", 1, "no test is red"),
+            "slow": (head + "from tinyq.stats.spread import spread\n\n\n@pytest.mark.intent\n@pytest.mark.slow\n"
+                     "def test_spread() -> None:\n    assert spread([1.0, 3.0]) == pytest.approx(2.0)\n", 0, ""),
         }
         for name, (text, want, says) in cases.items():
             with self.subTest(case=name):
                 reset(self.root)
                 self.interface()
+                if name == "slow":  # a project whose default run deselects slow tests
+                    path = self.root / "pyproject.toml"
+                    path.write_text(path.read_text().replace(
+                        'addopts = "-ra --strict-markers --strict-config --import-mode=importlib"',
+                        'addopts = "-ra --strict-markers --strict-config --import-mode=importlib -m \'not slow\'"'))
                 commit(self.root, "interface")  # the tester's base
                 write(self.root, "tests/intent/stats/test_spread.py", text)
                 result = check(self.root, "collect")
@@ -331,6 +350,20 @@ class SingleProject(unittest.TestCase):
                         .replace('"TRY003", "B006",', '"TRY003",'))
         (self.root / "src/tinyq/ruff.toml").unlink()
         self.assertEqual(self.floor().returncode, 0, "tightening is silent")
+
+    def test_floor_guard_catches_ways_to_silence_duplicate_code(self) -> None:
+        append(self.root, "src/tinyq/data/prices.py", "\n# pylint: disable=duplicate-code\n")
+        path = self.root / "pyproject.toml"
+        path.write_text(path.read_text().replace(
+            "min-similarity-lines = 8",
+            "min-similarity-lines = 12\n\n[tool.pylint.main]\nexit-zero = true\nignore-patterns = ['prices']"))
+        write(self.root, ".pylintrc", "[MAIN]\nexit-zero=yes\n")
+        result = self.floor()
+        self.assertEqual(result.returncode, 1)
+        for says in ("src/tinyq/data/prices.py:10: [suppression]", "min-similarity-lines: 8 -> 12",
+                     "tool.pylint.main.exit-zero turned on", "tool.pylint.main.ignore-patterns gained",
+                     ".pylintrc: [bar-loosened]"):
+            self.assertIn(says, result.stdout)
 
     def test_floor_guard_honours_exceptions_and_flags_new_rows(self) -> None:
         write(self.root, "tests/unit/data/test_skip.py",

@@ -86,6 +86,7 @@ def base_values() -> dict[str, str]:
         "extra_enforced_rows": "",
         "coverage_today": "80%",
         "vulture_today": "0",
+        "duplicates_today": "0",
         "boundary_rules": "- `tinyq.data` imports nothing first-party · `tinyq.stats` → data",
         "protected_globs_md": ", ".join(f"`{g}`" for g in PROTECTED),
         "exception_rows": "",
@@ -219,7 +220,8 @@ def make_multi(root: Path) -> dict[str, str]:
 
 SHARED = ("[tool.ruff.lint]", "[tool.ruff.lint.mccabe]", "[tool.ruff.lint.pylint]",
           "[tool.ruff.lint.per-file-ignores]", "[tool.ruff.format]", "[tool.size_limits]",
-          "[tool.pytest.ini_options]", "[tool.typos.files]", "[tool.typos.default]")
+          "[tool.pytest.ini_options]", "[tool.pylint.similarities]", "[tool.typos.files]",
+          "[tool.typos.default]")
 
 
 def shared_sections(single: str) -> str:

@@ -57,7 +57,7 @@ Templates use `{{name}}`. After filling, `grep -rn '{{[a-z_]*}}'` over the writt
 | `source_globs` | tester.md | `"src/**"` · `"packages/*/src/**"` | shape |
 | `date`, `owner` | CONSTRAINTS | today, `@user` | — |
 | `type_gate_key` | CONSTRAINTS | `tool.mypy.strict` · `tool.pyright.typeCheckingMode` | the type-gate answer |
-| `coverage_today`, `vulture_today` | CONSTRAINTS | `— (no code)` / `71.2%`; whitelist entry count | measured |
+| `coverage_today`, `vulture_today`, `duplicates_today` | CONSTRAINTS | `— (no code)` / `71.2%`; whitelist entry count; duplicate-code block count | measured. pylint has no whitelist: each block found on existing code is an Exceptions row plus its file in `[tool.pylint.main] ignore-paths`, so `full` fails only on new ones |
 | `readability_rules` | CONSTRAINTS | extra `- **CR-13** …` lines from pipeline-design, or empty | `pipelines.md` |
 | `extra_enforced_rows` | CONSTRAINTS | e.g. CR-27 repro, a frontend row, or empty | spec QRs; non-Python parts |
 | `boundary_rules` | CONSTRAINTS | one line, `` `pkg.data` imports nothing first-party · `pkg.profile` → data `` | same source as the contracts |
@@ -65,4 +65,4 @@ Templates use `{{name}}`. After filling, `grep -rn '{{[a-z_]*}}'` over the writt
 | `exception_rows` | CONSTRAINTS | `\| EX-01 \| … \|` rows, or empty | the `DEP002` and other exceptions |
 | `default_branch` | check.yml | `main` | `git symbolic-ref refs/remotes/origin/HEAD`, else `main` |
 
-**Multi-package `pyproject.toml`:** the root is `pyproject.workspace.toml` followed by these sections of `pyproject.toml`, unchanged: `[tool.ruff.lint]` (select, ignore), `.mccabe`, `.pylint`, `.per-file-ignores`, `[tool.ruff.format]`, `[tool.size_limits]`, `[tool.pytest.ini_options]`, `[tool.typos.files]`, `[tool.typos.default]`. deptry lives in each package's file, never the root.
+**Multi-package `pyproject.toml`:** the root is `pyproject.workspace.toml` followed by these sections of `pyproject.toml`, unchanged: `[tool.ruff.lint]` (select, ignore), `.mccabe`, `.pylint`, `.per-file-ignores`, `[tool.ruff.format]`, `[tool.size_limits]`, `[tool.pytest.ini_options]`, `[tool.pylint.similarities]`, `[tool.typos.files]`, `[tool.typos.default]`. deptry lives in each package's file, never the root.

@@ -5,7 +5,7 @@ Read when `dt status --skill build-setup` reports `ratchet`: at Advance, after t
 ## Steps
 
 1. Run `check.sh full`; record measured values in "Measured, not yet enforced".
-2. A metric that improved tightens (`fail_under` up, a shorter vulture whitelist).
+2. A metric that improved tightens (`fail_under` up, a shorter vulture whitelist, fewer pylint `ignore-paths`).
 3. Drop expired `DEP002` entries the code now imports.
 4. Offer once to promote a measured metric to enforced.
 5. Set `**Ratcheted:** M<n>` in the header.

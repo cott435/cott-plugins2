@@ -33,7 +33,7 @@ Run `python3 ../../scripts/dt.py status --skill build-setup` first (path relativ
 
 New, Extend, Ratchet and Revise end here. Rerun `dt status --skill build-setup`. Every gap key must be empty (`unknown` only where the input file doesn't exist yet) or explained under Open questions; the mode file names any extra key. Then present:
 1. **What was written**, file by file (outside New, the diff of the bar), and the proof run (pass/fail, gate time vs budget).
-2. **ASSUMPTIONS:** every derived value (`references/derive.md`), the coverage floor, vulture whitelist size, and the four answers.
+2. **ASSUMPTIONS:** every derived value (`references/derive.md`), the coverage floor, vulture whitelist size, duplicate-code count, and the four answers.
 3. **Loosenings**, each as before → after, or say there are none. A loosening is a higher limit, a removed rule, a new exception or a weaker type mode, and needs the user's explicit yes; a tightening is routine.
 4. **Open questions** and anything uncovered (CI not requested, a non-Python part with no check).
 

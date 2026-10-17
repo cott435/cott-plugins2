@@ -37,6 +37,7 @@ The standing quality bar. `pyproject.toml` and `scripts/check.sh` enforce it; ev
 |---|---|---|---|
 | CR-40 | Coverage (branch) | {{coverage_today}} (`tool.coverage.report.fail_under`, raised by Ratchet) | must not fall |
 | CR-41 | vulture findings at `min_confidence = 60` (`scripts/vulture_whitelist.py`) | {{vulture_today}} | must not grow |
+| CR-42 | Duplicate blocks of ≥ 8 similar source lines (pylint `duplicate-code`, `[tool.pylint.similarities]` in pyproject.toml) | {{duplicates_today}} | must not grow |
 
 ## Boundaries (generated from architecture — do not edit)
 {{boundary_rules}}
@@ -46,21 +47,32 @@ The standing quality bar. `pyproject.toml` and `scripts/check.sh` enforce it; ev
 |---|---|---|---|
 | tester | `tests/intent/**`, within the task's `Writes:` | everything else; reads no source | `check.sh collect` (lint, collect, red for the right reason) |
 | implementer / solo | `src/**`, `tests/unit/**`, within the task's `Writes:`; the interface task also its new `tests/contracts/<id>.<symbol>/` | the protected list; `tasks/` | `check.sh gate` + protected-path diff against `refs/checks/base` |
-| reviewer | nothing (the orchestrator records findings with `dt finding`) | everything | runs `check.sh full` by hand |
+| reviewer | its own worktree only, for the mutation check; nothing lands (the orchestrator records findings with `dt finding`) | everything else | runs `check.sh full` by hand |
 
 **Protected list** (`PROTECTED` in `scripts/check.sh`; `path_guard.sh deny --protected` reads the same list): {{protected_globs_md}}. `tests/contracts/**` covers the contract folders that exist at the task's base (CR-09). **`Writes:`**: the orchestrator puts a task's `Writes:` in `.claude/.task_writes` in the builder's worktree, and `path_guard.sh writes` blocks every edit outside it. Only the orchestrator writes `tasks/` (`dt tick`, `dt finding`), after each merge.
 
 ## Review
-Run by the reviewer agent at every checkpoint and at milestone exit, over the diff since the checkpoint's base.
-1. **Five axes:** correctness, readability, architecture, security, performance.
-2. **Pipelines:** each entry function matches its step table (`dt layout`); step owners are respected; spine baselines are still selectable; each task's commits stay inside its `Writes:`, and no frozen type changed outside a contract Revise. At milestone exit, `check.sh full --exit` finds no interface stub left.
-3. **Guard the bar:** diff this file, `pyproject.toml`, `scripts/` and `.claude/agents/` against the milestone's Base. Any loosening is a Critical finding. New exceptions need an owner and expiry.
-4. **Tests:** no assertion-free tests, no weakened intent tests, golden cases still loaded from fixtures, Hypothesis on the `ci` profile.
-5. **Docs:** `dt lint` clean, contracts fresh, no pre-build sections left after the spine.
-6. **External check:** pip-audit ran, so the bar isn't made entirely of the agent's own tests.
-7. **References:** where reference or probe code was reused, its Caveats (`docs/references.md`, `docs/probes.md`) were handled (e.g. a full-sample fit became per-window), and it fits the contract and step table rather than the reference's own structure.
+Run by the reviewer agent over what it is given (base, package, tasks, paths): the interface review after Phase 0, a phase review per package at each checkpoint, and the milestone exit. `dt land` already checks each task's `Writes:`, protected paths, gate and red tests; review judges what tools can't.
 
-Findings go under the checkpoint block in `tasks/plan.md` (`dt finding`), each with a fix task or a reason. Critical findings block the next checkpoint.
+**Interface** (after Phase 0): the code is the contract, no more and no less.
+1. Types match `contract.md`: fields, types, invariants. Nothing a step's In → Out needs is missing; no helper is frozen.
+2. Signatures match the step tables, in their owner modules. Each stub names the open task that owns its step; no logic beyond types and validation.
+3. One sample per case the contract names, valid and realistically shaped, never carrying a TC's expected value. Replay doubles replay an interaction the Protocol allows; fakes serve their fixtures.
+4. `__init__.py` exports exactly the contract; each `Mitigated by` in the plan's dependency graph exists; each split task's tester can write its tests from the frozen interface and its `Read:`.
+
+**Each phase**, per package, tests before code:
+1. **Interfaces followed** (CR-09): no frozen type, signature or contract folder changed outside a Revise. Consumers use the declared types: no dict for a dataclass, no reaching into a provider's internals, no local redefinition. A stub is replaced only by the task it names; no cross-package import outside the contract; spine tests run on samples and doubles, not another step's code.
+2. **Tests prove something:** each intent test asserts its TC case or acceptance bullet, loading expected values and tolerances from fixtures; none is assertion-free or weakened; Hypothesis runs the `ci` profile. Unit tests are specific, never computing the expected value with the code under test or testing only a mock. **Mutation check** (`.claude/agents/reviewer.md`): per acceptance bullet, the smallest change that should break it; a mutation no test catches is a finding.
+3. **Correct to the spec:** each acceptance bullet truly met, not special-cased to the sample; the error paths the requirement names; seeding and determinism; numerical edge cases.
+4. **Simple** (CR-11, CR-12, CR-42): no abstraction with one implementation outside the contract or an AD; no forwarding wrapper, one-method class, or class where a function does; no parameter, flag or config key every caller sets the same; no `try/except` that only re-raises or swallows, no checks the types already guarantee; no loop the library already provides. No near-copies within or across the phase's tasks: one concept is one function in its owner module (tests may repeat for readability). Each finding names the simpler form, with the same tests passing.
+5. **Pipelines** (CR-10): entry functions read as their step tables (`dt layout`); step owners respected; spine baselines still selectable.
+6. **The bar** (CR-07): diff this file, `pyproject.toml`, `scripts/` and `.claude/agents/` against the milestone's Base. Any loosening is Critical; new exceptions need an owner and expiry.
+7. **Hidden and parallel risks:** where a real provider could act differently from its double (flagged for the system phase); fixed output paths, global state, test-order dependence.
+8. **The rest:** readability, security, performance where a QR sets a number; reused reference or probe code has its Caveats handled and fits the contract; `dt lint` clean, pre-build sections replaced by `dt layout` pointers.
+
+**Milestone exit**, over the whole diff, adds: the Scope's Exit holds; every Covers ID has a test; `check.sh full --exit` finds no stub; system tests use real providers; the same sample through a real provider and its double agrees; deferred requirements untouched; pip-audit ran.
+
+**Severity:** Critical: a frozen interface changed, a weakened test, an intent test that misses a mutation changing its TC's expected output, a wrong answer, a loosened bar, a security hole, lost data; it stops the build. Important: a consumer bypassing a type, any other surviving mutation, an unneeded abstraction, a duplicate across tasks. Suggestion and Nit: local. Findings go under the checkpoint block in `tasks/plan.md` (`dt finding`), each with a fix task or a reason.
 
 ## Done
 agent-skills `references/definition-of-done.md`, tailored once:

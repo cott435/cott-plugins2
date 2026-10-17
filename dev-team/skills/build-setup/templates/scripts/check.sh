@@ -235,6 +235,7 @@ case "$mode" in
     other_parts
     if [ "$TYPE_GATE" = mypy ]; then run pyright; else run mypy; fi
     run vulture
+    run pylint --disable=all --enable=duplicate-code --recursive=y --score=n --fail-under=10 "${SRC_DIRS[@]}"   # CR-42
     run typos
     run pip-audit --skip-editable   # the external opinion: a vulnerability database (CR-26)
     step bash scripts/floor_guard.sh ${exit_check[@]+"${exit_check[@]}"}

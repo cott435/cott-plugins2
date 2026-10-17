@@ -1,10 +1,10 @@
 # Writing cases and the Strategy
 
-Read when writing golden cases and Strategy rows (New and Extend). File shapes and worked cases are in `../examples.md`.
+Read when writing golden cases and Strategy rows. File shapes and a routed case are in `../examples.md`.
 
-## Every case has a source outside the agent
+## What counts as a source
 
-A user file, a paper table, a closed form, or a generator plus seed. The case records that source and why its tolerance is what it is ("5% of λ+, for finite-sample edge fluctuation"; "exact, dates are discrete"). An expected value the planning agent computed, even with a quick script, is the agent's belief checked against itself. Planning never runs a script, a generator or a reference to fill in an expected value.
+A user file, a paper table, a closed form, or a generator plus seed. The case records that source, and its tolerance's reason says why it is what it is ("5% of λ+, for finite-sample edge fluctuation"; "exact, dates are discrete"). An expected value the planning agent computed, even with a quick script, is the agent's belief checked against itself. Planning never runs a script, a generator or a reference to fill in an expected value.
 
 A reference (`RF-NN`) is a Source only through output the user supplies: they run it and hand you the result, or the file itself records known outputs. Its entry's Caveats are candidate known-answer cases: "fits PCA on the full sample" suggests a look-ahead case.
 

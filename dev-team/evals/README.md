@@ -44,7 +44,7 @@ CLAUDE_BIN=$PWD/evals/harness/fake_claude.py \
   python3 evals/harness/driver.py quant-all-at-once /tmp/fake/quant-all-at-once/with_skill   # driver loop, fake CLI
 ```
 
-On dt's sample, `simulate.py` passes every Replan and Advance check and fails the one Ready check while the sample's plan has no interface task; on the dry run's interface-first replay, the Ready and contract-change checks wait on `dt ready` (below).
+On dt's sample, `simulate.py` passes every Replan, Advance, Ready and contract-change check.
 
 The dry run replays the fixture's `references/` and `docs/references.md` as a reference-intake turn (with one fake Agent launch per file) before the M2 idea. To exercise the driver's reference copying and Agent parsing, run the fake loop on `quant-all-at-once` with `MAX_TURNS=5`: turn 4 is the intake layer and should record one launch per file. The fake loop also writes one plan snapshot per turn to `plans/`.
 
@@ -52,10 +52,10 @@ The dry run is also the grader's self-test. It grades four replays, exports each
 
 | Replay | What it is | Checks passing |
 |---|---|---|
-| `quant-incremental` | The sample as it is (old-format plan), then its M1 code as a build turn | 51 of 77 |
-| `quant-incremental-ifd` | The sample with the interface-first M1 from `selftest/`; no code | 62 of 80 |
-| `quant-incremental-ifdbad` | That plan broken once per check, plus a `types.py` written in a planning turn and a frozen type revised after the plan | 46 of 80 |
-| `quant-incremental-ifdserial` | The spines chained one after another and the testers solo | 57 of 80 |
+| `quant-incremental` | The sample as it is (its interface-first M1), then its M1 code as a build turn | 66 of 80 |
+| `quant-incremental-ifd` | The sample with the interface-first M1 from `selftest/`; no code | 67 of 80 |
+| `quant-incremental-ifdbad` | That plan broken once per check, plus a `types.py` written in a planning turn and a frozen type revised after the plan | 47 of 80 |
+| `quant-incremental-ifdserial` | The spines chained one after another and the testers solo | 60 of 80 |
 
 Expected failures in every replay, because the sample is a two-milestone project, not a finished four-stage run:
 - The sample is single-package, not multi-package from the data stage (`quant_multi_from_data`).
@@ -64,15 +64,13 @@ Expected failures in every replay, because the sample is a two-milestone project
 - The sample has no viz app, so its M1 has no frontend-design (`skills_on_data_tasks`).
 - The sample's PCA reference serves its M1 (data + stats), not the structure_portfolios milestone, and its M2 has no `**Skills:**` line (`refs_milestones`, `skills_on_structure_tasks`).
 
-Beyond those, the old-format replay fails `no_code_during_planning` (M1-T01's code) and every interface-first check its plan has no fields for. The bad replay fails each of `graph_metrics` (a cycle), `writes_disjoint`, `edges_mitigated`, `unmitigated_reasoned`, `no_edge_to_code_when_interface`, `edge_table_consistent`, `phase0_split`, `step_tasks_small`, `tester_starts_early`, `fakes_only_cross_pipeline`, `tasks_not_editing_plan`, `interface_coverage`, `types_in_contract`, `tasks_well_formed`, `no_code_during_planning` and `doc_budgets`, and reports one `frozen_interface_churn` revision where the good replay reports none. The serial replay fails `plan_parallelism` and `wave_width`.
+Beyond those, the sample's own replay fails `no_code_during_planning` (M1-T01's code), and the good replay fails nothing else. The bad replay fails each of `graph_metrics` (a cycle), `writes_disjoint`, `edges_mitigated`, `unmitigated_reasoned`, `no_edge_to_code_when_interface`, `edge_table_consistent`, `phase0_split`, `step_tasks_small`, `tester_starts_early`, `fakes_only_cross_pipeline`, `tasks_not_editing_plan`, `interface_coverage`, `types_in_contract`, `tasks_well_formed`, `no_code_during_planning` and `doc_budgets`, and reports one `frozen_interface_churn` revision where the good replay reports none. dt catches the same plan: `dt_lint_clean` fails, `dt ready` stops at the cycle (`sim_ready_2`, `sim_ready_3`), and the archived plan isn't lint-clean (`sim_advance_3`). The serial replay fails `plan_parallelism` and `wave_width`; its chained spines also keep mitigated edges in `Depends on` and leave one without a row (`no_edge_to_code_when_interface`, `edge_table_consistent`, and dt's `edges` lint on the same rows), its solo testers break the Mode rule (`tasks_well_formed`), and `dt ready` lists one spine after the interface task (`sim_ready_2`).
 
-Five checks depend on the dt being staged and are pinned as pending: `sim_ready_1`–`3` and `sim_contract_1` need `dt ready` (with tester halves) and `interfaces_changed`, and the interface-first replays need `task-size` to count `Writes:`. With the interface-first dt they pass on the good replay. The dry run stages the plugin at `PLUGIN_SRC` and replays that checkout's sample, so it checks the harness against another branch's dt without merging it:
+The dry run stages the plugin at `PLUGIN_SRC` and replays that checkout's sample, so it checks the harness against another branch's dt without merging it:
 
 ```bash
 PLUGIN_SRC=<worktree>/dev-team python3 evals/harness/dryrun.py
 ```
-
-When the sample's own plan is interface-first, the first replay grades it, and the interface-first checks on it are reported, not pinned.
 
 ## Smoke run (one turn, about $0.30)
 
@@ -276,5 +274,5 @@ Each packaged run holds `plan_snapshot.json`, the final plan as one graph, with 
 - **Iteration 5 was the first full run** (2026-10-16, about $104): results and findings in [results-iteration-5/findings.md](results-iteration-5/findings.md). It found three driver bugs, now fixed. A stage change blocked by `readiness()` is re-asked instead of sending a message that already introduces the next stage. The simulated user moves to the next stage instead of ending at stage 1's build setup. After 4 blocked moves in a row with no doc change, the run stops as `stalled: …`. `gate_discipline` no longer counts `Used by:` appends to `contract.md`.
 - **Smoke run.** The one-turn smoke run passed on 2026-10-16 (Claude Code 2.1.292, $0.34): the plugin loads via `--plugin-dir` alongside `--setting-sources project,local`, `session_init` lists all seven `dev-team:*` skills, and `evalperm` is connected. A separate probe showed the guard's "ask" under `bypassPermissions` goes to `evalperm`, which allows and logs it. Without `--permission-prompt-tool` (or with `--permission-prompts none`) an "ask" is denied. Hook events other than SessionStart and Stop appear in stream-json only with `--include-hook-events`, which the driver now passes.
 - **Agent frontmatter hooks don't fire in headless runs in an untrusted folder** (they are skipped silently) unless the agents are passed with `--agents`, installed user-level, or the folder was trusted beforehand ([build-setup.md §11](../design/build-setup.md)). That only matters once evals cover building. Planning never runs the tester, implementer or reviewer agents.
-- **The interface-first checks have run only on replays.** Their thresholds are the design's proposals. `sim_ready_*`, `sim_contract_1` and the `graph_metrics` cross-check need the interface-first dt in the staged plugin; until then the cross-check reports that dt has no graph numbers.
+- **The interface-first checks have run only on replays.** Their thresholds are the design's proposals. A run staged with a dt that has no `devteam.graph`, `dt ready` or `dt plan --json` fails the Ready and contract-change simulations, and its `graph_metrics` evidence says dt has no graph numbers.
 - **Skill names are namespaced.** Plugin skills show up as `dev-team:<skill>`, and the grader strips the prefix.

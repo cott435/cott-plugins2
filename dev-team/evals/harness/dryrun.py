@@ -6,7 +6,7 @@ with the result pinned here. It is also the grader's self-test for the interface
 Each replay copies one planning layer per turn (brief → spec → architecture → reference intake → M2 idea →
 pipelines → tests → plan → build setup), keeps the plan snapshot per turn as driver.py does, grades the run and
 exports its plan.json. The replays:
-- `quant-incremental`: the sample as it is, then its M1 code as a final "build" turn.
+- `quant-incremental`: the sample as it is (its interface-first M1), then its M1 code as a final "build" turn.
 - `quant-incremental-ifd`: the sample with an interface-first M1 (§5.3 of design/interface-first-design.md):
   selftest/quant-interface-first/ laid over it. No code. Every interface-first check passes.
 - `quant-incremental-ifdbad`: the same plan broken once per check (shared Writes, a mitigated edge in Depends on,
@@ -14,8 +14,9 @@ exports its plan.json. The replays:
   contract, a types.py written during planning, a frozen type revised later, ...). Each of those checks fails.
 - `quant-incremental-ifdserial`: the spines chained one after another and the testers made solo. The parallelism
   and wave-width checks fail.
-Checks the sample can't meet (it isn't a finished four-stage quant run) are pinned as expected failures; checks
-that need the interface-first dt (`dt ready`, `Writes:` in task-size) are pinned as pending until it lands.
+Every check is pinned, pass or fail: the checks the sample can't meet (it isn't a finished four-stage quant run)
+fail in every replay, and in the broken replays dt itself (lint, `dt ready`, `dt archive`) catches the planted
+defects alongside the grader.
 
 Usage: dryrun.py [out-dir]   (default: a fresh temp dir; printed at the end). Exit 1 on any unexpected result.
 """
@@ -46,17 +47,15 @@ PLANNING = [l for l in LAYERS if l[0]]
 CONTENT = {"quant_multi_from_data", "approval_after_user", "nh_named", "nh_at_features", "nh_routed_in_plan",
            "spec_bias_guards", "spec_classical", "spec_ml_beats_classical", "spec_oos", "arch_viz_boundary",
            "refs_milestones", "skills_on_data_tasks", "skills_on_structure_tasks"}
-# The interface-first checks an old-format plan (no Kind, Writes or dependency graph) fails.
-IFD_CHECKS = {"tasks_well_formed", "wave_width", "writes_disjoint", "edges_mitigated", "unmitigated_reasoned",
-              "edge_table_consistent", "phase0_split", "step_tasks_small", "tester_starts_early", "interface_coverage",
-              "types_in_contract", "sim_ready_1"}
-# Pass only once dt-core lands: `dt ready`, contract-change readers, and task-size counting Writes.
-DT_CORE = {"dt_lint_clean", "sim_ready_1", "sim_ready_2", "sim_ready_3", "sim_contract_1"}
 BAD_FAIL = {"graph_metrics", "writes_disjoint", "edges_mitigated", "unmitigated_reasoned", "no_edge_to_code_when_interface",
             "edge_table_consistent", "phase0_split", "step_tasks_small", "tester_starts_early", "fakes_only_cross_pipeline",
             "tasks_not_editing_plan", "interface_coverage", "types_in_contract", "tasks_well_formed",
-            "no_code_during_planning", "doc_budgets"}
-SERIAL_FAIL = {"plan_parallelism", "wave_width"}
+            "no_code_during_planning", "doc_budgets",
+            # dt sees the same defects: lint errors, no `dt ready` past the cycle, an archive that isn't lint-clean.
+            "dt_lint_clean", "sim_ready_2", "sim_ready_3", "sim_advance_3"}
+# Chained spines also contradict their mitigated rows (dt's `edges` lint agrees), and solo testers break the Mode rule.
+SERIAL_FAIL = {"plan_parallelism", "wave_width", "dt_lint_clean", "sim_ready_2", "tasks_well_formed",
+               "no_edge_to_code_when_interface", "edge_table_consistent"}
 
 
 def copy_layer(fixture, proj, paths):
@@ -77,11 +76,6 @@ def intake_agents(proj):
     refs = sorted(p for p in (proj / "references").rglob("*") if p.is_file()) if (proj / "references").is_dir() else []
     return [{"subagent_type": "general-purpose", "description": f"Summarize {p.name}",
              "prompt": f"Read {p.relative_to(proj)} and draft its reference entry."} for p in refs]
-
-
-def native_ifd():
-    plan = FIXTURE / "tasks" / "plan.md"
-    return plan.exists() and "**Kind:**" in plan.read_text()
 
 
 def ifd_fixture(tmp):
@@ -193,23 +187,18 @@ def replay(out, name, fixture, layers):
     return run, {c["id"]: c for c in g["expectations"]}, g["summary"]
 
 
-def verdict(name, res, summary, must_fail, either=()):
+def verdict(name, res, summary, must_fail):
     """Compare a replay's checks with the pinned expectations; return the unexpected ones."""
     bad = []
     for cid, c in res.items():
         if c.get("na"):
-            continue
-        if cid in either:
             continue
         if cid in must_fail and c["passed"]:
             bad.append(f"{cid} passed, expected to fail")
         if cid not in must_fail and not c["passed"]:
             bad.append(f"{cid} failed: {c['evidence'][:220]}")
     bad += [f"{cid} missing from grading.json" for cid in must_fail if cid not in res]
-    pending = sorted(f"{cid}={'pass' if res[cid]['passed'] else 'fail'}" for cid in either if cid in res and cid in DT_CORE)
-    print(f"{name}: {summary['passed']}/{summary['total']} pass"
-          + (f"; dt-core pending: {', '.join(pending)}" if pending else "")
-          + ("; as pinned" if not bad else f"; UNEXPECTED: {len(bad)}"))
+    print(f"{name}: {summary['passed']}/{summary['total']} pass" + ("; as pinned" if not bad else f"; UNEXPECTED: {len(bad)}"))
     for b in bad:
         print("  " + b)
     return bad
@@ -226,15 +215,12 @@ def main():
     tmp = pathlib.Path(tempfile.mkdtemp(prefix="dt-dryrun-fx-"))
     bad = []
     try:
-        native = native_ifd()
         _, res, summ = replay(out, "quant-incremental", FIXTURE, LAYERS)
-        # With dt-core's interface-first fixture the sample's own M1 meets the new checks; its code turn still fails.
-        bad += verdict("quant-incremental", res, summ, CONTENT | {"no_code_during_planning"} | (set() if native else IFD_CHECKS),
-                       either=(IFD_CHECKS | DT_CORE) if native else DT_CORE)
+        bad += verdict("quant-incremental", res, summ, CONTENT | {"no_code_during_planning"})  # the M1 code turn
 
         good = ifd_fixture(tmp)
         _, res, summ = replay(out, "quant-incremental-ifd", good, PLANNING)
-        bad += verdict("quant-incremental-ifd", res, summ, CONTENT, either=DT_CORE)
+        bad += verdict("quant-incremental-ifd", res, summ, CONTENT)
         churn = res["frozen_interface_churn"].get("metrics", {}).get("churn")
         if churn != 0:
             bad.append(f"ifd: frozen_interface_churn {churn}, expected 0")
@@ -245,10 +231,7 @@ def main():
         layers = PLANNING[:-1] + [("architecture-design", code_in_planning), PLANNING[-1],
                                   ("architecture-design", revise_frozen_type)]
         _, res, summ = replay(out, "quant-incremental-ifdbad", fx, layers)
-        bad += verdict("quant-incremental-ifdbad", res, summ, CONTENT | BAD_FAIL,
-                       either=DT_CORE | {"gate_discipline", "sim_replan_1", "sim_replan_2", "sim_replan_3", "sim_replan_4",
-                                         "sim_replan_5", "sim_advance_1", "sim_advance_2", "sim_advance_3",
-                                         "context_packets_small", "milestone_size", "plan_parallelism", "wave_width"})
+        bad += verdict("quant-incremental-ifdbad", res, summ, CONTENT | BAD_FAIL)
         churn = res["frozen_interface_churn"].get("metrics", {}).get("churn")
         if not churn:
             bad.append(f"ifdbad: frozen_interface_churn {churn}, expected the revised stats.Cov to count")
@@ -257,9 +240,7 @@ def main():
         shutil.copytree(good, fx, ignore=shutil.ignore_patterns("src"))
         break_serial(fx)
         _, res, summ = replay(out, "quant-incremental-ifdserial", fx, PLANNING)
-        bad += verdict("quant-incremental-ifdserial", res, summ, CONTENT | SERIAL_FAIL,
-                       either=DT_CORE | {"tasks_well_formed", "no_edge_to_code_when_interface", "tester_starts_early",
-                                         "edge_table_consistent"})
+        bad += verdict("quant-incremental-ifdserial", res, summ, CONTENT | SERIAL_FAIL)
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
     print(f"run dirs: {out}")

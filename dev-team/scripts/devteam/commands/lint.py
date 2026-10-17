@@ -6,6 +6,7 @@ problems located in the files asked for. Cross-doc checks always read the whole 
 """
 from __future__ import annotations
 
+import fnmatch
 import json
 import os
 import re
@@ -14,7 +15,7 @@ from dataclasses import dataclass
 from functools import cached_property
 from pathlib import Path
 
-from .. import git, md, model
+from .. import git, graph, md, model
 from .. import references as refs
 from ..repo import Repo
 from ..status.common import available_skills
@@ -23,7 +24,8 @@ from ..status.common import available_skills
 SEVERITY = {
     "dup-id": "E", "missing-ref": "E", "retired-ref": "E", "budget": "W", "grow-size": "W", "approved-edit": "W",
     "prebuild-left": "E", "task-size": "E", "task-acceptance": "E", "task-title": "E", "task-fields": "E",
-    "task-step": "W", "depends": "E", "milestone-size": "E", "parallel": "E", "verify-smoke": "E", "todo-mismatch": "E",
+    "task-step": "W", "depends": "E", "milestone-size": "E", "writes": "E", "edges": "E", "deprecated": "W",
+    "step-io-types": "E", "verify-smoke": "E", "todo-mismatch": "E",
     "finding-disposition": "E", "foreign-plan": "W", "broken-fence": "E", "header": "E",
     "unreadable": "E", "internal": "W", "pipeline-fields": "E", "spine-mock": "W", "contract-heading": "E",
     "fixture-size": "W",                # missing fixture files are reported as E
@@ -45,9 +47,13 @@ SPINE_MOCK = re.compile(r"\b(mock|stub|fake|todo|placeholder)", re.IGNORECASE)
 # A fake of another package generated from an approved contract is allowed; a mocked step is not.
 BOUNDARY_FAKE = re.compile(r"\b(contract|boundary)\s+fakes?\b", re.IGNORECASE)
 
-SIZE_FILES = {"XS": (1, 1), "S": (1, 2), "M": (3, 5)}
-TRACK_MAX = 15        # serial Phase 0 tasks + the longest Depends-on chain through the rest
+SIZE_FILES = {"XS": (1, 1), "S": (1, 2), "M": (3, 5)}     # source files a task writes (tests don't count)
+TRACK_MAX = 15        # the plan's critical path, in tasks
 REQUIRED_TASK_FIELDS = ("Package", "Step", "Size", "Mode", "Read", "Acceptance", "Verify")
+INTERFACE_FIRST_FIELDS = ("Kind", "Writes")    # also required once a plan is interface-first
+# Shared files: only an interface, wiring or system task may write them (interface-first-design.md §1.5).
+SHARED_NAMES = ("__init__.py", "types.py", "__main__.py")
+SHARED_WRITERS = ("interface", "wiring", "system")
 
 # Fields and table columns whose IDs must resolve. `Depends on` is checked by `depends`.
 REF_FIELDS = {"Read", "Covers", "Step", "Pipeline", "Used by", "Part of", "References"}
@@ -544,22 +550,27 @@ def _acceptance_count(t: model.Task) -> int:
     return n
 
 
-def _files(t: model.Task) -> list[str]:
-    return [f.removeprefix("./") for f in t.files_likely if f.lower() not in NONE_VALUES]
+def _is_test(path: str) -> bool:
+    return path.startswith("tests/") or "/tests/" in path or path.rsplit("/", 1)[-1].startswith("test_")
 
 
 def check_task_size(ctx: Context):
+    """Size vs the source files the task writes (`Writes:`, else `Files likely`; test files don't count). An
+    interface task writes many small shapes and is sized by judgment."""
     for t in ctx.tasks:
         if not t.size:
             continue                  # task-fields reports it
         if t.size not in SIZE_FILES:
             yield _p(t.doc, t.start, "task-size", f"{t.id} Size {t.size}: must be XS, S or M (split it)")
             continue
+        if t.kind == "interface":
+            continue
         lo, hi = SIZE_FILES[t.size]
-        n = len(_files(t))
+        n = len([f for f in t.writes if not _is_test(f)])
         if not lo <= n <= hi:
             want = f"{lo}" if lo == hi else f"{lo}–{hi}"
-            yield _p(t.doc, t.start, "task-size", f"{t.id} Size {t.size} wants {want} Files likely, has {n}")
+            field = "Writes" if "Writes" in t.fields else "Files likely"
+            yield _p(t.doc, t.start, "task-size", f"{t.id} Size {t.size} wants {want} source files in {field}, has {n}")
 
 
 def check_task_acceptance(ctx: Context):
@@ -576,13 +587,27 @@ def check_task_title(ctx: Context):
 
 
 def check_task_fields(ctx: Context):
+    for doc in ctx.plan_docs:
+        required = REQUIRED_TASK_FIELDS + (INTERFACE_FIRST_FIELDS if model.is_interface_first(doc) else ())
+        for t in model.tasks(doc):
+            missing = [k for k in required if k not in t.fields or (k != "Acceptance" and not t.get(k))]
+            if missing:
+                yield _p(t.doc, t.start, "task-fields", f"{t.id} missing {', '.join(missing)}")
+            if t.get("Mode") and t.mode not in ("split", "solo"):
+                yield _p(t.doc, t.start, "task-fields", f"{t.id} Mode {t.get('Mode')!r}: must be split or solo")
+            if t.get("Kind") and t.kind not in model.KINDS:
+                yield _p(t.doc, t.start, "task-fields",
+                         f"{t.id} Kind {t.get('Kind')!r}: must be one of {', '.join(model.KINDS)}")
+
+
+def check_deprecated(ctx: Context):
+    """`Parallel` and `Files likely` still parse, but an interface-first plan derives groups from the graph and
+    claims files with `Writes:`."""
     for t in ctx.tasks:
-        missing = [k for k in REQUIRED_TASK_FIELDS
-                   if k not in t.fields or (k != "Acceptance" and not t.get(k))]
-        if missing:
-            yield _p(t.doc, t.start, "task-fields", f"{t.id} missing {', '.join(missing)}")
-        if t.get("Mode") and t.mode not in ("split", "solo"):
-            yield _p(t.doc, t.start, "task-fields", f"{t.id} Mode {t.get('Mode')!r}: must be split or solo")
+        for key, why in model.DEPRECATED_FIELDS.items():
+            if key in t.fields:
+                line = md.field_line(t.doc.lines, t.start, t.end, key)
+                yield _p(t.doc, t.start if line is None else line, "deprecated", f"{t.id} **{key}:** is deprecated: {why}")
 
 
 def check_task_step(ctx: Context):
@@ -640,67 +665,197 @@ def _cycles(graph: dict[str, list[str]]) -> list[list[str]]:
     return out
 
 
-def _longest_chain(tasks: list[model.Task]) -> list[str]:
-    """The longest Depends-on chain among `tasks` (IDs, first to last). Dependencies outside `tasks` and
-    cycles (reported by `depends`) are ignored."""
-    graph = {t.id: [d for d in t.depends_on if d != t.id] for t in tasks}
-    best: dict[str, list[str]] = {}
-
-    def chain(node: str, path: frozenset) -> list[str]:
-        if node in best:
-            return best[node]
-        prev = [chain(d, path | {node}) for d in graph[node] if d in graph and d not in path]
-        best[node] = max(prev, key=len, default=[]) + [node]
-        return best[node]
-
-    return max((chain(t.id, frozenset()) for t in tasks), key=len, default=[])
-
-
 def check_milestone_size(ctx: Context):
-    """A milestone's track: Phase 0 tasks with no Parallel group run one after another and count in full
-    (the contract task, the system spine); the rest, package spines in parallel groups included, count as
-    the longest Depends-on chain through them. Parallel tracks don't add up, so the plan's total task count
-    isn't capped (the plan's line budget bounds it)."""
+    """The plan's critical path (the longest `Depends on` chain; mitigated edges don't order) is capped. Parallel
+    tracks don't add up, so the total task count isn't capped (the plan's line budget bounds it)."""
     for doc in ctx.plan_docs:
-        tasks = model.tasks(doc)
-        serial = {t.id for t in tasks if t.is_spine and t.parallel.lower() in NONE_VALUES}
-        chain = _longest_chain([t for t in tasks if t.id not in serial])
-        n = len(serial) + len(chain)
-        if n > TRACK_MAX:
+        chain = graph.critical_path(model.tasks(doc))
+        if len(chain) > TRACK_MAX:
             line = doc.header_line if doc.header_line is not None else 0
             yield _p(doc, line, "milestone-size",
-                     f"track is {n} tasks, cap {TRACK_MAX}: serial Phase 0 {len(serial)} + chain "
-                     f"{' → '.join(chain)} ({len(chain)}). Shorten the chain, run package spines in parallel "
-                     "groups against the contract, or cut the stage into another milestone where a later part "
-                     "needs an earlier part's outputs; never split independent tracks")
+                     f"critical path is {len(chain)} tasks, cap {TRACK_MAX}: {' → '.join(chain)}. Freeze an "
+                     "interface for an edge on it so both sides start at once, or cut the stage into another "
+                     "milestone where a later part needs an earlier part's outputs; never split independent tracks")
 
 
-def check_parallel(ctx: Context):
-    """Two tasks in one group sharing a file or a contract symbol. A symbol the plan's contract task froze
-    (Step `contract`) is read-only for the rest of the milestone, so both sides of a boundary may share it."""
+def _norm(path: str) -> tuple[str, bool]:
+    """A Writes item → (path or folder prefix, is a folder). `dir/**`, `dir/*` and `dir/` claim the folder."""
+    p = path.strip().removeprefix("./")
+    for suffix in ("/**", "/*", "/"):
+        if p.endswith(suffix):
+            return p[: -len(suffix)] + "/", True
+    return p, False
+
+
+def _overlap(a: str, b: str) -> bool:
+    (pa, da), (pb, db) = _norm(a), _norm(b)
+    if pa == pb:
+        return True
+    if da and pb.startswith(pa) or db and pa.startswith(pb):
+        return True
+    return fnmatch.fnmatch(pa, pb) or fnmatch.fnmatch(pb, pa)
+
+
+def _shared(path: str, entries: set[str]) -> bool:
+    p, folder = _norm(path)
+    return not folder and (p in entries or p.rsplit("/", 1)[-1] in SHARED_NAMES)
+
+
+def check_writes(ctx: Context):
+    """`Writes:` is an exclusive claim. Two tasks with no `Depends on` path between them (in either direction)
+    must not write the same path, across the whole plan; a shared file (`__init__.py`, `types.py`, an entry
+    module) belongs to the interface, wiring or system task. A conflict only `Files likely` claims is a warning."""
+    entries = {p.entry_file for p in ctx.pipelines.values() if p.entry_file}
     for doc in ctx.plan_docs:
-        groups: dict[str, list[model.Task]] = {}
         tasks = model.tasks(doc)
-        frozen = set().union(*(_contract_symbols(_read_ids(t.get("Read"))) for t in tasks if t.is_contract))
+        up = {t.id: graph.ancestors(tasks, t.id) for t in tasks}
+        for n, b in enumerate(tasks):
+            for a in tasks[:n]:
+                if a.id in up[b.id] or b.id in up[a.id]:
+                    continue
+                shared = [w for w in b.writes if any(_overlap(w, v) for v in a.writes)]
+                if shared:
+                    sev = "" if "Writes" in a.fields and "Writes" in b.fields else "W"
+                    yield Problem(doc.rel, b.start + 1, "writes",
+                                  f"{b.id} and {a.id} both write {', '.join(shared)} with no Depends on path "
+                                  "between them: move the shared part to the interface or wiring task, or "
+                                  "order them (and give the edge a graph row)", sev)
+            if b.kind and b.kind not in SHARED_WRITERS:
+                owned = [w for w in b.writes if _shared(w, entries)]
+                if owned:
+                    line = md.field_line(doc.lines, b.start, b.end, "Writes")
+                    yield _p(doc, b.start if line is None else line, "writes",
+                             f"{b.id} ({b.kind}) writes the shared file {', '.join(owned)}: only an interface, "
+                             "wiring or system task may")
+
+
+def _produced(tasks: list[model.Task]) -> set[str]:
+    """Contract symbols the plan's interface tasks freeze: their `Read:` symbols and `tests/contracts/<sym>/`
+    folders in their `Writes:`."""
+    out: set[str] = set()
+    for t in tasks:
+        if t.is_contract:
+            out |= _contract_symbols(_read_ids(t.get("Read")))
+            for w in t.writes:
+                m = re.match(rf"tests/contracts/({md.SYMBOL_ID})(?:/|$)", w)
+                if m:
+                    out.add(m.group(1))
+    return out
+
+
+def _step_of(ctx: Context, t: model.Task) -> list[model.Step]:
+    """The pipeline steps a task touches: `PL-02.pca` → that step; `PL-02` → every step of PL-02."""
+    out = []
+    for m in re.finditer(r"(PL-\d{2,})(?:\.(\w+))?", t.step):
+        p = ctx.pipelines.get(m.group(1))
+        if p is not None:
+            out += [s for s in p.steps if m.group(2) in (None, s.name)]
+    return out
+
+
+def _types_between(ctx: Context, types, src: model.Task, dst: model.Task) -> set[str]:
+    """Contract types `dst`'s steps produce that `src`'s steps take in (a `data` edge's boundary)."""
+    outs = {ty.id for s in _step_of(ctx, dst) for n in s.out_types if (ty := model.resolve_type(types, n))}
+    ins = {ty.id for s in _step_of(ctx, src) for n in s.in_types if (ty := model.resolve_type(types, n))}
+    return outs & ins
+
+
+def _callees(ctx: Context, src: model.Task, dst: model.Task) -> set[str]:
+    """Contract symbols a `call` edge crosses: those `src`'s steps call (`<owner>.<step>`) that `dst` reads or
+    builds."""
+    called = {f"{s.owner}.{s.name}" for s in _step_of(ctx, src)}
+    provided = _contract_symbols(_read_ids(dst.get("Read"))) | {f"{s.owner}.{s.name}" for s in _step_of(ctx, dst)}
+    return called & provided
+
+
+def check_edges(ctx: Context):
+    """Every `Depends on` is an unmitigated `## Dependency graph` row (a dependency on an interface task is
+    implied); a mitigated row never orders, so it must not be in `Depends on`; a `none` row gives its reason; a
+    mitigation names a symbol an interface task freezes; and a `data` or `call` edge an interface already
+    covers is mitigated, not waited for."""
+    types = model.contract_types(ctx.repo)
+    for doc in ctx.plan_docs:
+        if not model.is_interface_first(doc):
+            continue
+        tasks = model.tasks(doc)
+        by_id = {t.id: t for t in tasks}
+        edges = model.graph_edges(doc)
+        produced = _produced(tasks)
+        section = model.graph_section(doc)
+        rows: dict[tuple[str, str], model.Edge] = {}
+        for e in edges:
+            where = e.line
+            if not e.src or not e.dst:
+                yield _p(doc, where, "edges", f"graph row {' | '.join(e.cells[:2])}: From and To must each name a task")
+                continue
+            for end in (e.src, e.dst):
+                if end not in by_id and not ctx.resolves(end):
+                    yield _p(doc, where, "edges", f"graph row {e.src} → {e.dst}: {end} isn't defined")
+            if e.kind not in model.EDGE_KINDS:
+                yield _p(doc, where, "edges",
+                         f"graph row {e.src} → {e.dst}: Kind {e.kind!r} must be one of {', '.join(model.EDGE_KINDS)}")
+            if not e.mitigated and not e.reason:
+                yield _p(doc, where, "edges", f"graph row {e.src} → {e.dst} is `none` with no reason (`none: <why>`)")
+            if e.mitigated:
+                syms = re.findall(rf"(?<![\w.]){md.SYMBOL_ID}", md.strip_md(e.mitigated_by))
+                if not syms:
+                    yield _p(doc, where, "edges",
+                             f"graph row {e.src} → {e.dst}: mitigation names no interface (`pkg.Symbol sample|fake`)")
+                for sym in syms:
+                    if sym not in produced:
+                        yield _p(doc, where, "edges",
+                                 f"graph row {e.src} → {e.dst}: {sym} isn't frozen by an interface task "
+                                 "(not in its Read: or a tests/contracts/ folder it Writes)")
+            elif e.kind in ("data", "call") and e.src in by_id and e.dst in by_id:
+                src, dst = by_id[e.src], by_id[e.dst]
+                covered = (_types_between(ctx, types, src, dst) if e.kind == "data"
+                           else _callees(ctx, src, dst)) & produced
+                if covered:
+                    yield _p(doc, where, "edges",
+                             f"{e.src} waits on code task {e.dst} across {', '.join(sorted(covered))}, which an "
+                             "interface task freezes: mitigate the edge and drop the dependency")
+            rows.setdefault((e.src, e.dst), e)
         for t in tasks:
-            if t.parallel.lower() not in NONE_VALUES:
-                groups.setdefault(t.parallel, []).append(t)
-        for group, members in groups.items():
-            for n, b in enumerate(members):
-                for a in members[:n]:
-                    files = sorted(set(_files(a)) & set(_files(b)))
-                    syms = sorted((_contract_symbols(_read_ids(a.get("Read")))
-                                   & _contract_symbols(_read_ids(b.get("Read")))) - frozen)
-                    shared = files + syms
-                    if shared:
-                        yield _p(doc, b.start, "parallel",
-                                 f"{b.id} and {a.id} are both in {group} but share {', '.join(shared)}")
+            line = md.field_line(doc.lines, t.start, t.end, "Depends on")
+            line = t.start if line is None else line
+            for dep in t.depends_on:
+                e = rows.get((t.id, dep))
+                if e is not None and e.mitigated:
+                    yield _p(doc, line, "edges", f"{t.id} depends on {dep}, but its graph row is mitigated by "
+                             f"{e.mitigated_by}: a mitigated edge doesn't order, drop the dependency")
+                elif e is None and not (dep in by_id and by_id[dep].kind == "interface"):
+                    where = "no ## Dependency graph section" if section is None else "no graph row"
+                    yield _p(doc, line, "edges", f"{t.id} depends on {dep} with {where} saying why (kind, `none: <reason>`)")
+
+
+def check_step_io_types(ctx: Context):
+    """Every type a package step's `In → Out` cell names is a contract type section, and where two consecutive
+    steps have different owners, the first one's Out names one (the boundary an interface task freezes). A
+    project with no type sections yet gets warnings, not errors."""
+    types = model.contract_types(ctx.repo)
+    sev = "" if types else "W"
+    for doc in ctx.repo.docs("pipelines"):
+        for p in model.pipelines(doc):
+            for s in p.steps:
+                for name in s.in_types + s.out_types:
+                    if model.resolve_type(types, name) is None:
+                        yield Problem(doc.rel, s.line + 1, "step-io-types",
+                                      f"{p.id} step `{s.name}` names {name}, which no contract.md type section "
+                                      f"defines (`### <pkg>.{name.rsplit('.', 1)[-1]}: …` with `**Kind:** type`)", sev)
+            for a, b in zip(p.steps, p.steps[1:]):
+                if a.owner and b.owner and a.owner != b.owner and not any(
+                        model.resolve_type(types, n) for n in a.out_types):
+                    yield Problem(doc.rel, a.line + 1, "step-io-types",
+                                  f"{p.id} step `{a.name}` ({a.owner}) feeds `{b.name}` ({b.owner}): its Out must "
+                                  "name a contract type", sev)
 
 
 def check_verify_smoke(ctx: Context):
+    """A task that makes a pipeline run (wiring, system; with no Kind, any task outside Phase 0) runs its smoke
+    command. Interface, spine and thicken tasks may land before their pipeline is wired."""
     smoke: dict[str, str | None] = {}
     for t in ctx.tasks:
-        if t.is_spine:
+        if t.kind in ("interface", "spine", "thicken") or (not t.kind and t.is_spine):
             continue
         verify = " ".join(t.get("Verify").split())
         for pl in dict.fromkeys(re.findall(r"PL-\d{2,}", t.step)):
@@ -781,7 +936,8 @@ CHECKS = [
     check_dup_id, check_missing_ref, check_retired_ref,
     check_budget, check_approved_edit, check_prebuild_left,
     check_task_fields, check_task_size, check_task_acceptance, check_task_title, check_task_step,
-    check_depends, check_milestone_size, check_parallel, check_verify_smoke,
+    check_depends, check_milestone_size, check_writes, check_edges, check_deprecated, check_verify_smoke,
+    check_step_io_types,
     check_todo_mismatch, check_finding_disposition, check_foreign_plan,
     check_ref_file, check_ref_hash, check_ref_large, check_ref_prefix, check_roadmap_skill, check_roadmap_stage,
 ]

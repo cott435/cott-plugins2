@@ -11,8 +11,13 @@ from .repo import Doc, Repo
 
 # ---- plan ------------------------------------------------------------------------------------
 
-TASK_FIELDS = ("Package", "Step", "Covers", "Size", "Mode", "Skills", "Read", "Verify",
-               "Depends on", "Parallel", "Files likely", "Blocked", "Reason")
+TASK_FIELDS = ("Package", "Step", "Kind", "Covers", "Size", "Mode", "Skills", "Read", "Verify",
+               "Depends on", "Writes", "Parallel", "Files likely", "Blocked", "Reason")
+# A task's kind (`**Kind:**`), in the order a milestone usually runs them (interface-first-design.md §5.1).
+KINDS = ("interface", "spine", "wiring", "thicken", "system")
+# The fields an interface-first plan replaces: groups are derived from the graph, Writes is the exclusive claim.
+DEPRECATED_FIELDS = {"Parallel": "groups are derived from Depends on (`dt ready`, `dt status` waves)",
+                     "Files likely": "use **Writes:**, the task's exclusive claim"}
 
 
 @dataclass
@@ -54,6 +59,20 @@ class Task:
         return md.split_list(self.get("Files likely"))
 
     @property
+    def kind(self) -> str:
+        """`interface | spine | wiring | thicken | system`, lower-cased; "" when the task has no Kind."""
+        v = md.strip_md(self.get("Kind")).split()
+        return v[0].lower() if v else ""
+
+    @property
+    def writes(self) -> list[str]:
+        """The paths the task writes, exclusively (`**Writes:**`, exact paths or one directory glob); a task
+        from before Writes falls back to its `Files likely`."""
+        raw = self.get("Writes") if "Writes" in self.fields else self.get("Files likely")
+        return [w.strip("`").strip().removeprefix("./") for w in md.split_list(raw)
+                if w.strip("`").strip().lower() not in ("", "—", "-", "none")]
+
+    @property
     def depends_on(self) -> list[str]:
         return md.task_refs(self.get("Depends on"))
 
@@ -80,12 +99,18 @@ class Task:
 
     @property
     def is_spine(self) -> bool:
-        """In Phase 0: a spine, or the contract task that freezes the milestone's boundaries."""
+        """Builds a skeleton rather than behaviour: an interface or spine task, or (a task with no Kind) any
+        Phase 0 task, the contract task included."""
+        if self.kind:
+            return self.kind in ("interface", "spine")
         return "spine" in self.phase.lower() or self.phase.lower().startswith("phase 0")
 
     @property
     def is_contract(self) -> bool:
-        """The Phase 0 contract task (`**Step:** contract`)."""
+        """The task that freezes the milestone's boundaries: `**Kind:** interface`, or the Phase 0 contract task
+        (`**Step:** contract`) of a plan from before Kind."""
+        if self.kind:
+            return self.kind == "interface"
         return self.is_spine and self.step.lower() == "contract"
 
     @property
@@ -191,6 +216,61 @@ def is_dev_team_plan(doc: Doc) -> bool:
     return "Milestone" in doc.header or (doc.status or "").lower().startswith("between")
 
 
+GRAPH_HEADING = "dependency graph"
+EDGE_KINDS = ("data", "call", "file", "code", "contract-change", "order")
+
+
+@dataclass
+class Edge:
+    """A `## Dependency graph` row: `src` depends on `dst` (From → To, as `Depends on`). `mitigated_by` is the
+    interface text (`stats.Cov sample (M1-T01)`), "" when the cell starts with `none`; `reason` is the text
+    after `none:`. A mitigated edge doesn't order the tasks."""
+    src: str
+    dst: str
+    kind: str
+    mitigated_by: str
+    reason: str
+    line: int = -1                     # 0-based row line in the plan doc
+    cells: tuple = ()                  # the raw From, To, Kind, Mitigated by cells
+
+    @property
+    def mitigated(self) -> bool:
+        return bool(self.mitigated_by)
+
+
+def graph_section(doc: Doc) -> md.Heading | None:
+    return next((h for h in doc.headings if not h.id and h.text.strip().lower() == GRAPH_HEADING), None)
+
+
+def graph_edges(doc: Doc) -> list[Edge]:
+    """The rows of a plan's `## Dependency graph` table (From | To | Kind | Mitigated by)."""
+    h = graph_section(doc)
+    if h is None:
+        return []
+    out = []
+    for _, head, rows in doc.tables(h.line + 1, h.end):
+        if not head or md.strip_md(head[0]).lower() != "from":
+            continue
+        for n, row in md.table_dicts(head, rows):
+            src, dst = (md.task_refs(_col(row, c)) for c in ("From", "To"))
+            kind = md.strip_md(_col(row, "Kind")).lower()
+            cell = _col(row, "Mitigat").strip()
+            plain = md.strip_md(cell)
+            if re.match(r"none\b", plain, re.IGNORECASE) or plain in ("", "—", "-"):
+                reason = re.sub(r"^none\s*:?\s*", "", plain, flags=re.IGNORECASE).strip()
+                mitigated, reason = "", "" if reason in ("—", "-") else reason
+            else:
+                mitigated, reason = cell, ""
+            out.append(Edge(src[0] if src else "", dst[0] if dst else "", kind, mitigated, reason, n,
+                            (_col(row, "From"), _col(row, "To"), _col(row, "Kind"), cell)))
+    return out
+
+
+def is_interface_first(doc: Doc) -> bool:
+    """A plan written to interface-first-design: a `## Dependency graph` section, or a task with Kind/Writes."""
+    return graph_section(doc) is not None or any("Kind" in t.fields or "Writes" in t.fields for t in tasks(doc))
+
+
 # ---- pipelines -------------------------------------------------------------------------------
 
 @dataclass
@@ -202,6 +282,28 @@ class Step:
     spine: str
     covers: list[str]
     line: int
+
+    def _side(self, n: int) -> str:
+        parts = re.split(r"→|->", self.io, maxsplit=1)
+        return parts[n] if len(parts) == 2 else (self.io if n == 1 else "")
+
+    @property
+    def in_types(self) -> list[str]:
+        """Type names on the In side of the `In → Out` cell (CamelCase or `pkg.Name`)."""
+        return type_names(self._side(0))
+
+    @property
+    def out_types(self) -> list[str]:
+        return type_names(self._side(1))
+
+
+TYPE_NAME = re.compile(r"(?<![\w.])(?:[a-z][a-z0-9_]*\.)*[A-Z][a-z0-9]+(?:[A-Z][A-Za-z0-9]*)*\b")
+
+
+def type_names(text: str) -> list[str]:
+    """CamelCase names in an `In → Out` cell, qualified ones kept whole: `Cov, T → stats.Cov` → [Cov, stats.Cov].
+    Single capitals (`T`, `N`) and all-caps words (`CSV`) aren't types."""
+    return list(dict.fromkeys(TYPE_NAME.findall(md.strip_md(text))))
 
 
 @dataclass
@@ -571,9 +673,58 @@ class Symbol:
     fields: dict[str, str]
 
 
+    @property
+    def is_type(self) -> bool:
+        """A boundary type (`**Kind:** type`, or a heading titled `type`), not a function."""
+        kind = md.strip_md(self.fields.get("Kind", "")).lower()
+        return kind.startswith("type") or md.strip_md(self.title).lower() == "type"
+
+    @property
+    def name(self) -> str:
+        return self.id.rsplit(".", 1)[1]
+
+    @property
+    def package(self) -> str | None:
+        return self.doc.package
+
+    @property
+    def sample(self) -> str:
+        """The `**Sample:**` path of a type section, or ""."""
+        v = md.strip_md(self.fields.get("Sample", ""))
+        return "" if v.lower() in ("", "—", "-", "none") else v
+
+    @property
+    def text(self) -> str:
+        return "\n".join(self.doc.lines[self.start:self.end]).rstrip() + "\n"
+
+
 def symbols(doc: Doc) -> list[Symbol]:
     return [Symbol(h.id, h.title, doc, h.line, h.end, md.fields_in(doc.lines, h.line + 1, h.end))
             for h in doc.headings if h.id and re.fullmatch(md.SYMBOL_ID, h.id)]
+
+
+def all_symbols(repo: Repo) -> list[Symbol]:
+    return [s for d in repo.docs("contract") for s in symbols(d)]
+
+
+def contract_types(repo: Repo) -> dict[str, Symbol]:
+    """Every contract type section by its ID (`stats.Cov`) and by its bare name (`Cov`; first one wins)."""
+    out: dict[str, Symbol] = {}
+    for s in all_symbols(repo):
+        if s.is_type:
+            out.setdefault(s.id, s)
+            out.setdefault(s.name, s)
+    return out
+
+
+def resolve_type(types: dict[str, Symbol], name: str) -> Symbol | None:
+    """A type name from a step table (`Cov`, `stats.Cov`, or `quant.stats.Cov`) → its contract section."""
+    parts = name.split(".")
+    for k in range(len(parts)):
+        hit = types.get(".".join(parts[k:]))
+        if hit is not None:
+            return hit
+    return None
 
 
 @dataclass
@@ -614,8 +765,12 @@ def todo_state(repo: Repo) -> dict[str, bool]:
 
 
 def spine_pipeline(task: Task) -> str | None:
-    """The pipeline a Phase 0 (spine) task builds, from its Step field (`PL-01` or `PL-01.step`)."""
-    if not task.is_spine:
+    """The pipeline a task makes run end to end, from its Step field (`PL-01` or `PL-01.step`): its wiring task,
+    or in a plan from before Kind, its Phase 0 spine task."""
+    if task.kind:
+        if task.kind != "wiring":
+            return None
+    elif not task.is_spine:
         return None
     m = re.match(r"PL-\d{2,}", task.step)
     return m.group(0) if m else None

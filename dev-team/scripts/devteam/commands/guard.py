@@ -37,15 +37,17 @@ def decide(file_path: str, cwd: str) -> dict | None:
         return _decision("ask", f"Oracle file: {path}. Expected outputs change only with the user's approval.")
     m = CONTRACT_RE.search(p.as_posix())
     if m and not _contract_open(Path(p.as_posix()[:m.start()] or "/"), m.group(1)):
-        return _decision("ask", f"Frozen contract: {path}. No open contract task (`**Step:** contract`) freezes "
-                                "it; a boundary contract changes only through architecture-design Revise (CR-09).")
+        return _decision("ask", f"Frozen contract: {path}. No open interface task (`**Kind:** interface`, or "
+                                "`**Step:** contract`) freezes it; a boundary contract changes only through "
+                                "architecture-design Revise (CR-09).")
     return None
 
 
 def _contract_open(root: Path, inside: str) -> bool:
-    """Whether an unticked contract task of root's plan freezes this path under tests/contracts/: its folder
-    (`<pkg>.<symbol>`) is in the task's `Read:` or `Files likely`. A file directly in tests/contracts/ is
-    shared support, open while any contract task is."""
+    """Whether an unticked contract (interface) task of root's plan freezes this path under tests/contracts/:
+    its folder (`<pkg>.<symbol>`) is in the task's `Read:`, or its `Writes:` (else `Files likely`) claims that
+    folder or all of tests/contracts/. A file directly in tests/contracts/ is shared support, open while any
+    contract task is."""
     repo = Repo(root)
     if repo.plan is None:
         return False
@@ -55,8 +57,9 @@ def _contract_open(root: Path, inside: str) -> bool:
         if not t.is_contract or done.get(t.id):
             continue
         names = {md.strip_md(i).split(" (")[0].strip() for i in t.read}
-        files = [md.strip_md(f).rstrip("/") + "/" for f in t.files_likely]
-        if folder is None or folder in names or any(f.startswith(f"tests/contracts/{folder}/") for f in files):
+        files = [re.sub(r"/\*\*?$", "", f).rstrip("/") + "/" for f in t.writes]
+        if folder is None or folder in names or any(f == "tests/contracts/" or f.startswith(f"tests/contracts/{folder}/")
+                                                    for f in files):
             return True
     return False
 

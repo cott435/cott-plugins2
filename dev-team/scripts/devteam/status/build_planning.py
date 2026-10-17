@@ -9,14 +9,15 @@ import re
 from .. import md, model
 from ..commands import roadmap as roadmap_cmd
 from ..repo import Doc, Repo
-from .common import (OWN_SKILLS, Report, add_common, advance_ready, available_skills, blocked_reason,
+from .common import (OWN_SKILLS, Report, add_common, add_graph, advance_ready, available_skills, blocked_reason,
                      live_spec_ids, milestone_row, next_task, plan_base)
 from .packages import drift, grow_triggers, stale_contracts
 
 
 def expected_mode(task: model.Task) -> str:
-    """The build-mode rule: solo for spine tasks, split for behaviour with a checkable outcome, else solo."""
-    if task.is_spine:
+    """The build-mode rule: solo for skeleton tasks (interface, spine, wiring, system; with no Kind, Phase 0),
+    split for behaviour with a checkable outcome, else solo."""
+    if task.kind in ("interface", "spine", "wiring", "system") or (not task.kind and task.is_spine):
         return "solo"
     return "split" if task.covers or any(i.startswith("TC-") for i in task.read) else "solo"
 
@@ -26,7 +27,8 @@ def mode_violations(tasks: list[model.Task]) -> list[str]:
     for t in tasks:
         want = expected_mode(t)
         if t.mode in ("split", "solo") and t.mode != want and not md.strip_md(t.get("Reason")):
-            why = "spine" if t.is_spine else "covers behaviour" if want == "split" else "no checkable outcome"
+            skeleton = t.kind if t.kind and t.kind != "thicken" else "spine" if not t.kind and t.is_spine else ""
+            why = skeleton or ("covers behaviour" if want == "split" else "no checkable outcome")
             out.append(f"{t.id}: {t.mode}, expected {want} ({why})")
     return out
 
@@ -264,3 +266,4 @@ def build_planning(repo: Repo, r: Report) -> None:
     r.add("stale_contracts", stale_contracts(repo))
     r.add("queued", queued)
     r.add("base", plan_base(active))
+    add_graph(repo, r)

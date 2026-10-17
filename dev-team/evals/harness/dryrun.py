@@ -14,6 +14,8 @@ exports its plan.json. The replays:
   contract, a types.py written during planning, a frozen type revised later, ...). Each of those checks fails.
 - `quant-incremental-ifdserial`: the spines chained one after another and the testers made solo. The parallelism
   and wave-width checks fail.
+- the probe replays (dryrun_probe.py): `quant-incremental-probe` and `-probebad` (design/probes.md §10.1, a user run
+  against the fake Sharadar), and the api-probe fixture's `api-probe-good` and `-bad` (§10.2, probe_skill.py).
 Every check is pinned, pass or fail: the checks the sample can't meet (it isn't a finished four-stage quant run)
 fail in every replay, and in the broken replays dt itself (lint, `dt ready`, `dt archive`) catches the planted
 defects alongside the grader.
@@ -149,8 +151,13 @@ def revise_frozen_type(proj):
         "- **Invariants:** N×N; symmetric; positive semi-definite; carries its estimation window\n- **Sample:**")
 
 
-def replay(out, name, fixture, layers):
-    """Fake one trajectory from (skill, paths or function) layers; return the grading.json results by id."""
+USER_RUN = "(user run)"  # a layer that is the user's "ran it", committed between turns as driver.py does
+
+
+def replay(out, name, fixture, layers, summary_extra=None, stream=None):
+    """Fake one trajectory from (skill, paths or function) layers; return the grading.json results by id. A
+    USER_RUN layer's function runs the user's checks and is committed as `user run before turn N`; `stream` is
+    written as the run's agent_stream.jsonl (tool calls the probe checks read)."""
     run = out / name / "with_skill"
     if run.exists():
         shutil.rmtree(run)
@@ -161,8 +168,13 @@ def replay(out, name, fixture, layers):
     proj.mkdir()
     subprocess.run(["git", "init", "-q"], cwd=proj)
     driver.commit(proj, "turn 0")
-    turns, stage = [], "data"
-    for n, (skill, what) in enumerate(layers, 1):
+    turns, stage, n, user_run = [], "data", 0, None
+    for skill, what in layers:
+        if skill == USER_RUN:
+            user_run = what(proj)
+            driver.commit(proj, f"user run before turn {n + 1}")
+            continue
+        n += 1
         what(proj) if callable(what) else copy_layer(fixture, proj, what)
         driver.commit(proj, f"turn {n}")
         _, status = driver.snapshot(proj, dt, keep=run / "plans" / f"T{n:03d}.json")
@@ -171,10 +183,15 @@ def replay(out, name, fixture, layers):
                       "skills": [f"dev-team:{skill}"] if skill else [], "tools": [], "seconds": 0,
                       "usage": {}, "docs_changed": "", "status": status, "stage": stage,
                       "agents": intake_agents(proj) if skill == "reference-intake" else []})
+        if user_run is not None:
+            turns[-1]["user_run"], user_run = user_run, None
     (run / "turns.json").write_text(json.dumps(turns, indent=1))
+    if stream is not None:
+        (run / "agent_stream.jsonl").write_text(stream)
     (run / "summary.json").write_text(json.dumps({"trajectory": f"{name} (dry run)", "turns": len(turns),
                                                   "stages_reached": 2, "finished": True, "stop_reason": "dry run",
-                                                  "references": [p.name for p in sorted((proj / "references").glob("*"))]}))
+                                                  "references": [p.name for p in sorted((proj / "references").glob("*"))],
+                                                  **(summary_extra or {})}))
     r = subprocess.run([sys.executable, str(HERE / "grade.py"), str(run)], capture_output=True, text=True)
     if r.returncode:
         raise SystemExit(f"dryrun: grade.py failed on {name}:\n{r.stderr[-2000:]}")
@@ -187,11 +204,12 @@ def replay(out, name, fixture, layers):
     return run, {c["id"]: c for c in g["expectations"]}, g["summary"]
 
 
-def verdict(name, res, summary, must_fail):
-    """Compare a replay's checks with the pinned expectations; return the unexpected ones."""
+def verdict(name, res, summary, must_fail, either=()):
+    """Compare a replay's checks with the pinned expectations; return the unexpected ones. Checks in `either` may
+    go both ways (a dt-dependent check on a deliberately broken project)."""
     bad = []
     for cid, c in res.items():
-        if c.get("na"):
+        if c.get("na") or cid in either:
             continue
         if cid in must_fail and c["passed"]:
             bad.append(f"{cid} passed, expected to fail")
@@ -241,6 +259,9 @@ def main():
         break_serial(fx)
         _, res, summ = replay(out, "quant-incremental-ifdserial", fx, PLANNING)
         bad += verdict("quant-incremental-ifdserial", res, summ, CONTENT | SERIAL_FAIL)
+
+        import dryrun_probe  # noqa: E402  (imports this module's helpers)
+        bad += dryrun_probe.run(out, tmp, good)
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
     print(f"run dirs: {out}")

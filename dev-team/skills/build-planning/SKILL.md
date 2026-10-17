@@ -9,38 +9,38 @@ The build plan says **in what order** the pipelines get built. Once a roadmap st
 
 **Not for:** plans from agent-skills' `/plan` (foreign); pipelines, oracles or the quality bar (`pipeline-design`, `test-planning`, `build-setup`); building tasks.
 
-`dt` means `python3 ../../scripts/dt.py`, relative to this skill's folder, run from the project root. Take IDs, coverage and lint from `dt`, never by hand. Templates: `examples.md`; worked examples: `references/examples-*.md`.
+`dt` means `python3 ../../scripts/dt.py`, relative to this skill's folder, run from the project root. Take IDs, coverage and lint from `dt`, never by hand. Templates: `examples.md`.
+
+## Documents and IDs
+
+- **Write only:** `tasks/plan.md`, `tasks/todo.md`, `tasks/queued/**`, the roadmap's milestone table and `## M<n>` sections, and the AGENTS.md doc map. Never the stage table or `## S<n>` sections, anything under `src/`, `tests/` or `scripts/`, or another skill's docs. Never a `Status*` column (`dt roadmap`) or a `todo.md` checkbox (`dt tick`).
+- **`tasks/plan.md` is never missing.** Between milestones it holds `dt archive`'s stub; replace it only with a new plan.
+- **IDs:** milestones `M<n>` from `dt next-id M`, tasks `M<n>-T<nn>` from `dt next-id M<n>-T`.
+
+## Preconditions
+
+- No roadmap stage for the work: route to `idea-refine`.
+- **References waiting:** route to `reference-intake` before planning.
 
 ## Modes
 
-Run `dt status --skill build-planning` first. It prints the mode, progress, coverage, routing lists and `next ids`.
+Run `dt status --skill build-planning` first. It prints the mode, progress, coverage, routing lists and `next ids`. Read the mode's file and only the topic references it names.
 
 | Mode | When | Do |
 |---|---|---|
 | **blocked** | A needed `pipelines.md` or `tests.md` is Draft or missing | Name what must come first. Stop |
 | **foreign** | `tasks/plan.md` has no `**Milestone:**` header and unchecked tasks | **Stop and ask.** Never overwrite, rename or delete it |
-| **New** | No active or archived plan; the roadmap has stages | Cut every designed stage, plan M1 and its todo, write the AGENTS.md doc map |
-| **Extend** | A stage is newly designed (`stage_to_cut`), or the next milestone needs a plan | Cut the stage; plan the next milestone at kickoff (in `tasks/queued/` only if asked), never merged into the active plan |
-| **Replan** | A task is `Blocked`, or a revised doc was re-approved (`changed_since_plan`) | `references/replan-advance.md` |
-| **Advance** | All todo items and the exit checkpoint are ticked | `references/replan-advance.md`, one gate per turn |
+| **New** | No active or archived plan; the roadmap has stages | `references/new.md` |
+| **Extend** | A stage is newly designed (`stage_to_cut`), or the next milestone needs a plan | `references/extend.md` |
+| **Replan** | A task is `Blocked`, or a revised doc was re-approved (`changed_since_plan`) | `references/replan.md` |
+| **Advance** | All todo items and the exit checkpoint are ticked | `references/advance.md`, one gate per turn |
 
-No roadmap stage for the work: route to `idea-refine`.
+A foreign plan's question: `references/examples-foreign.md`.
 
-## Shared rules
+## Asking
 
-- **Write only:** `tasks/plan.md`, `tasks/todo.md`, `tasks/queued/**`, the roadmap's milestone table and `## M<n>` sections, and the AGENTS.md doc map. Never the stage table or `## S<n>` sections, anything under `src/`, `tests/` or `scripts/`, or another skill's docs. Never a `Status*` column (`dt roadmap`) or a `todo.md` checkbox (`dt tick`).
-- **`tasks/plan.md` is never missing.** Between milestones it holds `dt archive`'s stub; replace it only with a new plan.
 - **Interview one question at a time**, with a guess and a default, only on the user's decisions: the cut, what the milestone covers and defers, the exit, queued plans, a missing skill, a mode override. Infer the rest as ASSUMPTIONS. For a choice from a list, show it, then ask once.
 - **No live user:** open decisions go under Open questions; leave Draft.
-- **References waiting:** route to `reference-intake` before planning.
-
-## Process (New, Extend)
-
-Read only `dt status`, the roadmap, the packages' `pipelines.md`, `contract.md` headings and `tests.md`, the spec sections they cover, the skill list and the `milestone_references` entries.
-
-1. **Grow check, cut the stage, scope the milestone:** `references/cut.md`.
-2. **Milestone shape** (interface task, one spine per step, wiring per pipeline, system task, folds): `references/phase0.md`.
-3. **Thicken, route skills and references, build modes, checkpoints, `Writes:`, the dependency graph, write:** `references/tasks.md`.
 
 ## Review Gate (CRITICAL)
 

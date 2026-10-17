@@ -1,6 +1,6 @@
 # Thickening, routing, modes, checkpoints, the graph, writing
 
-Read when writing thicken tasks, the dependency graph and the files. Templates: `../examples.md`; routing and graph example: `examples-phase0.md`.
+Read when writing thicken tasks, the dependency graph and the files. Templates: `../examples.md`; graph example: `examples-phase0.md`; routing example: `examples-routing.md`.
 
 ## 5. Thicken
 
@@ -54,4 +54,3 @@ Task IDs start at `dt next-id M<n>-T` and count up, in phase order.
 - `tasks/plan.md` with Status `Draft` and `**Base:** —` (pending). Never record a sha yourself: `build-setup` runs `dt base` after its bar is approved and committed.
 - `tasks/todo.md`: one unchecked line per task, IDs matching the plan.
 - Milestone rows and sections (`cut.md` step 2), the planned milestone's `**Exit:**` and `**Plan:**`, then `dt roadmap`.
-- **New only:** the AGENTS.md doc map (`## Docs` and `## Project skills`, ≤ 25 lines). If only `CLAUDE.md` exists, write it there. Leave every other section alone.

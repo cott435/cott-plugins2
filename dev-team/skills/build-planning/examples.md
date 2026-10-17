@@ -1,8 +1,6 @@
 # Build Planning Templates
 
-The plan, todo, roadmap milestone and AGENTS.md doc map templates. Worked examples on the quant project are in `references/`: `examples-new.md` (New, and cutting a large stage), `examples-advance-replan.md` (Advance into M2, Replan), `examples-phase0.md` (an interface-first milestone and its graph, skill and reference routing, a foreign plan).
-
-`dt` means `python3 ../../scripts/dt.py`, run from the project root.
+The plan, todo and roadmap milestone templates. Each mode's worked example is named in its `references/<mode>.md`; `references/examples-cut.md`, `examples-phase0.md` and `examples-routing.md` illustrate the cut, an interface-first milestone and its graph, and skill and reference routing.
 
 ## Templates
 
@@ -191,22 +189,4 @@ Written by `dt archive`. Never deleted; replaced only by the next plan.
 **Plan:** [../tasks/plan.md](../tasks/plan.md)
 ```
 
-A stage that fits one milestone gets one, and the milestone inherits the stage's Skills and references. A stage cut into several gives each milestone `**Skills:**` and `**References:**` lines from the stage's (`references/examples-new.md`). Later milestones get only the row and a 3–6 line section (Outline, Exit, and Plan once a plan exists).
-
-### AGENTS.md doc map
-
-Written in New mode, ≤ 25 lines, no script paths (the session-start hook supplies them). Replace only these two sections; leave the rest of the file alone. If the repo has `CLAUDE.md` and no `AGENTS.md`, write them there.
-
-```markdown
-## Docs
-- Plan with dev-team2's `build-planning`, not agent-skills' `/plan`.
-- Your task's context: `dt context <M#-T##>`. Read only what it prints.
-- Any section by ID: `dt section <ID>...` (e.g. PL-02 TC-02 STAT-02 AD-03)
-- Package docs: `docs/packages/<pkg>/{architecture,contract,pipelines,tests}.md`
-- Real layout: `dt layout <pkg>` (planned layouts are gone once the wiring lands)
-- Quality bar: CONSTRAINTS.md. Oracle files (tests/fixtures/*/expected.json) need user approval to change.
-## Project skills
-- data-science — stats steps
-```
-
-Use real IDs from the project in the `dt section` example. List each project skill with the steps it's routed to.
+A stage that fits one milestone gets one, and the milestone inherits the stage's Skills and references. A stage cut into several gives each milestone `**Skills:**` and `**References:**` lines from the stage's (`references/examples-cut.md`). Later milestones get only the row and a 3–6 line section (Outline, Exit, and Plan once a plan exists).

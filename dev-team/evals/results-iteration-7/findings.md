@@ -26,6 +26,10 @@ Detail: [findings-interface.md](findings-interface.md) (the interface-first chec
 - **Judge:** both projects are ties (margins 0.1 and 0.2, under the ~0.3 position bias). rl all-at-once's milestone_quality rose from 2 to 4.
 - **Most red checks are grader bugs.** The real plan problems are two design/skill gaps (object-typed boundaries, shared thicken modules), stages left uncut, and all-at-once pipeline-design stopping at S1 again.
 
+## Re-graded with iteration 8's grader
+
+[regraded/](regraded/) holds the four runs graded by the fixed grader (commit `fe8fb61`), the baseline iteration 8 compares with: rl inc 58/79, rl aao 64/79, quant inc 71/92, quant aao 67/92 (new checks, mostly probe checks that read N/A here). The false fails are gone (`milestone_depends` everywhere; `writes_disjoint`, `phase0_split`, `tester_starts_early`, `fakes_only_cross_pipeline`, `wave_width`, `spec_ml_beats_classical`, `intake_subagent_per_file` where the findings called them grader bugs). The new fails are real defects the findings named: `types_in_contract` (undefined settings types, schemas without fields) and `first_planned_rest_designed` (stages left uncut).
+
 ## Fix plan for iteration 8, by owner
 
 Each group writes disjoint files, so the groups run in parallel. Fixes land on top of the probe build (`api-probe`, `design/probes.md`).

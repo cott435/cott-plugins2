@@ -11,7 +11,7 @@ Read when `dt status --skill build-setup` reports `extend`: kickoff, after the n
 - **New stack:** stubs and rule families.
 - **Grow:** rewrite component contracts as package contracts; the rules don't change.
 - Remove parentheses from optional layers whose module now exists.
-- **References**, on a bar written before them: the `references/` excludes, `references/**` in both protected lists, CR-08 and Review item 7. A tightening; the floor guard doesn't count the `references` excludes as loosening.
+- **References and probes**, on a bar written before them: the `references/` and `probes/` excludes, `references/**` and `probes/**` in both protected lists, the template's `floor_guard.py`, CR-08, Review item 7 and the `.gitignore` lines. A tightening; the floor guard doesn't count those excludes as loosening.
 
 After approval and the commit, `dt base` runs as the Review Gate says.
 

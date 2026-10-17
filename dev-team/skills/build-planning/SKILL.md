@@ -21,6 +21,7 @@ The build plan says **in what order** the pipelines get built. Once a roadmap st
 
 - No roadmap stage for the work: route to `idea-refine`.
 - **References waiting:** route to `reference-intake` before planning.
+- **Probes open:** `probes_blocking` (`PB-01 → service, ledger.BankTxn (M1)`) blocks New and Extend for that milestone: name the probe and route to `api-probe`. Cutting stages into milestone rows (`cut.md` steps 1–2) still runs. Only the user waives a probe, through `api-probe`, and never on a headless run.
 
 ## Modes
 
@@ -28,7 +29,7 @@ Run `dt status --skill build-planning` first. It prints the mode, progress, cove
 
 | Mode | When | Do |
 |---|---|---|
-| **blocked** | A needed `pipelines.md` or `tests.md` is Draft or missing | Name what must come first. Stop |
+| **blocked** | A needed `pipelines.md` or `tests.md` is Draft or missing, or `probes_blocking` names the milestone | Name what must come first. Stop |
 | **foreign** | `tasks/plan.md` has no `**Milestone:**` header and unchecked tasks | **Stop and ask.** Never overwrite, rename or delete it |
 | **New** | No active or archived plan; the roadmap has stages | `references/new.md` |
 | **Extend** | A stage is newly designed (`stage_to_cut`), or the next milestone needs a plan | `references/extend.md` |

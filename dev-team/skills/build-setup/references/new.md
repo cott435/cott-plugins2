@@ -25,7 +25,7 @@ Architecture: `quant` with components `data` (depends on nothing), `stats` (→ 
 
 **Values**
 ```bash
-PROTECTED=('tests/intent/**' 'tests/fixtures/**' 'tests/conftest.py' 'pyproject.toml' 'uv.lock' 'CONSTRAINTS.md' 'scripts/**' '.claude/agents/**' '.claude/settings.json' 'references/**' 'tests/contracts/**')
+PROTECTED=('tests/intent/**' 'tests/fixtures/**' 'tests/conftest.py' 'pyproject.toml' 'uv.lock' 'CONSTRAINTS.md' 'scripts/**' '.claude/agents/**' '.claude/settings.json' 'references/**' 'probes/**' 'tests/contracts/**')
 pkg_scope() {
   case "$1" in
     data) echo "data stats portfolio" ;;
@@ -65,13 +65,13 @@ DEFAULT if unsure: mypy strict as the gate; pyright runs in check.sh full.
 ```
 Wrote: CONSTRAINTS.md (Draft), pyproject.toml tool config, scripts/check.sh, check_size.py,
 floor_guard.sh/.py, red_check.py, vulture_whitelist.py, scripts/hooks/*.sh, .claude/agents/{tester,implementer,
-reviewer}.md, tests/conftest.py (didn't exist), .gitignore (+8 lines). No CI (not requested).
+reviewer}.md, tests/conftest.py (didn't exist), .gitignore (+12 lines). No CI (not requested).
 Proof run, after the skeleton commit: ruff --show-settings ok; check.sh gate passed in 14 s
 (fresh venv; budget 90 s).
 
 ASSUMPTIONS:
 - Single package `quant`; components data < stats < portfolio; portfolio is an optional layer until M2
-- Protected list: the eleven globs above
+- Protected list: the twelve globs above
 - Rule families DTZ, NPY, PD; stubs: pandas-stubs
 - numpy, pandas declared now with a DEP002 exception expiring at M1 exit
 - Coverage floor 0 (no code yet); Ratchet sets it at M1 exit. vulture whitelist: 0 entries

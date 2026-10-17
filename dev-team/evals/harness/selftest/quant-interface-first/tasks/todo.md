@@ -1,0 +1,16 @@
+# M1: Data + stats — Todo
+
+- [ ] M1-T01 Freeze M1's step boundaries (quant, M, solo)
+- [ ] M1-T02 read_raw spine (quant, XS, solo)
+- [ ] M1-T03 apply_universe spine (quant, XS, solo)
+- [ ] M1-T04 estimate_cov spine (quant, XS, solo)
+- [ ] M1-T05 clean_eigen spine (no cleaning) (quant, XS, solo)
+- [ ] M1-T06 pca spine (quant, XS, solo)
+- [ ] M1-T07 write_report spine (quant, XS, solo)
+- [ ] M1-T08 Wire PL-01 (quant, S, solo)
+- [ ] M1-T09 Wire PL-02 on the load_prices fake (quant, S, solo)
+- [ ] M1-T10 Delisting-aware universe (quant, S, split)
+- [ ] M1-T11 Marchenko–Pastur cleaning (quant, S, split)
+- [ ] M1-T12 Shrinkage covariance (quant, S, split)
+- [ ] M1-T13 Planted-factor PCA check (quant, XS, split)
+- [ ] M1-T14 PL-02 on the real PL-01 (quant, S, solo)

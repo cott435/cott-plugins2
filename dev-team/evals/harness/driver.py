@@ -30,7 +30,7 @@ import json, os, re, subprocess, sys, time, uuid, shutil, pathlib
 
 HERE = pathlib.Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
-import dtrun, plugin  # noqa: E402
+import dtrun, planexport, plugin  # noqa: E402
 
 CLAUDE_BIN = os.environ.get("CLAUDE_BIN", "claude")
 ISOLATE = ["--setting-sources", "project,local"]
@@ -62,9 +62,18 @@ def commit(proj, msg):
     sh(["git", "-c", "user.email=e@e", "-c", "user.name=eval", "commit", "-q", "--allow-empty", "--no-verify", "-m", msg], proj)
 
 
-def snapshot(proj, dt):
-    """Doc statuses (from dt's parser) plus derived roadmap rows."""
+def snapshot(proj, dt, keep=None):
+    """Doc statuses (from dt's parser) plus derived roadmap rows. With `keep` (a file path), the plan as of now
+    (`dt plan --json`, else built from the same probe facts) is saved there with the commit it belongs to, for
+    the plan map (planexport.py) at no model cost."""
     facts = dtrun.probe(proj, dt)
+    if keep is not None:
+        try:
+            sha = sh(["git", "rev-parse", "HEAD"], proj).stdout.strip()
+            keep.parent.mkdir(parents=True, exist_ok=True)
+            keep.write_text(json.dumps({"commit": sha, "body": planexport.snapshot_body(proj, dt, facts)}))
+        except Exception as e:  # never stop a run for the plan map
+            print(f"plan snapshot failed: {e!r}", flush=True)
     lines = []
     for rel, st in facts["docs"].items():
         if rel.endswith(("todo.md", "AGENTS.md", "CLAUDE.md", "roadmap.md")):
@@ -292,7 +301,7 @@ def main():
             proj, sid, msg, t == 1, out / "agent_stream.jsonl", plugin_root, extra)
         commit(proj, f"turn {t}")
         changed = sh(["git", "show", "--stat", "--format=", "HEAD"], proj).stdout.strip()
-        facts, status = snapshot(proj, dt)
+        facts, status = snapshot(proj, dt, keep=out / "plans" / f"T{t:03d}.json")
         rec = {"turn": t, "user": msg, "assistant": reply, "skills": skills, "tools": tools,
                "seconds": round(dt_s, 1), "usage": usage, "docs_changed": changed, "status": status,
                "stage": stage_log[-1]["stage"], "tool_errors": errors, "hook_events": hooks, "agents": agents}

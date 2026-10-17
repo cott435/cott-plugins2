@@ -4,7 +4,9 @@ bench/eval-<project>/<mode>/run-1/{outputs/, grading.json, timing.json}
 
 outputs/ holds every final planning doc as final__<path with / as __> (docs/**, tasks/**, CONSTRAINTS.md,
 AGENTS.md), a fixtures listing, one context__<task>.md per task (its `dt context` packet, which the blind judge
-reads to decide whether the task is buildable from it alone), the transcript and the doc-evolution table.
+reads to decide whether the task is buildable from it alone), plan_snapshot.json (the final plan as one graph:
+`dt plan --json`, else planexport's build from dtprobe facts, with nothing that names the mode), the transcript
+and the doc-evolution table.
 
 Usage: package.py [iteration-dir]  (relative to $EVAL_WS, default: a dev-team-workspace next to the marketplace repo)
 """
@@ -12,7 +14,7 @@ import json, os, shutil, subprocess, pathlib, sys
 
 HERE = pathlib.Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
-import dtrun  # noqa: E402
+import dtrun, planexport  # noqa: E402
 WS = pathlib.Path(os.environ.get("EVAL_WS", HERE.parents[3] / "dev-team-workspace"))
 it = WS / sys.argv[1] if len(sys.argv) > 1 else WS / "iteration-1"
 bench = it / "bench"
@@ -55,6 +57,9 @@ for i, project in enumerate(["rl", "quant"]):
             for t in plan["tasks"]:
                 rc, packet, err = dtrun.run(proj, "context", t["id"], dt=dt)
                 (out / f"context__{t['id']}.md").write_text(packet if rc == 0 else f"(dt context failed: {err.strip()})\n")
+        snap = planexport.snapshot_body(proj, dt, facts)
+        snap.pop("source", None)
+        (out / "plan_snapshot.json").write_text(json.dumps({"schema": planexport.SCHEMA, **snap}, indent=1))
         turns = json.loads((src / "turns.json").read_text())
         md = [f"# Transcript — {project} / {mode}\n"]
         for t in turns:

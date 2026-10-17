@@ -29,8 +29,10 @@ Pages, all static HTML and inline SVG with no scripts, written into `<out>/plan/
               each node's expectations.
   M<n>.html   one milestone's build: columns are waves, lanes are task kinds; interface tasks
               are diamonds whose "unblocks" edges are dashed; a split task is two segments,
-              tester then implementer; the critical path is thick. Waves are the longest path
-              to each segment; a barycenter pass orders each cell. Metrics, the producer's own
+              tester then implementer, and the tester waits only on interface tasks; the
+              critical path is thick. Waves are the longest path to each segment; a barycenter
+              pass orders each cell. Metrics (waves of segments and of whole tasks; data and
+              call edges mitigated; unmitigated rows by why they stay), the producer's own
               numbers beside them, and a thumbnail per turn that changed the graph.
 
 `write(out)` draws them and returns `plan/index.html`, or None when `out/plan.json` is absent
@@ -42,6 +44,7 @@ Usage: planmap.py DIR        re-render DIR/plan/ from DIR/plan.json
 
 from __future__ import annotations
 
+import fnmatch
 import hashlib
 import json
 import re
@@ -323,9 +326,10 @@ def load(out: Path) -> Plan | None:
 
 class Graph:
     """One milestone's tasks in one snapshot, as segments: a split task is two, tester then
-    implementer. The tester half waits only on the interface tasks the task depends on (when
-    the milestone has any; otherwise on all of them); the implementer on its tester and the
-    task's dependencies."""
+    implementer. When the milestone has interface tasks, the tester half waits only on them:
+    on those among the task's ancestors, else on all of the milestone's, so a tester never
+    starts beside the interface. Without interface tasks it waits on everything the task
+    depends on. The implementer waits on its tester and the task's dependencies."""
 
     def __init__(self, s: Snap, mid: str):
         self.snap, self.mid = s, mid
@@ -355,13 +359,35 @@ class Graph:
     def last(self, t: str) -> tuple[str, str]:
         return (t, "impl") if self.split[t] else (t, "")
 
+    def _ancestors(self) -> dict[str, set[str]]:
+        """Every task each task reaches through `depends`, itself left out; safe on a cycle."""
+        anc: dict[str, set[str]] = {}
+        for t in self.ids:
+            seen, todo = set(), list(self.deps[t])
+            while todo:
+                d = todo.pop()
+                if d not in seen and d != t:
+                    seen.add(d)
+                    todo.extend(self.deps[d])
+            anc[t] = seen
+        return anc
+
+    def tester_waits_on(self, t: str) -> list[str]:
+        """The interface tasks a split task's tester half waits on: those among the task's
+        ancestors, else every interface task of the milestone. Only the last of a chain is kept
+        (an interface that another one already waits on adds no order)."""
+        ifaces = {d for d in self.anc[t] if self.kind[d] == "interface"} or \
+                 {d for d in self.ids if self.kind[d] == "interface" and d != t}
+        last = [i for i in ifaces if not any(i in self.anc[j] for j in ifaces if j != i)]
+        return sorted(last or ifaces, key=natural)  # a cycle among interfaces keeps them all
+
     def _segments(self) -> None:
+        self.anc = self._ancestors()
         self.preds: dict[tuple[str, str], list[tuple[str, str]]] = {}
         for t in sorted(self.ids, key=natural):
             deps = [self.last(d) for d in self.deps[t]]
             if self.split[t]:
-                tdeps = [self.last(d) for d in self.deps[t] if self.kind[d] == "interface"] \
-                    if self.interface_first else deps
+                tdeps = [self.last(d) for d in self.tester_waits_on(t)] if self.interface_first else deps
                 self.preds[(t, "test")] = tdeps
                 self.preds[(t, "impl")] = [(t, "test"), *deps]
             else:
@@ -481,12 +507,72 @@ class Graph:
         return json.dumps([[t["id"], self.kind[t["id"]], self.split[t["id"]], sorted(self.deps[t["id"]])]
                            for t in self.tasks])
 
+    def writes(self, t: str) -> list[str]:
+        w = self.snap.nodes[t]["expects"].get("writes") or []
+        return [str(x) for x in w] if isinstance(w, list) else [str(w)]
+
+    def reason_class(self, e: dict) -> str:
+        """Why an unmitigated dependency-graph row stays, read from its structure (the kinds of
+        its two tasks, their steps and Writes), not its wording. "" for a mitigated row."""
+        if e["mitigated_by"]:
+            return ""
+        a, b, kind = e["from"], e["to"], e["kind"]
+        ka, kb = self.kind.get(a, ""), self.kind.get(b, "")
+        if kind in ("data", "call"):
+            return "data or call, not mitigated"
+        if kind == "contract-change":
+            return "contract change"
+        if kind == "order":
+            return "side-effect order" if e["reason"] else "order, no reason"
+        if ka in ("wiring", "system"):
+            return "integration"
+        if kind == "file":
+            return "shared file"
+        if kind == "code" and ka in ("spine", "thicken") and kb in ("spine", "thicken"):
+            sa = self.snap.nodes[a]["attrs"].get("step")
+            sb = self.snap.nodes[b]["attrs"].get("step")
+            if (sa and sa == sb) or write_overlap(self.writes(a), self.writes(b)):
+                return "same module"
+            return "across steps"
+        return "other"
+
     def metrics(self) -> dict:
         width = [len(w) for w in self.waves]
         mitigated = [e for e in self.graph_edges if e["mitigated_by"]]
+        dc = [e for e in self.graph_edges if e["kind"] in ("data", "call")]
+        why: dict[str, int] = {}
+        for e in self.graph_edges:
+            c = self.reason_class(e)
+            if c:
+                why[c] = why.get(c, 0) + 1
         return {"tasks": len(self.tasks), "cp": len(self.cp), "waves": self.n_waves, "width": width,
+                "task_waves": len(self.task_waves),
                 "widest": max(width, default=0), "parallelism": len(self.tasks) / len(self.cp) if self.cp else 0.0,
-                "edges": len(self.graph_edges), "mitigated": len(mitigated)}
+                "edges": len(self.graph_edges), "mitigated": len(mitigated),
+                "dc": len(dc), "dc_mitigated": sum(1 for e in dc if e["mitigated_by"]),
+                "unmitigated": dict(sorted(why.items(), key=lambda kv: (REASON_ORDER.index(kv[0]), kv[0])))}
+
+
+# Unmitigated-row classes, in the order they are listed; the last three are worth a look.
+REASON_ORDER = ["integration", "same module", "shared file", "side-effect order", "contract change",
+                "across steps", "data or call, not mitigated", "order, no reason", "other"]
+REASON_FLAG = {"across steps", "data or call, not mitigated", "order, no reason", "other"}
+REASON_TIP = {
+    "integration": "a wiring or system task waits on what it wires or runs",
+    "same module": "a code edge between spine or thicken tasks of the same step, or whose Writes overlap",
+    "shared file": "a file edge: the two tasks write the same file",
+    "side-effect order": "an order edge with a reason",
+    "contract change": "a contract-change edge",
+    "across steps": "a code edge between spine or thicken tasks of different steps: it serializes them",
+    "data or call, not mitigated": "an interface could have frozen this boundary",
+    "order, no reason": "an order edge that gives no reason",
+    "other": "none of the above",
+}
+
+
+def write_overlap(a: list[str], b: list[str]) -> bool:
+    """Two Writes lists name a common file, a glob on one side matching a path on the other."""
+    return any(x == y or fnmatch.fnmatchcase(x, y) or fnmatch.fnmatchcase(y, x) for x in a for y in b)
 
 
 # ---------------------------------------------------------------- shared html
@@ -785,17 +871,19 @@ def milestone_rows(plan: Plan) -> str:
         m = g.metrics()
         node = plan.ever.get(mid) or {"title": "", "status": ""}
         alive = plan.final and mid in plan.final.nodes
-        mitigated = f"{m['mitigated']} of {m['edges']}" if m["edges"] else "—"
+        mitigated = f"{m['dc_mitigated']} of {m['dc']}" if m["dc"] else "—"
         rows.append(f'<tr><td><a href="{mpage(mid)}"><b>{esc(mid)}</b></a></td><td>{esc(node["title"])}'
                     f'{"" if alive or mid not in plan.ever else " <span class=bad>(removed)</span>"}</td>'
                     f'<td>{esc(node.get("status") or "—")}</td><td>T{s.turn:02d}</td><td>{m["tasks"]}</td>'
-                    f'<td class="{"bad" if m["cp"] > CP_CAP else ""}">{m["cp"]}</td><td>{m["waves"]}</td>'
+                    f'<td class="{"bad" if m["cp"] > CP_CAP else ""}">{m["cp"]}</td>'
+                    f'<td>{m["waves"]} ({m["task_waves"]})</td>'
                     f'<td>{m["widest"]}</td><td>{m["parallelism"]:.1f}</td>'
                     f'<td>{mitigated}</td></tr>')
     if not rows:
         return "<p>No milestone has tasks yet.</p>"
     return ('<table><tr><th>Milestone</th><th>Title</th><th>Status</th><th>As of</th><th>Tasks</th><th>Critical path</th>'
-            '<th>Waves</th><th>Widest wave</th><th>Parallelism</th><th>Edges mitigated</th></tr>' + "".join(rows) + "</table>")
+            '<th>Waves of boxes (of whole tasks)</th><th>Widest wave</th><th>Parallelism</th>'
+            '<th>Data and call edges mitigated</th></tr>' + "".join(rows) + "</table>")
 
 
 def last_with_tasks(plan: Plan, mid: str) -> Snap:
@@ -831,8 +919,9 @@ turns T{plan.snaps[0].turn:02d}–T{plan.snaps[-1].turn:02d}</div>
 {charts.tiles(tiles)}
 <h2>Milestones</h2>
 <p class="legend">Each opens its build view: what would run in parallel and what in series. Critical path is in tasks
-(cap {CP_CAP}); parallelism is tasks ÷ critical path; edges mitigated are the dependency-graph rows an interface
-removes from the order.</p>
+(cap {CP_CAP}); waves count boxes, a split task's tester and implementer apart, with the waves of whole tasks in
+brackets; parallelism is tasks ÷ critical path; mitigated are the data and call rows of the dependency graph that
+an interface removes from the order (the other rows can never be).</p>
 {milestone_rows(plan)}
 <h2>Growth</h2>
 {growth_strip(plan)}
@@ -1007,7 +1096,18 @@ def write_turn(plan: Plan, s: Snap, d: Path) -> Path:
 # ---------------------------------------------------------------- M<n>.html
 
 
-NW, NH, CW, LW, TOP, VG = 148, 42, 178, 112, 40, 12
+NW, NH, CW, LW, TOP, VG = 164, 56, 194, 112, 40, 12
+LINE1, LINE2 = 21, 26  # title characters on a box's first line (after the id) and second
+
+
+def wrap2(title: str, first: int = LINE1, second: int = LINE2) -> tuple[str, str]:
+    """A title on two lines, broken at a space where one fits; the second is cut with …."""
+    if len(title) <= first:
+        return title, ""
+    cut = title.rfind(" ", 0, first + 1)
+    if cut <= first // 3:
+        cut = first
+    return title[:cut].rstrip(), fit(title[cut:].strip(), second)
 
 
 def node_tip(g: Graph, t: str, half: str) -> str:
@@ -1063,8 +1163,9 @@ def graph_svg(g: Graph, turn: int) -> str:
             unb = g.kind.get(p[0]) == "interface"
             cls = "e" + (" cp" if cp else " sp" if inside else " unb" if unb else "")
             dx = max(30, (bx - ax) / 2)
-            what = ("tester then implementer" if inside else f"{k[0]} depends on {p[0]}"
-                    + (" (unblocked by the interface)" if unb else ""))
+            what = ("tester then implementer" if inside
+                    else f"{k[0]}'s tester waits on the interface {p[0]}" if k[1] == "test"
+                    else f"{k[0]} depends on {p[0]}" + (" (unblocked by the interface)" if unb else ""))
             edges.append((cp, f'<path d="M{ax:.1f},{ay:.1f} C{ax + dx:.1f},{ay:.1f} {bx - dx:.1f},{by:.1f} {bx:.1f},{by:.1f}" '
                               f'class="{cls}" marker-end="url(#{"acp" if cp else "a"})"><title>{esc(what)}</title></path>'))
     out += [e for cp, e in edges if not cp] + [e for cp, e in edges if cp]
@@ -1085,15 +1186,19 @@ def graph_svg(g: Graph, turn: int) -> str:
                      f'class="nb iface{" cpn" if on_cp else ""}"/>')
             ok = ' <tspan class="done">✓</tspan>' if done else ""
             text = (f'<text x="{x + NW / 2}" y="{y + 18}" text-anchor="middle" class="nid">{esc(short(t, g.mid))}{ok}</text>'
-                    f'<text x="{x + NW / 2}" y="{y + 32}" text-anchor="middle" class="nmeta">{esc(meta)}</text>')
+                    f'<text x="{x + NW / 2}" y="{y + 31}" text-anchor="middle" class="ntl">{esc(fit(n["title"], 18))}</text>'
+                    f'<text x="{x + NW / 2}" y="{y + 44}" text-anchor="middle" class="nmeta">{esc(meta)}</text>')
             done = False
         else:
             shape = (f'<rect x="{x}" y="{y}" width="{NW}" height="{NH}" rx="6" class="nb{" cpn" if on_cp else ""}'
                      f'{" half" if half == "test" else ""}"/>'
                      f'<rect x="{x}" y="{y}" width="5" height="{NH}" rx="2" class="{KIND_COLOR.get(kind, "cx")}"/>')
-            text = (f'<text x="{x + 11}" y="{y + 16}"><tspan class="nid">{esc(short(t, g.mid))}</tspan> '
-                    f'<tspan class="ntl">{esc(fit(n["title"], 17))}</tspan></text>'
-                    f'<text x="{x + 11}" y="{y + 32}" class="nmeta">{esc(meta)}</text>')
+            sid = short(t, g.mid)
+            l1, l2 = wrap2(n["title"], LINE1 + 4 - len(sid))
+            text = (f'<text x="{x + 11}" y="{y + 15}"><tspan class="nid">{esc(sid)}</tspan> '
+                    f'<tspan class="ntl">{esc(l1)}</tspan></text>'
+                    + (f'<text x="{x + 11}" y="{y + 29}" class="ntl">{esc(l2)}</text>' if l2 else "")
+                    + f'<text x="{x + 11}" y="{y + 46}" class="nmeta">{esc(meta)}</text>')
         tick = f'<text x="{x + NW - 6}" y="{y + 15}" text-anchor="end" class="done">✓</text>' if done else ""
         out.append(f'<a href="{tpage(turn)}#{anchor(t)}"><g><title>{esc(tip)}</title>{shape}{text}{tick}</g></a>')
     defs = ('<defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">'
@@ -1140,11 +1245,20 @@ def write_milestone(plan: Plan, mid: str, d: Path) -> Path:
     theirs = s.builds.get(mid) or {}
     tiles = [(str(m["tasks"]), "tasks", ""),
              (str(m["cp"]), "critical path (tasks)", f'<i class="{"bad" if m["cp"] > CP_CAP else "ok"}">cap {CP_CAP}</i>'),
-             (str(m["waves"]), "waves", ""), (str(m["widest"]), "agents in the widest wave", ""),
+             (str(m["waves"]), "waves of boxes (tester and implementer apart)",
+              f"<i>whole tasks: {m['task_waves']}</i>"),
+             (str(m["widest"]), "agents in the widest wave", ""),
              (f"{m['parallelism']:.1f}", "parallelism (tasks ÷ critical path)", ""),
-             (f"{m['mitigated']}/{m['edges']}" if m["edges"] else "—", "graph edges mitigated",
-              f"<i>{m['mitigated'] / m['edges']:.0%}</i>" if m["edges"] else "")]
+             (f"{m['dc_mitigated']}/{m['dc']}" if m["dc"] else "—", "data and call edges mitigated",
+              f"<i>{m['dc_mitigated'] / m['dc']:.0%}</i>" if m["dc"] else "")]
     notes = []
+    if m["unmitigated"]:
+        parts = [f'<span class="{"warnp" if c in REASON_FLAG else ""}" title="{esc(REASON_TIP.get(c, ""))}">'
+                 f'{esc(c)} {n}</span>' for c, n in m["unmitigated"].items()]
+        notes.append(f'<p>Unmitigated dependency-graph rows, {sum(m["unmitigated"].values())} of {m["edges"]}, '
+                     f'by why they stay: {" · ".join(parts)}. Integration, same-module, shared-file, order and '
+                     f'contract-change rows can never be mitigated; the rest are worth a look. Hover a class for '
+                     f'what it means.</p>')
     if theirs:
         tw = [list(w) for w in theirs.get("waves") or []]
         tcp = list(theirs.get("critical_path") or [])
@@ -1167,6 +1281,7 @@ def write_milestone(plan: Plan, mid: str, d: Path) -> Path:
     edge_rows = "".join(
         f"<tr><td>{esc(e['from'])}</td><td>{esc(e['to'])}</td><td>{esc(e['kind'])}</td>"
         f"<td class=\"{'ok' if e['mitigated_by'] else ''}\">{esc(e['mitigated_by'] or ('none: ' + e['reason'] if e['reason'] else 'none'))}</td>"
+        f"<td class=\"{'warnp' if g.reason_class(e) in REASON_FLAG else ''}\">{esc(g.reason_class(e) or '—')}</td>"
         f"<td>{'yes' if e['to'] in g.deps.get(e['from'], []) else 'no'}</td></tr>"
         for e in sorted(g.graph_edges, key=lambda e: (natural(e["from"]), natural(e["to"]))))
     ext = "".join(f"<li>{esc(e['from'])} → {esc(e['to'])}</li>" for e in g.external)
@@ -1196,14 +1311,15 @@ def write_milestone(plan: Plan, mid: str, d: Path) -> Path:
 <p class="legend">Left to right is the order work can start: a task sits in the first wave after everything it depends
 on. Rows are task kinds. <span class="c6 sw" style="transform:rotate(45deg)"></span>An interface task is a diamond;
 dashed edges are what it unblocks. Solid edges are other <code>depends</code>; a split task is two boxes, the tester
-(dashed border) then the implementer. The critical path is the thick line and the bold boxes; ✓ is done. Edges
+(dashed border) then the implementer. A tester waits only on the interface: the interface tasks among its task's
+ancestors, else all of the milestone's. Waves count boxes, so a split task can take two. The critical path is the thick line and the bold boxes; ✓ is done. Edges
 an interface mitigates do not order the tasks and are listed below, not drawn. Hover a box for its dependencies and
 writes; click it for the task on the turn's page.</p>
 <div class="scroll">{graph_svg(g, plan.page_for(s.turn).turn if plan.page_for(s.turn) else s.turn)}</div>
 <h2>Agents per wave</h2>
 <table><tr><th>Wave</th><th>Agents</th><th>Segments</th></tr>{width_rows}</table>
 <h2>Dependency graph</h2>
-{('<table><tr><th>From</th><th>To</th><th>Kind</th><th>Mitigated by</th><th>In depends</th></tr>' + edge_rows + '</table>') if edge_rows else '<p>No dependency-graph rows for this milestone.</p>'}
+{('<table><tr><th>From</th><th>To</th><th>Kind</th><th>Mitigated by</th><th>Why it stays</th><th>In depends</th></tr>' + edge_rows + '</table>') if edge_rows else '<p>No dependency-graph rows for this milestone.</p>'}
 {f'<p>Depends on tasks outside {esc(mid)}:</p><ul>{ext}</ul>' if ext else ''}
 <h2>How the graph changed</h2>
 <p class="legend">One thumbnail per turn that gave this milestone's graph a new shape (tasks, kinds, modes or depends);

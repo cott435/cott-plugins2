@@ -172,6 +172,53 @@ class OlderProducers(unittest.TestCase):
         self.assertIsNone(render({"schema": "plan-map/1", "snapshots": []})[1])
 
 
+class TesterAfterInterface(unittest.TestCase):
+    """Iteration 7's R1, R2, R4 and R5 on `fixtures/plan-tester-after-interface.json`: split tasks
+    whose only dependency is a spine (T04) or nothing (T05) once had testers drawn in W0."""
+
+    @classmethod
+    def setUpClass(cls):
+        doc = json.loads((HERE / "fixtures" / "plan-tester-after-interface.json").read_text(encoding="utf-8"))
+        cls.out, _ = render(doc)
+        cls.g = planmap.Graph(planmap.last_with_tasks(planmap.load(cls.out), "M1"), "M1")
+        cls.page = (cls.out / "plan" / "M1.html").read_text(encoding="utf-8")
+
+    def test_no_tester_starts_beside_the_interface(self):
+        self.assertEqual(self.g.waves[0], [("M1-T01", ""), ("M1-T02", "")])
+        self.assertEqual(self.g.preds[("M1-T04", "test")], [("M1-T01", "")])  # through the T03 spine
+        self.assertEqual(self.g.preds[("M1-T05", "test")], [("M1-T01", ""), ("M1-T02", "")])  # no deps: all of them
+        self.assertEqual(self.g.preds[("M1-T06", "test")], [("M1-T02", "")])  # its own direct interface
+        self.assertEqual(self.g.metrics()["width"], [2, 4, 3, 1])
+
+    def test_an_interface_chain_keeps_only_its_last(self):
+        doc = json.loads((HERE / "fixtures" / "plan-tester-after-interface.json").read_text(encoding="utf-8"))
+        doc["snapshots"][0]["edges"].append({"from": "M1-T02", "to": "M1-T01", "kind": "depends"})
+        out, _ = render(doc)
+        g = planmap.Graph(planmap.last_with_tasks(planmap.load(out), "M1"), "M1")
+        self.assertEqual(g.tester_waits_on("M1-T05"), ["M1-T02"])
+        self.assertEqual(g.tester_waits_on("M1-T04"), ["M1-T01"])
+
+    def test_mitigated_counts_data_and_call_edges_and_classes_the_rest(self):
+        m = self.g.metrics()
+        self.assertEqual((m["dc_mitigated"], m["dc"], m["mitigated"], m["edges"]), (1, 2, 1, 6))
+        self.assertEqual(m["unmitigated"], {"integration": 2, "same module": 1, "across steps": 1,
+                                            "data or call, not mitigated": 1})
+        self.assertIn("data and call edges mitigated", self.page)
+        self.assertIn("integration 2", self.page)
+        self.assertIn("<th>Why it stays</th>", self.page)
+
+    def test_the_wave_tile_names_its_unit(self):
+        self.assertIn("waves of boxes (tester and implementer apart)", self.page)
+        self.assertIn("whole tasks: 4", self.page)
+
+    def test_box_titles_wrap(self):
+        self.assertEqual(planmap.wrap2("Price-row flag checks on every symbol", 22),
+                         ("Price-row flag checks", "on every symbol"))
+        self.assertIn(">Price-row flag checks</tspan>", self.page)
+        self.assertIn('class="ntl">on every symbol</text>', self.page)
+        self.assertEqual(planmap.wrap2("Bulk download"), ("Bulk download", ""))
+
+
 class WithARun(unittest.TestCase):
     def test_axis_and_skills_come_from_the_run(self):
         index = {"title": "a run", "project": "/p", "turns": [

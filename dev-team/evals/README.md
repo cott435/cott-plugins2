@@ -7,7 +7,7 @@ Multi-turn trajectories that plan two projects (`rl`, `quant`) from a raw idea t
 
 Stages (from `harness/scenarios.json`): **rl** snake → fish → foraging; **quant** data → structure_portfolios → features_ml → forecasting_agents. Quant had six stages in the three-skill evals; statistics + classical portfolios and forecasting + agents are now merged, because each stage now runs through four more gates. The three-skill evals (iterations 1–4) are archived in [archive/three-skills/](archive/three-skills/README.md).
 
-Each stage goes idea/brief → spec → architecture → pipelines → test plan (optional) → build plan. Build setup comes before the first build. Quant also exercises references and stage-level skill routing ([design/references.md](../design/references.md) §10): the user's three reference files arrive with the stage they serve and go through `reference-intake`, and the `data-analysis` and `null-hypothesis-testing` project skills are routed per milestone. Then the run is graded programmatically, mostly through `dt`, and the final docs can be compared by a blind judge. Design: [design/planning-stage.md §13](../design/planning-stage.md).
+Each stage goes idea/brief → spec → architecture → pipelines → test plan (optional) → build plan. Build setup comes before the first build. Quant also exercises references and stage-level skill routing ([design/references.md](../design/references.md) §10): the user's three reference files arrive with the stage they serve and go through `reference-intake`, and the `data-analysis`, `null-hypothesis-testing` and `frontend-design` skills are routed per milestone (`frontend-design` to the data stage's viz app: a TypeScript + React frontend over a Python backend). Then the run is graded programmatically, mostly through `dt`, and the final docs can be compared by a blind judge. Design: [design/planning-stage.md §13](../design/planning-stage.md).
 
 ## Files (`harness/`)
 
@@ -26,7 +26,7 @@ Each stage goes idea/brief → spec → architecture → pipelines → test plan
 | `runviz.py` | The workflow analysis that ends every run: draws what the run did from its session transcripts and saves it in `<run>/flow/` (below). Uses the `workflow-analyzer` plugin's scripts (`trace.py`, `flow.py`, `charts.py`, `compare.py`), found at `$WORKFLOW_ANALYZER_SCRIPTS`, in this marketplace's `workflow-analyzer/scripts`, or in the installed plugin. |
 | `run.sh` | Runs trajectories in parallel, then grades, measures, packages and draws them. |
 | `scenarios.json` | Persona, project facts, stages, turn budgets, and per project the skill stubs (`project_skills`) and reference files per stage (`references`). |
-| `stub_*_SKILL.md` | Project skill stubs installed in the run's `.claude/skills/`: `null-hypothesis-testing` (both projects), `data-analysis` (quant). |
+| `stub_*_SKILL.md` | Project skill stubs installed in the run's `.claude/skills/`: `null-hypothesis-testing` (both projects), `data-analysis` and `frontend-design` (quant; the latter stands in for Anthropic's plugin skill, which the isolated run can't load). |
 | `references/quant/` | The user's reference code (never run): `market_decomposition.py` (PCA market removal, fit on the full sample: a deliberate look-ahead caveat) for structure_portfolios; `tft_dataset.py` and `tft_targets.py` for forecasting_agents. The driver copies them into the project's `references/` when that stage is revealed (all at the start in all-at-once) and says so in the user's message. |
 
 ## Checks that cost nothing (run these first)
@@ -41,11 +41,12 @@ CLAUDE_BIN=$PWD/evals/harness/fake_claude.py \
 
 The dry run replays the fixture's `references/` and `docs/references.md` as a reference-intake turn (with one fake Agent launch per file) before the M2 idea. To exercise the driver's reference copying and Agent parsing, run the fake loop on `quant-all-at-once` with `MAX_TURNS=5`: turn 4 is the intake layer and should record one launch per file.
 
-On the dry run, 46 of 58 checks pass. The 12 failures are expected, because the sample is a two-milestone project that is mid-build, not a finished four-stage run:
-- There is no features milestone, so no Grow.
+On the dry run, 46 of 60 checks pass. The 14 failures are expected, because the sample is a two-milestone project that is mid-build, not a finished four-stage run:
+- The sample is single-package, not multi-package from the data stage (`quant_multi_from_data`).
 - M1-T01's code is already in `src/`.
 - The brief is already Accepted when the replay first shows it.
-- The quant content checks fail (null-hypothesis-testing, classical portfolios, out-of-sample).
+- The quant content checks fail (null-hypothesis-testing, classical portfolios, out-of-sample, the viz app's boundary).
+- The sample has no viz app, so its M1 has no frontend-design (`skills_on_data_tasks`).
 - The sample's PCA reference serves its M1 (data + stats), not the structure_portfolios milestone, and its M2 has no `**Skills:**` line (`refs_milestones`, `skills_on_structure_tasks`).
 
 ## Smoke run (one turn, about $0.30)
@@ -143,7 +144,7 @@ These are the §13 assertions. Each is a named check in `grading.json`.
 | `milestone_depends` | Every milestone after the first has a Depends line naming existing milestones, with no cycles |
 | `first_planned_rest_designed` | Both modes: the first milestone has a plan and every later milestone is at least Designed (task plans are written for the next milestone only), so the final roadmaps of the two modes compare like for like |
 | `brief_goals_stage_neutral` | 5 goals or fewer, none worded per stage |
-| `quant_grow_at_features` | Incremental: the shape first becomes multi-package in the features_ml stage. All-at-once: the final shape is multi-package |
+| `quant_multi_from_data` | No turn's architecture is single-package (the data stage's TypeScript frontend is a runtime boundary), and the final shape has two or more packages |
 | `no_code_during_planning` | Nothing under `src/`, `tests/intent/` or `tests/unit/` in any turn, beyond empty or docstring-only files |
 | `gate_discipline` | No turn adds 12 or more lines to two layers. The layers are brief/idea, references (`docs/references.md`), spec, architecture, pipelines, tests, plan and setup |
 | `skills_invoked`, `test_planning_invoked`, `plan_docs_approved`, `approval_after_user` | Every planning skill ran, and the docs ended Approved only after the user said yes |
@@ -156,7 +157,7 @@ Quant only (projects with reference files), all through `dt`:
 | `refs_indexed_approved` | Every file in `references/` has an RF entry, `references_unindexed`/`_changed`/`_missing` are empty, and `docs/references.md` is Approved |
 | `refs_milestones` | By file name: `market_decomposition.py` on at least one structure_portfolios milestone, and both TFT files on at least one of forecasting_agents's. Later milestones that reuse a file may list it too (`—` while that stage has no roadmap row) |
 | `refs_skills_routed` | For every planned milestone, each of its references is in a task's `Read:` and each roadmap `**Skills:**` entry is on a task, unless the plan's Open questions names it; the same for dt's `references_unrouted` and `skills_unrouted` (active and queued plans) |
-| `skills_on_structure_tasks` | The structure_portfolios milestones' `**Skills:**` lines name data-analysis and null-hypothesis-testing, and each is on at least one of their tasks (no plan for them yet: the lines only) |
+| `skills_on_data_tasks`, `skills_on_structure_tasks` | The data milestones' `**Skills:**` lines name frontend-design; the structure_portfolios milestones' lines name data-analysis and null-hypothesis-testing. A planned milestone whose line names a skill puts it on a task (unplanned: the lines only) |
 | `reference_intake_invoked`, `intake_subagent_per_file` | reference-intake ran, and its turns launched one Agent per reference file (each launch names exactly one file; none batched) |
 | `no_reference_imports` | Nothing under `src/` or `tests/` imports `references` or adds it to `sys.path` (CR-08; matters once evals cover building) |
 

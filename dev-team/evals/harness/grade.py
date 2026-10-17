@@ -256,16 +256,12 @@ for n in sorted(turn_commit):
     m = re.search(r"\*\*Shape:\*\*\s*([^·\n]+)", a)
     shapes.append((n, m.group(1).strip() if m else None))
 if project == "quant":
+    # The data stage's TypeScript frontend is a runtime boundary, so the first architecture is already multi-package.
     stage_of = {t["turn"]: t["stage"] for t in turns}
-    multi = [(n, s) for n, s in shapes if s and not re.search(r"single", s, re.I)]
-    grow_turn = multi[0][0] if multi else None
+    single = [(n, stage_of.get(n)) for n, s in shapes if s and re.search(r"single", s, re.I)]
     final_multi = bool(shape) and not re.search(r"single", shape, re.I) and len(facts["packages"]) >= 2
-    if mode == "incremental":
-        ok = final_multi and stage_of.get(grow_turn) == "features_ml"
-        ev = f"first multi-package turn {grow_turn} (stage {stage_of.get(grow_turn)}); final shape {shape!r}, packages {facts['packages']}"
-    else:
-        ok, ev = final_multi, f"final shape {shape!r}, packages {facts['packages']}"
-    check("quant_grow_at_features", "quant: architecture Grows to multi-package at the features milestone (not before)", ok, ev)
+    check("quant_multi_from_data", "quant: architecture is multi-package from the data stage (the viz frontend is a separate runtime)",
+          final_multi and not single, f"single-package turns (turn, stage): {single}; final shape {shape!r}, packages {facts['packages']}")
 
 
 def is_code(text):
@@ -386,6 +382,10 @@ if project == "quant":
     check("no_live_trading", "Real-money / live trading is explicitly out of scope", bool(re.search(r"live|real[- ]money|brokerage", excluded, re.I)), "")
     check("spec_oos", "Out-of-sample / held-out evaluation is required for features and models",
           len(re.findall(r"out[- ]of[- ]sample|held[- ]out|walk[- ]forward", spec, re.I)) >= 3, f"{len(re.findall(r'out[- ]of[- ]sample|held[- ]out|walk[- ]forward', spec, re.I))} mentions")
+    viz = {k: bool(re.search(pat, arch_all, re.I)) for k, pat in
+           [("typescript", r"TypeScript"), ("react", r"\bReact\b"), ("websocket", r"WebSocket"), ("json_schema", r"JSON Schema")]}
+    check("arch_viz_boundary", "Architecture puts the viz app's TypeScript + React frontend across a WebSocket/HTTP boundary from the Python backend, "
+          "with a JSON Schema contract", all(viz.values()), f"{viz}")
 else:
     for env, pat in [("snake", r"snake"), ("fish", r"fish|tank|ball"), ("foraging", r"forag|predator|prey")]:
         check(f"spec_{env}", f"Spec covers the {env} environment", bool(re.search(pat, spec, re.I)), "")
@@ -450,21 +450,28 @@ if ref_stage:
           plans and not unrouted and not dt_open and all(isinstance(v, list) for v in dt_unrouted.values()),
           f"unrouted by milestone: {unrouted}; dt build-planning: {dt_unrouted}")
 
-    # Across the stage's milestones: their **Skills:** lines name both skills, and each lands on a task of a
-    # planned one. Only the first milestone gets a plan, so an unplanned stage is graded on the lines alone.
-    sms = stage_rows[stage_names.index("structure_portfolios")]
-    want_sk = ["data-analysis", "null-hypothesis-testing"]
-    if sms:
-        line_sk = {k for ms in sms for k in ms.get("skills", [])}
-        ms_tasks = [t for ms in sms for p in plans if p["milestone"] == ms["id"] for t in p["tasks"]]
-        on_task = {k: [t["id"] for t in ms_tasks if k in t.get("skills", [])] for k in want_sk}
-        ok = all(k in line_sk for k in want_sk) and (not ms_tasks or all(on_task.values()))
-        ev = (f"{[ms['id'] for ms in sms]} **Skills:** {sorted(line_sk)}; "
-              + (f"tasks carrying each: {on_task}" if ms_tasks else "no plan for them (roadmap lines only)"))
-    else:
-        ok, ev = False, "no structure_portfolios milestone"
-    check("skills_on_structure_tasks", "The structure & classical-portfolios milestones route data-analysis and null-hypothesis-testing "
-          "(their roadmap **Skills:** lines, and at least one task each when one of them has a plan)", ok, ev)
+    # Across the stage's milestones: their **Skills:** lines name each skill, and a planned milestone whose line
+    # names one puts it on a task. Only the first milestone gets a plan, so the rest are graded on the lines alone.
+    def stage_skills(cid, stage, want_sk, text):
+        sms = stage_rows[stage_names.index(stage)]
+        if sms:
+            line_sk = {k for ms in sms for k in ms.get("skills", [])}
+            on_task = {k: [t["id"] for ms in sms if k in ms.get("skills", []) for p in plans if p["milestone"] == ms["id"]
+                           for t in p["tasks"] if k in t.get("skills", [])]
+                       for k in want_sk}
+            planned = {k: [ms["id"] for ms in sms if k in ms.get("skills", []) and any(p["milestone"] == ms["id"] for p in plans)]
+                       for k in want_sk}
+            ok = all(k in line_sk for k in want_sk) and all(on_task[k] or not planned[k] for k in want_sk)
+            ev = f"{[ms['id'] for ms in sms]} **Skills:** {sorted(line_sk)}; planned milestones naming each: {planned}; tasks carrying each: {on_task}"
+        else:
+            ok, ev = False, f"no {stage} milestone"
+        check(cid, text, ok, ev)
+
+    stage_skills("skills_on_data_tasks", "data", ["frontend-design"],
+                 "The data milestones route frontend-design for the viz app (their roadmap **Skills:** lines, and a task of the planned milestone that names it)")
+    stage_skills("skills_on_structure_tasks", "structure_portfolios", ["data-analysis", "null-hypothesis-testing"],
+                 "The structure & classical-portfolios milestones route data-analysis and null-hypothesis-testing "
+                 "(their roadmap **Skills:** lines, and a task of each planned milestone that names one)")
 
     intake = [t for t in turns if "reference-intake" in [dtrun.skill_name(x) for x in t["skills"]]]
     check("reference_intake_invoked", "reference-intake ran", bool(intake), f"turns: {[t['turn'] for t in intake]}")

@@ -398,6 +398,44 @@ class BuildPlanningTest(Base):
         self.assertEqual(self.status("build-planning")["boundaries_unfrozen"], [])     # the interface task freezes it
 
 
+class InterfaceChangeTest(Base):
+    """A frozen interface edited after the plan: build-planning replans and names the tasks building on it."""
+    COV = "- **Invariants:** symmetric; positive semi-definite; `tickers` in column order"
+
+    def reapprove_cov(self):
+        self.edit("docs/packages/quant/contract.md", self.COV, self.COV + "; `n_obs` ≥ 2")
+        self.edit("docs/packages/quant/contract.md", "**Last updated:** 2026-10-15", "**Last updated:** 2026-10-20")
+
+    @unittest.skipUnless(HAS_GIT, "git not installed")
+    def test_in_git_only_the_changed_section(self):
+        git(self.root, "init", "-q")
+        git(self.root, "add", "-A")
+        git(self.root, "commit", "-q", "-m", "plan")
+        self.assertEqual(self.status("build-planning")["interfaces_changed"], [])
+        self.reapprove_cov()
+        git(self.root, "commit", "-qam", "revise Cov")
+        d = self.status("build-planning")
+        self.assertEqual(d["mode"], "replan")
+        self.assertEqual(d["interfaces_changed"],
+                         ["stats.Cov (M1-T04, M1-T05, M1-T06, M1-T09, M1-T11, M1-T12, M1-T13, M1-T14)"])
+        self.edit("docs/packages/quant/contract.md", "- **Used by:** PL-02, PL-03\n", "- **Used by:** PL-02, PL-03, PL-01\n")
+        self.assertEqual(len(self.status("build-planning")["interfaces_changed"]), 1)   # Used by appends don't count
+
+    def test_outside_git_every_frozen_symbol_of_the_changed_contract(self):
+        self.reapprove_cov()
+        d = self.status("build-planning")
+        self.assertEqual(d["mode"], "replan")
+        self.assertEqual([i.split(" ")[0] for i in d["interfaces_changed"]],
+                         ["data.Prices", "data.RawPrices", "data.load_prices", "stats.Cov", "stats.CovReport",
+                          "stats.Factors", "stats.Returns"])
+
+    def test_component_boundary_unfrozen(self):
+        self.edit("docs/packages/quant/contract.md", "- **Used by:** PL-03\n\n### portfolio.Comparison",
+                  "- **Boundary:** portfolio · **Fixtures:** tests/contracts/portfolio.Weights/ · **Cases:** one\n"
+                  "- **Used by:** PL-03\n\n### portfolio.Comparison")
+        self.assertEqual(self.status("build-planning")["boundaries_unfrozen"], ["portfolio.Weights (portfolio)"])
+
+
 class BuildPlanningLegacyTest(Base):
     """The same reports on the old-style plan (Phase 0 spines, `**Step:** contract`)."""
     legacy = True

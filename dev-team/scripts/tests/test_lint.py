@@ -110,7 +110,7 @@ class BudgetChecks(LintCase):
     def test_contract_budget_is_per_symbol(self):
         self._add_symbols(10)       # 139 lines, well past the old fixed 60, at 6 lines a symbol
         self.assertEqual(self.budget_messages(CONTRACT), [])
-        self.p.edit(CONTRACT, "- **Used by:** PL-03", "- **Used by:** PL-03\n" + "filler\n" * 55)
+        self.p.edit(CONTRACT, "- **Used by:** PL-03", "- **Used by:** PL-03\n" + "filler\n" * 57)
         self.assertEqual(self.budget_messages(CONTRACT), ["195 lines, budget 188 (8 per symbol × 22 + 12)"])
 
     def test_pipelines_budget_is_per_pipeline(self):
@@ -128,6 +128,7 @@ class BudgetChecks(LintCase):
 
     def test_grow_ceiling_is_a_separate_warning(self):
         self._add_symbols(22)
+        self.p.edit(CONTRACT, "- **Used by:** PL-03", "- **Used by:** PL-03\nfiller\nfiller")
         self.assertEqual(self.budget_messages(CONTRACT), [
             "211 lines, over the 200-line ceiling for one package's contract doc: architecture-design should "
             "consider a Grow"])
@@ -534,8 +535,8 @@ class InterfaceFirstChecks(LintCase):
 
     def test_mitigation_from_a_contracts_folder_in_writes(self):
         self.p.edit(PLAN, "stats.Cov, stats.Factors, stats.CovReport, data.load_prices", "stats.Cov, stats.CovReport, data.load_prices")
-        self.p.edit(PLAN, "src/quant/stats/report.py, tests/contracts/**",
-                    "src/quant/stats/report.py, tests/contracts/stats.Factors/sample.json, tests/contracts/**")
+        self.p.edit(PLAN, "src/quant/stats/**, tests/contracts/**",
+                    "src/quant/stats/**, tests/contracts/stats.Factors/sample.json, tests/contracts/**")
         self.assertEqual(self.messages("edges"), [])
 
     def test_mitigation_names_no_interface(self):
@@ -568,6 +569,14 @@ class InterfaceFirstChecks(LintCase):
         self.assertEqual(self.messages("verify-smoke"),
                          ["M1-T08 Verify lacks PL-01's smoke command `python -m quant.data load --smoke`"])
 
+    def test_thicken_after_the_wiring_needs_smoke(self):
+        # Smoke is due once a task's Depends on reaches its pipeline's wiring task.
+        self.p.edit(PLAN, "**Depends on:** M1-T06 · **Writes:**", "**Depends on:** M1-T06, M1-T09 · **Writes:**")
+        self.assertEqual(self.messages("verify-smoke"),
+                         ["M1-T13 Verify lacks PL-02's smoke command `python -m quant.stats cov-report --smoke`"])
+        self.p.edit(PLAN, "**Depends on:** M1-T06, M1-T09", "**Depends on:** M1-T06, M1-T08")    # PL-01's wiring
+        self.assertEqual(self.messages("verify-smoke"), [])
+
     def test_files_likely_in_an_interface_first_plan(self):
         self.p.edit(PLAN, "**Depends on:** M1-T06 · **Writes:**", "**Depends on:** M1-T06 · **Files likely:**")
         self.assertEqual(self.messages("task-fields"), ["M1-T13 missing Writes"])
@@ -582,25 +591,24 @@ class StepIoTypes(LintCase):
     def test_unknown_type(self):
         self.p.edit(PIPES, "| Cov → Factors |", "| Cov → Loadings |")
         self.assertEqual(self.messages(), [("E", "PL-02 step `pca` names Loadings, which no contract.md type section "
-                                                 "defines (`### <pkg>.Loadings: …` with `**Kind:** type`)")])
+                                                 "defines (`### <component>.Loadings: type`)")])
 
     def test_qualified_type_resolves(self):
         self.p.edit(PIPES, "| Cov → Factors |", "| stats.Cov → quant.stats.Factors |")
         self.assertEqual(self.messages(), [])
 
-    def test_cross_owner_boundary_needs_a_type(self):
-        self.p.edit(PIPES, "| 1 | `estimate_cov` | stats | Returns → Cov |", "| 1 | `estimate_cov` | stats | returns → cov matrix |")
-        self.assertEqual(self.messages(), [("E", "PL-03 step `estimate_cov` (stats) feeds `min_variance` (portfolio): "
-                                                 "its Out must name a contract type")])
-
-    def test_same_owner_boundary_needs_none(self):
+    def test_every_out_names_a_type(self):
         self.p.edit(PIPES, "| dates → RawPrices |", "| dates → raw rows |")
         self.p.edit(PIPES, "| RawPrices, dates → Prices |", "| raw rows, dates → Prices |")
+        self.assertEqual(self.messages(), [("E", "PL-01 step `read_raw`: its Out names no contract type")])
+
+    def test_entry_arguments_may_stay_plain(self):
+        self.p.edit(PIPES, "| RawPrices, dates → Prices |", "| RawPrices, dates, a universe file → Prices |")
         self.assertEqual(self.messages(), [])
 
     def test_project_without_types_gets_warnings(self):
         text = self.p.read(CONTRACT)
-        self.p.write(CONTRACT, text.replace("**Kind:** type · ", ""))
+        self.p.write(CONTRACT, text.replace(": type\n", ": A shape\n"))
         found = self.messages()
         self.assertTrue(found and {sev for sev, _ in found} == {"W"}, found)
 

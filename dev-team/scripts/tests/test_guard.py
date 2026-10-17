@@ -101,8 +101,7 @@ class InterfaceGuardTest(FixtureCopy):
 
     def test_open_interface_task_with_named_folders(self):
         self.replace("tasks/todo.md", "- [x] M1-T01", "- [ ] M1-T01")
-        self.replace("tasks/plan.md", "src/quant/stats/report.py, tests/contracts/**",
-                     "src/quant/stats/report.py, tests/contracts/stats.Cov/**")
+        self.replace("tasks/plan.md", "src/quant/stats/**, tests/contracts/**", "src/quant/stats/**, tests/contracts/stats.Cov/**")
         self.assertIsNone(self.decide("tests/contracts/stats.Cov/sample.json"))             # in Writes:
         self.assertIsNone(self.decide("tests/contracts/data.load_prices/fake.py"))          # in Read:
         self.assertEqual(self.decide("tests/contracts/portfolio.Weights/sample.json"), "ask")

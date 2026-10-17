@@ -266,6 +266,24 @@ def graph_edges(doc: Doc) -> list[Edge]:
     return out
 
 
+def frozen_symbols(plan_tasks: list[Task]) -> set[str]:
+    """Contract symbols the plan's interface (contract) tasks freeze: those in their `Read:`, and the
+    `tests/contracts/<pkg.Symbol>/` folders their `Writes:` name."""
+    out: set[str] = set()
+    for t in plan_tasks:
+        if not t.is_contract:
+            continue
+        for item in t.read:
+            ref = md.strip_md(item.split(" (")[0]).strip()
+            if re.fullmatch(md.SYMBOL_ID, ref):
+                out.add(ref)
+        for w in t.writes:
+            m = re.match(rf"tests/contracts/({md.SYMBOL_ID})(?:/|$)", w)
+            if m:
+                out.add(m.group(1))
+    return out
+
+
 def is_interface_first(doc: Doc) -> bool:
     """A plan written to interface-first-design: a `## Dependency graph` section, or a task with Kind/Writes."""
     return graph_section(doc) is not None or any("Kind" in t.fields or "Writes" in t.fields for t in tasks(doc))
@@ -689,9 +707,14 @@ class Symbol:
 
     @property
     def sample(self) -> str:
-        """The `**Sample:**` path of a type section, or ""."""
-        v = md.strip_md(self.fields.get("Sample", ""))
-        return "" if v.lower() in ("", "—", "-", "none") else v
+        """Where a type's sample lives: its `**Sample:**` path, else its `**Fixtures:**` folder (on the
+        `- **Boundary:** … · **Fixtures:** …` line), or ""."""
+        bullets = md.bullet_fields(self.doc.lines, self.start + 1, self.end)
+        for key in ("Sample", "Fixtures"):
+            v = md.strip_md(self.fields.get(key, "") or bullets.get(key, ""))
+            if v.lower() not in ("", "—", "-", "none"):
+                return v
+        return ""
 
     @property
     def text(self) -> str:

@@ -104,7 +104,7 @@ class PlanSnapshotTest(unittest.TestCase):
         self.assertEqual((step["parent"], step["attrs"]["owner"], step["expects"]["in_types"]), ("PL-02", "stats", ["Cov"]))
         self.assertEqual(next(n for n in self.nodes("pipeline") if n["id"] == "PL-03")["parent"], "M2")
         cov = next(n for n in self.nodes("type") if n["id"] == "stats.Cov")
-        self.assertEqual(cov["attrs"], {"package": "quant", "sample": "tests/contracts/stats.Cov/sample.json"})
+        self.assertEqual(cov["attrs"], {"package": "quant", "sample": "tests/contracts/stats.Cov/"})
         self.assertEqual(next(n for n in self.nodes("test") if n["id"] == "TC-02")["parent"], "PL-02")
 
     def test_edges(self):

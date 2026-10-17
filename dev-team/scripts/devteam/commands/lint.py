@@ -729,20 +729,6 @@ def check_writes(ctx: Context):
                              "wiring or system task may")
 
 
-def _produced(tasks: list[model.Task]) -> set[str]:
-    """Contract symbols the plan's interface tasks freeze: their `Read:` symbols and `tests/contracts/<sym>/`
-    folders in their `Writes:`."""
-    out: set[str] = set()
-    for t in tasks:
-        if t.is_contract:
-            out |= _contract_symbols(_read_ids(t.get("Read")))
-            for w in t.writes:
-                m = re.match(rf"tests/contracts/({md.SYMBOL_ID})(?:/|$)", w)
-                if m:
-                    out.add(m.group(1))
-    return out
-
-
 def _step_of(ctx: Context, t: model.Task) -> list[model.Step]:
     """The pipeline steps a task touches: `PL-02.pca` → that step; `PL-02` → every step of PL-02."""
     out = []
@@ -780,7 +766,7 @@ def check_edges(ctx: Context):
         tasks = model.tasks(doc)
         by_id = {t.id: t for t in tasks}
         edges = model.graph_edges(doc)
-        produced = _produced(tasks)
+        produced = model.frozen_symbols(tasks)
         section = model.graph_section(doc)
         rows: dict[tuple[str, str], model.Edge] = {}
         for e in edges:
@@ -829,9 +815,9 @@ def check_edges(ctx: Context):
 
 
 def check_step_io_types(ctx: Context):
-    """Every type a package step's `In → Out` cell names is a contract type section, and where two consecutive
-    steps have different owners, the first one's Out names one (the boundary an interface task freezes). A
-    project with no type sections yet gets warnings, not errors."""
+    """Every type a package step's `In → Out` cell names is a contract type section, and every step's Out names
+    one: the boundaries an interface task freezes (entry arguments on the In side may stay plain). A project with
+    no type sections yet gets warnings, not errors."""
     types = model.contract_types(ctx.repo)
     sev = "" if types else "W"
     for doc in ctx.repo.docs("pipelines"):
@@ -841,24 +827,34 @@ def check_step_io_types(ctx: Context):
                     if model.resolve_type(types, name) is None:
                         yield Problem(doc.rel, s.line + 1, "step-io-types",
                                       f"{p.id} step `{s.name}` names {name}, which no contract.md type section "
-                                      f"defines (`### <pkg>.{name.rsplit('.', 1)[-1]}: …` with `**Kind:** type`)", sev)
-            for a, b in zip(p.steps, p.steps[1:]):
-                if a.owner and b.owner and a.owner != b.owner and not any(
-                        model.resolve_type(types, n) for n in a.out_types):
-                    yield Problem(doc.rel, a.line + 1, "step-io-types",
-                                  f"{p.id} step `{a.name}` ({a.owner}) feeds `{b.name}` ({b.owner}): its Out must "
-                                  "name a contract type", sev)
+                                      f"defines (`### <component>.{name.rsplit('.', 1)[-1]}: type`)", sev)
+                if not s.out_types:
+                    yield Problem(doc.rel, s.line + 1, "step-io-types",
+                                  f"{p.id} step `{s.name}`: its Out names no contract type", sev)
+
+
+def _smoke_due(t: model.Task, pl: str, wired_before: dict[str, set[str]]) -> bool:
+    """Whether the task's Verify must run pipeline `pl`'s smoke command. Wiring and system tasks do, and so does
+    any other task whose `Depends on` reaches `pl`'s wiring task; interface and spine tasks, and thicken tasks
+    beside the wiring, land before the pipeline runs. A task with no Kind: every task outside Phase 0."""
+    if not t.kind:
+        return not t.is_spine
+    return t.kind in ("wiring", "system") or pl in wired_before.get(t.id, set())
 
 
 def check_verify_smoke(ctx: Context):
-    """A task that makes a pipeline run (wiring, system; with no Kind, any task outside Phase 0) runs its smoke
-    command. Interface, spine and thicken tasks may land before their pipeline is wired."""
     smoke: dict[str, str | None] = {}
+    wired_before: dict[str, set[str]] = {}
+    for doc in ctx.plan_docs:
+        tasks = model.tasks(doc)
+        wiring = {t.id: model.spine_pipeline(t) for t in tasks if t.kind == "wiring"}
+        for t in tasks:
+            wired_before[t.id] = {wiring[a] for a in graph.ancestors(tasks, t.id) if a in wiring}
     for t in ctx.tasks:
-        if t.kind in ("interface", "spine", "thicken") or (not t.kind and t.is_spine):
-            continue
         verify = " ".join(t.get("Verify").split())
         for pl in dict.fromkeys(re.findall(r"PL-\d{2,}", t.step)):
+            if not _smoke_due(t, pl, wired_before):
+                continue
             if pl not in smoke:
                 smoke[pl] = model.smoke_command(ctx.repo, pl)
             cmd = smoke[pl]

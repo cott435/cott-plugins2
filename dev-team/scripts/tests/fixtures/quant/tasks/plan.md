@@ -17,7 +17,7 @@
 - [x] Every M1 step signature in its owner module, body `raise NotImplementedError("<task>")`
 - [x] `data.load_prices` fake backed by fixtures; `__init__` exports
 **Verify:** `pytest tests/contracts` · `scripts/check.sh gate`
-**Depends on:** — · **Writes:** src/quant/__init__.py, src/quant/data/__init__.py, src/quant/data/types.py, src/quant/data/raw.py, src/quant/data/universe.py, src/quant/stats/__init__.py, src/quant/stats/types.py, src/quant/stats/cov.py, src/quant/stats/rmt.py, src/quant/stats/pca.py, src/quant/stats/report.py, tests/contracts/**
+**Depends on:** — · **Writes:** src/quant/__init__.py, src/quant/data/**, src/quant/stats/**, tests/contracts/**
 
 ## Phase 1: Step spines
 
@@ -69,7 +69,7 @@
 **Verify:** `pytest tests/unit/quant -k report` · `scripts/check.sh gate`
 **Depends on:** M1-T01 · **Writes:** src/quant/stats/report.py, tests/unit/quant/test_report.py
 
-## Phase 2: Wiring
+## Phase 2: Wiring and thicken
 
 ### M1-T08: Wire PL-01
 **Package:** quant · **Step:** PL-01 · **Kind:** wiring · **Size:** S · **Mode:** solo
@@ -88,8 +88,6 @@
 - [ ] Pre-build sections replaced by a `dt layout` pointer
 **Verify:** `python -m quant.stats cov-report --smoke` · `scripts/check.sh gate`
 **Depends on:** M1-T04, M1-T05, M1-T06, M1-T07 · **Writes:** src/quant/stats/pipeline.py, src/quant/stats/__main__.py
-
-## Phase 2: Thicken
 
 ### M1-T10: Delisting-aware universe
 **Package:** quant · **Step:** PL-01.apply_universe · **Kind:** thicken · **Covers:** DATA-02 · **Size:** S · **Mode:** split
@@ -154,6 +152,12 @@
 ## Dependency graph
 | From | To | Kind | Mitigated by |
 |---|---|---|---|
+| M1-T02 read_raw spine | M1-T01 interface | code | none: replaces its stub |
+| M1-T03 apply_universe spine | M1-T01 interface | code | none: replaces its stub |
+| M1-T04 estimate_cov spine | M1-T01 interface | code | none: replaces its stub |
+| M1-T05 clean_eigen spine | M1-T01 interface | code | none: replaces its stub |
+| M1-T06 pca spine | M1-T01 interface | code | none: replaces its stub |
+| M1-T07 write_report spine | M1-T01 interface | code | none: replaces its stub |
 | M1-T03 apply_universe spine | M1-T02 read_raw spine | data | data.RawPrices sample (M1-T01) |
 | M1-T05 clean_eigen spine | M1-T04 estimate_cov spine | data | stats.Cov sample (M1-T01) |
 | M1-T06 pca spine | M1-T05 clean_eigen spine | data | stats.Cov sample (M1-T01) |
@@ -171,11 +175,11 @@
 | M1-T12 shrinkage | M1-T04 estimate_cov spine | code | none: thickens the same module |
 | M1-T13 PCA check | M1-T06 pca spine | code | none: thickens the same module |
 | M1-T14 system | M1-T08 wire PL-01 | code | none: swaps the fake for the real PL-01 |
-| M1-T14 system | M1-T09 wire PL-02 | file | none: rewires stats/pipeline.py, which M1-T09 writes |
-| M1-T14 system | M1-T10 delisting universe | order | none: the golden cases run on the finished steps |
-| M1-T14 system | M1-T11 MP cleaning | order | none: the golden cases run on the finished steps |
-| M1-T14 system | M1-T12 shrinkage | order | none: the golden cases run on the finished steps |
-| M1-T14 system | M1-T13 PCA check | order | none: the golden cases run on the finished steps |
+| M1-T14 system | M1-T09 wire PL-02 | file | none: shared entry module stats/pipeline.py, which M1-T09 writes |
+| M1-T14 system | M1-T10 delisting universe | order | none: the golden cases run end to end on the finished steps |
+| M1-T14 system | M1-T11 MP cleaning | order | none: the golden cases run end to end on the finished steps |
+| M1-T14 system | M1-T12 shrinkage | order | none: the golden cases run end to end on the finished steps |
+| M1-T14 system | M1-T13 PCA check | order | none: the golden cases run end to end on the finished steps |
 
 ## Risks
 | Risk | Impact | Mitigation |

@@ -16,12 +16,12 @@ class ContextFixtureTest(unittest.TestCase):
         self.assertTrue(lines[1].startswith("Read only what is below"))
         order = ["<!-- docs/packages/quant/pipelines.md:5 -->", "## PL-01: Load prices",
                  "### TC-01: Delisted name drops out", "- **DATA-02** Delisted names",
-                 "### data.Prices: Point-in-time price panel", "## Layout (`dt layout quant`)",
-                 "## Interfaces (frozen", "### data.RawPrices: Raw price rows",
-                 "## Writes (edit only these files", "<!-- tasks/plan.md:94 -->", "### M1-T10: Delisting-aware universe"]
+                 "### data.Prices: type", "## Layout (`dt layout quant`)",
+                 "## Interfaces (frozen", "### data.RawPrices: type",
+                 "## Writes (edit only these files", "<!-- tasks/plan.md:92 -->", "### M1-T10: Delisting-aware universe"]
         positions = [out.index(s) for s in order]
         self.assertEqual(positions, sorted(positions))
-        self.assertIn("Sample: tests/contracts/data.RawPrices/sample.json (exists)\n", out)
+        self.assertIn("Sample: tests/contracts/data.RawPrices/ (exists)\n", out)
         self.assertIn("- src/quant/data/universe.py (new)\n- tests/unit/quant/test_universe.py (new)\n", out)
         self.assertIn("    pipeline.py — PL-01 entry: load prices.\n", out)
         self.assertEqual(out.count("### data.Prices:"), 1)          # read already: not repeated as an interface

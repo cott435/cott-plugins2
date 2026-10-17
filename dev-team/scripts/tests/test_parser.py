@@ -145,7 +145,7 @@ class ModelTest(unittest.TestCase):
 
     def test_graph_edges(self):
         edges = model.graph_edges(self.repo.plan)
-        self.assertEqual(len(edges), 22)
+        self.assertEqual(len(edges), 28)
         self.assertTrue(model.is_interface_first(self.repo.plan))
         call = next(e for e in edges if e.kind == "call")
         self.assertEqual((call.src, call.dst, call.mitigated_by, call.reason),
@@ -225,7 +225,7 @@ class ModelTest(unittest.TestCase):
         self.assertEqual([s.id for s in types], ["data.RawPrices", "data.Prices", "stats.Returns", "stats.Cov",
                                                  "stats.Factors", "stats.CovReport", "portfolio.Weights",
                                                  "portfolio.Comparison"])
-        self.assertEqual(types[3].sample, "tests/contracts/stats.Cov/sample.json")
+        self.assertEqual(types[3].sample, "tests/contracts/stats.Cov/")
         by_name = model.contract_types(self.repo)
         self.assertIs(model.resolve_type(by_name, "Cov"), model.resolve_type(by_name, "quant.stats.Cov"))
         self.assertIsNone(model.resolve_type(by_name, "Loadings"))

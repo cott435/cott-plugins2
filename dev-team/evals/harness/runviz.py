@@ -7,7 +7,9 @@ ran (the `session_id` in `agent_stream.jsonl`, whose transcript is under ~/.clau
 writes `eval.json` beside the trace (the trajectory, its checks from `grading.json`, and per turn
 the stage and cost from `turns.json`), and builds `<run>/flow/`: `flow.html` with the timeline,
 tokens and time per turn and per agent, files read and edited per turn, the wave chart, and one
-page per turn and per agent.
+page per turn and per agent. It also writes `<run>/flow/plan.json`, the plan as of every turn that
+changed it (planexport.py), and, when the workflow-analyzer scripts have `planmap.write`, the plan
+map pages under `<run>/flow/plan/`.
 
 For an iteration it does that for every run, compares each with the same trajectory in the
 previous iteration (or `--against`), and writes `<iteration>/runflow/index.html`, the
@@ -56,6 +58,12 @@ import charts  # noqa: E402
 import compare  # noqa: E402
 import flow  # noqa: E402
 import trace  # noqa: E402
+try:
+    import planmap  # noqa: E402  (workflow-analyzer versions before the plan map have none)
+except ImportError:
+    planmap = None
+sys.path.insert(0, str(HERE))
+import planexport  # noqa: E402
 
 WS = pathlib.Path(os.environ.get("EVAL_WS", HERE.parents[3] / "dev-team-workspace"))
 PLUGIN = "dev-team"
@@ -94,21 +102,42 @@ def eval_facts(run: pathlib.Path, compare_links: list[dict] | None = None) -> di
                          "cost_usd": round(cum - prev, 4) if cum is not None else None})
         prev = cum if cum is not None else prev
     grading = read("grading.json") or {}
+    # Retired check ids (`na`) stay in grading.json for history; the pages show only checks that count.
+    checks = [c for c in grading.get("expectations") or [] if not c.get("na")]
     return {"iteration": run.parents[1].name, "trajectory": run.parent.name, "run": str(run),
-            "summary": read("summary.json") or {}, "checks": grading.get("expectations") or [],
+            "summary": read("summary.json") or {}, "checks": checks,
             "turns": per_turn, "compare": compare_links or []}
+
+
+def export_plan(run: pathlib.Path, out: pathlib.Path) -> None:
+    """plan.json from the run's turn commits; a failure is printed and never fails the eval."""
+    try:
+        planexport.export(run, out)
+    except Exception as e:  # noqa: BLE001
+        print(f"runviz: plan export failed for {run}: {e!r}", file=sys.stderr)
+
+
+def draw_plan(out: pathlib.Path) -> None:
+    if planmap is None or not hasattr(planmap, "write"):
+        return
+    try:
+        planmap.write(out)
+    except Exception as e:  # noqa: BLE001
+        print(f"runviz: plan map failed for {out}: {e!r}", file=sys.stderr)
 
 
 def build_run(run: pathlib.Path, compare_links: list[dict] | None = None, quiet: bool = True) -> pathlib.Path | None:
     run = run.resolve()
+    out = run / "flow"
+    out.mkdir(exist_ok=True)
+    export_plan(run, out)
     session = session_of(run)
     if session is None:
         print(f"runviz: no session transcript for {run}; skipped", file=sys.stderr)
         return None
-    out = run / "flow"
-    out.mkdir(exist_ok=True)
     (out / "eval.json").write_text(json.dumps(eval_facts(run, compare_links), indent=1))
     trace.build(session, PLUGIN, out, quiet=True)
+    draw_plan(out)
     if not quiet:
         print(out / "flow.html")
     return out

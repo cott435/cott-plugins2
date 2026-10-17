@@ -4,7 +4,9 @@
 Measures what eval iteration 1 found growing in incremental runs: total words, struck
 (removed) requirements and how long they stay, "(changed ...)" markers, superseded
 decisions kept in full, Risks size, and the size of the docs past the architecture (pipelines, test plans,
-contracts, build plans, CONSTRAINTS.md) against their §3 line budgets.
+contracts, build plans, CONSTRAINTS.md) against their per-unit line budgets: the ones `dt lint` applies to contracts
+(per symbol, types included), pipelines (per pipeline, plus the pre-build layout) and test plans (per case), and the
+grader's per-task budget for build plans (grade.py `doc_budgets`).
 
 Usage: docstats.py <docs-dir>   (a project's docs/, or a dir of final__*.md files from package.py)
 """
@@ -50,8 +52,21 @@ def section(t, heading):
 brief, spec, arch = load("brief.md"), load("spec.md"), load("architecture.md")
 pkgs = globbed("architecture") + [t for _, t in matching("packages/*/architecture.md", "final__packages__*__architecture.md")]
 ideas = globbed("ideas")
-# Line budgets from design/planning-stage.md §3, as `dt lint` applies them.
-BUDGETS = {"contract": 60, "pipelines": 120, "tests": 120, "plan": 400}
+# Per-unit line budgets: (lines per unit, allowance, unit heading pattern). Contracts, pipelines and test plans as
+# `dt lint` budgets them; plans per task plus one line per dependency-graph row, as grade.py's doc_budgets does.
+UNIT_BUDGETS = {"contract": (8, 12, r"^### [a-z][\w-]*(?:\.\w+)+:"), "pipelines": (35, 10, r"^## PL-\d{2,}:(?!.*~~)"),
+                "tests": (10, 15, r"^### TC-\d{2,}:(?!.*~~)"), "plan": (12, 40, r"^### M\d+-T\d{2,}:")}
+
+
+def budget(kind, text):
+    per, allowance, unit = UNIT_BUDGETS[kind]
+    n = len(re.findall(unit, text, re.M))
+    extra = 0
+    if kind == "pipelines":  # pre-build sections (planned layout, entry sketches) are extra
+        extra = sum(len(m.group(0).splitlines()) for m in re.finditer(r"^##+ [^\n]*pre-build.*?(?=^## |\Z)", text, re.S | re.M))
+    if kind == "plan":
+        extra = len(re.findall(r"^\|\s*M\d+-T\d{2,}", section(text, "Dependency graph"), re.M))
+    return per * n + allowance + extra
 later = {k: matching(f"packages/*/{k}.md", f"final__packages__*__{k}.md") for k in ("contract", "pipelines", "tests")}
 later["plan"] = matching("tasks/plan.md", "final__tasks__plan.md", d.parent) + matching("tasks/queued/*.md", "final__tasks__queued__*.md", d.parent)
 constraints = matching("CONSTRAINTS.md", "final__CONSTRAINTS.md", d.parent)
@@ -93,8 +108,8 @@ out = {
                                             and not re.search(r"^> Record of why", t, re.M)),
               "specced_with_open_questions": sum(1 for t in ideas if re.search(r"\*\*Status:\*\*\s*Specced", t)
                                                  and re.search(r"^## Open questions\n+\s*- ", t, re.M))},
-    "planning": {k: {"docs": len(v), "lines": [len(t.splitlines()) for _, t in v],
-                     "over_budget": [n for n, t in v if len(t.splitlines()) > BUDGETS[k]]} for k, v in later.items()}
+    "planning": {k: {"docs": len(v), "lines": [len(t.splitlines()) for _, t in v], "budgets": [budget(k, t) for _, t in v],
+                     "over_budget": [n for n, t in v if len(t.splitlines()) > budget(k, t)]} for k, v in later.items()}
                 | {"constraints_lines": sum(len(t.splitlines()) for _, t in constraints),
                    "tasks": sum(len(re.findall(r"^### M\d+-T\d{2,}:", t, re.M)) for _, t in later["plan"])},
 }

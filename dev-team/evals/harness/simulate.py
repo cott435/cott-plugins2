@@ -8,10 +8,15 @@ Replan:  edit a step of a pipeline the active milestone uses and put its pipelin
          a task Blocked as well → `replan`, task listed; both files restored → back to the starting mode.
 Advance: tick every todo item with `dt tick` → not yet `advance` (exit checkpoint open); tick the exit
          checkpoint → `advance`; `dt archive` → plan stubbed, milestone derived Done, lint clean.
+Ready (interface-first plans, design/interface-first-design.md §9.1): on a fresh plan `dt ready` lists only the
+         interface task; once it is ticked, every spine and every split task's tester half; a pipeline's wiring task
+         isn't ready until all its spines are ticked.
+Contract change: edit a type the interface task froze and re-approve the contract → build-planning `replan`, with
+         the tasks that read the type listed.
 
 Usage: simulate.py <project-dir> [<dt.py>]   prints one line per check; exit 1 if any fails
 """
-import re, shutil, subprocess, sys, tempfile, pathlib
+import json, re, shutil, subprocess, sys, tempfile, pathlib
 
 HERE = pathlib.Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
@@ -119,6 +124,109 @@ def tick_exit(path):
     return True
 
 
+def set_todo(proj, done):
+    """Rewrite tasks/todo.md so exactly the tasks in `done` are checked."""
+    path = proj / "tasks" / "todo.md"
+    lines = path.read_text().splitlines()
+    for i, l in enumerate(lines):
+        m = re.match(r"^(\s*[-*] \[)[ xX](\] (M\d+-T\d{2,})\b.*)$", l)
+        if m:
+            lines[i] = m.group(1) + ("x" if m.group(3) in done else " ") + m.group(2)
+    path.write_text("\n".join(lines) + "\n")
+
+
+def ready(proj, dt):
+    """(task IDs `dt ready --json` lists, raw entries), or (None, why) when dt has no ready command."""
+    rc, out, err = dtrun.run(proj, "ready", "--json", dt=dt)
+    try:
+        d = json.loads(out)
+    except Exception:
+        return None, f"dt ready: rc={rc} {(err or out).strip()[-160:]}"
+    items = d if isinstance(d, list) else d.get("ready") or d.get("tasks") or []
+    return [x.get("id") if isinstance(x, dict) else str(x) for x in items], items
+
+
+def task_ids_in(d, skip=("next_task", "progress", "milestone", "next ids", "next_ids")):
+    """Every task ID anywhere in a dt JSON answer, apart from the fields that always name one."""
+    if isinstance(d, dict):
+        return set().union(set(), *(task_ids_in(v) for k, v in d.items() if k not in skip))
+    if isinstance(d, list):
+        return set().union(set(), *(task_ids_in(v) for v in d))
+    return set(re.findall(r"M\d+-T\d{2,}", d)) if isinstance(d, str) else set()
+
+
+def interface_first(src, dt, tmp, plan, check):
+    """The four `dt ready` / contract-change replays, on a plan whose tasks carry Kind (else one failing check)."""
+    tasks = plan["tasks"]
+    iface = [t["id"] for t in tasks if t.get("kind") == "interface"]
+    if not iface:
+        check("Ready simulation: the active plan has an interface task (`**Kind:** interface`)", False,
+              f"kinds: {sorted({t.get('kind') or '—' for t in tasks})}")
+        return
+    proj = copy_project(src, tmp / "ready")
+    declared = set(plan.get("interface_symbols", []))
+    spines = [t["id"] for t in tasks if t.get("kind") == "spine"]
+    testers = [t["id"] for t in tasks if t["mode"] == "split" and t.get("read_symbols")
+               and set(t["read_symbols"]) <= declared]
+    set_todo(proj, set())
+    got, raw = ready(proj, dt)
+    check("Ready simulation: on a fresh plan `dt ready` lists only the interface task",
+          got is not None and sorted(got) == sorted(iface), f"ready={got if got is not None else raw}; interface={iface}")
+    set_todo(proj, set(iface))
+    got, raw = ready(proj, dt)
+    missing = [i for i in spines + testers if got is None or i not in got]
+    check("Ready simulation: after the interface task, `dt ready` lists every spine and every split task's tester half",
+          got is not None and spines and not missing,
+          f"spines {spines}; tester halves {testers}; missing: {missing}; ready={got if got is not None else raw}")
+    # Wiring: everything ticked except one pipeline's wiring, its last spine, and whatever follows them.
+    by_id = {t["id"]: t for t in tasks}
+    wiring = next((t for t in tasks if t.get("kind") == "wiring"
+                   and [s for s in spines if by_id[s]["step"].split(".")[0] == t["step"].split(".")[0]]), None)
+    if not wiring:
+        check("Ready simulation: a pipeline's wiring task waits for all its spines", False, "no wiring task with spines on its pipeline")
+    else:
+        own = [s for s in spines if by_id[s]["step"].split(".")[0] == wiring["step"].split(".")[0]]
+        held = {wiring["id"], own[-1]}
+        anc = dtrun.ancestors(tasks)
+        later = {t["id"] for t in tasks if held & anc[t["id"]]}
+        set_todo(proj, {t["id"] for t in tasks} - held - later)
+        before, raw = ready(proj, dt)
+        set_todo(proj, {t["id"] for t in tasks} - {wiring["id"]} - later)
+        after, _ = ready(proj, dt)
+        check(f"Ready simulation: {wiring['id']} (wiring {wiring['step']}) isn't ready until its spines {own} are ticked",
+              before is not None and wiring["id"] not in before and wiring["id"] in (after or []),
+              f"with {own[-1]} open: {before if before is not None else raw}; with it ticked: {after}")
+    # Contract change: a frozen type edited and the contract re-approved after the plan.
+    proj = copy_project(src, tmp / "contract")
+    facts = dtrun.probe(proj, dt)
+    readers = {}
+    for t in tasks:
+        for sym in t.get("read_symbols", []):
+            readers.setdefault(sym, []).append(t["id"])
+    typ = next((s for s in facts.get("symbols", []) if s["is_type"] and s["id"] in declared and readers.get(s["id"])), None)
+    if not typ:
+        check("Contract-change simulation: a frozen type that tasks read exists", False, f"declared: {sorted(declared)[:8]}")
+        return
+    doc = proj / typ["doc"]
+    lines = doc.read_text().splitlines(keepends=True)
+    b = section_bounds([l.rstrip("\n") for l in lines], rf"^### {re.escape(typ['id'])}:")
+    lines.insert(b[1] if b else len(lines), "- **Invariants:** (revised) one more field the interface lacked\n")
+    doc.write_text("".join(lines))
+    set_last_updated(doc, "2099-01-01")
+    s_bp = bp(proj, dt)
+    listed = task_ids_in(s_bp)
+    rc, out, _ = dtrun.run(proj, "plan", "--json", dt=dt)
+    try:
+        cc = [e for e in json.loads(out).get("edges", []) if e.get("kind") == "contract-change"]
+    except Exception:
+        cc = []
+    want = [i for i in readers[typ["id"]] if i not in iface]
+    check(f"Contract-change simulation: editing frozen {typ['id']} → build-planning Replan with its readers {want} listed",
+          s_bp.get("mode") == "replan" and (set(want) <= listed or bool(cc)),
+          f"mode={s_bp.get('mode')} changed_since_plan={s_bp.get('changed_since_plan')} tasks listed={sorted(listed)[:10]} "
+          f"contract-change edges={cc[:3]}")
+
+
 def simulate(src, dt=None):
     """[{text, passed, evidence}] for the Replan and Advance checks, run on copies of <src>."""
     dt = dt or dtrun.REPO_DT
@@ -203,6 +311,9 @@ def simulate(src, dt=None):
               rc == 0 and "Between milestones" in stub and ms.get("derived") == "Done" and lint.get("errors") == 0,
               f"archive rc={rc} {(out or err).strip()[:160]} · {plan['milestone']}={ms.get('derived')} · "
               f"lint errors={lint.get('errors')} · next build-planning mode={s_bp.get('mode')}")
+
+        # ---- Ready and contract change (interface-first)
+        interface_first(src, dt, tmp, plan, check)
         return R
     finally:
         shutil.rmtree(tmp, ignore_errors=True)

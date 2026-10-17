@@ -20,6 +20,7 @@ import dt  # noqa: E402
 from devteam import code, specdocs  # noqa: E402
 from devteam.commands import status  # noqa: E402
 from devteam.status.tomlread import parse_toml  # noqa: E402
+from dt_helpers import copy_quant  # noqa: E402
 
 QUANT = HERE / "fixtures" / "quant"
 HAS_GIT = shutil.which("git") is not None
@@ -39,7 +40,8 @@ KEYS = {
                        "pipelines_inferred",
                        "milestone_references", "milestone_skills", "references_unrouted", "skills_unrouted",
                        "stage_unrouted", "skills_missing", "skills_available",
-                       "grow_triggers", "drift", "stale_contracts", "queued", "base"],
+                       "grow_triggers", "drift", "stale_contracts", "queued", "base",
+                       "critical_path", "waves", "width", "parallelism", "graph_warning"],
     "build-setup": ["constraints", "config_mismatches", "contract_mismatches", "optional_layers_existing",
                     "deptry_missing", "protected_gaps", "ignores_without_exception", "agents_missing", "hooks_missing",
                     "not_executable", "expired_exceptions", "tools_missing", "dependents", "base"],
@@ -65,10 +67,12 @@ def git(root: Path, *args: str, date: str | None = None) -> None:
 
 
 class Base(unittest.TestCase):
+    legacy = False          # True: the old-style M1 plan (fixtures/legacy-plan)
+
     def setUp(self):
         self.tmp = Path(tempfile.mkdtemp())
         self.root = self.tmp / "quant"
-        shutil.copytree(QUANT, self.root)
+        copy_quant(self.root, self.legacy)
         env = mock.patch.dict(os.environ)
         env.start()
         os.environ.pop("CLAUDE_PLUGIN_ROOT", None)
@@ -103,7 +107,7 @@ class CommonTest(Base):
         self.assertEqual(lines[:2], ["skill: build-planning", "mode: extend"])
         self.assertIn("docs: brief Accepted · spec Approved · architecture Approved (Single package) · roadmap ok"
                       " · plan M1 In progress", out)
-        self.assertIn("next ids: AD-04 PL-05 TC-04 M3 M1-T07", out)
+        self.assertIn("next ids: AD-04 PL-05 TC-04 M3 M1-T15", out)
         self.assertNotIn("blocked:", out.replace("blocked_tasks", ""))
 
     def test_every_key_printed_even_when_empty(self):
@@ -336,12 +340,74 @@ class BuildPlanningTest(Base):
         d = self.status("build-planning")
         self.assertEqual(d["mode"], "extend")         # M1 building, M2 designed and unplanned
         self.assertEqual(d["milestone"], "M1 In progress")
-        self.assertEqual(d["progress"], "1/6")
-        self.assertEqual(d["next_task"], "M1-T02 PL-02 spine with sample covariance")
+        self.assertEqual(d["progress"], "1/14")
+        self.assertEqual(d["next_task"], "M1-T02 read_raw spine on a synthetic CSV")
         self.assertEqual(d["base"], "3f2c1ab")
         self.assertEqual(d["skills_available"], ["data-science"])
         for k in ("blocked_tasks", "uncovered", "no_spine", "mode_violations", "skills_missing", "queued"):
             self.assertEqual(d[k], [], k)
+
+    def test_graph(self):
+        for d in (self.status("build-planning"), self.status()):
+            self.assertEqual(len(d["critical_path"]), 4)
+            self.assertEqual(d["critical_path"][0], "M1-T01")
+            self.assertEqual(d["critical_path"][-1], "M1-T14")
+            self.assertEqual([len(w) for w in d["waves"]], [1, 6, 6, 1])
+            self.assertEqual((d["width"], d["parallelism"], d["graph_warning"]), (6, 3.5, None))
+
+    def test_graph_warning_when_mostly_serial(self):
+        prev = {"data/universe.py": "M1-T02", "stats/cov.py": "M1-T03", "stats/rmt.py": "M1-T04",
+                "stats/pca.py": "M1-T05", "stats/report.py": "M1-T06"}     # every spine waits on the one before
+        for path, dep in prev.items():
+            self.edit("tasks/plan.md", f"**Depends on:** M1-T01 · **Writes:** src/quant/{path}",
+                      f"**Depends on:** {dep} · **Writes:** src/quant/{path}")
+        d = self.status("build-planning")
+        self.assertEqual(len(d["critical_path"]), 9)
+        self.assertEqual(d["graph_warning"], "5 of 9 waves have width 1: freeze interfaces so more tasks can start "
+                                             "at once")
+
+    def test_no_plan_has_an_empty_graph(self):
+        (self.root / "tasks/plan.md").unlink()
+        d = self.status()
+        self.assertEqual((d["critical_path"], d["waves"], d["width"], d["parallelism"]), ([], [], 0, 0.0))
+
+    def test_task_checks(self):
+        self.edit("tasks/plan.md", "**Skills:** —\n", "**Skills:** —\n**Blocked:** waiting on PL-01 Revise\n")
+        self.edit("tasks/plan.md", "**Size:** S · **Mode:** split\n**Skills:** data-science\n**Read:** PL-02, TC-02",
+                  "**Size:** S · **Mode:** solo\n**Skills:** rmt-tools\n**Read:** PL-02, TC-02")
+        self.edit("tasks/plan.md", "**Kind:** spine · **Size:** XS · **Mode:** solo\n**Read:** PL-02, stats.Cov, stats.Factors",
+                  "**Kind:** spine · **Size:** XS · **Mode:** split\n**Read:** PL-02, stats.Cov, stats.Factors")
+        self.edit("tasks/plan.md", "**Step:** PL-02 · **Kind:** wiring", "**Step:** PL-02 · **Kind:** system")
+        self.edit("tasks/plan.md", "**Covers:** STAT-03 ·", "**Covers:** ·")
+        d = self.status("build-planning")
+        self.assertEqual(d["mode"], "replan")
+        self.assertEqual(d["blocked_tasks"], ["M1-T10 (waiting on PL-01 Revise)"])
+        self.assertEqual(d["mode_violations"], ["M1-T06: split, expected solo (spine)",
+                                                "M1-T11: solo, expected split (covers behaviour)"])
+        self.assertEqual(d["skills_missing"], ["rmt-tools"])
+        self.assertEqual(d["no_spine"], ["PL-02"])          # no wiring task builds PL-02 now
+        self.assertEqual(d["uncovered"], ["STAT-03"])
+
+    def test_boundaries_unfrozen(self):
+        self.write("docs/packages/feed/contract.md",
+                   "# feed — Contract\n\n**Package:** feed · **Status:** Approved · **Last updated:** 2026-10-15\n\n"
+                   "### feed.quotes: Quotes\n`def quotes() -> Quotes`\n"
+                   "- **Boundary:** quant · **Fixtures:** tests/contracts/feed.quotes/ · **Cases:** one day\n")
+        self.assertEqual(self.status("build-planning")["boundaries_unfrozen"], ["feed.quotes (quant)"])
+        self.edit("tasks/plan.md", "stats.CovReport, data.load_prices\n", "stats.CovReport, data.load_prices, feed.quotes\n")
+        self.assertEqual(self.status("build-planning")["boundaries_unfrozen"], [])     # the interface task freezes it
+
+
+class BuildPlanningLegacyTest(Base):
+    """The same reports on the old-style plan (Phase 0 spines, `**Step:** contract`)."""
+    legacy = True
+
+    def test_fixture(self):
+        d = self.status("build-planning")
+        self.assertEqual((d["progress"], d["next_task"]), ("1/6", "M1-T02 PL-02 spine with sample covariance"))
+        for k in ("blocked_tasks", "uncovered", "no_spine", "mode_violations"):
+            self.assertEqual(d[k], [], k)
+        self.assertEqual(d["critical_path"], ["M1-T01", "M1-T02", "M1-T04", "M1-T05"])
 
     def test_task_checks(self):
         self.edit("tasks/plan.md", "**Skills:** —\n", "**Skills:** —\n**Blocked:** waiting on PL-02 Revise\n")
@@ -377,6 +443,8 @@ class BuildPlanningTest(Base):
         self.edit("tasks/plan.md", "**Read:** PL-02, stats.estimate_cov, STAT-04", "**Read:** feed.quotes")
         self.assertEqual(self.status("build-planning")["boundaries_unfrozen"], [])
 
+
+class BuildPlanningModesTest(Base):
     def test_reason_overrides_mode_rule(self):
         self.edit("tasks/plan.md", "**Size:** XS · **Mode:** split", "**Size:** XS · **Mode:** solo\n**Reason:** doc-only")
         self.assertEqual(self.status("build-planning")["mode_violations"], [])
@@ -428,7 +496,7 @@ class BuildPlanningTest(Base):
         self.assertEqual((d["mode"], d["stage_to_cut"], d["pipelines_inferred"]),
                          ("extend", "S2 Classical portfolios", ["PL-03"]))
         self.assertEqual(d["stage_unrouted"], [])
-        self.assertEqual(d["next_ids"], ["AD-04", "PL-05", "TC-04", "S3", "M2", "M1-T07"])
+        self.assertEqual(d["next_ids"], ["AD-04", "PL-05", "TC-04", "S3", "M2", "M1-T15"])
         self.edit("docs/roadmap.md", "**Skills:** data-science", "**Skills:** data-science, rmt-tools")
         self.edit("docs/roadmap.md", "**Plan:** [../tasks", "**Skills:** data-science\n**Plan:** [../tasks")
         self.assertEqual(self.status("build-planning")["stage_unrouted"], ["rmt-tools (S1)"])
@@ -588,6 +656,7 @@ class BuildSetupTest(Base):
             self.assertEqual(d[k], "unknown", k)
 
     def test_generated_config_checks(self):
+        shutil.rmtree(self.root / "tests/contracts")
         self.write("pyproject.toml", self.GENERATED)
         self.add_exception(self.EXCEPTION)
         self.write("scripts/check.sh", "#!/usr/bin/env bash\nPROTECTED=('tests/intent/**' 'tests/conftest.py')\n")
@@ -644,7 +713,7 @@ class SummaryTest(Base):
         self.assertEqual(rc, 0)
         self.assertLessEqual(len(lines), 8)
         self.assertEqual(lines[0], "milestone: M1 Data + stats · plan In progress")
-        self.assertEqual(lines[1], "progress: 1/6 · next: M1-T02 PL-02 spine with sample covariance")
+        self.assertEqual(lines[1], "progress: 1/14 · next: M1-T02 read_raw spine on a synthetic CSV")
         self.assertEqual(lines[2], "blocked: none")
         self.assertTrue(lines[-1].startswith("dt: python3 /") and lines[-1].endswith("dt.py"))
 
@@ -653,7 +722,7 @@ class SummaryTest(Base):
         self.edit("tasks/plan.md", "**Skills:** —\n", "**Skills:** —\n**Blocked:** oracle question\n")
         self.write("tasks/queued/M2-x.md", "# M2: X — Plan\n\n**Milestone:** M2 · **Status:** Approved\n")
         _, lines = self.summary()
-        self.assertIn("blocked: M1-T03 (oracle question)", lines)
+        self.assertIn("blocked: M1-T10 (oracle question)", lines)
         self.assertIn("draft (waiting for approval): docs/spec.md", lines)
         self.assertIn("queued: M2", lines)
         self.assertLessEqual(len(lines), 8)

@@ -1,5 +1,7 @@
 """Shared helpers for command tests: run `dt` in-process, and work on a throwaway copy of the quant fixture
-(`FixtureCopy` as a TestCase base, or `Project` when a test needs git)."""
+(`FixtureCopy` as a TestCase base, or `Project` when a test needs git). Either can swap in the old-style M1 plan
+(`fixtures/legacy-plan/`: Phase 0 spines, `Parallel` groups, `Files likely`) so backward-compatible parsing stays
+tested; the quant fixture's own plan is interface-first."""
 from __future__ import annotations
 
 import contextlib
@@ -17,6 +19,15 @@ sys.path.insert(0, str(HERE.parent))
 import dt  # noqa: E402
 
 QUANT = HERE / "fixtures" / "quant"
+LEGACY_PLAN = HERE / "fixtures" / "legacy-plan"
+
+
+def copy_quant(dest: Path, legacy: bool = False) -> None:
+    """Copy the quant fixture to dest; `legacy` replaces its tasks/plan.md and todo.md with the old-style plan."""
+    shutil.copytree(QUANT, dest)
+    if legacy:
+        for name in ("plan.md", "todo.md"):
+            shutil.copyfile(LEGACY_PLAN / name, dest / "tasks" / name)
 HAS_GIT = shutil.which("git") is not None
 
 
@@ -32,12 +43,14 @@ def run_dt(root: Path, *args: str) -> tuple[int, str, str]:
 
 
 class FixtureCopy(unittest.TestCase):
-    """Each test gets its own copy of fixtures/quant at self.root; the shared fixture is never touched."""
+    """Each test gets its own copy of fixtures/quant at self.root; the shared fixture is never touched. A subclass
+    sets `legacy = True` for the old-style plan."""
+    legacy = False
 
     def setUp(self):
         self._tmp = tempfile.TemporaryDirectory()
         self.root = Path(self._tmp.name) / "quant"
-        shutil.copytree(QUANT, self.root)
+        copy_quant(self.root, self.legacy)
 
     def tearDown(self):
         self._tmp.cleanup()
@@ -64,10 +77,10 @@ class FixtureCopy(unittest.TestCase):
 class Project:
     """A copy of fixtures/quant in a temp dir. Call cleanup() (or use addCleanup) when done."""
 
-    def __init__(self, git: bool = False):
+    def __init__(self, git: bool = False, legacy: bool = False):
         self._tmp = tempfile.TemporaryDirectory()
         self.root = Path(self._tmp.name) / "quant"
-        shutil.copytree(QUANT, self.root)
+        copy_quant(self.root, legacy)
         if git:
             self.git("init", "-q")
             self.git("add", "-A")

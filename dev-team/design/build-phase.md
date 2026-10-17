@@ -2,7 +2,7 @@
 
 **Status:** Draft, revised after a fresh-context review · **Last updated:** 2026-10-17 · **Branch:** `interface-first-design` · **Builds on:** [build-phase-notes.md](build-phase-notes.md) (§4 verified runtime, §5 open questions), [interface-first-design.md](interface-first-design.md) (§5 milestone shape, §6.4 dispatch inputs, §7 TDD), [build-setup.md](build-setup.md) (§4 roles, §6 hooks, §7 review)
 
-How a planned milestone gets built: which agents run, what each sees and may write, how many run at once, how their work lands, who reviews it, and when the user is asked. The plan arrives interface-first (`tasks/plan.md` with `Kind`, `Mode`, `Writes:`, a dependency graph and checkpoints) and the bar arrives from build-setup (`CONSTRAINTS.md`, `check.sh`, hooks, the tester, implementer and reviewer agent files). Nothing here has run yet; §12 lists the smoke tests that come first, and marks which runtime behaviour is verified and which is assumed.
+How a planned milestone gets built: which agents run, what each sees and may write, how many run at once, how their work lands, who reviews it, and when the user is asked. The plan arrives interface-first (`tasks/plan.md` with `Kind`, `Mode`, `Writes:`, a dependency graph and checkpoints) and the bar arrives from build-setup (`CONSTRAINTS.md`, `check.sh`, hooks, the tester, implementer and reviewer agent files). None of the `dt` commands exist yet; §12 lists the runtime behaviour verified so far and the smoke tests still to run.
 
 Inputs: agent-skills' build phase (`/Users/connorott/dev/agent-skills`, v0.6.13, surveyed in full), the iteration-8 rl all-at-once plan (`dev-team-workspace/iteration-8/rl-all-at-once/with_skill/project`, its `tasks/plan.md`, generated `.claude/agents/`, `scripts/`), `dt status` / `dt ready` on that plan, and an adversarial review of the first draft (38 findings; each is answered in the section it concerns).
 
@@ -225,8 +225,8 @@ Reviewers are spawned with `isolation: worktree` like builders, so a mutation ne
 | Chained git in one Bash call refused in worktrees (build-phase-notes §4) | Agent files say: one git command per call |
 | Slow and perf tests deselected by `addopts` (rl: `-m 'not slow and not perf'`) | `red_check.py` and the reviewer's mutation runs pass `-m ""`; `dt land` runs the task's own intent tests with every marker; the exit review runs `-m slow` and `-m perf` |
 | `tests/contracts` never runs (`check.sh` `test_dirs` covers `tests/intent` and `tests/unit` only) | `gate` and `full` run `tests/contracts` too, so samples, fakes and doubles are checked when the interface lands and after |
-| Background agents can't answer permission prompts | build-setup writes `.claude/settings.json` allow rules for `uv run`, `git`, `scripts/check.sh` and the `dt` path (smoke test 7) |
-| Worktree base | Assumed: Agent-tool worktrees branch from the main checkout's HEAD (verified only for workflow `agent()` worktrees). `dt claim` checks the base either way |
+| Background agents' un-allowed commands are denied, and every worktree agent reads the main checkout's `.claude/settings.json` (verified, §12) | build-setup writes allow rules there for `uv run`, `git`, `scripts/check.sh` and the `dt` path; the build runs in `acceptEdits`. The main checkout's copy is the one that must stay protected |
+| Worktree base | Agent-tool worktrees branch from the main checkout's HEAD (verified, §12). `dt claim` still checks the base |
 
 ---
 
@@ -273,20 +273,22 @@ On restart (Resume mode, a new session, so no agent of the old one is running), 
 
 ## 12. Before building: smoke tests
 
-Verified already (build-phase-notes §4): hook `cwd` is the worktree and `$CLAUDE_PROJECT_DIR` the main checkout; plugin and agent-file hooks fire in worktree and background agents; chained git is refused in worktrees; a `schema` agent skips its gate; per-worktree refs (`refs/worktree/*`, checked with git 2.48 in the review).
+**Verified** (build-phase-notes §4; [evidence/2026-10-17-build-smoke.md](evidence/2026-10-17-build-smoke.md), Claude Code 2.1.296, $0.97):
+- Hook `cwd` is the worktree and `$CLAUDE_PROJECT_DIR` the main checkout; plugin and agent-file hooks fire in worktree and background agents; chained git is refused in worktrees; a `schema` agent skips its gate; per-worktree refs (`refs/worktree/*`, git 2.48).
+- Worktree agents load the **main checkout's** `.claude/settings.json` from disk, not the worktree's copy.
+- Agent-tool worktrees branch from the main checkout's HEAD (the build branch, not the default branch).
+- A worktree holding only new, untracked files is kept; an unchanged one is removed. A kept worktree's path and branch come back with the agent's result.
+- A subagent runs `dt` by absolute path and reads a 2,100-line packet file in full.
+- In `-p`, a background agent's command with no allow rule is denied, not asked; `--allowedTools` rules reach subagents; `acceptEdits` accepts writes inside the worktree; a guard's `ask` becomes a denial.
+- With the sandbox on, a worktree agent writes under the git common dir (the session's cwd, the repo root, contains it).
+- SubagentStart and SubagentStop carry the agent's worktree as `cwd`, so the liveness hook finds its claim.
+- A per-worktree venv takes 0.35–0.9 s from a warm uv cache, torch included; the first torch import ~6 s.
+- `claude -p` waits for background agents and resumes the main agent on each completion, with one `result` event per main turn.
 
-Assumed, to verify first (about $2–4):
+**Still to verify**, once `dt claim` and `dt land` exist:
 1. A full split task end to end: tester claims, writes red tests, lands on its tests branch; implementer claims (tests merged in), passes, lands; the merged gate passes and the build branch was never red.
 2. Two worktree agents in parallel, landing one after the other under the lock.
-3. Which `settings.json` and agent files a worktree agent loads (untested in notes §4).
-4. Agent-tool worktrees branch from the main checkout's HEAD.
-5. A worktree holding only new, untracked files (every tester's) survives the Agent tool's clean-up of unchanged worktrees.
-6. A subagent runs `dt` from the absolute path in its prompt, and reads a 2,000-line packet file.
-7. Background agents' permissions: which commands need allow rules; how a `dt guard` ask surfaces inside one.
-8. The sandbox lets a worktree agent write under the git common directory (`dt-build/`).
-9. The `SubagentStop` liveness hook marks the right claim.
-10. Venv setup time per worktree with torch.
-11. For the eval harness: whether `claude -p` waits for background agents and resumes the main agent when they finish.
+3. In the interactive app: how a background agent's permission prompt, or a guard's `ask`, surfaces.
 
 ---
 

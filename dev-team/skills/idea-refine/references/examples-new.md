@@ -1,6 +1,6 @@
 # Example: a new project
 
-A vague early-stage concept through all three phases to a Draft brief. More examples in `references/`: `examples-extend.md` (an idea file), `examples-process.md` (a non-product idea), `examples-quant.md` (a data-dependent brief, roadmap stages, stage skills and references), `examples-ml.md` (an ML idea file).
+A vague early-stage concept through all three phases to a Draft brief.
 
 ## Vague Early-Stage Concept (Full 3-Phase Session)
 

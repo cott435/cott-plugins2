@@ -1,10 +1,13 @@
 # Extend mode: an idea file
 
-Read when `docs/brief.md` exists and a new idea arrives. Examples: `examples-extend.md`, `examples-ml.md`.
+`docs/brief.md` exists, so the new idea gets its own file and must earn its place in the project. Examples: `examples-extend.md`, `examples-ml.md`, `examples-quant.md` (stage skills and references).
 
-When `docs/brief.md` already exists, the new idea gets its own file and must earn its place in the project.
+**Read before asking anything:** `docs/brief.md`, `docs/spec.md`, `docs/roadmap.md` and open ideas in `docs/ideas/`. Their problem, goals, constraints, Not Doing list and requirements constrain the new idea. `Specced` ideas are frozen records; where one disagrees with the spec, the spec is current.
 
-**Before Phase 1** (after reading the docs Phase 0 names): `Specced` ideas are frozen records; where one disagrees with the spec, the spec is current. Restate the new idea in terms of the existing project: "This adds [X] so that [existing user] can [outcome]." Note which existing features and requirement IDs it touches.
+- A `Draft` brief: ask whether to finish reviewing it first.
+- A `Draft`, `Accepted` or `Parked` idea covering the same ground: offer to refine it instead. A `Specced` one is frozen; a change starts a new file.
+
+**Phases 1-2** per `ideation.md`. Before Phase 1, restate the new idea in terms of the existing project: "This adds [X] so that [existing user] can [outcome]." Note which existing features and requirement IDs it touches.
 
 **Fit check (during Phase 2) — answer one of these out loud. It decides whether the brief changes:**
 
@@ -16,7 +19,7 @@ When `docs/brief.md` already exists, the new idea gets its own file and must ear
 | Contradicts the Not Doing list | Write it only if the user reverses that decision | Remove the item, with the user's agreement. Otherwise park the idea. |
 | Different problem or different user | Don't write it | Push back: this may be a separate project with its own brief. |
 
-**Write `docs/ideas/<idea-slug>.md`** (kebab-case slug, e.g. `shared-editing.md`):
+**Phase 3: write `docs/ideas/<idea-slug>.md`** (kebab-case slug, e.g. `shared-editing.md`):
 
 ```markdown
 # Idea: [Name]
@@ -68,5 +71,9 @@ When `docs/brief.md` already exists, the new idea gets its own file and must ear
 - **Write it as a record, in the brief's voice.** The file outlives the review. Notes to the user ("my proposed limit, for you to check") belong in the conversation. Questions belong under *Open questions*.
 - **Tool preferences live here, not in the spec.** If the user names a library, dataset or service ("hand-write PPO, then compare with Stable-Baselines3"), record it under *Recommended direction* or *Data*. `spec-writing` writes the behavior without the name, and `architecture-design` reads the name from here.
 - **Never paste the idea into the brief.** Brief edits are limited to the fit-check table above. Goal numbers stay stable; new goals take the next number. If a goal is dropped, tell the user which spec requirements referenced it.
+
+**Review Gate** (`../SKILL.md`): also say whether the brief changed and which sections.
+
+**Stage** per `roadmap.md`: one stage for the idea, Source `ideas/<slug>.md`. Skip it only when the idea's *Stage* line says it joins a stage not yet being built.
 
 **Idea status lifecycle:** `Draft` → `Accepted` (user approved here) → `Specced` (set by `spec-writing` once the spec is approved). Parked ideas get `Parked` with a one-line reason, so they aren't re-proposed blindly. **A `Specced` idea is frozen.** It records why the feature was added, as it stood that day. `spec-writing` adds a one-line banner saying so, and nobody edits the file afterwards. The spec is the current description. When a new idea changes what a `Specced` one describes, such as a narrowed holdout or a merged stage, the new idea gets its own file and names the old one under *Touches*. The old file is not edited.

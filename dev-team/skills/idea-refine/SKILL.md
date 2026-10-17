@@ -5,58 +5,43 @@ description: Refines a raw idea into a sharp direction through divergent and con
 
 # Idea Refine
 
-Turns a raw idea into a focused direction and writes it down for the user to accept before anything is specified.
+Turns a raw idea into a focused direction and writes it down for the user to accept before anything is specified. idea-refine makes and edits the brief, writes an idea file for each addition, and is in charge of the first stage split: it starts `docs/roadmap.md` and adds every stage after.
 
-- **New project:** `docs/brief.md`, *why the project exists*: a page or less, plain English. On acceptance, a roadmap stage per agreed stage.
-- **Extend** (a brief exists): `docs/ideas/<idea-slug>.md`, *why this feature and how it fits*, with the context `spec-writing` needs; brief edits only if needed. On acceptance, a roadmap stage.
+## What it owns
 
-The brief stays the stable "why"; ideas carry each addition's detail; stages live in `docs/roadmap.md`, never as brief goals.
+- **`docs/brief.md`**, *why the project exists*: a page or less, plain English, the stable "why".
+- **`docs/ideas/<idea-slug>.md`**, *why this feature and how it fits*, with the context `spec-writing` needs. Ideas carry each addition's detail, so the brief doesn't grow.
+- **Roadmap stages** (`S<n>`, from `dt next-id S`): the stage rows and each `## S<n>` section's `**Outline:**` and `**Skills:**` lines. Stages live in `docs/roadmap.md`, never as brief goals.
+- **`docs/references.md`**: only the `**Milestones:**` field of entries the user assigns to a stage.
+
+**Never:** sizes or cuts a stage, or writes milestone rows and `## M<n>` sections (`build-planning`); writes a Status* cell (`dt roadmap`); writes requirements (`spec-writing`) or picks tools, APIs or datasets (`architecture-design`).
 
 **Not for:** a user unsure what they want at all (`interview-me` if available); an accepted brief or idea that needs requirements (`spec-writing`); bug fixes or small changes with obvious requirements.
 
-`dt` means `python3 ../../scripts/dt.py`, relative to this skill's folder, run from the project root. Examples: `examples.md` (a new project, all phases) and `references/examples-*.md`.
+`dt` means `python3 ../../scripts/dt.py`, relative to this skill's folder, run from the project root.
 
-## Workflow
-
-```
-MODE CHECK ─→ UNDERSTAND & EXPAND ─→ EVALUATE & CONVERGE ─→ WRITE BRIEF or IDEA ─→ [user accepts] ─→ spec-writing
-```
-
-Each arrow waits on the user. Everything is written as **Draft** and becomes **Accepted** only when the user says so.
-
-### Phase 0: Mode check
+## Picking a mode
 
 Run `dt status --skill idea-refine`: the mode, doc statuses, `brief_words`, `brief_goals`, `ideas`, `roadmap_rows`, and references waiting or unassigned. If references are waiting, offer `reference-intake` first (default: run it, then come back).
 
-- **New** (no brief): the full process, writing `docs/brief.md`.
-- **Extend** (a brief exists): read `docs/brief.md`, `docs/spec.md`, `docs/roadmap.md` and open ideas in `docs/ideas/` *before* asking anything; their problem, goals, constraints, Not Doing list and requirements constrain the new idea. Read `references/extend.md`.
+## Modes
 
-A `Draft` brief: ask whether to finish reviewing it first. A `Draft`, `Accepted` or `Parked` idea covering the same ground: offer to refine it instead. A `Specced` one is frozen; a change starts a new file.
+| Mode | When | Read |
+|---|---|---|
+| New | No brief | `references/new.md`: writes `docs/brief.md` and the first stages |
+| Extend | A brief exists | `references/extend.md`: writes an idea file, edits the brief only if the fit check says so |
 
-### Phase 1: Understand & expand
+```
+MODE CHECK ─→ 1 UNDERSTAND & EXPAND ─→ 2 EVALUATE & CONVERGE ─→ 3 WRITE BRIEF or IDEA ─→ 4 REVIEW GATE ─→ [user accepts] ─→ spec-writing
+```
 
-1. **Restate the idea** as a "How Might We" problem statement.
-2. **Ask 3-5 sharpening questions**, no more, with `AskUserQuestion`: who it's for, what success looks like, real constraints, what's been tried, why now. Don't proceed until you know who it's for and what success looks like.
-3. **Generate 5-8 variations**, each with a one-line reason it exists. Lenses: inversion, constraint removal, audience shift, combination, simplification, 10x version, expert lens. `frameworks.md` has more; pick what fits.
+## Asking and tone
 
-In a codebase, ground variations in what exists and cite files. Read `docs/references.md` too; an idea cites a reference as prior art by `RF-NN`, never its path.
+Each arrow waits on the user. Everything is written as **Draft** and becomes **Accepted** only when the user says so. Be honest, not supportive: say kindly when an idea is weak and push back on complexity. Sharp while ideating; calm and plain when writing.
 
-### Phase 2: Evaluate & converge
+## Review Gate (CRITICAL)
 
-1. **Cluster** what resonated into 2-3 meaningfully different directions.
-2. **Stress-test** each: user value (painkiller or vitamin?), feasibility (cost, hardest part), differentiation (would someone switch?), and for ML and data projects, data: does usable data exist, can we use it, what's the non-ML baseline? "No usable data" is a feasibility failure, not an open question. Rubric: `refinement-criteria.md`.
-3. **Surface hidden assumptions:** what you're betting is true, what could kill it, what you're ignoring for now.
-4. **Get a decision** on a direction before writing anything.
-
-Be honest, not supportive: say kindly when an idea is weak and push back on complexity. Sharp while ideating; calm and plain when writing.
-
-### Phase 3: Write
-
-New mode: read `references/brief.md` and write the brief; check `wc -w docs/brief.md`. Extend mode: write the idea file per `references/extend.md`. Read `references/roadmap.md` for the stages you'll propose.
-
-### Phase 4: Review Gate (CRITICAL)
-
-1. Say what was written and where, in three lines: the problem, the top goal (or the idea's direction), the biggest Not Doing item. In Extend, say whether the brief changed and which sections. Propose the roadmap stage(s) to add on acceptance (`S3: Classical portfolios`), each with its skills and references, as one question with your proposal as the default.
+1. Say what was written and where, in three lines: the problem, the top goal (or the idea's direction), the biggest Not Doing item. Propose the roadmap stage(s) to add on acceptance (`S3: Classical portfolios`), each with its skills and references, as one question with your proposal as the default.
 2. Ask the user to **accept** or request changes.
 3. **STOP YOUR TURN.** Never start the spec in the same turn, and never edit the brief or idea and draft the spec in one turn.
 

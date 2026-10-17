@@ -1,13 +1,14 @@
 #!/usr/bin/env python3
-"""Cases for driver.session_step: when a turn resumes the current agent session and when it opens a fresh one, and
-for which skill. No dt, no model calls; the dry run runs this too.
+"""Cases for the driver's own decisions: driver.session_step (when a turn resumes the current agent session and when
+it opens a fresh one, and for which skill) and driver.user_steps (the probe.py steps a probe's README gives the user,
+run in order on "ran it"). No dt, no model calls; the dry run runs this too.
 
 Usage: sessions.py   prints one line per case; exit 1 if any case comes out wrong
 """
 import pathlib, sys
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
-from driver import session_step  # noqa: E402
+from driver import session_step, user_steps  # noqa: E402
 
 
 def sess(skill, *seen):
@@ -44,11 +45,38 @@ CASES = [
 ]
 
 
+STEPS_README = """## Who runs what
+
+| Check | Runner | Command |
+|---|---|---|
+| C1 | agent | `python3 probes/PB-01-x/public.py` |
+| C8 | user | `python3 probes/PB-01-x/probe.py bulk` |
+| C3–C7 | user | `python3 probes/PB-01-x/probe.py checks` |
+
+## Steps, in order
+
+1. `python3 probes/PB-01-x/probe.py ping` — seconds.
+2. `uv run probes/PB-01-x/probe.py bulk` — an hour.
+3. `cd probes/PB-01-x && python3 probe.py checks > log.txt` — minutes.
+
+## Files
+- `probe.py` (yours to run)
+"""
+# (what, README text, expected argument lists)
+STEPS = [
+    ("the Steps section's commands, in its order", STEPS_README, [["ping"], ["bulk"], ["checks"]]),
+    ("no Steps section: the table's", STEPS_README.split("## Steps")[0], [["bulk"], ["checks"]]),
+    ("one plain command", "3. `cd probes/PB-01-sharadar && python3 probe.py` (about a minute).", [[]]),
+    ("no README", "", [[]]),
+]
+
+
 def run(verbose=True):
     """The cases that came out wrong (empty when all hold)."""
     wrong = [(what, got, want) for what, n, b, s, a, want in CASES if (got := session_step(n, b, s, a)) != want]
+    wrong += [(what, got, want) for what, text, want in STEPS if (got := user_steps(text)) != want]
     if verbose:
-        print(f"selftest/sessions.py: {len(CASES) - len(wrong)}/{len(CASES)} cases as expected")
+        print(f"selftest/sessions.py: {len(CASES) + len(STEPS) - len(wrong)}/{len(CASES) + len(STEPS)} cases as expected")
         for what, got, want in wrong:
             print(f"  WRONG {what}: {got}, expected {want}")
     return wrong

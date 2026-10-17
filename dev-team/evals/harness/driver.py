@@ -409,9 +409,31 @@ def vendor_env(names, vendors):
     return env
 
 
+PROBE_CMD = re.compile(r"(?:uv run|python3?)\s+(?:[^\s`]*/)?probe\.py((?:[ \t]+[^\s`&|;<>]+)*)")
+
+
+def user_steps(readme):
+    """The argument lists the probe's README gives `probe.py`, in order: from its `## Steps` section when that names
+    probe.py, else from the whole README (the Who-runs-what table). A probe may split the user's run into steps
+    (`probe.py bulk`, then `probe.py checks`; the api-probe README template does). [[]] when it names none."""
+    steps = re.search(r"^##\s+Steps\b.*?(?=^##\s|\Z)", readme, re.M | re.S)
+    out = []
+    for text in ([steps.group(0)] if steps else []) + [readme]:
+        for span in re.findall(r"`([^`]+)`", text):
+            for m in PROBE_CMD.finditer(span):
+                args = m.group(1).split()
+                if args not in out:
+                    out.append(args)
+        if out:
+            break
+    return out or [[]]
+
+
 def run_user_checks(proj, vendors, log_path, ids=None, timeout=600):
-    """The user's "ran it": every Ready probe (or just `ids`) is run as the user would run it. Returns one record
-    per script; the canary is scrubbed from what is kept, and `printed_key` says whether a script printed it."""
+    """The user's "ran it": every Ready probe (or just `ids`) is run as the user would run it: public.py with no
+    environment, then each probe.py step its README gives (`user_steps`), in order, stopping at the first that
+    fails. Returns one record per run; the canary is scrubbed from what is kept, and `printed_key` says whether a
+    script printed it."""
     text = (proj / "docs" / "probes.md").read_text(errors="ignore") if (proj / "docs" / "probes.md").exists() else ""
     runs, keys = [], [v["key"] for v in vendors.values()]
     scrub = lambda t: re.sub("|".join(map(re.escape, keys)) or r"(?!)", "<canary>", t or "")
@@ -428,18 +450,24 @@ def run_user_checks(proj, vendors, log_path, ids=None, timeout=600):
         dot = folder / ".env"
         dot.write_text("".join(f"{k}={v}\n" for k, v in env.items() if k in names or not names))
         dot.chmod(0o600)
-        for script, script_env in (("public.py", {}), ("probe.py", {**{k: os.environ[k] for k in ("PATH", "HOME") if k in os.environ}, **env})):
+        readme = (folder / "README.md").read_text(errors="ignore") if (folder / "README.md").exists() else ""
+        user_env = {**{k: os.environ[k] for k in ("PATH", "HOME") if k in os.environ}, **env}
+        for script, script_env, args in [("public.py", {}, [])] + [("probe.py", user_env, a) for a in user_steps(readme)]:
             if not (folder / script).exists():
                 continue
+            if script == "probe.py" and any(r_["probe"] == e["id"] and r_["script"].endswith("probe.py") and r_["rc"] != 0
+                                            for r_ in runs):
+                break  # a failed step stops the user's run, as the README's steps say
             head = (folder / script).read_text(errors="ignore")[:2000]
-            cmd = ["uv", "run", script] if "# /// script" in head and shutil.which("uv") and script == "probe.py" else [sys.executable, "-B", script]
+            cmd = (["uv", "run", script] if "# /// script" in head and shutil.which("uv") and script == "probe.py"
+                   else [sys.executable, "-B", script]) + args
             t0 = time.time()
             try:
                 r = subprocess.run(cmd, cwd=folder, env=script_env, capture_output=True, text=True, timeout=timeout)
                 rc, so, se = r.returncode, r.stdout, r.stderr
             except subprocess.TimeoutExpired as ex:
                 rc, so, se = "timeout", str(ex.stdout or ""), str(ex.stderr or "")
-            runs.append({"probe": e["id"], "script": f"{folder.relative_to(proj)}/{script}", "rc": rc,
+            runs.append({"probe": e["id"], "script": f"{folder.relative_to(proj)}/{script}", "args": args, "rc": rc,
                          "seconds": round(time.time() - t0, 1), "env": sorted(script_env) if script_env else [],
                          "printed_key": any(k in so + se for k in keys), "stdout_tail": scrub(so)[-600:],
                          "stderr_tail": scrub(se)[-600:]})

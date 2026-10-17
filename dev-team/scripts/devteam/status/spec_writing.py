@@ -1,6 +1,7 @@
 """`dt status --skill spec-writing` (replaces spec-status.sh): ideas ready to spec, ID prefixes, skills."""
 from __future__ import annotations
 
+from .. import routes
 from ..repo import Repo
 from .common import Report, add_common, available_skills, fmt
 
@@ -25,3 +26,4 @@ def spec_writing(repo: Repo, r: Report) -> None:
     r.add("prefixes", prefixes, fmt([f"{v['highest']}→{v['next']}" for v in prefixes.values()]))
     r.add("reserved_prefixes", RESERVED_PREFIXES)
     r.add("skills", available_skills(repo))
+    r.add("routed_changes", routes.open_for(repo, "spec-writing"))

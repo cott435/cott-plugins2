@@ -27,6 +27,7 @@ KINDS = [
     (r"docs/packages/[^/]+/tests\.md", "tests"),
     (r"docs/references\.md", "references"),
     (r"docs/probes\.md", "probes"),
+    (r"docs/routes\.md", "routes"),
     (r"CONSTRAINTS\.md", "constraints"),
     (r"(AGENTS|CLAUDE)\.md", "agents"),
     (r"tasks/plan\.md", "plan"),

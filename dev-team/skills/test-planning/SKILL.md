@@ -7,7 +7,7 @@ description: Plans how each package's pipelines are proven correct - a test stra
 
 A golden case is an oracle: an input and the output the code must produce, recorded before the code exists, from a source outside the agent that will build it. This skill writes `docs/packages/<pkg>/tests.md` (strategy and case index) and the fixtures under `tests/fixtures/<pkg>/TC-NN/`, and mints the `TC-NN` IDs. It's optional: when skipped, `build-planning` still requires a smoke test per pipeline and test-backed acceptance per task. The tester writes test code in the build.
 
-**Not for:** test code (the build's), pipeline design (`pipeline-design`), task order (`build-planning`).
+**Not for:** test code (the build's), pipeline design (`pipeline-design`), task order (`build-planning`). A change another skill owns (a contract, a pipeline, a spec ID) is recorded for its Revise, never made here: `dt route <owner> "<change>" --from test-planning`, and listed at the gate.
 
 `dt` means `python3 ../../scripts/dt.py`, relative to this skill's folder, run from the project root. `examples.md` here has the `tests.md` template, fixture shapes and a routed case; each mode file names its own examples.
 
@@ -20,7 +20,7 @@ Start with `dt status --skill test-planning`: the mode per package, the gap keys
 | **Blocked** | The package's `pipelines.md` isn't Approved | Say so. Stop |
 | **New** | No `tests.md` | `references/new.md` |
 | **Extend** | A new pipeline, new user pairs, or a regression case after a bug | Add cases; existing ones untouched: `references/extend.md` |
-| **Revise** | An expected output or tolerance must change | Approval required: `references/revise.md` |
+| **Revise** | An expected output or tolerance must change, or `routed_changes` lists a change | Approval required: `references/revise.md` |
 | **Grow** | The package split; cases move with their pipelines | Move sections and fixtures; content unchanged: `references/grow.md` |
 | **Current** | Nothing to do | Say so; next is `build-planning`. Stop |
 
@@ -52,8 +52,8 @@ Fix what `dt lint docs/packages/<pkg>/tests.md` reports. Rerun `dt status --skil
 
 | The user says | Do | Then |
 |---|---|---|
-| An unambiguous yes to the expected outputs | Set `Status: Approved` and the date. Offer to commit `tests.md` and the fixtures; commit only on a yes | Stop. Next: `build-planning` |
+| An unambiguous yes to the expected outputs | Set `Status: Approved` and the date; `dt route --done test-planning` if `routed_changes` listed any. Offer to commit `tests.md` and the fixtures; commit only on a yes | Stop. Next: `build-planning` |
 | "Approved, go ahead" | As above | Start `build-planning` (run its `dt status`). Never start code |
 | A hedge on any oracle ("looks fine I guess") | Keep Draft. Ask again, naming the cases and values | Repeat this gate |
 | Changes to a case, or a case dropped | Edit; list drops explicitly; keep Draft | Repeat this gate |
-| Approved, plus an upstream change (a contract, a pipeline, a spec ID) | Set Approved; route the change to its owner's Revise, never make it this turn | Stop |
+| Approved, plus an upstream change (a contract, a pipeline, a spec ID) | Set Approved; record it with `dt route` (Not for), never make it this turn | Stop; the owner's Revise is next |

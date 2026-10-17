@@ -2,6 +2,22 @@
 
 One entry per tagged release, newest first.
 
+## [0.4.0] - 2026-10-17
+
+### Added
+- `api-probe` skill: probes an external API before a decision rests on it (PB-NN entries in `docs/probes.md`, evidence kept, keys never read by the agent); architecture-design, idea-refine, test-planning, build-planning and build-setup wired to probes.
+- dt probes: `dt probes --stamp/--scan`, `dt status --skill api-probe`, `dt context` for PB-NN, `dt guard` on Read (`.env*`, probe output), and probe lints.
+- `dt plan --json` schema plan-map/2: goal, feature and requirement levels, with `serves` and `covers` edges.
+- Spec features carry a `**Stage:** S<n>` line (spec-writing); `dt plan` places each feature by it.
+- Lints `spec-stage`, `type-cases` and `task-ref` (errors). A spec whose roadmap has stages now fails `dt lint` until every feature names its stage.
+- Evals: probe scenarios with fake vendors, stage-based readiness, blind judge copies, structural graders with self-tests, `planexport.py --dt`.
+
+### Changed
+- build-planning cuts each Designed stage on its own; an uncut stage is Designed only when every spec ID its Source adds is on an Approved pipeline; New waits while a brief stage is below Designed. The derived stage status Cut is Split.
+- Iteration-7 fixes across build-planning, pipeline-design, architecture-design and test-planning: replay doubles, one module per separately thickened step, Boundary lines for types crossing step owners, `fold:` reasons, an upstream-change gate row.
+- spec-writing: cost, licence and budget limits are QR- items.
+- Skill examples use the GridLoad and LeafLab domains, kept apart from the eval projects.
+
 ## [0.3.0] - 2026-10-17
 
 ### Added

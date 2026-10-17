@@ -1,0 +1,546 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1"><title>T04 turn</title>
+<style>
+:root{--bg:#fbfbfa;--fg:#1d1d1f;--muted:#6b6b70;--line:#d9d9de;--box:#fff;--rowp:#eef3fb;--band:#fff4d6;
+--ok:#2e7d32;--bad:#c62828;--warn:#b26a00;--idle:#6b6b70}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#17171a;--fg:#ececf0;--muted:#9a9aa3;
+--line:#34343a;--box:#222227;--rowp:#1d2433;--band:#3a3015;--ok:#6fcf73;--bad:#ff6b6b;--warn:#f0b35a;--idle:#9a9aa3}}
+:root[data-theme="dark"]{--bg:#17171a;--fg:#ececf0;--muted:#9a9aa3;--line:#34343a;--box:#222227;--rowp:#1d2433;
+--band:#3a3015;--ok:#6fcf73;--bad:#ff6b6b;--warn:#f0b35a;--idle:#9a9aa3}
+body{margin:0;padding:16px;background:var(--bg);color:var(--fg);font:14px/1.45 -apple-system,system-ui,sans-serif}
+h1{font-size:18px;margin:0 0 4px}h2{font-size:15px;margin:22px 0 8px}.sub{color:var(--muted)}
+table{border-collapse:collapse;margin:4px 0 8px}td,th{border-bottom:1px solid var(--line);padding:4px 10px;text-align:left;
+vertical-align:top}th{color:var(--muted);font-weight:600}.chips span{display:inline-block;margin:0 4px 2px 0}
+.legend span{margin-right:14px;white-space:nowrap}.sw{display:inline-block;width:10px;height:10px;border-radius:2px;
+margin-right:4px;vertical-align:-1px}.scroll{overflow:auto;max-height:88vh;border:1px solid var(--line);border-radius:8px}
+.chart{display:grid;width:max-content}.chart>div{line-height:0}.corner{position:sticky;top:0;left:0;z-index:3}
+.colhead{position:sticky;top:0;z-index:2}.rowhead{position:sticky;left:0;z-index:2}
+svg.bg{background:var(--bg)}.colhead svg{border-bottom:1px solid var(--line)}.rowhead svg{border-right:1px solid var(--line)}
+.ok{color:var(--ok);fill:var(--ok)}.bad{color:var(--bad);fill:var(--bad)}.warn{color:var(--warn);fill:var(--warn)}
+.idle{color:var(--idle);fill:var(--idle)}
+svg text{fill:var(--fg);font-family:-apple-system,system-ui,sans-serif}
+.box{fill:var(--box);stroke:var(--line)}.unit:hover .box{stroke:var(--fg)}
+.role{font-size:12px;font-weight:600}.uid,.wmeta,.lmeta,.meta{font-size:10px;fill:var(--muted)}
+.sub{font-size:10.5px;fill:var(--muted)}.badge{font-size:11px;font-weight:600}
+.meta.bad{fill:var(--bad);font-weight:600}.lane{font-size:13px;font-weight:700}.wave{font-size:13px;font-weight:700}
+.par{fill:#4e79a7}.ser{fill:var(--muted)}.rowp{fill:var(--rowp)}.rows{fill:transparent}.band{fill:var(--band)}
+.bandt{font-size:11.5px}.grid{stroke:var(--line)}.link{stroke:var(--muted);stroke-width:1.2;opacity:.55}
+.arrowhead{fill:var(--muted)}.marks{font-size:10.5px}.audit{stroke:var(--box);stroke-width:2}.auditn{font-size:10px;font-weight:700;fill:#fff}
+a{color:inherit}svg a .box{cursor:pointer}
+
+:root{--c0:#2a78d6;--c1:#eb6834;--c2:#1baf7a;--c3:#eda100;--c4:#e87ba4;--c5:#008300;--c6:#6250d6;--c7:#e34948;
+--cx:#8a8985;--main:#52514e;--read:#dcdbd5;--readfg:#1d1d1f}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--c0:#3987e5;--c1:#d95926;--c2:#199e70;
+--c3:#c98500;--c4:#d55181;--c5:#008300;--c6:#9085e9;--c7:#e66767;--cx:#77766f;--main:#c3c2b7;--read:#3b3b40;
+--readfg:#ececf0}}
+:root[data-theme="dark"]{--c0:#3987e5;--c1:#d95926;--c2:#199e70;--c3:#c98500;--c4:#d55181;--c5:#008300;
+--c6:#9085e9;--c7:#e66767;--cx:#77766f;--main:#c3c2b7;--read:#3b3b40;--readfg:#ececf0}
+.c0{fill:var(--c0);background:var(--c0)}.c1{fill:var(--c1);background:var(--c1)}.c2{fill:var(--c2);background:var(--c2)}
+.c3{fill:var(--c3);background:var(--c3)}.c4{fill:var(--c4);background:var(--c4)}.c5{fill:var(--c5);background:var(--c5)}
+.c6{fill:var(--c6);background:var(--c6)}.c7{fill:var(--c7);background:var(--c7)}.cx{fill:var(--cx);background:var(--cx)}
+.cmain{fill:var(--main)}.sc0{stroke:var(--c0)}.sc1{stroke:var(--c1)}.sc2{stroke:var(--c2)}
+.tl text,.sm text,.lc text{font-size:10.5px;fill:var(--muted)}.tl .lbl-in,.sm .lbl-in{fill:#fff;font-size:10.5px;font-weight:600}
+.tl .rowl,.sm .rowl,.lc .rowl{fill:var(--fg);font-size:11.5px;font-weight:600}.tl .band{fill:var(--rowp)}
+.tl .brk{stroke:var(--muted);stroke-dasharray:2 3}.tl a:hover rect,.sm a:hover rect{stroke:var(--fg);stroke-width:1.5}
+.axis{stroke:var(--line)}.sm .val{fill:var(--fg);font-weight:600}.lc path.ln{fill:none;stroke-width:2}
+.lc circle{stroke:var(--bg);stroke-width:2}.lc .end{font-weight:600;fill:var(--fg)}
+.tiles{display:flex;flex-wrap:wrap;gap:10px;margin:12px 0}.tile{border:1px solid var(--line);border-radius:8px;
+padding:8px 12px;min-width:110px;background:var(--box)}.tile b{display:block;font-size:20px;line-height:1.2}
+.tile span{font-size:12px;color:var(--muted)}.tile i{font-style:normal;font-size:12px;margin-left:6px}
+.fm{border-collapse:separate;border-spacing:2px}.fm td,.fm th{border:0;padding:0;text-align:center;font-size:11px}
+.fm th{padding:0 2px;font-weight:600}.fm td.f,.fm th.f{text-align:left;padding-right:10px;white-space:nowrap;
+position:sticky;left:0;background:var(--bg);font:11.5px ui-monospace,Menlo,monospace;
+max-width:380px;overflow:hidden;text-overflow:ellipsis}
+.fm td.cell{min-width:22px;height:20px;border-radius:3px}.fm td.fw{background:var(--c0);color:#fff;font-weight:700}
+.fm td.fe{background:var(--c1);color:#fff;font-weight:700}.fm td.fr{background:var(--read);color:var(--readfg)}
+.fm td.n{color:var(--muted);padding:0 6px}.fm tr.grp td{text-align:left;padding-top:8px;color:var(--muted);
+font-weight:600}
+.key{display:inline-block;min-width:18px;text-align:center;border-radius:3px;font-size:11px;margin-right:4px}
+.bar{display:inline-block;height:9px;border-radius:2px;vertical-align:0}
+
+pre{white-space:pre-wrap;word-break:break-word;background:var(--box);border:1px solid var(--line);border-radius:6px;
+padding:8px 10px;margin:4px 0;font:12px/1.45 ui-monospace,SFMono-Regular,Menlo,monospace;max-width:100%;overflow:auto}
+.step{border-top:1px solid var(--line);padding:6px 0}.step:target{background:var(--rowp)}
+.sid{font:12px ui-monospace,Menlo,monospace;color:var(--muted);margin-right:8px}.kind{font-weight:600;margin-right:8px}
+.err{color:var(--bad);font-weight:600}.hook{color:var(--bad);margin:4px 0 0 16px}.lbl{font-size:12px;color:var(--muted);margin-top:6px}
+details summary{cursor:pointer;color:var(--muted);font-size:12px}.head td:first-child{color:var(--muted)}
+.top{font-size:13px}.narr{list-style:none;padding-left:0}.narr li{margin:3px 0}
+</style></head>
+<body>
+<p class="top"><a href="../flow.html">← the run's flow chart</a></p>
+<p class="top"><a href="../plan/T03.html">The plan as of T04</a>: unchanged since T03 · <a href="../plan/index.html">plan map</a></p>
+<h1>T04 · turn · Answers: 1) 3 years held-out is fine, accept that a no-significant-difference verdict is likely. 2) </h1>
+<table class="head"><tr><td>Type</td><td>turn</td></tr><tr><td>Description</td><td>Answers: 1) 3 years held-out is fine, accept that a no-significant-difference verdict is likely. 2) </td></tr><tr><td>Spawned by</td><td>user</td></tr><tr><td>Model</td><td>claude-opus-5-5</td></tr><tr><td>Start</td><td>2026-10-17 20:27:21 UTC</td></tr><tr><td>Duration</td><td>3 min</td></tr><tr><td>Tool calls</td><td>2</td></tr><tr><td>Errors</td><td>0</td></tr><tr><td>Hook blocks</td><td>0</td></tr><tr><td>Tokens</td><td>17.4k out · 18.8k new in · 258k cached in · peak context 97.7k</td></tr><tr><td>Skills invoked</td><td>none</td></tr><tr><td>Files written or edited</td><td>docs/spec.md</td></tr><tr><td>Definition</td><td>none</td></tr><tr><td>Steps</td><td>5</td></tr><tr><td>Finished</td><td>yes</td></tr></table>
+
+
+<h2>Prompt</h2>
+<pre>Answers: 1) 3 years held-out is fine, accept that a no-significant-difference verdict is likely. 2) Long-only, fully invested, no leverage, 5% cap, same for all strategies, no shorting. 3) Weekly rebalance with monthly sensitivity, 5 bps one-way with 15 bps stress: OK. 4) Those significance bars are right. 5) Speed targets are fine. Assumptions 1-7 are fine; for 2 on budget: Sharadar plus anything else free or under $50/month is correct. Proceed with the spec.</pre>
+<h2>Files</h2>
+<table><tr><th>Op</th><th>File</th><th>Calls</th><th>By</th><th>Via</th><th>Steps</th></tr><tr><td>write</td><td><code>docs/spec.md</code></td><td>1</td><td>main</td><td>Write</td><td><a href="#D35">D35</a></td></tr></table>
+<h2>Steps</h2>
+<div class="step" id="SD34"><span class="sid">D34</span><span class="kind">user</span>Answers: 1) 3 years held-out is fine, accept that a no-significant-difference verdict is likely. 2) Long-only, fully invested, no leverage, 5% cap, same for all strategies, no shorting. 3) Weekly rebalance with monthly sensitivity, 5 bps one-way with 15 bps stress: OK. 4) Those significance bars are right. 5) Speed targets are fine. Assumptions 1-7 are fine; for 2 on budget: Sharadar plus anything else free or under $50/month is correct. Proceed with the spec.<details><summary>full text</summary><pre>Answers: 1) 3 years held-out is fine, accept that a no-significant-difference verdict is likely. 2) Long-only, fully invested, no leverage, 5% cap, same for all strategies, no shorting. 3) Weekly rebalance with monthly sensitivity, 5 bps one-way with 15 bps stress: OK. 4) Those significance bars are right. 5) Speed targets are fine. Assumptions 1-7 are fine; for 2 on budget: Sharadar plus anything else free or under $50/month is correct. Proceed with the spec.</pre></details></div><div class="step" id="SD35"><span class="sid">D35</span><span class="kind">Write</span>/Users/connorott/plugins/dev-team-workspace/iteration-8/quant-all-at-once/with_skill/project/docs/spec.md (379 lines)<div class="lbl">wrote /Users/connorott/plugins/dev-team-workspace/iteration-8/quant-all-at-once/with_skill/project/docs/spec.md</div><pre># Quant Research Platform — Spec
+
+**Status:** Draft · **Last updated:** 2026-10-17 · **Brief:** [brief.md](brief.md)
+
+## Summary
+A personal, local research platform for daily S&amp;P 500 equities, built in four stages: a trustworthy point-in-time dataset with a browser explorer; return-structure analysis and classical risk-based portfolios; candidate features tested against chance; and neural forecasts and trading agents that must beat the classical portfolios after costs on years that were never looked at. Why: see the [brief](brief.md).
+
+## Users
+| User | What they need to do |
+|---|---|
+| The researcher (sole user) | Build and update the dataset, check it, explore it in the browser, run each stage&#x27;s experiments, and read one scoreboard of honest out-of-sample results |
+
+## Scope
+**In scope:** Data download &amp; update, Validation &amp; cross-check, Point-in-time loader, Exploratory analysis, Explorer app, Live run progress, Backtest &amp; scoreboard, Held-out lock, Factor decomposition, Covariance estimation, Classical portfolios, Candidate features, Feature significance, Forecasting, Forecast-driven portfolios, Trading agents, Final verdict.
+
+**Out of scope:**
+- Real-money or live broker trading; only paper results from backtests.
+- Small and mid caps, non-US stocks, other asset classes, intraday data.
+- Short selling, leverage, or any position above 5% of the portfolio.
+- Return prediction before covariance estimation and classical portfolios are scored (S2 precedes S3 and S4).
+- Any use of the held-out years before a stage&#x27;s final verdict.
+- Hosting, logins, multiple users, remote access.
+- Editing or correcting data from the app.
+- Scheduled or automatic updates; updates run when the researcher starts them.
+
+## Features
+
+### Data download &amp; update (`INGST`)
+**Serves:** Goal 1
+**Behavior:** The researcher starts a full build or an incremental update. The system fetches every security that was an S&amp;P 500 member at any time since January 2005, delisted ones included, with prices, corporate actions and membership history, and stores it locally as one dated snapshot.
+
+**Requirements**
+- **INGST-01** A full build fetches the complete history for every security that was an index member at any time from 2005-01-03 to the latest trading day.
+  - Given an empty local store, when a full build completes, then every security on the point-in-time membership list since 2005-01-03 has price history for each day it was a member.
+  - Given a security delisted in 2009, when the full build completes, then its history up to its last trading day is present.
+- **INGST-02** An incremental update fetches only trading days after the latest stored day.
+  - Given a store complete to day D, when an incremental update runs on day D+3, then only days D+1 to D+3 are fetched and earlier stored values are unchanged unless the source revised them.
+- **INGST-03** Revisions the source makes to already-stored history are detected and recorded.
+  - Given the source changes a stored close, when an update runs, then the change is applied and recorded with old value, new value and the update date.
+- **INGST-04** Every build or update produces a numbered snapshot that later steps can name.
+  - Given two updates on different days, when a backtest names snapshot 1, then it sees exactly the data of snapshot 1.
+- **INGST-05** An interrupted run can be resumed without refetching completed securities.
+  - Given a full build stopped at security 300 of 1,000, when it is resumed, then securities 1-299 are not fetched again and the result equals an uninterrupted build.
+- **INGST-06** Raw fetched data is kept unchanged alongside the cleaned data.
+  - Given a cleaned value, when the researcher asks for its origin, then the raw value it came from is shown.
+
+**Edge cases &amp; errors**
+- Source unreachable or rate-limited → the run retries with back-off, then stops with a clear error naming what was not fetched; the previous snapshot stays usable.
+- Credentials missing or rejected → the run stops before fetching anything, with a message saying which credential failed.
+- A ticker symbol reused by a different company → the two histories are kept separate under different permanent identifiers.
+
+### Validation &amp; cross-check (`VALID`)
+**Serves:** Goal 1
+**Behavior:** After each build or update the system checks the data for internal consistency and compares it against a second, independent source, then writes a validation report. A snapshot is usable for research only once its report has no unexplained failures.
+
+**Requirements**
+- **VALID-01** Each snapshot is checked for internal consistency: no duplicate (security, day) rows, no non-positive prices, high ≥ open, close ≥ low, and no price on a non-trading day.
+  - Given a snapshot with a duplicated row, when validation runs, then the report lists it as a failure with the security and date.
+- **VALID-02** Each snapshot is checked for coverage: on every trading day, the number of members with a price equals the number of members on the membership list.
+  - Given a day where a member has no price, when validation runs, then the report lists the security and day as a coverage gap.
+- **VALID-03** Daily returns beyond ±40% are flagged for review against corporate actions.
+  - Given a −50% return on a split ex-date with no recorded split, when validation runs, then it is flagged as a likely missing corporate action.
+- **VALID-04** Adjusted daily returns are compared with the second source on every overlapping (security, day); they must agree within 1 basis point.
+  - Given an overlapping day where the two sources differ by 3 basis points, when cross-check runs, then the pair is listed as a mismatch with both values.
+- **VALID-05** Unadjusted closes are compared with the second source; they must agree within 0.5%.
+  - Given a close differing by 1%, when cross-check runs, then it is listed as a mismatch.
+- **VALID-06** Every failure and mismatch carries a status: unexplained, explained (with a written reason), or corrected.
+  - Given a snapshot with one unexplained mismatch, when a research run asks to use it, then the run is refused and names the open item.
+- **VALID-07** The report states the overlap coverage with the second source as a share of member-days.
+  - Given a cross-check, when the report is written, then it shows the share of member-days compared, per year.
+
+**Edge cases &amp; errors**
+- Second source has no data for a security (e.g. long delisted) → listed as &quot;not cross-checkable&quot;, not as a failure.
+- The two sources disagree on a corporate action date → listed as a mismatch on the action, not on every affected day.
+
+### Point-in-time loader (`LOAD`)
+**Serves:** Goal 1, Goal 3
+**Behavior:** Every later stage gets its data through one loader. Given a snapshot, a date range and an as-of rule, it returns prices, total returns and the index universe exactly as they were known on each day.
+
+**Requirements**
+- **LOAD-01** The universe on day t is the list of index members on day t, including securities later removed or delisted.
+  - Given a security removed from the index in 2012, when the universe for 2010-06-01 is requested, then it is included; for 2013-06-01 it is not.
+- **LOAD-02** Daily total returns include dividends on their ex-dates and are unaffected by splits.
+  - Given a 2-for-1 split on day t, when returns are loaded, then the return on day t reflects only the real price change.
+  - Given a cash dividend ex-dated day t, when returns are loaded, then the return on day t includes it.
+- **LOAD-03** Returns for past days do not change when a later corporate action is recorded.
+  - Given returns loaded from snapshot 1, when snapshot 2 adds a split dated after snapshot 1&#x27;s last day, then returns for days in snapshot 1 are identical.
+- **LOAD-04** A delisted security&#x27;s final return is included: the reported delisting return, or, if none is reported, an assumed return (default −30% for performance-related delistings, 0% for mergers and acquisitions), flagged as assumed.
+  - Given a delisting for bankruptcy with no reported delisting return, when returns are loaded, then the last return is −30% and flagged.
+  - Given the researcher sets the performance default to −50%, when returns are loaded, then that value is used.
+- **LOAD-05** A request for any day inside the locked held-out period is refused unless the stage holds an unlock (see `HOLD`).
+  - Given the lock is active, when a load reaches into the held-out period, then it fails with an error naming the lock.
+- **LOAD-06** Each loaded panel records which snapshot and settings produced it.
+  - Given a loaded panel, when its origin is inspected, then snapshot number, date range and delisting defaults are shown.
+
+**Edge cases &amp; errors**
+- A member with missing prices on some days → returns for those days are missing, never filled with zero; later steps decide how to treat them.
+- A ticker change mid-membership → one continuous history under the permanent identifier.
+
+### Exploratory analysis (`EDA`)
+**Serves:** Goal 1
+**Behavior:** A repeatable analysis of each validated snapshot, run with the `data-analysis` skill, characterising the dataset before any modelling.
+
+**Requirements**
+- **EDA-01** The `data-analysis` skill is run on the snapshot&#x27;s daily returns and reports, per year: member count, missing share, return distribution and tail statistics, and largest absolute returns.
+  - Given a validated snapshot, when the analysis runs, then a report with those statistics for every year from 2005 is produced.
+- **EDA-02** The report shows how average pairwise correlation and the largest eigenvalue&#x27;s share of variance move over time on trailing 252-day windows.
+  - Given the 2008-09 crisis, when the report is read, then both series are shown through it.
+- **EDA-03** The report shows universe turnover: additions, removals and delistings per year.
+  - Given the snapshot, when the report is read, then those counts are shown for each year.
+
+### Explorer app (`APP`)
+**Serves:** Goal 5
+**Behavior:** A browser app running on the researcher&#x27;s own machine to explore the stored data and results. It reads only; it never changes data.
+
+**Requirements**
+- **APP-01** The researcher can search any security, current or delisted, and see its price and total-return history with corporate actions and membership periods marked.
+  - Given a delisted security, when it is searched, then its chart appears with the delisting date marked.
+- **APP-02** The researcher can pick any date and see that day&#x27;s universe with each member&#x27;s return.
+  - Given 2008-09-15, when chosen, then the members on that day and their returns are listed.
+- **APP-03** The researcher can browse the latest validation report and filter its items by status.
+  - Given a report with unexplained items, when filtered to &quot;unexplained&quot;, then only those are shown.
+- **APP-04** The researcher can view the exploratory analysis charts for any snapshot.
+  - Given snapshot 2, when chosen, then its EDA charts are shown.
+- **APP-05** The researcher can view the scoreboard and compare any two entries side by side.
+  - Given two scoreboard entries, when compared, then their metrics and cumulative after-cost returns are shown together on the same period.
+- **APP-06** Every message between the app and the backend matches one shared, versioned contract; a message that does not is rejected and shown as an error.
+  - Given the backend sends a field the contract does not define, when the app receives it, then the app shows a contract error and does not render the bad data.
+
+**Edge cases &amp; errors**
+- Backend not running → the app says so and offers a retry, instead of an empty screen.
+- A view reaches into the held-out period while it is locked → those days are hidden and labelled &quot;held out&quot;.
+
+### Live run progress (`RUNS`)
+**Serves:** Goal 5
+**Behavior:** While a download or validation run is working, the app shows its progress as it happens, without refreshing.
+
+**Requirements**
+- **RUNS-01** The researcher can start a full build, incremental update or validation from the app.
+  - Given no run in progress, when &quot;incremental update&quot; is started, then a run begins and appears in the app.
+- **RUNS-02** A running job shows securities done out of total, current step, elapsed time, estimated time left and error count, updated at least every 2 seconds.
+  - Given a running full build, when the app is open, then the counts change at least every 2 seconds.
+- **RUNS-03** Errors and warnings appear in a live log as they occur.
+  - Given a security fails to fetch, when it fails, then a log line naming it appears within 2 seconds.
+- **RUNS-04** Closing the app does not stop a run, and reopening it shows the run&#x27;s current state.
+  - Given a run at 40%, when the app is closed and reopened, then it shows the run at its current progress with the full log so far.
+- **RUNS-05** Only one data-changing run can be active at a time.
+  - Given a full build running, when an update is started, then it is refused with a message naming the running job.
+- **RUNS-06** A run can be cancelled from the app, leaving the previous snapshot intact.
+  - Given a running update, when cancelled, then it stops within 10 seconds and the previous snapshot is still the current one.
+
+### Backtest &amp; scoreboard (`SCORE`)
+**Serves:** Goal 3, Goal 4
+**Behavior:** Every strategy, from the equal-weight baseline to the trading agents, is run through the same backtest with the same rules and costs, and its results land as one entry on one scoreboard.
+
+**Requirements**
+- **SCORE-01** All strategies obey the same portfolio rules: long only, fully invested, no leverage, no position above 5%, holdings only from the point-in-time universe at each rebalance.
+  - Given a strategy proposing a 7% weight, when the backtest applies it, then the run fails with a rule violation; it is never silently clipped.
+- **SCORE-02** The headline rebalance is weekly, at the last trading day&#x27;s close of each week; a monthly rebalance is reported as a sensitivity.
+  - Given any strategy entry, when it is read, then weekly (headline) and monthly results are both shown.
+- **SCORE-03** Weights for a rebalance use only data through the close of the day before the trade; trades execute at the rebalance day&#x27;s close.
+  - Given a strategy whose weights depend on the rebalance day&#x27;s own return, when the backtest is checked by the look-ahead test (a strategy given tomorrow&#x27;s return must not gain), then it is detected and fails.
+- **SCORE-04** Trading costs are 5 basis points one way per unit of turnover; a 15-basis-point stress case is also reported.
+  - Given a rebalance with 40% turnover, when costs are charged, then 0.4 × 5 bp = 2 bp is deducted at headline and 6 bp in the stress case.
+- **SCORE-05** Between rebalances holdings drift with returns; a holding that leaves the index is kept until the next rebalance; a holding that delists takes its delisting return and its proceeds are held as cash at zero return until the next rebalance.
+  - Given a holding delisted mid-week, when the week ends, then its delisting return is applied and the proceeds sit in cash.
+- **SCORE-06** Each entry reports annualised Sharpe ratio after costs (headline), annualised realised volatility, average weekly turnover, maximum drawdown and the period covered.
+  - Given a finished backtest, when its entry is read, then all five are shown for weekly/monthly × 5 bp/15 bp.
+- **SCORE-07** The equal-weight portfolio over the point-in-time universe is always on the scoreboard as the baseline.
+  - Given any comparison, when the scoreboard is shown, then the equal-weight entry for the same period is present.
+- **SCORE-08** Each entry records the snapshot, strategy settings, random seed and code version that produced it, and rerunning with those gives identical numbers.
+  - Given an entry, when rerun from its record, then all metrics match to the last reported digit.
+- **SCORE-09** Development results use walk-forward evaluation on 2008-01-01 up to the held-out start: every estimate used at a date is fitted only on data before it.
+  - Given a development backtest, when any fitted object used on date t is inspected, then its fitting window ends before t.
+- **SCORE-10** Claims that one strategy beats another are tested with the `null-hypothesis-testing` skill on the after-cost return series; a claim passes only if significant at 5% after correction for the number of comparisons made.
+  - Given two strategies whose Sharpe ratios differ by 0.1, when the test does not reject at 5% corrected, then the scoreboard marks the difference &quot;not significant&quot;.
+
+### Held-out lock (`HOLD`)
+**Serves:** Goal 3, Goal 4
+**Behavior:** The final 3 years of data are locked away at the start of the project. A stage can unlock them once, for its final verdict, after declaring what it will evaluate. Every unlock is logged.
+
+**Requirements**
+- **HOLD-01** The held-out period starts at a fixed date, three years before the last trading day of the first validated snapshot, and runs to the latest data; the start date never moves.
+  - Given the first validated snapshot ends 2026-10-16, when the lock is set, then held-out starts 2023-10-17 and all later data, including future updates, is held out.
+- **HOLD-02** A stage unlocks only after recording its pre-registration: the strategies or models to evaluate, the comparisons, metrics and significance bar.
+  - Given no pre-registration for S2, when S2 requests unlock, then it is refused.
+- **HOLD-03** Each stage can unlock once; a second unlock for the same stage needs a written reason and marks every result produced after it &quot;re-opened&quot;.
+  - Given S2 has unlocked once, when it requests again with a reason, then the unlock proceeds and later S2 held-out results carry the &quot;re-opened&quot; mark.
+- **HOLD-04** Every unlock is logged with the date, stage, pre-registration and reason.
+  - Given two unlocks, when the log is read, then both appear with their details.
+- **HOLD-05** Held-out results report only the pre-registered comparisons; anything else run during an unlock is marked &quot;exploratory&quot;.
+  - Given an unregistered strategy run during an unlock, when it reaches the scoreboard, then it is marked exploratory.
+
+### Factor decomposition (`FACT`)
+**Serves:** Goal 4
+**Behavior:** Returns are decomposed into their principal components on trailing windows; the market and other dominant components are removed, leaving residual returns used by later stages.
+
+**Requirements**
+- **FACT-01** On each date the principal components of the standardised returns are fitted on the trailing 252 trading days only (504 as a sensitivity).
+  - Given residuals for day t, when the fit behind them is inspected, then it uses days t−252 to t−1 only.
+- **FACT-02** The number of components removed is either fixed by the researcher or set to the count of eigenvalues above the noise edge predicted for pure-noise data of the same shape.
+  - Given the automatic setting, when a window is fitted, then the chosen count and the noise edge are recorded for that date.
+- **FACT-03** Residual returns for day t are the day-t returns minus their projection on the components fitted before day t.
+  - Given a synthetic panel with one planted market factor and independent noise, when one component is removed, then the residuals&#x27; mean absolute pairwise correlation is within 0.02 of the noise-only value.
+- **FACT-04** A report, run with the `data-analysis` skill, shows over time the variance share of each removed component and the mean absolute pairwise correlation before and after removal.
+  - Given a development run, when the report is read, then both series are shown from 2008 to the held-out start.
+
+**Edge cases &amp; errors**
+- A member with fewer than 200 of the trailing 252 days → excluded from that window&#x27;s fit and residuals, and the exclusion counted.
+
+### Covariance estimation (`COV`)
+**Serves:** Goal 4
+**Behavior:** Three covariance estimates are built on the same trailing windows — sample, shrinkage toward a structured target, and denoised (eigenvalues inside the pure-noise band replaced by their average, the rest kept) — and compared on how well they control variance out of sample.
+
+**Requirements**
+- **COV-01** Each estimator is fitted at each rebalance on the trailing 252 trading days only (504 as a sensitivity).
+  - Given an estimate used on rebalance date t, when its window is inspected, then it ends at t−1.
+- **COV-02** The denoised estimate keeps eigenvalues above the pure-noise edge and replaces those below it with their mean, preserving the trace.
+  - Given a synthetic matrix with 3 planted factors plus noise, when denoised, then exactly 3 eigenvalues exceed the edge and the trace equals the sample trace.
+- **COV-03** Every estimate is symmetric and positive definite.
+  - Given any rebalance date, when an estimate is checked, then its smallest eigenvalue is above zero.
+- **COV-04** Estimators are compared by the realised out-of-sample variance of the minimum-variance portfolio built from each, using the `data-analysis` skill for the comparison report and the `null-hypothesis-testing` skill for whether differences are significant at 5% corrected.
+  - Given a development run, when the comparison finishes, then each estimator&#x27;s realised variance, its ranking and the significance of each pairwise difference are reported.
+- **COV-05** The comparison is also reported per sub-period (2008-09, 2010-19, 2020-held-out start).
+  - Given the report, when read, then the ranking for each sub-period is shown.
+
+### Classical portfolios (`PORT`)
+**Serves:** Goal 3, Goal 4
+**Behavior:** Minimum-variance, risk parity and hierarchical risk parity portfolios are built from each covariance estimate and scored on the scoreboard against the equal-weight baseline.
+
+**Requirements**
+- **PORT-01** Minimum-variance weights minimise predicted variance under the shared portfolio rules.
+  - Given a known 3-asset covariance with a closed-form solution inside the constraints, when weights are computed, then they match it within 1e-6.
+- **PORT-02** Risk-parity weights give each holding an equal contribution to predicted risk, within the 5% cap.
+  - Given a diagonal covariance, when weights are computed, then each is proportional to inverse volatility.
+- **PORT-03** Hierarchical risk-parity weights come from clustering assets by correlation and splitting risk down the cluster tree.
+  - Given two uncorrelated blocks of identical assets, when weights are computed, then each block receives half the weight.
+- **PORT-04** Every portfolio × estimator combination is a scoreboard entry on development data.
+  - Given 3 portfolio methods and 3 estimators, when S2&#x27;s development run completes, then 9 entries plus equal-weight are on the scoreboard.
+- **PORT-05** S2&#x27;s held-out verdict compares the pre-registered portfolios with equal weight on the held-out years under `HOLD`.
+  - Given S2&#x27;s pre-registration, when the unlock runs, then only those comparisons are reported as S2&#x27;s verdict.
+
+### Candidate features (`FEAT`)
+**Serves:** Goal 2, Goal 4
+**Behavior:** The researcher defines candidate features in a catalogue; each is computed per security and day from data known at that day&#x27;s close.
+
+**Requirements**
+- **FEAT-01** Every feature tried is registered in the catalogue with its definition, lookback and the date it was added, before it is tested.
+  - Given a feature tested without a catalogue entry, when the test starts, then it is refused.
+- **FEAT-02** A feature value for day t uses only data through day t&#x27;s close.
+  - Given the look-ahead test (shifting all inputs after t changes nothing at t), when run on each feature, then every feature passes.
+- **FEAT-03** Features are computed only for securities in the point-in-time universe on that day.
+  - Given a security not yet a member on day t, when features are computed, then it has no value on day t.
+- **FEAT-04** Feature scaling or encoding is fitted on training data only; categories unseen in training map to an &quot;unknown&quot; value.
+  - Given a sector that first appears after the training window, when encoded, then it is &quot;unknown&quot; and no error occurs.
+
+### Feature significance (`SIG`)
+**Serves:** Goal 2
+**Behavior:** Each candidate is tested for information gain over the market-removed residual return: does a learned model predict next-period residual returns better with the feature than without it, out of sample, beyond chance?
+
+**Requirements**
+- **SIG-01** The target is the residual return (from `FACT`) over the next 1, 5 and 21 trading days, including delisting returns.
+  - Given a security that delists 3 days after t, when its 5-day target is built, then it includes the delisting return rather than being dropped.
+- **SIG-02** Information gain is measured out of sample on walk-forward folds within the development period, with a gap between training and test at least as long as the target horizon.
+  - Given a 21-day target, when folds are built, then no training label&#x27;s window overlaps any test day.
+- **SIG-03** Each feature&#x27;s information gain is tested with the `null-hypothesis-testing` skill; it passes only if the false discovery rate across every feature in the catalogue is held at 10%.
+  - Given 40 catalogued features, when tests finish, then the correction counts all 40, including ones abandoned early.
+- **SIG-04** Every result, pass or fail, is recorded with its effect size, raw and corrected p-value, horizon and fold scheme.
+  - Given a failed feature, when results are read, then it appears with its numbers.
+- **SIG-05** A planted-signal check shows the procedure can find a real effect and rejects noise: a synthetic feature built from the future target passes, and pure-noise features pass no more often than the 10% rate allows.
+  - Given 100 noise features and 1 planted one, when tested, then the planted one passes and the false-discovery share among passes is at most 10% on average across repeats.
+
+### Forecasting (`FCST`)
+**Serves:** Goal 4
+**Behavior:** Neural-network forecasters predict residual returns and volatility at 1, 5 and 21 days from price history and the features that passed `SIG`, and are compared against simple baselines.
+
+**Requirements**
+- **FCST-01** Inputs are limited to price-derived history, calendar information known in advance, and features that passed `SIG`.
+  - Given a feature that failed `SIG`, when a forecaster is configured with it, then configuration is refused.
+- **FCST-02** Volatility forecasts are compared against trailing realised volatility and an exponentially weighted trailing volatility.
+  - Given a development run, when results are reported, then each forecaster&#x27;s volatility loss is shown next to both baselines.
+- **FCST-03** Return forecasts are compared against a zero forecast and a trailing-mean forecast, by the rank correlation between forecast and realised residual return.
+  - Given a development run, when results are reported, then each forecaster&#x27;s rank correlation is shown next to both baselines.
+- **FCST-04** Training, validation and test periods are split by forecast date with a gap at least as long as the horizon.
+  - Given a 5-day horizon, when the split is checked, then no training target window reaches into validation.
+- **FCST-05** A forecaster beats a baseline only if the `null-hypothesis-testing` skill finds the loss difference significant at 5%, corrected for the number of forecaster × baseline × horizon comparisons.
+  - Given 2 forecasters, 4 baselines and 3 horizons, when tested, then the correction counts all those comparisons.
+- **FCST-06** Results are reported as the median across at least 5 training seeds, with the spread.
+  - Given a forecaster, when its result is reported, then the median and range over ≥ 5 seeds are shown.
+
+### Forecast-driven portfolios (`FPORT`)
+**Serves:** Goal 3, Goal 4
+**Behavior:** Portfolios that use the return and volatility forecasts, combined with the best covariance estimate from S2, under the shared portfolio rules.
+
+**Requirements**
+- **FPORT-01** Each forecast-driven portfolio uses forecasts from forecasters that beat their baselines in `FCST`, plus a covariance estimate from `COV`.
+  - Given a forecaster that did not beat its baselines, when a portfolio is configured with it, then configuration is refused.
+- **FPORT-02** Each forecast-driven portfolio is a scoreboard entry under the shared rules and costs.
+  - Given a finished development run, when the scoreboard is read, then the entry shows the same metrics as every other entry.
+
+### Trading agents (`AGENT`)
+**Serves:** Goal 3, Goal 4
+**Behavior:** Reinforcement-learning agents learn to set portfolio weights in a backtest environment that applies the shared rules and costs, trained only on development data.
+
+**Requirements**
+- **AGENT-01** The training environment applies exactly the backtest&#x27;s rules, costs and rebalance schedule.
+  - Given the same weights, when applied in the environment and in the backtest, then after-cost returns match to 1e-10.
+- **AGENT-02** The agent&#x27;s observation at a rebalance contains only data through the previous close.
+  - Given the look-ahead test, when run on the environment, then it passes.
+- **AGENT-03** Agents are trained only on development data; held-out data is reachable only through `HOLD`.
+  - Given the lock is active, when training reaches the held-out start, then the episode ends.
+- **AGENT-04** Agent results are reported as the median across at least 5 training seeds, with the spread.
+  - Given an agent, when scored, then median and range over ≥ 5 seeds are on its scoreboard entry.
+- **AGENT-05** Each agent is a scoreboard entry under the shared rules and costs.
+  - Given a trained agent, when evaluated, then its entry has all `SCORE-06` metrics.
+
+### Final verdict (`VERD`)
+**Serves:** Goal 3, Goal 4
+**Behavior:** The project&#x27;s closing comparison: pre-registered forecast-driven portfolios and agents against pre-registered classical portfolios, on the held-out years, after costs.
+
+**Requirements**
+- **VERD-01** Candidates on both sides are chosen on development data and pre-registered before the S4 unlock.
+  - Given a strategy not in S4&#x27;s pre-registration, when the verdict is produced, then it is not part of the verdict.
+- **VERD-02** &quot;S4 beats S2&quot; holds only if the after-cost Sharpe difference on the held-out years is significant at 5%, corrected for the number of pre-registered comparisons, tested with the `null-hypothesis-testing` skill.
+  - Given a held-out Sharpe difference of 0.2 that is not significant, when the verdict is written, then it reads &quot;no significant difference&quot;.
+- **VERD-03** The verdict reports realised volatility, turnover and drawdown alongside Sharpe, at both cost levels.
+  - Given the verdict, when read, then all metrics at 5 bp and 15 bp are shown for every compared strategy.
+
+## Data requirements
+- **DATA-01** Daily unadjusted open, high, low, close and volume for every security that was an S&amp;P 500 member at any time from 2005-01-03 to the latest trading day, including delisted securities, from the existing Sharadar subscription.
+  - Given a security that was a member only in 2006-2008 and then went bankrupt, when the data is fetched, then its daily prices for that period are present.
+- **DATA-02** Point-in-time index membership: for every day since 2005-01-03, the list of members, with addition and removal dates.
+  - Given any trading day, when membership is asked for, then a list of about 500 members is returned.
+- **DATA-03** Corporate actions with ex-dates: splits with ratios, cash dividends with amounts, and delistings with date and reason category (performance, merger or acquisition, other).
+  - Given a known 2-for-1 split, when actions are loaded, then it appears with its ex-date and ratio.
+- **DATA-04** A permanent identifier per security that survives ticker changes and is never reused.
+  - Given a company that changed ticker, when its history is loaded, then it is one continuous series.
+- **DATA-05** The exchange trading calendar from 2005, including holidays and early closes.
+  - Given 2012-10-29 (market closed for a hurricane), when the calendar is checked, then it is not a trading day.
+- **DATA-06** A second, independent source of daily prices for cross-checking, overlapping at least 50% of member-days since 2010.
+  - Given the cross-check report, when overlap is read, then it is at least 50% per year since 2010.
+
+## Quality requirements
+- **QR-01** Data costs beyond the existing Sharadar subscription are at most $50 a month.
+  - Checked by listing every paid source and its monthly price in the architecture.
+- **QR-02** A full build from 2005 completes within 2 hours on the researcher&#x27;s laptop.
+  - Timed on the laptop with a full build.
+- **QR-03** A one-day incremental update completes within 5 minutes.
+  - Timed on the laptop with a one-day update.
+- **QR-04** Any app chart or table loads within 2 seconds of being requested.
+  - Timed in the browser on the laptop for the largest security history and a full-universe day.
+- **QR-05** Same snapshot, settings and seed give identical results.
+  - Checked by rerunning a scoreboard entry and comparing every metric.
+- **QR-06** The app and backend accept connections only from the researcher&#x27;s own machine.
+  - Checked by attempting a connection from another machine on the network; it is refused.
+- **QR-07** Data-source credentials never appear in logs, reports, the app or version control.
+  - Checked by searching all logs, reports and the repository history for the credential values.
+- **QR-08** Licensed data is never sent anywhere except the researcher&#x27;s own machine.
+  - Checked by reviewing every outbound connection the system makes; only data-source requests are present.
+
+## Assumptions
+- History starts 2005-01-03, giving three years of warm-up before 2008.
+- Delisting returns not reported by the source default to −30% (performance-related) and 0% (mergers and acquisitions), configurable and flagged.
+- Cross-check tolerances: 1 basis point on adjusted daily returns, 0.5% on unadjusted closes.
+- Trailing estimation window of 252 trading days, 504 as a sensitivity.
+- Updates run on demand only.
+- The app is read-only over stored data, apart from starting and cancelling runs.
+- A 3-year held-out period is accepted although it gives little statistical power; &quot;no significant difference&quot; is the likely and acceptable verdict.
+- Weights are computed from data through the previous close and traded at the rebalance day&#x27;s close.
+
+## Open questions
+- Does the Sharadar subscription cover delisted members&#x27; final prices, delisting reasons and point-in-time S&amp;P 500 membership back to 2005? Answered by a probe during architecture.
+- Which free or cheap second source meets DATA-06? Answered by a probe during architecture.
+- Budget and time limit for rented GPU training in S4. The researcher answers before S4 is planned.
+
+## Changelog
+| Date | Change | Source | IDs |
+|---|---|---|---|
+| 2026-10-17 | Initial spec | brief.md | all |
+</pre><details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-8/quant-all-at-once/with_skill/project/docs/spec.md&quot;,
+  &quot;content&quot;: &quot;# Quant Research Platform — Spec\n\n**Status:** Draft · **Last updated:** 2026-10-17 · **Brief:** [brief.md](brief.md)\n\n## Summary\nA personal, local research platform for daily S&amp;P 500 equities, built in four stages: a trustworthy point-in-time dataset with a browser explorer; return-structure analysis and classical risk-based portfolios; candidate features tested against chance; and neural forecasts and trading agents that must beat the classical portfolios after costs on years that were never looked at. Why: see the [brief](brief.md).\n\n## Users\n| User | What they need to do |\n|---|---|\n| The researcher (sole user) | Build and update the dataset, check it, explore it in the browser, run each stage&#x27;s experiments, and read one scoreboard of honest out-of-sample results |\n\n## Scope\n**In scope:** Data download &amp; update, Validation &amp; cross-check, Point-in-time loader, Exploratory analysis, Explorer app, Live run progress, Backtest &amp; scoreboard, Held-out lock, Factor decomposition, Covariance estimation, Classical portfolios, Candidate features, Feature significance, Forecasting, Forecast-driven portfolios, Trading agents, Final verdict.\n\n**Out of scope:**\n- Real-money or live broker trading; only paper results from backtests.\n- Small and mid caps, non-US stocks, other asset classes, intraday data.\n- Short selling, leverage, or any position above 5% of the portfolio.\n- Return prediction before covariance estimation and classical portfolios are scored (S2 precedes S3 and S4).\n- Any use of the held-out years before a stage&#x27;s final verdict.\n- Hosting, logins, multiple users, remote access.\n- Editing or correcting data from the app.\n- Scheduled or automatic updates; updates run when the researcher starts them.\n\n## Features\n\n### Data download &amp; update (`INGST`)\n**Serves:** Goal 1\n**Behavior:** The researcher starts a full build or an incremental update. The system fetches every security that was an S&amp;P 500 member at any time since January 2005, delisted ones included, with prices, corporate actions and membership history, and stores it locally as one dated snapshot.\n\n**Requirements**\n- **INGST-01** A full build fetches the complete history for every security that was an index member at any time from 2005-01-03 to the latest trading day.\n  - Given an empty local store, when a full build completes, then every security on the point-in-time membership list since 2005-01-03 has price history for each day it was a member.\n  - Given a security delisted in 2009, when the full build completes, then its history up to its last trading day is present.\n- **INGST-02** An incremental update fetches only trading days after the latest stored day.\n  - Given a store complete to day D, when an incremental update runs on day D+3, then only days D+1 to D+3 are fetched and earlier stored values are unchanged unless the source revised them.\n- **INGST-03** Revisions the source makes to already-stored history are detected and recorded.\n  - Given the source changes a stored close, when an update runs, then the change is applied and recorded with old value, new value and the update date.\n- **INGST-04** Every build or update produces a numbered snapshot that later steps can name.\n  - Given two updates on different days, when a backtest names snapshot 1, then it sees exactly the data of snapshot 1.\n- **INGST-05** An interrupted run can be resumed without refetching completed securities.\n  - Given a full build stopped at security 300 of 1,000, when it is resumed, then securities 1-299 are not fetched again and the result equals an uninterrupted build.\n- **INGST-06** Raw fetched data is kept unchanged alongside the cleaned data.\n  - Given a cleaned value, when the researcher asks for its origin, then the raw value it came from is shown.\n\n**Edge cases &amp; errors**\n- Source unreachable or rate-limited → the run retries with back-off, then stops with a clear error naming what was not fetched; the previous snapshot stays usable.\n- Credentials missing or rejected → the run stops before fetching anything, with a message saying which credential failed.\n- A ticker symbol reused by a different company → the two histories are kept separate under different permanent identifiers.\n\n### Validation &amp; cross-check (`VALID`)\n**Serves:** Goal 1\n**Behavior:** After each build or update the system checks the data for internal consistency and compares it against a second, independent source, then writes a validation report. A snapshot is usable for research only once its report has no unexplained failures.\n\n**Requirements**\n- **VALID-01** Each snapshot is checked for internal consistency: no duplicate (security, day) rows, no non-positive prices, high ≥ open, close ≥ low, and no price on a non-trading day.\n  - Given a snapshot with a duplicated row, when validation runs, then the report lists it as a failure with the security and date.\n- **VALID-02** Each snapshot is checked for coverage: on every trading day, the number of members with a price equals the number of members on the membership list.\n  - Given a day where a member has no price, when validation runs, then the report lists the security and day as a coverage gap.\n- **VALID-03** Daily returns beyond ±40% are flagged for review against corporate actions.\n  - Given a −50% return on a split ex-date with no recorded split, when validation runs, then it is flagged as a likely missing corporate action.\n- **VALID-04** Adjusted daily returns are compared with the second source on every overlapping (security, day); they must agree within 1 basis point.\n  - Given an overlapping day where the two sources differ by 3 basis points, when cross-check runs, then the pair is listed as a mismatch with both values.\n- **VALID-05** Unadjusted closes are compared with the second source; they must agree within 0.5%.\n  - Given a close differing by 1%, when cross-check runs, then it is listed as a mismatch.\n- **VALID-06** Every failure and mismatch carries a status: unexplained, explained (with a written reason), or corrected.\n  - Given a snapshot with one unexplained mismatch, when a research run asks to use it, then the run is refused and names the open item.\n- **VALID-07** The report states the overlap coverage with the second source as a share of member-days.\n  - Given a cross-check, when the report is written, then it shows the share of member-days compared, per year.\n\n**Edge cases &amp; errors**\n- Second source has no data for a security (e.g. long delisted) → listed as \&quot;not cross-checkable\&quot;, not as a failure.\n- The two sources disagree on a corporate action date → listed as a mismatch on the action, not on every affected day.\n\n### Point-in-time loader (`LOAD`)\n**Serves:** Goal 1, Goal 3\n**Behavior:** Every later stage gets its data through one loader. Given a snapshot, a date range and an as-of rule, it returns prices, total returns and the index universe exactly as they were known on each day.\n\n**Requirements**\n- **LOAD-01** The universe on day t is the list of index members on day t, including securities later removed or delisted.\n  - Given a security removed from the index in 2012, when the universe for 2010-06-01 is requested, then it is included; for 2013-06-01 it is not.\n- **LOAD-02** Daily total returns include dividends on their ex-dates and are unaffected by splits.\n  - Given a 2-for-1 split on day t, when returns are loaded, then the return on day t reflects only the real price change.\n  - Given a cash dividend ex-dated day t, when returns are loaded, then the return on day t includes it.\n- **LOAD-03** Returns for past days do not change when a later corporate action is recorded.\n  - Given returns loaded from snapshot 1, when snapshot 2 adds a split dated after snapshot 1&#x27;s last day, then returns for days in snapshot 1 are identical.\n- **LOAD-04** A delisted security&#x27;s final return is included: the reported delisting return, or, if none is reported, an assumed return (default −30% for performance-related delistings, 0% for mergers and acquisitions), flagged as assumed.\n  - Given a delisting for bankruptcy with no reported delisting return, when returns are loaded, then the last return is −30% and flagged.\n  - Given the researcher sets the performance default to −50%, when returns are loaded, then that value is used.\n- **LOAD-05** A request for any day inside the locked held-out period is refused unless the stage holds an unlock (see `HOLD`).\n  - Given the lock is active, when a load reaches into the held-out period, then it fails with an error naming the lock.\n- **LOAD-06** Each loaded panel records which snapshot and settings produced it.\n  - Given a loaded panel, when its origin is inspected, then snapshot number, date range and delisting defaults are shown.\n\n**Edge cases &amp; errors**\n- A member with missing prices on some days → returns for those days are missing, never filled with zero; later steps decide how to treat them.\n- A ticker change mid-membership → one continuous history under the permanent identifier.\n\n### Exploratory analysis (`EDA`)\n**Serves:** Goal 1\n**Behavior:** A repeatable analysis of each validated snapshot, run with the `data-analysis` skill, characterising the dataset before any modelling.\n\n**Requirements**\n- **EDA-01** The `data-analysis` skill is run on the snapshot&#x27;s daily returns and reports, per year: member count, missing share, return distribution and tail statistics, and largest absolute returns.\n  - Given a validated snapshot, when the analysis runs, then a report with those statistics for every year from 2005 is produced.\n- **EDA-02** The report shows how average pairwise correlation and the largest eigenvalue&#x27;s share of variance move over time on trailing 252-day windows.\n  - Given the 2008-09 crisis, when the report is read, then both series are shown through it.\n- **EDA-03** The report shows universe turnover: additions, removals and delistings per year.\n  - Given the snapshot, when the report is read, then those counts are shown for each year.\n\n### Explorer app (`APP`)\n**Serves:** Goal 5\n**Behavior:** A browser app running on the researcher&#x27;s own machine to explore the stored data and results. It reads only; it never changes data.\n\n**Requirements**\n- **APP-01** The researcher can search any security, current or delisted, and see its price and total-return history with corporate actions and membership periods marked.\n  - Given a delisted security, when it is searched, then its chart appears with the delisting date marked.\n- **APP-02** The researcher can pick any date and see that day&#x27;s universe with each member&#x27;s return.\n  - Given 2008-09-15, when chosen, then the members on that day and their returns are listed.\n- **APP-03** The researcher can browse the latest validation report and filter its items by status.\n  - Given a report with unexplained items, when filtered to \&quot;unexplained\&quot;, then only those are shown.\n- **APP-04** The researcher can view the exploratory analysis charts for any snapshot.\n  - Given snapshot 2, when chosen, then its EDA charts are shown.\n- **APP-05** The researcher can view the scoreboard and compare any two entries side by side.\n  - Given two scoreboard entries, when compared, then their metrics and cumulative after-cost returns are shown together on the same period.\n- **APP-06** Every message between the app and the backend matches one shared, versioned contract; a message that does not is rejected and shown as an error.\n  - Given the backend sends a field the contract does not define, when the app receives it, then the app shows a contract error and does not render the bad data.\n\n**Edge cases &amp; errors**\n- Backend not running → the app says so and offers a retry, instead of an empty screen.\n- A view reaches into the held-out period while it is locked → those days are hidden and labelled \&quot;held out\&quot;.\n\n### Live run progress (`RUNS`)\n**Serves:** Goal 5\n**Behavior:** While a download or validation run is working, the app shows its progress as it happens, without refreshing.\n\n**Requirements**\n- **RUNS-01** The researcher can start a full build, incremental update or validation from the app.\n  - Given no run in progress, when \&quot;incremental update\&quot; is started, then a run begins and appears in the app.\n- **RUNS-02** A running job shows securities done out of total, current step, elapsed time, estimated time left and error count, updated at least every 2 seconds.\n  - Given a running full build, when the app is open, then the counts change at least every 2 seconds.\n- **RUNS-03** Errors and warnings appear in a live log as they occur.\n  - Given a security fails to fetch, when it fails, then a log line naming it appears within 2 seconds.\n- **RUNS-04** Closing the app does not stop a run, and reopening it shows the run&#x27;s current state.\n  - Given a run at 40%, when the app is closed and reopened, then it shows the run at its current progress with the full log so far.\n- **RUNS-05** Only one data-changing run can be active at a time.\n  - Given a full build running, when an update is started, then it is refused with a message naming the running job.\n- **RUNS-06** A run can be cancelled from the app, leaving the previous snapshot intact.\n  - Given a running update, when cancelled, then it stops within 10 seconds and the previous snapshot is still the current one.\n\n### Backtest &amp; scoreboard (`SCORE`)\n**Serves:** Goal 3, Goal 4\n**Behavior:** Every strategy, from the equal-weight baseline to the trading agents, is run through the same backtest with the same rules and costs, and its results land as one entry on one scoreboard.\n\n**Requirements**\n- **SCORE-01** All strategies obey the same portfolio rules: long only, fully invested, no leverage, no position above 5%, holdings only from the point-in-time universe at each rebalance.\n  - Given a strategy proposing a 7% weight, when the backtest applies it, then the run fails with a rule violation; it is never silently clipped.\n- **SCORE-02** The headline rebalance is weekly, at the last trading day&#x27;s close of each week; a monthly rebalance is reported as a sensitivity.\n  - Given any strategy entry, when it is read, then weekly (headline) and monthly results are both shown.\n- **SCORE-03** Weights for a rebalance use only data through the close of the day before the trade; trades execute at the rebalance day&#x27;s close.\n  - Given a strategy whose weights depend on the rebalance day&#x27;s own return, when the backtest is checked by the look-ahead test (a strategy given tomorrow&#x27;s return must not gain), then it is detected and fails.\n- **SCORE-04** Trading costs are 5 basis points one way per unit of turnover; a 15-basis-point stress case is also reported.\n  - Given a rebalance with 40% turnover, when costs are charged, then 0.4 × 5 bp = 2 bp is deducted at headline and 6 bp in the stress case.\n- **SCORE-05** Between rebalances holdings drift with returns; a holding that leaves the index is kept until the next rebalance; a holding that delists takes its delisting return and its proceeds are held as cash at zero return until the next rebalance.\n  - Given a holding delisted mid-week, when the week ends, then its delisting return is applied and the proceeds sit in cash.\n- **SCORE-06** Each entry reports annualised Sharpe ratio after costs (headline), annualised realised volatility, average weekly turnover, maximum drawdown and the period covered.\n  - Given a finished backtest, when its entry is read, then all five are shown for weekly/monthly × 5 bp/15 bp.\n- **SCORE-07** The equal-weight portfolio over the point-in-time universe is always on the scoreboard as the baseline.\n  - Given any comparison, when the scoreboard is shown, then the equal-weight entry for the same period is present.\n- **SCORE-08** Each entry records the snapshot, strategy settings, random seed and code version that produced it, and rerunning with those gives identical numbers.\n  - Given an entry, when rerun from its record, then all metrics match to the last reported digit.\n- **SCORE-09** Development results use walk-forward evaluation on 2008-01-01 up to the held-out start: every estimate used at a date is fitted only on data before it.\n  - Given a development backtest, when any fitted object used on date t is inspected, then its fitting window ends before t.\n- **SCORE-10** Claims that one strategy beats another are tested with the `null-hypothesis-testing` skill on the after-cost return series; a claim passes only if significant at 5% after correction for the number of comparisons made.\n  - Given two strategies whose Sharpe ratios differ by 0.1, when the test does not reject at 5% corrected, then the scoreboard marks the difference \&quot;not significant\&quot;.\n\n### Held-out lock (`HOLD`)\n**Serves:** Goal 3, Goal 4\n**Behavior:** The final 3 years of data are locked away at the start of the project. A stage can unlock them once, for its final verdict, after declaring what it will evaluate. Every unlock is logged.\n\n**Requirements**\n- **HOLD-01** The held-out period starts at a fixed date, three years before the last trading day of the first validated snapshot, and runs to the latest data; the start date never moves.\n  - Given the first validated snapshot ends 2026-10-16, when the lock is set, then held-out starts 2023-10-17 and all later data, including future updates, is held out.\n- **HOLD-02** A stage unlocks only after recording its pre-registration: the strategies or models to evaluate, the comparisons, metrics and significance bar.\n  - Given no pre-registration for S2, when S2 requests unlock, then it is refused.\n- **HOLD-03** Each stage can unlock once; a second unlock for the same stage needs a written reason and marks every result produced after it \&quot;re-opened\&quot;.\n  - Given S2 has unlocked once, when it requests again with a reason, then the unlock proceeds and later S2 held-out results carry the \&quot;re-opened\&quot; mark.\n- **HOLD-04** Every unlock is logged with the date, stage, pre-registration and reason.\n  - Given two unlocks, when the log is read, then both appear with their details.\n- **HOLD-05** Held-out results report only the pre-registered comparisons; anything else run during an unlock is marked \&quot;exploratory\&quot;.\n  - Given an unregistered strategy run during an unlock, when it reaches the scoreboard, then it is marked exploratory.\n\n### Factor decomposition (`FACT`)\n**Serves:** Goal 4\n**Behavior:** Returns are decomposed into their principal components on trailing windows; the market and other dominant components are removed, leaving residual returns used by later stages.\n\n**Requirements**\n- **FACT-01** On each date the principal components of the standardised returns are fitted on the trailing 252 trading days only (504 as a sensitivity).\n  - Given residuals for day t, when the fit behind them is inspected, then it uses days t−252 to t−1 only.\n- **FACT-02** The number of components removed is either fixed by the researcher or set to the count of eigenvalues above the noise edge predicted for pure-noise data of the same shape.\n  - Given the automatic setting, when a window is fitted, then the chosen count and the noise edge are recorded for that date.\n- **FACT-03** Residual returns for day t are the day-t returns minus their projection on the components fitted before day t.\n  - Given a synthetic panel with one planted market factor and independent noise, when one component is removed, then the residuals&#x27; mean absolute pairwise correlation is within 0.02 of the noise-only value.\n- **FACT-04** A report, run with the `data-analysis` skill, shows over time the variance share of each removed component and the mean absolute pairwise correlation before and after removal.\n  - Given a development run, when the report is read, then both series are shown from 2008 to the held-out start.\n\n**Edge cases &amp; errors**\n- A member with fewer than 200 of the trailing 252 days → excluded from that window&#x27;s fit and residuals, and the exclusion counted.\n\n### Covariance estimation (`COV`)\n**Serves:** Goal 4\n**Behavior:** Three covariance estimates are built on the same trailing windows — sample, shrinkage toward a structured target, and denoised (eigenvalues inside the pure-noise band replaced by their average, the rest kept) — and compared on how well they control variance out of sample.\n\n**Requirements**\n- **COV-01** Each estimator is fitted at each rebalance on the trailing 252 trading days only (504 as a sensitivity).\n  - Given an estimate used on rebalance date t, when its window is inspected, then it ends at t−1.\n- **COV-02** The denoised estimate keeps eigenvalues above the pure-noise edge and replaces those below it with their mean, preserving the trace.\n  - Given a synthetic matrix with 3 planted factors plus noise, when denoised, then exactly 3 eigenvalues exceed the edge and the trace equals the sample trace.\n- **COV-03** Every estimate is symmetric and positive definite.\n  - Given any rebalance date, when an estimate is checked, then its smallest eigenvalue is above zero.\n- **COV-04** Estimators are compared by the realised out-of-sample variance of the minimum-variance portfolio built from each, using the `data-analysis` skill for the comparison report and the `null-hypothesis-testing` skill for whether differences are significant at 5% corrected.\n  - Given a development run, when the comparison finishes, then each estimator&#x27;s realised variance, its ranking and the significance of each pairwise difference are reported.\n- **COV-05** The comparison is also reported per sub-period (2008-09, 2010-19, 2020-held-out start).\n  - Given the report, when read, then the ranking for each sub-period is shown.\n\n### Classical portfolios (`PORT`)\n**Serves:** Goal 3, Goal 4\n**Behavior:** Minimum-variance, risk parity and hierarchical risk parity portfolios are built from each covariance estimate and scored on the scoreboard against the equal-weight baseline.\n\n**Requirements**\n- **PORT-01** Minimum-variance weights minimise predicted variance under the shared portfolio rules.\n  - Given a known 3-asset covariance with a closed-form solution inside the constraints, when weights are computed, then they match it within 1e-6.\n- **PORT-02** Risk-parity weights give each holding an equal contribution to predicted risk, within the 5% cap.\n  - Given a diagonal covariance, when weights are computed, then each is proportional to inverse volatility.\n- **PORT-03** Hierarchical risk-parity weights come from clustering assets by correlation and splitting risk down the cluster tree.\n  - Given two uncorrelated blocks of identical assets, when weights are computed, then each block receives half the weight.\n- **PORT-04** Every portfolio × estimator combination is a scoreboard entry on development data.\n  - Given 3 portfolio methods and 3 estimators, when S2&#x27;s development run completes, then 9 entries plus equal-weight are on the scoreboard.\n- **PORT-05** S2&#x27;s held-out verdict compares the pre-registered portfolios with equal weight on the held-out years under `HOLD`.\n  - Given S2&#x27;s pre-registration, when the unlock runs, then only those comparisons are reported as S2&#x27;s verdict.\n\n### Candidate features (`FEAT`)\n**Serves:** Goal 2, Goal 4\n**Behavior:** The researcher defines candidate features in a catalogue; each is computed per security and day from data known at that day&#x27;s close.\n\n**Requirements**\n- **FEAT-01** Every feature tried is registered in the catalogue with its definition, lookback and the date it was added, before it is tested.\n  - Given a feature tested without a catalogue entry, when the test starts, then it is refused.\n- **FEAT-02** A feature value for day t uses only data through day t&#x27;s close.\n  - Given the look-ahead test (shifting all inputs after t changes nothing at t), when run on each feature, then every feature passes.\n- **FEAT-03** Features are computed only for securities in the point-in-time universe on that day.\n  - Given a security not yet a member on day t, when features are computed, then it has no value on day t.\n- **FEAT-04** Feature scaling or encoding is fitted on training data only; categories unseen in training map to an \&quot;unknown\&quot; value.\n  - Given a sector that first appears after the training window, when encoded, then it is \&quot;unknown\&quot; and no error occurs.\n\n### Feature significance (`SIG`)\n**Serves:** Goal 2\n**Behavior:** Each candidate is tested for information gain over the market-removed residual return: does a learned model predict next-period residual returns better with the feature than without it, out of sample, beyond chance?\n\n**Requirements**\n- **SIG-01** The target is the residual return (from `FACT`) over the next 1, 5 and 21 trading days, including delisting returns.\n  - Given a security that delists 3 days after t, when its 5-day target is built, then it includes the delisting return rather than being dropped.\n- **SIG-02** Information gain is measured out of sample on walk-forward folds within the development period, with a gap between training and test at least as long as the target horizon.\n  - Given a 21-day target, when folds are built, then no training label&#x27;s window overlaps any test day.\n- **SIG-03** Each feature&#x27;s information gain is tested with the `null-hypothesis-testing` skill; it passes only if the false discovery rate across every feature in the catalogue is held at 10%.\n  - Given 40 catalogued features, when tests finish, then the correction counts all 40, including ones abandoned early.\n- **SIG-04** Every result, pass or fail, is recorded with its effect size, raw and corrected p-value, horizon and fold scheme.\n  - Given a failed feature, when results are read, then it appears with its numbers.\n- **SIG-05** A planted-signal check shows the procedure can find a real effect and rejects noise: a synthetic feature built from the future target passes, and pure-noise features pass no more often than the 10% rate allows.\n  - Given 100 noise features and 1 planted one, when tested, then the planted one passes and the false-discovery share among passes is at most 10% on average across repeats.\n\n### Forecasting (`FCST`)\n**Serves:** Goal 4\n**Behavior:** Neural-network forecasters predict residual returns and volatility at 1, 5 and 21 days from price history and the features that passed `SIG`, and are compared against simple baselines.\n\n**Requirements**\n- **FCST-01** Inputs are limited to price-derived history, calendar information known in advance, and features that passed `SIG`.\n  - Given a feature that failed `SIG`, when a forecaster is configured with it, then configuration is refused.\n- **FCST-02** Volatility forecasts are compared against trailing realised volatility and an exponentially weighted trailing volatility.\n  - Given a development run, when results are reported, then each forecaster&#x27;s volatility loss is shown next to both baselines.\n- **FCST-03** Return forecasts are compared against a zero forecast and a trailing-mean forecast, by the rank correlation between forecast and realised residual return.\n  - Given a development run, when results are reported, then each forecaster&#x27;s rank correlation is shown next to both baselines.\n- **FCST-04** Training, validation and test periods are split by forecast date with a gap at least as long as the horizon.\n  - Given a 5-day horizon, when the split is checked, then no training target window reaches into validation.\n- **FCST-05** A forecaster beats a baseline only if the `null-hypothesis-testing` skill finds the loss difference significant at 5%, corrected for the number of forecaster × baseline × horizon comparisons.\n  - Given 2 forecasters, 4 baselines and 3 horizons, when tested, then the correction counts all those comparisons.\n- **FCST-06** Results are reported as the median across at least 5 training seeds, with the spread.\n  - Given a forecaster, when its result is reported, then the median and range over ≥ 5 seeds are shown.\n\n### Forecast-driven portfolios (`FPORT`)\n**Serves:** Goal 3, Goal 4\n**Behavior:** Portfolios that use the return and volatility forecasts, combined with the best covariance estimate from S2, under the shared portfolio rules.\n\n**Requirements**\n- **FPORT-01** Each forecast-driven portfolio uses forecasts from forecasters that beat their baselines in `FCST`, plus a covariance estimate from `COV`.\n  - Given a forecaster that did not beat its baselines, when a portfolio is configured with it, then configuration is refused.\n- **FPORT-02** Each forecast-driven portfolio is a scoreboard entry under the shared rules and costs.\n  - Given a finished development run, when the scoreboard is read, then the entry shows the same metrics as every other entry.\n\n### Trading agents (`AGENT`)\n**Serves:** Goal 3, Goal 4\n**Behavior:** Reinforcement-learning agents learn to set portfolio weights in a backtest environment that applies the shared rules and costs, trained only on development data.\n\n**Requirements**\n- **AGENT-01** The training environment applies exactly the backtest&#x27;s rules, costs and rebalance schedule.\n  - Given the same weights, when applied in the environment and in the backtest, then after-cost returns match to 1e-10.\n- **AGENT-02** The agent&#x27;s observation at a rebalance contains only data through the previous close.\n  - Given the look-ahead test, when run on the environment, then it passes.\n- **AGENT-03** Agents are trained only on development data; held-out data is reachable only through `HOLD`.\n  - Given the lock is active, when training reaches the held-out start, then the episode ends.\n- **AGENT-04** Agent results are reported as the median across at least 5 training seeds, with the spread.\n  - Given an agent, when scored, then median and range over ≥ 5 seeds are on its scoreboard entry.\n- **AGENT-05** Each agent is a scoreboard entry under the shared rules and costs.\n  - Given a trained agent, when evaluated, then its entry has all `SCORE-06` metrics.\n\n### Final verdict (`VERD`)\n**Serves:** Goal 3, Goal 4\n**Behavior:** The project&#x27;s closing comparison: pre-registered forecast-driven portfolios and agents against pre-registered classical portfolios, on the held-out years, after costs.\n\n**Requirements**\n- **VERD-01** Candidates on both sides are chosen on development data and pre-registered before the S4 unlock.\n  - Given a strategy not in S4&#x27;s pre-registration, when the verdict is produced, then it is not part of the verdict.\n- **VERD-02** \&quot;S4 beats S2\&quot; holds only if the after-cost Sharpe difference on the held-out years is significant at 5%, corrected for the number of pre-registered comparisons, tested with the `null-hypothesis-testing` skill.\n  - Given a held-out Sharpe difference of 0.2 that is not significant, when the verdict is written, then it reads \&quot;no significant difference\&quot;.\n- **VERD-03** The verdict reports realised volatility, turnover and drawdown alongside Sharpe, at both cost levels.\n  - Given the verdict, when read, then all metrics at 5 bp and 15 bp are shown for every compared strategy.\n\n## Data requirements\n- **DATA-01** Daily unadjusted open, high, low, close and volume for every security that was an S&amp;P 500 member at any time from 2005-01-03 to the latest trading day, including delisted securities, from the existing Sharadar subscription.\n  - Given a security that was a member only in 2006-2008 and then went bankrupt, when the data is fetched, then its daily prices for that period are present.\n- **DATA-02** Point-in-time index membership: for every day since 2005-01-03, the list of members, with addition and removal dates.\n  - Given any trading day, when membership is asked for, then a list of about 500 members is returned.\n- **DATA-03** Corporate actions with ex-dates: splits with ratios, cash dividends with amounts, and delistings with date and reason category (performance, merger or acquisition, other).\n  - Given a known 2-for-1 split, when actions are loaded, then it appears with its ex-date and ratio.\n- **DATA-04** A permanent identifier per security that survives ticker changes and is never reused.\n  - Given a company that changed ticker, when its history is loaded, then it is one continuous series.\n- **DATA-05** The exchange trading calendar from 2005, including holidays and early closes.\n  - Given 2012-10-29 (market closed for a hurricane), when the calendar is checked, then it is not a trading day.\n- **DATA-06** A second, independent source of daily prices for cross-checking, overlapping at least 50% of member-days since 2010.\n  - Given the cross-check report, when overlap is read, then it is at least 50% per year since 2010.\n\n## Quality requirements\n- **QR-01** Data costs beyond the existing Sharadar subscription are at most $50 a month.\n  - Checked by listing every paid source and its monthly price in the architecture.\n- **QR-02** A full build from 2005 completes within 2 hours on the researcher&#x27;s laptop.\n  - Timed on the laptop with a full build.\n- **QR-03** A one-day incremental update completes within 5 minutes.\n  - Timed on the laptop with a one-day update.\n- **QR-04** Any app chart or table loads within 2 seconds of being requested.\n  - Timed in the browser on the laptop for the largest security history and a full-universe day.\n- **QR-05** Same snapshot, settings and seed give identical results.\n  - Checked by rerunning a scoreboard entry and comparing every metric.\n- **QR-06** The app and backend accept connections only from the researcher&#x27;s own machine.\n  - Checked by attempting a connection from another machine on the network; it is refused.\n- **QR-07** Data-source credentials never appear in logs, reports, the app or version control.\n  - Checked by searching all logs, reports and the repository history for the credential values.\n- **QR-08** Licensed data is never sent anywhere except the researcher&#x27;s own machine.\n  - Checked by reviewing every outbound connection the system makes; only data-source requests are present.\n\n## Assumptions\n- History starts 2005-01-03, giving three years of warm-up before 2008.\n- Delisting returns not reported by the source default to −30% (performance-related) and 0% (mergers and acquisitions), configurable and flagged.\n- Cross-check tolerances: 1 basis point on adjusted daily returns, 0.5% on unadjusted closes.\n- Trailing estimation window of 252 trading days, 504 as a sensitivity.\n- Updates run on demand only.\n- The app is read-only over stored data, apart from starting and cancelling runs.\n- A 3-year held-out period is accepted although it gives little statistical power; \&quot;no significant difference\&quot; is the likely and acceptable verdict.\n- Weights are computed from data through the previous close and traded at the rebalance day&#x27;s close.\n\n## Open questions\n- Does the Sharadar subscription cover delisted members&#x27; final prices, delisting reasons and point-in-time S&amp;P 500 membership back to 2005? Answered by a probe during architecture.\n- Which free or cheap second source meets DATA-06? Answered by a probe during architecture.\n- Budget and time limit for rented GPU training in S4. The researcher answers before S4 is planned.\n\n## Changelog\n| Date | Change | Source | IDs |\n|---|---|---|---|\n| 2026-10-17 | Initial spec | brief.md | all |\n&quot;
+}</pre><div class="lbl">output</div><pre>File created successfully at: /Users/connorott/plugins/dev-team-workspace/iteration-8/quant-all-at-once/with_skill/project/docs/spec.md (file state is current in your context — no need to Read it back)</pre></details></div><div class="step" id="SD36"><span class="sid">D36</span><span class="kind">Bash</span>python3 ../plugin/dev-team/scripts/dt.py lint docs/spec.md; grep -niE &quot;python|typescript|react|websocket|pandas|numpy|torch|ppo|lstm|transformer|tft|sql|parquet|json|ledoit|marchenko|yfinance|tiingo|csv&quot; docs/spec.md; grep -cE &quot;^- \*\*[A-Z]+-[0-9]+\*\*&quot; docs/spec.md<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;python3 ../plugin/dev-team/scripts/dt.py lint docs/spec.md; grep -niE \&quot;python|typescript|react|websocket|pandas|numpy|torch|ppo|lstm|transformer|tft|sql|parquet|json|ledoit|marchenko|yfinance|tiingo|csv\&quot; docs/spec.md; grep -cE \&quot;^- \\*\\*[A-Z]+-[0-9]+\\*\\*\&quot; docs/spec.md&quot;
+}</pre><div class="lbl">output</div><pre>0 errors, 0 warnings
+102</pre></details></div><div class="step" id="SD37"><span class="sid">D37</span><span class="kind">say</span>The spec is written in `docs/spec.md` as a Draft. Lint passes, and a search found no tools, libraries or vendors named in it. The one exception is Sharadar, which the brief makes a fixed constraint. ⏎ Size: 17 features with 88 feature requirements, plus 6 data requirements and 8 quality requirements (102 total). Every requirement has at least one acceptance test. ⏎ | Goal | Features | ⏎ |---|---| ⏎ | 1. Trust the data | Download &amp; update, Validation &amp; cross-check, Point-in-time loader, Exploratory analysis | ⏎ | 2. Survive chance | Candidate features, Feature significance; every &quot;beats&quot; cl …[+3019 chars]<details><summary>full text</summary><pre>The spec is written in `docs/spec.md` as a Draft. Lint passes, and a search found no tools, libraries or vendors named in it. The one exception is Sharadar, which the brief makes a fixed constraint.
+
+**Size:** 17 features with 88 feature requirements, plus 6 data requirements and 8 quality requirements (102 total). Every requirement has at least one acceptance test.
+
+| Goal | Features |
+|---|---|
+| 1. Trust the data | Download &amp; update, Validation &amp; cross-check, Point-in-time loader, Exploratory analysis |
+| 2. Survive chance | Candidate features, Feature significance; every &quot;beats&quot; claim elsewhere |
+| 3. One scoreboard | Backtest &amp; scoreboard, Held-out lock, Classical portfolios, Forecast-driven portfolios, Trading agents, Final verdict |
+| 4. Earn complexity | Factor decomposition, Covariance estimation, Classical portfolios, Candidate features, Forecasting, Forecast-driven portfolios, Trading agents, Final verdict |
+| 5. See data and runs | Explorer app, Live run progress |
+
+**Requirements that guard against fooling yourself:**
+- **Unadjusted returns:** past returns never change when a later corporate action arrives (LOAD-03). Delisting returns are kept, and filled with an assumed value and a flag when the source has none (LOAD-04, SIG-01).
+- **Training/test gap:** walk-forward folds leave a gap between training and test at least as long as the forecast horizon, so labels can&#x27;t leak (SIG-02, FCST-04).
+- **Every feature counts:** a feature must be in the catalogue before it is tested, and the multiple-testing correction counts every feature tried, abandoned ones included (FEAT-01, SIG-03).
+- **Planted-signal check:** the feature test must find a planted signal and pass pure noise no more often than chance allows (SIG-05).
+- **Held-out lock:** a stage must pre-register what it will compare before unlocking the held-out years (HOLD-02, VERD-01).
+
+**Calls I made that you haven&#x27;t confirmed yet** (please check these):
+1. **Trade timing:** weights use data through the previous close, and trades execute at the rebalance day&#x27;s close (SCORE-03).
+2. **Rule breaks fail:** a weight above 5% fails the run instead of being quietly clipped (SCORE-01).
+3. **Delisted holdings** sit in cash until the next rebalance. Holdings that leave the index are kept until the next rebalance (SCORE-05).
+4. **Second unlock:** allowed with a written reason, and every result produced after it is marked &quot;re-opened&quot; (HOLD-03).
+5. **Thresholds:**
+   - The second source must overlap at least 50% of member-days since 2010 (DATA-06).
+   - Returns beyond ±40% are flagged for a missing corporate action (VALID-03).
+   - A stock with fewer than 200 of the trailing 252 days is left out of that window&#x27;s fit (FACT).
+6. **Seeds:** neural nets and agents are reported as the median over at least 5 training seeds (FCST-06, AGENT-04).
+7. **Method names:** the spec describes PPO, Marchenko–Pastur and sequence models generically (&quot;reinforcement-learning agents&quot;, &quot;pure-noise edge&quot;, &quot;neural-network forecasters&quot;). The specific choices are made in the architecture.
+
+**Open questions:**
+- Does Sharadar cover delisted names, delisting reasons and point-in-time S&amp;P 500 membership back to 2005? A probe answers this during the architecture.
+- Which second source meets DATA-06? Also answered by a probe.
+- What are the budget and time limit for rented GPU training? Needed from you before S4 is planned.
+
+Approve the spec, or tell me what to change. I can also commit the docs so far (brief, roadmap, references, spec) if you want; I won&#x27;t commit unless you say yes.</pre></details></div><div class="step" id="SD38"><span class="sid">D38</span><span class="kind">hook</span><span class="hook">SessionStart:resume said: milestone: none (no tasks/plan.md)
+draft (waiting for approval): docs/spec.md
+dt: python3 /Users/connorott/plugins/dev-team-workspace/iteration-8/quant-all-at-once/with_skill/plugin/dev-team/scripts/dt.py
+</span></div>
+<h2>Commits</h2>
+<p>None.</p>
+<h2>Returned</h2>
+<pre>The spec is written in `docs/spec.md` as a Draft. Lint passes, and a search found no tools, libraries or vendors named in it. The one exception is Sharadar, which the brief makes a fixed constraint.
+
+**Size:** 17 features with 88 feature requirements, plus 6 data requirements and 8 quality requirements (102 total). Every requirement has at least one acceptance test.
+
+| Goal | Features |
+|---|---|
+| 1. Trust the data | Download &amp; update, Validation &amp; cross-check, Point-in-time loader, Exploratory analysis |
+| 2. Survive chance | Candidate features, Feature significance; every &quot;beats&quot; claim elsewhere |
+| 3. One scoreboard | Backtest &amp; scoreboard, Held-out lock, Classical portfolios, Forecast-driven portfolios, Trading agents, Final verdict |
+| 4. Earn complexity | Factor decomposition, Covariance estimation, Classical portfolios, Candidate features, Forecasting, Forecast-driven portfolios, Trading agents, Final verdict |
+| 5. See data and runs | Explorer app, Live run progress |
+
+**Requirements that guard against fooling yourself:**
+- **Unadjusted returns:** past returns never change when a later corporate action arrives (LOAD-03). Delisting returns are kept, and filled with an assumed value and a flag when the source has none (LOAD-04, SIG-01).
+- **Training/test gap:** walk-forward folds leave a gap between training and test at least as long as the forecast horizon, so labels can&#x27;t leak (SIG-02, FCST-04).
+- **Every feature counts:** a feature must be in the catalogue before it is tested, and the multiple-testing correction counts every feature tried, abandoned ones included (FEAT-01, SIG-03).
+- **Planted-signal check:** the feature test must find a planted signal and pass pure noise no more often than chance allows (SIG-05).
+- **Held-out lock:** a stage must pre-register what it will compare before unlocking the held-out years (HOLD-02, VERD-01).
+
+**Calls I made that you haven&#x27;t confirmed yet** (please check these):
+1. **Trade timing:** weights use data through the previous close, and trades execute at the rebalance day&#x27;s close (SCORE-03).
+2. **Rule breaks fail:** a weight above 5% fails the run instead of being quietly clipped (SCORE-01).
+3. **Delisted holdings** sit in cash until the next rebalance. Holdings that leave the index are kept until the next rebalance (SCORE-05).
+4. **Second unlock:** allowed with a written reason, and every result produced after it is marked &quot;re-opened&quot; (HOLD-03).
+5. **Thresholds:**
+   - The second source must overlap at least 50% of member-days since 2010 (DATA-06).
+   - Returns beyond ±40% are flagged for a missing corporate action (VALID-03).
+   - A stock with fewer than 200 of the trailing 252 days is left out of that window&#x27;s fit (FACT).
+6. **Seeds:** neural nets and agents are reported as the median over at least 5 training seeds (FCST-06, AGENT-04).
+7. **Method names:** the spec describes PPO, Marchenko–Pastur and sequence models generically (&quot;reinforcement-learning agents&quot;, &quot;pure-noise edge&quot;, &quot;neural-network forecasters&quot;). The specific choices are made in the architecture.
+
+**Open questions:**
+- Does Sharadar cover delisted names, delisting reasons and point-in-time S&amp;P 500 membership back to 2005? A probe answers this during the architecture.
+- Which second source meets DATA-06? Also answered by a probe.
+- What are the budget and time limit for rented GPU training? Needed from you before S4 is planned.
+
+Approve the spec, or tell me what to change. I can also commit the docs so far (brief, roadmap, references, spec) if you want; I won&#x27;t commit unless you say yes.</pre>
+</body></html>

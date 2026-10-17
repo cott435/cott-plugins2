@@ -1,0 +1,126 @@
+{
+ "winner": "B",
+ "reasoning": "Both sets cover all three stages with a shared core, beats-baseline verdicts built with the null-hypothesis-testing skill, replays and lab notes. Set B is the stronger plan for learning RL. Its ladders add one idea per rung: a lookup table on the compact view, then on a 6x6 raw grid, then a network; REINFORCE before PPO; P1 to P5 with an opponent pool and cross-play forgetting counts. It cuts milestones along real dependency lines (the tank depends on M1, not M2) and freezes every M1 boundary in a single interface task. Its golden cases are very precise and check out arithmetically. Set B pays for this in bulk: a 47KB spec, packets of about 50KB that carry the whole tests.md, replan history, and a few stale or inconsistent lines (out-of-scope still says 'only what Snake and the tank need', rebuild returns bool in the contract but Replay in the pipeline, AD-13 says both 6 and five pipelines). Set A is leaner and better packaged: four layered packages, small per-package pipelines and short packets. But its milestones are less clean. M2 bundles the DQN, the lab note and the library comparison, M3 carries the replay upgrades, and M3 depends on M2's comparison. Its M1 also has build-breaking gaps: RunWriter has no snapshot method although M1-T10 must save snapshots through it, M1-T17 needs the chain2 test world that only M1-T21 writes, and the packets leave out the Learner/Transition protocol and the full-view encoding. On balance B's content is stronger, and its structure is only slightly weaker.",
+ "rubric": {
+  "A": {
+   "content": {
+    "rl_soundness": 4,
+    "stage_completeness": 5,
+    "internal_consistency": 3,
+    "right_sizing": 4,
+    "milestone_quality": 3,
+    "pipeline_clarity": 4,
+    "interface_quality": 3,
+    "dependency_graph_soundness": 3,
+    "task_buildability": 3
+   },
+   "structure": {
+    "organization": 4,
+    "readability_for_solo_learner": 4,
+    "ease_of_finding_next_build_step": 4,
+    "layout_sensibility": 4
+   },
+   "content_score": 3.6,
+   "structure_score": 4.0,
+   "overall_score": 7.6
+  },
+  "B": {
+   "content": {
+    "rl_soundness": 5,
+    "stage_completeness": 5,
+    "internal_consistency": 3,
+    "right_sizing": 3,
+    "milestone_quality": 5,
+    "pipeline_clarity": 3,
+    "interface_quality": 4,
+    "dependency_graph_soundness": 4,
+    "task_buildability": 4
+   },
+   "structure": {
+    "organization": 4,
+    "readability_for_solo_learner": 4,
+    "ease_of_finding_next_build_step": 3,
+    "layout_sensibility": 4
+   },
+   "content_score": 4.0,
+   "structure_score": 3.8,
+   "overall_score": 7.8
+  }
+ },
+ "output_quality": {
+  "A": {
+   "score": 7,
+   "strengths": [
+    "Clean four-package layering (worlds <- learn <- lab <- compare), enforced with import-linter and matching the per-package planned layouts",
+    "Lean, readable spec with concrete Given/When/Then criteria; break-it ablations and a library-comparison sanity check that suit a learner",
+    "Per-package pipelines with entry sketches and real spine versions; context packets are short and focused",
+    "Seeds, determinism, truncation-vs-terminal handling and the evaluation-seed split are specified carefully",
+    "M1 is a true walking skeleton (train, eval, replay on a lookup-table Snake) with checkable Exit criteria"
+   ],
+   "weaknesses": [
+    "Later milestones are lopsided or mixed: M2 bundles value network, lab note and comparison; M3 carries four-panel and video replay upgrades; M3 depends on M2's comparison",
+    "Interface gaps: RunWriter has no way to write snapshots; RunSettings declares a non-default field after a default one; TournamentTable (an M6 type) is frozen in M1",
+    "Hidden dependency: M1-T17's smoke run and TC-25/26 need the chain2 world, which M1-T21 writes in parallel",
+    "Packets leave out the internal Learner/Transition protocol, the q-table defaults and the Snake full-view encoding that builders need",
+    "Small coverage and layout drift (REPLAY-02 claimed in M1-T12, beats placed in verdicts.py against the planned evaluate.py)"
+   ]
+  },
+  "B": {
+   "score": 8,
+   "strengths": [
+    "Strong learning ladders: table on compact vs raw grid, network on both, REINFORCE then PPO, then P1-P5 co-evolution with snapshot pool and cross-play forgetting",
+    "A non-inferiority 'matches scripted' bar and Holm correction, with golden cases whose arithmetic checks out (TC-10, TC-11, TC-41, TC-57, TC-66)",
+    "Milestones are vertical slices along real dependency lines; M1 drives all five commands on L1/L2 with a corridor env proving the shared core",
+    "One interface task freezes every M1 boundary as concrete code shapes with named cases and replay doubles",
+    "Packets carry the conventions and cases builders need, so most tasks are buildable from the packet alone"
+   ],
+   "weaknesses": [
+    "Bloat: 47KB spec, 41KB tests file pasted whole into many packets (about 50KB each, mostly tank and hunt cases), replan history kept in the plan",
+    "Stale or inconsistent text: out-of-scope still limits the shared pieces to Snake and the tank; WATCH behaviour speaks of 'three moves'; rebuild returns bool in the contract but Replay in PL-04; AD-13 says both 6 and five pipelines",
+    "PL-01's `build` step covers about 60 requirement IDs; envs and learners own no step, which hides much of the call path",
+    "Task-order confusion (M1-T27 sits before T22 in the plan but last in the todo) and several split-mode tasks with no intent-test file",
+    "NetSettings declares a non-default field after defaults; CONSTRAINTS.md is still Draft"
+   ]
+  }
+ },
+ "unbuildable_tasks": {
+  "A": [
+   "M1-T17: the smoke config and TC-25/TC-26/TC-29 run on the test-only chain2 world, but the packet has no chain2 definition and chain2 is written by M1-T21, which T17 doesn't depend on",
+   "M1-T10: acceptance requires saving s000-s100 'through the RunWriter double', but the frozen RunWriter has no snapshot method; the internal Learner/Transition protocol and lookup-table defaults (alpha, gamma, epsilon schedule) are missing from the packet",
+   "M1-T02: must write the internal Learner and Transition in protocols.py, but their definitions (learn architecture) aren't in the packet",
+   "M1-T04: the packet lacks the full-view cell codes (body 0.5, head 1, food -1, plus heading), the WorldSpec/StepResult/ActionSpace/Scene shapes the world must return, and how Snake registers with make_world/baseline"
+  ],
+  "B": [
+   "M1-T03: train builds Transitions from TimeSteps and logs Endings, but core.TimeStep, core.Ending and AD-09's generator splitting are not in the packet",
+   "M1-T01: must stub 'every M1 step and contract class' with its signature, but the packet lacks the signatures of TableAgent, CorridorEnv, RandomBot, ScriptedBot, train.train, replay.save/load/rebuild/view, plots.learning_curve and lab.build/LADDER"
+  ]
+ },
+ "defects": {
+  "A": [
+   "tasks__plan.md: M1-T12 'Covers: TRAIN-01, EVAL-04, REPLAY-02' \u2014 REPLAY-02 is deferred to M3 in the same plan's Scope",
+   "roadmap.md M3: 'the replay shows four snapshots side by side and exports video' \u2014 M1-T14 already 'writes an MP4 when `video` is set' and M1 Covers REPLAY-06, while lab pipelines list 'MP4 export' as a later upgrade of play",
+   "packages__learn__pipelines.md: 'evaluate.py   evaluate, final_scores, play_pairs, beats (...)' \u2014 plan M1-T22 writes 'packages/learn/src/rllab/learn/verdicts.py'",
+   "packages__learn__contract.md RunWriter: only episode/evaluation/scores/close methods \u2014 M1-T10 requires 'saves s000\u2013s100 through the RunWriter double'",
+   "packages__learn__contract.md RunSettings: 'copies: int = 8; eval_every: int' \u2014 non-default field after a default; not a valid dataclass",
+   "tasks__plan.md M1-T17: 'TC-25, TC-26 and TC-29 pass' on chain2 \u2014 chain2 is written by M1-T21 ('tests/intent/learn/worlds_chain2.py') with no dependency edge",
+   "roadmap.md: 'M2 | Snake value network, lab note, library comparison' \u2014 three capabilities in one milestone; M3 'Depends M2 (learn.RunWriter, PL-22 Snake comparison)' needlessly serializes the tank behind the comparison",
+   "tasks__plan.md M1-T22: 'Package: learn \u00b7 Step: PL-16.judge' \u2014 PL-16's judge step is owned by cli in lab",
+   "tasks__plan.md M1-T04: 'Size: XS' while covering 'SNAKE-01\u2013SNAKE-08, EVAL-02' (all rules, both views, scene and greedy baseline)",
+   "architecture.md AD-16: 'At build planning, the Grow trigger fired' \u2014 planning-process history kept in a design decision"
+  ],
+  "B": [
+   "spec.md Out of scope: 'The shared pieces are only what Snake and the tank need.' \u2014 stale; predator-prey was added and the brief was updated",
+   "spec.md Replay viewer Behavior: 'with the agent's value for each of the three moves shown at every step' \u2014 Snake-only wording for a shared feature",
+   "packages__rllab__pipelines.md PL-04: '`rebuild` | replay.record | Replay, Env \u2192 Replay' \u2014 the contract has 'def rebuild(replay: Replay, env: Env) -> bool'",
+   "architecture.md AD-13: '6 pipelines (more than 3)' and then 'All five pipelines are short command-line workflows'",
+   "spec.md PPO-02: 'a single step with reward 1 that ends in the fish being caught' \u2014 contradicts TANK-04 'the fish is removed and earns nothing for that step'",
+   "tasks__plan.md: M1-T27 sits between M1-T21 and M1-T22 and is listed last in todo, though T22 depends on it \u2014 build order reads confusingly against the IDs",
+   "tasks__plan.md: M1-T13, T14, T18, T21 and T27 are 'Mode: split' but their Writes contain no tests/intent file",
+   "packages__rllab__contract.md NetSettings: 'learn_every: int = 4; schedule: LinearSchedule' \u2014 non-default field after defaults",
+   "final__CONSTRAINTS.md: 'Status: Draft' while the plan is Approved and ready to build",
+   "context__M1-T12.md (and T11, T15, T17, T19, T20, T22, T25, T26): include the whole tests.md, with tank and predator-prey cases irrelevant to M1 \u2014 packet bloat",
+   "packages__rllab__pipelines.md PL-01: '`build` | lab.settings' covers 'GAME-01\u2013GAME-09, ... TANK-01\u2013TANK-10, ... HUNT-01\u2013HUNT-10' \u2014 environments and learners own no step, which hides the call path",
+   "tasks__plan.md Replan notes: '2026-10-17: the S2 design batched the shared protocols (AD-14)...' \u2014 superseded planning history kept in the plan"
+  ]
+ }
+}

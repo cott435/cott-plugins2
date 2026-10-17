@@ -5,15 +5,17 @@ description: Indexes the reference files a user drops into references/ (code or 
 
 # Reference Intake
 
-A reference is a file in `references/` showing how something is done (a TFT dataset builder, a derivation in markdown). It isn't project code: nothing imports it, and builders decide whether to reuse it. This skill gives each file one `RF-NN` entry in `docs/references.md`: what it is *for*, what not to trust in it (Caveats), and the stage it serves. Planning skills and tasks cite the ID, never the path; `dt context` shows the file to the builder. The skill never runs, edits, moves or imports a reference, and writes only `docs/references.md`.
+A reference is a file in `references/` showing how something is done (a TFT dataset builder, a derivation in markdown). It isn't project code: nothing imports it, and builders decide whether to reuse it.
+
+**Writes:** `docs/references.md` only. **IDs:** one `RF-NN` entry per file: what it is *for*, what not to trust in it (Caveats), and the stage it serves. Planning skills and tasks cite the ID, never the path; `dt context` shows the file to the builder. **Never** runs, edits, moves or imports a reference.
 
 **Not for:** example data (`test-planning` fixtures); adding a stage (`idea-refine`'s); PDFs, notebooks and data files (ask for a `.py` export or markdown notes instead).
 
 `dt` means `python3 ../../scripts/dt.py`, relative to this skill's folder, run from the project root. `examples.md` here has the index template, the subagent prompt and a worked example.
 
-## Status and modes
+## What's waiting
 
-Start with `dt status --skill reference-intake`: three waiting lists (`references_unindexed`, `references_changed`, `references_missing`), plus `files_to_read`, `outline_first` (`.py` over 400 lines), `next_id` and `milestones`. No index yet: create it from the template. Otherwise process only the listed files. All lists empty: say so, name the skill that routed here, and stop.
+Start with `dt status --skill reference-intake`: three waiting lists (`references_unindexed`, `references_changed`, `references_missing`), plus `files_to_read`, `outline_first` (`.py` over 400 lines), `next_id` and `milestones`. `mode: current` (all lists empty): say so, name the skill that routed here, and stop. Otherwise one process serves every status: with no index yet, create it from the template; process only the listed files.
 
 ## Process
 

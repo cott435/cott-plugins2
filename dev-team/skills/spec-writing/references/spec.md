@@ -48,7 +48,7 @@ Read before writing or extending `docs/spec.md`, and again for the hygiene check
   - [How it's checked.]
 
 ## Assumptions
-- [Assumptions the user confirmed in Step 2]
+- [Assumptions the user confirmed]
 
 ## Open questions
 - [Unresolved items, each with who can answer it. Omit if none.]
@@ -80,8 +80,6 @@ Read before writing or extending `docs/spec.md`, and again for the hygiene check
 
 ## Hygiene check
 
-Run on everything above the Changelog before presenting a Draft; in Extend mode, on the whole spec, not just the new section.
+Run on everything above the Changelog before presenting a Draft.
 
 - **Implementation names.** Search for library, framework, vendor, dataset, file-format, database and model-type names, file and function names (a reference's included), including names the user, the brief or the idea file used. Rewrite each one as the behavior or guarantee it stands for: "within 10% of Stable-Baselines3" becomes "within 10% of an established reference implementation", and "NumPy only" becomes "written from basic array operations". The only exception is a source the brief makes a fixed constraint.
-- **Out of scope** (extend mode). Read every out-of-scope line against the features this round added. Drop a line the new features bring into scope. Narrow a line that is now only partly true to the part still excluded, and name the stage it applies to. Once a neural-network stage exists, "deep learning" is no longer out of scope. Once a trading stage uses return forecasts, "no return forecasts — the portfolio stage is variance-only" becomes "the variance-only portfolios use no return forecasts". Then merge duplicates.
-- **Leftovers** (extend mode). The Summary describes the whole spec as it now stands. No requirement is still worded for one stage when it now covers several. Removed requirements are one line each. No `(changed …)` marker or other change note appears above the Changelog.

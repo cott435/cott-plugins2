@@ -52,6 +52,7 @@ class ChangelogRow:
     source: str
     files: set[str] = field(default_factory=set)     # .md files the Source cell cites, minus spec/architecture
     ids: dict[str, str] = field(default_factory=dict)
+    all_ids: bool = False                            # the IDs cell reads `all` (an initial spec)
 
     def label(self) -> str:
         return f"{self.date} | {self.change} | {self.source}"
@@ -67,7 +68,8 @@ def changelog(text: str | None) -> list[ChangelogRow]:
             continue
         cited = {re.sub(r"^(\.\./|docs/)+", "", f) for f in re.findall(r"[\w./-]+\.md", cells[-2])}
         rows.append(ChangelogRow(cells[0], " | ".join(cells[1:-2]), cells[-2],
-                                 cited - {"spec.md", "architecture.md"}, marked_ids(cells[-1])))
+                                 cited - {"spec.md", "architecture.md"}, marked_ids(cells[-1]),
+                                 bool(re.fullmatch(r"all\b.*", cells[-1].strip(), re.I))))
     return rows
 
 

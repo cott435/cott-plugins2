@@ -995,16 +995,25 @@ def todo_state(repo: Repo) -> dict[str, bool]:
     return {i.id: i.checked for i in todo_items(repo.todo)} if repo.todo else {}
 
 
-def spine_pipeline(task: Task) -> str | None:
-    """The pipeline a task makes run end to end, from its Step field (`PL-01` or `PL-01.step`): its wiring task,
-    or in a plan from before Kind, its Phase 0 spine task."""
+def system_pipeline_ids(repo: Repo) -> set[str]:
+    """IDs of the system pipelines (defined in the architecture, not in a package's pipelines.md)."""
+    return {p.id for p in all_pipelines(repo) if p.is_system}
+
+
+def spine_pipeline(task: Task, system: set[str] | frozenset[str] = frozenset()) -> str | None:
+    """The pipeline a task makes run end to end, from its Step field (`PL-01` or `PL-01.step`): its wiring task;
+    a `Kind: system` task for a system pipeline (one of `system`, `system_pipeline_ids`), which has no wiring
+    task; or in a plan from before Kind, its Phase 0 spine task."""
+    m = re.match(r"PL-\d{2,}", task.step)
+    pl = m.group(0) if m else None
     if task.kind:
+        if task.kind == "system":
+            return pl if pl in system else None
         if task.kind != "wiring":
             return None
     elif not task.is_spine:
         return None
-    m = re.match(r"PL-\d{2,}", task.step)
-    return m.group(0) if m else None
+    return pl
 
 
 def spine_done(repo: Repo) -> dict[str, bool]:
@@ -1012,9 +1021,10 @@ def spine_done(repo: Repo) -> dict[str, bool]:
     if not repo.plan:
         return {}
     state = todo_state(repo)
+    system = system_pipeline_ids(repo)
     out: dict[str, bool] = {}
     for t in tasks(repo.plan):
-        pl = spine_pipeline(t)
+        pl = spine_pipeline(t, system)
         if pl:
             out[pl] = out.get(pl, False) or state.get(t.id, False)
     return out

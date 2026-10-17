@@ -128,6 +128,8 @@ class ModelTest(unittest.TestCase):
         self.assertEqual(ts[10].skills, ["data-science"])
         self.assertEqual(t10.skills, [])
         self.assertEqual([model.spine_pipeline(t) for t in ts if model.spine_pipeline(t)], ["PL-01", "PL-02"])
+        # The system task (Step PL-02) builds PL-02 only when PL-02 is a system pipeline.
+        self.assertEqual((model.spine_pipeline(ts[-1]), model.spine_pipeline(ts[-1], {"PL-02"})), (None, "PL-02"))
 
     def test_legacy_tasks(self):
         doc = Doc(LEGACY, "plan.md")

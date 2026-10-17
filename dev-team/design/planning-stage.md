@@ -1,6 +1,6 @@
 # Planning Stage — Design
 
-**Status:** Ready to build · **Last updated:** 2026-10-16 · **Start here:** §13 Implementation handoff
+**Status:** Ready to build · **Last updated:** 2026-10-17 · **Start here:** §13 Implementation handoff · **Proposed change:** [interface-first-design.md](interface-first-design.md) replaces §5.4's Phase 0 and task fields (step spines, `Writes:`, dependency graph)
 
 Covers what happens after `architecture-design` is approved and before any code: pipelines, file layout, test plans, build plans, skill routing, and how all of it evolves across new, extend, grow, replan, rebuild and debug. Building itself is agent-skills' `/build`; this design only makes sure builders get small, correct inputs.
 

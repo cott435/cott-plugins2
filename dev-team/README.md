@@ -176,4 +176,4 @@ Code tooling (`check.sh`, Ruff, mypy, import-linter, the agent role files and th
 | [`build-planning`](skills/build-planning/SKILL.md) | Plan | Roadmap milestone rows (each stage cut into slices), `tasks/plan.md`, `tasks/todo.md`, AGENTS.md doc map |
 | [`build-setup`](skills/build-setup/SKILL.md) | Bar | `CONSTRAINTS.md`, tool config, `scripts/`, `.claude/agents/` |
 
-Design notes: [design/planning-stage.md](design/planning-stage.md), [design/build-setup.md](design/build-setup.md).
+Design notes: [design/planning-stage.md](design/planning-stage.md), [design/build-setup.md](design/build-setup.md); proposed: [design/interface-first-design.md](design/interface-first-design.md).

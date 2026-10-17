@@ -17,6 +17,7 @@ from devteam.repo import Repo  # noqa: E402
 # command name → module in devteam.commands. Each module defines add_arguments(parser) and run(args, repo) -> int.
 COMMANDS = {
     "status": "status",
+    "next": "next",
     "next-id": "next_id",
     "section": "section",
     "context": "context",
@@ -32,6 +33,7 @@ COMMANDS = {
     "prebuild-clear": "prebuild_clear",
     "archive": "archive",
     "finding": "finding",
+    "route": "route",
     "tick": "tick",
     "base": "base",
 }

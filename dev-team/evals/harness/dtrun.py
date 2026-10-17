@@ -52,6 +52,24 @@ def probe(proj, dt=None):
                 "packages": [], "probes": [], "probes_retired": [], "decisions": [], "dt_probes": None}
 
 
+def turn_costs(turns):
+    """Each turn's own cost from turns.json: total_cost_usd is cumulative within one agent session, so a turn's cost
+    is the difference from the previous turn of the same session (`session.id`; a run from before sessions is one)."""
+    last, out = {}, []
+    for t in turns:
+        sid = (t.get("session") or {}).get("id", "")
+        cum = (t.get("usage") or {}).get("cost_usd")
+        out.append(None if cum is None else round(cum - last.get(sid, 0.0), 4))
+        if cum is not None:
+            last[sid] = cum
+    return out
+
+
+def run_cost(turns):
+    """The run's agent cost: each session's last cumulative total, summed."""
+    return sum(c for c in turn_costs(turns) if c is not None)
+
+
 def skill_name(s):
     """Plugin skills are invoked namespaced (`dev-team:pipeline-design`); compare on the bare name."""
     return (s or "").split(":")[-1]
@@ -541,8 +559,13 @@ SKILL_READ = re.compile(r"(?:^|/)skills/([a-z][\w-]*)/(?:SKILL\.md|references/)"
 def turn_skill_map(turns, calls=()):
     """Turn → the skills it worked in: its Skill calls, plus each `dt status --skill X` and skills/X/ read among
     its tool calls (`calls`: probefacts.tool_calls records), so a turn that continues a skill without a Skill
-    call is still attributed to it."""
+    call is still attributed to it. A turn that opened a session with `/dev-team:<skill>` (`session.new`) worked in
+    that skill too."""
     out = {t["turn"]: {skill_name(s) for s in t.get("skills", [])} for t in turns}
+    for t in turns:
+        s = t.get("session") or {}
+        if s.get("new") and s.get("skill"):
+            out[t["turn"]].add(s["skill"])
     for c in calls:
         i = c.get("input") or {}
         text = " ".join(str(i.get(k) or "") for k in ("command", "file_path", "path", "pattern"))
@@ -586,6 +609,52 @@ def routed_revise(layers, prev_turn, changed, prev_layers=()):
     left_draft = any(p.endswith(suffix) and prev.get(p, "").split(" (")[0].strip() == "Draft" for p in changed)
     text = prev_turn.get("assistant") or ""
     return left_draft and bool(REVISE_ASK.search(text)) and bool(UPSTREAM.search(text))
+
+
+# data_sources_suggested (grade.py): sources the agent may raise beyond the user's Sharadar prices and yahooquery cross-check,
+# matched by name: {name: (pattern, is a fundamentals source)}. Sharadar counts only as SF1 or "Sharadar
+# Fundamentals"; EODHD counts as fundamentals only where its fundamentals are named.
+DATA_SOURCES = {
+    "SEC EDGAR / XBRL": (r"\bEDGAR\b|\bXBRL\b|companyfacts|company[- ]facts API", True),
+    "SimFin": (r"\bSimFin\b", True),
+    "Financial Modeling Prep": (r"Financial Modeling Prep|\bFMP\b", True),
+    "Sharadar SF1": (r"\bSF1\b|Sharadar(?:'s)? (?:Core US )?Fundamentals", True),
+    "EODHD fundamentals": (r"\bEODHD?\b[^.\n]{0,80}fundamental|fundamental[^.\n]{0,80}\bEODHD?\b", True),
+    "Compustat": (r"\bCompustat\b", True),
+    "EODHD": (r"\bEODHD?\b|EOD Historical Data", False),
+    "Tiingo": (r"\bTiingo\b", False),
+    "Polygon": (r"\bPolygon(?:\.io)?\b", False),
+    "Alpha Vantage": (r"Alpha ?Vantage", False),
+    "Alpaca": (r"\bAlpaca\b", False),
+    "Norgate": (r"\bNorgate\b", False),
+    "CRSP": (r"\bCRSP\b|\bWRDS\b", False),
+    "Stooq": (r"\bStooq\b", False),
+    "Databento": (r"\bDatabento\b", False),
+    "Intrinio": (r"\bIntrinio\b", False),
+    "FRED": (r"\bFRED\b", False),
+}
+
+
+def data_sources(texts):
+    """({source: [doc, ...]} for every DATA_SOURCES name found in `texts` ({doc: text}), the fundamentals ones)."""
+    found = {name: sorted(rel for rel, txt in texts.items() if re.search(pat, txt, re.I))
+             for name, (pat, _) in DATA_SOURCES.items()}
+    found = {name: rels for name, rels in found.items() if rels}
+    return found, sorted(name for name in found if DATA_SOURCES[name][1])
+
+
+def crosscheck_facts(entries, design, planted):
+    """crosscheck_facts_reached_design (grade.py): (passed, metrics) for the cross-check source's probe `entries`
+    (probefacts entries), the `design` text (its decisions and the Risks) and the vendor's PLANTED facts: a probe
+    Answered, its Verdict, Caveats or results naming every lost name, the design saying the close isn't raw, and the
+    ticker reuse named in either."""
+    answered = [e["id"] for e in entries if e["kind"] == "answered"]
+    text = " ".join(e["verdict"] + " " + e["caveats"] + " " + " ".join(c["result"] for c in e["checks"]) for e in entries)
+    m = {"answered": answered, "missing_not_named": [n for n in planted["missing"] if not re.search(rf"\b{n}\b", text)],
+         "adjusted_only": bool(re.search(planted["adjusted_only"], design, re.I)),
+         "reused": bool(re.search(planted["reused"], design + " " + text, re.I)),
+         "not_point_in_time": bool(re.search(planted["not_pit"], design + " " + text, re.I))}
+    return bool(answered and not m["missing_not_named"] and m["adjusted_only"] and m["reused"]), m
 
 
 # spec_ml_beats_classical: the ML bar names the classical portfolios or the earlier stage's named benchmark.

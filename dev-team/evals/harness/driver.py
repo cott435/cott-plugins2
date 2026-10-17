@@ -1,8 +1,12 @@
 #!/usr/bin/env python3
 """Multi-turn trajectory driver for the dev-team planning skills, idea through build-setup.
 
-An agent session (claude -p, resumed each turn) works in a fresh project dir with the whole dev-team plugin
-loaded via --plugin-dir (skills, scripts/dt.py, hooks), staged into <out>/plugin/. A simulated user (separate
+Agent sessions (claude -p) work in a fresh project dir with the whole dev-team plugin loaded via --plugin-dir
+(skills, scripts/dt.py, hooks), staged into <out>/plugin/. As a user opens a new chat per skill, each skill run gets
+its own session: before every message the driver asks the run's own dt for the next run (`dt next --json`). A fresh
+session opens with `/dev-team:<skill> <message>` when that run is another skill, or the same skill again once its
+gate was approved; the session is resumed only while one skill works through its questions and gate (`session_step`).
+Each session's id, skill and turns go into turns.json (`session`) and summary.json (`sessions`). A simulated user (separate
 claude -p, no tools) answers questions, approves drafts, and — in incremental mode — reveals the next stage
 only after the current one is fully planned (pipelines approved and milestone rows on the roadmap; for the first
 stage, also an approved build plan and build setup).
@@ -15,16 +19,18 @@ After every turn the whole project is git-committed ("turn N") so doc evolution,
 planning, can be diffed.
 
 Probes (design/probes.md §10.1): a project's `fake_vendors` (scenarios.json) are served on 127.0.0.1 for the
-whole run (fakevendor/), and the agent is never told where. When the simulated user says "ran it", the driver
-runs each Ready probe as the user would: it writes the probe's .env from its .env.example (keys get the canary
-`sk-canary-<run id>`, base URLs the fake vendor), runs public.py with no environment at all, then probe.py with
-the fake vendor's environment, logs both to <out>/user_runs.jsonl and commits "user run before turn N".
+whole run (fakevendor/), and the agent is never told where. A vendor whose client takes no base URL (Yahoo) is
+served on its real hosts behind an HTTPS proxy whose environment the whole run gets (`start_vendors`). When the
+simulated user says "ran it", the driver runs each Ready probe as the user would: it writes the probe's .env from its
+.env.example (keys get the canary `sk-canary-<run id>`, base URLs the fake vendor), runs public.py with no
+environment but the proxy's, then each probe.py step its README gives with the fake vendors' environment, logs them
+to <out>/user_runs.jsonl and commits "user run before turn N".
 
 Usage: driver.py <trajectory-id> <out-dir>
 
 Env: PLUGIN_SRC / SKILLS_SRC (see plugin.py), CLAUDE_BIN (default: claude; fake_claude.py for a no-cost
-loop test), AGENT_MODEL, USER_MODEL, COST_CAP_USD (stop once the agent session has cost this much; default
-none), MAX_TURNS (override the scenario's turn budget, e.g. 1 for a smoke run), PERMISSION_PROMPTS=0 (don't
+loop test), AGENT_MODEL, USER_MODEL, COST_CAP_USD (stop once the agent sessions together have cost this much;
+default none), MAX_TURNS (override the scenario's turn budget, e.g. 1 for a smoke run), PERMISSION_PROMPTS=0 (don't
 answer the oracle guard's "ask" prompts; see permission_mcp.py). Both sessions load project/local settings
 only, no CLAUDE.md files and no MCP servers but the eval's own, so the host's user-level instructions, skills,
 plugins and MCP servers don't leak into the trajectory.
@@ -38,6 +44,7 @@ import json, os, re, subprocess, sys, time, uuid, shutil, pathlib
 HERE = pathlib.Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 import dtrun, fakevendor, planexport, plugin, probefacts  # noqa: E402
+from fakevendor import proxy  # noqa: E402
 
 CLAUDE_BIN = os.environ.get("CLAUDE_BIN", "claude")
 ISOLATE = ["--setting-sources", "project,local"]
@@ -177,6 +184,36 @@ def mcp_args(out):
     return args + (["--permission-prompt-tool", "mcp__evalperm__approve"] if PERMISSION_PROMPTS else [])
 
 
+STATUS_SKILL = re.compile(r"status\s+--skill[\s=]+([a-z-]+)")
+SLASH = re.compile(r"^/dev-team:([a-z-]+)")
+
+
+def dt_next(proj, dt):
+    """`dt next --json` on the project, or {} if it fails (the driver then keeps the current session)."""
+    r = sh([sys.executable, str(dt), "--root", str(proj), "next", "--json"], proj)
+    try:
+        return json.loads(r.stdout)
+    except Exception:
+        print(f"dt next failed: {r.stderr[-300:]}", flush=True)
+        return {}
+
+
+def session_step(nxt, before, sess, action):
+    """Resume the current session or open a fresh one, for which skill: (fresh, skill).
+
+    `nxt` is `dt next` now, `before` what it said before the current session's last message, `sess` the current
+    session ({skill, seen}: the skills its turns ran) or None, `action` the simulated user's. With nothing left to
+    plan, a new stage goes to idea-refine. A skill the session already ran (its own, or one the agent moved on to)
+    keeps the session through its questions and gate; once that gate is approved, its next run is a fresh session."""
+    skill = nxt.get("skill") or ("idea-refine" if action == "next_stage" else None)
+    if sess is None:
+        return True, skill or "idea-refine"
+    if skill is None:
+        return False, sess["skill"]
+    just_approved = nxt.get("mode") != "gate" and (before or {}).get("mode") == "gate" and before.get("skill") == skill
+    return (False, skill) if skill in sess["seen"] and not just_approved else (True, skill)
+
+
 def agent_turn(proj, sid, msg, first, log_path, plugin_root, extra):
     # --include-hook-events: without it the stream carries only SessionStart and Stop hook events.
     cmd = [CLAUDE_BIN, "-p", msg, "--model", AGENT_MODEL, "--output-format", "stream-json", "--verbose",
@@ -188,7 +225,7 @@ def agent_turn(proj, sid, msg, first, log_path, plugin_root, extra):
     dt = time.time() - t0
     with open(log_path, "a") as f:
         f.write(r.stdout)
-    result, usage, tools, skills, errors, hooks, init, agents = "", {}, [], [], [], 0, {}, []
+    result, usage, tools, skills, errors, hooks, init, agents, seen = "", {}, [], [], [], 0, {}, [], []
     for line in r.stdout.splitlines():
         try:
             d = json.loads(line)
@@ -205,6 +242,8 @@ def agent_turn(proj, sid, msg, first, log_path, plugin_root, extra):
                     tools.append(c["name"])
                     if c["name"] == "Skill":
                         skills.append(dtrun.skill_name(c["input"].get("skill")))
+                    if c["name"] == "Bash":
+                        seen += STATUS_SKILL.findall(str((c.get("input") or {}).get("command", "")))
                     if c["name"] in ("Agent", "Task") and not d.get("parent_tool_use_id"):
                         # Top-level subagent launches (reference-intake sends one per file); graded per file name.
                         inp = c.get("input") or {}
@@ -222,7 +261,9 @@ def agent_turn(proj, sid, msg, first, log_path, plugin_root, extra):
                      "usage": d.get("usage"), "num_turns": d.get("num_turns")}
     if not result and r.returncode != 0:
         result = f"[agent error rc={r.returncode}] {r.stderr[-500:]}"
-    return result, usage, tools, skills, dt, errors, hooks, init, agents
+    m = SLASH.match(msg)
+    seen = list(dict.fromkeys(([m.group(1)] if m else []) + skills + seen))
+    return result, usage, tools, skills, dt, errors, hooks, init, agents, seen
 
 
 PLANNING_CHAIN = """For each stage the assistant takes you through several planning documents, one at a time, each needing your approval: the idea/brief, the spec, the architecture, the pipelines (the workflows you will run and the planned file layout), optionally a test plan with golden test cases, and the build plan (the tasks for that milestone). Before the first build it also sets up the build tooling and quality bar (CONSTRAINTS.md, checks, agent roles); approve that too."""
@@ -339,25 +380,44 @@ def setup_project(out, project, ref_stages=()):
 
 
 def start_vendors(out, project, run_id):
-    """The project's fake vendors, each logging to <out>/vendor_<name>.jsonl: {name: {url, server, key, cfg}}."""
-    vendors = {}
+    """The project's fake vendors, each logging to <out>/vendor_<name>.jsonl: {name: {url, server, key, cfg}}.
+
+    A vendor with `proxy_hosts` (a client that takes no base URL, like yahooquery) is served on those hosts behind
+    one HTTPS proxy (fakevendor/proxy.py) for the whole run: its environment goes into ENV, so the agent, the
+    simulated user and the user's runs use it, and shims for python3, python, uv and curl lead PATH, so
+    `env -i PATH="$PATH" python3 public.py` still does. Such a vendor takes no key."""
+    vendors, routes = {}, {}
     for name, cfg in project.get("fake_vendors", {}).items():
+        if cfg.get("proxy_hosts"):
+            handler = fakevendor.handler_class(name, out / f"vendor_{name}.jsonl")
+            routes.update({h: handler for h in cfg["proxy_hosts"]})
+            vendors[name] = {"url": None, "server": None, "key": None, "cfg": cfg}
+            continue
         key = f"sk-canary-{run_id}"
         url, server = fakevendor.start(name, out / f"vendor_{name}.jsonl", expect_key=key)
         vendors[name] = {"url": url + cfg.get("path", ""), "server": server, "key": key, "cfg": cfg}
+    if routes:
+        url, server, env = proxy.start_proxy(str(out / "proxy" / "certs"), routes, log=out / "proxy.jsonl")
+        bindir = proxy.shims(str(out / "proxy" / "bin"), env)
+        ENV.update(env)
+        ENV["PATH"] = bindir + os.pathsep + ENV.get("PATH", "")
+        for v in vendors.values():
+            if v["server"] is None:
+                v.update(url=url, server=server, env=env)
     return vendors
 
 
 def vendor_env(names, vendors):
     """What the user puts in .env for these variable names: keys → the canary, base URLs → the fake vendor.
-    A name is matched to the vendor it mentions (or its aliases), else to the only vendor."""
+    A name goes to the vendor it names (or one of its aliases), or to none: a variable has to say whose it is. A
+    proxied vendor (no key, no base URL) gets nothing here."""
     env = {}
+    vendors = {k: v for k, v in vendors.items() if v.get("key")}
     for v in vendors.values():
         env.update({n: v["url"] for n in v["cfg"].get("base_env", [])})
         env.update({n: v["key"] for n in v["cfg"].get("key_env", [])})
     for n in names:
-        v = next((v for k, v in vendors.items() if any(a.upper() in n.upper() for a in [k, *v["cfg"].get("aliases", [])])),
-                 next(iter(vendors.values())) if len(vendors) == 1 else None)
+        v = next((v for k, v in vendors.items() if any(a.upper() in n.upper() for a in [k, *v["cfg"].get("aliases", [])])), None)
         if v is None:
             continue
         if re.search(r"URL|HOST|BASE", n, re.I):
@@ -371,11 +431,34 @@ def vendor_env(names, vendors):
     return env
 
 
+PROBE_CMD = re.compile(r"(?:uv run|python3?)\s+(?:[^\s`]*/)?probe\.py((?:[ \t]+[^\s`&|;<>]+)*)")
+
+
+def user_steps(readme):
+    """The argument lists the probe's README gives `probe.py`, in order: from its `## Steps` section when that names
+    probe.py, else from the whole README (the Who-runs-what table). A probe may split the user's run into steps
+    (`probe.py bulk`, then `probe.py checks`; the api-probe README template does). [[]] when it names none."""
+    steps = re.search(r"^##\s+Steps\b.*?(?=^##\s|\Z)", readme, re.M | re.S)
+    out = []
+    for text in ([steps.group(0)] if steps else []) + [readme]:
+        for span in re.findall(r"`([^`]+)`", text):
+            for m in PROBE_CMD.finditer(span):
+                args = m.group(1).split()
+                if args not in out:
+                    out.append(args)
+        if out:
+            break
+    return out or [[]]
+
+
 def run_user_checks(proj, vendors, log_path, ids=None, timeout=600):
-    """The user's "ran it": every Ready probe (or just `ids`) is run as the user would run it. Returns one record
-    per script; the canary is scrubbed from what is kept, and `printed_key` says whether a script printed it."""
+    """The user's "ran it": every Ready probe (or just `ids`) is run as the user would run it: public.py with no
+    environment, then each probe.py step its README gives (`user_steps`), in order, stopping at the first that
+    fails. Returns one record per run; the canary is scrubbed from what is kept, and `printed_key` says whether a
+    script printed it."""
     text = (proj / "docs" / "probes.md").read_text(errors="ignore") if (proj / "docs" / "probes.md").exists() else ""
-    runs, keys = [], [v["key"] for v in vendors.values()]
+    runs, keys = [], [v["key"] for v in vendors.values() if v.get("key")]
+    proxied = next((v["env"] for v in vendors.values() if v.get("env")), {})  # no secret: the proxy and its CA
     scrub = lambda t: re.sub("|".join(map(re.escape, keys)) or r"(?!)", "<canary>", t or "")
     for e in probefacts.parse_probes(text)["entries"]:
         if e["kind"] != "ready" or (ids is not None and e["id"] not in ids):
@@ -388,20 +471,26 @@ def run_user_checks(proj, vendors, log_path, ids=None, timeout=600):
         names = [l.split("=", 1)[0].strip().lstrip("# ") for l in example.read_text().splitlines() if "=" in l] if example.exists() else []
         env = vendor_env(names, vendors)
         dot = folder / ".env"
-        dot.write_text("".join(f"{k}={v}\n" for k, v in env.items() if k in names or not names))
+        dot.write_text("".join(f"{k}={v}\n" for k, v in env.items() if k in names))
         dot.chmod(0o600)
-        for script, script_env in (("public.py", {}), ("probe.py", {**{k: os.environ[k] for k in ("PATH", "HOME") if k in os.environ}, **env})):
+        readme = (folder / "README.md").read_text(errors="ignore") if (folder / "README.md").exists() else ""
+        user_env = {**{k: ENV[k] for k in ("PATH", "HOME") if k in ENV}, **proxied, **env}
+        for script, script_env, args in [("public.py", dict(proxied), [])] + [("probe.py", user_env, a) for a in user_steps(readme)]:
             if not (folder / script).exists():
                 continue
+            if script == "probe.py" and any(r_["probe"] == e["id"] and r_["script"].endswith("probe.py") and r_["rc"] != 0
+                                            for r_ in runs):
+                break  # a failed step stops the user's run, as the README's steps say
             head = (folder / script).read_text(errors="ignore")[:2000]
-            cmd = ["uv", "run", script] if "# /// script" in head and shutil.which("uv") and script == "probe.py" else [sys.executable, "-B", script]
+            cmd = (["uv", "run", script] if "# /// script" in head and shutil.which("uv") and script == "probe.py"
+                   else [sys.executable, "-B", script]) + args
             t0 = time.time()
             try:
                 r = subprocess.run(cmd, cwd=folder, env=script_env, capture_output=True, text=True, timeout=timeout)
                 rc, so, se = r.returncode, r.stdout, r.stderr
             except subprocess.TimeoutExpired as ex:
                 rc, so, se = "timeout", str(ex.stdout or ""), str(ex.stderr or "")
-            runs.append({"probe": e["id"], "script": f"{folder.relative_to(proj)}/{script}", "rc": rc,
+            runs.append({"probe": e["id"], "script": f"{folder.relative_to(proj)}/{script}", "args": args, "rc": rc,
                          "seconds": round(time.time() - t0, 1), "env": sorted(script_env) if script_env else [],
                          "printed_key": any(k in so + se for k in keys), "stdout_tail": scrub(so)[-600:],
                          "stderr_tail": scrub(se)[-600:]})
@@ -429,15 +518,15 @@ def main():
     try:
         run_loop(scn, traj, project, stages, out, proj, plugin_root, dt, extra, msg, n_revealed, refs, vendors)
     finally:
-        for v in vendors.values():
-            v["server"].shutdown()
+        for server in {id(v["server"]): v["server"] for v in vendors.values() if v.get("server")}.values():
+            server.shutdown()
 
 
 def run_loop(scn, traj, project, stages, out, proj, plugin_root, dt, extra, msg, n_revealed, refs, vendors):
     tid = traj["id"]
 
-    sid = str(uuid.uuid4())
-    turns, history = [], []
+    turns, history, sessions = [], [], []
+    sess, before, action = None, {}, None  # the current session; dt next before its last message; the user's action
     stage_log = [{"turn": 1, "stage": stages[0]["name"] if traj["mode"] == "incremental" else "all"}]
     t_start = time.time()
     closing, stop_reason = False, "max_turns"
@@ -447,33 +536,51 @@ def run_loop(scn, traj, project, stages, out, proj, plugin_root, dt, extra, msg,
         # The commit the turn starts from (the previous turn's, or the user run's after it): diffing from it,
         # not `git show HEAD`, counts the agent's own commits in this turn as changes.
         base = sh(["git", "rev-parse", "HEAD"], proj).stdout.strip()
-        reply, usage, tools, skills, dt_s, errors, hooks, init, agents = agent_turn(
-            proj, sid, msg, t == 1, out / "agent_stream.jsonl", plugin_root, extra)
+        nxt = dt_next(proj, dt)
+        fresh, skill = session_step(nxt, before, sess, action)
+        if fresh:
+            sess = {"n": len(sessions) + 1, "id": str(uuid.uuid4()), "skill": skill, "seen": [skill], "turns": [],
+                    "cost_usd": 0.0, "output_tokens": 0}
+            sessions.append(sess)
+        sess["skill"] = skill
+        before = nxt
+        sent = f"/dev-team:{skill} {msg}" if fresh else msg
+        reply, usage, tools, skills, dt_s, errors, hooks, init, agents, seen = agent_turn(
+            proj, sess["id"], sent, fresh, out / "agent_stream.jsonl", plugin_root, extra)
+        sess["seen"] = list(dict.fromkeys(sess["seen"] + seen))
+        sess["turns"].append(t)
+        cum = usage.get("cost_usd") or 0  # total_cost_usd is cumulative within one resumed session
+        usage["cost_turn_usd"] = round(max(cum - sess["cost_usd"], 0), 4)
+        sess["cost_usd"] = max(sess["cost_usd"], cum)
+        sess["output_tokens"] += (usage.get("usage") or {}).get("output_tokens") or 0
         commit(proj, f"turn {t}")
         changed = sh(["git", "diff", "--stat", base, "HEAD"], proj).stdout.strip()
         facts, status = snapshot(proj, dt, keep=out / "plans" / f"T{t:03d}.json")
-        rec = {"turn": t, "user": msg, "assistant": reply, "skills": skills, "tools": tools,
+        rec = {"turn": t, "user": sent, "assistant": reply, "skills": skills, "tools": tools,
                "seconds": round(dt_s, 1), "usage": usage, "docs_changed": changed, "status": status,
-               "stage": stage_log[-1]["stage"], "tool_errors": errors, "hook_events": hooks, "agents": agents}
+               "stage": stage_log[-1]["stage"], "tool_errors": errors, "hook_events": hooks, "agents": agents,
+               "session": {"n": sess["n"], "id": sess["id"], "skill": skill, "new": fresh, "next": nxt, "seen": seen}}
         if user_run is not None:
             rec["user_run"] = user_run
             user_run = None
-        if t == 1:
+        if fresh:
             rec["session_init"] = init
+        if t == 1:
             own = [s for s in json.dumps(init.get("skills") or init.get("slash_commands") or []).split('"') if "pipeline-design" in s]
             if init and not own:
                 print(f"[{tid}] WARNING: session init lists no dev-team skills; is the plugin loading? {json.dumps(init)[:400]}", flush=True)
         turns.append(rec)
         history.append(f"USER: {msg[:1500]}\nASSISTANT: {reply[:1500]}")
         (out / "turns.json").write_text(json.dumps(turns, indent=1))
-        print(f"[{tid}] turn {t} stage={rec['stage']} {dt_s:.0f}s skills={skills} changed={changed.splitlines()[-1] if changed else '-'}", flush=True)
+        print(f"[{tid}] turn {t} stage={rec['stage']} session={sess['n']}{'*' if fresh else ''}:{skill} {dt_s:.0f}s "
+              f"skills={skills} changed={changed.splitlines()[-1] if changed else '-'}", flush=True)
 
         if closing:
             turns[-1]["sim_user_final"] = "(closing approval delivered)"
             (out / "turns.json").write_text(json.dumps(turns, indent=1))
             stop_reason = "finished"
             break
-        if (usage.get("cost_usd") or 0) > COST_CAP:
+        if sum(s["cost_usd"] for s in sessions) > COST_CAP:
             stop_reason = f"cost cap {COST_CAP} USD"
             break
         revealed = stages[:n_revealed]
@@ -521,6 +628,7 @@ def run_loop(scn, traj, project, stages, out, proj, plugin_root, dt, extra, msg,
             new_refs = add_references(proj, project, [nxt["name"]])
             refs += new_refs
         msg = (u.get("message") or "Approved. Continue.") + refs_note(new_refs)
+        action = u.get("action")
         if vendors and re.search(r"\bran it\b", msg, re.I):
             user_run = run_user_checks(proj, vendors, out / "user_runs.jsonl")
             commit(proj, f"user run before turn {t + 1}")
@@ -528,11 +636,13 @@ def run_loop(scn, traj, project, stages, out, proj, plugin_root, dt, extra, msg,
     summary = {"trajectory": tid, "turns": len(turns), "stages_reached": n_revealed, "stage_log": stage_log,
                "references": refs,
                "total_seconds": round(time.time() - t_start, 1),
-               # total_cost_usd is cumulative over a resumed session, so the last turn's value is the run's cost.
-               "agent_cost_usd": round(max([(x["usage"].get("cost_usd") or 0) for x in turns] or [0]), 3),
-               "agent_output_tokens": sum(((x["usage"].get("usage") or {}).get("output_tokens") or 0) for x in turns),
+               # Each session's cost is its last cumulative total_cost_usd; the run's is their sum.
+               "agent_cost_usd": round(sum(s["cost_usd"] for s in sessions), 3),
+               "agent_output_tokens": sum(s["output_tokens"] for s in sessions),
+               "sessions": [{k: s[k] for k in ("n", "id", "skill", "seen", "turns")} | {"cost_usd": round(s["cost_usd"], 3),
+                            "output_tokens": s["output_tokens"]} for s in sessions],
                "finished": any("sim_user_final" in x for x in turns), "stop_reason": stop_reason,
-               "fake_vendors": sorted(vendors), "probe_canary": next(iter(vendors.values()))["key"] if vendors else None,
+               "fake_vendors": sorted(vendors), "probe_canary": next((v["key"] for v in vendors.values() if v.get("key")), None),
                "user_runs": sum(1 for x in turns if x.get("user_run") is not None),
                "agent_model": AGENT_MODEL, "user_model": USER_MODEL}
     (out / "summary.json").write_text(json.dumps(summary, indent=1))

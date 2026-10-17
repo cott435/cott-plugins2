@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from .. import md, model
+from .. import md, model, routes
 from ..repo import Doc, Repo
 from .common import Report, add_common, doc_state, in_revise, live_spec_ids
 from .packages import drift, is_multi, known_packages, package_components, source_dir
@@ -101,10 +101,11 @@ def pipeline_design(repo: Repo, r: Report) -> None:
             modes[pkg] = "sync"
         else:
             modes[pkg] = "extend" if pkg_uncovered or pkg_unowned else "current"
+    routed = routes.open_for(repo, "pipeline-design")
     if blocked:
         r.mode("blocked", blocked)
     else:
-        present = set(modes.values())
+        present = set(modes.values()) | ({"revise"} if routed else set())
         r.mode(next((m for m in ("new", "grow", "revise", "extend", "sync") if m in present),
                     "current" if modes else "new"))
     add_common(repo, r)
@@ -114,3 +115,4 @@ def pipeline_design(repo: Repo, r: Report) -> None:
     r.add("drift", "unknown" if unknown and not drifts else drifts)
     r.add("retired_refs", retired_refs(repo, sorted(repo.docs("pipelines"), key=lambda d: d.rel)))
     r.add("misplaced", moved)
+    r.add("routed_changes", routed)

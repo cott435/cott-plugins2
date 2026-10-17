@@ -9,7 +9,7 @@ A pipeline is one workflow the user runs: an entry function reading as calls to 
 
 **Owns:** `docs/packages/*/pipelines.md` and the `PL-NN` IDs, plus PL IDs appended to `contract.md`'s `Used by:` lines, and nothing else. The file format is `references/template.md`; step, layout and readability rules are `references/steps.md`.
 
-**Not for:** components or technologies (`architecture-design`), golden cases (`test-planning`), tasks (`build-planning`), code or contract changes.
+**Not for:** components or technologies (`architecture-design`), golden cases (`test-planning`), tasks (`build-planning`), code or contract changes. A change another skill owns (a contract type, a spec ID) is recorded for its Revise, never made here: `dt route architecture-design "<change>" --from pipeline-design` (or `spec-writing`), and listed at the gate.
 
 `dt` means `python3 ../../scripts/dt.py`, relative to this skill's folder, run from the project root.
 
@@ -22,7 +22,7 @@ Start with `dt status --skill pipeline-design`: the mode per package, `uncovered
 | **Blocked** | The architecture isn't Approved | Say which doc needs approval. Stop |
 | **New** | A package in scope has no `pipelines.md` | `references/new.md` |
 | **Extend** | `uncovered_ids` or `components_unowned` non-empty | `references/extend.md` |
-| **Revise** | The build found a step to replace, split or reorder (`dt` reports `revise` until re-approval) | `references/revise.md` |
+| **Revise** | The build found a step to replace, split or reorder, or `routed_changes` lists one (`dt` reports `revise` until re-approval) | `references/revise.md` |
 | **Grow** | The architecture became Multi-package (`misplaced` lists a pipeline) | `references/grow.md` |
 | **Sync** | `drift` is non-empty | `references/sync.md` |
 | **Current** | Nothing to do | Say so and name the next skill. Stop |
@@ -48,8 +48,8 @@ Rerun `dt status --skill pipeline-design`. `retired_refs` must be empty; `uncove
 
 | The user says | Do | Then |
 |---|---|---|
-| An unambiguous yes | Set `Status: Approved` and the date. Offer to commit `pipelines.md` and any `contract.md` whose `Used by:` changed; commit only on a yes | Stop. Next: `test-planning` (optional) or `build-planning` (Replan, after a Revise) |
+| An unambiguous yes | Set `Status: Approved` and the date; `dt route --done pipeline-design` if `routed_changes` listed any. Offer to commit `pipelines.md` and any `contract.md` whose `Used by:` changed; commit only on a yes | Stop. Next: `test-planning` (optional) or `build-planning` (Replan, after a Revise) |
 | "Approved, go ahead" | As above | Start the next planning skill (run its `dt status`). Never start code |
 | Approved with a small, fully specified change | Make exactly that edit, set Approved | Stop; list the edit |
-| Approved, plus an upstream change (a contract type, a spec ID) | Set Approved; route the change to its owner's Revise, never make it this turn | Stop |
+| Approved, plus an upstream change (a contract type, a spec ID) | Set Approved; record it with `dt route` (Not for), never make it this turn | Stop; the owner's Revise is next |
 | Changes, or a hedge ("looks fine I guess") | Edit or ask again; keep Draft | Repeat this gate |

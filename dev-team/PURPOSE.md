@@ -9,8 +9,11 @@ what they build matches what was agreed.
 
 ## Who uses it, and when
 
-A developer taking a Python project from idea to built milestones. They approve each planning Draft in their own words before the next skill starts,
-then each milestone's build and its merge; between those the build runs unattended, stopping when stuck. `dt` and the hooks act on their own.
+A developer taking a Python project from idea to built milestones. They run
+`/dev-team:plan`, which opens each skill run in its own session, or run the skills
+themselves, and approve each planning Draft in their own words before the next skill
+starts; then each milestone's build and its merge. Between those the build runs
+unattended, stopping when stuck. `dt` and the hooks act on their own.
 
 ## What it does
 

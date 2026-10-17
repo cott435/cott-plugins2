@@ -28,13 +28,14 @@ HAS_GIT = shutil.which("git") is not None
 # Keys each skill promises to print (scripts/README.md, dt status table).
 KEYS = {
     "idea-refine": ["brief_words", "brief_goals", "ideas", "roadmap_rows", "references_unassigned"],
-    "spec-writing": ["ideas_ready", "prefixes", "reserved_prefixes", "skills"],
+    "spec-writing": ["ideas_ready", "prefixes", "reserved_prefixes", "skills", "routed_changes"],
     "architecture-design": ["uncovered", "changed_since", "spec_rows_pending", "stale", "package_docs",
                             "packages_found", "skills", "broken_fences", "contracts_missing", "legacy_layout",
-                            "grow_triggers", "stale_contracts", "next_decision"],
-    "pipeline-design": ["packages", "uncovered_ids", "components_unowned", "drift", "retired_refs", "misplaced"],
+                            "grow_triggers", "stale_contracts", "next_decision", "routed_changes"],
+    "pipeline-design": ["packages", "uncovered_ids", "components_unowned", "drift", "retired_refs", "misplaced",
+                        "routed_changes"],
     "test-planning": ["packages", "pipelines_no_smoke", "pipelines_no_golden", "cases_no_source",
-                      "cases_no_tolerance", "fixtures_missing", "fixtures_orphan", "skills"],
+                      "cases_no_tolerance", "fixtures_missing", "fixtures_orphan", "skills", "routed_changes"],
     "build-planning": ["milestone", "progress", "next_task", "blocked_tasks", "uncovered", "no_spine",
                        "mode_violations", "boundaries_unfrozen", "draft_pipelines", "changed_since_plan", "stage_to_cut",
                        "pipelines_inferred",

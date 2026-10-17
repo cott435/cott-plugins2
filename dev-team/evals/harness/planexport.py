@@ -153,15 +153,18 @@ def body_at(proj, sha, dt):
 
 def turn_skills(run):
     """{turn: the skill at work}. A skill runs on over later turns without a new `Skill` call, so a turn with
-    none carries the last invoked skill forward until another one is invoked."""
+    none carries the last invoked skill forward until another one is invoked. A session the driver opened with
+    `/dev-team:<skill>` (`session.new`) starts with that skill."""
     try:
         turns = json.loads((run / "turns.json").read_text())
     except (OSError, json.JSONDecodeError):
         return {}
     out, last = {}, ""
     for t in sorted(turns, key=lambda t: int(t["turn"])):
-        own = [dtrun.skill_name(s) for s in t.get("skills", []) if str(s).startswith("dev-team")] or \
-              [dtrun.skill_name(s) for s in t.get("skills", [])]
+        sess = t.get("session") or {}
+        opened = [sess["skill"]] if sess.get("new") and sess.get("skill") else []
+        own = opened + ([dtrun.skill_name(s) for s in t.get("skills", []) if str(s).startswith("dev-team")] or
+                        [dtrun.skill_name(s) for s in t.get("skills", [])])
         last = own[-1] if own else last
         out[int(t["turn"])] = last
     return out

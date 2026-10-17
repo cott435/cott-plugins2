@@ -28,7 +28,7 @@ Run `python3 ../../scripts/dt.py status --skill spec-writing` first (path relati
 |---|---|---|
 | Blocked | No `docs/brief.md` | Route to `idea-refine`. Stop |
 | New | No `docs/spec.md`; the brief is the input | `references/new.md` |
-| Extend | The spec exists; an idea file is the input | `references/extend.md` |
+| Extend | The spec exists; an idea file, or a change another skill routed here (`routed_changes`), is the input | `references/extend.md` |
 
 `references/spec.md` holds the template, writing rules and hygiene check; the mode file says when to read it.
 
@@ -49,6 +49,6 @@ Run the hygiene check in `references/spec.md`, and the gate steps your mode file
 
 | The user says | Do | Then |
 |---|---|---|
-| Approved, nothing to change | Set `**Status:** Approved` and the date, and do the on-approval step your mode file names. Offer to commit the spec and idea; commit only on a yes | Hand off to `architecture-design` |
+| Approved, nothing to change | Set `**Status:** Approved` and the date, do the on-approval step your mode file names, and `python3 ../../scripts/dt.py route --done spec-writing` if `routed_changes` listed any. Offer to commit the spec and idea; commit only on a yes | Hand off to `architecture-design` |
 | Approved, with a change ("make QR-02 ≤ 5 minutes") | Make exactly that edit. Fully specified: set Approved. Needs your judgment: keep Draft | **Stop.** List what you changed; the architecture starts next turn |
 | Changes requested | Edit, keep Draft | Repeat this gate |

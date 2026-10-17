@@ -861,6 +861,16 @@ if project == "quant":
     check("no_live_trading", "Real-money / live trading is explicitly out of scope", bool(re.search(r"live|real[- ]money|brokerage", excluded, re.I)), "")
     check("spec_oos", "Out-of-sample / held-out evaluation is required for features and models",
           len(re.findall(r"out[- ]of[- ]sample|held[- ]out|walk[- ]forward", spec, re.I)) >= 3, f"{len(re.findall(r'out[- ]of[- ]sample|held[- ]out|walk[- ]forward', spec, re.I))} mentions")
+    # The user names Sharadar (subscribed) and yahooquery (cross-check); the agent should raise more sources itself,
+    # among them one for company fundamentals, as a chosen source or an alternative considered.
+    src_docs = {p.relative_to(proj).as_posix(): p.read_text() for p in
+                [docs / "brief.md", docs / "spec.md", docs / "architecture.md", *pkg_docs, *ideas] if p.exists()}
+    src_docs = {rel: txt for rel, txt in src_docs.items() if status(txt) in ("Approved", "Accepted", "Specced")}
+    found, fundamentals = dtrun.data_sources(src_docs)
+    check("data_sources_suggested", "quant: approved docs name a data source beyond the user's two (Sharadar prices, "
+          "yahooquery), at least one of them for company fundamentals", bool(fundamentals),
+          f"found: {found}; fundamentals: {fundamentals}; docs searched: {sorted(src_docs)}",
+          {"sources": sorted(found), "fundamentals": fundamentals, "where": found})
     viz = {k: bool(re.search(pat, arch_all, re.I)) for k, pat in
            [("typescript", r"TypeScript"), ("react", r"\bReact\b"), ("websocket", r"WebSocket"), ("json_schema", r"JSON Schema")]}
     check("arch_viz_boundary", "Architecture puts the viz app's TypeScript + React frontend across a WebSocket/HTTP boundary from the Python backend, "
@@ -982,7 +992,8 @@ PR = probegrade.Run(run, DT)
 vendor_cfg = scn["projects"][project].get("fake_vendors", {})
 served = bool(PR.summary.get("fake_vendors"))
 probing = PR.has_probes or served
-planted = {k: v for n in vendor_cfg for k, v in getattr(fakevendor.VENDORS.get(n), "PLANTED", {}).items()}
+# The primary source's planted facts (the first fake vendor, Sharadar); a cross-check source has its own check below.
+planted = getattr(fakevendor.VENDORS.get(next(iter(vendor_cfg), "")), "PLANTED", {})
 src_rx = re.compile("|".join(re.escape(c.get("decision", n)) for n, c in vendor_cfg.items()) or r"(?!)", re.I)
 NOT_PROBING = "no probes, and the driver served no fake vendor"
 
@@ -1079,6 +1090,21 @@ else:
           f"answered: {answered}; decisions {sorted(src_ids)} say split-adjusted + closeunadj: {adj}; "
           f"{planted.get('start')} in decision or spec question: {start}; missing names not in the Verdict: {missing}")
 
+T_CROSS = ("After Record: the Yahoo cross-check probe is Answered, its Verdict names the 7 delisted names Yahoo has lost, "
+           "and the design says Yahoo has no raw close and that BUD, DNA and WB now answer for other companies")
+yahoo = fakevendor.VENDORS["yahoo"].PLANTED if "yahoo" in vendor_cfg else None
+y_entries = [e for e in PR.probes if re.search(r"yahoo|yfinance", e["title"] + e["folder"] + e["question"], re.I)]
+if not probing or yahoo is None:
+    graded_or_na("crosscheck_facts_reached_design", T_CROSS, (None, NOT_PROBING if not probing else "the project has no proxied cross-check source"))
+elif not y_entries:
+    check("crosscheck_facts_reached_design", T_CROSS, False, "no probe of the Yahoo cross-check")
+else:
+    y_design = "\n".join(d["text"] for d in final_decs if re.search(r"yahoo", d["text"], re.I)) + "\n" + pf.risks(arch_all)
+    ok, m = dtrun.crosscheck_facts(y_entries, y_design, yahoo)
+    check("crosscheck_facts_reached_design", T_CROSS, ok,
+          f"yahoo probes {[e['id'] for e in y_entries]}, answered {m['answered']}; lost names not in the Verdict: "
+          f"{m['missing_not_named']}; no raw close in the design: {m['adjusted_only']}; ticker reuse named: {m['reused']}", m)
+
 T_BLOCK = "Probe simulation: build-planning is blocked on an open probe for its milestone, and not once it is Answered"
 if not PR.has_probes:
     graded_or_na("plan_blocked_while_open", T_BLOCK, (None, NOT_PROBING if not probing else "no probes"))
@@ -1119,7 +1145,7 @@ out = {"expectations": R,
                              "errors_encountered": sum(1 for t in turns if t["assistant"].startswith("[agent error")),
                              "output_chars": len(all_docs)},
        "timing": {"executor_duration_seconds": summary.get("total_seconds"), "total_duration_seconds": summary.get("total_seconds")},
-       "extra": {"turns": len(turns), "cost_usd": round(max([(t["usage"].get("cost_usd") or 0) for t in turns] or [0]), 2),
+       "extra": {"turns": len(turns), "cost_usd": round(dtrun.run_cost(turns), 2),
                  "output_tokens": sum(((t["usage"].get("usage") or {}).get("output_tokens") or 0) for t in turns),
                  "agent_seconds": round(sum(t["seconds"] for t in turns)),
                  "final_words": {k: len(v.split()) for k, v in [("brief", brief), ("spec", spec), ("architecture", arch_all)]}, "skills_used": skills_used,

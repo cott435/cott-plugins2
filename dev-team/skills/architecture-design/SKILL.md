@@ -23,7 +23,7 @@ Start with `dt status --skill architecture-design`. Take the mode, shape, gap ke
 |---|---|---|
 | **New** | No `docs/architecture.md` | `references/new.md` |
 | **Extend** | Uncovered or changed spec requirements | `references/extend.md` |
-| **Revise** | A technical change with no spec change, or probe results to fold in (`probes_answered`, `probes_failed`) | `references/revise.md` |
+| **Revise** | A technical change with no spec change, probe results to fold in (`probes_answered`, `probes_failed`), or a change another skill routed here (`routed_changes`) | `references/revise.md` |
 | **Grow** | A Grow trigger fires, or the user wants a split | `references/grow.md` |
 | **Sync** | Code and doc disagree, or code has no doc | `references/sync.md` |
 
@@ -44,7 +44,7 @@ Approval is an unambiguous yes in the user's words; a hedge ("looks fine I guess
 
 | The user says | Do | Then |
 |---|---|---|
-| Approved, nothing to change | Set `Approved` on every doc and contract touched, `Proposed` decisions to `Accepted`, the date. A decision whose `**Probe:**` names a probe not Answered or Waived stays `Proposed`, with its Risks line. Offer to commit; commit only on a yes | **Stop.** Next is `pipeline-design`, and `api-probe` for each probe with no entry yet |
+| Approved, nothing to change | Set `Approved` on every doc and contract touched, `Proposed` decisions to `Accepted`, the date; `dt route --done architecture-design` if `routed_changes` listed any. A decision whose `**Probe:**` names a probe not Answered or Waived stays `Proposed`, with its Risks line. Offer to commit; commit only on a yes | **Stop.** Next is `pipeline-design`, and `api-probe` for each probe with no entry yet |
 | Approved, with a change | Make exactly that edit. Fully specified and changing no decision or contract: set Approved. Otherwise keep Draft | **Stop.** List what you changed |
 | Changes requested | Edit, keep Draft | Repeat this gate |
 

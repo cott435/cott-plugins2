@@ -19,7 +19,8 @@ exports its plan.json. The replays:
 Every check is pinned, pass or fail: the checks the sample can't meet (it isn't a finished four-stage quant run)
 fail in every replay, and in the broken replays dt itself (lint, `dt ready`, `dt archive`) catches the planted
 defects alongside the grader. Before the replays it runs selftest/checks.py: a good and a bad case for each
-structural rule (dtrun.py) that the iteration-7 findings changed.
+structural rule (dtrun.py) that the iteration-7 findings changed; selftest/sessions.py: when the driver opens a
+fresh agent session; and selftest/yahoo.py: the fake Yahoo's planted facts through the HTTPS proxy.
 
 Usage: dryrun.py [out-dir]   (default: a fresh temp dir; printed at the end). Exit 1 on any unexpected result.
 """
@@ -48,7 +49,7 @@ PLANNING = [l for l in LAYERS if l[0]]
 
 # What a single-package sample mid-M1 can't meet, in every replay.
 CONTENT = {"quant_multi_from_data", "approval_after_user", "nh_named", "nh_at_features", "nh_routed_in_plan",
-           "spec_bias_guards", "spec_classical", "spec_ml_beats_classical", "spec_oos", "arch_viz_boundary",
+           "spec_bias_guards", "spec_classical", "spec_ml_beats_classical", "spec_oos", "data_sources_suggested", "arch_viz_boundary",
            "refs_milestones", "skills_on_data_tasks", "skills_on_structure_tasks"}
 BAD_FAIL = {"graph_metrics", "writes_disjoint", "edges_mitigated", "unmitigated_reasoned", "no_edge_to_code_when_interface",
             "edge_table_consistent", "phase0_split", "step_tasks_small", "tester_starts_early", "fakes_only_cross_pipeline",
@@ -241,7 +242,11 @@ def main():
     tmp = pathlib.Path(tempfile.mkdtemp(prefix="dt-dryrun-fx-"))
     sys.path.insert(0, str(HERE / "selftest"))
     import checks  # noqa: E402  (the structural rules' good and bad cases, no dt)
+    import sessions  # noqa: E402  (driver.session_step: when a turn opens a fresh agent session)
     bad = [f"selftest/checks.py: {c[0]} {c[1]}: {c[2]}" for c in checks.run()]
+    bad += [f"selftest/sessions.py: {c[0]}" for c in sessions.run()]
+    import yahoo  # noqa: E402  (the fake Yahoo behind the HTTPS proxy, over urllib)
+    bad += [f"selftest/yahoo.py: {w}" for w in yahoo.run()]
     try:
         _, res, summ = replay(out, "quant-incremental", FIXTURE, LAYERS)
         bad += verdict("quant-incremental", res, summ, CONTENT | {"no_code_during_planning"})  # the M1 code turn

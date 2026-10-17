@@ -11,6 +11,8 @@ Define                      Design                                   Plan       
 idea-refine → spec-writing → architecture-design → pipeline-design → test-planning (optional) → build-planning → build-setup → /build
 ```
 
+`/dev-team:plan <what you want>` drives the flow for you: `dt next` names the next skill run, and in the Claude desktop app each run starts as its own session in the project folder, so every context stays small. You answer and approve in that session; `/plan` only starts the next one. Without session tools it names the skill and runs it in the same session.
+
 Every skill stops after writing a Draft and waits for your review. Nothing moves forward until you approve it in your own words, and "approved, go ahead" starts the next *planning* skill, never code. Planning skills never write or run project code. The one exception is `api-probe`: it writes small probe scripts under `probes/` to check an external API before a decision rests on it, runs only the checks that need no credentials, and leaves the rest for you to run.
 
 ## The documents

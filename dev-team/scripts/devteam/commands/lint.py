@@ -1160,7 +1160,7 @@ def check_broken_fence(ctx: Context):
 
 def check_header(ctx: Context):
     for doc in ctx.scoped_docs:
-        if doc.kind in ("agents", "todo") or (doc.kind == "plan" and not model.is_dev_team_plan(doc)):
+        if doc.kind in ("agents", "todo", "routes") or (doc.kind == "plan" and not model.is_dev_team_plan(doc)):
             continue
         if doc.header_line is None:
             line = doc.title_line if doc.title_line is not None else 0

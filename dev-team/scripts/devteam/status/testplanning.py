@@ -7,7 +7,7 @@ from __future__ import annotations
 import os
 import re
 
-from .. import md, model
+from .. import md, model, routes
 from ..repo import Repo
 from .common import Report, add_common, available_skills, in_revise
 from .packages import known_packages
@@ -69,10 +69,11 @@ def test_planning(repo: Repo, r: Report) -> None:
                 fx_missing.append(f"{t.id} (no expected.json)")
         modes[pkg] = "new" if tdoc is None else "revise" if in_revise(repo, tdoc) else \
             "extend" if gaps else "current"
+    routed = routes.open_for(repo, "test-planning")
     if not modes or all(m == "blocked" for m in modes.values()):
         r.mode("blocked", "no Approved pipelines.md (run pipeline-design)")
     else:
-        present = set(modes.values())
+        present = set(modes.values()) | ({"revise"} if routed else set())
         r.mode(next(m for m in ("new", "revise", "extend", "current") if m in present))
     add_common(repo, r)
     r.add("packages", modes)
@@ -83,3 +84,4 @@ def test_planning(repo: Repo, r: Report) -> None:
     r.add("fixtures_missing", fx_missing)
     r.add("fixtures_orphan", fixtures_orphan(repo, referenced_fixtures))
     r.add("skills", available_skills(repo))
+    r.add("routed_changes", routed)

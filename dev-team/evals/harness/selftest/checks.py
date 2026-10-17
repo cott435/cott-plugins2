@@ -265,6 +265,35 @@ case("types_in_contract", True, "library types, comments and prose are left out"
 case("types_in_contract", True, "a type defined inline resolves", d.defined_in("CovMethod", "`CovMethod = Literal['sample', 'shrink']`"))
 
 
+# ---- data_sources_suggested (iteration-8 follow-up): the agent's own sources beyond Sharadar prices and yahooquery
+f, fund = d.data_sources({"docs/architecture.md": "- **Alternatives:** Tiingo (raw closes); SEC EDGAR company facts "
+                          "(XBRL) for fundamentals, deferred to S3."})
+case("data_sources_suggested", True, "a fundamentals source among the alternatives counts", fund == ["SEC EDGAR / XBRL"] and "Tiingo" in f)
+f, fund = d.data_sources({"docs/architecture.md": "Fundamentals from Sharadar's SF1 table, on the same subscription."})
+case("data_sources_suggested", True, "Sharadar SF1, named as the fundamentals source, counts", fund == ["Sharadar SF1"])
+f, fund = d.data_sources({"docs/architecture.md": "Prices from Sharadar SEP; cross-checked against Yahoo via yahooquery, "
+                          "with EODHD and Polygon considered for prices."})
+case("data_sources_suggested", False, "price sources alone, and Sharadar without SF1, don't count", not fund and sorted(f) == ["EODHD", "Polygon"])
+f, fund = d.data_sources({"docs/brief.md": "- Intraday data, fundamentals or live streaming — daily prices first."})
+case("data_sources_suggested", False, "fundamentals ruled out, no source named", not f and not fund)
+
+
+# ---- crosscheck_facts_reached_design (the fake Yahoo's planted facts reach the design)
+import fakevendor  # noqa: E402
+Y = fakevendor.VENDORS["yahoo"].PLANTED
+def y_entry(kind="answered", verdict=""):
+    return {"id": "PB-02", "kind": kind, "verdict": verdict, "caveats": "", "checks": [{"result": ""}]}
+lost = "LEH, BSC, CFC, MER, SGP, WYE and EK return no data."
+ok, _ = d.crosscheck_facts([y_entry(verdict=lost + " BUD, DNA and WB now belong to AB InBev, Ginkgo and Weibo.")],
+                           "AD-05: Yahoo's close is split-adjusted; no raw close, so raw prices stay Sharadar's.", Y)
+case("crosscheck_facts_reached_design", True, "answered, lost names and ticker reuse in the Verdict, no raw close in the decision", ok)
+ok, m = d.crosscheck_facts([y_entry(verdict="LEH and MER return no data.")], "AD-05: cross-check closes against Yahoo.", Y)
+case("crosscheck_facts_reached_design", False, "names missing from the Verdict, nothing on raw closes or reuse",
+     not ok and "BSC" in m["missing_not_named"] and not m["adjusted_only"])
+ok, _ = d.crosscheck_facts([y_entry("ready", lost + " DNA is Ginkgo now.")], "Yahoo has no raw close.", Y)
+case("crosscheck_facts_reached_design", False, "the facts guessed before the probe is Answered", not ok)
+
+
 def run(verbose=True):
     """The cases that came out wrong (empty when all hold)."""
     wrong = [c for c in CASES if not c[3]]

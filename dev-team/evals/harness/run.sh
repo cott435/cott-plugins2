@@ -29,3 +29,17 @@ EVAL_WS="$ws" python3 "$here/package.py" "$iter"
 # The workflow analysis of every run, regraded, and the comparison with the previous iteration:
 # <run>/flow/flow.html and $ws/$iter/runflow/index.html
 EVAL_WS="$ws" python3 "$here/runviz.py" "$iter" || echo "runviz failed: no flow pages (the eval itself is fine)"
+# Copy the flow pages into the repo's results folder, in the workspace's layout so their links
+# hold: results-<iteration>/runflow/index.html and results-<iteration>/<trajectory>/with_skill/flow/
+res="$here/../results-$iter"
+mkdir -p "$res/runflow"
+[ -d "$ws/$iter/runflow" ] && cp -R "$ws/$iter/runflow/." "$res/runflow/"
+for t in "${trajs[@]}"; do
+  if [ -d "$ws/$iter/$t/with_skill/flow" ]; then
+    mkdir -p "$res/$t/with_skill"
+    cp -R "$ws/$iter/$t/with_skill/flow" "$res/$t/with_skill/"
+  else
+    echo "no flow pages for $t (the eval itself is fine)"
+  fi
+done
+echo "flow pages: $res/runflow/index.html"

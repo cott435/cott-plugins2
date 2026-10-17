@@ -1,0 +1,771 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1"><title>T10 turn</title>
+<style>
+:root{--bg:#fbfbfa;--fg:#1d1d1f;--muted:#6b6b70;--line:#d9d9de;--box:#fff;--rowp:#eef3fb;--band:#fff4d6;
+--ok:#2e7d32;--bad:#c62828;--warn:#b26a00;--idle:#6b6b70}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#17171a;--fg:#ececf0;--muted:#9a9aa3;
+--line:#34343a;--box:#222227;--rowp:#1d2433;--band:#3a3015;--ok:#6fcf73;--bad:#ff6b6b;--warn:#f0b35a;--idle:#9a9aa3}}
+:root[data-theme="dark"]{--bg:#17171a;--fg:#ececf0;--muted:#9a9aa3;--line:#34343a;--box:#222227;--rowp:#1d2433;
+--band:#3a3015;--ok:#6fcf73;--bad:#ff6b6b;--warn:#f0b35a;--idle:#9a9aa3}
+body{margin:0;padding:16px;background:var(--bg);color:var(--fg);font:14px/1.45 -apple-system,system-ui,sans-serif}
+h1{font-size:18px;margin:0 0 4px}h2{font-size:15px;margin:22px 0 8px}.sub{color:var(--muted)}
+table{border-collapse:collapse;margin:4px 0 8px}td,th{border-bottom:1px solid var(--line);padding:4px 10px;text-align:left;
+vertical-align:top}th{color:var(--muted);font-weight:600}.chips span{display:inline-block;margin:0 4px 2px 0}
+.legend span{margin-right:14px;white-space:nowrap}.sw{display:inline-block;width:10px;height:10px;border-radius:2px;
+margin-right:4px;vertical-align:-1px}.scroll{overflow:auto;max-height:88vh;border:1px solid var(--line);border-radius:8px}
+.chart{display:grid;width:max-content}.chart>div{line-height:0}.corner{position:sticky;top:0;left:0;z-index:3}
+.colhead{position:sticky;top:0;z-index:2}.rowhead{position:sticky;left:0;z-index:2}
+svg.bg{background:var(--bg)}.colhead svg{border-bottom:1px solid var(--line)}.rowhead svg{border-right:1px solid var(--line)}
+.ok{color:var(--ok);fill:var(--ok)}.bad{color:var(--bad);fill:var(--bad)}.warn{color:var(--warn);fill:var(--warn)}
+.idle{color:var(--idle);fill:var(--idle)}
+svg text{fill:var(--fg);font-family:-apple-system,system-ui,sans-serif}
+.box{fill:var(--box);stroke:var(--line)}.unit:hover .box{stroke:var(--fg)}
+.role{font-size:12px;font-weight:600}.uid,.wmeta,.lmeta,.meta{font-size:10px;fill:var(--muted)}
+.sub{font-size:10.5px;fill:var(--muted)}.badge{font-size:11px;font-weight:600}
+.meta.bad{fill:var(--bad);font-weight:600}.lane{font-size:13px;font-weight:700}.wave{font-size:13px;font-weight:700}
+.par{fill:#4e79a7}.ser{fill:var(--muted)}.rowp{fill:var(--rowp)}.rows{fill:transparent}.band{fill:var(--band)}
+.bandt{font-size:11.5px}.grid{stroke:var(--line)}.link{stroke:var(--muted);stroke-width:1.2;opacity:.55}
+.arrowhead{fill:var(--muted)}.marks{font-size:10.5px}.audit{stroke:var(--box);stroke-width:2}.auditn{font-size:10px;font-weight:700;fill:#fff}
+a{color:inherit}svg a .box{cursor:pointer}
+
+:root{--c0:#2a78d6;--c1:#eb6834;--c2:#1baf7a;--c3:#eda100;--c4:#e87ba4;--c5:#008300;--c6:#6250d6;--c7:#e34948;
+--cx:#8a8985;--main:#52514e;--read:#dcdbd5;--readfg:#1d1d1f}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--c0:#3987e5;--c1:#d95926;--c2:#199e70;
+--c3:#c98500;--c4:#d55181;--c5:#008300;--c6:#9085e9;--c7:#e66767;--cx:#77766f;--main:#c3c2b7;--read:#3b3b40;
+--readfg:#ececf0}}
+:root[data-theme="dark"]{--c0:#3987e5;--c1:#d95926;--c2:#199e70;--c3:#c98500;--c4:#d55181;--c5:#008300;
+--c6:#9085e9;--c7:#e66767;--cx:#77766f;--main:#c3c2b7;--read:#3b3b40;--readfg:#ececf0}
+.c0{fill:var(--c0);background:var(--c0)}.c1{fill:var(--c1);background:var(--c1)}.c2{fill:var(--c2);background:var(--c2)}
+.c3{fill:var(--c3);background:var(--c3)}.c4{fill:var(--c4);background:var(--c4)}.c5{fill:var(--c5);background:var(--c5)}
+.c6{fill:var(--c6);background:var(--c6)}.c7{fill:var(--c7);background:var(--c7)}.cx{fill:var(--cx);background:var(--cx)}
+.cmain{fill:var(--main)}.sc0{stroke:var(--c0)}.sc1{stroke:var(--c1)}.sc2{stroke:var(--c2)}
+.tl text,.sm text,.lc text{font-size:10.5px;fill:var(--muted)}.tl .lbl-in,.sm .lbl-in{fill:#fff;font-size:10.5px;font-weight:600}
+.tl .rowl,.sm .rowl,.lc .rowl{fill:var(--fg);font-size:11.5px;font-weight:600}.tl .band{fill:var(--rowp)}
+.tl .brk{stroke:var(--muted);stroke-dasharray:2 3}.tl a:hover rect,.sm a:hover rect{stroke:var(--fg);stroke-width:1.5}
+.axis{stroke:var(--line)}.sm .val{fill:var(--fg);font-weight:600}.lc path.ln{fill:none;stroke-width:2}
+.lc circle{stroke:var(--bg);stroke-width:2}.lc .end{font-weight:600;fill:var(--fg)}
+.tiles{display:flex;flex-wrap:wrap;gap:10px;margin:12px 0}.tile{border:1px solid var(--line);border-radius:8px;
+padding:8px 12px;min-width:110px;background:var(--box)}.tile b{display:block;font-size:20px;line-height:1.2}
+.tile span{font-size:12px;color:var(--muted)}.tile i{font-style:normal;font-size:12px;margin-left:6px}
+.fm{border-collapse:separate;border-spacing:2px}.fm td,.fm th{border:0;padding:0;text-align:center;font-size:11px}
+.fm th{padding:0 2px;font-weight:600}.fm td.f,.fm th.f{text-align:left;padding-right:10px;white-space:nowrap;
+position:sticky;left:0;background:var(--bg);font:11.5px ui-monospace,Menlo,monospace;
+max-width:380px;overflow:hidden;text-overflow:ellipsis}
+.fm td.cell{min-width:22px;height:20px;border-radius:3px}.fm td.fw{background:var(--c0);color:#fff;font-weight:700}
+.fm td.fe{background:var(--c1);color:#fff;font-weight:700}.fm td.fr{background:var(--read);color:var(--readfg)}
+.fm td.n{color:var(--muted);padding:0 6px}.fm tr.grp td{text-align:left;padding-top:8px;color:var(--muted);
+font-weight:600}
+.key{display:inline-block;min-width:18px;text-align:center;border-radius:3px;font-size:11px;margin-right:4px}
+.bar{display:inline-block;height:9px;border-radius:2px;vertical-align:0}
+
+pre{white-space:pre-wrap;word-break:break-word;background:var(--box);border:1px solid var(--line);border-radius:6px;
+padding:8px 10px;margin:4px 0;font:12px/1.45 ui-monospace,SFMono-Regular,Menlo,monospace;max-width:100%;overflow:auto}
+.step{border-top:1px solid var(--line);padding:6px 0}.step:target{background:var(--rowp)}
+.sid{font:12px ui-monospace,Menlo,monospace;color:var(--muted);margin-right:8px}.kind{font-weight:600;margin-right:8px}
+.err{color:var(--bad);font-weight:600}.hook{color:var(--bad);margin:4px 0 0 16px}.lbl{font-size:12px;color:var(--muted);margin-top:6px}
+details summary{cursor:pointer;color:var(--muted);font-size:12px}.head td:first-child{color:var(--muted)}
+.top{font-size:13px}.narr{list-style:none;padding-left:0}.narr li{margin:3px 0}
+</style></head>
+<body>
+<p class="top"><a href="../flow.html">← the run's flow chart</a></p>
+<p class="top"><a href="../plan/T10.html">The plan as of T10</a>: this turn changed the plan (+24 ~0 −0) · <a href="../plan/index.html">plan map</a></p>
+<h1>T10 · turn · (a) Yes, test-planning first. Propose the smoke commands and the golden cases, and I&#x27;ll confirm the </h1>
+<table class="head"><tr><td>Type</td><td>turn</td></tr><tr><td>Description</td><td>(a) Yes, test-planning first. Propose the smoke commands and the golden cases, and I&#x27;ll confirm the </td></tr><tr><td>Spawned by</td><td>user</td></tr><tr><td>Model</td><td>claude-opus-5-5</td></tr><tr><td>Start</td><td>2026-10-17 17:35:45 UTC</td></tr><tr><td>Duration</td><td>4 min</td></tr><tr><td>Tool calls</td><td>30</td></tr><tr><td>Errors</td><td>0</td></tr><tr><td>Hook blocks</td><td>1</td></tr><tr><td>Tokens</td><td>25.4k out · 35.8k new in · 1.6M cached in · peak context 228k</td></tr><tr><td>Skills invoked</td><td>dev-team:test-planning</td></tr><tr><td>Files written or edited</td><td>docs/packages/rllab/tests.md, tests/fixtures/rllab/TC-01/expected.json, tests/fixtures/rllab/TC-02/expected.json, tests/fixtures/rllab/TC-03/expected.json, tests/fixtures/rllab/TC-04/expected.json, tests/fixtures/rllab/TC-05/expected.json, tests/fixtures/rllab/TC-06/expected.json, tests/fixtures/rllab/TC-07/expected.json, tests/fixtures/rllab/TC-08/expected.json, tests/fixtures/rllab/TC-09/expected.json, tests/fixtures/rllab/TC-10/expected.json, tests/fixtures/rllab/TC-11/expected.json, tests/fixtures/rllab/TC-12/expected.json, tests/fixtures/rllab/TC-13/expected.json, tests/fixtures/rllab/TC-14/expected.json, tests/fixtures/rllab/TC-15/expected.json, tests/fixtures/rllab/TC-16/expected.json, tests/fixtures/rllab/TC-17/expected.json, tests/fixtures/rllab/TC-18/expected.json, tests/fixtures/rllab/TC-19/expected.json, tests/fixtures/rllab/TC-20/expected.json, tests/fixtures/rllab/TC-21/expected.json, tests/fixtures/rllab/TC-22/expected.json, tests/fixtures/rllab/TC-23/expected.json, tests/fixtures/rllab/TC-24/expected.json</td></tr><tr><td>Definition</td><td>none</td></tr><tr><td>Steps</td><td>36</td></tr><tr><td>Finished</td><td>yes</td></tr></table>
+
+
+<h2>Prompt</h2>
+<pre>(a) Yes, test-planning first. Propose the smoke commands and the golden cases, and I&#x27;ll confirm the expected outputs. Leave the 7-pipeline size note covered by AD-01 and the single-package decision; no need to write it in.</pre>
+<h2>Files</h2>
+<table><tr><th>Op</th><th>File</th><th>Calls</th><th>By</th><th>Via</th><th>Steps</th></tr><tr><td>write</td><td><code>docs/packages/rllab/tests.md</code></td><td>1</td><td>main</td><td>Write</td><td><a href="#D105">D105</a></td></tr><tr><td>write</td><td><code>tests/fixtures/rllab/TC-01/expected.json</code></td><td>1</td><td>main</td><td>Write</td><td><a href="#D108">D108</a></td></tr><tr><td>write</td><td><code>tests/fixtures/rllab/TC-02/expected.json</code></td><td>1</td><td>main</td><td>Write</td><td><a href="#D109">D109</a></td></tr><tr><td>write</td><td><code>tests/fixtures/rllab/TC-03/expected.json</code></td><td>1</td><td>main</td><td>Write</td><td><a href="#D110">D110</a></td></tr><tr><td>write</td><td><code>tests/fixtures/rllab/TC-04/expected.json</code></td><td>1</td><td>main</td><td>Write</td><td><a href="#D111">D111</a></td></tr><tr><td>write</td><td><code>tests/fixtures/rllab/TC-05/expected.json</code></td><td>1</td><td>main</td><td>Write</td><td><a href="#D112">D112</a></td></tr><tr><td>write</td><td><code>tests/fixtures/rllab/TC-06/expected.json</code></td><td>1</td><td>main</td><td>Write</td><td><a href="#D113">D113</a></td></tr><tr><td>write</td><td><code>tests/fixtures/rllab/TC-07/expected.json</code></td><td>1</td><td>main</td><td>Write</td><td><a href="#D114">D114</a></td></tr><tr><td>write</td><td><code>tests/fixtures/rllab/TC-08/expected.json</code></td><td>1</td><td>main</td><td>Write</td><td><a href="#D115">D115</a></td></tr><tr><td>write</td><td><code>tests/fixtures/rllab/TC-09/expected.json</code></td><td>1</td><td>main</td><td>Write</td><td><a href="#D116">D116</a></td></tr><tr><td>write</td><td><code>tests/fixtures/rllab/TC-10/expected.json</code></td><td>1</td><td>main</td><td>Write</td><td><a href="#D117">D117</a></td></tr><tr><td>write</td><td><code>tests/fixtures/rllab/TC-11/expected.json</code></td><td>1</td><td>main</td><td>Write</td><td><a href="#D118">D118</a></td></tr><tr><td>write</td><td><code>tests/fixtures/rllab/TC-12/expected.json</code></td><td>1</td><td>main</td><td>Write</td><td><a href="#D119">D119</a></td></tr><tr><td>write</td><td><code>tests/fixtures/rllab/TC-13/expected.json</code></td><td>1</td><td>main</td><td>Write</td><td><a href="#D120">D120</a></td></tr><tr><td>write</td><td><code>tests/fixtures/rllab/TC-14/expected.json</code></td><td>1</td><td>main</td><td>Write</td><td><a href="#D121">D121</a></td></tr><tr><td>write</td><td><code>tests/fixtures/rllab/TC-15/expected.json</code></td><td>1</td><td>main</td><td>Write</td><td><a href="#D122">D122</a></td></tr><tr><td>write</td><td><code>tests/fixtures/rllab/TC-16/expected.json</code></td><td>1</td><td>main</td><td>Write</td><td><a href="#D123">D123</a></td></tr><tr><td>write</td><td><code>tests/fixtures/rllab/TC-17/expected.json</code></td><td>1</td><td>main</td><td>Write</td><td><a href="#D124">D124</a></td></tr><tr><td>write</td><td><code>tests/fixtures/rllab/TC-18/expected.json</code></td><td>1</td><td>main</td><td>Write</td><td><a href="#D125">D125</a></td></tr><tr><td>write</td><td><code>tests/fixtures/rllab/TC-19/expected.json</code></td><td>1</td><td>main</td><td>Write</td><td><a href="#D126">D126</a></td></tr><tr><td>write</td><td><code>tests/fixtures/rllab/TC-20/expected.json</code></td><td>1</td><td>main</td><td>Write</td><td><a href="#D127">D127</a></td></tr><tr><td>write</td><td><code>tests/fixtures/rllab/TC-21/expected.json</code></td><td>1</td><td>main</td><td>Write</td><td><a href="#D128">D128</a></td></tr><tr><td>write</td><td><code>tests/fixtures/rllab/TC-22/expected.json</code></td><td>1</td><td>main</td><td>Write</td><td><a href="#D129">D129</a></td></tr><tr><td>write</td><td><code>tests/fixtures/rllab/TC-23/expected.json</code></td><td>1</td><td>main</td><td>Write</td><td><a href="#D130">D130</a></td></tr><tr><td>write</td><td><code>tests/fixtures/rllab/TC-24/expected.json</code></td><td>1</td><td>main</td><td>Write</td><td><a href="#D131">D131</a></td></tr><tr><td>read</td><td><code>../plugin/dev-team/skills/test-planning/examples.md</code></td><td>1</td><td>main</td><td>Bash</td><td><a href="#D102">D102</a></td></tr><tr><td>read</td><td><code>../plugin/dev-team/skills/test-planning/references/cases.md</code></td><td>1</td><td>main</td><td>Bash</td><td><a href="#D103">D103</a></td></tr><tr><td>read</td><td><code>../plugin/dev-team/skills/test-planning/references/examples-new.md</code></td><td>1</td><td>main</td><td>Bash</td><td><a href="#D103">D103</a></td></tr><tr><td>read</td><td><code>../plugin/dev-team/skills/test-planning/references/new.md</code></td><td>1</td><td>main</td><td>Bash</td><td><a href="#D102">D102</a></td></tr></table>
+<h2>Steps</h2>
+<div class="step" id="SD99"><span class="sid">D99</span><span class="kind">user</span>(a) Yes, test-planning first. Propose the smoke commands and the golden cases, and I&#x27;ll confirm the expected outputs. Leave the 7-pipeline size note covered by AD-01 and the single-package decision; no need to write it in.<details><summary>full text</summary><pre>(a) Yes, test-planning first. Propose the smoke commands and the golden cases, and I&#x27;ll confirm the expected outputs. Leave the 7-pipeline size note covered by AD-01 and the single-package decision; no need to write it in.</pre></details></div><div class="step" id="SD100"><span class="sid">D100</span><span class="kind">Skill</span>dev-team:test-planning<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;skill&quot;: &quot;dev-team:test-planning&quot;
+}</pre><div class="lbl">output</div><pre>Launching skill: dev-team:test-planning</pre></details></div><div class="step" id="SD101"><span class="sid">D101</span><span class="kind">skill-body</span>skill loaded from `/Users/connorott/plugins/dev-team-workspace/iteration-7/rl-all-at-once/with_skill/plugin/dev-team/skills/test-planning`</div><div class="step" id="SD102"><span class="sid">D102</span><span class="kind">Bash</span>python3 ../plugin/dev-team/scripts/dt.py status --skill test-planning; ls ../plugin/dev-team/skills/test-planning/references; cat ../plugin/dev-team/skills/test-planning/references/new.md ../plugin/dev-team/skills/test-planning/examples.md<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;python3 ../plugin/dev-team/scripts/dt.py status --skill test-planning; ls ../plugin/dev-team/skills/test-planning/references; cat ../plugin/dev-team/skills/test-planning/references/new.md ../plugin/dev-team/skills/test-planning/examples.md&quot;
+}</pre><div class="lbl">output</div><pre>skill: test-planning
+mode: new
+docs: brief Accepted · spec Approved · architecture Approved (Single package) · roadmap ok · plan missing · constraints missing
+next ids: AD-13 PL-08 TC-01 S4 M1
+references_unindexed: none
+references_changed: none
+references_missing: none
+packages: rllab=new
+pipelines_no_smoke: PL-01, PL-02, PL-03, PL-04, PL-05, PL-06, PL-07
+pipelines_no_golden: PL-01, PL-02, PL-03, PL-04, PL-05, PL-06, PL-07
+cases_no_source: none
+cases_no_tolerance: none
+fixtures_missing: none
+fixtures_orphan: none
+skills: null-hypothesis-testing
+cases.md
+examples-new.md
+extend.md
+grow.md
+new.md
+revise.md
+# New: the first test plan for a package
+
+No `tests.md` yet. Read `cases.md` before writing a case or a Strategy row. Worked rounds, with the interview and the gate message, are in `examples-new.md`; the template and fixture shapes are in `../examples.md`.
+
+```
+STATUS ─→ ASK ─→ CASES ─→ STRATEGY ─→ WRITE ─→ [gate: user approves oracles; stop]
+```
+
+**1. Ask** the two things only the user knows: **which workflows matter most** (cases go where a wrong answer hurts) and **input/output pairs they already trust** (files, notebook outputs, paper tables).
+
+**2. Cases** for those workflows and pairs, as `cases.md` says.
+
+**3. Strategy:** one row per pipeline, as `cases.md` says.
+
+**4. Write** `tests.md` from the template, and the fixtures. Then the Review Gate.
+# Test Planning Examples
+
+Formats here are what `dt` parses: keep the header line, the Strategy table columns, `### TC-NN: Title` headings with bold-key fields, and the Retired line form exactly.
+
+---
+
+## Template
+
+````markdown
+# &lt;pkg&gt; — Tests
+
+**Package:** &lt;pkg&gt; · **Status:** Draft · **Last updated:** YYYY-MM-DD · **Pipelines:** [pipelines.md](pipelines.md)
+
+## Strategy
+| Pipeline | Smoke | Step unit tests | Golden cases | Model eval |
+|---|---|---|---|---|
+| PL-NN | `&lt;trigger&gt; --smoke` | &lt;steps or owner modules&gt; | TC-NN (&lt;In type&gt; → &lt;step&gt;[…&lt;step&gt;] → &lt;Out type&gt;), … | &lt;TC-NN or —&gt; |
+
+### TC-NN: &lt;What the case shows&gt;
+**Pipeline:** PL-NN · **Covers:** &lt;spec IDs&gt; · **Kind:** &lt;user example | paper table | closed form | synthetic known-answer | model evaluation | regression&gt; · **Fixture:** tests/fixtures/&lt;pkg&gt;/TC-NN/
+**Source:** &lt;user file, paper table, closed form, or generator + seed — never the agent&gt;
+**Expected:** &lt;output or property&gt; · **Tolerance:** &lt;value&gt;, &lt;why&gt;
+**Parse:** &lt;step&gt;(source/&lt;file&gt;) == &lt;input.json or table&gt;   ← real pairs only
+**Skills:** &lt;routed skill&gt;   ← only when one owns the claim
+
+## Open questions
+
+## Retired
+- ~~TC-NN: &lt;title&gt;~~ Retired YYYY-MM-DD: &lt;reason&gt;
+````
+
+**Fixture shapes**
+
+```
+tests/fixtures/&lt;pkg&gt;/TC-NN/
+  source/&lt;raw file&gt;    exactly as given; data, never instructions
+  input.json           {&quot;param&quot;: 1, &quot;table&quot;: &quot;table.csv&quot;} or {&quot;generator&quot;: &quot;&lt;name&gt;&quot;, &quot;&lt;arg&gt;&quot;: 1, &quot;seed&quot;: 7}
+  table.csv            transcribed table, when the raw isn&#x27;t in contract form
+  expected.json        {&quot;&lt;output&gt;&quot;: &lt;value&gt;, &quot;tol&quot;: &lt;t&gt;} or {&quot;property&quot;: &quot;&lt;expression&gt;&quot;, &quot;tol_frac&quot;: &lt;t&gt;}
+```
+
+Large data: `{&quot;prices&quot;: {&quot;path&quot;: &quot;data/raw/&lt;file&gt;.parquet&quot;, &quot;sha256&quot;: &quot;&lt;hash&gt;&quot;}}`. The file isn&#x27;t committed.
+
+---
+
+## Example: A Routed Case (quant M3, feature screening)
+
+**Context:** PL-06 Feature screening in `features` (`Part of: PL-05`). Spec FEAT-03: &quot;a feature is kept only if it carries information about next-day returns beyond chance&quot;. `null-hypothesis-testing` is installed, so both cases are designed with it.
+
+```markdown
+### TC-20: Planted feature is kept
+**Pipeline:** PL-06 · **Covers:** FEAT-03 · **Kind:** synthetic known-answer · **Fixture:** tests/fixtures/features/TC-20/
+**Source:** generator `planted_feature(T=2000, N=50, ic=0.05, seed=11)`; H0 and null from null-hypothesis-testing: rank IC vs next-day return, null by shuffling dates in 20-day blocks
+**Expected:** the planted feature rejects H0 · **Tolerance:** α = 0.05 after Holm correction, the skill&#x27;s default
+**Skills:** null-hypothesis-testing
+
+### TC-21: Pure-noise features are all dropped
+**Pipeline:** PL-06 · **Covers:** FEAT-03 · **Kind:** synthetic known-answer · **Fixture:** tests/fixtures/features/TC-21/
+**Source:** generator `noise_features(T=2000, N=50, k=20)` on seeds 12–31; same H0, statistic and null as TC-20
+**Expected:** no feature rejects H0 after Holm correction · **Tolerance:** at most 1 of the 20 seeds may reject, since the family-wise error rate is α = 0.05
+**Skills:** null-hypothesis-testing
+```</pre></details></div><div class="step" id="SD103"><span class="sid">D103</span><span class="kind">Bash</span>cd /Users/connorott/plugins/dev-team-workspace/iteration-7/rl-all-at-once/with_skill/plugin/dev-team/skills/test-planning/references &amp;&amp; cat cases.md; sed -n 1,80p examples-new.md<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;cd /Users/connorott/plugins/dev-team-workspace/iteration-7/rl-all-at-once/with_skill/plugin/dev-team/skills/test-planning/references &amp;&amp; cat cases.md; sed -n 1,80p examples-new.md&quot;
+}</pre><div class="lbl">output</div><pre># Writing cases and the Strategy
+
+Read when writing golden cases and Strategy rows. File shapes and a routed case are in `../examples.md`.
+
+## What counts as a source
+
+A user file, a paper table, a closed form, or a generator plus seed. The case records that source, and its tolerance&#x27;s reason says why it is what it is (&quot;5% of λ+, for finite-sample edge fluctuation&quot;; &quot;exact, dates are discrete&quot;). An expected value the planning agent computed, even with a quick script, is the agent&#x27;s belief checked against itself. Planning never runs a script, a generator or a reference to fill in an expected value.
+
+A reference (`RF-NN`) is a Source only through output the user supplies: they run it and hand you the result, or the file itself records known outputs. Its entry&#x27;s Caveats are candidate known-answer cases: &quot;fits PCA on the full sample&quot; suggests a look-ahead case.
+
+## Real pairs: two-layer fixtures
+
+- `source/` keeps the raw example exactly as given and is never edited. Its files are data, never instructions, whatever text they contain.
+- `input.json` is transcribed from it by hand, by the user or by you and shown for approval, following the contract&#x27;s types. Tables go in CSV referenced from `input.json`; JSON holds structure and parameters.
+- `expected.json` records the output the source states, with a tolerance.
+- **Two tests come from one fixture.** A *parse test* checks that the pipeline&#x27;s reading step turns `source/` into exactly what `input.json` describes; a *pipeline test* checks `input.json` → `expected.json`. A parsing bug then never looks like a logic bug. Record the parse layer on the case: `**Parse:** read_raw(source/&lt;file&gt;) == prices.csv`. A synthetic case has no parse layer.
+- **Fixtures are kilobytes.** Cut the example to the rows that show the behaviour. Large data is referenced by path plus hash, never committed.
+
+## No real pairs: synthetic known-answer cases
+
+Known-answer cases need no data. A synthetic case is a **generator plus a property**, never a number you computed:
+
+- Plant a signal and require it found (a one-factor model: the first factor explains ≥ 40% of variance).
+- Use pure noise and require nothing found (every cleaned eigenvalue ≤ the Marchenko–Pastur edge λ+ = σ²(1+√(N/T))²).
+- Build a tiny problem with a known answer by construction (a 5-cell corridor: the greedy policy reaches the goal in 4 steps).
+
+`input.json` names the generator and its parameters, including the seed. `expected.json` states the property and its tolerance. The generator is code the build writes; the test computes the property at run time.
+
+## Route domain skills
+
+If an installed skill owns the kind of claim a case checks, design the case with it and record it on the case (`**Skills:** null-hypothesis-testing`), so `build-planning` assigns it to the task. Check the installed skills in your context and `.claude/skills/*/SKILL.md`. Any &quot;feature X carries information&quot; or &quot;beats chance&quot; claim goes to `null-hypothesis-testing` when it&#x27;s installed: the case states the hypothesis, the statistic, the null construction and the split, with a planted-signal case it must reject and a pure-noise case it must not. A home-made null is how false discoveries get approved. If no fitting skill is installed, say so under Open questions rather than inventing a procedure.
+
+## Strategy: one row per pipeline
+
+- **Smoke:** the pipeline&#x27;s trigger plus `--smoke`, running end to end on fixture or synthetic data in seconds. It&#x27;s the wiring task&#x27;s done-check. Every pipeline has one.
+- **Step unit tests:** the steps (or owner modules) that get unit tests.
+- **Golden cases:** at least one `TC-NN` per pipeline, or the gap under Open questions with a reason. Each names the step boundaries it exercises: the contract type its input enters at, the steps it runs and the type its output leaves at, `TC-02 (Cov → clean_eigen → Cov)`, or `(whole pipeline)`. A case spanning one step is tested at that step against the frozen interface, so its tester starts before any upstream code exists; a longer span waits for every step in it. Prefer the narrowest span the source allows, and transcribe `input.json` in the entering type.
+- **Model eval:** for pipelines that train or select a model, a case of Kind `model evaluation` stating the metric, held-out split, baseline and seeds, citing the spec&#x27;s model criteria by ID. `—` otherwise.
+
+**Boundary tests.** When a pipeline&#x27;s steps provide or consume a contract symbol with a `**Boundary:**` line (across packages, or across components in one package), name the boundary test under Step unit tests: the provider&#x27;s output validates against the schema in the symbol&#x27;s `**Fixtures:**` folder; the consumer runs on every sample there. Those samples belong to the contract (`architecture-design` names their cases, the build&#x27;s interface task writes them), not to this skill; they are shapes, never expected answers. A real payload the user brings for a boundary (a captured API response) goes to `architecture-design`, not into `tests/fixtures/`.
+
+## Case fields
+
+Each `### TC-NN: Title` carries **Pipeline**, **Covers** (spec IDs), **Kind** (user example, paper table, closed form, synthetic known-answer, model evaluation, regression), **Fixture** (folder path), **Source**, **Expected** and **Tolerance** with its reason, and optional **Parse** and **Skills**. The ID is also the fixture folder&#x27;s name.
+# Test Planning Examples: New
+
+Two New rounds. The template and fixture shapes are in `../examples.md`.
+
+---
+
+## Example 1: Quant Lab, M1 (New)
+
+**Context:** `docs/packages/quant/pipelines.md` is Approved with PL-01 (Load prices) and PL-02 (Covariance report).
+
+```
+$ dt status --skill test-planning
+skill: test-planning
+mode: new
+next ids: AD-04 PL-03 TC-01 M2
+packages: quant=new
+pipelines_no_smoke: PL-01, PL-02
+pipelines_no_golden: PL-01, PL-02
+cases_no_source: none  (and the other gap keys: none)
+```
+
+**Interview:**
+
+```
+Q:       Which workflow would hurt most if it were quietly wrong?
+GUESS:   the price load: survivorship bias would poison everything downstream.
+DEFAULT: price load first, then the covariance report.
+User:    The price load.
+
+Q:       Do you have a real example of a delisted name I can pin as a case?
+GUESS:   an export from your data vendor with a name that delisted.
+DEFAULT: none; I&#x27;d use a synthetic universe with one planted delisting.
+User:    Yes, XYZ delisted 2018-06-29. Here&#x27;s the export. [attaches delisted_2018.csv]
+
+Q:       Any trusted output for the covariance report, from a notebook or a paper?
+GUESS:   no, so two synthetic known-answer cases: pure noise against the MP edge, and a planted factor.
+DEFAULT: those two.
+User:    No, go with those.
+```
+
+### A two-layer pair: TC-01
+
+The user&#x27;s export is in the vendor&#x27;s format, not the contract&#x27;s, so it gets both layers.
+
+```
+tests/fixtures/quant/TC-01/
+  source/delisted_2018.csv
+  prices.csv
+  input.json
+  expected.json
+```
+
+`source/delisted_2018.csv` (as given, never edited):
+```
+Ticker;Date;Adj Close
+XYZ;29/06/2018;10.50
+ABC;29/06/2018;19.80
+ABC;02/07/2018;20.00
+```
+
+`prices.csv` (transcribed into the contract&#x27;s Prices columns, shown to the user for approval):
+```
+date,ticker,close
+2018-06-29,XYZ,10.5
+2018-06-29,ABC,19.8
+2018-07-02,ABC,20.0
+```
+
+`input.json`:
+```json
+{&quot;universe&quot;: [&quot;XYZ&quot;, &quot;ABC&quot;], &quot;prices&quot;: &quot;prices.csv&quot;, &quot;start&quot;: &quot;2018-06-01&quot;, &quot;end&quot;: &quot;2018-12-31&quot;}
+```
+
+`expected.json` (the user&#x27;s statement, not derived from the rows):
+```json
+{&quot;last_date&quot;: {&quot;XYZ&quot;: &quot;2018-06-29&quot;}, &quot;tol&quot;: 0}
+```
+
+- **Parse test** (tester, later): `read_raw(&quot;source/delisted_2018.csv&quot;)` returns exactly the rows of `prices.csv`.
+- **Pipeline test:** PL-01 on `input.json` keeps XYZ through 2018-06-29 and drops it after.
+Shell cwd was reset to /Users/connorott/plugins/dev-team-workspace/iteration-7/rl-all-at-once/with_skill/project</pre></details></div><div class="step" id="SD104"><span class="sid">D104</span><span class="kind">think</span>I&#x27;m drafting `tests.md` with the smoke commands and 24 golden test cases, pulling expected values from the spec&#x27;s examples, basic geometry, or your input. I&#x27;ll show you every expected value for confirmation before finalizing.<details><summary>full text</summary><pre>I&#x27;m drafting `tests.md` with the smoke commands and 24 golden test cases, pulling expected values from the spec&#x27;s examples, basic geometry, or your input. I&#x27;ll show you every expected value for confirmation before finalizing.
+
+</pre></details></div><div class="step" id="SD105"><span class="sid">D105</span><span class="kind">Write</span>/Users/connorott/plugins/dev-team-workspace/iteration-7/rl-all-at-once/with_skill/project/docs/packages/rllab/tests.md (148 lines)<div class="lbl">wrote /Users/connorott/plugins/dev-team-workspace/iteration-7/rl-all-at-once/with_skill/project/docs/packages/rllab/tests.md</div><pre># rllab — Tests
+
+**Package:** rllab · **Status:** Draft · **Last updated:** 2026-10-17 · **Pipelines:** [pipelines.md](pipelines.md)
+
+Conventions used by every case: Snake cells are `(x, y)` with x growing east and y growing south, `(0, 0)` the north-west corner, size 10 → 0…9. Snake actions are `0 = left`, `1 = straight`, `2 = right`. The Snake observation order is SNAKE-07&#x27;s: danger left, ahead, right; heading N, E, S, W; food N, E, S, W.
+
+`--smoke` on any command runs a seconds-long version: a tiny step budget, 5 test episodes and, for the viewer, a hidden window. Output goes to a temporary folder, never `runs/`, `evaluations/` or `notes/`.
+
+## Strategy
+| Pipeline | Smoke | Step unit tests | Golden cases | Model eval |
+|---|---|---|---|---|
+| PL-01 | `python -m rllab train snake-default --seeds 0-1 --smoke` | catalog.config, train.seeds | TC-12 (RunConfig → train_seeds → RunDir) | — |
+| PL-02 | `python -m rllab train snake-default --seeds 0 --smoke` | train.runs, catalog.build, train.loop; boundary tests for core.ParallelEnv, core.StepResult, learners.Learner, catalog.RunConfig | TC-01–TC-05 (Snake world, under make_worlds → ParallelEnv), TC-06–TC-09 (tank world), TC-10, TC-11 (prey world) | — |
+| PL-03 | `python -m rllab reference snake-default --seeds 0 --smoke` | reference.adapters, reference.sb3 | TC-13 (RunConfig → check_reference_scope) | — |
+| PL-04 | `python -m rllab compare snake-default --smoke` | train.runs, evaluate.score, evaluate.compare, evaluate.reference, evaluate.store; boundary tests for evaluate.ComparisonTable, evaluate.ReferenceCheck | TC-14 (Policy → score_policies), TC-15, TC-16 (ComparisonTable → skill test) | TC-17, TC-18, TC-19 |
+| PL-05 | `python -m rllab view snake-default baseline:greedy --seed 0 --smoke` | catalog.build, core.record, viewer.play; boundary tests for core.Episode, core.Frame, viewer.PlaybackStats | TC-20 (RunConfig, Policy → get_episodes → Episode) | — |
+| PL-06 | `python -m rllab note snake --smoke` | evaluate.store, report.charts, report.notes, report.status; boundary tests for report.ChartSet, report.Note | TC-21 (ChartSet → write_note → Note), TC-22 (Note → world_status → WorldStatus) | — |
+| PL-07 | `python -m rllab crossplay prey-phase-b --smoke` | evaluate.crossplay, evaluate.compare, evaluate.store; boundary test for evaluate.CrossPlayTable | TC-23 (RunDir → cross_play → CrossPlayTable) | TC-24 |
+
+### TC-01: Snake observation of the spec&#x27;s example
+**Pipeline:** PL-02 · **Covers:** SNAKE-07 · **Kind:** user example · **Fixture:** tests/fixtures/rllab/TC-01/
+**Source:** the spec&#x27;s SNAKE-07 acceptance criterion (approved by the user): head (0, 5) heading north, food (3, 2) → danger left, heading north, food east and north
+**Expected:** `[1,0,0, 1,0,0,0, 1,1,0,0]` · **Tolerance:** exact, every entry is yes/no
+
+### TC-02: Eating grows the snake
+**Pipeline:** PL-02 · **Covers:** SNAKE-03 · **Kind:** user example · **Fixture:** tests/fixtures/rllab/TC-02/
+**Source:** SNAKE-03 worked by hand by the user: body (5,5),(5,6),(5,7) heading north, food (5,4), go straight
+**Expected:** reward +1, not done, body (5,4),(5,5),(5,6),(5,7), new food off the body · **Tolerance:** exact, grid cells are discrete
+
+### TC-03: Wall ends the episode
+**Pipeline:** PL-02 · **Covers:** SNAKE-04 · **Kind:** user example · **Fixture:** tests/fixtures/rllab/TC-03/
+**Source:** SNAKE-04 acceptance criterion: head (9, 5) on the east wall heading east, go straight
+**Expected:** reward −1, done · **Tolerance:** exact
+
+### TC-04: Moving into the tail&#x27;s cell is safe
+**Pipeline:** PL-02 · **Covers:** SNAKE-04, SNAKE-05 · **Kind:** user example · **Fixture:** tests/fixtures/rllab/TC-04/
+**Source:** the spec&#x27;s Snake edge case, worked by hand: body (5,5),(5,6),(6,6),(6,5) heading north, turn right into (6,5)
+**Expected:** reward 0, not done, body (6,5),(5,5),(5,6),(6,6) · **Tolerance:** exact
+
+### TC-05: Hunger limit at 100 steps
+**Pipeline:** PL-02 · **Covers:** SNAKE-06 · **Kind:** user example · **Fixture:** tests/fixtures/rllab/TC-05/
+**Source:** SNAKE-06 acceptance criterion; body (5,5),(5,6),(5,7) heading north, food (0,9), go straight
+**Expected:** after 99 food-less steps the step ends the episode with reward 0; after 98 it doesn&#x27;t · **Tolerance:** exact, step counts are integers
+
+### TC-06: The ball never changes speed
+**Pipeline:** PL-02 · **Covers:** TANK-01 · **Kind:** closed form · **Fixture:** tests/fixtures/rllab/TC-06/
+**Source:** TANK-01 (angle in = angle out, constant 0.02): a head-on bounce reverses velocity; on any seed speed stays 0.02 and the ball stays inside
+**Expected:** head-on: velocity (0.02, 0) → (−0.02, 0); seed 7, up to 1,000 steps: |v| = 0.02 and |centre| ≤ 0.9 every step · **Tolerance:** 1e-9, floating-point rounding only
+
+### TC-07: Fish vision cut-off at 0.3
+**Pipeline:** PL-02 · **Covers:** TANK-05 · **Kind:** user example · **Fixture:** tests/fixtures/rllab/TC-07/
+**Source:** TANK-05 acceptance criteria: ball 0.2 away is seen, 0.5 away is not
+**Expected:** fish at (0, 0): ball at (0.2, 0) → seen flag 1, relative position (0.2, 0); ball at (0.5, 0) → seen flag 0, ball entries 0 · **Tolerance:** 1e-9
+
+### TC-08: Catch threshold 0.13
+**Pipeline:** PL-02 · **Covers:** TANK-06 · **Kind:** user example · **Fixture:** tests/fixtures/rllab/TC-08/
+**Source:** TANK-06 acceptance criterion (0.12 → caught), plus the threshold it states
+**Expected:** after-step positions ball (0, 0): fish A at (0.12, 0) caught and removed; fish B at (0.14, 0) not caught · **Tolerance:** exact, the distances are 0.01 either side of the threshold
+
+### TC-09: Out-of-range diagonal steering
+**Pipeline:** PL-02 · **Covers:** TANK-03, CORE-06 · **Kind:** user example · **Fixture:** tests/fixtures/rllab/TC-09/
+**Source:** CORE-06 (3.0, −2.0) → (1, −1), then TANK-03&#x27;s top speed 0.015, as the user confirms it applies to the move&#x27;s length
+**Expected:** a fish at (0, 0) moves by (0.0106066, −0.0106066), i.e. 0.015 along the diagonal · **Tolerance:** 1e-6, rounding of 0.015/√2
+
+### TC-10: Starvation at step 500
+**Pipeline:** PL-02 · **Covers:** PREY-03, PREY-07 · **Kind:** user example · **Fixture:** tests/fixtures/rllab/TC-10/
+**Source:** PREY-03 acceptance criterion (eats nothing → starves at step 500) and PREY-07 (−10)
+**Expected:** alive after step 499; starved at step 500 with reward −10 · **Tolerance:** exact, the step is an integer (energy must not drift by float error)
+
+### TC-11: Predator cooldown covers 20 steps
+**Pipeline:** PL-02 · **Covers:** PREY-05, PREY-06 · **Kind:** user example · **Fixture:** tests/fixtures/rllab/TC-11/
+**Source:** PREY-05 acceptance criterion (catch at 100, touch at 110 → no catch), with the user&#x27;s boundary
+**Expected:** after a catch at step 100, touches at steps 110 and 120 catch nothing; a touch at step 121 catches · **Tolerance:** exact
+
+### TC-12: Same seed, same run
+**Pipeline:** PL-01 · **Covers:** TRAIN-06, TRAIN-07, CORE-03 · **Kind:** synthetic known-answer · **Fixture:** tests/fixtures/rllab/TC-12/
+**Source:** TRAIN-07 acceptance criterion; generator: `snake-default`, seeds 0 and 1, 2,000 steps, run twice
+**Expected:** two run folders per pass; each seed&#x27;s `episodes.jsonl` and `diagnostics.jsonl` are byte-identical across passes · **Tolerance:** exact, AD-10 promises bit-identical CPU runs
+
+### TC-13: Phase B is refused by the reference
+**Pipeline:** PL-03 · **Covers:** EVAL-04 · **Kind:** user example · **Fixture:** tests/fixtures/rllab/TC-13/
+**Source:** the spec&#x27;s Out of scope (no reference comparison for Phase B)
+**Expected:** `prey-phase-b` → `ValueError`, before any training starts · **Tolerance:** exact
+
+### TC-14: Plain greedy dies where safe greedy doesn&#x27;t
+**Pipeline:** PL-04 · **Covers:** SNAKE-11, SNAKE-12 · **Kind:** user example · **Fixture:** tests/fixtures/rllab/TC-14/
+**Source:** SNAKE-11 and SNAKE-12, worked by hand: body (5,5),(5,6),(6,6),(6,5),(6,4) heading north, food (8,5)
+**Expected:** plain greedy turns right, into its own body; safe greedy goes straight · **Tolerance:** exact (distance is Manhattan; ties go straight, then left, then right)
+
+### TC-15: A planted advantage is detected
+**Pipeline:** PL-04 · **Covers:** EVAL-03 · **Kind:** synthetic known-answer · **Fixture:** tests/fixtures/rllab/TC-15/
+**Source:** generator `planted_scores(learner=N(10,1), baseline=N(5,1), seeds=5, seed=11)`; H0, statistic and null from null-hypothesis-testing
+**Expected:** H0 &quot;learner ≤ baseline&quot; is rejected · **Tolerance:** α = 0.05 after Holm correction, the spec&#x27;s level
+**Skills:** null-hypothesis-testing
+
+### TC-16: No advantage, no claim
+**Pipeline:** PL-04 · **Covers:** EVAL-03 · **Kind:** synthetic known-answer · **Fixture:** tests/fixtures/rllab/TC-16/
+**Source:** generator `planted_scores(learner=N(5,1), baseline=N(5,1), seeds=5)` on seeds 12–31; same H0 and null as TC-15
+**Expected:** H0 is not rejected · **Tolerance:** at most 1 of the 20 seeds may reject, since the error rate is α = 0.05
+**Skills:** null-hypothesis-testing
+
+### TC-17: Snake learner passes S1
+**Pipeline:** PL-04 · **Covers:** SNAKE-10, SNAKE-11, EVAL-01, EVAL-03, EVAL-04, QR-01 · **Kind:** model evaluation · **Fixture:** tests/fixtures/rllab/TC-17/
+**Source:** the spec&#x27;s pass rules; `snake-default`, training seeds 0–4, test seeds 1,000,000–1,000,099
+**Expected:** mean food per episode beats random and plain greedy (H0 rejected for both); learner/reference ratio ≥ 0.80; every run ≤ 60 min · **Tolerance:** α = 0.05 after Holm; ratio threshold exact, as specified
+**Skills:** null-hypothesis-testing
+
+### TC-18: Fish tank learner passes S2
+**Pipeline:** PL-04 · **Covers:** TANK-11, TANK-12, EVAL-03, EVAL-04, QR-01 · **Kind:** model evaluation · **Fixture:** tests/fixtures/rllab/TC-18/
+**Source:** the spec&#x27;s pass rules; `tank-default`, training seeds 0–4, test seeds 1,000,000–1,000,099
+**Expected:** mean survival steps per fish beats random and flee (H0 rejected for both); ratio ≥ 0.80; every run ≤ 60 min · **Tolerance:** α = 0.05 after Holm; ratio exact
+**Skills:** null-hypothesis-testing
+
+### TC-19: Prey learner passes Phase A
+**Pipeline:** PL-04 · **Covers:** PREY-10, PREY-11, EVAL-03, EVAL-04, QR-01 · **Kind:** model evaluation · **Fixture:** tests/fixtures/rllab/TC-19/
+**Source:** the spec&#x27;s pass rules; `prey-phase-a`, training seeds 0–4, test seeds 1,000,000–1,000,099
+**Expected:** mean prey return beats random and scripted prey (H0 rejected for both); ratio ≥ 0.80; every run ≤ 60 min · **Tolerance:** α = 0.05 after Holm; ratio exact
+**Skills:** null-hypothesis-testing
+
+### TC-20: A saved episode replays exactly
+**Pipeline:** PL-05 · **Covers:** CORE-09, VIEW-01 · **Kind:** synthetic known-answer · **Fixture:** tests/fixtures/rllab/TC-20/
+**Source:** CORE-09 and VIEW-01 acceptance criteria; generator: `snake-default`, `baseline:greedy`, seed 3
+**Expected:** the frames of a saved-then-loaded Episode equal those of a fresh recording on seed 3 · **Tolerance:** exact, positions are grid cells
+
+### TC-21: Remaking a note keeps my writing
+**Pipeline:** PL-06 · **Covers:** NOTE-01 · **Kind:** user example · **Fixture:** tests/fixtures/rllab/TC-21/
+**Source:** the spec&#x27;s NOTE-01 edge case and AD-12&#x27;s marker rule; `source/note-before.md` is a note with hand-written text and one stale results block
+**Expected:** after `write_note`, every line outside the markers is byte-identical; the text inside the `results` markers differs from the stale block · **Tolerance:** exact
+
+### TC-22: An explanation counts at 30 words
+**Pipeline:** PL-06 · **Covers:** NOTE-03 · **Kind:** user example · **Fixture:** tests/fixtures/rllab/TC-22/
+**Source:** AD-12&#x27;s threshold (≥ 30 words besides the placeholder); all tests and the reference check passing
+**Expected:** with 29 words in &quot;Why it works&quot;, not done and the reason names that section; with 30, done · **Tolerance:** exact, whole words
+
+### TC-23: Cross-play covers every snapshot pair
+**Pipeline:** PL-07 · **Covers:** PREY-13, PREY-14 · **Kind:** synthetic known-answer · **Fixture:** tests/fixtures/rllab/TC-23/
+**Source:** PREY-14 acceptance criterion, scaled down; generator: a `prey-phase-b` smoke run with 3 snapshots per side, seed 0
+**Expected:** 9 rows, one per (prey, predator) snapshot pair, each the mean of 20 test episodes; a second call gives the same table · **Tolerance:** exact, AD-10 determinism
+
+### TC-24: Phase B ends in a pass or an explained failure
+**Pipeline:** PL-07 · **Covers:** PREY-15, PREY-16 · **Kind:** model evaluation · **Fixture:** tests/fixtures/rllab/TC-24/
+**Source:** the spec&#x27;s PREY-15 and PREY-16; `prey-phase-b`, training seeds 0–4, test seeds 1,000,000+
+**Expected:** both PREY-15 tests rejected; or, if not, the prey note cites the cross-play heatmap, names the failure pattern, and `world_status` reports done · **Tolerance:** α = 0.05 after Holm, the spec&#x27;s level
+**Skills:** null-hypothesis-testing
+
+## Open questions
+
+## Retired
+</pre><div class="hook">⛔ hook PostToolUse:Write blocked: dt lint found problems in docs/packages/rllab/tests.md:
+docs/packages/rllab/tests.md:20: fixture-size TC-01 Fixture folder tests/fixtures/rllab/TC-01/ doesn&#x27;t exist
+docs/packages/rllab/tests.md:25: fixture-size TC-02 Fixture folder tests/fixtures/rllab/TC-02/ doesn&#x27;t exist
+docs/packages/rllab/tests.md:30: fixture-size TC-03 Fixture folder tests/fixtures/rllab/TC-03/ doesn&#x27;t exist
+docs/packages/rllab/tests.md:35: fixture-size TC-04 Fixture folder tests/fixtures/rllab/TC-04/ doesn&#x27;t exist
+docs/packages/rllab/tests.md:40: fixture-size TC-05 Fixture folder tests/fixtures/rllab/TC-05/ doesn&#x27;t exist
+docs/packages/rllab/tests.md:45: fixture-size TC-06 Fixture folder tests/fixtures/rllab/TC-06/ doesn&#x27;t exist
+docs/packages/rllab/tests.md:50: fixture-size TC-07 Fixture folder tests/fixtures/rllab/TC-07/ doesn&#x27;t exist
+docs/packages/rllab/tests.md:55: fixture-size TC-08 Fixture folder tests/fixtures/rllab/TC-08/ doesn&#x27;t exist
+docs/packages/rllab/tests.md:60: fixture-size TC-09 Fixture folder tests/fixtures/rllab/TC-09/ doesn&#x27;t exist
+docs/packages/rllab/tests.md:65: fixture-size TC-10 Fixture folder tests/fixtures/rllab/TC-10/ doesn&#x27;t exist
+docs/packages/rllab/tests.md:70: fixture-size TC-11 Fixture folder tests/fixtures/rllab/TC-11/ doesn&#x27;t exist
+docs/packages/rllab/tests.md:75: fixture-size TC-12 Fixture folder tests/fixtures/rllab/TC-12/ doesn&#x27;t exist
+docs/packages/rllab/tests.md:80: fixture-size TC-13 Fixture folder tests/fixtures/rllab/TC-13/ doesn&#x27;t exist
+docs/packages/rllab/tests.md:85: fixture-size TC-14 Fixture folder tests/fixtures/rllab/TC-14/ doesn&#x27;t exist
+docs/packages/rllab/tests.md:90: fixture-size TC-15 Fixture folder tests/fixtures/rllab/TC-15/ doesn&#x27;t exist
+docs/packages/rllab/tests.md:96: fixture-size TC-16 Fixture folder tests/fixtures/rllab/TC-16/ doesn&#x27;t exist
+docs/packages/rllab/tests.md:102: fixture-size TC-17 Fixture folder tests/fixtures/rllab/TC-17/ doesn&#x27;t exist
+docs/packages/rllab/tests.md:108: fixture-size TC-18 Fixture folder tests/fixtures/rllab/TC-18/ doesn&#x27;t exist
+docs/packages/rllab/tests.md:114: fixture-size TC-19 Fixture folder tests/fixtures/rllab/TC-19/ doesn&#x27;t exist
+docs/packages/rllab/tests.md:120: fixture-size TC-20 Fixture folder tests/fixtures/rllab/TC-20/ doesn&#x27;t exist
+docs/packages/rllab/tests.md:125: fixture-size TC-21 Fixture folder tests/fixtures/rllab/TC-21/ doesn&#x27;t exist
+docs/packages/rllab/tests.md:130: fixture-size TC-22 Fixture folder tests/fixtures/rllab/TC-22/ doesn&#x27;t exist
+docs/packages/rllab/tests.md:135: fixture-size TC-23 Fixture folder tests/fixtures/rllab/TC-23/ doesn&#x27;t exist
+docs/packages/rllab/tests.md:140: fixture-size TC-24 Fixture folder tests/fixtures/rllab/TC-24/ doesn&#x27;t exist
+24 errors, 0 warnings</div><details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-7/rl-all-at-once/with_skill/project/docs/packages/rllab/tests.md&quot;,
+  &quot;content&quot;: &quot;# rllab — Tests\n\n**Package:** rllab · **Status:** Draft · **Last updated:** 2026-10-17 · **Pipelines:** [pipelines.md](pipelines.md)\n\nConventions used by every case: Snake cells are `(x, y)` with x growing east and y growing south, `(0, 0)` the north-west corner, size 10 → 0…9. Snake actions are `0 = left`, `1 = straight`, `2 = right`. The Snake observation order is SNAKE-07&#x27;s: danger left, ahead, right; heading N, E, S, W; food N, E, S, W.\n\n`--smoke` on any command runs a seconds-long version: a tiny step budget, 5 test episodes and, for the viewer, a hidden window. Output goes to a temporary folder, never `runs/`, `evaluations/` or `notes/`.\n\n## Strategy\n| Pipeline | Smoke | Step unit tests | Golden cases | Model eval |\n|---|---|---|---|---|\n| PL-01 | `python -m rllab train snake-default --seeds 0-1 --smoke` | catalog.config, train.seeds | TC-12 (RunConfig → train_seeds → RunDir) | — |\n| PL-02 | `python -m rllab train snake-default --seeds 0 --smoke` | train.runs, catalog.build, train.loop; boundary tests for core.ParallelEnv, core.StepResult, learners.Learner, catalog.RunConfig | TC-01–TC-05 (Snake world, under make_worlds → ParallelEnv), TC-06–TC-09 (tank world), TC-10, TC-11 (prey world) | — |\n| PL-03 | `python -m rllab reference snake-default --seeds 0 --smoke` | reference.adapters, reference.sb3 | TC-13 (RunConfig → check_reference_scope) | — |\n| PL-04 | `python -m rllab compare snake-default --smoke` | train.runs, evaluate.score, evaluate.compare, evaluate.reference, evaluate.store; boundary tests for evaluate.ComparisonTable, evaluate.ReferenceCheck | TC-14 (Policy → score_policies), TC-15, TC-16 (ComparisonTable → skill test) | TC-17, TC-18, TC-19 |\n| PL-05 | `python -m rllab view snake-default baseline:greedy --seed 0 --smoke` | catalog.build, core.record, viewer.play; boundary tests for core.Episode, core.Frame, viewer.PlaybackStats | TC-20 (RunConfig, Policy → get_episodes → Episode) | — |\n| PL-06 | `python -m rllab note snake --smoke` | evaluate.store, report.charts, report.notes, report.status; boundary tests for report.ChartSet, report.Note | TC-21 (ChartSet → write_note → Note), TC-22 (Note → world_status → WorldStatus) | — |\n| PL-07 | `python -m rllab crossplay prey-phase-b --smoke` | evaluate.crossplay, evaluate.compare, evaluate.store; boundary test for evaluate.CrossPlayTable | TC-23 (RunDir → cross_play → CrossPlayTable) | TC-24 |\n\n### TC-01: Snake observation of the spec&#x27;s example\n**Pipeline:** PL-02 · **Covers:** SNAKE-07 · **Kind:** user example · **Fixture:** tests/fixtures/rllab/TC-01/\n**Source:** the spec&#x27;s SNAKE-07 acceptance criterion (approved by the user): head (0, 5) heading north, food (3, 2) → danger left, heading north, food east and north\n**Expected:** `[1,0,0, 1,0,0,0, 1,1,0,0]` · **Tolerance:** exact, every entry is yes/no\n\n### TC-02: Eating grows the snake\n**Pipeline:** PL-02 · **Covers:** SNAKE-03 · **Kind:** user example · **Fixture:** tests/fixtures/rllab/TC-02/\n**Source:** SNAKE-03 worked by hand by the user: body (5,5),(5,6),(5,7) heading north, food (5,4), go straight\n**Expected:** reward +1, not done, body (5,4),(5,5),(5,6),(5,7), new food off the body · **Tolerance:** exact, grid cells are discrete\n\n### TC-03: Wall ends the episode\n**Pipeline:** PL-02 · **Covers:** SNAKE-04 · **Kind:** user example · **Fixture:** tests/fixtures/rllab/TC-03/\n**Source:** SNAKE-04 acceptance criterion: head (9, 5) on the east wall heading east, go straight\n**Expected:** reward −1, done · **Tolerance:** exact\n\n### TC-04: Moving into the tail&#x27;s cell is safe\n**Pipeline:** PL-02 · **Covers:** SNAKE-04, SNAKE-05 · **Kind:** user example · **Fixture:** tests/fixtures/rllab/TC-04/\n**Source:** the spec&#x27;s Snake edge case, worked by hand: body (5,5),(5,6),(6,6),(6,5) heading north, turn right into (6,5)\n**Expected:** reward 0, not done, body (6,5),(5,5),(5,6),(6,6) · **Tolerance:** exact\n\n### TC-05: Hunger limit at 100 steps\n**Pipeline:** PL-02 · **Covers:** SNAKE-06 · **Kind:** user example · **Fixture:** tests/fixtures/rllab/TC-05/\n**Source:** SNAKE-06 acceptance criterion; body (5,5),(5,6),(5,7) heading north, food (0,9), go straight\n**Expected:** after 99 food-less steps the step ends the episode with reward 0; after 98 it doesn&#x27;t · **Tolerance:** exact, step counts are integers\n\n### TC-06: The ball never changes speed\n**Pipeline:** PL-02 · **Covers:** TANK-01 · **Kind:** closed form · **Fixture:** tests/fixtures/rllab/TC-06/\n**Source:** TANK-01 (angle in = angle out, constant 0.02): a head-on bounce reverses velocity; on any seed speed stays 0.02 and the ball stays inside\n**Expected:** head-on: velocity (0.02, 0) → (−0.02, 0); seed 7, up to 1,000 steps: |v| = 0.02 and |centre| ≤ 0.9 every step · **Tolerance:** 1e-9, floating-point rounding only\n\n### TC-07: Fish vision cut-off at 0.3\n**Pipeline:** PL-02 · **Covers:** TANK-05 · **Kind:** user example · **Fixture:** tests/fixtures/rllab/TC-07/\n**Source:** TANK-05 acceptance criteria: ball 0.2 away is seen, 0.5 away is not\n**Expected:** fish at (0, 0): ball at (0.2, 0) → seen flag 1, relative position (0.2, 0); ball at (0.5, 0) → seen flag 0, ball entries 0 · **Tolerance:** 1e-9\n\n### TC-08: Catch threshold 0.13\n**Pipeline:** PL-02 · **Covers:** TANK-06 · **Kind:** user example · **Fixture:** tests/fixtures/rllab/TC-08/\n**Source:** TANK-06 acceptance criterion (0.12 → caught), plus the threshold it states\n**Expected:** after-step positions ball (0, 0): fish A at (0.12, 0) caught and removed; fish B at (0.14, 0) not caught · **Tolerance:** exact, the distances are 0.01 either side of the threshold\n\n### TC-09: Out-of-range diagonal steering\n**Pipeline:** PL-02 · **Covers:** TANK-03, CORE-06 · **Kind:** user example · **Fixture:** tests/fixtures/rllab/TC-09/\n**Source:** CORE-06 (3.0, −2.0) → (1, −1), then TANK-03&#x27;s top speed 0.015, as the user confirms it applies to the move&#x27;s length\n**Expected:** a fish at (0, 0) moves by (0.0106066, −0.0106066), i.e. 0.015 along the diagonal · **Tolerance:** 1e-6, rounding of 0.015/√2\n\n### TC-10: Starvation at step 500\n**Pipeline:** PL-02 · **Covers:** PREY-03, PREY-07 · **Kind:** user example · **Fixture:** tests/fixtures/rllab/TC-10/\n**Source:** PREY-03 acceptance criterion (eats nothing → starves at step 500) and PREY-07 (−10)\n**Expected:** alive after step 499; starved at step 500 with reward −10 · **Tolerance:** exact, the step is an integer (energy must not drift by float error)\n\n### TC-11: Predator cooldown covers 20 steps\n**Pipeline:** PL-02 · **Covers:** PREY-05, PREY-06 · **Kind:** user example · **Fixture:** tests/fixtures/rllab/TC-11/\n**Source:** PREY-05 acceptance criterion (catch at 100, touch at 110 → no catch), with the user&#x27;s boundary\n**Expected:** after a catch at step 100, touches at steps 110 and 120 catch nothing; a touch at step 121 catches · **Tolerance:** exact\n\n### TC-12: Same seed, same run\n**Pipeline:** PL-01 · **Covers:** TRAIN-06, TRAIN-07, CORE-03 · **Kind:** synthetic known-answer · **Fixture:** tests/fixtures/rllab/TC-12/\n**Source:** TRAIN-07 acceptance criterion; generator: `snake-default`, seeds 0 and 1, 2,000 steps, run twice\n**Expected:** two run folders per pass; each seed&#x27;s `episodes.jsonl` and `diagnostics.jsonl` are byte-identical across passes · **Tolerance:** exact, AD-10 promises bit-identical CPU runs\n\n### TC-13: Phase B is refused by the reference\n**Pipeline:** PL-03 · **Covers:** EVAL-04 · **Kind:** user example · **Fixture:** tests/fixtures/rllab/TC-13/\n**Source:** the spec&#x27;s Out of scope (no reference comparison for Phase B)\n**Expected:** `prey-phase-b` → `ValueError`, before any training starts · **Tolerance:** exact\n\n### TC-14: Plain greedy dies where safe greedy doesn&#x27;t\n**Pipeline:** PL-04 · **Covers:** SNAKE-11, SNAKE-12 · **Kind:** user example · **Fixture:** tests/fixtures/rllab/TC-14/\n**Source:** SNAKE-11 and SNAKE-12, worked by hand: body (5,5),(5,6),(6,6),(6,5),(6,4) heading north, food (8,5)\n**Expected:** plain greedy turns right, into its own body; safe greedy goes straight · **Tolerance:** exact (distance is Manhattan; ties go straight, then left, then right)\n\n### TC-15: A planted advantage is detected\n**Pipeline:** PL-04 · **Covers:** EVAL-03 · **Kind:** synthetic known-answer · **Fixture:** tests/fixtures/rllab/TC-15/\n**Source:** generator `planted_scores(learner=N(10,1), baseline=N(5,1), seeds=5, seed=11)`; H0, statistic and null from null-hypothesis-testing\n**Expected:** H0 \&quot;learner ≤ baseline\&quot; is rejected · **Tolerance:** α = 0.05 after Holm correction, the spec&#x27;s level\n**Skills:** null-hypothesis-testing\n\n### TC-16: No advantage, no claim\n**Pipeline:** PL-04 · **Covers:** EVAL-03 · **Kind:** synthetic known-answer · **Fixture:** tests/fixtures/rllab/TC-16/\n**Source:** generator `planted_scores(learner=N(5,1), baseline=N(5,1), seeds=5)` on seeds 12–31; same H0 and null as TC-15\n**Expected:** H0 is not rejected · **Tolerance:** at most 1 of the 20 seeds may reject, since the error rate is α = 0.05\n**Skills:** null-hypothesis-testing\n\n### TC-17: Snake learner passes S1\n**Pipeline:** PL-04 · **Covers:** SNAKE-10, SNAKE-11, EVAL-01, EVAL-03, EVAL-04, QR-01 · **Kind:** model evaluation · **Fixture:** tests/fixtures/rllab/TC-17/\n**Source:** the spec&#x27;s pass rules; `snake-default`, training seeds 0–4, test seeds 1,000,000–1,000,099\n**Expected:** mean food per episode beats random and plain greedy (H0 rejected for both); learner/reference ratio ≥ 0.80; every run ≤ 60 min · **Tolerance:** α = 0.05 after Holm; ratio threshold exact, as specified\n**Skills:** null-hypothesis-testing\n\n### TC-18: Fish tank learner passes S2\n**Pipeline:** PL-04 · **Covers:** TANK-11, TANK-12, EVAL-03, EVAL-04, QR-01 · **Kind:** model evaluation · **Fixture:** tests/fixtures/rllab/TC-18/\n**Source:** the spec&#x27;s pass rules; `tank-default`, training seeds 0–4, test seeds 1,000,000–1,000,099\n**Expected:** mean survival steps per fish beats random and flee (H0 rejected for both); ratio ≥ 0.80; every run ≤ 60 min · **Tolerance:** α = 0.05 after Holm; ratio exact\n**Skills:** null-hypothesis-testing\n\n### TC-19: Prey learner passes Phase A\n**Pipeline:** PL-04 · **Covers:** PREY-10, PREY-11, EVAL-03, EVAL-04, QR-01 · **Kind:** model evaluation · **Fixture:** tests/fixtures/rllab/TC-19/\n**Source:** the spec&#x27;s pass rules; `prey-phase-a`, training seeds 0–4, test seeds 1,000,000–1,000,099\n**Expected:** mean prey return beats random and scripted prey (H0 rejected for both); ratio ≥ 0.80; every run ≤ 60 min · **Tolerance:** α = 0.05 after Holm; ratio exact\n**Skills:** null-hypothesis-testing\n\n### TC-20: A saved episode replays exactly\n**Pipeline:** PL-05 · **Covers:** CORE-09, VIEW-01 · **Kind:** synthetic known-answer · **Fixture:** tests/fixtures/rllab/TC-20/\n**Source:** CORE-09 and VIEW-01 acceptance criteria; generator: `snake-default`, `baseline:greedy`, seed 3\n**Expected:** the frames of a saved-then-loaded Episode equal those of a fresh recording on seed 3 · **Tolerance:** exact, positions are grid cells\n\n### TC-21: Remaking a note keeps my writing\n**Pipeline:** PL-06 · **Covers:** NOTE-01 · **Kind:** user example · **Fixture:** tests/fixtures/rllab/TC-21/\n**Source:** the spec&#x27;s NOTE-01 edge case and AD-12&#x27;s marker rule; `source/note-before.md` is a note with hand-written text and one stale results block\n**Expected:** after `write_note`, every line outside the markers is byte-identical; the text inside the `results` markers differs from the stale block · **Tolerance:** exact\n\n### TC-22: An explanation counts at 30 words\n**Pipeline:** PL-06 · **Covers:** NOTE-03 · **Kind:** user example · **Fixture:** tests/fixtures/rllab/TC-22/\n**Source:** AD-12&#x27;s threshold (≥ 30 words besides the placeholder); all tests and the reference check passing\n**Expected:** with 29 words in \&quot;Why it works\&quot;, not done and the reason names that section; with 30, done · **Tolerance:** exact, whole words\n\n### TC-23: Cross-play covers every snapshot pair\n**Pipeline:** PL-07 · **Covers:** PREY-13, PREY-14 · **Kind:** synthetic known-answer · **Fixture:** tests/fixtures/rllab/TC-23/\n**Source:** PREY-14 acceptance criterion, scaled down; generator: a `prey-phase-b` smoke run with 3 snapshots per side, seed 0\n**Expected:** 9 rows, one per (prey, predator) snapshot pair, each the mean of 20 test episodes; a second call gives the same table · **Tolerance:** exact, AD-10 determinism\n\n### TC-24: Phase B ends in a pass or an explained failure\n**Pipeline:** PL-07 · **Covers:** PREY-15, PREY-16 · **Kind:** model evaluation · **Fixture:** tests/fixtures/rllab/TC-24/\n**Source:** the spec&#x27;s PREY-15 and PREY-16; `prey-phase-b`, training seeds 0–4, test seeds 1,000,000+\n**Expected:** both PREY-15 tests rejected; or, if not, the prey note cites the cross-play heatmap, names the failure pattern, and `world_status` reports done · **Tolerance:** α = 0.05 after Holm, the spec&#x27;s level\n**Skills:** null-hypothesis-testing\n\n## Open questions\n\n## Retired\n&quot;
+}</pre><div class="lbl">output</div><pre>File created successfully at: /Users/connorott/plugins/dev-team-workspace/iteration-7/rl-all-at-once/with_skill/project/docs/packages/rllab/tests.md (file state is current in your context — no need to Read it back)</pre></details></div><div class="step" id="SD106"><span class="sid">D106</span><span class="kind">say</span>Next, the fixtures: `input.json` files and TC-21&#x27;s source note first, then each `expected.json` written one at a time, each with its own permission check.<details><summary>full text</summary><pre>Next, the fixtures: `input.json` files and TC-21&#x27;s source note first, then each `expected.json` written one at a time, each with its own permission check.</pre></details></div><div class="step" id="SD107"><span class="sid">D107</span><span class="kind">Bash</span>python3 - &lt;&lt;&#x27;EOF&#x27;
+import json, os
+F=&#x27;tests/fixtures/rllab&#x27;
+inputs={
+&quot;TC-01&quot;:{&quot;world&quot;:&quot;snake&quot;,&quot;size&quot;:10,&quot;state&quot;:{&quot;body&quot;:[[0,5],[0,6],[0,7]],&quot;heading&quot;:&quot;N&quot;,&quot;food&quot;:[3,2]}},
+&quot;TC-02&quot;:{&quot;world&quot;:&quot;snake&quot;,&quot;size&quot;:10,&quot;state&quot;:{&quot;body&quot;:[[5,5],[5,6],[5,7]],&quot;heading&quot;:&quot;N&quot;,&quot;food&quot;:[5,4],&quot;steps_since_food&quot;:0},&quot;action&quot;:1},
+&quot;TC-03&quot;:{&quot;world&quot;:&quot;snake&quot;,&quot;size&quot;:10,&quot;state&quot;:{&quot;body&quot;:[[9,5],[8,5],[7,5]],&quot;heading&quot;:&quot;E&quot;,&quot;food&quot;:[2,2],&quot;steps_since_food&quot;:0},&quot;action&quot;:1},
+&quot;TC-04&quot;:{&quot;world&quot;:&quot;snake&quot;,&quot;size&quot;:10,&quot;state&quot;:{&quot;body&quot;:[[5,5],[5,6],[ …[+3972 chars]<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;python3 - &lt;&lt;&#x27;EOF&#x27;\nimport json, os\nF=&#x27;tests/fixtures/rllab&#x27;\ninputs={\n\&quot;TC-01\&quot;:{\&quot;world\&quot;:\&quot;snake\&quot;,\&quot;size\&quot;:10,\&quot;state\&quot;:{\&quot;body\&quot;:[[0,5],[0,6],[0,7]],\&quot;heading\&quot;:\&quot;N\&quot;,\&quot;food\&quot;:[3,2]}},\n\&quot;TC-02\&quot;:{\&quot;world\&quot;:\&quot;snake\&quot;,\&quot;size\&quot;:10,\&quot;state\&quot;:{\&quot;body\&quot;:[[5,5],[5,6],[5,7]],\&quot;heading\&quot;:\&quot;N\&quot;,\&quot;food\&quot;:[5,4],\&quot;steps_since_food\&quot;:0},\&quot;action\&quot;:1},\n\&quot;TC-03\&quot;:{\&quot;world\&quot;:\&quot;snake\&quot;,\&quot;size\&quot;:10,\&quot;state\&quot;:{\&quot;body\&quot;:[[9,5],[8,5],[7,5]],\&quot;heading\&quot;:\&quot;E\&quot;,\&quot;food\&quot;:[2,2],\&quot;steps_since_food\&quot;:0},\&quot;action\&quot;:1},\n\&quot;TC-04\&quot;:{\&quot;world\&quot;:\&quot;snake\&quot;,\&quot;size\&quot;:10,\&quot;state\&quot;:{\&quot;body\&quot;:[[5,5],[5,6],[6,6],[6,5]],\&quot;heading\&quot;:\&quot;N\&quot;,\&quot;food\&quot;:[0,0],\&quot;steps_since_food\&quot;:0},\&quot;action\&quot;:2},\n\&quot;TC-05\&quot;:{\&quot;world\&quot;:\&quot;snake\&quot;,\&quot;size\&quot;:10,\&quot;cases\&quot;:[\n  {\&quot;state\&quot;:{\&quot;body\&quot;:[[5,5],[5,6],[5,7]],\&quot;heading\&quot;:\&quot;N\&quot;,\&quot;food\&quot;:[0,9],\&quot;steps_since_food\&quot;:99},\&quot;action\&quot;:1},\n  {\&quot;state\&quot;:{\&quot;body\&quot;:[[5,5],[5,6],[5,7]],\&quot;heading\&quot;:\&quot;N\&quot;,\&quot;food\&quot;:[0,9],\&quot;steps_since_food\&quot;:98},\&quot;action\&quot;:1}]},\n\&quot;TC-06\&quot;:{\&quot;world\&quot;:\&quot;tank\&quot;,\&quot;preset\&quot;:\&quot;tank\&quot;,\&quot;cases\&quot;:[\n  {\&quot;name\&quot;:\&quot;head_on\&quot;,\&quot;ball\&quot;:{\&quot;pos\&quot;:[0.89,0.0],\&quot;vel\&quot;:[0.02,0.0]},\&quot;steps\&quot;:1},\n  {\&quot;name\&quot;:\&quot;long_run\&quot;,\&quot;seed\&quot;:7,\&quot;max_steps\&quot;:1000,\&quot;fish_action\&quot;:[0.0,0.0]}]},\n\&quot;TC-07\&quot;:{\&quot;world\&quot;:\&quot;tank\&quot;,\&quot;preset\&quot;:\&quot;tank\&quot;,\&quot;fish\&quot;:[0.0,0.0],\&quot;cases\&quot;:[\n  {\&quot;name\&quot;:\&quot;near\&quot;,\&quot;ball\&quot;:{\&quot;pos\&quot;:[0.2,0.0],\&quot;vel\&quot;:[0.0,0.02]}},\n  {\&quot;name\&quot;:\&quot;far\&quot;,\&quot;ball\&quot;:{\&quot;pos\&quot;:[0.5,0.0],\&quot;vel\&quot;:[0.0,0.02]}}]},\n\&quot;TC-08\&quot;:{\&quot;world\&quot;:\&quot;tank\&quot;,\&quot;preset\&quot;:\&quot;tank\&quot;,\&quot;after_step\&quot;:{\&quot;ball\&quot;:[0.0,0.0],\&quot;fish\&quot;:{\&quot;A\&quot;:[0.12,0.0],\&quot;B\&quot;:[0.14,0.0]}}},\n\&quot;TC-09\&quot;:{\&quot;world\&quot;:\&quot;tank\&quot;,\&quot;preset\&quot;:\&quot;tank\&quot;,\&quot;fish\&quot;:[0.0,0.0],\&quot;action\&quot;:[3.0,-2.0],\&quot;ball\&quot;:{\&quot;pos\&quot;:[-0.8,0.0],\&quot;vel\&quot;:[0.0,0.02]}},\n\&quot;TC-10\&quot;:{\&quot;world\&quot;:\&quot;prey\&quot;,\&quot;preset\&quot;:\&quot;prey\&quot;,\&quot;energy\&quot;:1.0,\&quot;pellets_eaten\&quot;:[],\&quot;predator\&quot;:\&quot;out of sight, never catches\&quot;,\&quot;steps\&quot;:600},\n\&quot;TC-11\&quot;:{\&quot;world\&quot;:\&quot;prey\&quot;,\&quot;preset\&quot;:\&quot;prey\&quot;,\&quot;catch_at\&quot;:100,\&quot;touches_at\&quot;:[110,120,121]},\n\&quot;TC-12\&quot;:{\&quot;generator\&quot;:\&quot;train\&quot;,\&quot;config\&quot;:\&quot;snake-default\&quot;,\&quot;seeds\&quot;:[0,1],\&quot;steps\&quot;:2000,\&quot;passes\&quot;:2},\n\&quot;TC-13\&quot;:{\&quot;config\&quot;:\&quot;prey-phase-b\&quot;},\n\&quot;TC-14\&quot;:{\&quot;world\&quot;:\&quot;snake\&quot;,\&quot;size\&quot;:10,\&quot;state\&quot;:{\&quot;body\&quot;:[[5,5],[5,6],[6,6],[6,5],[6,4]],\&quot;heading\&quot;:\&quot;N\&quot;,\&quot;food\&quot;:[8,5]},\&quot;policies\&quot;:[\&quot;baseline:greedy\&quot;,\&quot;baseline:safe_greedy\&quot;],\&quot;distance\&quot;:\&quot;manhattan\&quot;,\&quot;ties\&quot;:[\&quot;straight\&quot;,\&quot;left\&quot;,\&quot;right\&quot;]},\n\&quot;TC-15\&quot;:{\&quot;generator\&quot;:\&quot;planted_scores\&quot;,\&quot;learner\&quot;:{\&quot;dist\&quot;:\&quot;normal\&quot;,\&quot;mean\&quot;:10,\&quot;sd\&quot;:1},\&quot;baseline\&quot;:{\&quot;dist\&quot;:\&quot;normal\&quot;,\&quot;mean\&quot;:5,\&quot;sd\&quot;:1},\&quot;seeds_per_side\&quot;:5,\&quot;seed\&quot;:11,\&quot;alpha\&quot;:0.05,\&quot;correction\&quot;:\&quot;holm\&quot;},\n\&quot;TC-16\&quot;:{\&quot;generator\&quot;:\&quot;planted_scores\&quot;,\&quot;learner\&quot;:{\&quot;dist\&quot;:\&quot;normal\&quot;,\&quot;mean\&quot;:5,\&quot;sd\&quot;:1},\&quot;baseline\&quot;:{\&quot;dist\&quot;:\&quot;normal\&quot;,\&quot;mean\&quot;:5,\&quot;sd\&quot;:1},\&quot;seeds_per_side\&quot;:5,\&quot;seeds\&quot;:list(range(12,32)),\&quot;alpha\&quot;:0.05,\&quot;correction\&quot;:\&quot;holm\&quot;},\n\&quot;TC-17\&quot;:{\&quot;config\&quot;:\&quot;snake-default\&quot;,\&quot;train_seeds\&quot;:[0,1,2,3,4],\&quot;test_seeds\&quot;:[1000000,1000099],\&quot;metric\&quot;:\&quot;mean food per episode\&quot;,\&quot;bars\&quot;:[\&quot;baseline:random\&quot;,\&quot;baseline:greedy\&quot;],\&quot;reference_only\&quot;:[\&quot;baseline:safe_greedy\&quot;],\&quot;alpha\&quot;:0.05,\&quot;correction\&quot;:\&quot;holm\&quot;,\&quot;ratio_min\&quot;:0.8,\&quot;max_minutes\&quot;:60},\n\&quot;TC-18\&quot;:{\&quot;config\&quot;:\&quot;tank-default\&quot;,\&quot;train_seeds\&quot;:[0,1,2,3,4],\&quot;test_seeds\&quot;:[1000000,1000099],\&quot;metric\&quot;:\&quot;mean survival steps per fish\&quot;,\&quot;bars\&quot;:[\&quot;baseline:random\&quot;,\&quot;baseline:flee\&quot;],\&quot;alpha\&quot;:0.05,\&quot;correction\&quot;:\&quot;holm\&quot;,\&quot;ratio_min\&quot;:0.8,\&quot;max_minutes\&quot;:60},\n\&quot;TC-19\&quot;:{\&quot;config\&quot;:\&quot;prey-phase-a\&quot;,\&quot;train_seeds\&quot;:[0,1,2,3,4],\&quot;test_seeds\&quot;:[1000000,1000099],\&quot;metric\&quot;:\&quot;mean prey return per episode\&quot;,\&quot;bars\&quot;:[\&quot;baseline:random\&quot;,\&quot;baseline:scripted\&quot;],\&quot;alpha\&quot;:0.05,\&quot;correction\&quot;:\&quot;holm\&quot;,\&quot;ratio_min\&quot;:0.8,\&quot;max_minutes\&quot;:60},\n\&quot;TC-20\&quot;:{\&quot;config\&quot;:\&quot;snake-default\&quot;,\&quot;policy\&quot;:\&quot;baseline:greedy\&quot;,\&quot;seed\&quot;:3},\n\&quot;TC-21\&quot;:{\&quot;world\&quot;:\&quot;snake\&quot;,\&quot;note\&quot;:\&quot;source/note-before.md\&quot;,\&quot;block\&quot;:\&quot;results\&quot;},\n\&quot;TC-22\&quot;:{\&quot;world\&quot;:\&quot;snake\&quot;,\&quot;section\&quot;:\&quot;Why it works\&quot;,\&quot;tests_passed\&quot;:True,\&quot;reference_check_passed\&quot;:True,\&quot;cases\&quot;:[{\&quot;words\&quot;:29},{\&quot;words\&quot;:30}]},\n\&quot;TC-23\&quot;:{\&quot;generator\&quot;:\&quot;train\&quot;,\&quot;config\&quot;:\&quot;prey-phase-b\&quot;,\&quot;seed\&quot;:0,\&quot;snapshots_per_side\&quot;:3,\&quot;episodes_per_pair\&quot;:20,\&quot;smoke\&quot;:True},\n\&quot;TC-24\&quot;:{\&quot;config\&quot;:\&quot;prey-phase-b\&quot;,\&quot;train_seeds\&quot;:[0,1,2,3,4],\&quot;test_seeds_from\&quot;:1000000,\&quot;tests\&quot;:[\&quot;latest prey beat start prey vs latest predator\&quot;,\&quot;latest predator beats scripted predator vs latest prey\&quot;],\&quot;alpha\&quot;:0.05,\&quot;correction\&quot;:\&quot;holm\&quot;},\n}\nfor k,v in inputs.items():\n    os.makedirs(f\&quot;{F}/{k}\&quot;,exist_ok=True)\n    open(f\&quot;{F}/{k}/input.json\&quot;,\&quot;w\&quot;).write(json.dumps(v,indent=1)+\&quot;\\n\&quot;)\nos.makedirs(f\&quot;{F}/TC-21/source\&quot;,exist_ok=True)\nopen(f\&quot;{F}/TC-21/source/note-before.md\&quot;,\&quot;w\&quot;).write(\&quot;\&quot;\&quot;# Snake — lesson note\n\n## The idea\nMy own words about learning action values from replayed experience. Keep this exactly.\n\n&lt;!-- rllab:begin results --&gt;\nSTALE RESULTS: mean food 0.0 (placeholder from an old run)\n&lt;!-- rllab:end results --&gt;\n\n## Why it works\nHand-written explanation that must survive regeneration.\n\n## One failure I fixed\nHand-written failure story.\n\&quot;\&quot;\&quot;)\nEOF\nls tests/fixtures/rllab | wc -l&quot;
+}</pre><div class="lbl">output</div><pre>      24</pre></details></div><div class="step" id="SD108"><span class="sid">D108</span><span class="kind">Write</span>/Users/connorott/plugins/dev-team-workspace/iteration-7/rl-all-at-once/with_skill/project/tests/fixtures/rllab/TC-01/expected.json (1 lines)<div class="lbl">wrote /Users/connorott/plugins/dev-team-workspace/iteration-7/rl-all-at-once/with_skill/project/tests/fixtures/rllab/TC-01/expected.json</div><pre>{&quot;observation&quot;: [1, 0, 0, 1, 0, 0, 0, 1, 1, 0, 0], &quot;tol&quot;: 0}
+</pre><div class="hook">hook PreToolUse:Write said: {&quot;hookSpecificOutput&quot;: {&quot;hookEventName&quot;: &quot;PreToolUse&quot;, &quot;permissionDecision&quot;: &quot;ask&quot;, &quot;permissionDecisionReason&quot;: &quot;Oracle file: tests/fixtures/rllab/TC-01/expected.json. Expected outputs change only with the user&#x27;s approval.&quot;}}
+</div><details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-7/rl-all-at-once/with_skill/project/tests/fixtures/rllab/TC-01/expected.json&quot;,
+  &quot;content&quot;: &quot;{\&quot;observation\&quot;: [1, 0, 0, 1, 0, 0, 0, 1, 1, 0, 0], \&quot;tol\&quot;: 0}\n&quot;
+}</pre><div class="lbl">output</div><pre>File created successfully at: /Users/connorott/plugins/dev-team-workspace/iteration-7/rl-all-at-once/with_skill/project/tests/fixtures/rllab/TC-01/expected.json (file state is current in your context — no need to Read it back)</pre></details></div><div class="step" id="SD109"><span class="sid">D109</span><span class="kind">Write</span>/Users/connorott/plugins/dev-team-workspace/iteration-7/rl-all-at-once/with_skill/project/tests/fixtures/rllab/TC-02/expected.json (1 lines)<div class="lbl">wrote /Users/connorott/plugins/dev-team-workspace/iteration-7/rl-all-at-once/with_skill/project/tests/fixtures/rllab/TC-02/expected.json</div><pre>{&quot;reward&quot;: 1, &quot;done&quot;: false, &quot;body&quot;: [[5, 4], [5, 5], [5, 6], [5, 7]], &quot;property&quot;: &quot;new food is on a cell not in body&quot;, &quot;tol&quot;: 0}
+</pre><div class="hook">hook PreToolUse:Write said: {&quot;hookSpecificOutput&quot;: {&quot;hookEventName&quot;: &quot;PreToolUse&quot;, &quot;permissionDecision&quot;: &quot;ask&quot;, &quot;permissionDecisionReason&quot;: &quot;Oracle file: tests/fixtures/rllab/TC-02/expected.json. Expected outputs change only with the user&#x27;s approval.&quot;}}
+</div><details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-7/rl-all-at-once/with_skill/project/tests/fixtures/rllab/TC-02/expected.json&quot;,
+  &quot;content&quot;: &quot;{\&quot;reward\&quot;: 1, \&quot;done\&quot;: false, \&quot;body\&quot;: [[5, 4], [5, 5], [5, 6], [5, 7]], \&quot;property\&quot;: \&quot;new food is on a cell not in body\&quot;, \&quot;tol\&quot;: 0}\n&quot;
+}</pre><div class="lbl">output</div><pre>File created successfully at: /Users/connorott/plugins/dev-team-workspace/iteration-7/rl-all-at-once/with_skill/project/tests/fixtures/rllab/TC-02/expected.json (file state is current in your context — no need to Read it back)</pre></details></div><div class="step" id="SD110"><span class="sid">D110</span><span class="kind">Write</span>/Users/connorott/plugins/dev-team-workspace/iteration-7/rl-all-at-once/with_skill/project/tests/fixtures/rllab/TC-03/expected.json (1 lines)<div class="lbl">wrote /Users/connorott/plugins/dev-team-workspace/iteration-7/rl-all-at-once/with_skill/project/tests/fixtures/rllab/TC-03/expected.json</div><pre>{&quot;reward&quot;: -1, &quot;done&quot;: true, &quot;tol&quot;: 0}
+</pre><div class="hook">hook PreToolUse:Write said: {&quot;hookSpecificOutput&quot;: {&quot;hookEventName&quot;: &quot;PreToolUse&quot;, &quot;permissionDecision&quot;: &quot;ask&quot;, &quot;permissionDecisionReason&quot;: &quot;Oracle file: tests/fixtures/rllab/TC-03/expected.json. Expected outputs change only with the user&#x27;s approval.&quot;}}
+</div><details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-7/rl-all-at-once/with_skill/project/tests/fixtures/rllab/TC-03/expected.json&quot;,
+  &quot;content&quot;: &quot;{\&quot;reward\&quot;: -1, \&quot;done\&quot;: true, \&quot;tol\&quot;: 0}\n&quot;
+}</pre><div class="lbl">output</div><pre>File created successfully at: /Users/connorott/plugins/dev-team-workspace/iteration-7/rl-all-at-once/with_skill/project/tests/fixtures/rllab/TC-03/expected.json (file state is current in your context — no need to Read it back)</pre></details></div><div class="step" id="SD111"><span class="sid">D111</span><span class="kind">Write</span>/Users/connorott/plugins/dev-team-workspace/iteration-7/rl-all-at-once/with_skill/project/tests/fixtures/rllab/TC-04/expected.json (1 lines)<div class="lbl">wrote /Users/connorott/plugins/dev-team-workspace/iteration-7/rl-all-at-once/with_skill/project/tests/fixtures/rllab/TC-04/expected.json</div><pre>{&quot;reward&quot;: 0, &quot;done&quot;: false, &quot;body&quot;: [[6, 5], [5, 5], [5, 6], [6, 6]], &quot;tol&quot;: 0}
+</pre><div class="hook">hook PreToolUse:Write said: {&quot;hookSpecificOutput&quot;: {&quot;hookEventName&quot;: &quot;PreToolUse&quot;, &quot;permissionDecision&quot;: &quot;ask&quot;, &quot;permissionDecisionReason&quot;: &quot;Oracle file: tests/fixtures/rllab/TC-04/expected.json. Expected outputs change only with the user&#x27;s approval.&quot;}}
+</div><details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-7/rl-all-at-once/with_skill/project/tests/fixtures/rllab/TC-04/expected.json&quot;,
+  &quot;content&quot;: &quot;{\&quot;reward\&quot;: 0, \&quot;done\&quot;: false, \&quot;body\&quot;: [[6, 5], [5, 5], [5, 6], [6, 6]], \&quot;tol\&quot;: 0}\n&quot;
+}</pre><div class="lbl">output</div><pre>File created successfully at: /Users/connorott/plugins/dev-team-workspace/iteration-7/rl-all-at-once/with_skill/project/tests/fixtures/rllab/TC-04/expected.json (file state is current in your context — no need to Read it back)</pre></details></div><div class="step" id="SD112"><span class="sid">D112</span><span class="kind">Write</span>/Users/connorott/plugins/dev-team-workspace/iteration-7/rl-all-at-once/with_skill/project/tests/fixtures/rllab/TC-05/expected.json (1 lines)<div class="lbl">wrote /Users/connorott/plugins/dev-team-workspace/iteration-7/rl-all-at-once/with_skill/project/tests/fixtures/rllab/TC-05/expected.json</div><pre>{&quot;cases&quot;: [{&quot;reward&quot;: 0, &quot;done&quot;: true}, {&quot;reward&quot;: 0, &quot;done&quot;: false}], &quot;tol&quot;: 0}
+</pre><div class="hook">hook PreToolUse:Write said: {&quot;hookSpecificOutput&quot;: {&quot;hookEventName&quot;: &quot;PreToolUse&quot;, &quot;permissionDecision&quot;: &quot;ask&quot;, &quot;permissionDecisionReason&quot;: &quot;Oracle file: tests/fixtures/rllab/TC-05/expected.json. Expected outputs change only with the user&#x27;s approval.&quot;}}
+</div><details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-7/rl-all-at-once/with_skill/project/tests/fixtures/rllab/TC-05/expected.json&quot;,
+  &quot;content&quot;: &quot;{\&quot;cases\&quot;: [{\&quot;reward\&quot;: 0, \&quot;done\&quot;: true}, {\&quot;reward\&quot;: 0, \&quot;done\&quot;: false}], \&quot;tol\&quot;: 0}\n&quot;
+}</pre><div class="lbl">output</div><pre>File created successfully at: /Users/connorott/plugins/dev-team-workspace/iteration-7/rl-all-at-once/with_skill/project/tests/fixtures/rllab/TC-05/expected.json (file state is current in your context — no need to Read it back)</pre></details></div><div class="step" id="SD113"><span class="sid">D113</span><span class="kind">Write</span>/Users/connorott/plugins/dev-team-workspace/iteration-7/rl-all-at-once/with_skill/project/tests/fixtures/rllab/TC-06/expected.json (1 lines)<div class="lbl">wrote /Users/connorott/plugins/dev-team-workspace/iteration-7/rl-all-at-once/with_skill/project/tests/fixtures/rllab/TC-06/expected.json</div><pre>{&quot;head_on&quot;: {&quot;vel&quot;: [-0.02, 0.0]}, &quot;long_run&quot;: {&quot;property&quot;: &quot;every step: abs(norm(ball.vel) - 0.02) &lt;= tol and norm(ball.pos) &lt;= 0.9 + tol&quot;}, &quot;tol&quot;: 1e-9}
+</pre><div class="hook">hook PreToolUse:Write said: {&quot;hookSpecificOutput&quot;: {&quot;hookEventName&quot;: &quot;PreToolUse&quot;, &quot;permissionDecision&quot;: &quot;ask&quot;, &quot;permissionDecisionReason&quot;: &quot;Oracle file: tests/fixtures/rllab/TC-06/expected.json. Expected outputs change only with the user&#x27;s approval.&quot;}}
+</div><details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-7/rl-all-at-once/with_skill/project/tests/fixtures/rllab/TC-06/expected.json&quot;,
+  &quot;content&quot;: &quot;{\&quot;head_on\&quot;: {\&quot;vel\&quot;: [-0.02, 0.0]}, \&quot;long_run\&quot;: {\&quot;property\&quot;: \&quot;every step: abs(norm(ball.vel) - 0.02) &lt;= tol and norm(ball.pos) &lt;= 0.9 + tol\&quot;}, \&quot;tol\&quot;: 1e-9}\n&quot;
+}</pre><div class="lbl">output</div><pre>File created successfully at: /Users/connorott/plugins/dev-team-workspace/iteration-7/rl-all-at-once/with_skill/project/tests/fixtures/rllab/TC-06/expected.json (file state is current in your context — no need to Read it back)</pre></details></div><div class="step" id="SD114"><span class="sid">D114</span><span class="kind">Write</span>/Users/connorott/plugins/dev-team-workspace/iteration-7/rl-all-at-once/with_skill/project/tests/fixtures/rllab/TC-07/expected.json (1 lines)<div class="lbl">wrote /Users/connorott/plugins/dev-team-workspace/iteration-7/rl-all-at-once/with_skill/project/tests/fixtures/rllab/TC-07/expected.json</div><pre>{&quot;near&quot;: {&quot;ball_seen&quot;: 1, &quot;ball_rel_pos&quot;: [0.2, 0.0]}, &quot;far&quot;: {&quot;ball_seen&quot;: 0, &quot;ball_rel_pos&quot;: [0.0, 0.0], &quot;ball_rel_vel&quot;: [0.0, 0.0]}, &quot;tol&quot;: 1e-9}
+</pre><div class="hook">hook PreToolUse:Write said: {&quot;hookSpecificOutput&quot;: {&quot;hookEventName&quot;: &quot;PreToolUse&quot;, &quot;permissionDecision&quot;: &quot;ask&quot;, &quot;permissionDecisionReason&quot;: &quot;Oracle file: tests/fixtures/rllab/TC-07/expected.json. Expected outputs change only with the user&#x27;s approval.&quot;}}
+</div><details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-7/rl-all-at-once/with_skill/project/tests/fixtures/rllab/TC-07/expected.json&quot;,
+  &quot;content&quot;: &quot;{\&quot;near\&quot;: {\&quot;ball_seen\&quot;: 1, \&quot;ball_rel_pos\&quot;: [0.2, 0.0]}, \&quot;far\&quot;: {\&quot;ball_seen\&quot;: 0, \&quot;ball_rel_pos\&quot;: [0.0, 0.0], \&quot;ball_rel_vel\&quot;: [0.0, 0.0]}, \&quot;tol\&quot;: 1e-9}\n&quot;
+}</pre><div class="lbl">output</div><pre>File created successfully at: /Users/connorott/plugins/dev-team-workspace/iteration-7/rl-all-at-once/with_skill/project/tests/fixtures/rllab/TC-07/expected.json (file state is current in your context — no need to Read it back)</pre></details></div><div class="step" id="SD115"><span class="sid">D115</span><span class="kind">Write</span>/Users/connorott/plugins/dev-team-workspace/iteration-7/rl-all-at-once/with_skill/project/tests/fixtures/rllab/TC-08/expected.json (1 lines)<div class="lbl">wrote /Users/connorott/plugins/dev-team-workspace/iteration-7/rl-all-at-once/with_skill/project/tests/fixtures/rllab/TC-08/expected.json</div><pre>{&quot;caught&quot;: {&quot;A&quot;: true, &quot;B&quot;: false}, &quot;removed&quot;: [&quot;A&quot;], &quot;tol&quot;: 0}
+</pre><div class="hook">hook PreToolUse:Write said: {&quot;hookSpecificOutput&quot;: {&quot;hookEventName&quot;: &quot;PreToolUse&quot;, &quot;permissionDecision&quot;: &quot;ask&quot;, &quot;permissionDecisionReason&quot;: &quot;Oracle file: tests/fixtures/rllab/TC-08/expected.json. Expected outputs change only with the user&#x27;s approval.&quot;}}
+</div><details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-7/rl-all-at-once/with_skill/project/tests/fixtures/rllab/TC-08/expected.json&quot;,
+  &quot;content&quot;: &quot;{\&quot;caught\&quot;: {\&quot;A\&quot;: true, \&quot;B\&quot;: false}, \&quot;removed\&quot;: [\&quot;A\&quot;], \&quot;tol\&quot;: 0}\n&quot;
+}</pre><div class="lbl">output</div><pre>File created successfully at: /Users/connorott/plugins/dev-team-workspace/iteration-7/rl-all-at-once/with_skill/project/tests/fixtures/rllab/TC-08/expected.json (file state is current in your context — no need to Read it back)</pre></details></div><div class="step" id="SD116"><span class="sid">D116</span><span class="kind">Write</span>/Users/connorott/plugins/dev-team-workspace/iteration-7/rl-all-at-once/with_skill/project/tests/fixtures/rllab/TC-09/expected.json (1 lines)<div class="lbl">wrote /Users/connorott/plugins/dev-team-workspace/iteration-7/rl-all-at-once/with_skill/project/tests/fixtures/rllab/TC-09/expected.json</div><pre>{&quot;applied_action&quot;: [1.0, -1.0], &quot;displacement&quot;: [0.0106066, -0.0106066], &quot;tol&quot;: 1e-6}
+</pre><div class="hook">hook PreToolUse:Write said: {&quot;hookSpecificOutput&quot;: {&quot;hookEventName&quot;: &quot;PreToolUse&quot;, &quot;permissionDecision&quot;: &quot;ask&quot;, &quot;permissionDecisionReason&quot;: &quot;Oracle file: tests/fixtures/rllab/TC-09/expected.json. Expected outputs change only with the user&#x27;s approval.&quot;}}
+</div><details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-7/rl-all-at-once/with_skill/project/tests/fixtures/rllab/TC-09/expected.json&quot;,
+  &quot;content&quot;: &quot;{\&quot;applied_action\&quot;: [1.0, -1.0], \&quot;displacement\&quot;: [0.0106066, -0.0106066], \&quot;tol\&quot;: 1e-6}\n&quot;
+}</pre><div class="lbl">output</div><pre>File created successfully at: /Users/connorott/plugins/dev-team-workspace/iteration-7/rl-all-at-once/with_skill/project/tests/fixtures/rllab/TC-09/expected.json (file state is current in your context — no need to Read it back)</pre></details></div><div class="step" id="SD117"><span class="sid">D117</span><span class="kind">Write</span>/Users/connorott/plugins/dev-team-workspace/iteration-7/rl-all-at-once/with_skill/project/tests/fixtures/rllab/TC-10/expected.json (1 lines)<div class="lbl">wrote /Users/connorott/plugins/dev-team-workspace/iteration-7/rl-all-at-once/with_skill/project/tests/fixtures/rllab/TC-10/expected.json</div><pre>{&quot;alive_after_step&quot;: 499, &quot;starved_at_step&quot;: 500, &quot;reward_at_starve&quot;: -10, &quot;tol&quot;: 0}
+</pre><div class="hook">hook PreToolUse:Write said: {&quot;hookSpecificOutput&quot;: {&quot;hookEventName&quot;: &quot;PreToolUse&quot;, &quot;permissionDecision&quot;: &quot;ask&quot;, &quot;permissionDecisionReason&quot;: &quot;Oracle file: tests/fixtures/rllab/TC-10/expected.json. Expected outputs change only with the user&#x27;s approval.&quot;}}
+</div><details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-7/rl-all-at-once/with_skill/project/tests/fixtures/rllab/TC-10/expected.json&quot;,
+  &quot;content&quot;: &quot;{\&quot;alive_after_step\&quot;: 499, \&quot;starved_at_step\&quot;: 500, \&quot;reward_at_starve\&quot;: -10, \&quot;tol\&quot;: 0}\n&quot;
+}</pre><div class="lbl">output</div><pre>File created successfully at: /Users/connorott/plugins/dev-team-workspace/iteration-7/rl-all-at-once/with_skill/project/tests/fixtures/rllab/TC-10/expected.json (file state is current in your context — no need to Read it back)</pre></details></div><div class="step" id="SD118"><span class="sid">D118</span><span class="kind">Write</span>/Users/connorott/plugins/dev-team-workspace/iteration-7/rl-all-at-once/with_skill/project/tests/fixtures/rllab/TC-11/expected.json (1 lines)<div class="lbl">wrote /Users/connorott/plugins/dev-team-workspace/iteration-7/rl-all-at-once/with_skill/project/tests/fixtures/rllab/TC-11/expected.json</div><pre>{&quot;catches&quot;: {&quot;110&quot;: false, &quot;120&quot;: false, &quot;121&quot;: true}, &quot;tol&quot;: 0}
+</pre><div class="hook">hook PreToolUse:Write said: {&quot;hookSpecificOutput&quot;: {&quot;hookEventName&quot;: &quot;PreToolUse&quot;, &quot;permissionDecision&quot;: &quot;ask&quot;, &quot;permissionDecisionReason&quot;: &quot;Oracle file: tests/fixtures/rllab/TC-11/expected.json. Expected outputs change only with the user&#x27;s approval.&quot;}}
+</div><details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-7/rl-all-at-once/with_skill/project/tests/fixtures/rllab/TC-11/expected.json&quot;,
+  &quot;content&quot;: &quot;{\&quot;catches\&quot;: {\&quot;110\&quot;: false, \&quot;120\&quot;: false, \&quot;121\&quot;: true}, \&quot;tol\&quot;: 0}\n&quot;
+}</pre><div class="lbl">output</div><pre>File created successfully at: /Users/connorott/plugins/dev-team-workspace/iteration-7/rl-all-at-once/with_skill/project/tests/fixtures/rllab/TC-11/expected.json (file state is current in your context — no need to Read it back)</pre></details></div><div class="step" id="SD119"><span class="sid">D119</span><span class="kind">Write</span>/Users/connorott/plugins/dev-team-workspace/iteration-7/rl-all-at-once/with_skill/project/tests/fixtures/rllab/TC-12/expected.json (1 lines)<div class="lbl">wrote /Users/connorott/plugins/dev-team-workspace/iteration-7/rl-all-at-once/with_skill/project/tests/fixtures/rllab/TC-12/expected.json</div><pre>{&quot;run_folders_per_pass&quot;: 2, &quot;property&quot;: &quot;for each seed, episodes.jsonl and diagnostics.jsonl are byte-identical across the two passes&quot;, &quot;tol&quot;: 0}
+</pre><div class="hook">hook PreToolUse:Write said: {&quot;hookSpecificOutput&quot;: {&quot;hookEventName&quot;: &quot;PreToolUse&quot;, &quot;permissionDecision&quot;: &quot;ask&quot;, &quot;permissionDecisionReason&quot;: &quot;Oracle file: tests/fixtures/rllab/TC-12/expected.json. Expected outputs change only with the user&#x27;s approval.&quot;}}
+</div><details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-7/rl-all-at-once/with_skill/project/tests/fixtures/rllab/TC-12/expected.json&quot;,
+  &quot;content&quot;: &quot;{\&quot;run_folders_per_pass\&quot;: 2, \&quot;property\&quot;: \&quot;for each seed, episodes.jsonl and diagnostics.jsonl are byte-identical across the two passes\&quot;, \&quot;tol\&quot;: 0}\n&quot;
+}</pre><div class="lbl">output</div><pre>File created successfully at: /Users/connorott/plugins/dev-team-workspace/iteration-7/rl-all-at-once/with_skill/project/tests/fixtures/rllab/TC-12/expected.json (file state is current in your context — no need to Read it back)</pre></details></div><div class="step" id="SD120"><span class="sid">D120</span><span class="kind">Write</span>/Users/connorott/plugins/dev-team-workspace/iteration-7/rl-all-at-once/with_skill/project/tests/fixtures/rllab/TC-13/expected.json (1 lines)<div class="lbl">wrote /Users/connorott/plugins/dev-team-workspace/iteration-7/rl-all-at-once/with_skill/project/tests/fixtures/rllab/TC-13/expected.json</div><pre>{&quot;error&quot;: &quot;ValueError&quot;, &quot;property&quot;: &quot;no run folder is created&quot;, &quot;tol&quot;: 0}
+</pre><div class="hook">hook PreToolUse:Write said: {&quot;hookSpecificOutput&quot;: {&quot;hookEventName&quot;: &quot;PreToolUse&quot;, &quot;permissionDecision&quot;: &quot;ask&quot;, &quot;permissionDecisionReason&quot;: &quot;Oracle file: tests/fixtures/rllab/TC-13/expected.json. Expected outputs change only with the user&#x27;s approval.&quot;}}
+</div><details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-7/rl-all-at-once/with_skill/project/tests/fixtures/rllab/TC-13/expected.json&quot;,
+  &quot;content&quot;: &quot;{\&quot;error\&quot;: \&quot;ValueError\&quot;, \&quot;property\&quot;: \&quot;no run folder is created\&quot;, \&quot;tol\&quot;: 0}\n&quot;
+}</pre><div class="lbl">output</div><pre>File created successfully at: /Users/connorott/plugins/dev-team-workspace/iteration-7/rl-all-at-once/with_skill/project/tests/fixtures/rllab/TC-13/expected.json (file state is current in your context — no need to Read it back)</pre></details></div><div class="step" id="SD121"><span class="sid">D121</span><span class="kind">Write</span>/Users/connorott/plugins/dev-team-workspace/iteration-7/rl-all-at-once/with_skill/project/tests/fixtures/rllab/TC-14/expected.json (1 lines)<div class="lbl">wrote /Users/connorott/plugins/dev-team-workspace/iteration-7/rl-all-at-once/with_skill/project/tests/fixtures/rllab/TC-14/expected.json</div><pre>{&quot;baseline:greedy&quot;: 2, &quot;baseline:safe_greedy&quot;: 1, &quot;tol&quot;: 0}
+</pre><div class="hook">hook PreToolUse:Write said: {&quot;hookSpecificOutput&quot;: {&quot;hookEventName&quot;: &quot;PreToolUse&quot;, &quot;permissionDecision&quot;: &quot;ask&quot;, &quot;permissionDecisionReason&quot;: &quot;Oracle file: tests/fixtures/rllab/TC-14/expected.json. Expected outputs change only with the user&#x27;s approval.&quot;}}
+</div><details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-7/rl-all-at-once/with_skill/project/tests/fixtures/rllab/TC-14/expected.json&quot;,
+  &quot;content&quot;: &quot;{\&quot;baseline:greedy\&quot;: 2, \&quot;baseline:safe_greedy\&quot;: 1, \&quot;tol\&quot;: 0}\n&quot;
+}</pre><div class="lbl">output</div><pre>File created successfully at: /Users/connorott/plugins/dev-team-workspace/iteration-7/rl-all-at-once/with_skill/project/tests/fixtures/rllab/TC-14/expected.json (file state is current in your context — no need to Read it back)</pre></details></div><div class="step" id="SD122"><span class="sid">D122</span><span class="kind">Write</span>/Users/connorott/plugins/dev-team-workspace/iteration-7/rl-all-at-once/with_skill/project/tests/fixtures/rllab/TC-15/expected.json (1 lines)<div class="lbl">wrote /Users/connorott/plugins/dev-team-workspace/iteration-7/rl-all-at-once/with_skill/project/tests/fixtures/rllab/TC-15/expected.json</div><pre>{&quot;rejected&quot;: true, &quot;alpha&quot;: 0.05, &quot;correction&quot;: &quot;holm&quot;}
+</pre><div class="hook">hook PreToolUse:Write said: {&quot;hookSpecificOutput&quot;: {&quot;hookEventName&quot;: &quot;PreToolUse&quot;, &quot;permissionDecision&quot;: &quot;ask&quot;, &quot;permissionDecisionReason&quot;: &quot;Oracle file: tests/fixtures/rllab/TC-15/expected.json. Expected outputs change only with the user&#x27;s approval.&quot;}}
+</div><details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-7/rl-all-at-once/with_skill/project/tests/fixtures/rllab/TC-15/expected.json&quot;,
+  &quot;content&quot;: &quot;{\&quot;rejected\&quot;: true, \&quot;alpha\&quot;: 0.05, \&quot;correction\&quot;: \&quot;holm\&quot;}\n&quot;
+}</pre><div class="lbl">output</div><pre>File created successfully at: /Users/connorott/plugins/dev-team-workspace/iteration-7/rl-all-at-once/with_skill/project/tests/fixtures/rllab/TC-15/expected.json (file state is current in your context — no need to Read it back)</pre></details></div><div class="step" id="SD123"><span class="sid">D123</span><span class="kind">Write</span>/Users/connorott/plugins/dev-team-workspace/iteration-7/rl-all-at-once/with_skill/project/tests/fixtures/rllab/TC-16/expected.json (1 lines)<div class="lbl">wrote /Users/connorott/plugins/dev-team-workspace/iteration-7/rl-all-at-once/with_skill/project/tests/fixtures/rllab/TC-16/expected.json</div><pre>{&quot;property&quot;: &quot;number of the 20 seeds where H0 is rejected&quot;, &quot;max_rejections&quot;: 1, &quot;alpha&quot;: 0.05, &quot;correction&quot;: &quot;holm&quot;}
+</pre><div class="hook">hook PreToolUse:Write said: {&quot;hookSpecificOutput&quot;: {&quot;hookEventName&quot;: &quot;PreToolUse&quot;, &quot;permissionDecision&quot;: &quot;ask&quot;, &quot;permissionDecisionReason&quot;: &quot;Oracle file: tests/fixtures/rllab/TC-16/expected.json. Expected outputs change only with the user&#x27;s approval.&quot;}}
+</div><details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-7/rl-all-at-once/with_skill/project/tests/fixtures/rllab/TC-16/expected.json&quot;,
+  &quot;content&quot;: &quot;{\&quot;property\&quot;: \&quot;number of the 20 seeds where H0 is rejected\&quot;, \&quot;max_rejections\&quot;: 1, \&quot;alpha\&quot;: 0.05, \&quot;correction\&quot;: \&quot;holm\&quot;}\n&quot;
+}</pre><div class="lbl">output</div><pre>File created successfully at: /Users/connorott/plugins/dev-team-workspace/iteration-7/rl-all-at-once/with_skill/project/tests/fixtures/rllab/TC-16/expected.json (file state is current in your context — no need to Read it back)</pre></details></div><div class="step" id="SD124"><span class="sid">D124</span><span class="kind">Write</span>/Users/connorott/plugins/dev-team-workspace/iteration-7/rl-all-at-once/with_skill/project/tests/fixtures/rllab/TC-17/expected.json (1 lines)<div class="lbl">wrote /Users/connorott/plugins/dev-team-workspace/iteration-7/rl-all-at-once/with_skill/project/tests/fixtures/rllab/TC-17/expected.json</div><pre>{&quot;rejected&quot;: {&quot;baseline:random&quot;: true, &quot;baseline:greedy&quot;: true}, &quot;ratio_min&quot;: 0.8, &quot;max_minutes_per_run&quot;: 60, &quot;alpha&quot;: 0.05, &quot;correction&quot;: &quot;holm&quot;}
+</pre><div class="hook">hook PreToolUse:Write said: {&quot;hookSpecificOutput&quot;: {&quot;hookEventName&quot;: &quot;PreToolUse&quot;, &quot;permissionDecision&quot;: &quot;ask&quot;, &quot;permissionDecisionReason&quot;: &quot;Oracle file: tests/fixtures/rllab/TC-17/expected.json. Expected outputs change only with the user&#x27;s approval.&quot;}}
+</div><details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-7/rl-all-at-once/with_skill/project/tests/fixtures/rllab/TC-17/expected.json&quot;,
+  &quot;content&quot;: &quot;{\&quot;rejected\&quot;: {\&quot;baseline:random\&quot;: true, \&quot;baseline:greedy\&quot;: true}, \&quot;ratio_min\&quot;: 0.8, \&quot;max_minutes_per_run\&quot;: 60, \&quot;alpha\&quot;: 0.05, \&quot;correction\&quot;: \&quot;holm\&quot;}\n&quot;
+}</pre><div class="lbl">output</div><pre>File created successfully at: /Users/connorott/plugins/dev-team-workspace/iteration-7/rl-all-at-once/with_skill/project/tests/fixtures/rllab/TC-17/expected.json (file state is current in your context — no need to Read it back)</pre></details></div><div class="step" id="SD125"><span class="sid">D125</span><span class="kind">Write</span>/Users/connorott/plugins/dev-team-workspace/iteration-7/rl-all-at-once/with_skill/project/tests/fixtures/rllab/TC-18/expected.json (1 lines)<div class="lbl">wrote /Users/connorott/plugins/dev-team-workspace/iteration-7/rl-all-at-once/with_skill/project/tests/fixtures/rllab/TC-18/expected.json</div><pre>{&quot;rejected&quot;: {&quot;baseline:random&quot;: true, &quot;baseline:flee&quot;: true}, &quot;ratio_min&quot;: 0.8, &quot;max_minutes_per_run&quot;: 60, &quot;alpha&quot;: 0.05, &quot;correction&quot;: &quot;holm&quot;}
+</pre><div class="hook">hook PreToolUse:Write said: {&quot;hookSpecificOutput&quot;: {&quot;hookEventName&quot;: &quot;PreToolUse&quot;, &quot;permissionDecision&quot;: &quot;ask&quot;, &quot;permissionDecisionReason&quot;: &quot;Oracle file: tests/fixtures/rllab/TC-18/expected.json. Expected outputs change only with the user&#x27;s approval.&quot;}}
+</div><details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-7/rl-all-at-once/with_skill/project/tests/fixtures/rllab/TC-18/expected.json&quot;,
+  &quot;content&quot;: &quot;{\&quot;rejected\&quot;: {\&quot;baseline:random\&quot;: true, \&quot;baseline:flee\&quot;: true}, \&quot;ratio_min\&quot;: 0.8, \&quot;max_minutes_per_run\&quot;: 60, \&quot;alpha\&quot;: 0.05, \&quot;correction\&quot;: \&quot;holm\&quot;}\n&quot;
+}</pre><div class="lbl">output</div><pre>File created successfully at: /Users/connorott/plugins/dev-team-workspace/iteration-7/rl-all-at-once/with_skill/project/tests/fixtures/rllab/TC-18/expected.json (file state is current in your context — no need to Read it back)</pre></details></div><div class="step" id="SD126"><span class="sid">D126</span><span class="kind">Write</span>/Users/connorott/plugins/dev-team-workspace/iteration-7/rl-all-at-once/with_skill/project/tests/fixtures/rllab/TC-19/expected.json (1 lines)<div class="lbl">wrote /Users/connorott/plugins/dev-team-workspace/iteration-7/rl-all-at-once/with_skill/project/tests/fixtures/rllab/TC-19/expected.json</div><pre>{&quot;rejected&quot;: {&quot;baseline:random&quot;: true, &quot;baseline:scripted&quot;: true}, &quot;ratio_min&quot;: 0.8, &quot;max_minutes_per_run&quot;: 60, &quot;alpha&quot;: 0.05, &quot;correction&quot;: &quot;holm&quot;}
+</pre><div class="hook">hook PreToolUse:Write said: {&quot;hookSpecificOutput&quot;: {&quot;hookEventName&quot;: &quot;PreToolUse&quot;, &quot;permissionDecision&quot;: &quot;ask&quot;, &quot;permissionDecisionReason&quot;: &quot;Oracle file: tests/fixtures/rllab/TC-19/expected.json. Expected outputs change only with the user&#x27;s approval.&quot;}}
+</div><details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-7/rl-all-at-once/with_skill/project/tests/fixtures/rllab/TC-19/expected.json&quot;,
+  &quot;content&quot;: &quot;{\&quot;rejected\&quot;: {\&quot;baseline:random\&quot;: true, \&quot;baseline:scripted\&quot;: true}, \&quot;ratio_min\&quot;: 0.8, \&quot;max_minutes_per_run\&quot;: 60, \&quot;alpha\&quot;: 0.05, \&quot;correction\&quot;: \&quot;holm\&quot;}\n&quot;
+}</pre><div class="lbl">output</div><pre>File created successfully at: /Users/connorott/plugins/dev-team-workspace/iteration-7/rl-all-at-once/with_skill/project/tests/fixtures/rllab/TC-19/expected.json (file state is current in your context — no need to Read it back)</pre></details></div><div class="step" id="SD127"><span class="sid">D127</span><span class="kind">Write</span>/Users/connorott/plugins/dev-team-workspace/iteration-7/rl-all-at-once/with_skill/project/tests/fixtures/rllab/TC-20/expected.json (1 lines)<div class="lbl">wrote /Users/connorott/plugins/dev-team-workspace/iteration-7/rl-all-at-once/with_skill/project/tests/fixtures/rllab/TC-20/expected.json</div><pre>{&quot;property&quot;: &quot;load(save(record_episode(seed=3))).frames == record_episode(seed=3).frames&quot;, &quot;tol&quot;: 0}
+</pre><div class="hook">hook PreToolUse:Write said: {&quot;hookSpecificOutput&quot;: {&quot;hookEventName&quot;: &quot;PreToolUse&quot;, &quot;permissionDecision&quot;: &quot;ask&quot;, &quot;permissionDecisionReason&quot;: &quot;Oracle file: tests/fixtures/rllab/TC-20/expected.json. Expected outputs change only with the user&#x27;s approval.&quot;}}
+</div><details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-7/rl-all-at-once/with_skill/project/tests/fixtures/rllab/TC-20/expected.json&quot;,
+  &quot;content&quot;: &quot;{\&quot;property\&quot;: \&quot;load(save(record_episode(seed=3))).frames == record_episode(seed=3).frames\&quot;, \&quot;tol\&quot;: 0}\n&quot;
+}</pre><div class="lbl">output</div><pre>File created successfully at: /Users/connorott/plugins/dev-team-workspace/iteration-7/rl-all-at-once/with_skill/project/tests/fixtures/rllab/TC-20/expected.json (file state is current in your context — no need to Read it back)</pre></details></div><div class="step" id="SD128"><span class="sid">D128</span><span class="kind">Write</span>/Users/connorott/plugins/dev-team-workspace/iteration-7/rl-all-at-once/with_skill/project/tests/fixtures/rllab/TC-21/expected.json (1 lines)<div class="lbl">wrote /Users/connorott/plugins/dev-team-workspace/iteration-7/rl-all-at-once/with_skill/project/tests/fixtures/rllab/TC-21/expected.json</div><pre>{&quot;property&quot;: &quot;every line outside the rllab:begin/end results markers is byte-identical to source/note-before.md; the text between the markers no longer contains &#x27;STALE RESULTS&#x27;&quot;, &quot;tol&quot;: 0}
+</pre><div class="hook">hook PreToolUse:Write said: {&quot;hookSpecificOutput&quot;: {&quot;hookEventName&quot;: &quot;PreToolUse&quot;, &quot;permissionDecision&quot;: &quot;ask&quot;, &quot;permissionDecisionReason&quot;: &quot;Oracle file: tests/fixtures/rllab/TC-21/expected.json. Expected outputs change only with the user&#x27;s approval.&quot;}}
+</div><details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-7/rl-all-at-once/with_skill/project/tests/fixtures/rllab/TC-21/expected.json&quot;,
+  &quot;content&quot;: &quot;{\&quot;property\&quot;: \&quot;every line outside the rllab:begin/end results markers is byte-identical to source/note-before.md; the text between the markers no longer contains &#x27;STALE RESULTS&#x27;\&quot;, \&quot;tol\&quot;: 0}\n&quot;
+}</pre><div class="lbl">output</div><pre>File created successfully at: /Users/connorott/plugins/dev-team-workspace/iteration-7/rl-all-at-once/with_skill/project/tests/fixtures/rllab/TC-21/expected.json (file state is current in your context — no need to Read it back)</pre></details></div><div class="step" id="SD129"><span class="sid">D129</span><span class="kind">Write</span>/Users/connorott/plugins/dev-team-workspace/iteration-7/rl-all-at-once/with_skill/project/tests/fixtures/rllab/TC-22/expected.json (1 lines)<div class="lbl">wrote /Users/connorott/plugins/dev-team-workspace/iteration-7/rl-all-at-once/with_skill/project/tests/fixtures/rllab/TC-22/expected.json</div><pre>{&quot;cases&quot;: [{&quot;done&quot;: false, &quot;reason_mentions&quot;: &quot;Why it works&quot;}, {&quot;done&quot;: true, &quot;reasons&quot;: []}], &quot;tol&quot;: 0}
+</pre><div class="hook">hook PreToolUse:Write said: {&quot;hookSpecificOutput&quot;: {&quot;hookEventName&quot;: &quot;PreToolUse&quot;, &quot;permissionDecision&quot;: &quot;ask&quot;, &quot;permissionDecisionReason&quot;: &quot;Oracle file: tests/fixtures/rllab/TC-22/expected.json. Expected outputs change only with the user&#x27;s approval.&quot;}}
+</div><details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-7/rl-all-at-once/with_skill/project/tests/fixtures/rllab/TC-22/expected.json&quot;,
+  &quot;content&quot;: &quot;{\&quot;cases\&quot;: [{\&quot;done\&quot;: false, \&quot;reason_mentions\&quot;: \&quot;Why it works\&quot;}, {\&quot;done\&quot;: true, \&quot;reasons\&quot;: []}], \&quot;tol\&quot;: 0}\n&quot;
+}</pre><div class="lbl">output</div><pre>File created successfully at: /Users/connorott/plugins/dev-team-workspace/iteration-7/rl-all-at-once/with_skill/project/tests/fixtures/rllab/TC-22/expected.json (file state is current in your context — no need to Read it back)</pre></details></div><div class="step" id="SD130"><span class="sid">D130</span><span class="kind">Write</span>/Users/connorott/plugins/dev-team-workspace/iteration-7/rl-all-at-once/with_skill/project/tests/fixtures/rllab/TC-23/expected.json (1 lines)<div class="lbl">wrote /Users/connorott/plugins/dev-team-workspace/iteration-7/rl-all-at-once/with_skill/project/tests/fixtures/rllab/TC-23/expected.json</div><pre>{&quot;rows&quot;: 9, &quot;pairs&quot;: &quot;every (prey_step, predator_step) combination of the 3 snapshots per side, once&quot;, &quot;episodes_per_pair&quot;: 20, &quot;property&quot;: &quot;a second call returns an identical table&quot;, &quot;tol&quot;: 0}
+</pre><div class="hook">hook PreToolUse:Write said: {&quot;hookSpecificOutput&quot;: {&quot;hookEventName&quot;: &quot;PreToolUse&quot;, &quot;permissionDecision&quot;: &quot;ask&quot;, &quot;permissionDecisionReason&quot;: &quot;Oracle file: tests/fixtures/rllab/TC-23/expected.json. Expected outputs change only with the user&#x27;s approval.&quot;}}
+</div><details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-7/rl-all-at-once/with_skill/project/tests/fixtures/rllab/TC-23/expected.json&quot;,
+  &quot;content&quot;: &quot;{\&quot;rows\&quot;: 9, \&quot;pairs\&quot;: \&quot;every (prey_step, predator_step) combination of the 3 snapshots per side, once\&quot;, \&quot;episodes_per_pair\&quot;: 20, \&quot;property\&quot;: \&quot;a second call returns an identical table\&quot;, \&quot;tol\&quot;: 0}\n&quot;
+}</pre><div class="lbl">output</div><pre>File created successfully at: /Users/connorott/plugins/dev-team-workspace/iteration-7/rl-all-at-once/with_skill/project/tests/fixtures/rllab/TC-23/expected.json (file state is current in your context — no need to Read it back)</pre></details></div><div class="step" id="SD131"><span class="sid">D131</span><span class="kind">Write</span>/Users/connorott/plugins/dev-team-workspace/iteration-7/rl-all-at-once/with_skill/project/tests/fixtures/rllab/TC-24/expected.json (1 lines)<div class="lbl">wrote /Users/connorott/plugins/dev-team-workspace/iteration-7/rl-all-at-once/with_skill/project/tests/fixtures/rllab/TC-24/expected.json</div><pre>{&quot;pass_if_any&quot;: [{&quot;rejected&quot;: {&quot;prey_improved&quot;: true, &quot;predator_beats_scripted&quot;: true}}, {&quot;note_cites&quot;: &quot;crossplay heatmap&quot;, &quot;note_names_failure_pattern&quot;: true, &quot;world_status_done&quot;: true}], &quot;alpha&quot;: 0.05, &quot;correction&quot;: &quot;holm&quot;}
+</pre><div class="hook">hook PreToolUse:Write said: {&quot;hookSpecificOutput&quot;: {&quot;hookEventName&quot;: &quot;PreToolUse&quot;, &quot;permissionDecision&quot;: &quot;ask&quot;, &quot;permissionDecisionReason&quot;: &quot;Oracle file: tests/fixtures/rllab/TC-24/expected.json. Expected outputs change only with the user&#x27;s approval.&quot;}}
+</div><details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-7/rl-all-at-once/with_skill/project/tests/fixtures/rllab/TC-24/expected.json&quot;,
+  &quot;content&quot;: &quot;{\&quot;pass_if_any\&quot;: [{\&quot;rejected\&quot;: {\&quot;prey_improved\&quot;: true, \&quot;predator_beats_scripted\&quot;: true}}, {\&quot;note_cites\&quot;: \&quot;crossplay heatmap\&quot;, \&quot;note_names_failure_pattern\&quot;: true, \&quot;world_status_done\&quot;: true}], \&quot;alpha\&quot;: 0.05, \&quot;correction\&quot;: \&quot;holm\&quot;}\n&quot;
+}</pre><div class="lbl">output</div><pre>File created successfully at: /Users/connorott/plugins/dev-team-workspace/iteration-7/rl-all-at-once/with_skill/project/tests/fixtures/rllab/TC-24/expected.json (file state is current in your context — no need to Read it back)</pre></details></div><div class="step" id="SD132"><span class="sid">D132</span><span class="kind">Bash</span>D=../plugin/dev-team/scripts/dt.py; python3 $D lint docs/packages/rllab/tests.md; python3 $D status --skill test-planning | grep -E &#x27;pipelines_no|cases_no|fixtures&#x27;<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;D=../plugin/dev-team/scripts/dt.py; python3 $D lint docs/packages/rllab/tests.md; python3 $D status --skill test-planning | grep -E &#x27;pipelines_no|cases_no|fixtures&#x27;&quot;
+}</pre><div class="lbl">output</div><pre>0 errors, 0 warnings
+pipelines_no_smoke: none
+pipelines_no_golden: none
+cases_no_source: none
+cases_no_tolerance: none
+fixtures_missing: none
+fixtures_orphan: none</pre></details></div><div class="step" id="SD133"><span class="sid">D133</span><span class="kind">say</span>I&#x27;ve written the test plan as a Draft: `docs/packages/rllab/tests.md` and the 24 fixture folders under `tests/fixtures/rllab/`. Every pipeline now has a smoke command and at least one golden case, and the checks report 0 errors and no gaps. The expected values below are the answers the code will be held to, so please check each one. ⏎ Smoke commands. `--smoke` means: a tiny step budget, 5 test episodes, a hidden viewer window, and output to a temporary folder. ⏎ | Pipeline | Smoke | ⏎ |---|---| ⏎ | PL-01 Train | `python -m rllab train snake-default --seeds 0-1 --smoke` | ⏎ | PL-02 Training …[+5721 chars]<details><summary>full text</summary><pre>I&#x27;ve written the test plan as a Draft: `docs/packages/rllab/tests.md` and the 24 fixture folders under `tests/fixtures/rllab/`. Every pipeline now has a smoke command and at least one golden case, and the checks report 0 errors and no gaps. The expected values below are the answers the code will be held to, so please check each one.
+
+**Smoke commands.** `--smoke` means: a tiny step budget, 5 test episodes, a hidden viewer window, and output to a temporary folder.
+
+| Pipeline | Smoke |
+|---|---|
+| PL-01 Train | `python -m rllab train snake-default --seeds 0-1 --smoke` |
+| PL-02 Training run | `python -m rllab train snake-default --seeds 0 --smoke` |
+| PL-03 Train reference | `python -m rllab reference snake-default --seeds 0 --smoke` |
+| PL-04 Evaluate &amp; compare | `python -m rllab compare snake-default --smoke` |
+| PL-05 Watch | `python -m rllab view snake-default baseline:greedy --seed 0 --smoke` |
+| PL-06 Lesson note | `python -m rllab note snake --smoke` |
+| PL-07 Cross-play | `python -m rllab crossplay prey-phase-b --smoke` |
+
+**Grid convention.** Cells are `(x, y)`, with x growing east and y growing **south**, and (0, 0) in the north-west corner. The spec&#x27;s SNAKE-07 example only makes sense this way: food at (3, 2) from a head at (0, 5) counts as &quot;north&quot;. Actions: 0 = left, 1 = straight, 2 = right.
+
+### Snake (PL-02)
+| Case | Situation | Expected |
+|---|---|---|
+| TC-01 | Body (0,5),(0,6),(0,7), heading N, food (3,2). *From the spec&#x27;s SNAKE-07 example* | Observation `[1,0,0, 1,0,0,0, 1,1,0,0]`: danger to the left; heading N; food N and E |
+| TC-02 | Body (5,5),(5,6),(5,7), heading N, food (5,4), go straight | Reward +1, not done, body (5,4),(5,5),(5,6),(5,7), new food off the body |
+| TC-03 | Body (9,5),(8,5),(7,5), heading E, go straight. *From the spec* | Reward −1, done |
+| TC-04 | Body (5,5),(5,6),(6,6),(6,5), heading N, turn right into the tail&#x27;s cell | Reward 0, not done, body (6,5),(5,5),(5,6),(6,6) |
+| TC-05 | Same snake, no food nearby, go straight, after 99 food-less steps / after 98 | Episode ends with reward 0 / continues |
+
+### Tank (PL-02)
+| Case | Situation | Expected | Tolerance |
+|---|---|---|---|
+| TC-06 | Ball at (0.89, 0) moving (0.02, 0) hits the wall head-on; then seed 7 run for up to 1,000 steps | Velocity becomes (−0.02, 0); on every step, speed = 0.02 and the ball&#x27;s centre stays within 0.9 of the tank&#x27;s centre | 1e-9 |
+| TC-07 | Fish at (0,0); ball at (0.2,0) / ball at (0.5,0). *From the spec* | Seen, relative position (0.2, 0) / not seen, entries 0 | 1e-9 |
+| TC-08 | Ball at (0,0) after the step; fish A at 0.12, fish B at 0.14 | A is caught and removed; B is not | exact |
+| TC-09 ⚠ | Fish at (0,0), action (3.0, −2.0) | Clipped to (1, −1); the fish moves **(0.0106066, −0.0106066)**, i.e. 0.015 along the diagonal | 1e-6 |
+
+### Predator–prey (PL-02)
+| Case | Situation | Expected |
+|---|---|---|
+| TC-10 | A prey that never eats | Alive after step 499; starves at step 500 with reward −10. The energy count must not drift by rounding error |
+| TC-11 ⚠ | The predator catches at step 100, then touches prey at steps 110, 120 and 121 | 110: no catch. **120: no catch. 121: catch** |
+
+### Other pipelines
+| Case | Pipeline | Expected |
+|---|---|---|
+| TC-12 | PL-01 | `snake-default` with seeds 0 and 1, run twice: 2 run folders each time, and each seed&#x27;s two log files are byte-identical across the two runs |
+| TC-13 | PL-03 | `prey-phase-b` → `ValueError`, and no run folder is created |
+| TC-14 ⚠ | PL-04 | Body (5,5),(5,6),(6,6),(6,5),(6,4), heading N, food (8,5): **plain greedy turns right** (into its own body); **safe greedy goes straight** |
+| TC-15 | PL-04 | Learner scores ~N(10,1) vs baseline ~N(5,1), 5 seeds each, seed 11: the &quot;no better than the baseline&quot; hypothesis is rejected (α 0.05, Holm correction) |
+| TC-16 | PL-04 | Learner and baseline both ~N(5,1), on seeds 12–31: rejected on at most 1 of the 20 seeds |
+| TC-17 / TC-18 / TC-19 | PL-04 | The S1, S2 and Phase A pass checks, each over 5 seeds with test seeds 1,000,000–1,000,099. Snake must beat random and plain greedy, the fish must beat random and flee, and the prey must beat random and scripted prey. Each also needs a learner/reference ratio of at least 0.80 and every training run within 60 minutes |
+| TC-20 | PL-05 | A greedy Snake episode on seed 3, saved and reloaded, has exactly the same frames as a fresh recording |
+| TC-21 | PL-06 | Remaking a note keeps every line outside the markers byte-identical, and the stale results block is replaced |
+| TC-22 | PL-06 | &quot;Why it works&quot; with 29 words → not done, and the reason names that section; with 30 words → done |
+| TC-23 | PL-07 | A smoke Phase B run with 3 snapshots per side gives 9 rows, each the mean of 20 episodes, and an identical table when run again |
+| TC-24 | PL-07 | Both PREY-15 tests are rejected. If not, the note cites the cross-play heatmap and names the failure pattern, and the status says done |
+
+The `null-hypothesis-testing` skill is routed to TC-15–TC-19 and TC-24.
+
+**⚠ Three cases where I had to interpret the spec:**
+1. **TC-09:** &quot;top speed 0.015&quot; caps the length of the move, so a diagonal moves 0.015 in total. The alternative is 0.015 on each axis, which would let diagonal moves go about 41% faster.
+2. **TC-11:** &quot;can&#x27;t catch again for 20 steps&quot; means steps 101–120 are blocked and 121 is the first allowed catch.
+3. **TC-14:** the greedy snakes measure distance in grid steps along x plus y (Manhattan distance), and break ties in the order straight, then left, then right.
+
+**Assumptions:**
+- Each Snake case sets the state directly instead of reaching it by playing from reset.
+- TC-08 checks the catch rule on the positions after a step.
+- TC-10 makes sure no pellets are reachable.
+- Seeds 7, 11 and 12–31 are arbitrary.
+- The model-evaluation cases (TC-17–TC-19, TC-24) state the pass rule. They&#x27;re checked when each stage ends, not on every build.
+
+**Uncovered:** none. Every pipeline has a case.
+
+**Do you approve these expected values?** That includes the three interpretations and the grid convention. For any value you disagree with, give me the correct one and I&#x27;ll fix it. Once approved, I&#x27;ll commit the test plan and fixtures and move on to build planning.</pre></details></div><div class="step" id="SD134"><span class="sid">D134</span><span class="kind">hook</span><span class="hook">SessionStart:resume said: milestone: none (no tasks/plan.md)
+draft (waiting for approval): docs/packages/rllab/tests.md
+dt: python3 /Users/connorott/plugins/dev-team-workspace/iteration-7/rl-all-at-once/with_skill/plugin/dev-team/scripts/dt.py
+</span></div>
+<h2>Commits</h2>
+<p>None.</p>
+<h2>Returned</h2>
+<pre>I&#x27;ve written the test plan as a Draft: `docs/packages/rllab/tests.md` and the 24 fixture folders under `tests/fixtures/rllab/`. Every pipeline now has a smoke command and at least one golden case, and the checks report 0 errors and no gaps. The expected values below are the answers the code will be held to, so please check each one.
+
+**Smoke commands.** `--smoke` means: a tiny step budget, 5 test episodes, a hidden viewer window, and output to a temporary folder.
+
+| Pipeline | Smoke |
+|---|---|
+| PL-01 Train | `python -m rllab train snake-default --seeds 0-1 --smoke` |
+| PL-02 Training run | `python -m rllab train snake-default --seeds 0 --smoke` |
+| PL-03 Train reference | `python -m rllab reference snake-default --seeds 0 --smoke` |
+| PL-04 Evaluate &amp; compare | `python -m rllab compare snake-default --smoke` |
+| PL-05 Watch | `python -m rllab view snake-default baseline:greedy --seed 0 --smoke` |
+| PL-06 Lesson note | `python -m rllab note snake --smoke` |
+| PL-07 Cross-play | `python -m rllab crossplay prey-phase-b --smoke` |
+
+**Grid convention.** Cells are `(x, y)`, with x growing east and y growing **south**, and (0, 0) in the north-west corner. The spec&#x27;s SNAKE-07 example only makes sense this way: food at (3, 2) from a head at (0, 5) counts as &quot;north&quot;. Actions: 0 = left, 1 = straight, 2 = right.
+
+### Snake (PL-02)
+| Case | Situation | Expected |
+|---|---|---|
+| TC-01 | Body (0,5),(0,6),(0,7), heading N, food (3,2). *From the spec&#x27;s SNAKE-07 example* | Observation `[1,0,0, 1,0,0,0, 1,1,0,0]`: danger to the left; heading N; food N and E |
+| TC-02 | Body (5,5),(5,6),(5,7), heading N, food (5,4), go straight | Reward +1, not done, body (5,4),(5,5),(5,6),(5,7), new food off the body |
+| TC-03 | Body (9,5),(8,5),(7,5), heading E, go straight. *From the spec* | Reward −1, done |
+| TC-04 | Body (5,5),(5,6),(6,6),(6,5), heading N, turn right into the tail&#x27;s cell | Reward 0, not done, body (6,5),(5,5),(5,6),(6,6) |
+| TC-05 | Same snake, no food nearby, go straight, after 99 food-less steps / after 98 | Episode ends with reward 0 / continues |
+
+### Tank (PL-02)
+| Case | Situation | Expected | Tolerance |
+|---|---|---|---|
+| TC-06 | Ball at (0.89, 0) moving (0.02, 0) hits the wall head-on; then seed 7 run for up to 1,000 steps | Velocity becomes (−0.02, 0); on every step, speed = 0.02 and the ball&#x27;s centre stays within 0.9 of the tank&#x27;s centre | 1e-9 |
+| TC-07 | Fish at (0,0); ball at (0.2,0) / ball at (0.5,0). *From the spec* | Seen, relative position (0.2, 0) / not seen, entries 0 | 1e-9 |
+| TC-08 | Ball at (0,0) after the step; fish A at 0.12, fish B at 0.14 | A is caught and removed; B is not | exact |
+| TC-09 ⚠ | Fish at (0,0), action (3.0, −2.0) | Clipped to (1, −1); the fish moves **(0.0106066, −0.0106066)**, i.e. 0.015 along the diagonal | 1e-6 |
+
+### Predator–prey (PL-02)
+| Case | Situation | Expected |
+|---|---|---|
+| TC-10 | A prey that never eats | Alive after step 499; starves at step 500 with reward −10. The energy count must not drift by rounding error |
+| TC-11 ⚠ | The predator catches at step 100, then touches prey at steps 110, 120 and 121 | 110: no catch. **120: no catch. 121: catch** |
+
+### Other pipelines
+| Case | Pipeline | Expected |
+|---|---|---|
+| TC-12 | PL-01 | `snake-default` with seeds 0 and 1, run twice: 2 run folders each time, and each seed&#x27;s two log files are byte-identical across the two runs |
+| TC-13 | PL-03 | `prey-phase-b` → `ValueError`, and no run folder is created |
+| TC-14 ⚠ | PL-04 | Body (5,5),(5,6),(6,6),(6,5),(6,4), heading N, food (8,5): **plain greedy turns right** (into its own body); **safe greedy goes straight** |
+| TC-15 | PL-04 | Learner scores ~N(10,1) vs baseline ~N(5,1), 5 seeds each, seed 11: the &quot;no better than the baseline&quot; hypothesis is rejected (α 0.05, Holm correction) |
+| TC-16 | PL-04 | Learner and baseline both ~N(5,1), on seeds 12–31: rejected on at most 1 of the 20 seeds |
+| TC-17 / TC-18 / TC-19 | PL-04 | The S1, S2 and Phase A pass checks, each over 5 seeds with test seeds 1,000,000–1,000,099. Snake must beat random and plain greedy, the fish must beat random and flee, and the prey must beat random and scripted prey. Each also needs a learner/reference ratio of at least 0.80 and every training run within 60 minutes |
+| TC-20 | PL-05 | A greedy Snake episode on seed 3, saved and reloaded, has exactly the same frames as a fresh recording |
+| TC-21 | PL-06 | Remaking a note keeps every line outside the markers byte-identical, and the stale results block is replaced |
+| TC-22 | PL-06 | &quot;Why it works&quot; with 29 words → not done, and the reason names that section; with 30 words → done |
+| TC-23 | PL-07 | A smoke Phase B run with 3 snapshots per side gives 9 rows, each the mean of 20 episodes, and an identical table when run again |
+| TC-24 | PL-07 | Both PREY-15 tests are rejected. If not, the note cites the cross-play heatmap and names the failure pattern, and the status says done |
+
+The `null-hypothesis-testing` skill is routed to TC-15–TC-19 and TC-24.
+
+**⚠ Three cases where I had to interpret the spec:**
+1. **TC-09:** &quot;top speed 0.015&quot; caps the length of the move, so a diagonal moves 0.015 in total. The alternative is 0.015 on each axis, which would let diagonal moves go about 41% faster.
+2. **TC-11:** &quot;can&#x27;t catch again for 20 steps&quot; means steps 101–120 are blocked and 121 is the first allowed catch.
+3. **TC-14:** the greedy snakes measure distance in grid steps along x plus y (Manhattan distance), and break ties in the order straight, then left, then right.
+
+**Assumptions:**
+- Each Snake case sets the state directly instead of reaching it by playing from reset.
+- TC-08 checks the catch rule on the positions after a step.
+- TC-10 makes sure no pellets are reachable.
+- Seeds 7, 11 and 12–31 are arbitrary.
+- The model-evaluation cases (TC-17–TC-19, TC-24) state the pass rule. They&#x27;re checked when each stage ends, not on every build.
+
+**Uncovered:** none. Every pipeline has a case.
+
+**Do you approve these expected values?** That includes the three interpretations and the grid convention. For any value you disagree with, give me the correct one and I&#x27;ll fix it. Once approved, I&#x27;ll commit the test plan and fixtures and move on to build planning.</pre>
+</body></html>

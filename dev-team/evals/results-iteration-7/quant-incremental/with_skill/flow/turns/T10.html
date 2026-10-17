@@ -1,0 +1,891 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1"><title>T10 turn</title>
+<style>
+:root{--bg:#fbfbfa;--fg:#1d1d1f;--muted:#6b6b70;--line:#d9d9de;--box:#fff;--rowp:#eef3fb;--band:#fff4d6;
+--ok:#2e7d32;--bad:#c62828;--warn:#b26a00;--idle:#6b6b70}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#17171a;--fg:#ececf0;--muted:#9a9aa3;
+--line:#34343a;--box:#222227;--rowp:#1d2433;--band:#3a3015;--ok:#6fcf73;--bad:#ff6b6b;--warn:#f0b35a;--idle:#9a9aa3}}
+:root[data-theme="dark"]{--bg:#17171a;--fg:#ececf0;--muted:#9a9aa3;--line:#34343a;--box:#222227;--rowp:#1d2433;
+--band:#3a3015;--ok:#6fcf73;--bad:#ff6b6b;--warn:#f0b35a;--idle:#9a9aa3}
+body{margin:0;padding:16px;background:var(--bg);color:var(--fg);font:14px/1.45 -apple-system,system-ui,sans-serif}
+h1{font-size:18px;margin:0 0 4px}h2{font-size:15px;margin:22px 0 8px}.sub{color:var(--muted)}
+table{border-collapse:collapse;margin:4px 0 8px}td,th{border-bottom:1px solid var(--line);padding:4px 10px;text-align:left;
+vertical-align:top}th{color:var(--muted);font-weight:600}.chips span{display:inline-block;margin:0 4px 2px 0}
+.legend span{margin-right:14px;white-space:nowrap}.sw{display:inline-block;width:10px;height:10px;border-radius:2px;
+margin-right:4px;vertical-align:-1px}.scroll{overflow:auto;max-height:88vh;border:1px solid var(--line);border-radius:8px}
+.chart{display:grid;width:max-content}.chart>div{line-height:0}.corner{position:sticky;top:0;left:0;z-index:3}
+.colhead{position:sticky;top:0;z-index:2}.rowhead{position:sticky;left:0;z-index:2}
+svg.bg{background:var(--bg)}.colhead svg{border-bottom:1px solid var(--line)}.rowhead svg{border-right:1px solid var(--line)}
+.ok{color:var(--ok);fill:var(--ok)}.bad{color:var(--bad);fill:var(--bad)}.warn{color:var(--warn);fill:var(--warn)}
+.idle{color:var(--idle);fill:var(--idle)}
+svg text{fill:var(--fg);font-family:-apple-system,system-ui,sans-serif}
+.box{fill:var(--box);stroke:var(--line)}.unit:hover .box{stroke:var(--fg)}
+.role{font-size:12px;font-weight:600}.uid,.wmeta,.lmeta,.meta{font-size:10px;fill:var(--muted)}
+.sub{font-size:10.5px;fill:var(--muted)}.badge{font-size:11px;font-weight:600}
+.meta.bad{fill:var(--bad);font-weight:600}.lane{font-size:13px;font-weight:700}.wave{font-size:13px;font-weight:700}
+.par{fill:#4e79a7}.ser{fill:var(--muted)}.rowp{fill:var(--rowp)}.rows{fill:transparent}.band{fill:var(--band)}
+.bandt{font-size:11.5px}.grid{stroke:var(--line)}.link{stroke:var(--muted);stroke-width:1.2;opacity:.55}
+.arrowhead{fill:var(--muted)}.marks{font-size:10.5px}.audit{stroke:var(--box);stroke-width:2}.auditn{font-size:10px;font-weight:700;fill:#fff}
+a{color:inherit}svg a .box{cursor:pointer}
+
+:root{--c0:#2a78d6;--c1:#eb6834;--c2:#1baf7a;--c3:#eda100;--c4:#e87ba4;--c5:#008300;--c6:#6250d6;--c7:#e34948;
+--cx:#8a8985;--main:#52514e;--read:#dcdbd5;--readfg:#1d1d1f}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--c0:#3987e5;--c1:#d95926;--c2:#199e70;
+--c3:#c98500;--c4:#d55181;--c5:#008300;--c6:#9085e9;--c7:#e66767;--cx:#77766f;--main:#c3c2b7;--read:#3b3b40;
+--readfg:#ececf0}}
+:root[data-theme="dark"]{--c0:#3987e5;--c1:#d95926;--c2:#199e70;--c3:#c98500;--c4:#d55181;--c5:#008300;
+--c6:#9085e9;--c7:#e66767;--cx:#77766f;--main:#c3c2b7;--read:#3b3b40;--readfg:#ececf0}
+.c0{fill:var(--c0);background:var(--c0)}.c1{fill:var(--c1);background:var(--c1)}.c2{fill:var(--c2);background:var(--c2)}
+.c3{fill:var(--c3);background:var(--c3)}.c4{fill:var(--c4);background:var(--c4)}.c5{fill:var(--c5);background:var(--c5)}
+.c6{fill:var(--c6);background:var(--c6)}.c7{fill:var(--c7);background:var(--c7)}.cx{fill:var(--cx);background:var(--cx)}
+.cmain{fill:var(--main)}.sc0{stroke:var(--c0)}.sc1{stroke:var(--c1)}.sc2{stroke:var(--c2)}
+.tl text,.sm text,.lc text{font-size:10.5px;fill:var(--muted)}.tl .lbl-in,.sm .lbl-in{fill:#fff;font-size:10.5px;font-weight:600}
+.tl .rowl,.sm .rowl,.lc .rowl{fill:var(--fg);font-size:11.5px;font-weight:600}.tl .band{fill:var(--rowp)}
+.tl .brk{stroke:var(--muted);stroke-dasharray:2 3}.tl a:hover rect,.sm a:hover rect{stroke:var(--fg);stroke-width:1.5}
+.axis{stroke:var(--line)}.sm .val{fill:var(--fg);font-weight:600}.lc path.ln{fill:none;stroke-width:2}
+.lc circle{stroke:var(--bg);stroke-width:2}.lc .end{font-weight:600;fill:var(--fg)}
+.tiles{display:flex;flex-wrap:wrap;gap:10px;margin:12px 0}.tile{border:1px solid var(--line);border-radius:8px;
+padding:8px 12px;min-width:110px;background:var(--box)}.tile b{display:block;font-size:20px;line-height:1.2}
+.tile span{font-size:12px;color:var(--muted)}.tile i{font-style:normal;font-size:12px;margin-left:6px}
+.fm{border-collapse:separate;border-spacing:2px}.fm td,.fm th{border:0;padding:0;text-align:center;font-size:11px}
+.fm th{padding:0 2px;font-weight:600}.fm td.f,.fm th.f{text-align:left;padding-right:10px;white-space:nowrap;
+position:sticky;left:0;background:var(--bg);font:11.5px ui-monospace,Menlo,monospace;
+max-width:380px;overflow:hidden;text-overflow:ellipsis}
+.fm td.cell{min-width:22px;height:20px;border-radius:3px}.fm td.fw{background:var(--c0);color:#fff;font-weight:700}
+.fm td.fe{background:var(--c1);color:#fff;font-weight:700}.fm td.fr{background:var(--read);color:var(--readfg)}
+.fm td.n{color:var(--muted);padding:0 6px}.fm tr.grp td{text-align:left;padding-top:8px;color:var(--muted);
+font-weight:600}
+.key{display:inline-block;min-width:18px;text-align:center;border-radius:3px;font-size:11px;margin-right:4px}
+.bar{display:inline-block;height:9px;border-radius:2px;vertical-align:0}
+
+pre{white-space:pre-wrap;word-break:break-word;background:var(--box);border:1px solid var(--line);border-radius:6px;
+padding:8px 10px;margin:4px 0;font:12px/1.45 ui-monospace,SFMono-Regular,Menlo,monospace;max-width:100%;overflow:auto}
+.step{border-top:1px solid var(--line);padding:6px 0}.step:target{background:var(--rowp)}
+.sid{font:12px ui-monospace,Menlo,monospace;color:var(--muted);margin-right:8px}.kind{font-weight:600;margin-right:8px}
+.err{color:var(--bad);font-weight:600}.hook{color:var(--bad);margin:4px 0 0 16px}.lbl{font-size:12px;color:var(--muted);margin-top:6px}
+details summary{cursor:pointer;color:var(--muted);font-size:12px}.head td:first-child{color:var(--muted)}
+.top{font-size:13px}.narr{list-style:none;padding-left:0}.narr li{margin:3px 0}
+</style></head>
+<body>
+<p class="top"><a href="../flow.html">← the run's flow chart</a></p>
+<p class="top"><a href="../plan/T10.html">The plan as of T10</a>: this turn changed the plan (+102 ~0 −0) · <a href="../plan/index.html">plan map</a></p>
+<h1>T10 · turn · (a) All 10. Go ahead with the architecture revision for the internal hand-off types too; I&#x27;ll approv</h1>
+<table class="head"><tr><td>Type</td><td>turn</td></tr><tr><td>Description</td><td>(a) All 10. Go ahead with the architecture revision for the internal hand-off types too; I&#x27;ll approv</td></tr><tr><td>Spawned by</td><td>user</td></tr><tr><td>Model</td><td>claude-opus-5-5</td></tr><tr><td>Start</td><td>2026-10-17 17:35:50 UTC</td></tr><tr><td>Duration</td><td>6 min</td></tr><tr><td>Tool calls</td><td>13</td></tr><tr><td>Errors</td><td>0</td></tr><tr><td>Hook blocks</td><td>2</td></tr><tr><td>Tokens</td><td>38.2k out · 47.1k new in · 2.0M cached in · peak context 186k</td></tr><tr><td>Skills invoked</td><td>none</td></tr><tr><td>Files written or edited</td><td>docs/packages/data/architecture.md, docs/packages/server/contract.md, docs/packages/data/pipelines.md, docs/packages/server/pipelines.md, docs/packages/web/pipelines.md, docs/architecture.md</td></tr><tr><td>Definition</td><td>none</td></tr><tr><td>Steps</td><td>23</td></tr><tr><td>Finished</td><td>yes</td></tr></table>
+
+
+<h2>Prompt</h2>
+<pre>(a) All 10. Go ahead with the architecture revision for the internal hand-off types too; I&#x27;ll approve the list.</pre>
+<h2>Files</h2>
+<table><tr><th>Op</th><th>File</th><th>Calls</th><th>By</th><th>Via</th><th>Steps</th></tr><tr><td>write</td><td><code>docs/packages/data/pipelines.md</code></td><td>1</td><td>main</td><td>Write</td><td><a href="#D96">D96</a></td></tr><tr><td>write</td><td><code>docs/packages/server/pipelines.md</code></td><td>1</td><td>main</td><td>Write</td><td><a href="#D98">D98</a></td></tr><tr><td>write</td><td><code>docs/packages/web/pipelines.md</code></td><td>1</td><td>main</td><td>Write</td><td><a href="#D99">D99</a></td></tr><tr><td>edit</td><td><code>docs/architecture.md</code></td><td>1</td><td>main</td><td>Bash</td><td><a href="#D103">D103</a></td></tr><tr><td>edit</td><td><code>docs/packages/data/architecture.md</code></td><td>1</td><td>main</td><td>Bash</td><td><a href="#D93">D93</a></td></tr><tr><td>edit</td><td><code>docs/packages/server/contract.md</code></td><td>1</td><td>main</td><td>Bash</td><td><a href="#D94">D94</a></td></tr><tr><td>edit</td><td><code>docs/packages/server/pipelines.md</code></td><td>1</td><td>main</td><td>Bash</td><td><a href="#D107">D107</a></td></tr><tr><td>read</td><td><code>../plugin/dev-team/scripts/devteam/commands/lint.py</code></td><td>1</td><td>main</td><td>Bash</td><td><a href="#D101">D101</a></td></tr><tr><td>read</td><td><code>../plugin/dev-team/skills/architecture-design/references/revise.md</code></td><td>1</td><td>main</td><td>Bash</td><td><a href="#D90">D90</a></td></tr><tr><td>read</td><td><code>../plugin/dev-team/skills/pipeline-design/references/examples-new.md</code></td><td>1</td><td>main</td><td>Bash</td><td><a href="#D90">D90</a></td></tr><tr><td>read</td><td><code>docs/packages/data/pipelines.md</code></td><td>1</td><td>main</td><td>Bash</td><td><a href="#D108">D108</a></td></tr></table>
+<h2>Steps</h2>
+<div class="step" id="SD89"><span class="sid">D89</span><span class="kind">user</span>(a) All 10. Go ahead with the architecture revision for the internal hand-off types too; I&#x27;ll approve the list.<details><summary>full text</summary><pre>(a) All 10. Go ahead with the architecture revision for the internal hand-off types too; I&#x27;ll approve the list.</pre></details></div><div class="step" id="SD90"><span class="sid">D90</span><span class="kind">Bash</span>git status -s; git log --oneline -2; cat ../plugin/dev-team/skills/architecture-design/references/revise.md; sed -n 1,80p ../plugin/dev-team/skills/pipeline-design/references/examples-new.md<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;git status -s; git log --oneline -2; cat ../plugin/dev-team/skills/architecture-design/references/revise.md; sed -n 1,80p ../plugin/dev-team/skills/pipeline-design/references/examples-new.md&quot;
+}</pre><div class="lbl">output</div><pre>b321c3b turn 9
+c31bb95 turn 8
+# Revise
+
+Read when `dt status --skill architecture-design` reports Revise: a technical change with no spec change. It ends at the Review Gate in `../SKILL.md`, following `writing-rules.md`. Example: `examples-revise.md`.
+
+1. Write a new decision whose Context explains what was learned (&quot;the simulator is 40× too slow for QR-02 at 1M steps&quot;). Then supersede the old decision if the new one reverses it, or revise it in place if the new one changes only part of it (`decisions.md`).
+2. Update every section and contract the change touches (tech stack, components, Overview; contracts per `contracts.md`), and run the Review Gate.
+3. If a contract changes, list its consumers (its **Used by**): their pipelines and tasks need revisiting. A frozen interface&#x27;s type, samples and fake change with it, in a new interface task Replan adds (a `contract-change` edge).
+# New: worked examples
+
+Two New rounds, each from `dt status` to the gate. The format is `template.md`.
+
+## Example 1: Quant Lab, M1 (New, single package)
+
+**Context:** the architecture is Approved, single package `quant`, components `data`, `stats`, `portfolio`. M1 covers DATA-01, DATA-02, STAT-01–STAT-04, QR-01, QR-02. `portfolio` is M2.
+
+```
+$ dt status --skill pipeline-design
+skill: pipeline-design
+mode: new
+next ids: AD-04 PL-01 TC-01 M3
+packages: quant=new
+uncovered_ids: none  (and the other lists: none)
+```
+
+In New mode the lists stay empty until the gate&#x27;s re-run; the scope comes from the architecture&#x27;s Covers.
+
+**Interview:**
+
+```
+Candidates for M1 (nothing is written until you confirm):
+1. `load` — pull prices for a universe and date range                 M1
+2. `cov-report` — PCA and MP cleaning on loaded returns                M1
+3. `backtest` — min-variance vs equal weight out of sample             M2 (later)
+Q:       Which will you actually run in M1?   (multi-select; recommended: 1, 2)
+User:    1 and 2. And the report should be runnable on its own; it can load prices itself.
+
+Q:       Should `cov-report` read prices saved by `load`, or call the loader directly?
+GUESS:   call it directly; a separate cache step is more than M1 needs.
+DEFAULT: call it directly.
+User:    Directly.
+```
+
+**`contract.md` after the write** (only `Used by:` changes; each step-table type already has its `type` section):
+
+```markdown
+### stats.estimate_cov: Covariance estimate
+`def estimate_cov(returns: Returns, *, method: CovMethod = &quot;sample&quot;) -&gt; Cov`
+- **Invariants:** N×N for T×N input; symmetric; positive semi-definite
+- **Errors:** `ValueError` if T &lt; 2 or the input contains NaN
+- **Used by:** portfolio; PL-02
+```
+
+**Result — `docs/packages/quant/pipelines.md`:**
+
+````markdown
+# quant — Pipelines
+
+**Package:** quant · **Status:** Draft · **Last updated:** 2026-10-16 · **Contract:** [contract.md](contract.md)
+
+## PL-01: Load prices
+**Entry:** `src/quant/data/pipeline.py::run_load_prices` · **Trigger:** `python -m quant.data load`
+**Covers:** DATA-01, DATA-02, QR-01
+
+| # | Step | Owner | In → Out | Spine version | Covers |
+|---|---|---|---|---|---|
+| 1 | `read_raw` | data.raw | dates → RawPrices | read a synthetic CSV | DATA-01 |
+| 2 | `apply_universe` | data.universe | RawPrices, dates → Prices | static universe, no delistings | DATA-02 |
+| 3 | `save_prices` | data.store | Prices → path | one Parquet file per run | DATA-01 |
+
+### Entry sketch (pre-build — removed by spine task)
+```python
+def run_load_prices(cfg: LoadConfig) -&gt; Path:
+    rows = read_raw(cfg.start, cfg.end)
+    prices = apply_universe(rows, cfg.start, cfg.end)
+    return save_prices(prices, cfg.out)
+```
+
+## PL-02: Covariance report
+**Entry:** `src/quant/stats/pipeline.py::run_cov_report` · **Trigger:** `python -m quant.stats cov-report`
+**Covers:** STAT-01–STAT-04, QR-02
+
+| # | Step | Owner | In → Out | Spine version | Covers |
+|---|---|---|---|---|---|
+| 1 | `load_prices` | data | universe, dates → Prices | PL-01 as built | DATA-01 |
+| 2 | `estimate_cov` | stats.cov | Returns → Cov | sample covariance | STAT-02 |
+| 3 | `clean_eigen` | stats.rmt | Cov, T → Cov | no cleaning (baseline) | STAT-03 |
+| 4 | `pca` | stats.pca | Cov → Factors | full eigendecomposition | STAT-01 |</pre></details></div><div class="step" id="SD91"><span class="sid">D91</span><span class="kind">Bash</span>cd /Users/connorott/plugins/dev-team-workspace/iteration-7/quant-incremental/with_skill/plugin/dev-team/skills/architecture-design/references &amp;&amp; grep -n &quot;Changelog&quot; -A6 examples-revise.md | head -30<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;cd /Users/connorott/plugins/dev-team-workspace/iteration-7/quant-incremental/with_skill/plugin/dev-team/skills/architecture-design/references &amp;&amp; grep -n \&quot;Changelog\&quot; -A6 examples-revise.md | head -30&quot;
+}</pre><div class="lbl">output</div><pre>3:During the build, ExecGym runs at 3,000 steps/second, failing QR-01. The fix is to move the step loop into Numba. The skill writes `AD-05: JIT-compile the step loop with Numba`, with context &quot;AD-03&#x27;s NumPy step measured at 3k steps/s; QR-01 needs 10k&quot;. AD-03&#x27;s choice (vectorized, not event-driven) still holds, so AD-05 doesn&#x27;t supersede it. AD-03&#x27;s text is still true, so it isn&#x27;t revised either. Some other text is no longer true, and the skill rewrites it: the Speed line under Cross-cutting concerns said all per-step math is plain NumPy, and now names the compiled loop and AD-05. The tech stack gains Numba. One Changelog row; no spec change.
+Shell cwd was reset to /Users/connorott/plugins/dev-team-workspace/iteration-7/quant-incremental/with_skill/project</pre></details></div><div class="step" id="SD92"><span class="sid">D92</span><span class="kind">say</span>I&#x27;ll do the architecture revision first: one new decision (AD-14) and the hand-off types.<details><summary>full text</summary><pre>I&#x27;ll do the architecture revision first: one new decision (AD-14) and the hand-off types.</pre></details></div><div class="step" id="SD93"><span class="sid">D93</span><span class="kind">Bash</span>python3 - &lt;&lt;&#x27;EOF&#x27;
+import re
+p=&#x27;docs/architecture.md&#x27;; s=open(p).read()
+ad14=&#x27;&#x27;&#x27;### AD-14: Typed build hand-offs and two-phase validation
+Status: Proposed · Date: 2026-10-17 · Scope: `data`, `server`
+- Context: Pipeline design showed each build step hands a bundle of tables to the next, and that validation can&#x27;t run in one place: impossible prices (VAL-02) must be rejected before returns are derived, while large-move checks (VAL-03) and the universe count (UNIV-02) need derived re …[+1949 chars]<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;python3 - &lt;&lt;&#x27;EOF&#x27;\nimport re\np=&#x27;docs/architecture.md&#x27;; s=open(p).read()\nad14=&#x27;&#x27;&#x27;### AD-14: Typed build hand-offs and two-phase validation\n**Status:** Proposed · **Date:** 2026-10-17 · **Scope:** `data`, `server`\n- **Context:** Pipeline design showed each build step hands a bundle of tables to the next, and that validation can&#x27;t run in one place: impossible prices (VAL-02) must be rejected before returns are derived, while large-move checks (VAL-03) and the universe count (UNIV-02) need derived returns.\n- **Decision:** Build steps pass frozen dataclasses of pandera-validated Polars frames, each a contract type (`data.RawTables` → `data.CanonicalTables` → `data.CheckedTables` → `data.DerivedTables` → `data.ValidatedDataset`). Validation runs in two steps: row checks before derivation, dataset checks and the gate after. Server start-up and contract export pass `server.ServerConfig`, `server.LoaderCache` and `server.ContractSchema`.\n- **Alternatives:** One mutable dict of frames — no contract to freeze, and steps couple through key names. One validation step after derivation — rejected rows would already have produced returns.\n- **Consequences:** Every hand-off gets a frozen sample before its steps are built, so steps build in parallel. A new table means a contract change.\n\n## Risks and open questions&#x27;&#x27;&#x27;\ns=s.replace(\&quot;## Risks and open questions\&quot;,ad14,1)\ns=s.replace(\&quot;| 2026-10-17 | Initial architecture | spec.md | AD-01–AD-13 |\&quot;,\&quot;| 2026-10-17 | Initial architecture | spec.md | AD-01–AD-13 |\\n| 2026-10-17 | Typed build hand-offs, two-phase validation | pipeline design | AD-14 |\&quot;)\ns=s.replace(\&quot;**Status:** Approved · **Shape:**\&quot;,\&quot;**Status:** Draft · **Shape:**\&quot;)\nopen(p,&#x27;w&#x27;).write(s)\n\np=&#x27;docs/packages/data/architecture.md&#x27;; s=open(p).read()\ns=s.replace(\&quot;| `validate` | Row checks with outcomes and reasons; cross-source check; reference-list checks; dataset-level gate; the validation report |\&quot;,\n \&quot;| `validate` | Two phases (AD-14): `validate.rows` checks canonical rows before derivation (outcomes, reasons, cross-source, reference lists); `validate.dataset` runs dataset checks, the gate and the report after |\&quot;)\ns=s.replace(\&quot;- **Flow:** sources → snapshots → clean → derive → validate → eda → store.\&quot;,\&quot;- **Flow:** sources → snapshots → clean → validate (rows) → derive → validate (dataset) → eda → store, each hand-off a contract type (AD-14).\&quot;)\ns=s.replace(\&quot;**Status:** Approved\&quot;,\&quot;**Status:** Draft\&quot;)\nopen(p,&#x27;w&#x27;).write(s)\nEOF&quot;
+}</pre><div class="lbl">output</div><pre>(Bash completed with no output)</pre></details></div><div class="step" id="SD94"><span class="sid">D94</span><span class="kind">Bash</span>python3 - &lt;&lt;&#x27;EOF&#x27;
+p=&#x27;docs/packages/data/contract.md&#x27;; s=open(p).read()
+s=s.replace(&quot;Status: Approved&quot;,&quot;Status: Draft&quot;)
+block=&#x27;&#x27;&#x27;## Build hand-offs
+
+Internal to `data`: the types one build step hands to the next (AD-14). Frames are Polars, validated by the named pandera schema on construction.
+
+### data.BuildConfig: type
+`@dataclass(frozen=True) class BuildConfig: kind: RunKind; started_by: Literal[&quot;app&quot;, &quot;cli&quot;]; home: Path; reference_dir: Path; history_start: date = date(2006, 1, 1); his …[+5587 chars]<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;python3 - &lt;&lt;&#x27;EOF&#x27;\np=&#x27;docs/packages/data/contract.md&#x27;; s=open(p).read()\ns=s.replace(\&quot;**Status:** Approved\&quot;,\&quot;**Status:** Draft\&quot;)\nblock=&#x27;&#x27;&#x27;## Build hand-offs\n\nInternal to `data`: the types one build step hands to the next (AD-14). Frames are Polars, validated by the named pandera schema on construction.\n\n### data.BuildConfig: type\n`@dataclass(frozen=True) class BuildConfig: kind: RunKind; started_by: Literal[\&quot;app\&quot;, \&quot;cli\&quot;]; home: Path; reference_dir: Path; history_start: date = date(2006, 1, 1); history_floor: date = date(2011, 1, 1); lookback_days: int = 30; base_version: str | None = None`\n- **Invariants:** `history_floor` ≥ `history_start` (DATA-01); API keys are read from the environment, never stored here\n- **Used by:** data\n\n### data.Download: type\n`@dataclass(frozen=True) class Download: kind: Literal[\&quot;full\&quot;, \&quot;update\&quot;]; files: Mapping[str, tuple[Path, ...]]; requested: tuple[date, date]; tmp_dir: Path`\n- **Invariants:** keys of `files` ⊆ {\&quot;sharadar_prices\&quot;, \&quot;sharadar_actions\&quot;, \&quot;sharadar_tickers\&quot;, \&quot;sharadar_sp500\&quot;, \&quot;eodhd_closes\&quot;}; files are unmodified vendor bytes\n- **Used by:** data\n\n### data.SnapshotRef: type\n`@dataclass(frozen=True) class SnapshotRef: snapshot_id: str; kind: Literal[\&quot;full\&quot;, \&quot;update\&quot;]; created: datetime; path: Path; manifest_sha256: str`\n- **Invariants:** folder is read-only; `manifest_sha256` hashes the manifest of per-file SHA-256s (BUILD-05)\n- **Used by:** data\n\n### data.SnapshotSet: type\n`@dataclass(frozen=True) class SnapshotSet: snapshots: tuple[SnapshotRef, ...]`\n- **Invariants:** starts with one `full` snapshot, then `update`s in creation order; later snapshots override earlier rows for the same key\n- **Used by:** data\n\n### data.RawTables: type\n`@dataclass(frozen=True) class RawTables: sharadar_prices: DataFrame; sharadar_actions: DataFrame; sharadar_tickers: DataFrame; sharadar_sp500: DataFrame; eodhd_closes: DataFrame`\n- **Invariants:** vendor columns as delivered, merged across the `SnapshotSet`; read only from verified snapshots\n- **Used by:** data\n\n### data.ReferenceLists: type\n`@dataclass(frozen=True) class ReferenceLists: known_actions: DataFrame; known_delisted: DataFrame; delisting_payouts: DataFrame; sha256: str`\n- **Invariants:** ≥ 20 known actions (VAL-07), ≥ 10 known delisted members (DATA-02); `sha256` covers all three files and enters `VersionInputs`\n- **Used by:** data\n\n### data.CanonicalTables: type\n`@dataclass(frozen=True) class CanonicalTables: securities: DataFrame[SecuritySchema]; tickers: DataFrame[TickerSchema]; membership: DataFrame[MembershipSchema]; prices_raw: DataFrame[PriceRawSchema]; actions: DataFrame[ActionSchema]; delistings: DataFrame[DelistingSchema]; crosscheck: DataFrame[CrosscheckSchema]`\n- **Invariants:** keyed by `security_id`; every row has `known_date` (AD-05); dates are trading days (DATA-07); exact duplicates removed\n- **Used by:** data\n\n### data.CheckedTables: type\n`@dataclass(frozen=True) class CheckedTables: tables: CanonicalTables; flags: FlaggedRow; checks: tuple[CheckSummary, ...]`\n- **Invariants:** rejected rows are absent from `tables` and present in `flags`; corrections applied with originals in `flags` (VAL-01)\n- **Used by:** data\n\n### data.DerivedTables: type\n`@dataclass(frozen=True) class DerivedTables: checked: CheckedTables; factors: DataFrame[FactorSchema]; returns: DataFrame[ReturnSchema]`\n- **Invariants:** one factor row per applied action (PRICE-05); returns unique on (date, security_id) with `ret_days` ≥ 1; floats rounded per AD-09\n- **Used by:** data\n\n### data.ValidatedDataset: type\n`@dataclass(frozen=True) class ValidatedDataset: derived: DerivedTables; report: ValidationReport`\n- **Invariants:** `report` covers both validation phases; `report` decides `DatasetVersion.passed` (VAL-08)\n- **Used by:** data\n\n### data.VersionInputs: type\n`@dataclass(frozen=True) class VersionInputs: snapshots: SnapshotSet; reference_sha256: str; code_version: str; rebuild_of: str | None`\n- **Invariants:** identical inputs give an identical fingerprint (BUILD-04)\n- **Used by:** data, server\n\n### data.MembershipSpans: type\n`MembershipSpans = DataFrame[SpanSchema]  # security_id, start, end (end exclusive, null = still a member), by known date`\n- **Invariants:** spans for one security never overlap; only changes with `known_date` ≤ the request end (UNIV-01, LOAD-01)\n- **Used by:** data\n\n### data.PriceRows: type\n`@dataclass(frozen=True) class PriceRows: rows: DataFrame[PriceRowSchema]; factors: DataFrame[FactorSchema]; end: date`\n- **Invariants:** rows restricted to `MembershipSpans` when asked; no row or factor with `known_date` &gt; `end`; no rejected rows\n- **Used by:** data\n\n## Errors&#x27;&#x27;&#x27;\ns=s.replace(\&quot;## Errors\&quot;,block,1)\nopen(p,&#x27;w&#x27;).write(s)\n\np=&#x27;docs/packages/server/contract.md&#x27;; s=open(p).read()\ns=s.replace(\&quot;**Status:** Approved\&quot;,\&quot;**Status:** Draft\&quot;)\nblock=&#x27;&#x27;&#x27;## Start-up and contract export\n\nInternal to `server` (AD-14).\n\n### server.ServerConfig: type\n`@dataclass(frozen=True) class ServerConfig: home: Path; host: Literal[\&quot;127.0.0.1\&quot;] = \&quot;127.0.0.1\&quot;; port: int = 8765; allowed_origins: tuple[str, ...]; static_dir: Path | None`\n- **Invariants:** `host` is always loopback (QR-05); `allowed_origins` holds only `http://127.0.0.1:&lt;port&gt;`, `http://localhost:&lt;port&gt;` and the dev server&#x27;s origin\n- **Used by:** server\n\n### server.LoaderCache: type\n`class LoaderCache(Protocol): def loader(self) -&gt; data.Loader; def selected(self) -&gt; VersionRow; def select(self, fingerprint: str, allow_failed: bool) -&gt; VersionRow`\n- **Invariants:** one selected version per process (APP-07); tables loaded once per selected version (QR-02); thread-safe\n- **Used by:** server\n\n### server.ContractSchema: type\n`class ContractSchema(TypedDict): openapi: dict; message_schemas: dict[str, dict]`\n- **Invariants:** covers every HTTP model and every WebSocket message, including `data.EdaReport`&#x27;s schema; serialised with sorted keys so the drift check is byte-stable (AD-12)\n- **Used by:** server, web\n\n## Common&#x27;&#x27;&#x27;\ns=s.replace(\&quot;## Common\&quot;,block,1)\nopen(p,&#x27;w&#x27;).write(s)\nEOF\ngrep -c \&quot;^### \&quot; docs/packages/data/contract.md docs/packages/server/contract.md&quot;
+}</pre><div class="lbl">output</div><pre>docs/packages/data/contract.md:46
+docs/packages/server/contract.md:31</pre></details></div><div class="step" id="SD95"><span class="sid">D95</span><span class="kind">say</span>Now the `data` pipelines.<details><summary>full text</summary><pre>Now the `data` pipelines.</pre></details></div><div class="step" id="SD96"><span class="sid">D96</span><span class="kind">Write</span>/Users/connorott/plugins/dev-team-workspace/iteration-7/quant-incremental/with_skill/project/docs/packages/data/pipelines.md (158 lines)<div class="lbl">wrote /Users/connorott/plugins/dev-team-workspace/iteration-7/quant-incremental/with_skill/project/docs/packages/data/pipelines.md</div><pre># data — Pipelines
+
+**Package:** data · **Status:** Draft · **Last updated:** 2026-10-17 · **Contract:** [contract.md](contract.md)
+
+## PL-04: Full build
+**Entry:** `packages/data/src/qlab_data/pipeline.py::run_full_build` · **Trigger:** `qlab build` (the app spawns the same command, AD-10) · **Part of:** PL-01
+**Covers:** BUILD-01, BUILD-05–BUILD-08, DATA-01–DATA-08, UNIV-02–UNIV-04, PRICE-01–PRICE-06, RET-01–RET-05, VAL-01–VAL-09, EDA-01–EDA-03, LOAD-03, RUN-02, RUN-03, RUN-05, RUN-07, QR-04
+
+| # | Step | Owner | In → Out | Spine version | Covers |
+|---|---|---|---|---|---|
+| 1 | `begin_run` | runs.lock | BuildConfig → RunRecord | SQLite lock row with PID, start event, SIGTERM handler that deletes staging | BUILD-07, RUN-03, RUN-07 |
+| 2 | `download_full` | sources.download | BuildConfig → Download | Sharadar bulk export of the four tables, then EODHD raw closes for every ticker ever in the index since 2011; 3 retries | DATA-01–DATA-06, DATA-08, BUILD-08 |
+| 3 | `save_snapshot` | snapshots.store | Download, base → SnapshotSet | copy files into a timestamped folder, write SHA-256 manifest, chmod read-only | BUILD-01, QR-04 |
+| 4 | `read_snapshots` | snapshots.store | SnapshotSet → RawTables | verify manifests, read CSVs into frames; single full snapshot | BUILD-05 |
+| 5 | `read_references` | clean.references | BuildConfig → ReferenceLists | read the three CSVs in `reference/`, hash them | VAL-07, DATA-02 |
+| 6 | `clean` | clean.canonical | RawTables → CanonicalTables | map vendor columns to canonical schemas, permaticker as ID, ticker spans, effective-date membership, drop exact duplicates, align to the XNYS calendar | UNIV-03, UNIV-04, PRICE-01–PRICE-03, PRICE-06, DATA-03–DATA-05, DATA-07 |
+| 7 | `check_rows` | validate.rows | CanonicalTables, ReferenceLists → CheckedTables | impossible prices, duplicates, missing member-days, stale runs, cross-source closes, reference actions; one outcome per failing row | VAL-01, VAL-02, VAL-04–VAL-07, DATA-06 |
+| 8 | `derive` | derive.returns | CheckedTables, ReferenceLists → DerivedTables | cumulative split and dividend factors, total and price-only returns, delisting returns from payouts file else unknown, gap markers | PRICE-04, PRICE-05, RET-01–RET-05 |
+| 9 | `check_dataset` | validate.dataset | DerivedTables, ReferenceLists → ValidatedDataset | large moves without actions, member count 490–510, history floor, gate and report | VAL-03, VAL-08, VAL-09, UNIV-02, DATA-01 |
+| 10 | `explore` | eda.report | ValidatedDataset → EdaReport | the `data-analysis` skill&#x27;s sections over returns, prices and membership, survivorship comparison, threshold findings | EDA-01–EDA-03 |
+| 11 | `publish` | store.publish | ValidatedDataset, EdaReport, SnapshotSet → DatasetVersion | write Parquet to staging, fingerprint per AD-09, rename, update registry last | BUILD-04, BUILD-06, LOAD-03 |
+| 12 | `finish_run` | runs.lock | RunRecord, DatasetVersion → RunRecord | final event, outcome, release lock | RUN-02, RUN-05 |
+
+### Entry sketch (pre-build — removed by spine task)
+```python
+def run_full_build(cfg: BuildConfig) -&gt; RunRecord:
+    run = begin_run(cfg)
+    download = download_full(cfg)
+    snapshots = save_snapshot(download, base=None)
+    raw = read_snapshots(snapshots)
+    refs = read_references(cfg)
+    tables = clean(raw)
+    checked = check_rows(tables, refs)
+    derived = derive(checked, refs)
+    dataset = check_dataset(derived, refs)
+    report = explore(dataset)
+    version = publish(dataset, report, snapshots)
+    return finish_run(run, version)
+```
+
+## PL-05: Update
+**Entry:** `packages/data/src/qlab_data/pipeline.py::run_update` · **Trigger:** `qlab update` · **Part of:** PL-01
+**Covers:** BUILD-02, BUILD-03, BUILD-05–BUILD-08, RUN-02, RUN-05
+
+| # | Step | Owner | In → Out | Spine version | Covers |
+|---|---|---|---|---|---|
+| 1 | `begin_run` | runs.lock | BuildConfig → RunRecord | PL-04 as built | BUILD-07 |
+| 2 | `latest_version` | store.registry | BuildConfig → DatasetVersion | newest passing version from the registry | BUILD-02 |
+| 3 | `download_update` | sources.download | BuildConfig, DatasetVersion → Download | last 30 trading days of prices for ever-members plus the full small tables and EODHD closes for the same window | BUILD-02, BUILD-08 |
+| 4 | `save_snapshot` | snapshots.store | Download, SnapshotSet → SnapshotSet | PL-04 as built, appended to the base version&#x27;s set | BUILD-05 |
+| 5 | `read_snapshots` | snapshots.store | SnapshotSet → RawTables | PL-04 as built, plus merging updates over the full snapshot by key | BUILD-05 |
+| 6 | `read_references` | clean.references | BuildConfig → ReferenceLists | PL-04 as built | VAL-07 |
+| 7 | `clean` | clean.canonical | RawTables → CanonicalTables | PL-04 as built | PRICE-01 |
+| 8 | `check_rows` | validate.rows | CanonicalTables, ReferenceLists → CheckedTables | PL-04 as built | VAL-01 |
+| 9 | `derive` | derive.returns | CheckedTables, ReferenceLists → DerivedTables | PL-04 as built | RET-01 |
+| 10 | `check_dataset` | validate.dataset | DerivedTables, ReferenceLists → ValidatedDataset | PL-04 as built | VAL-08 |
+| 11 | `explore` | eda.report | ValidatedDataset → EdaReport | PL-04 as built | EDA-01 |
+| 12 | `publish` | store.publish | ValidatedDataset, EdaReport, SnapshotSet → DatasetVersion | PL-04 as built; an unchanged fingerprint stores nothing and reports &quot;no new data&quot; | BUILD-06 |
+| 13 | `diff_versions` | store.diff | DatasetVersion, DatasetVersion → ChangeList | anti-join on keys per table plus field compare, stored beside the new version | BUILD-03 |
+| 14 | `finish_run` | runs.lock | RunRecord, DatasetVersion → RunRecord | PL-04 as built | RUN-05 |
+
+### Entry sketch (pre-build — removed by spine task)
+```python
+def run_update(cfg: BuildConfig) -&gt; RunRecord:
+    run = begin_run(cfg)
+    previous = latest_version(cfg)
+    download = download_update(cfg, previous)
+    snapshots = save_snapshot(download, base=previous.inputs.snapshots)
+    raw = read_snapshots(snapshots)
+    refs = read_references(cfg)
+    checked = check_rows(clean(raw), refs)
+    dataset = check_dataset(derive(checked, refs), refs)
+    version = publish(dataset, explore(dataset), snapshots)
+    diff_versions(previous, version)
+    return finish_run(run, version)
+```
+
+## PL-06: Rebuild from snapshots
+**Entry:** `packages/data/src/qlab_data/pipeline.py::run_rebuild` · **Trigger:** `qlab rebuild [--version FP]` · **Part of:** PL-01
+**Covers:** BUILD-04, BUILD-05, BUILD-09
+
+| # | Step | Owner | In → Out | Spine version | Covers |
+|---|---|---|---|---|---|
+| 1 | `begin_run` | runs.lock | BuildConfig → RunRecord | PL-04 as built | BUILD-07 |
+| 2 | `select_snapshots` | store.registry | BuildConfig → SnapshotSet | the named version&#x27;s `inputs.snapshots`, else the newest version&#x27;s | BUILD-04 |
+| 3 | `read_snapshots` | snapshots.store | SnapshotSet → RawTables | PL-05 as built; a hash mismatch raises `SnapshotTamperedError` naming the snapshot | BUILD-05 |
+| 4 | `read_references` | clean.references | BuildConfig → ReferenceLists | PL-04 as built | VAL-07 |
+| 5 | `clean` | clean.canonical | RawTables → CanonicalTables | PL-04 as built | PRICE-01 |
+| 6 | `check_rows` | validate.rows | CanonicalTables, ReferenceLists → CheckedTables | PL-04 as built | VAL-01 |
+| 7 | `derive` | derive.returns | CheckedTables, ReferenceLists → DerivedTables | PL-04 as built | RET-01 |
+| 8 | `check_dataset` | validate.dataset | DerivedTables, ReferenceLists → ValidatedDataset | PL-04 as built | VAL-08 |
+| 9 | `explore` | eda.report | ValidatedDataset → EdaReport | PL-04 as built | EDA-03 |
+| 10 | `publish` | store.publish | ValidatedDataset, EdaReport, SnapshotSet → DatasetVersion | PL-05 as built; records `rebuild_of` and whether the fingerprint matched | BUILD-04 |
+| 11 | `finish_run` | runs.lock | RunRecord, DatasetVersion → RunRecord | PL-04 as built | RUN-05 |
+
+### Entry sketch (pre-build — removed by spine task)
+```python
+def run_rebuild(cfg: BuildConfig) -&gt; RunRecord:
+    run = begin_run(cfg)
+    snapshots = select_snapshots(cfg)
+    raw = read_snapshots(snapshots)
+    refs = read_references(cfg)
+    checked = check_rows(clean(raw), refs)
+    dataset = check_dataset(derive(checked, refs), refs)
+    version = publish(dataset, explore(dataset), snapshots)
+    return finish_run(run, version)
+```
+
+## PL-07: Load point-in-time data
+**Entry:** `packages/data/src/qlab_data/pipeline.py::run_panel` · **Trigger:** `Loader.panel(...)` from research code or `server`
+**Covers:** LOAD-01–LOAD-06, UNIV-01, PRICE-04, QR-01
+
+| # | Step | Owner | In → Out | Spine version | Covers |
+|---|---|---|---|---|---|
+| 1 | `resolve_version` | store.registry | version, allow_failed → DatasetVersion | named version, else newest passing; failed only with `allow_failed` | LOAD-04, LOAD-06 |
+| 2 | `membership_spans` | loader.universe | DatasetVersion, start, end → MembershipSpans | membership changes with `known_date` ≤ end folded into spans | UNIV-01, LOAD-01, LOAD-02 |
+| 3 | `scan_prices` | loader.scan | DatasetVersion, MembershipSpans, start, end → PriceRows | lazy Parquet scan with date and ID predicates, join returns and flags, drop flagged on request | LOAD-01, LOAD-05, QR-01 |
+| 4 | `adjust_as_of` | loader.adjust | PriceRows → Panel | apply factors with ex-date ≤ end, attach fingerprint and uncovered dates | PRICE-04, LOAD-01, LOAD-03 |
+
+### Entry sketch (pre-build — removed by spine task)
+```python
+def run_panel(req: PanelRequest) -&gt; Panel:
+    version = resolve_version(req.version, req.allow_failed)
+    spans = membership_spans(version, req.start, req.end)
+    rows = scan_prices(version, spans, req.start, req.end)
+    return adjust_as_of(rows)
+```
+
+## Planned layout (pre-build — removed by spine task)
+```
+packages/data/src/qlab_data/
+  __init__.py          contract exports only
+  pipeline.py          PL-04–PL-07 entries
+  types.py             contract types and pandera schemas
+  errors/__init__.py   DataError hierarchy
+  calendar/__init__.py XNYS trading days (used by clean, derive, sources)
+  cli/__main__.py      `qlab` commands → pipeline entries
+  runs/lock.py         begin_run, finish_run
+  sources/download.py  download_full, download_update
+  snapshots/store.py   save_snapshot, read_snapshots
+  clean/references.py  read_references
+  clean/canonical.py   clean
+  validate/rows.py     check_rows
+  validate/dataset.py  check_dataset
+  derive/returns.py    derive
+  eda/report.py        explore
+  store/publish.py     publish
+  store/registry.py    latest_version, select_snapshots, resolve_version
+  store/diff.py        diff_versions
+  loader/universe.py   membership_spans
+  loader/scan.py       scan_prices
+  loader/adjust.py     adjust_as_of
+packages/data/tests/intent/data/  packages/data/tests/unit/data/
+```
+
+## Open questions
+- `clean.canonical` may pass the 500-line bar with five vendor tables (assumed: one module now; split into one step per table group if it does).
+- `PanelRequest` (start, end, ids, universe_only, exclude_flagged, version, allow_failed) is the entry argument bundle of `Loader.panel` (assumed: a plain dataclass in `types.py`, not a contract hand-off).
+</pre><details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-7/quant-incremental/with_skill/project/docs/packages/data/pipelines.md&quot;,
+  &quot;content&quot;: &quot;# data — Pipelines\n\n**Package:** data · **Status:** Draft · **Last updated:** 2026-10-17 · **Contract:** [contract.md](contract.md)\n\n## PL-04: Full build\n**Entry:** `packages/data/src/qlab_data/pipeline.py::run_full_build` · **Trigger:** `qlab build` (the app spawns the same command, AD-10) · **Part of:** PL-01\n**Covers:** BUILD-01, BUILD-05–BUILD-08, DATA-01–DATA-08, UNIV-02–UNIV-04, PRICE-01–PRICE-06, RET-01–RET-05, VAL-01–VAL-09, EDA-01–EDA-03, LOAD-03, RUN-02, RUN-03, RUN-05, RUN-07, QR-04\n\n| # | Step | Owner | In → Out | Spine version | Covers |\n|---|---|---|---|---|---|\n| 1 | `begin_run` | runs.lock | BuildConfig → RunRecord | SQLite lock row with PID, start event, SIGTERM handler that deletes staging | BUILD-07, RUN-03, RUN-07 |\n| 2 | `download_full` | sources.download | BuildConfig → Download | Sharadar bulk export of the four tables, then EODHD raw closes for every ticker ever in the index since 2011; 3 retries | DATA-01–DATA-06, DATA-08, BUILD-08 |\n| 3 | `save_snapshot` | snapshots.store | Download, base → SnapshotSet | copy files into a timestamped folder, write SHA-256 manifest, chmod read-only | BUILD-01, QR-04 |\n| 4 | `read_snapshots` | snapshots.store | SnapshotSet → RawTables | verify manifests, read CSVs into frames; single full snapshot | BUILD-05 |\n| 5 | `read_references` | clean.references | BuildConfig → ReferenceLists | read the three CSVs in `reference/`, hash them | VAL-07, DATA-02 |\n| 6 | `clean` | clean.canonical | RawTables → CanonicalTables | map vendor columns to canonical schemas, permaticker as ID, ticker spans, effective-date membership, drop exact duplicates, align to the XNYS calendar | UNIV-03, UNIV-04, PRICE-01–PRICE-03, PRICE-06, DATA-03–DATA-05, DATA-07 |\n| 7 | `check_rows` | validate.rows | CanonicalTables, ReferenceLists → CheckedTables | impossible prices, duplicates, missing member-days, stale runs, cross-source closes, reference actions; one outcome per failing row | VAL-01, VAL-02, VAL-04–VAL-07, DATA-06 |\n| 8 | `derive` | derive.returns | CheckedTables, ReferenceLists → DerivedTables | cumulative split and dividend factors, total and price-only returns, delisting returns from payouts file else unknown, gap markers | PRICE-04, PRICE-05, RET-01–RET-05 |\n| 9 | `check_dataset` | validate.dataset | DerivedTables, ReferenceLists → ValidatedDataset | large moves without actions, member count 490–510, history floor, gate and report | VAL-03, VAL-08, VAL-09, UNIV-02, DATA-01 |\n| 10 | `explore` | eda.report | ValidatedDataset → EdaReport | the `data-analysis` skill&#x27;s sections over returns, prices and membership, survivorship comparison, threshold findings | EDA-01–EDA-03 |\n| 11 | `publish` | store.publish | ValidatedDataset, EdaReport, SnapshotSet → DatasetVersion | write Parquet to staging, fingerprint per AD-09, rename, update registry last | BUILD-04, BUILD-06, LOAD-03 |\n| 12 | `finish_run` | runs.lock | RunRecord, DatasetVersion → RunRecord | final event, outcome, release lock | RUN-02, RUN-05 |\n\n### Entry sketch (pre-build — removed by spine task)\n```python\ndef run_full_build(cfg: BuildConfig) -&gt; RunRecord:\n    run = begin_run(cfg)\n    download = download_full(cfg)\n    snapshots = save_snapshot(download, base=None)\n    raw = read_snapshots(snapshots)\n    refs = read_references(cfg)\n    tables = clean(raw)\n    checked = check_rows(tables, refs)\n    derived = derive(checked, refs)\n    dataset = check_dataset(derived, refs)\n    report = explore(dataset)\n    version = publish(dataset, report, snapshots)\n    return finish_run(run, version)\n```\n\n## PL-05: Update\n**Entry:** `packages/data/src/qlab_data/pipeline.py::run_update` · **Trigger:** `qlab update` · **Part of:** PL-01\n**Covers:** BUILD-02, BUILD-03, BUILD-05–BUILD-08, RUN-02, RUN-05\n\n| # | Step | Owner | In → Out | Spine version | Covers |\n|---|---|---|---|---|---|\n| 1 | `begin_run` | runs.lock | BuildConfig → RunRecord | PL-04 as built | BUILD-07 |\n| 2 | `latest_version` | store.registry | BuildConfig → DatasetVersion | newest passing version from the registry | BUILD-02 |\n| 3 | `download_update` | sources.download | BuildConfig, DatasetVersion → Download | last 30 trading days of prices for ever-members plus the full small tables and EODHD closes for the same window | BUILD-02, BUILD-08 |\n| 4 | `save_snapshot` | snapshots.store | Download, SnapshotSet → SnapshotSet | PL-04 as built, appended to the base version&#x27;s set | BUILD-05 |\n| 5 | `read_snapshots` | snapshots.store | SnapshotSet → RawTables | PL-04 as built, plus merging updates over the full snapshot by key | BUILD-05 |\n| 6 | `read_references` | clean.references | BuildConfig → ReferenceLists | PL-04 as built | VAL-07 |\n| 7 | `clean` | clean.canonical | RawTables → CanonicalTables | PL-04 as built | PRICE-01 |\n| 8 | `check_rows` | validate.rows | CanonicalTables, ReferenceLists → CheckedTables | PL-04 as built | VAL-01 |\n| 9 | `derive` | derive.returns | CheckedTables, ReferenceLists → DerivedTables | PL-04 as built | RET-01 |\n| 10 | `check_dataset` | validate.dataset | DerivedTables, ReferenceLists → ValidatedDataset | PL-04 as built | VAL-08 |\n| 11 | `explore` | eda.report | ValidatedDataset → EdaReport | PL-04 as built | EDA-01 |\n| 12 | `publish` | store.publish | ValidatedDataset, EdaReport, SnapshotSet → DatasetVersion | PL-04 as built; an unchanged fingerprint stores nothing and reports \&quot;no new data\&quot; | BUILD-06 |\n| 13 | `diff_versions` | store.diff | DatasetVersion, DatasetVersion → ChangeList | anti-join on keys per table plus field compare, stored beside the new version | BUILD-03 |\n| 14 | `finish_run` | runs.lock | RunRecord, DatasetVersion → RunRecord | PL-04 as built | RUN-05 |\n\n### Entry sketch (pre-build — removed by spine task)\n```python\ndef run_update(cfg: BuildConfig) -&gt; RunRecord:\n    run = begin_run(cfg)\n    previous = latest_version(cfg)\n    download = download_update(cfg, previous)\n    snapshots = save_snapshot(download, base=previous.inputs.snapshots)\n    raw = read_snapshots(snapshots)\n    refs = read_references(cfg)\n    checked = check_rows(clean(raw), refs)\n    dataset = check_dataset(derive(checked, refs), refs)\n    version = publish(dataset, explore(dataset), snapshots)\n    diff_versions(previous, version)\n    return finish_run(run, version)\n```\n\n## PL-06: Rebuild from snapshots\n**Entry:** `packages/data/src/qlab_data/pipeline.py::run_rebuild` · **Trigger:** `qlab rebuild [--version FP]` · **Part of:** PL-01\n**Covers:** BUILD-04, BUILD-05, BUILD-09\n\n| # | Step | Owner | In → Out | Spine version | Covers |\n|---|---|---|---|---|---|\n| 1 | `begin_run` | runs.lock | BuildConfig → RunRecord | PL-04 as built | BUILD-07 |\n| 2 | `select_snapshots` | store.registry | BuildConfig → SnapshotSet | the named version&#x27;s `inputs.snapshots`, else the newest version&#x27;s | BUILD-04 |\n| 3 | `read_snapshots` | snapshots.store | SnapshotSet → RawTables | PL-05 as built; a hash mismatch raises `SnapshotTamperedError` naming the snapshot | BUILD-05 |\n| 4 | `read_references` | clean.references | BuildConfig → ReferenceLists | PL-04 as built | VAL-07 |\n| 5 | `clean` | clean.canonical | RawTables → CanonicalTables | PL-04 as built | PRICE-01 |\n| 6 | `check_rows` | validate.rows | CanonicalTables, ReferenceLists → CheckedTables | PL-04 as built | VAL-01 |\n| 7 | `derive` | derive.returns | CheckedTables, ReferenceLists → DerivedTables | PL-04 as built | RET-01 |\n| 8 | `check_dataset` | validate.dataset | DerivedTables, ReferenceLists → ValidatedDataset | PL-04 as built | VAL-08 |\n| 9 | `explore` | eda.report | ValidatedDataset → EdaReport | PL-04 as built | EDA-03 |\n| 10 | `publish` | store.publish | ValidatedDataset, EdaReport, SnapshotSet → DatasetVersion | PL-05 as built; records `rebuild_of` and whether the fingerprint matched | BUILD-04 |\n| 11 | `finish_run` | runs.lock | RunRecord, DatasetVersion → RunRecord | PL-04 as built | RUN-05 |\n\n### Entry sketch (pre-build — removed by spine task)\n```python\ndef run_rebuild(cfg: BuildConfig) -&gt; RunRecord:\n    run = begin_run(cfg)\n    snapshots = select_snapshots(cfg)\n    raw = read_snapshots(snapshots)\n    refs = read_references(cfg)\n    checked = check_rows(clean(raw), refs)\n    dataset = check_dataset(derive(checked, refs), refs)\n    version = publish(dataset, explore(dataset), snapshots)\n    return finish_run(run, version)\n```\n\n## PL-07: Load point-in-time data\n**Entry:** `packages/data/src/qlab_data/pipeline.py::run_panel` · **Trigger:** `Loader.panel(...)` from research code or `server`\n**Covers:** LOAD-01–LOAD-06, UNIV-01, PRICE-04, QR-01\n\n| # | Step | Owner | In → Out | Spine version | Covers |\n|---|---|---|---|---|---|\n| 1 | `resolve_version` | store.registry | version, allow_failed → DatasetVersion | named version, else newest passing; failed only with `allow_failed` | LOAD-04, LOAD-06 |\n| 2 | `membership_spans` | loader.universe | DatasetVersion, start, end → MembershipSpans | membership changes with `known_date` ≤ end folded into spans | UNIV-01, LOAD-01, LOAD-02 |\n| 3 | `scan_prices` | loader.scan | DatasetVersion, MembershipSpans, start, end → PriceRows | lazy Parquet scan with date and ID predicates, join returns and flags, drop flagged on request | LOAD-01, LOAD-05, QR-01 |\n| 4 | `adjust_as_of` | loader.adjust | PriceRows → Panel | apply factors with ex-date ≤ end, attach fingerprint and uncovered dates | PRICE-04, LOAD-01, LOAD-03 |\n\n### Entry sketch (pre-build — removed by spine task)\n```python\ndef run_panel(req: PanelRequest) -&gt; Panel:\n    version = resolve_version(req.version, req.allow_failed)\n    spans = membership_spans(version, req.start, req.end)\n    rows = scan_prices(version, spans, req.start, req.end)\n    return adjust_as_of(rows)\n```\n\n## Planned layout (pre-build — removed by spine task)\n```\npackages/data/src/qlab_data/\n  __init__.py          contract exports only\n  pipeline.py          PL-04–PL-07 entries\n  types.py             contract types and pandera schemas\n  errors/__init__.py   DataError hierarchy\n  calendar/__init__.py XNYS trading days (used by clean, derive, sources)\n  cli/__main__.py      `qlab` commands → pipeline entries\n  runs/lock.py         begin_run, finish_run\n  sources/download.py  download_full, download_update\n  snapshots/store.py   save_snapshot, read_snapshots\n  clean/references.py  read_references\n  clean/canonical.py   clean\n  validate/rows.py     check_rows\n  validate/dataset.py  check_dataset\n  derive/returns.py    derive\n  eda/report.py        explore\n  store/publish.py     publish\n  store/registry.py    latest_version, select_snapshots, resolve_version\n  store/diff.py        diff_versions\n  loader/universe.py   membership_spans\n  loader/scan.py       scan_prices\n  loader/adjust.py     adjust_as_of\npackages/data/tests/intent/data/  packages/data/tests/unit/data/\n```\n\n## Open questions\n- `clean.canonical` may pass the 500-line bar with five vendor tables (assumed: one module now; split into one step per table group if it does).\n- `PanelRequest` (start, end, ids, universe_only, exclude_flagged, version, allow_failed) is the entry argument bundle of `Loader.panel` (assumed: a plain dataclass in `types.py`, not a contract hand-off).\n&quot;
+}</pre><div class="lbl">output</div><pre>File created successfully at: /Users/connorott/plugins/dev-team-workspace/iteration-7/quant-incremental/with_skill/project/docs/packages/data/pipelines.md (file state is current in your context — no need to Read it back)</pre></details></div><div class="step" id="SD97"><span class="sid">D97</span><span class="kind">say</span>Now the `server` and `web` pipelines.<details><summary>full text</summary><pre>Now the `server` and `web` pipelines.</pre></details></div><div class="step" id="SD98"><span class="sid">D98</span><span class="kind">Write</span>/Users/connorott/plugins/dev-team-workspace/iteration-7/quant-incremental/with_skill/project/docs/packages/server/pipelines.md (78 lines)<div class="lbl">wrote /Users/connorott/plugins/dev-team-workspace/iteration-7/quant-incremental/with_skill/project/docs/packages/server/pipelines.md</div><pre># server — Pipelines
+
+**Package:** server · **Status:** Draft · **Last updated:** 2026-10-17 · **Contract:** [contract.md](contract.md)
+
+## PL-08: Serve the app
+**Entry:** `packages/server/src/qlab_server/pipeline.py::run_server` · **Trigger:** `qlab-server [--port 8765]` · **Part of:** PL-01, PL-03
+**Covers:** APP-01–APP-07, UNIV-05, PRICE-05, RUN-01, RUN-04, RUN-05, RUN-07, QR-02, QR-05
+
+| # | Step | Owner | In → Out | Spine version | Covers |
+|---|---|---|---|---|---|
+| 1 | `load_config` | app.config | env → ServerConfig | read `QLAB_HOME` and port, fix host to 127.0.0.1, derive allowed origins | QR-05 |
+| 2 | `open_cache` | cache | ServerConfig → LoaderCache | `data.open_loader()` once; prices, returns and flags of the selected version held in memory | APP-07, QR-02 |
+| 3 | `serve` | app.assemble | ServerConfig, LoaderCache → none | FastAPI with the guard middleware, `queries` and `runs_api` routers, the run socket, problem mapping and the static bundle; uvicorn on 127.0.0.1 | APP-01–APP-07, UNIV-05, PRICE-05, RUN-01, RUN-04, RUN-05, RUN-07, QR-02, QR-05 |
+
+### Entry sketch (pre-build — removed by spine task)
+```python
+def run_server(env: Mapping[str, str]) -&gt; None:
+    cfg = load_config(env)
+    cache = open_cache(cfg)
+    serve(cfg, cache)
+```
+
+## PL-09: Stream run progress
+**Entry:** `packages/server/src/qlab_server/pipeline.py::run_live_stream` · **Trigger:** the app connects to `WS /api/runs/live` · **Part of:** PL-02
+**Covers:** RUN-02, RUN-03, RUN-06, QR-03, QR-05
+
+| # | Step | Owner | In → Out | Spine version | Covers |
+|---|---|---|---|---|---|
+| 1 | `check_origin` | guard | socket, ServerConfig → none | close with 1008 unless Origin is in `allowed_origins` | QR-05 |
+| 2 | `hello_message` | live.state | ServerConfig → RunEventMessage | `data.list_runs(limit=1)` plus its latest `data.read_events` row, or an idle hello | RUN-06 |
+| 3 | `stream_events` | live.stream | socket, RunEventMessage → none | send hello, then every 250 ms `data.read_events(after_seq)` mapped to messages; picks up runs started from the command line | RUN-02, RUN-03, QR-03 |
+
+### Entry sketch (pre-build — removed by spine task)
+```python
+async def run_live_stream(socket: WebSocket, cfg: ServerConfig) -&gt; None:
+    await check_origin(socket, cfg)
+    hello = hello_message(cfg)
+    await stream_events(socket, hello)
+```
+
+## PL-10: Export the contract
+**Entry:** `packages/server/src/qlab_server/pipeline.py::run_export_contract` · **Trigger:** `qlab-server export-contract [--check]` (run by the project checks)
+**Covers:** QR-06
+
+| # | Step | Owner | In → Out | Spine version | Covers |
+|---|---|---|---|---|---|
+| 1 | `export_schema` | contract_export | models → ContractSchema | FastAPI&#x27;s OpenAPI plus `model_json_schema()` for each socket message and `data.EdaReport`, keys sorted | QR-06 |
+| 2 | `write_or_check` | contract_export | ContractSchema, path → path | write `packages/web/src/api/openapi.json`; with `--check`, fail on any byte difference | QR-06 |
+
+### Entry sketch (pre-build — removed by spine task)
+```python
+def run_export_contract(out: Path, check: bool) -&gt; Path:
+    schema = export_schema(MODELS)
+    return write_or_check(schema, out, check)
+```
+
+## Planned layout (pre-build — removed by spine task)
+```
+packages/server/src/qlab_server/
+  __init__.py               contract exports only
+  __main__.py               `qlab-server` commands → pipeline entries
+  pipeline.py               PL-08–PL-10 entries
+  types.py                  ServerConfig, LoaderCache, ContractSchema
+  models/__init__.py        Pydantic contract models (no step; the contract itself)
+  app/config.py             load_config
+  app/assemble.py           serve (mounts routers, problem mapping, static files)
+  guard/__init__.py         check_origin and the Host/Origin middleware
+  cache/__init__.py         open_cache
+  queries/__init__.py       query routes (mounted by serve)
+  runs_api/__init__.py      run routes (mounted by serve)
+  live/state.py             hello_message
+  live/stream.py            stream_events
+  contract_export/__init__.py  export_schema, write_or_check
+packages/server/tests/intent/server/  packages/server/tests/unit/server/
+```
+
+## Open questions
+- Endpoint handlers in `queries` and `runs_api` are one-line calls into `data` mapped to response models, so they sit under `serve` rather than in pipelines of their own (assumed; each endpoint still gets tests against its contract fixtures).
+</pre><div class="hook">⛔ hook PostToolUse:Write blocked: dt lint found problems in docs/packages/server/pipelines.md:
+docs/packages/server/pipelines.md:13: step-io-types PL-08 step `serve`: its Out names no contract type
+docs/packages/server/pipelines.md:29: step-io-types PL-09 step `check_origin`: its Out names no contract type
+docs/packages/server/pipelines.md:31: step-io-types PL-09 step `stream_events`: its Out names no contract type
+docs/packages/server/pipelines.md:48: step-io-types PL-10 step `write_or_check`: its Out names no contract type
+4 errors, 0 warnings</div><details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-7/quant-incremental/with_skill/project/docs/packages/server/pipelines.md&quot;,
+  &quot;content&quot;: &quot;# server — Pipelines\n\n**Package:** server · **Status:** Draft · **Last updated:** 2026-10-17 · **Contract:** [contract.md](contract.md)\n\n## PL-08: Serve the app\n**Entry:** `packages/server/src/qlab_server/pipeline.py::run_server` · **Trigger:** `qlab-server [--port 8765]` · **Part of:** PL-01, PL-03\n**Covers:** APP-01–APP-07, UNIV-05, PRICE-05, RUN-01, RUN-04, RUN-05, RUN-07, QR-02, QR-05\n\n| # | Step | Owner | In → Out | Spine version | Covers |\n|---|---|---|---|---|---|\n| 1 | `load_config` | app.config | env → ServerConfig | read `QLAB_HOME` and port, fix host to 127.0.0.1, derive allowed origins | QR-05 |\n| 2 | `open_cache` | cache | ServerConfig → LoaderCache | `data.open_loader()` once; prices, returns and flags of the selected version held in memory | APP-07, QR-02 |\n| 3 | `serve` | app.assemble | ServerConfig, LoaderCache → none | FastAPI with the guard middleware, `queries` and `runs_api` routers, the run socket, problem mapping and the static bundle; uvicorn on 127.0.0.1 | APP-01–APP-07, UNIV-05, PRICE-05, RUN-01, RUN-04, RUN-05, RUN-07, QR-02, QR-05 |\n\n### Entry sketch (pre-build — removed by spine task)\n```python\ndef run_server(env: Mapping[str, str]) -&gt; None:\n    cfg = load_config(env)\n    cache = open_cache(cfg)\n    serve(cfg, cache)\n```\n\n## PL-09: Stream run progress\n**Entry:** `packages/server/src/qlab_server/pipeline.py::run_live_stream` · **Trigger:** the app connects to `WS /api/runs/live` · **Part of:** PL-02\n**Covers:** RUN-02, RUN-03, RUN-06, QR-03, QR-05\n\n| # | Step | Owner | In → Out | Spine version | Covers |\n|---|---|---|---|---|---|\n| 1 | `check_origin` | guard | socket, ServerConfig → none | close with 1008 unless Origin is in `allowed_origins` | QR-05 |\n| 2 | `hello_message` | live.state | ServerConfig → RunEventMessage | `data.list_runs(limit=1)` plus its latest `data.read_events` row, or an idle hello | RUN-06 |\n| 3 | `stream_events` | live.stream | socket, RunEventMessage → none | send hello, then every 250 ms `data.read_events(after_seq)` mapped to messages; picks up runs started from the command line | RUN-02, RUN-03, QR-03 |\n\n### Entry sketch (pre-build — removed by spine task)\n```python\nasync def run_live_stream(socket: WebSocket, cfg: ServerConfig) -&gt; None:\n    await check_origin(socket, cfg)\n    hello = hello_message(cfg)\n    await stream_events(socket, hello)\n```\n\n## PL-10: Export the contract\n**Entry:** `packages/server/src/qlab_server/pipeline.py::run_export_contract` · **Trigger:** `qlab-server export-contract [--check]` (run by the project checks)\n**Covers:** QR-06\n\n| # | Step | Owner | In → Out | Spine version | Covers |\n|---|---|---|---|---|---|\n| 1 | `export_schema` | contract_export | models → ContractSchema | FastAPI&#x27;s OpenAPI plus `model_json_schema()` for each socket message and `data.EdaReport`, keys sorted | QR-06 |\n| 2 | `write_or_check` | contract_export | ContractSchema, path → path | write `packages/web/src/api/openapi.json`; with `--check`, fail on any byte difference | QR-06 |\n\n### Entry sketch (pre-build — removed by spine task)\n```python\ndef run_export_contract(out: Path, check: bool) -&gt; Path:\n    schema = export_schema(MODELS)\n    return write_or_check(schema, out, check)\n```\n\n## Planned layout (pre-build — removed by spine task)\n```\npackages/server/src/qlab_server/\n  __init__.py               contract exports only\n  __main__.py               `qlab-server` commands → pipeline entries\n  pipeline.py               PL-08–PL-10 entries\n  types.py                  ServerConfig, LoaderCache, ContractSchema\n  models/__init__.py        Pydantic contract models (no step; the contract itself)\n  app/config.py             load_config\n  app/assemble.py           serve (mounts routers, problem mapping, static files)\n  guard/__init__.py         check_origin and the Host/Origin middleware\n  cache/__init__.py         open_cache\n  queries/__init__.py       query routes (mounted by serve)\n  runs_api/__init__.py      run routes (mounted by serve)\n  live/state.py             hello_message\n  live/stream.py            stream_events\n  contract_export/__init__.py  export_schema, write_or_check\npackages/server/tests/intent/server/  packages/server/tests/unit/server/\n```\n\n## Open questions\n- Endpoint handlers in `queries` and `runs_api` are one-line calls into `data` mapped to response models, so they sit under `serve` rather than in pipelines of their own (assumed; each endpoint still gets tests against its contract fixtures).\n&quot;
+}</pre><div class="lbl">output</div><pre>File created successfully at: /Users/connorott/plugins/dev-team-workspace/iteration-7/quant-incremental/with_skill/project/docs/packages/server/pipelines.md (file state is current in your context — no need to Read it back)</pre></details></div><div class="step" id="SD99"><span class="sid">D99</span><span class="kind">Write</span>/Users/connorott/plugins/dev-team-workspace/iteration-7/quant-incremental/with_skill/project/docs/packages/web/pipelines.md (99 lines)<div class="lbl">wrote /Users/connorott/plugins/dev-team-workspace/iteration-7/quant-incremental/with_skill/project/docs/packages/web/pipelines.md</div><pre># web — Pipelines
+
+**Package:** web · **Status:** Draft · **Last updated:** 2026-10-17 · **Contract:** [contract.md](contract.md)
+
+Pipelines here are user flows. Each entry is a React route component whose body reads as calls to the named steps; `api` steps are TanStack Query hooks or socket subscriptions over the generated client (AD-12).
+
+## PL-11: Explore a stock
+**Entry:** `packages/web/src/pipeline.tsx::ExploreStock` · **Trigger:** the researcher searches a ticker or opens `/stocks/:id` · **Part of:** PL-03
+**Covers:** APP-01–APP-03, APP-05, APP-07–APP-09, UNIV-05, PRICE-05, QR-02
+
+| # | Step | Owner | In → Out | Spine version | Covers |
+|---|---|---|---|---|---|
+| 1 | `useSelectedVersion` | shell | none → VersionRow | `server.list_versions`, header picker calling `server.select_version` | APP-07 |
+| 2 | `useSearch` | api | text, date → SearchResult | debounced `server.search`, every holder of a reused ticker with dates | APP-02, UNIV-05 |
+| 3 | `useStock` | api | SearchResult, VersionRow → StockView | `server.get_stock`, cache key includes fingerprint | APP-01, QR-02 |
+| 4 | `useTrace` | api | StockView, date → PriceTraceView | `server.get_trace` for the clicked point | APP-05, PRICE-05 |
+| 5 | `useUniverse` | api | date → UniverseView | `server.get_universe` for the date in focus | APP-03 |
+| 6 | `StockView` | views.stock | StockView, PriceTraceView, UniverseView → view | uPlot raw and adjusted lines with action and flag markers from `charts`, trace panel, members-on-date panel, in the `design` tokens | APP-01, APP-03, APP-05, APP-08, APP-09 |
+
+### Entry sketch (pre-build — removed by spine task)
+```tsx
+export function ExploreStock({ text, focus }: Props) {
+  const version = useSelectedVersion();
+  const match = useSearch(text, focus);
+  const stock = useStock(match, version);
+  const trace = useTrace(stock, focus);
+  const universe = useUniverse(focus);
+  return &lt;StockView stock={stock} trace={trace} universe={universe} /&gt;;
+}
+```
+
+## PL-12: Monitor a run
+**Entry:** `packages/web/src/pipeline.tsx::MonitorRun` · **Trigger:** the researcher starts a run or opens `/runs` · **Part of:** PL-01, PL-02
+**Covers:** RUN-01–RUN-07, QR-03
+
+| # | Step | Owner | In → Out | Spine version | Covers |
+|---|---|---|---|---|---|
+| 1 | `useStartRun` | api | RunRequest → RunView | `server.start_run`; a 409 shows the active run | RUN-01 |
+| 2 | `useRunSocket` | api | RunView → RunEventMessage | `WS /api/runs/live`, `hello` restores state, reconnect with backoff and a &quot;reconnecting&quot; banner | RUN-02, RUN-03, RUN-06, QR-03 |
+| 3 | `useCancelRun` | api | RunView → RunView | `server.cancel_run` | RUN-04 |
+| 4 | `useRunHistory` | api | none → RunView | `server.list_runs` | RUN-07 |
+| 5 | `RunMonitor` | views.runs | RunView, RunEventMessage → view | stage, percent bar, current item, counts, elapsed; summary with links when finished | RUN-02, RUN-05 |
+
+### Entry sketch (pre-build — removed by spine task)
+```tsx
+export function MonitorRun() {
+  const start = useStartRun();
+  const live = useRunSocket(start.run);
+  const cancel = useCancelRun(start.run);
+  const history = useRunHistory();
+  return &lt;RunMonitor run={start.run} live={live} cancel={cancel} history={history} /&gt;;
+}
+```
+
+## PL-13: Check data quality
+**Entry:** `packages/web/src/pipeline.tsx::CheckQuality` · **Trigger:** the researcher opens `/quality` · **Part of:** PL-03
+**Covers:** APP-04, APP-06, APP-07, APP-09, VAL-01, VAL-09, EDA-01, EDA-03, BUILD-03
+
+| # | Step | Owner | In → Out | Spine version | Covers |
+|---|---|---|---|---|---|
+| 1 | `useValidation` | api | VersionRow → ValidationView | `server.get_validation` | APP-04, VAL-09 |
+| 2 | `useCheck` | api | ValidationView, check, id → CheckDrilldown | `server.get_check`, rows paged 500 at a time | APP-04, VAL-01 |
+| 3 | `useEda` | api | VersionRow → EdaReport | `server.get_eda` | APP-06, EDA-03 |
+| 4 | `useDiff` | api | VersionRow, VersionRow → ChangeListView | `server.diff_versions` for two chosen versions | APP-07, BUILD-03 |
+| 5 | `QualityView` | views.quality | ValidationView, CheckDrilldown, EdaReport, ChangeListView → view | check table → stocks → rows; EDA sections with Observable Plot charts from `charts`; change list table | APP-04, APP-06, APP-09, EDA-01 |
+
+### Entry sketch (pre-build — removed by spine task)
+```tsx
+export function CheckQuality({ check, id, compareTo }: Props) {
+  const version = useSelectedVersion();
+  const validation = useValidation(version);
+  const drill = useCheck(validation, check, id);
+  const eda = useEda(version);
+  const diff = useDiff(version, compareTo);
+  return &lt;QualityView validation={validation} drill={drill} eda={eda} diff={diff} /&gt;;
+}
+```
+
+## Planned layout (pre-build — removed by spine task)
+```
+packages/web/src/
+  pipeline.tsx          PL-11–PL-13 route entries
+  main.tsx              router, theme, query client
+  api/generated.ts      generated from openapi.json (never edited)
+  api/queries.ts        useSearch, useStock, useTrace, useUniverse, useValidation, useCheck, useEda, useDiff, useRunHistory
+  api/runs.ts           useStartRun, useCancelRun, useRunSocket
+  shell/version.tsx     useSelectedVersion and the header picker; backend-down screen
+  design/               tokens and base components (no step; used by every view)
+  charts/price.tsx      price chart with markers (used by views.stock)
+  charts/stats.tsx      EDA charts (used by views.quality)
+  views/stock.tsx       StockView
+  views/runs.tsx        RunMonitor
+  views/quality.tsx     QualityView
+packages/web/tests/intent/web/  packages/web/tests/unit/web/
+```
+
+## Open questions
+- `design` and `charts` own no step: they are building blocks every view uses (assumed; APP-08 and APP-09 are checked on the views that use them, and `design` is built first from the approved direction).
+- The empty &quot;build your first dataset&quot; screen and backend-down screen live in `shell` (assumed; APP edge cases).
+</pre><div class="hook">⛔ hook PostToolUse:Write blocked: dt lint found problems in docs/packages/web/pipelines.md:
+docs/packages/web/pipelines.md:18: step-io-types PL-11 step `StockView`: its Out names no contract type
+docs/packages/web/pipelines.md:42: step-io-types PL-12 step `RunMonitor`: its Out names no contract type
+docs/packages/web/pipelines.md:65: step-io-types PL-13 step `QualityView`: its Out names no contract type
+3 errors, 0 warnings</div><details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-7/quant-incremental/with_skill/project/docs/packages/web/pipelines.md&quot;,
+  &quot;content&quot;: &quot;# web — Pipelines\n\n**Package:** web · **Status:** Draft · **Last updated:** 2026-10-17 · **Contract:** [contract.md](contract.md)\n\nPipelines here are user flows. Each entry is a React route component whose body reads as calls to the named steps; `api` steps are TanStack Query hooks or socket subscriptions over the generated client (AD-12).\n\n## PL-11: Explore a stock\n**Entry:** `packages/web/src/pipeline.tsx::ExploreStock` · **Trigger:** the researcher searches a ticker or opens `/stocks/:id` · **Part of:** PL-03\n**Covers:** APP-01–APP-03, APP-05, APP-07–APP-09, UNIV-05, PRICE-05, QR-02\n\n| # | Step | Owner | In → Out | Spine version | Covers |\n|---|---|---|---|---|---|\n| 1 | `useSelectedVersion` | shell | none → VersionRow | `server.list_versions`, header picker calling `server.select_version` | APP-07 |\n| 2 | `useSearch` | api | text, date → SearchResult | debounced `server.search`, every holder of a reused ticker with dates | APP-02, UNIV-05 |\n| 3 | `useStock` | api | SearchResult, VersionRow → StockView | `server.get_stock`, cache key includes fingerprint | APP-01, QR-02 |\n| 4 | `useTrace` | api | StockView, date → PriceTraceView | `server.get_trace` for the clicked point | APP-05, PRICE-05 |\n| 5 | `useUniverse` | api | date → UniverseView | `server.get_universe` for the date in focus | APP-03 |\n| 6 | `StockView` | views.stock | StockView, PriceTraceView, UniverseView → view | uPlot raw and adjusted lines with action and flag markers from `charts`, trace panel, members-on-date panel, in the `design` tokens | APP-01, APP-03, APP-05, APP-08, APP-09 |\n\n### Entry sketch (pre-build — removed by spine task)\n```tsx\nexport function ExploreStock({ text, focus }: Props) {\n  const version = useSelectedVersion();\n  const match = useSearch(text, focus);\n  const stock = useStock(match, version);\n  const trace = useTrace(stock, focus);\n  const universe = useUniverse(focus);\n  return &lt;StockView stock={stock} trace={trace} universe={universe} /&gt;;\n}\n```\n\n## PL-12: Monitor a run\n**Entry:** `packages/web/src/pipeline.tsx::MonitorRun` · **Trigger:** the researcher starts a run or opens `/runs` · **Part of:** PL-01, PL-02\n**Covers:** RUN-01–RUN-07, QR-03\n\n| # | Step | Owner | In → Out | Spine version | Covers |\n|---|---|---|---|---|---|\n| 1 | `useStartRun` | api | RunRequest → RunView | `server.start_run`; a 409 shows the active run | RUN-01 |\n| 2 | `useRunSocket` | api | RunView → RunEventMessage | `WS /api/runs/live`, `hello` restores state, reconnect with backoff and a \&quot;reconnecting\&quot; banner | RUN-02, RUN-03, RUN-06, QR-03 |\n| 3 | `useCancelRun` | api | RunView → RunView | `server.cancel_run` | RUN-04 |\n| 4 | `useRunHistory` | api | none → RunView | `server.list_runs` | RUN-07 |\n| 5 | `RunMonitor` | views.runs | RunView, RunEventMessage → view | stage, percent bar, current item, counts, elapsed; summary with links when finished | RUN-02, RUN-05 |\n\n### Entry sketch (pre-build — removed by spine task)\n```tsx\nexport function MonitorRun() {\n  const start = useStartRun();\n  const live = useRunSocket(start.run);\n  const cancel = useCancelRun(start.run);\n  const history = useRunHistory();\n  return &lt;RunMonitor run={start.run} live={live} cancel={cancel} history={history} /&gt;;\n}\n```\n\n## PL-13: Check data quality\n**Entry:** `packages/web/src/pipeline.tsx::CheckQuality` · **Trigger:** the researcher opens `/quality` · **Part of:** PL-03\n**Covers:** APP-04, APP-06, APP-07, APP-09, VAL-01, VAL-09, EDA-01, EDA-03, BUILD-03\n\n| # | Step | Owner | In → Out | Spine version | Covers |\n|---|---|---|---|---|---|\n| 1 | `useValidation` | api | VersionRow → ValidationView | `server.get_validation` | APP-04, VAL-09 |\n| 2 | `useCheck` | api | ValidationView, check, id → CheckDrilldown | `server.get_check`, rows paged 500 at a time | APP-04, VAL-01 |\n| 3 | `useEda` | api | VersionRow → EdaReport | `server.get_eda` | APP-06, EDA-03 |\n| 4 | `useDiff` | api | VersionRow, VersionRow → ChangeListView | `server.diff_versions` for two chosen versions | APP-07, BUILD-03 |\n| 5 | `QualityView` | views.quality | ValidationView, CheckDrilldown, EdaReport, ChangeListView → view | check table → stocks → rows; EDA sections with Observable Plot charts from `charts`; change list table | APP-04, APP-06, APP-09, EDA-01 |\n\n### Entry sketch (pre-build — removed by spine task)\n```tsx\nexport function CheckQuality({ check, id, compareTo }: Props) {\n  const version = useSelectedVersion();\n  const validation = useValidation(version);\n  const drill = useCheck(validation, check, id);\n  const eda = useEda(version);\n  const diff = useDiff(version, compareTo);\n  return &lt;QualityView validation={validation} drill={drill} eda={eda} diff={diff} /&gt;;\n}\n```\n\n## Planned layout (pre-build — removed by spine task)\n```\npackages/web/src/\n  pipeline.tsx          PL-11–PL-13 route entries\n  main.tsx              router, theme, query client\n  api/generated.ts      generated from openapi.json (never edited)\n  api/queries.ts        useSearch, useStock, useTrace, useUniverse, useValidation, useCheck, useEda, useDiff, useRunHistory\n  api/runs.ts           useStartRun, useCancelRun, useRunSocket\n  shell/version.tsx     useSelectedVersion and the header picker; backend-down screen\n  design/               tokens and base components (no step; used by every view)\n  charts/price.tsx      price chart with markers (used by views.stock)\n  charts/stats.tsx      EDA charts (used by views.quality)\n  views/stock.tsx       StockView\n  views/runs.tsx        RunMonitor\n  views/quality.tsx     QualityView\npackages/web/tests/intent/web/  packages/web/tests/unit/web/\n```\n\n## Open questions\n- `design` and `charts` own no step: they are building blocks every view uses (assumed; APP-08 and APP-09 are checked on the views that use them, and `design` is built first from the approved direction).\n- The empty \&quot;build your first dataset\&quot; screen and backend-down screen live in `shell` (assumed; APP edge cases).\n&quot;
+}</pre><div class="lbl">output</div><pre>File created successfully at: /Users/connorott/plugins/dev-team-workspace/iteration-7/quant-incremental/with_skill/project/docs/packages/web/pipelines.md (file state is current in your context — no need to Read it back)</pre></details></div><div class="step" id="SD100"><span class="sid">D100</span><span class="kind">Bash</span>cd /Users/connorott/plugins/dev-team-workspace/iteration-7/quant-incremental/with_skill/plugin/dev-team/scripts/devteam &amp;&amp; grep -n &quot;step-io-types&quot; -B30 commands/lint.py | grep -n &quot;def check_step_io\|last\|plain\|lower\|NONE\|_empty\|skip\|continue&quot;<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;cd /Users/connorott/plugins/dev-team-workspace/iteration-7/quant-incremental/with_skill/plugin/dev-team/scripts/devteam &amp;&amp; grep -n \&quot;step-io-types\&quot; -B30 commands/lint.py | grep -n \&quot;def check_step_io\\|last\\|plain\\|lower\\|NONE\\|_empty\\|skip\\|continue\&quot; &quot;
+}</pre><div class="lbl">output</div><pre>49:817-def check_step_io_types(ctx: Context):
+51:819-    one: the boundaries an interface task freezes (entry arguments on the In side may stay plain). A project with
+Shell cwd was reset to /Users/connorott/plugins/dev-team-workspace/iteration-7/quant-incremental/with_skill/project</pre></details></div><div class="step" id="SD101"><span class="sid">D101</span><span class="kind">Bash</span>cd /Users/connorott/plugins/dev-team-workspace/iteration-7/quant-incremental/with_skill/plugin/dev-team/scripts/devteam &amp;&amp; sed -n 790,860p commands/lint.py<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;cd /Users/connorott/plugins/dev-team-workspace/iteration-7/quant-incremental/with_skill/plugin/dev-team/scripts/devteam &amp;&amp; sed -n 790,860p commands/lint.py&quot;
+}</pre><div class="lbl">output</div><pre>                for sym in syms:
+                    if sym not in produced:
+                        yield _p(doc, where, &quot;edges&quot;,
+                                 f&quot;graph row {e.src} → {e.dst}: {sym} isn&#x27;t frozen by an interface task &quot;
+                                 &quot;(not in its Read: or a tests/contracts/ folder it Writes)&quot;)
+            elif e.kind in (&quot;data&quot;, &quot;call&quot;) and e.src in by_id and e.dst in by_id:
+                src, dst = by_id[e.src], by_id[e.dst]
+                covered = (_types_between(ctx, types, src, dst) if e.kind == &quot;data&quot;
+                           else _callees(ctx, src, dst)) &amp; produced
+                if covered:
+                    yield _p(doc, where, &quot;edges&quot;,
+                             f&quot;{e.src} waits on code task {e.dst} across {&#x27;, &#x27;.join(sorted(covered))}, which an &quot;
+                             &quot;interface task freezes: mitigate the edge and drop the dependency&quot;)
+            rows.setdefault((e.src, e.dst), e)
+        for t in tasks:
+            line = md.field_line(doc.lines, t.start, t.end, &quot;Depends on&quot;)
+            line = t.start if line is None else line
+            for dep in t.depends_on:
+                e = rows.get((t.id, dep))
+                if e is not None and e.mitigated:
+                    yield _p(doc, line, &quot;edges&quot;, f&quot;{t.id} depends on {dep}, but its graph row is mitigated by &quot;
+                             f&quot;{e.mitigated_by}: a mitigated edge doesn&#x27;t order, drop the dependency&quot;)
+                elif e is None and not (dep in by_id and by_id[dep].kind == &quot;interface&quot;):
+                    where = &quot;no ## Dependency graph section&quot; if section is None else &quot;no graph row&quot;
+                    yield _p(doc, line, &quot;edges&quot;, f&quot;{t.id} depends on {dep} with {where} saying why (kind, `none: &lt;reason&gt;`)&quot;)
+
+
+def check_step_io_types(ctx: Context):
+    &quot;&quot;&quot;Every type a package step&#x27;s `In → Out` cell names is a contract type section, and every step&#x27;s Out names
+    one: the boundaries an interface task freezes (entry arguments on the In side may stay plain). A project with
+    no type sections yet gets warnings, not errors.&quot;&quot;&quot;
+    types = model.contract_types(ctx.repo)
+    sev = &quot;&quot; if types else &quot;W&quot;
+    for doc in ctx.repo.docs(&quot;pipelines&quot;):
+        for p in model.pipelines(doc):
+            for s in p.steps:
+                for name in s.in_types + s.out_types:
+                    if model.resolve_type(types, name) is None:
+                        yield Problem(doc.rel, s.line + 1, &quot;step-io-types&quot;,
+                                      f&quot;{p.id} step `{s.name}` names {name}, which no contract.md type section &quot;
+                                      f&quot;defines (`### &lt;component&gt;.{name.rsplit(&#x27;.&#x27;, 1)[-1]}: type`)&quot;, sev)
+                if not s.out_types:
+                    yield Problem(doc.rel, s.line + 1, &quot;step-io-types&quot;,
+                                  f&quot;{p.id} step `{s.name}`: its Out names no contract type&quot;, sev)
+
+
+def _smoke_due(t: model.Task, pl: str, wired_before: dict[str, set[str]]) -&gt; bool:
+    &quot;&quot;&quot;Whether the task&#x27;s Verify must run pipeline `pl`&#x27;s smoke command. Wiring and system tasks do, and so does
+    any other task whose `Depends on` reaches `pl`&#x27;s wiring task; interface and spine tasks, and thicken tasks
+    beside the wiring, land before the pipeline runs. A task with no Kind: every task outside Phase 0.&quot;&quot;&quot;
+    if not t.kind:
+        return not t.is_spine
+    return t.kind in (&quot;wiring&quot;, &quot;system&quot;) or pl in wired_before.get(t.id, set())
+
+
+def check_verify_smoke(ctx: Context):
+    smoke: dict[str, str | None] = {}
+    wired_before: dict[str, set[str]] = {}
+    for doc in ctx.plan_docs:
+        tasks = model.tasks(doc)
+        wiring = {t.id: model.spine_pipeline(t) for t in tasks if t.kind == &quot;wiring&quot;}
+        for t in tasks:
+            wired_before[t.id] = {wiring[a] for a in graph.ancestors(tasks, t.id) if a in wiring}
+    for t in ctx.tasks:
+        verify = &quot; &quot;.join(t.get(&quot;Verify&quot;).split())
+        for pl in dict.fromkeys(re.findall(r&quot;PL-\d{2,}&quot;, t.step)):
+            if not _smoke_due(t, pl, wired_before):
+                continue
+            if pl not in smoke:
+                smoke[pl] = model.smoke_command(ctx.repo, pl)
+            cmd = smoke[pl]
+Shell cwd was reset to /Users/connorott/plugins/dev-team-workspace/iteration-7/quant-incremental/with_skill/project</pre></details></div><div class="step" id="SD102"><span class="sid">D102</span><span class="kind">think</span>I found that the lint check requires every step&#x27;s output to be a contract type, even for side-effect-only steps, so I&#x27;m fixing it properly: making `server` return its assembled app, giving the live stream session and end-of-stream types, having the contract export return a check result, and making `web`&#x27;s final steps return a `web.Page` type.<details><summary>full text</summary><pre>I found that the lint check requires every step&#x27;s output to be a contract type, even for side-effect-only steps, so I&#x27;m fixing it properly: making `server` return its assembled app, giving the live stream session and end-of-stream types, having the contract export return a check result, and making `web`&#x27;s final steps return a `web.Page` type.
+
+</pre></details></div><div class="step" id="SD103"><span class="sid">D103</span><span class="kind">Bash</span>python3 - &lt;&lt;&#x27;EOF&#x27;
+p=&#x27;docs/packages/server/pipelines.md&#x27;; s=open(p).read()
+s=s.replace(&quot;Trigger: `qlab-server [--port 8765]`&quot;,&quot;Trigger: `qlab-server [--port 8765]` (`__main__` hands the app to uvicorn on 127.0.0.1)&quot;)
+s=s.replace(&quot;| 3 | `serve` | app.assemble | ServerConfig, LoaderCache → none | FastAPI with the guard middleware, `queries` and `runs_api` routers, the run socket, problem mapping and the static bundle; uvicorn on 127.0.0.1 |&quot;,
+&quot;| 3 | `build_app` | app.assemble | ServerConfig …[+6022 chars]<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;python3 - &lt;&lt;&#x27;EOF&#x27;\np=&#x27;docs/packages/server/pipelines.md&#x27;; s=open(p).read()\ns=s.replace(\&quot;**Trigger:** `qlab-server [--port 8765]`\&quot;,\&quot;**Trigger:** `qlab-server [--port 8765]` (`__main__` hands the app to uvicorn on 127.0.0.1)\&quot;)\ns=s.replace(\&quot;| 3 | `serve` | app.assemble | ServerConfig, LoaderCache → none | FastAPI with the guard middleware, `queries` and `runs_api` routers, the run socket, problem mapping and the static bundle; uvicorn on 127.0.0.1 |\&quot;,\n\&quot;| 3 | `build_app` | app.assemble | ServerConfig, LoaderCache → ServerApp | FastAPI with the guard middleware, `queries` and `runs_api` routers, the run socket, problem mapping and the static bundle |\&quot;)\ns=s.replace(\&quot;\&quot;\&quot;def run_server(env: Mapping[str, str]) -&gt; None:\n    cfg = load_config(env)\n    cache = open_cache(cfg)\n    serve(cfg, cache)\&quot;\&quot;\&quot;,\&quot;\&quot;\&quot;def run_server(env: Mapping[str, str]) -&gt; ServerApp:\n    cfg = load_config(env)\n    cache = open_cache(cfg)\n    return build_app(cfg, cache)\&quot;\&quot;\&quot;)\ns=s.replace(\&quot;| 1 | `check_origin` | guard | socket, ServerConfig → none | close with 1008 unless Origin is in `allowed_origins` | QR-05 |\&quot;,\n\&quot;| 1 | `accept_socket` | guard | socket, ServerConfig → LiveSession | accept only if Origin is in `allowed_origins`, else close with 1008 | QR-05 |\&quot;)\ns=s.replace(\&quot;| 2 | `hello_message` | live.state | ServerConfig → RunEventMessage |\&quot;,\&quot;| 2 | `hello_message` | live.state | LiveSession → RunEventMessage |\&quot;)\ns=s.replace(\&quot;| 3 | `stream_events` | live.stream | socket, RunEventMessage → none |\&quot;,\&quot;| 3 | `stream_events` | live.stream | LiveSession, RunEventMessage → StreamEnd |\&quot;)\ns=s.replace(\&quot;\&quot;\&quot;async def run_live_stream(socket: WebSocket, cfg: ServerConfig) -&gt; None:\n    await check_origin(socket, cfg)\n    hello = hello_message(cfg)\n    await stream_events(socket, hello)\&quot;\&quot;\&quot;,\&quot;\&quot;\&quot;async def run_live_stream(socket: WebSocket, cfg: ServerConfig) -&gt; StreamEnd:\n    session = await accept_socket(socket, cfg)\n    hello = hello_message(session)\n    return await stream_events(session, hello)\&quot;\&quot;\&quot;)\ns=s.replace(\&quot;| 2 | `write_or_check` | contract_export | ContractSchema, path → path | write `packages/web/src/api/openapi.json`; with `--check`, fail on any byte difference | QR-06 |\&quot;,\n\&quot;| 2 | `write_or_check` | contract_export | ContractSchema, path → ContractCheck | write `packages/web/src/api/openapi.json`; with `--check`, report any byte difference and exit non-zero | QR-06 |\&quot;)\ns=s.replace(\&quot;\&quot;\&quot;def run_export_contract(out: Path, check: bool) -&gt; Path:\&quot;\&quot;\&quot;,\&quot;\&quot;\&quot;def run_export_contract(out: Path, check: bool) -&gt; ContractCheck:\&quot;\&quot;\&quot;)\ns=s.replace(\&quot;  types.py                  ServerConfig, LoaderCache, ContractSchema\&quot;,\&quot;  types.py                  ServerConfig, LoaderCache, ServerApp, LiveSession, StreamEnd, ContractSchema, ContractCheck\&quot;)\ns=s.replace(\&quot;  app/assemble.py           serve (mounts routers, problem mapping, static files)\&quot;,\&quot;  app/assemble.py           build_app (mounts routers, problem mapping, static files)\&quot;)\ns=s.replace(\&quot;  guard/__init__.py         check_origin and the Host/Origin middleware\&quot;,\&quot;  guard/__init__.py         accept_socket and the Host/Origin middleware\&quot;)\ns=s.replace(\&quot;so they sit under `serve`\&quot;,\&quot;so they sit under `build_app`\&quot;)\ns=s.replace(\&quot;`queries` and `runs_api` routers, the run socket\&quot;,\&quot;`queries` and `runs_api` routers, the run socket\&quot;)\ns=s.replace(\&quot;query routes (mounted by serve)\&quot;,\&quot;query routes (mounted by build_app)\&quot;).replace(\&quot;run routes (mounted by serve)\&quot;,\&quot;run routes (mounted by build_app)\&quot;)\nopen(p,&#x27;w&#x27;).write(s)\n\np=&#x27;docs/packages/server/contract.md&#x27;; s=open(p).read()\ns=s.replace(\&quot;\&quot;\&quot;### server.ContractSchema: type\&quot;\&quot;\&quot;,\&quot;\&quot;\&quot;### server.ServerApp: type\n`ServerApp = FastAPI  # assembled app: guard middleware, routers, run socket, problem mapping, static bundle`\n- **Invariants:** serves only through the guard (AD-11); every route&#x27;s models come from `qlab_server.models`\n- **Used by:** server\n\n### server.LiveSession: type\n`@dataclass(frozen=True) class LiveSession: socket: WebSocket; cfg: ServerConfig; connected: datetime`\n- **Invariants:** exists only for an accepted socket whose Origin passed (QR-05)\n- **Used by:** server\n\n### server.StreamEnd: type\n`@dataclass(frozen=True) class StreamEnd: reason: Literal[\&quot;client_closed\&quot;, \&quot;server_shutdown\&quot;, \&quot;error\&quot;]; last_seq: int | None; sent: int`\n- **Invariants:** `sent` ≥ 1 (the hello)\n- **Used by:** server\n\n### server.ContractSchema: type\&quot;\&quot;\&quot;)\ns=s.replace(\&quot;\&quot;\&quot;- **Used by:** server, web\n\n## Common\&quot;\&quot;\&quot;,\&quot;\&quot;\&quot;- **Used by:** server, web\n\n### server.ContractCheck: type\n`@dataclass(frozen=True) class ContractCheck: path: Path; changed: bool; diff: str | None`\n- **Invariants:** with `--check`, `changed` ⇒ non-zero exit and `diff` names the first differing paths (QR-06)\n- **Used by:** server\n\n## Common\&quot;\&quot;\&quot;)\nopen(p,&#x27;w&#x27;).write(s)\n\np=&#x27;docs/packages/web/contract.md&#x27;; s=open(p).read()\ns=s.replace(\&quot;**Status:** Approved\&quot;,\&quot;**Status:** Draft\&quot;)\ns=s.replace(\&quot;`web` is the top of the dependency graph: no package imports it, so it has no public symbols.\&quot;,\&quot;`web` is the top of the dependency graph: no package imports it. Its one type is internal: what each flow renders (AD-14).\&quot;)\ns+=&#x27;&#x27;&#x27;\n## views\n\n### web.Page: type\n`type Page = JSX.Element  // a rendered route: StockView, RunMonitor, QualityView`\n- **Invariants:** shows the selected version&#x27;s fingerprint (APP-07); uses only `design` tokens (APP-08); every chart passes the `dataviz` checklist in light and dark (APP-09); renders ≤ 1 s after its data arrives (QR-02)\n- **Used by:** web\n&#x27;&#x27;&#x27;\nopen(p,&#x27;w&#x27;).write(s)\n\np=&#x27;docs/packages/web/pipelines.md&#x27;; s=open(p).read()\ns=s.replace(\&quot;StockView, PriceTraceView, UniverseView → view |\&quot;,\&quot;StockView, PriceTraceView, UniverseView → Page |\&quot;)\ns=s.replace(\&quot;RunView, RunEventMessage → view |\&quot;,\&quot;RunView, RunEventMessage → Page |\&quot;)\ns=s.replace(\&quot;ValidationView, CheckDrilldown, EdaReport, ChangeListView → view |\&quot;,\&quot;ValidationView, CheckDrilldown, EdaReport, ChangeListView → Page |\&quot;)\nopen(p,&#x27;w&#x27;).write(s)\n\np=&#x27;docs/architecture.md&#x27;; s=open(p).read()\ns=s.replace(\&quot;Server start-up and contract export pass `server.ServerConfig`, `server.LoaderCache` and `server.ContractSchema`.\&quot;,\&quot;`server`&#x27;s start-up, live stream and contract export pass `server.ServerConfig`, `server.LoaderCache`, `server.ServerApp`, `server.LiveSession`, `server.StreamEnd`, `server.ContractSchema` and `server.ContractCheck`; each `web` flow renders a `web.Page`.\&quot;)\ns=s.replace(\&quot;**Scope:** `data`, `server`\\n- **Context:** Pipeline design\&quot;,\&quot;**Scope:** `data`, `server`, `web`\\n- **Context:** Pipeline design\&quot;)\nopen(p,&#x27;w&#x27;).write(s)\nEOF\ngrep -n \&quot;serve\\b\\|check_origin\&quot; docs/packages/server/*.md docs/architecture.md | head&quot;
+}</pre><div class="lbl">output</div><pre>(Bash completed with no output)</pre></details></div><div class="step" id="SD104"><span class="sid">D104</span><span class="kind">say</span>Now adding the calling pipeline IDs to each contract symbol&#x27;s `Used by` line.<details><summary>full text</summary><pre>Now adding the calling pipeline IDs to each contract symbol&#x27;s `Used by` line.</pre></details></div><div class="step" id="SD105"><span class="sid">D105</span><span class="kind">Bash</span>python3 - &lt;&lt;&#x27;EOF&#x27;
+import re
+maps={
+&#x27;docs/packages/data/contract.md&#x27;:{
+ &#x27;data.open_loader&#x27;:[&#x27;PL-08&#x27;],&#x27;data.Loader.panel&#x27;:[&#x27;PL-07&#x27;,&#x27;PL-08&#x27;],&#x27;data.Loader.universe&#x27;:[&#x27;PL-08&#x27;],
+ &#x27;data.Loader.membership_changes&#x27;:[&#x27;PL-08&#x27;],&#x27;data.Loader.lookup_ticker&#x27;:[&#x27;PL-08&#x27;],&#x27;data.Loader.search&#x27;:[&#x27;PL-08&#x27;],
+ &#x27;data.Loader.trace&#x27;:[&#x27;PL-08&#x27;],&#x27;data.list_versions&#x27;:[&#x27;PL-08&#x27;],&#x27;data.diff_versions&#x27;:[&#x27;PL-05&#x27;,&#x27;PL-08&#x27;],
+ &#x27;data.load_validation_report&#x27;:[&#x27;PL-08&#x27;],&#x27;data.load_eda_report&#x27;:[&#x27;PL-08&#x27;],&#x27;data.start_run&#x27;:[&#x27;PL-08&#x27;],
+ &#x27;data.can …[+1200 chars]<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;python3 - &lt;&lt;&#x27;EOF&#x27;\nimport re\nmaps={\n&#x27;docs/packages/data/contract.md&#x27;:{\n &#x27;data.open_loader&#x27;:[&#x27;PL-08&#x27;],&#x27;data.Loader.panel&#x27;:[&#x27;PL-07&#x27;,&#x27;PL-08&#x27;],&#x27;data.Loader.universe&#x27;:[&#x27;PL-08&#x27;],\n &#x27;data.Loader.membership_changes&#x27;:[&#x27;PL-08&#x27;],&#x27;data.Loader.lookup_ticker&#x27;:[&#x27;PL-08&#x27;],&#x27;data.Loader.search&#x27;:[&#x27;PL-08&#x27;],\n &#x27;data.Loader.trace&#x27;:[&#x27;PL-08&#x27;],&#x27;data.list_versions&#x27;:[&#x27;PL-08&#x27;],&#x27;data.diff_versions&#x27;:[&#x27;PL-05&#x27;,&#x27;PL-08&#x27;],\n &#x27;data.load_validation_report&#x27;:[&#x27;PL-08&#x27;],&#x27;data.load_eda_report&#x27;:[&#x27;PL-08&#x27;],&#x27;data.start_run&#x27;:[&#x27;PL-08&#x27;],\n &#x27;data.cancel_run&#x27;:[&#x27;PL-08&#x27;],&#x27;data.read_events&#x27;:[&#x27;PL-09&#x27;],&#x27;data.list_runs&#x27;:[&#x27;PL-08&#x27;,&#x27;PL-09&#x27;]},\n&#x27;docs/packages/server/contract.md&#x27;:{\n &#x27;server.list_versions&#x27;:[&#x27;PL-11&#x27;],&#x27;server.select_version&#x27;:[&#x27;PL-11&#x27;],&#x27;server.search&#x27;:[&#x27;PL-11&#x27;],&#x27;server.get_stock&#x27;:[&#x27;PL-11&#x27;],\n &#x27;server.get_trace&#x27;:[&#x27;PL-11&#x27;],&#x27;server.get_universe&#x27;:[&#x27;PL-11&#x27;],&#x27;server.start_run&#x27;:[&#x27;PL-12&#x27;],&#x27;server.cancel_run&#x27;:[&#x27;PL-12&#x27;],\n &#x27;server.list_runs&#x27;:[&#x27;PL-12&#x27;],&#x27;server.run_socket&#x27;:[&#x27;PL-12&#x27;],&#x27;server.get_validation&#x27;:[&#x27;PL-13&#x27;],&#x27;server.get_check&#x27;:[&#x27;PL-13&#x27;],\n &#x27;server.get_eda&#x27;:[&#x27;PL-13&#x27;],&#x27;server.diff_versions&#x27;:[&#x27;PL-13&#x27;]}}\nfor p,m in maps.items():\n    lines=open(p).read().split(&#x27;\\n&#x27;); cur=None; done=set()\n    for i,l in enumerate(lines):\n        h=re.match(r&#x27;### (\\S+):&#x27;,l)\n        if h: cur=h.group(1); continue\n        if cur in m and l.startswith(&#x27;- **Used by:**&#x27;) and cur not in done:\n            lines[i]=l+&#x27;; &#x27;+&#x27;, &#x27;.join(m[cur]); done.add(cur)\n    assert done==set(m), set(m)-done\n    open(p,&#x27;w&#x27;).write(&#x27;\\n&#x27;.join(lines))\nEOF\nDT=../plugin/dev-team/scripts/dt.py; python3 $DT lint docs/; python3 $DT status --skill pipeline-design | grep -v \&quot;^next\\|^refer\&quot;; python3 $DT status --skill architecture-design | grep -E \&quot;uncovered|stale|broken|contracts_missing|grow\&quot;&quot;
+}</pre><div class="lbl">output</div><pre>docs/packages/data/contract.md:1: grow-size 263 lines, over the 200-line ceiling for one package&#x27;s contract doc: architecture-design should consider a Grow
+docs/packages/server/contract.md:1: grow-size 204 lines, over the 200-line ceiling for one package&#x27;s contract doc: architecture-design should consider a Grow
+docs/roadmap.md:13: roadmap-skill S1 Skills names dataviz: not installed (.claude/skills or the plugin)
+0 errors, 3 warnings
+skill: pipeline-design
+mode: blocked
+blocked: architecture is Draft, not Approved
+docs: brief Accepted · spec Approved · architecture Draft (Multi-package) · roadmap ok · plan missing · constraints missing
+packages: data=extend, server=extend, web=extend
+uncovered_ids: QR-06, UNIV-05
+components_unowned: data.errors, data.calendar, data.cli, server.models, server.queries, server.runs_api, web.design, web.charts
+drift: none
+retired_refs: none
+misplaced: none
+uncovered: none
+stale: none
+broken_fences: none
+contracts_missing: none
+grow_triggers: data: 4 pipelines &gt; 3
+stale_contracts: none</pre></details></div><div class="step" id="SD106"><span class="sid">D106</span><span class="kind">think</span>Lint passes with 0 errors, but UNIV-05 and QR-06 aren&#x27;t mapped to any step, some modules have no owning step, and `data` exceeds the size limit. I&#x27;ll address the unmapped requirements and ownership gaps first.<details><summary>full text</summary><pre>Lint passes with 0 errors, but UNIV-05 and QR-06 aren&#x27;t mapped to any step, some modules have no owning step, and `data` exceeds the size limit. I&#x27;ll address the unmapped requirements and ownership gaps first.
+
+</pre></details></div><div class="step" id="SD107"><span class="sid">D107</span><span class="kind">Bash</span>python3 - &lt;&lt;&#x27;EOF&#x27;
+p=&#x27;docs/packages/data/contract.md&#x27;; s=open(p).read()
+s=s.replace(&quot;&quot;&quot;### data.MembershipSpans: type&quot;&quot;&quot;,&quot;&quot;&quot;### data.TradingCalendar: type
+`@dataclass(frozen=True) class TradingCalendar: days: tuple[date, ...]; source: str  # exchange_calendars XNYS, version pinned`
+- Invariants: ascending; excludes weekends, holidays and unscheduled closures (DATA-07)
+- Used by: data
+
+### data.TickerSpans: type
+`TickerSpans = DataFrame[TickerSpanSchema]  # ticker, security_id, start, end  …[+5693 chars]<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;python3 - &lt;&lt;&#x27;EOF&#x27;\np=&#x27;docs/packages/data/contract.md&#x27;; s=open(p).read()\ns=s.replace(\&quot;\&quot;\&quot;### data.MembershipSpans: type\&quot;\&quot;\&quot;,\&quot;\&quot;\&quot;### data.TradingCalendar: type\n`@dataclass(frozen=True) class TradingCalendar: days: tuple[date, ...]; source: str  # exchange_calendars XNYS, version pinned`\n- **Invariants:** ascending; excludes weekends, holidays and unscheduled closures (DATA-07)\n- **Used by:** data\n\n### data.TickerSpans: type\n`TickerSpans = DataFrame[TickerSpanSchema]  # ticker, security_id, start, end (end exclusive, null = still held)`\n- **Invariants:** for one ticker, spans never overlap, so a (ticker, date) resolves to at most one security (UNIV-05)\n- **Used by:** data\n\n### data.MembershipSpans: type\&quot;\&quot;\&quot;)\nopen(p,&#x27;w&#x27;).write(s)\n\np=&#x27;docs/packages/data/pipelines.md&#x27;; s=open(p).read()\n# calendar step in PL-04\ns=s.replace(\&quot;\&quot;\&quot;| 5 | `read_references` | clean.references | BuildConfig → ReferenceLists | read the three CSVs in `reference/`, hash them | VAL-07, DATA-02 |\n| 6 | `clean` | clean.canonical | RawTables → CanonicalTables | map vendor columns to canonical schemas, permaticker as ID, ticker spans, effective-date membership, drop exact duplicates, align to the XNYS calendar | UNIV-03, UNIV-04, PRICE-01–PRICE-03, PRICE-06, DATA-03–DATA-05, DATA-07 |\&quot;\&quot;\&quot;,\n\&quot;\&quot;\&quot;| 5 | `read_references` | clean.references | BuildConfig → ReferenceLists | read the three CSVs in `reference/`, hash them | VAL-07, DATA-02 |\n| 6 | `trading_days` | calendar | BuildConfig → TradingCalendar | XNYS sessions from exchange_calendars between `history_start` and today | DATA-07 |\n| 7 | `clean` | clean.canonical | RawTables, TradingCalendar → CanonicalTables | map vendor columns to canonical schemas, permaticker as ID, ticker spans, effective-date membership, drop exact duplicates, align to the calendar | UNIV-03, UNIV-04, PRICE-01–PRICE-03, PRICE-06, DATA-03–DATA-05, DATA-07 |\&quot;\&quot;\&quot;)\nfor a,b in [(\&quot;| 7 | `check_rows`\&quot;,\&quot;| 8 | `check_rows`\&quot;),(\&quot;| 8 | `derive`\&quot;,\&quot;| 9 | `derive`\&quot;),(\&quot;| 9 | `check_dataset`\&quot;,\&quot;| 10 | `check_dataset`\&quot;),(\&quot;| 10 | `explore`\&quot;,\&quot;| 11 | `explore`\&quot;),(\&quot;| 11 | `publish`\&quot;,\&quot;| 12 | `publish`\&quot;),(\&quot;| 12 | `finish_run`\&quot;,\&quot;| 13 | `finish_run`\&quot;)]:\n    i=s.index(\&quot;## PL-05\&quot;); head,tail=s[:i],s[i:]\n    s=head.replace(a,b,1)+tail\ns=s.replace(\&quot;\&quot;\&quot;    refs = read_references(cfg)\n    tables = clean(raw)\&quot;\&quot;\&quot;,\&quot;\&quot;\&quot;    refs = read_references(cfg)\n    days = trading_days(cfg)\n    tables = clean(raw, days)\&quot;\&quot;\&quot;)\n# PL-05 / PL-06: add calendar row and pass days\ns=s.replace(\&quot;\&quot;\&quot;| 6 | `read_references` | clean.references | BuildConfig → ReferenceLists | PL-04 as built | VAL-07 |\n| 7 | `clean` | clean.canonical | RawTables → CanonicalTables | PL-04 as built | PRICE-01 |\&quot;\&quot;\&quot;,\&quot;\&quot;\&quot;| 6 | `read_references` | clean.references | BuildConfig → ReferenceLists | PL-04 as built | VAL-07 |\n| 6a | `trading_days` | calendar | BuildConfig → TradingCalendar | PL-04 as built | DATA-07 |\n| 7 | `clean` | clean.canonical | RawTables, TradingCalendar → CanonicalTables | PL-04 as built | PRICE-01 |\&quot;\&quot;\&quot;)\ns=s.replace(\&quot;\&quot;\&quot;| 4 | `read_references` | clean.references | BuildConfig → ReferenceLists | PL-04 as built | VAL-07 |\n| 5 | `clean` | clean.canonical | RawTables → CanonicalTables | PL-04 as built | PRICE-01 |\&quot;\&quot;\&quot;,\&quot;\&quot;\&quot;| 4 | `read_references` | clean.references | BuildConfig → ReferenceLists | PL-04 as built | VAL-07 |\n| 4a | `trading_days` | calendar | BuildConfig → TradingCalendar | PL-04 as built | DATA-07 |\n| 5 | `clean` | clean.canonical | RawTables, TradingCalendar → CanonicalTables | PL-04 as built | PRICE-01 |\&quot;\&quot;\&quot;)\ns=s.replace(\&quot;\&quot;\&quot;    refs = read_references(cfg)\n    checked = check_rows(clean(raw), refs)\&quot;\&quot;\&quot;,\&quot;\&quot;\&quot;    refs = read_references(cfg)\n    checked = check_rows(clean(raw, trading_days(cfg)), refs)\&quot;\&quot;\&quot;)\n# PL-07 ticker resolution\ns=s.replace(\&quot;\&quot;\&quot;**Covers:** LOAD-01–LOAD-06, UNIV-01, PRICE-04, QR-01\&quot;\&quot;\&quot;,\&quot;\&quot;\&quot;**Covers:** LOAD-01–LOAD-06, UNIV-01, UNIV-05, PRICE-04, QR-01\&quot;\&quot;\&quot;)\ns=s.replace(\&quot;\&quot;\&quot;| 2 | `membership_spans` | loader.universe | DatasetVersion, start, end → MembershipSpans | membership changes with `known_date` ≤ end folded into spans | UNIV-01, LOAD-01, LOAD-02 |\&quot;\&quot;\&quot;,\n\&quot;\&quot;\&quot;| 2 | `resolve_ids` | loader.tickers | DatasetVersion, ids, start, end → TickerSpans | permanent IDs pass through as whole-range spans; tickers resolve to their holder on each date from the ticker table | UNIV-05 |\n| 3 | `membership_spans` | loader.universe | DatasetVersion, TickerSpans, start, end → MembershipSpans | membership changes with `known_date` ≤ end folded into spans, intersected with the requested IDs | UNIV-01, LOAD-01, LOAD-02 |\&quot;\&quot;\&quot;)\ns=s.replace(\&quot;| 3 | `scan_prices` | loader.scan\&quot;,\&quot;| 4 | `scan_prices` | loader.scan\&quot;).replace(\&quot;| 4 | `adjust_as_of` | loader.adjust\&quot;,\&quot;| 5 | `adjust_as_of` | loader.adjust\&quot;)\ns=s.replace(\&quot;\&quot;\&quot;    spans = membership_spans(version, req.start, req.end)\&quot;\&quot;\&quot;,\&quot;\&quot;\&quot;    ids = resolve_ids(version, req.ids, req.start, req.end)\n    spans = membership_spans(version, ids, req.start, req.end)\&quot;\&quot;\&quot;)\ns=s.replace(\&quot;  calendar/__init__.py XNYS trading days (used by clean, derive, sources)\&quot;,\&quot;  calendar/__init__.py trading_days\&quot;)\ns=s.replace(\&quot;  loader/universe.py   membership_spans\&quot;,\&quot;  loader/tickers.py    resolve_ids\\n  loader/universe.py   membership_spans\&quot;)\ns=s.replace(\&quot;\&quot;\&quot;## Open questions\n\&quot;\&quot;\&quot;,\&quot;\&quot;\&quot;## Open questions\n- `errors` (the `DataError` hierarchy) and `cli` (the `qlab` trigger that calls these entries) own no step by design (assumed).\n\&quot;\&quot;\&quot;)\nopen(p,&#x27;w&#x27;).write(s)\n\np=&#x27;docs/packages/web/pipelines.md&#x27;; s=open(p).read()\ns=s.replace(\&quot;**Covers:** APP-01–APP-03, APP-05, APP-07–APP-09, UNIV-05, PRICE-05, QR-02\&quot;,\&quot;**Covers:** APP-01–APP-03, APP-05, APP-07–APP-09, UNIV-05, PRICE-05, QR-02, QR-06\&quot;)\ns=s.replace(\&quot;| debounced `server.search`, every holder of a reused ticker with dates | APP-02, UNIV-05 |\&quot;,\&quot;| debounced `server.search` through the generated client, every holder of a reused ticker with dates | APP-02, UNIV-05, QR-06 |\&quot;)\nopen(p,&#x27;w&#x27;).write(s)\n\np=&#x27;docs/packages/server/pipelines.md&#x27;; s=open(p).read()\ns=s.replace(\&quot;\&quot;\&quot;## Open questions\n\&quot;\&quot;\&quot;,\&quot;\&quot;\&quot;## Open questions\n- `models` is the contract itself (read by `export_schema`), and `queries` and `runs_api` are routers `build_app` mounts; none owns a step (assumed).\n\&quot;\&quot;\&quot;)\nopen(p,&#x27;w&#x27;).write(s)\nEOF\ngrep -n \&quot;6a\\|4a\&quot; docs/packages/data/pipelines.md | head -3&quot;
+}</pre><div class="lbl">output</div><pre>55:| 6a | `trading_days` | calendar | BuildConfig → TradingCalendar | PL-04 as built | DATA-07 |
+91:| 4a | `trading_days` | calendar | BuildConfig → TradingCalendar | PL-04 as built | DATA-07 |</pre></details></div><div class="step" id="SD108"><span class="sid">D108</span><span class="kind">Bash</span>python3 - &lt;&lt;&#x27;EOF&#x27;
+import re
+for p in [&#x27;docs/packages/data/pipelines.md&#x27;,&#x27;docs/packages/server/pipelines.md&#x27;,&#x27;docs/packages/web/pipelines.md&#x27;]:
+    out=[];n=0
+    for l in open(p).read().split(&#x27;\n&#x27;):
+        if l.startswith(&#x27;| # |&#x27;): n=0
+        m=re.match(r&#x27;\| (\d+[a-z]?) \| `&#x27;,l)
+        if m:
+            n+=1; l=l.replace(f&#x27;| {m.group(1)} |&#x27;,f&#x27;| {n} |&#x27;,1)
+        out.append(l)
+    open(p,&#x27;w&#x27;).write(&#x27;\n&#x27;.join(out))
+EOF
+DT=../plugin/dev-team/scripts/dt.py; python3 $DT lint docs/; python3 $DT sta …[+117 chars]<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;python3 - &lt;&lt;&#x27;EOF&#x27;\nimport re\nfor p in [&#x27;docs/packages/data/pipelines.md&#x27;,&#x27;docs/packages/server/pipelines.md&#x27;,&#x27;docs/packages/web/pipelines.md&#x27;]:\n    out=[];n=0\n    for l in open(p).read().split(&#x27;\\n&#x27;):\n        if l.startswith(&#x27;| # |&#x27;): n=0\n        m=re.match(r&#x27;\\| (\\d+[a-z]?) \\| `&#x27;,l)\n        if m:\n            n+=1; l=l.replace(f&#x27;| {m.group(1)} |&#x27;,f&#x27;| {n} |&#x27;,1)\n        out.append(l)\n    open(p,&#x27;w&#x27;).write(&#x27;\\n&#x27;.join(out))\nEOF\nDT=../plugin/dev-team/scripts/dt.py; python3 $DT lint docs/; python3 $DT status --skill pipeline-design | grep -E \&quot;uncovered|unowned\&quot;; sed -n 50,70p docs/packages/data/pipelines.md | cut -c1-60&quot;
+}</pre><div class="lbl">output</div><pre>docs/packages/data/contract.md:1: grow-size 273 lines, over the 200-line ceiling for one package&#x27;s contract doc: architecture-design should consider a Grow
+docs/packages/server/contract.md:1: grow-size 204 lines, over the 200-line ceiling for one package&#x27;s contract doc: architecture-design should consider a Grow
+docs/roadmap.md:13: roadmap-skill S1 Skills names dataviz: not installed (.claude/skills or the plugin)
+0 errors, 3 warnings
+uncovered_ids: none
+components_unowned: data.errors, data.cli, server.models, server.queries, server.runs_api, web.design, web.charts
+| 2 | `latest_version` | store.registry | BuildConfig → Data
+| 3 | `download_update` | sources.download | BuildConfig, Da
+| 4 | `save_snapshot` | snapshots.store | Download, Snapshot
+| 5 | `read_snapshots` | snapshots.store | SnapshotSet → Raw
+| 6 | `read_references` | clean.references | BuildConfig → R
+| 7 | `trading_days` | calendar | BuildConfig → TradingCalen
+| 8 | `clean` | clean.canonical | RawTables, TradingCalendar
+| 9 | `check_rows` | validate.rows | CanonicalTables, Refere
+| 10 | `derive` | derive.returns | CheckedTables, ReferenceL
+| 11 | `check_dataset` | validate.dataset | DerivedTables, R
+| 12 | `explore` | eda.report | ValidatedDataset → EdaReport
+| 13 | `publish` | store.publish | ValidatedDataset, EdaRepo
+| 14 | `diff_versions` | store.diff | DatasetVersion, Datase
+| 15 | `finish_run` | runs.lock | RunRecord, DatasetVersion 
+
+### Entry sketch (pre-build — removed by spine task)
+```python
+def run_update(cfg: BuildConfig) -&gt; RunRecord:
+    run = begin_run(cfg)
+    previous = latest_version(cfg)
+    download = download_update(cfg, previous)</pre></details></div><div class="step" id="SD109"><span class="sid">D109</span><span class="kind">say</span>Nothing is left uncovered, and lint reports 0 errors. Both the architecture revision and the pipelines are written as Drafts, waiting on you. ⏎ ## 1. Architecture revision (the type list you said you&#x27;d approve) ⏎ New decision AD-14: each build step hands the next a fixed, typed bundle of tables. Validation is split in two: ⏎ - Row checks run before returns are derived, so a rejected price never produces a return. ⏎ - Dataset checks and the pass/fail gate run after, because they need the returns. ⏎ Types added to the `data` contract (15), all internal to `data`: ⏎ | Type | What  …[+4731 chars]<details><summary>full text</summary><pre>Nothing is left uncovered, and lint reports 0 errors. Both the architecture revision and the pipelines are written as Drafts, waiting on you.
+
+## 1. Architecture revision (the type list you said you&#x27;d approve)
+
+**New decision AD-14:** each build step hands the next a fixed, typed bundle of tables. Validation is split in two:
+- Row checks run **before** returns are derived, so a rejected price never produces a return.
+- Dataset checks and the pass/fail gate run **after**, because they need the returns.
+
+**Types added to the `data` contract (15), all internal to `data`:**
+
+| Type | What it holds |
+|---|---|
+| `BuildConfig` | The settings for one run |
+| `Download` | Vendor files as downloaded |
+| `SnapshotRef` | One saved snapshot |
+| `SnapshotSet` | The full snapshot plus later updates, in order |
+| `RawTables` | The vendor tables read back from snapshots |
+| `ReferenceLists` | The three hand-checked lists |
+| `TradingCalendar` | US exchange trading days |
+| `CanonicalTables` | The cleaned tables, keyed by permanent ID |
+| `CheckedTables` | Cleaned tables after row checks, with flags |
+| `DerivedTables` | Plus adjustment factors and returns |
+| `ValidatedDataset` | Plus the validation report |
+| `VersionInputs` | What a dataset version was built from |
+| `TickerSpans` | Which company held a ticker over which dates |
+| `MembershipSpans` | Index membership periods by known date |
+| `PriceRows` | Prices read for a load, before adjustment |
+
+**Types added to the `server` contract (6), all internal to `server`:**
+
+| Type | What it holds |
+|---|---|
+| `ServerConfig` | Port, data location, allowed origins |
+| `LoaderCache` | The open dataset version the views show |
+| `ServerApp` | The assembled backend app |
+| `LiveSession` | One accepted live-progress connection |
+| `StreamEnd` | How a live-progress connection ended |
+| `ContractSchema` | The exported contract |
+| `ContractCheck` | The result of the drift check |
+
+**Type added to `web` (1):** `Page`, which is what each flow renders.
+
+## 2. Pipelines
+
+| ID | Package | Workflow | Trigger | Steps |
+|---|---|---|---|---|
+| PL-04 | data | Full build | `qlab build`, or the app | 13 |
+| PL-05 | data | Update | `qlab update` | 15 |
+| PL-06 | data | Rebuild from snapshots | `qlab rebuild` | 12 |
+| PL-07 | data | Load point-in-time data | `Loader.panel(...)` | 5 |
+| PL-08 | server | Serve the app | `qlab-server` | 3 |
+| PL-09 | server | Stream run progress | a WebSocket connection | 3 |
+| PL-10 | server | Export the contract | `qlab-server export-contract --check` | 2 |
+| PL-11 | web | Explore a stock | search, or `/stocks/:id` | 6 |
+| PL-12 | web | Monitor a run | Start, or `/runs` | 5 |
+| PL-13 | web | Check data quality | `/quality` | 5 |
+
+The planned file layout is in each `pipelines.md`. Every package has one `pipeline.py` entry module (`pipeline.tsx` for `web`) and one module per step owner.
+
+## Assumptions
+- **Shared steps:** the update and rebuild pipelines reuse the full build&#x27;s steps (&quot;PL-04 as built&quot;). Only reading snapshots is extended, so update snapshots are merged over the full one by key.
+- **Update with nothing new:** if the fingerprint doesn&#x27;t change, publishing stores nothing and reports &quot;no new data&quot;.
+- **Lock and cleanup:** the run lock and the handler that cleans up on failure or cancel are set up in `begin_run`.
+- **Loading by ticker:** loading can take tickers. They&#x27;re resolved to the company that held each ticker on each date (the new `resolve_ids` step).
+- **Server endpoints:** they&#x27;re thin handlers mounted when the server app is built, not pipelines of their own.
+- **Web flows:** the three web flows are React route components, and the `api` steps are query hooks.
+- **Modules that own no step, by design:**
+  - In `data`: `errors` and `cli`.
+  - In `server`: `models` (the contract itself), `queries` and `runs_api`.
+  - In `web`: `design` and `charts`.
+  
+  `dt` lists these as `components_unowned`. Each is explained under Open questions in its package&#x27;s `pipelines.md`.
+
+## Open questions
+1. **The `data` package has outgrown one package.** It has 4 pipelines (the limit is 3) and 12 modules, and its contract is 273 lines (the ceiling is 200). The `server` contract is just over too, at 204 lines.
+   
+   **My recommendation:** split `data` now, while no code exists:
+   - **`data`** is the read side: the loader, version registry reads, the calendar, the shared types and errors. Research code depends on this alone.
+   - **`build`** is the write side: sources, snapshots, cleaning, validation, deriving, exploration, publishing, runs and the `qlab` command line. `build` depends on `data`.
+   
+   That keeps each package&#x27;s docs small enough for the agents that build it, and makes the read side impossible to change by accident. It&#x27;s one more architecture round, the &quot;Grow&quot; step, and it would move PL-04 to PL-06 into `build`.
+   
+   Default: **split now**. The other choice is to accept the size, with a note in the architecture.
+2. **Possible split inside cleaning.** `clean.canonical` may pass the 500-line module limit. If it does, it gets split into one step per group of tables.
+
+Do you approve the revision and the pipelines, and should I split `data` now or keep it as one package?</pre></details></div><div class="step" id="SD110"><span class="sid">D110</span><span class="kind">hook</span><span class="hook">Stop said: {&quot;systemMessage&quot;: &quot;dt lint: 2 problems\ndocs/packages/data/contract.md:1: grow-size 273 lines, over the 200-line ceiling for one package&#x27;s contract doc: architecture-design should consider a Grow\ndocs/packages/server/contract.md:1: grow-size 204 lines, over the 200-line ceiling for one package&#x27;s contract doc: architecture-design should consider a Grow&quot;}
+</span></div><div class="step" id="SD111"><span class="sid">D111</span><span class="kind">hook</span><span class="hook">SessionStart:resume said: milestone: none (no tasks/plan.md)
+draft (waiting for approval): docs/architecture.md, docs/packages/data/architecture.md, docs/packages/data/contract.md, docs/packages/data/pipelines.md, docs/packages/server/contract.md, +3 more
+dt: python3 /Users/connorott/plugins/dev-team-workspace/iteration-7/quant-incremental/with_skill/plugin/dev-team/scripts/dt.py
+</span></div>
+<h2>Commits</h2>
+<p>None.</p>
+<h2>Returned</h2>
+<pre>Nothing is left uncovered, and lint reports 0 errors. Both the architecture revision and the pipelines are written as Drafts, waiting on you.
+
+## 1. Architecture revision (the type list you said you&#x27;d approve)
+
+**New decision AD-14:** each build step hands the next a fixed, typed bundle of tables. Validation is split in two:
+- Row checks run **before** returns are derived, so a rejected price never produces a return.
+- Dataset checks and the pass/fail gate run **after**, because they need the returns.
+
+**Types added to the `data` contract (15), all internal to `data`:**
+
+| Type | What it holds |
+|---|---|
+| `BuildConfig` | The settings for one run |
+| `Download` | Vendor files as downloaded |
+| `SnapshotRef` | One saved snapshot |
+| `SnapshotSet` | The full snapshot plus later updates, in order |
+| `RawTables` | The vendor tables read back from snapshots |
+| `ReferenceLists` | The three hand-checked lists |
+| `TradingCalendar` | US exchange trading days |
+| `CanonicalTables` | The cleaned tables, keyed by permanent ID |
+| `CheckedTables` | Cleaned tables after row checks, with flags |
+| `DerivedTables` | Plus adjustment factors and returns |
+| `ValidatedDataset` | Plus the validation report |
+| `VersionInputs` | What a dataset version was built from |
+| `TickerSpans` | Which company held a ticker over which dates |
+| `MembershipSpans` | Index membership periods by known date |
+| `PriceRows` | Prices read for a load, before adjustment |
+
+**Types added to the `server` contract (6), all internal to `server`:**
+
+| Type | What it holds |
+|---|---|
+| `ServerConfig` | Port, data location, allowed origins |
+| `LoaderCache` | The open dataset version the views show |
+| `ServerApp` | The assembled backend app |
+| `LiveSession` | One accepted live-progress connection |
+| `StreamEnd` | How a live-progress connection ended |
+| `ContractSchema` | The exported contract |
+| `ContractCheck` | The result of the drift check |
+
+**Type added to `web` (1):** `Page`, which is what each flow renders.
+
+## 2. Pipelines
+
+| ID | Package | Workflow | Trigger | Steps |
+|---|---|---|---|---|
+| PL-04 | data | Full build | `qlab build`, or the app | 13 |
+| PL-05 | data | Update | `qlab update` | 15 |
+| PL-06 | data | Rebuild from snapshots | `qlab rebuild` | 12 |
+| PL-07 | data | Load point-in-time data | `Loader.panel(...)` | 5 |
+| PL-08 | server | Serve the app | `qlab-server` | 3 |
+| PL-09 | server | Stream run progress | a WebSocket connection | 3 |
+| PL-10 | server | Export the contract | `qlab-server export-contract --check` | 2 |
+| PL-11 | web | Explore a stock | search, or `/stocks/:id` | 6 |
+| PL-12 | web | Monitor a run | Start, or `/runs` | 5 |
+| PL-13 | web | Check data quality | `/quality` | 5 |
+
+The planned file layout is in each `pipelines.md`. Every package has one `pipeline.py` entry module (`pipeline.tsx` for `web`) and one module per step owner.
+
+## Assumptions
+- **Shared steps:** the update and rebuild pipelines reuse the full build&#x27;s steps (&quot;PL-04 as built&quot;). Only reading snapshots is extended, so update snapshots are merged over the full one by key.
+- **Update with nothing new:** if the fingerprint doesn&#x27;t change, publishing stores nothing and reports &quot;no new data&quot;.
+- **Lock and cleanup:** the run lock and the handler that cleans up on failure or cancel are set up in `begin_run`.
+- **Loading by ticker:** loading can take tickers. They&#x27;re resolved to the company that held each ticker on each date (the new `resolve_ids` step).
+- **Server endpoints:** they&#x27;re thin handlers mounted when the server app is built, not pipelines of their own.
+- **Web flows:** the three web flows are React route components, and the `api` steps are query hooks.
+- **Modules that own no step, by design:**
+  - In `data`: `errors` and `cli`.
+  - In `server`: `models` (the contract itself), `queries` and `runs_api`.
+  - In `web`: `design` and `charts`.
+  
+  `dt` lists these as `components_unowned`. Each is explained under Open questions in its package&#x27;s `pipelines.md`.
+
+## Open questions
+1. **The `data` package has outgrown one package.** It has 4 pipelines (the limit is 3) and 12 modules, and its contract is 273 lines (the ceiling is 200). The `server` contract is just over too, at 204 lines.
+   
+   **My recommendation:** split `data` now, while no code exists:
+   - **`data`** is the read side: the loader, version registry reads, the calendar, the shared types and errors. Research code depends on this alone.
+   - **`build`** is the write side: sources, snapshots, cleaning, validation, deriving, exploration, publishing, runs and the `qlab` command line. `build` depends on `data`.
+   
+   That keeps each package&#x27;s docs small enough for the agents that build it, and makes the read side impossible to change by accident. It&#x27;s one more architecture round, the &quot;Grow&quot; step, and it would move PL-04 to PL-06 into `build`.
+   
+   Default: **split now**. The other choice is to accept the size, with a note in the architecture.
+2. **Possible split inside cleaning.** `clean.canonical` may pass the 500-line module limit. If it does, it gets split into one step per group of tables.
+
+Do you approve the revision and the pipelines, and should I split `data` now or keep it as one package?</pre>
+</body></html>

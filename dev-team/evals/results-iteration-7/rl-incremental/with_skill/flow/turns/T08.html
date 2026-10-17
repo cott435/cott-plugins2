@@ -1,0 +1,733 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1"><title>T08 turn</title>
+<style>
+:root{--bg:#fbfbfa;--fg:#1d1d1f;--muted:#6b6b70;--line:#d9d9de;--box:#fff;--rowp:#eef3fb;--band:#fff4d6;
+--ok:#2e7d32;--bad:#c62828;--warn:#b26a00;--idle:#6b6b70}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#17171a;--fg:#ececf0;--muted:#9a9aa3;
+--line:#34343a;--box:#222227;--rowp:#1d2433;--band:#3a3015;--ok:#6fcf73;--bad:#ff6b6b;--warn:#f0b35a;--idle:#9a9aa3}}
+:root[data-theme="dark"]{--bg:#17171a;--fg:#ececf0;--muted:#9a9aa3;--line:#34343a;--box:#222227;--rowp:#1d2433;
+--band:#3a3015;--ok:#6fcf73;--bad:#ff6b6b;--warn:#f0b35a;--idle:#9a9aa3}
+body{margin:0;padding:16px;background:var(--bg);color:var(--fg);font:14px/1.45 -apple-system,system-ui,sans-serif}
+h1{font-size:18px;margin:0 0 4px}h2{font-size:15px;margin:22px 0 8px}.sub{color:var(--muted)}
+table{border-collapse:collapse;margin:4px 0 8px}td,th{border-bottom:1px solid var(--line);padding:4px 10px;text-align:left;
+vertical-align:top}th{color:var(--muted);font-weight:600}.chips span{display:inline-block;margin:0 4px 2px 0}
+.legend span{margin-right:14px;white-space:nowrap}.sw{display:inline-block;width:10px;height:10px;border-radius:2px;
+margin-right:4px;vertical-align:-1px}.scroll{overflow:auto;max-height:88vh;border:1px solid var(--line);border-radius:8px}
+.chart{display:grid;width:max-content}.chart>div{line-height:0}.corner{position:sticky;top:0;left:0;z-index:3}
+.colhead{position:sticky;top:0;z-index:2}.rowhead{position:sticky;left:0;z-index:2}
+svg.bg{background:var(--bg)}.colhead svg{border-bottom:1px solid var(--line)}.rowhead svg{border-right:1px solid var(--line)}
+.ok{color:var(--ok);fill:var(--ok)}.bad{color:var(--bad);fill:var(--bad)}.warn{color:var(--warn);fill:var(--warn)}
+.idle{color:var(--idle);fill:var(--idle)}
+svg text{fill:var(--fg);font-family:-apple-system,system-ui,sans-serif}
+.box{fill:var(--box);stroke:var(--line)}.unit:hover .box{stroke:var(--fg)}
+.role{font-size:12px;font-weight:600}.uid,.wmeta,.lmeta,.meta{font-size:10px;fill:var(--muted)}
+.sub{font-size:10.5px;fill:var(--muted)}.badge{font-size:11px;font-weight:600}
+.meta.bad{fill:var(--bad);font-weight:600}.lane{font-size:13px;font-weight:700}.wave{font-size:13px;font-weight:700}
+.par{fill:#4e79a7}.ser{fill:var(--muted)}.rowp{fill:var(--rowp)}.rows{fill:transparent}.band{fill:var(--band)}
+.bandt{font-size:11.5px}.grid{stroke:var(--line)}.link{stroke:var(--muted);stroke-width:1.2;opacity:.55}
+.arrowhead{fill:var(--muted)}.marks{font-size:10.5px}.audit{stroke:var(--box);stroke-width:2}.auditn{font-size:10px;font-weight:700;fill:#fff}
+a{color:inherit}svg a .box{cursor:pointer}
+
+:root{--c0:#2a78d6;--c1:#eb6834;--c2:#1baf7a;--c3:#eda100;--c4:#e87ba4;--c5:#008300;--c6:#6250d6;--c7:#e34948;
+--cx:#8a8985;--main:#52514e;--read:#dcdbd5;--readfg:#1d1d1f}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--c0:#3987e5;--c1:#d95926;--c2:#199e70;
+--c3:#c98500;--c4:#d55181;--c5:#008300;--c6:#9085e9;--c7:#e66767;--cx:#77766f;--main:#c3c2b7;--read:#3b3b40;
+--readfg:#ececf0}}
+:root[data-theme="dark"]{--c0:#3987e5;--c1:#d95926;--c2:#199e70;--c3:#c98500;--c4:#d55181;--c5:#008300;
+--c6:#9085e9;--c7:#e66767;--cx:#77766f;--main:#c3c2b7;--read:#3b3b40;--readfg:#ececf0}
+.c0{fill:var(--c0);background:var(--c0)}.c1{fill:var(--c1);background:var(--c1)}.c2{fill:var(--c2);background:var(--c2)}
+.c3{fill:var(--c3);background:var(--c3)}.c4{fill:var(--c4);background:var(--c4)}.c5{fill:var(--c5);background:var(--c5)}
+.c6{fill:var(--c6);background:var(--c6)}.c7{fill:var(--c7);background:var(--c7)}.cx{fill:var(--cx);background:var(--cx)}
+.cmain{fill:var(--main)}.sc0{stroke:var(--c0)}.sc1{stroke:var(--c1)}.sc2{stroke:var(--c2)}
+.tl text,.sm text,.lc text{font-size:10.5px;fill:var(--muted)}.tl .lbl-in,.sm .lbl-in{fill:#fff;font-size:10.5px;font-weight:600}
+.tl .rowl,.sm .rowl,.lc .rowl{fill:var(--fg);font-size:11.5px;font-weight:600}.tl .band{fill:var(--rowp)}
+.tl .brk{stroke:var(--muted);stroke-dasharray:2 3}.tl a:hover rect,.sm a:hover rect{stroke:var(--fg);stroke-width:1.5}
+.axis{stroke:var(--line)}.sm .val{fill:var(--fg);font-weight:600}.lc path.ln{fill:none;stroke-width:2}
+.lc circle{stroke:var(--bg);stroke-width:2}.lc .end{font-weight:600;fill:var(--fg)}
+.tiles{display:flex;flex-wrap:wrap;gap:10px;margin:12px 0}.tile{border:1px solid var(--line);border-radius:8px;
+padding:8px 12px;min-width:110px;background:var(--box)}.tile b{display:block;font-size:20px;line-height:1.2}
+.tile span{font-size:12px;color:var(--muted)}.tile i{font-style:normal;font-size:12px;margin-left:6px}
+.fm{border-collapse:separate;border-spacing:2px}.fm td,.fm th{border:0;padding:0;text-align:center;font-size:11px}
+.fm th{padding:0 2px;font-weight:600}.fm td.f,.fm th.f{text-align:left;padding-right:10px;white-space:nowrap;
+position:sticky;left:0;background:var(--bg);font:11.5px ui-monospace,Menlo,monospace;
+max-width:380px;overflow:hidden;text-overflow:ellipsis}
+.fm td.cell{min-width:22px;height:20px;border-radius:3px}.fm td.fw{background:var(--c0);color:#fff;font-weight:700}
+.fm td.fe{background:var(--c1);color:#fff;font-weight:700}.fm td.fr{background:var(--read);color:var(--readfg)}
+.fm td.n{color:var(--muted);padding:0 6px}.fm tr.grp td{text-align:left;padding-top:8px;color:var(--muted);
+font-weight:600}
+.key{display:inline-block;min-width:18px;text-align:center;border-radius:3px;font-size:11px;margin-right:4px}
+.bar{display:inline-block;height:9px;border-radius:2px;vertical-align:0}
+
+pre{white-space:pre-wrap;word-break:break-word;background:var(--box);border:1px solid var(--line);border-radius:6px;
+padding:8px 10px;margin:4px 0;font:12px/1.45 ui-monospace,SFMono-Regular,Menlo,monospace;max-width:100%;overflow:auto}
+.step{border-top:1px solid var(--line);padding:6px 0}.step:target{background:var(--rowp)}
+.sid{font:12px ui-monospace,Menlo,monospace;color:var(--muted);margin-right:8px}.kind{font-weight:600;margin-right:8px}
+.err{color:var(--bad);font-weight:600}.hook{color:var(--bad);margin:4px 0 0 16px}.lbl{font-size:12px;color:var(--muted);margin-top:6px}
+details summary{cursor:pointer;color:var(--muted);font-size:12px}.head td:first-child{color:var(--muted)}
+.top{font-size:13px}.narr{list-style:none;padding-left:0}.narr li{margin:3px 0}
+</style></head>
+<body>
+<p class="top"><a href="../flow.html">← the run's flow chart</a></p>
+<p class="top"><a href="../plan/T08.html">The plan as of T08</a>: this turn changed the plan (+36 ~0 −0) · <a href="../plan/index.html">plan map</a></p>
+<h1>T08 · turn · Option 1, all of them (recommended). Go ahead and write pipelines.md.</h1>
+<table class="head"><tr><td>Type</td><td>turn</td></tr><tr><td>Description</td><td>Option 1, all of them (recommended). Go ahead and write pipelines.md.</td></tr><tr><td>Spawned by</td><td>user</td></tr><tr><td>Model</td><td>claude-opus-5-5</td></tr><tr><td>Start</td><td>2026-10-17 17:28:51 UTC</td></tr><tr><td>Duration</td><td>4 min</td></tr><tr><td>Tool calls</td><td>8</td></tr><tr><td>Errors</td><td>0</td></tr><tr><td>Hook blocks</td><td>2</td></tr><tr><td>Tokens</td><td>22.5k out · 34.6k new in · 1.1M cached in · peak context 156k</td></tr><tr><td>Skills invoked</td><td>none</td></tr><tr><td>Files written or edited</td><td>docs/packages/gridlab/pipelines.md</td></tr><tr><td>Definition</td><td>none</td></tr><tr><td>Steps</td><td>14</td></tr><tr><td>Finished</td><td>yes</td></tr></table>
+
+
+<h2>Prompt</h2>
+<pre>Option 1, all of them (recommended). Go ahead and write pipelines.md.</pre>
+<h2>Files</h2>
+<table><tr><th>Op</th><th>File</th><th>Calls</th><th>By</th><th>Via</th><th>Steps</th></tr><tr><td>write</td><td><code>docs/packages/gridlab/pipelines.md</code></td><td>1</td><td>main</td><td>Write</td><td><a href="#D72">D72</a></td></tr><tr><td>edit</td><td><code>docs/packages/gridlab/pipelines.md</code></td><td>1</td><td>main</td><td>Edit</td><td><a href="#D75">D75</a></td></tr><tr><td>read</td><td><code>../plugin/dev-team/scripts/devteam/commands/lint.py</code></td><td>2</td><td>main</td><td>Bash</td><td><a href="#D70">D70</a> <a href="#D70">D70</a></td></tr><tr><td>read</td><td><code>../plugin/dev-team/skills/pipeline-design/references/examples-new.md</code></td><td>1</td><td>main</td><td>Bash</td><td><a href="#D66">D66</a></td></tr><tr><td>read</td><td><code>docs/packages/gridlab/contract.md</code></td><td>1</td><td>main</td><td>Bash</td><td><a href="#D66">D66</a></td></tr></table>
+<h2>Steps</h2>
+<div class="step" id="SD65"><span class="sid">D65</span><span class="kind">user</span>Option 1, all of them (recommended). Go ahead and write pipelines.md.<details><summary>full text</summary><pre>Option 1, all of them (recommended). Go ahead and write pipelines.md.</pre></details></div><div class="step" id="SD66"><span class="sid">D66</span><span class="kind">Bash</span>git status --short; git log --oneline -3; head -4 docs/packages/gridlab/contract.md; cat ../plugin/dev-team/skills/pipeline-design/references/examples-new.md | head -120<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;git status --short; git log --oneline -3; head -4 docs/packages/gridlab/contract.md; cat ../plugin/dev-team/skills/pipeline-design/references/examples-new.md | head -120&quot;,
+  &quot;description&quot;: &quot;Check repo state and read pipeline example&quot;
+}</pre><div class="lbl">output</div><pre>c33c704 turn 7
+5d726d7 turn 6
+e14cfab turn 5
+# gridlab — Contract
+
+**Package:** gridlab · **Status:** Approved · **Last updated:** 2026-10-17 · **Architecture:** [../../architecture.md](../../architecture.md)
+
+# New: worked examples
+
+Two New rounds, each from `dt status` to the gate. The format is `template.md`.
+
+## Example 1: Quant Lab, M1 (New, single package)
+
+**Context:** the architecture is Approved, single package `quant`, components `data`, `stats`, `portfolio`. M1 covers DATA-01, DATA-02, STAT-01–STAT-04, QR-01, QR-02. `portfolio` is M2.
+
+```
+$ dt status --skill pipeline-design
+skill: pipeline-design
+mode: new
+next ids: AD-04 PL-01 TC-01 M3
+packages: quant=new
+uncovered_ids: none  (and the other lists: none)
+```
+
+In New mode the lists stay empty until the gate&#x27;s re-run; the scope comes from the architecture&#x27;s Covers.
+
+**Interview:**
+
+```
+Candidates for M1 (nothing is written until you confirm):
+1. `load` — pull prices for a universe and date range                 M1
+2. `cov-report` — PCA and MP cleaning on loaded returns                M1
+3. `backtest` — min-variance vs equal weight out of sample             M2 (later)
+Q:       Which will you actually run in M1?   (multi-select; recommended: 1, 2)
+User:    1 and 2. And the report should be runnable on its own; it can load prices itself.
+
+Q:       Should `cov-report` read prices saved by `load`, or call the loader directly?
+GUESS:   call it directly; a separate cache step is more than M1 needs.
+DEFAULT: call it directly.
+User:    Directly.
+```
+
+**`contract.md` after the write** (only `Used by:` changes; each step-table type already has its `type` section):
+
+```markdown
+### stats.estimate_cov: Covariance estimate
+`def estimate_cov(returns: Returns, *, method: CovMethod = &quot;sample&quot;) -&gt; Cov`
+- **Invariants:** N×N for T×N input; symmetric; positive semi-definite
+- **Errors:** `ValueError` if T &lt; 2 or the input contains NaN
+- **Used by:** portfolio; PL-02
+```
+
+**Result — `docs/packages/quant/pipelines.md`:**
+
+````markdown
+# quant — Pipelines
+
+**Package:** quant · **Status:** Draft · **Last updated:** 2026-10-16 · **Contract:** [contract.md](contract.md)
+
+## PL-01: Load prices
+**Entry:** `src/quant/data/pipeline.py::run_load_prices` · **Trigger:** `python -m quant.data load`
+**Covers:** DATA-01, DATA-02, QR-01
+
+| # | Step | Owner | In → Out | Spine version | Covers |
+|---|---|---|---|---|---|
+| 1 | `read_raw` | data.raw | dates → RawPrices | read a synthetic CSV | DATA-01 |
+| 2 | `apply_universe` | data.universe | RawPrices, dates → Prices | static universe, no delistings | DATA-02 |
+| 3 | `save_prices` | data.store | Prices → path | one Parquet file per run | DATA-01 |
+
+### Entry sketch (pre-build — removed by spine task)
+```python
+def run_load_prices(cfg: LoadConfig) -&gt; Path:
+    rows = read_raw(cfg.start, cfg.end)
+    prices = apply_universe(rows, cfg.start, cfg.end)
+    return save_prices(prices, cfg.out)
+```
+
+## PL-02: Covariance report
+**Entry:** `src/quant/stats/pipeline.py::run_cov_report` · **Trigger:** `python -m quant.stats cov-report`
+**Covers:** STAT-01–STAT-04, QR-02
+
+| # | Step | Owner | In → Out | Spine version | Covers |
+|---|---|---|---|---|---|
+| 1 | `load_prices` | data | universe, dates → Prices | PL-01 as built | DATA-01 |
+| 2 | `estimate_cov` | stats.cov | Returns → Cov | sample covariance | STAT-02 |
+| 3 | `clean_eigen` | stats.rmt | Cov, T → Cov | no cleaning (baseline) | STAT-03 |
+| 4 | `pca` | stats.pca | Cov → Factors | full eigendecomposition | STAT-01 |
+| 5 | `write_report` | stats.report | Factors → CovReport | print table | STAT-04 |
+
+### Entry sketch (pre-build — removed by spine task)
+```python
+def run_cov_report(cfg: CovConfig) -&gt; CovReport:
+    prices = load_prices(cfg.universe, cfg.start, cfg.end)
+    cov = estimate_cov(prices.returns())
+    cov = clean_eigen(cov, n_obs=len(prices))
+    factors = pca(cov)
+    return write_report(factors, cfg.out)
+```
+
+## Planned layout (pre-build — removed by spine task)
+```
+src/quant/
+  data/
+    __init__.py   contract exports only (load_prices, Prices)
+    __main__.py   CLI: load
+    pipeline.py   PL-01 entry
+    raw.py  universe.py  store.py
+  stats/
+    __init__.py   contract exports only (estimate_cov, clean_eigen)
+    __main__.py   CLI: cov-report
+    pipeline.py   PL-02 entry
+    cov.py  rmt.py  pca.py  report.py
+tests/intent/quant/  tests/unit/quant/
+```
+
+## Open questions
+- Should `clean_eigen` take T from Returns instead of a parameter? (assumed: parameter)
+
+## Retired
+````
+
+**Review gate message:**
+
+```
+Wrote docs/packages/quant/pipelines.md (Draft).
+- PL-01 Load prices · `python -m quant.data load` · read_raw → apply_universe → save_prices
+- PL-02 Covariance report · `python -m quant.stats cov-report` · load_prices → estimate_cov → clean_eigen → pca → write_report</pre></details></div><div class="step" id="SD67"><span class="sid">D67</span><span class="kind">Bash</span>cd /Users/connorott/plugins/dev-team-workspace/iteration-7/rl-incremental/with_skill/plugin/dev-team/scripts &amp;&amp; grep -n &quot;run_\|step-io-types\|def _lint_pipel\|budget&quot; dt.py | head -60<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;cd /Users/connorott/plugins/dev-team-workspace/iteration-7/rl-incremental/with_skill/plugin/dev-team/scripts &amp;&amp; grep -n \&quot;run_\\|step-io-types\\|def _lint_pipel\\|budget\&quot; dt.py | head -60&quot;,
+  &quot;description&quot;: &quot;Inspect dt lint rules for pipelines&quot;
+}</pre><div class="lbl">output</div><pre>Shell cwd was reset to /Users/connorott/plugins/dev-team-workspace/iteration-7/rl-incremental/with_skill/project</pre></details></div><div class="step" id="SD68"><span class="sid">D68</span><span class="kind">Bash</span>cd /Users/connorott/plugins/dev-team-workspace/iteration-7/rl-incremental/with_skill/plugin/dev-team/scripts &amp;&amp; ls; grep -rln &quot;step-io-types&quot; . | head;<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;cd /Users/connorott/plugins/dev-team-workspace/iteration-7/rl-incremental/with_skill/plugin/dev-team/scripts &amp;&amp; ls; grep -rln \&quot;step-io-types\&quot; . | head; &quot;,
+  &quot;description&quot;: &quot;Locate lint rule implementation&quot;
+}</pre><div class="lbl">output</div><pre>README.md
+devteam
+dt.py
+README.md
+devteam/commands/lint.py
+Shell cwd was reset to /Users/connorott/plugins/dev-team-workspace/iteration-7/rl-incremental/with_skill/project</pre></details></div><div class="step" id="SD69"><span class="sid">D69</span><span class="kind">Bash</span>cd /Users/connorott/plugins/dev-team-workspace/iteration-7/rl-incremental/with_skill/plugin/dev-team/scripts/devteam &amp;&amp; grep -n &quot;step-io-types\|run_\|budget\|entry&quot; commands/lint.py | head -40<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;cd /Users/connorott/plugins/dev-team-workspace/iteration-7/rl-incremental/with_skill/plugin/dev-team/scripts/devteam &amp;&amp; grep -n \&quot;step-io-types\\|run_\\|budget\\|entry\&quot; commands/lint.py | head -40&quot;,
+  &quot;description&quot;: &quot;Read pipeline lint rule details&quot;
+}</pre><div class="lbl">output</div><pre>1:&quot;&quot;&quot;Check the planning docs: IDs, references, size budgets, task rules, fences and headers.
+25:    &quot;dup-id&quot;: &quot;E&quot;, &quot;missing-ref&quot;: &quot;E&quot;, &quot;retired-ref&quot;: &quot;E&quot;, &quot;budget&quot;: &quot;W&quot;, &quot;grow-size&quot;: &quot;W&quot;, &quot;approved-edit&quot;: &quot;W&quot;,
+28:    &quot;step-io-types&quot;: &quot;E&quot;, &quot;verify-smoke&quot;: &quot;E&quot;, &quot;todo-mismatch&quot;: &quot;E&quot;,
+36:# Size budgets (planning-stage.md §3), in lines. Package docs are budgeted per unit (lines per unit × units +
+245:def _unit_budget(doc) -&gt; tuple[int, str]:
+246:    &quot;&quot;&quot;(budget in lines, how it was worked out) for a contract, pipelines or tests doc.&quot;&quot;&quot;
+254:def check_budget(ctx: Context):
+258:            yield _p(doc, 0, &quot;budget&quot;, f&quot;{len(doc.lines)} lines, budget {limit} ({doc.kind})&quot;)
+260:            limit, how = _unit_budget(doc)
+262:                yield _p(doc, 0, &quot;budget&quot;, f&quot;{len(doc.lines)} lines, budget {limit} ({how})&quot;)
+272:                        yield _p(doc, h.line, &quot;budget&quot;, f&quot;{h.id} section is {n} lines, budget {ROADMAP_SECTION_MAX}&quot;)
+280:                    yield _p(doc, docs_h.line, &quot;budget&quot;, f&quot;doc map is {n} lines, budget {AGENTS_DOC_MAP_MAX}&quot;)
+440:                         f&quot;{tc.id} Fixture {rel}/ is {size // 1024} KB (budget 100 KB; store large data as path + hash)&quot;)
+446:                yield Problem(rel + &quot;/&quot;, 0, &quot;fixture-size&quot;, f&quot;{size // 1024} KB (budget 100 KB)&quot;)
+452:    &quot;&quot;&quot;An RF entry with no File, or whose file is gone (reference-intake retires it).&quot;&quot;&quot;
+461:    &quot;&quot;&quot;An RF entry whose Hash isn&#x27;t the file&#x27;s current one (or is unstamped).&quot;&quot;&quot;
+670:    tracks don&#x27;t add up, so the total task count isn&#x27;t capped (the plan&#x27;s line budget bounds it).&quot;&quot;&quot;
+706:    must not write the same path, across the whole plan; a shared file (`__init__.py`, `types.py`, an entry
+708:    entries = {p.entry_file for p in ctx.pipelines.values() if p.entry_file}
+819:    one: the boundaries an interface task freezes (entry arguments on the In side may stay plain). A project with
+828:                        yield Problem(doc.rel, s.line + 1, &quot;step-io-types&quot;,
+832:                    yield Problem(doc.rel, s.line + 1, &quot;step-io-types&quot;,
+933:    check_budget, check_approved_edit, check_prebuild_left,
+1005:        return run_hook(sys.stdin.read())
+1027:def run_hook(stdin_text: str) -&gt; int:
+Shell cwd was reset to /Users/connorott/plugins/dev-team-workspace/iteration-7/rl-incremental/with_skill/project</pre></details></div><div class="step" id="SD70"><span class="sid">D70</span><span class="kind">Bash</span>cd /Users/connorott/plugins/dev-team-workspace/iteration-7/rl-incremental/with_skill/plugin/dev-team/scripts/devteam &amp;&amp; sed -n 240,265p commands/lint.py; sed -n 810,840p commands/lint.py<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;cd /Users/connorott/plugins/dev-team-workspace/iteration-7/rl-incremental/with_skill/plugin/dev-team/scripts/devteam &amp;&amp; sed -n 240,265p commands/lint.py; sed -n 810,840p commands/lint.py&quot;,
+  &quot;description&quot;: &quot;Read budget and step-io-types checks&quot;
+}</pre><div class="lbl">output</div><pre>    if doc.kind == &quot;pipelines&quot;:
+        return len(model.pipelines(doc))
+    return len(model.test_cases(doc))
+
+
+def _unit_budget(doc) -&gt; tuple[int, str]:
+    &quot;&quot;&quot;(budget in lines, how it was worked out) for a contract, pipelines or tests doc.&quot;&quot;&quot;
+    per, allowance, unit = UNIT_BUDGETS[doc.kind]
+    n = _units(doc)
+    layout = sum(h.end - h.line for h in doc.prebuild_sections() if h.level == 2) if doc.kind == &quot;pipelines&quot; else 0
+    how = f&quot;{per} per {unit} × {n} + {allowance}&quot; + (f&quot; + {layout} layout&quot; if layout else &quot;&quot;)
+    return per * n + allowance + layout, how
+
+
+def check_budget(ctx: Context):
+    for doc in ctx.scoped_docs:
+        limit = BUDGETS.get(doc.kind)
+        if limit and len(doc.lines) &gt; limit:
+            yield _p(doc, 0, &quot;budget&quot;, f&quot;{len(doc.lines)} lines, budget {limit} ({doc.kind})&quot;)
+        if doc.kind in UNIT_BUDGETS:
+            limit, how = _unit_budget(doc)
+            if len(doc.lines) &gt; limit:
+                yield _p(doc, 0, &quot;budget&quot;, f&quot;{len(doc.lines)} lines, budget {limit} ({how})&quot;)
+            ceiling = GROW_CEILINGS[doc.kind]
+            if len(doc.lines) &gt; ceiling:
+                yield _p(doc, 0, &quot;grow-size&quot;, f&quot;{len(doc.lines)} lines, over the {ceiling}-line ceiling for one &quot;
+                    yield _p(doc, line, &quot;edges&quot;, f&quot;{t.id} depends on {dep}, but its graph row is mitigated by &quot;
+                             f&quot;{e.mitigated_by}: a mitigated edge doesn&#x27;t order, drop the dependency&quot;)
+                elif e is None and not (dep in by_id and by_id[dep].kind == &quot;interface&quot;):
+                    where = &quot;no ## Dependency graph section&quot; if section is None else &quot;no graph row&quot;
+                    yield _p(doc, line, &quot;edges&quot;, f&quot;{t.id} depends on {dep} with {where} saying why (kind, `none: &lt;reason&gt;`)&quot;)
+
+
+def check_step_io_types(ctx: Context):
+    &quot;&quot;&quot;Every type a package step&#x27;s `In → Out` cell names is a contract type section, and every step&#x27;s Out names
+    one: the boundaries an interface task freezes (entry arguments on the In side may stay plain). A project with
+    no type sections yet gets warnings, not errors.&quot;&quot;&quot;
+    types = model.contract_types(ctx.repo)
+    sev = &quot;&quot; if types else &quot;W&quot;
+    for doc in ctx.repo.docs(&quot;pipelines&quot;):
+        for p in model.pipelines(doc):
+            for s in p.steps:
+                for name in s.in_types + s.out_types:
+                    if model.resolve_type(types, name) is None:
+                        yield Problem(doc.rel, s.line + 1, &quot;step-io-types&quot;,
+                                      f&quot;{p.id} step `{s.name}` names {name}, which no contract.md type section &quot;
+                                      f&quot;defines (`### &lt;component&gt;.{name.rsplit(&#x27;.&#x27;, 1)[-1]}: type`)&quot;, sev)
+                if not s.out_types:
+                    yield Problem(doc.rel, s.line + 1, &quot;step-io-types&quot;,
+                                  f&quot;{p.id} step `{s.name}`: its Out names no contract type&quot;, sev)
+
+
+def _smoke_due(t: model.Task, pl: str, wired_before: dict[str, set[str]]) -&gt; bool:
+    &quot;&quot;&quot;Whether the task&#x27;s Verify must run pipeline `pl`&#x27;s smoke command. Wiring and system tasks do, and so does
+    any other task whose `Depends on` reaches `pl`&#x27;s wiring task; interface and spine tasks, and thicken tasks
+    beside the wiring, land before the pipeline runs. A task with no Kind: every task outside Phase 0.&quot;&quot;&quot;
+    if not t.kind:
+Shell cwd was reset to /Users/connorott/plugins/dev-team-workspace/iteration-7/rl-incremental/with_skill/project</pre></details></div><div class="step" id="SD71"><span class="sid">D71</span><span class="kind">think</span>I&#x27;m writing all nine pipelines now. I noticed some contract symbols don&#x27;t satisfy the lint rule requiring step outputs to be contract types—I&#x27;ll list the needed changes at the end, since per the skill&#x27;s rules those must be routed back to `architecture-design` rather than edited here.<details><summary>full text</summary><pre>I&#x27;m writing all nine pipelines now. I noticed some contract symbols don&#x27;t satisfy the lint rule requiring step outputs to be contract types—I&#x27;ll list the needed changes at the end, since per the skill&#x27;s rules those must be routed back to `architecture-design` rather than edited here.
+
+</pre></details></div><div class="step" id="SD72"><span class="sid">D72</span><span class="kind">Write</span>/Users/connorott/plugins/dev-team-workspace/iteration-7/rl-incremental/with_skill/project/docs/packages/gridlab/pipelines.md (201 lines)<div class="lbl">wrote /Users/connorott/plugins/dev-team-workspace/iteration-7/rl-incremental/with_skill/project/docs/packages/gridlab/pipelines.md</div><pre># gridlab — Pipelines
+
+**Package:** gridlab · **Status:** Draft · **Last updated:** 2026-10-17 · **Contract:** [contract.md](contract.md)
+
+## PL-01: Train one run
+**Entry:** `src/gridlab/train/pipeline.py::run_train` · **Trigger:** `gridlab train --env snake --level L3 --agent dqn --seed 1 --steps 200000`
+**Covers:** TRAIN-01, TRAIN-03–TRAIN-07, CORE-01–CORE-07, SNAKE-01–SNAKE-15, CORR-01–CORR-03, BASE-01–BASE-04, TAB-01–TAB-05, DQN-01–DQN-09, DQN-11, EVAL-01, QR-01–QR-05
+
+| # | Step | Owner | In → Out | Spine version | Covers |
+|---|---|---|---|---|---|
+| 1 | `make_env` | experiments.build | env name, level, overrides → Env | name lookup: corridor, or snake with `LEVELS[level]` plus overrides | CORE-01–CORE-04, SNAKE-01–SNAKE-15, CORR-01, CORR-02, QR-03 |
+| 2 | `make_agent` | experiments.build | agent name, Env, seed, overrides → Agent | name lookup: random, greedy, tabular, dqn; overrides applied with `dataclasses.replace` | CORE-05, BASE-01–BASE-03, TAB-01–TAB-05, DQN-01–DQN-09 |
+| 3 | `RunWriter.create` | runstore.writer | RunConfig → RunWriter | exclusive `mkdir` of `seed&lt;N&gt;-&lt;timestamp&gt;`, `config.json` with `complete: false` | TRAIN-04, QR-05 |
+| 4 | `train_agent` | train.loop | Env, Agent, RunConfig, RunWriter → Agent | one environment, plain step loop: act with exploration → step → `observe(Transition)` → episode row; a learning-curve point on `CURVE_EVAL_SEEDS` every `eval_every` steps; one progress line every 10 s; Ctrl-C closes the run incomplete; no-op when `steps == 0` | TRAIN-01, TRAIN-03, TRAIN-05, TRAIN-07, CORE-07, QR-01, QR-02, QR-04 |
+| 5 | `evaluate` | evaluate.score | Agent, Env → EvalResult | 100 greedy episodes on `FINAL_EVAL_SEEDS` | EVAL-01, BASE-04 |
+| 6 | `record_highlights` | train.highlights | Agent, Env, EvalResult → Recording | replay the best- and median-scoring evaluation seeds with `record_episode` | TRAIN-06 |
+| 7 | `save_outputs` | train.outputs | RunWriter, Agent, EvalResult, Recording → RunDir | `final_eval.json`, the agent, `best`/`median` recordings, then `complete: true` | TRAIN-04, CORE-06 |
+
+### Entry sketch (pre-build — removed by spine task)
+```python
+def run_train(config: RunConfig, root: Path = Path(&quot;runs&quot;), progress: bool = True) -&gt; RunDir:
+    env = make_env(config.env, config.level, **config.env_overrides)
+    agent = make_agent(config.agent, env, config.seed, **config.agent_overrides)
+    writer = RunWriter.create(root, config)
+    agent = train_agent(env, agent, config, writer, progress=progress)
+    result = evaluate(agent, env)
+    best, median = record_highlights(agent, env, result)
+    return save_outputs(writer, agent, result, best, median)
+```
+
+## PL-02: Run a preset experiment set
+**Entry:** `src/gridlab/train/pipeline.py::run_preset` · **Trigger:** `gridlab preset dqn-l3` (also `corridor-sanity`, `tabular-l1`, `tabular-l2`, `ablations-l3`)
+**Covers:** TRAIN-02, TAB-07, DQN-10, ABL-01, ABL-02, CORR-04, QR-01, QR-02
+
+| # | Step | Owner | In → Out | Spine version | Covers |
+|---|---|---|---|---|---|
+| 1 | `get_preset` | experiments.presets | preset name → ExperimentSet | dictionary lookup; `ValueError` listing the names | ABL-01, ABL-02, CORR-04 |
+| 2 | `train_set` | train.sets | ExperimentSet, runs root → RunDir | every `RunConfig` in order through PL-01 as built; already-complete runs are kept, never skipped silently | TRAIN-02, TAB-07, DQN-10 |
+
+### Entry sketch (pre-build — removed by spine task)
+```python
+def run_preset(name: str, root: Path = Path(&quot;runs&quot;)) -&gt; list[RunDir]:
+    experiment = get_preset(name)
+    return train_set(experiment, root)
+```
+
+## PL-03: Write comparison inputs
+**Entry:** `src/gridlab/compare/pipeline.py::run_compare` · **Trigger:** `gridlab compare dqn-l3`, then run the `null-hypothesis-testing` skill on the written `inputs.json`
+**Covers:** EVAL-02, ABL-03, TAB-07, DQN-10
+
+| # | Step | Owner | In → Out | Spine version | Covers |
+|---|---|---|---|---|---|
+| 1 | `get_preset` | experiments.presets | preset name → ExperimentSet | PL-02 as built | — |
+| 2 | `write_comparisons` | compare.inputs | ExperimentSet, runs root, reports root → Artifact | one `ComparisonInput` per pair from complete runs&#x27; `final_eval.json`; &quot;greater&quot; for agent vs baseline, &quot;two-sided&quot; for ablation vs full (AD-08) | EVAL-02, ABL-03 |
+
+### Entry sketch (pre-build — removed by spine task)
+```python
+def run_compare(name: str, runs_root: Path = Path(&quot;runs&quot;), reports_root: Path = Path(&quot;reports&quot;)) -&gt; Artifact:
+    experiment = get_preset(name)
+    return write_comparisons(name, experiment, runs_root=runs_root, reports_root=reports_root)
+```
+
+## PL-04: Build the results report
+**Entry:** `src/gridlab/compare/pipeline.py::run_report` · **Trigger:** `gridlab report dqn-l3` (after the skill wrote `verdicts.json`)
+**Covers:** EVAL-02, EVAL-04, ABL-03
+
+| # | Step | Owner | In → Out | Spine version | Covers |
+|---|---|---|---|---|---|
+| 1 | `results_table` | compare.table | report dir → ResultsTable | join `verdicts.json` (Verdict) with each group&#x27;s mean ± sd; pass/fail or ablation outcome; &quot;underpowered&quot; flag under 5 seeds; write `table.md` | EVAL-02, EVAL-04, ABL-03 |
+
+### Entry sketch (pre-build — removed by spine task)
+```python
+def run_report(report_dir: Path) -&gt; ResultsTable:
+    return results_table(report_dir)
+```
+
+## PL-05: Plot learning curves
+**Entry:** `src/gridlab/plots/pipeline.py::run_plot` · **Trigger:** `gridlab plot dqn-l3`
+**Covers:** EVAL-03, ABL-04
+
+| # | Step | Owner | In → Out | Spine version | Covers |
+|---|---|---|---|---|---|
+| 1 | `get_preset` | experiments.presets | preset name → ExperimentSet | PL-02 as built | — |
+| 2 | `learning_curve` | plots.curves | ExperimentSet, runs root, out dir → Artifact | Matplotlib lines from `curve.csv`: faint per seed, bold mean, baseline final means as labeled horizontal lines; styled per the `dataviz` skill; PNG | EVAL-03 |
+| 3 | `ablation_curves` | plots.curves | ExperimentSet, runs root, out dir → Artifact | mean line per learning group with the baselines; returns None for a set with one learning group | ABL-04 |
+
+### Entry sketch (pre-build — removed by spine task)
+```python
+def run_plot(name: str, runs_root: Path = Path(&quot;runs&quot;), reports_root: Path = Path(&quot;reports&quot;)) -&gt; tuple[Artifact, Artifact | None]:
+    experiment = get_preset(name)
+    curve = learning_curve(experiment, runs_root, reports_root / name)
+    overlay = ablation_curves(experiment, runs_root, reports_root / name)
+    return curve, overlay
+```
+
+## PL-06: View a recording
+**Entry:** `src/gridlab/viewer/pipeline.py::run_view` · **Trigger:** `gridlab view runs/.../recordings/best.npz`
+**Covers:** VIEW-01–VIEW-03, VIEW-06
+
+| # | Step | Owner | In → Out | Spine version | Covers |
+|---|---|---|---|---|---|
+| 1 | `load_recording` | runstore.reader | path → Recording | `np.load` of the `.npz`; `ValueError` naming a corrupt file | VIEW-01 |
+| 2 | `view` | viewer.window | Recording → ViewResult | one Matplotlib figure: cell-code image from `Frame.legend`, status text, action-value bars (or &quot;n/a&quot;), play/pause/step/start/end buttons, 1–30 steps/s slider | VIEW-01–VIEW-03, VIEW-06 |
+
+### Entry sketch (pre-build — removed by spine task)
+```python
+def run_view(path: Path) -&gt; ViewResult:
+    recording = load_recording(path)
+    return view(recording)
+```
+
+## PL-07: Play a saved agent live
+**Entry:** `src/gridlab/viewer/pipeline.py::run_play` · **Trigger:** `gridlab play runs/dqn-l3/dqn-snake-L3/seed1-... --seed 42`
+**Covers:** VIEW-04
+
+| # | Step | Owner | In → Out | Spine version | Covers |
+|---|---|---|---|---|---|
+| 1 | `open_run` | runstore.reader | run path → RunDir | read `config.json` | VIEW-04 |
+| 2 | `load_agent` | runstore.reader | RunDir → Agent, Env | `make_env` and `make_agent` from the config, then the agent&#x27;s `load` (baselines are rebuilt from the seed) | VIEW-04, CORE-06 |
+| 3 | `record_episode` | evaluate.record | Agent, Env, seed → Recording | one greedy episode, frames and action values each step | VIEW-04 |
+| 4 | `save_recording` | runstore.writer | RunDir, Recording → Artifact | `recordings/live-&lt;seed&gt;.npz` in the run | VIEW-04 |
+| 5 | `view` | viewer.window | Recording → ViewResult | PL-06 as built | VIEW-04 |
+
+### Entry sketch (pre-build — removed by spine task)
+```python
+def run_play(run_path: Path, seed: int) -&gt; ViewResult:
+    run = open_run(run_path)
+    agent, env = load_agent(run)
+    recording = record_episode(agent, env, seed, run.config.level)
+    save_recording(run, recording)
+    return view(recording)
+```
+
+## PL-08: Export an animation
+**Entry:** `src/gridlab/viewer/pipeline.py::run_export` · **Trigger:** `gridlab export runs/.../recordings/best.npz --out snake.gif`
+**Covers:** VIEW-05
+
+| # | Step | Owner | In → Out | Spine version | Covers |
+|---|---|---|---|---|---|
+| 1 | `load_recording` | runstore.reader | path → Recording | PL-06 as built | — |
+| 2 | `export_animation` | viewer.export | Recording, out path, fps → Artifact | `FuncAnimation` over the frames, Pillow writer, GIF; no display needed | VIEW-05 |
+
+### Entry sketch (pre-build — removed by spine task)
+```python
+def run_export(path: Path, out: Path, fps: int = 10) -&gt; Artifact:
+    recording = load_recording(path)
+    return export_animation(recording, out, fps=fps)
+```
+
+## PL-09: Inspect the Q-table
+**Entry:** `src/gridlab/cli/pipeline.py::run_inspect_table` · **Trigger:** `gridlab inspect-table runs/tabular-l2/tabular-snake-L2/seed1-...`
+**Covers:** TAB-06
+
+| # | Step | Owner | In → Out | Spine version | Covers |
+|---|---|---|---|---|---|
+| 1 | `open_run` | runstore.reader | run path → RunDir | PL-07 as built | — |
+| 2 | `load_agent` | runstore.reader | RunDir → Agent, Env | PL-07 as built | — |
+| 3 | `inspect_table` | tabular.table_view | Agent, Env obs labels → TableRow | one row per observation seen, most-visited first; `ValueError` for a non-tabular agent | TAB-06 |
+
+### Entry sketch (pre-build — removed by spine task)
+```python
+def run_inspect_table(run_path: Path) -&gt; list[TableRow]:
+    run = open_run(run_path)
+    agent, env = load_agent(run)
+    return inspect_table(agent, env.obs_labels)
+```
+
+## Planned layout (pre-build — removed by spine task)
+```
+src/gridlab/
+  __init__.py
+  core/        __init__.py (contract exports)  types.py (Env, Agent, LearningAgent, StepResult, Transition, Frame, Recording, Artifact, EpsilonSchedule)
+  snake/       __init__.py  env.py (SnakeEnv, SnakeConfig, LEVELS, FEATURES)
+  corridor/    __init__.py  env.py
+  baselines/   __init__.py  uniform.py  greedy.py
+  tabular/     __init__.py  agent.py  table_view.py
+  dqn/         __init__.py  agent.py  network.py  replay.py
+  experiments/ __init__.py  types.py (RunConfig, ExperimentSet)  build.py  presets.py
+  evaluate/    __init__.py  types.py (EvalResult)  seeds.py  score.py  record.py
+  runstore/    __init__.py  types.py (RunDir, RunData)  writer.py  reader.py
+  train/       __init__.py  pipeline.py (PL-01, PL-02)  loop.py  highlights.py  outputs.py  sets.py
+  compare/     __init__.py  pipeline.py (PL-03, PL-04)  types.py (ComparisonInput, Verdict, ResultsTable)  inputs.py  table.py
+  plots/       __init__.py  pipeline.py (PL-05)  curves.py
+  viewer/      __init__.py  pipeline.py (PL-06–PL-08)  types.py (ViewResult)  window.py  export.py
+  cli/         __init__.py  __main__.py  main.py (argument parsing → entries)  pipeline.py (PL-09)
+tests/intent/gridlab/  tests/unit/gridlab/
+```
+
+## Open questions
+- **Contract changes needed** (routed to `architecture-design` Revise; until they land, `dt lint` reports `step-io-types` errors for the names marked *new*):
+  1. Retitle `core.Env`, `core.Agent`, `core.LearningAgent` and `runstore.RunWriter` as `type` sections (shape unchanged).
+  2. `core.Env` gains `obs_labels: tuple[str, ...]` (Snake: `FEATURES`; corridor: `pos_0…pos_{n-1}`), so `inspect_table` and the viewer label features without importing `snake`.
+  3. *New* `core.Artifact: type`, `@dataclass(frozen=True) class Artifact: path: Path; kind: Literal[&quot;inputs&quot;, &quot;plot&quot;, &quot;animation&quot;, &quot;recording&quot;]`. Returned by `write_comparisons`, `learning_curve`, `ablation_curves` (or None), `export_animation` and `save_recording`.
+  4. *New* `compare.ResultsTable: type` (`markdown: str; path: Path; underpowered: bool`), returned by `results_table` instead of `str`.
+  5. *New* `viewer.ViewResult: type` (`last_step: int; closed_at_end: bool`), returned by `view` instead of `None`.
+  6. Entries replace entry-like functions: `train.train_run` → `train.run_train`; `train.train_seeds` → `train.run_preset(name, root)` (TRAIN-02 runs through presets); `viewer.play_live` → `viewer.run_play`. Add the entries `compare.run_compare`, `compare.run_report`, `plots.run_plot`, `viewer.run_view`, `viewer.run_export` and `cli.run_inspect_table`.
+  7. *New* `experiments.get_preset(name) -&gt; ExperimentSet`, `runstore.open_run(path) -&gt; RunDir` and `runstore.save_recording(run, rec) -&gt; Artifact`.
+  8. `plots.learning_curve` and `plots.ablation_curves` take `(experiment: ExperimentSet, runs_root: Path, out_dir: Path)`, and group the runs themselves.
+  9. `tabular.inspect_table` raises `ValueError` for a non-tabular agent.
+
+## Retired
+</pre><div class="hook">⛔ hook PostToolUse:Write blocked: dt lint found problems in docs/packages/gridlab/pipelines.md:
+docs/packages/gridlab/pipelines.md:11: step-io-types PL-01 step `make_env` names Env, which no contract.md type section defines (`### &lt;component&gt;.Env: type`)
+docs/packages/gridlab/pipelines.md:12: step-io-types PL-01 step `make_agent` names Agent, which no contract.md type section defines (`### &lt;component&gt;.Agent: type`)
+docs/packages/gridlab/pipelines.md:12: step-io-types PL-01 step `make_agent` names Env, which no contract.md type section defines (`### &lt;component&gt;.Env: type`)
+docs/packages/gridlab/pipelines.md:13: step-io-types PL-01 step `RunWriter.create` names RunWriter, which no contract.md type section defines (`### &lt;component&gt;.RunWriter: type`)
+docs/packages/gridlab/pipelines.md:14: step-io-types PL-01 step `train_agent` names Agent, which no contract.md type section defines (`### &lt;component&gt;.Agent: type`)
+docs/packages/gridlab/pipelines.md:14: step-io-types PL-01 step `train_agent` names Env, which no contract.md type section defines (`### &lt;component&gt;.Env: type`)
+docs/packages/gridlab/pipelines.md:14: step-io-types PL-01 step `train_agent` names RunWriter, which no contract.md type section defines (`### &lt;component&gt;.RunWriter: type`)
+docs/packages/gridlab/pipelines.md:15: step-io-types PL-01 step `evaluate` names Agent, which no contract.md type section defines (`### &lt;component&gt;.Agent: type`)
+docs/packages/gridlab/pipelines.md:15: step-io-types PL-01 step `evaluate` names Env, which no contract.md type section defines (`### &lt;component&gt;.Env: type`)
+docs/packages/gridlab/pipelines.md:16: step-io-types PL-01 step `record_highlights` names Agent, which no contract.md type section defines (`### &lt;component&gt;.Agent: type`)
+docs/packages/gridlab/pipelines.md:16: step-io-types PL-01 step `record_highlights` names Env, which no contract.md type section defines (`### &lt;component&gt;.Env: type`)
+docs/packages/gridlab/pipelines.md:17: step-io-types PL-01 step `save_outputs` names Agent, which no contract.md type section defines (`### &lt;component&gt;.Agent: type`)
+docs/packages/gridlab/pipelines.md:17: step-io-types PL-01 step `save_outputs` names RunWriter, which no contract.md type section defines (`### &lt;component&gt;.RunWriter: type`)
+docs/packages/gridlab/pipelines.md:54: step-io-types PL-03 step `write_comparisons` names Artifact, which no contract.md type section defines (`### &lt;component&gt;.Artifact: type`)
+docs/packages/gridlab/pipelines.md:69: step-io-types PL-04 step `results_table` names ResultsTable, which no contract.md type section defines (`### &lt;component&gt;.ResultsTable: type`)
+docs/packages/gridlab/pipelines.md:84: step-io-types PL-05 step `learning_curve` names Artifact, which no contract.md type section defines (`### &lt;component&gt;.Artifact: type`)
+docs/packages/gridlab/pipelines.md:85: step-io-types PL-05 step `ablation_curves` names Artifact, which no contract.md type section defines (`### &lt;component&gt;.Artifact: type`)
+docs/packages/gridlab/pipelines.md:103: step-io-types PL-06 step `view` names ViewResult, which no contract.md type section defines (`### &lt;component&gt;.ViewResult: type`)
+docs/packages/gridlab/pipelines.md:119: step-io-types PL-07 step `load_agent` names Agent, which no contract.md type section defines (`### &lt;component&gt;.Agent: type`)
+docs/packages/gridlab/pipelines.md:119: step-io-types PL-07 step `load_agent` names Env, which no contract.md type section defines (`### &lt;component&gt;.Env: type`)
+docs/packages/gridlab/pipelines.md:120: step-io-types PL-07 step `record_episode` names Agent, which no contract.md type section defines (`### &lt;component&gt;.Agent: type`)
+docs/packages/gridlab/pipelines.md:120: step-io-types PL-07 step `record_episode` names Env, which no contract.md type section defines (`### &lt;component&gt;.Env: type`)
+docs/packages/gridlab/pipelines.md:121: step-io-types PL-07 step `save_recording` names Artifact, which no contract.md type section defines (`### &lt;component&gt;.Artifact: type`)
+docs/packages/gridlab/pipelines.md:122: step-io-types PL-07 step `view` names ViewResult, which no contract.md type section defines (`### &lt;component&gt;.ViewResult: type`)
+docs/packages/gridlab/pipelines.md:141: step-io-types PL-08 step `export_animation` names Artifact, which no contract.md type section defines (`### &lt;component&gt;.Artifact: type`)
+docs/packages/gridlab/pipelines.md:157: step-io-types PL-09 step `load_agent` names Agent, which no contract.md type section defines (`### &lt;component&gt;.Agent: type`)
+docs/packages/gridlab/pipelines.md:157: step-io-types PL-09 step `load_agent` names Env, which no contract.md type section defines (`### &lt;component&gt;.Env: type`)
+docs/packages/gridlab/pipelines.md:158: step-io-types PL-09 step `inspect_table` names Agent, which no contract.md type section defines (`### &lt;component&gt;.Agent: type`)
+docs/packages/gridlab/pipelines.md:158: step-io-types PL-09 step `inspect_table` names Env, which no contract.md type section defines (`### &lt;component&gt;.Env: type`)
+29 errors, 0 warnings</div><details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-7/rl-incremental/with_skill/project/docs/packages/gridlab/pipelines.md&quot;,
+  &quot;content&quot;: &quot;# gridlab — Pipelines\n\n**Package:** gridlab · **Status:** Draft · **Last updated:** 2026-10-17 · **Contract:** [contract.md](contract.md)\n\n## PL-01: Train one run\n**Entry:** `src/gridlab/train/pipeline.py::run_train` · **Trigger:** `gridlab train --env snake --level L3 --agent dqn --seed 1 --steps 200000`\n**Covers:** TRAIN-01, TRAIN-03–TRAIN-07, CORE-01–CORE-07, SNAKE-01–SNAKE-15, CORR-01–CORR-03, BASE-01–BASE-04, TAB-01–TAB-05, DQN-01–DQN-09, DQN-11, EVAL-01, QR-01–QR-05\n\n| # | Step | Owner | In → Out | Spine version | Covers |\n|---|---|---|---|---|---|\n| 1 | `make_env` | experiments.build | env name, level, overrides → Env | name lookup: corridor, or snake with `LEVELS[level]` plus overrides | CORE-01–CORE-04, SNAKE-01–SNAKE-15, CORR-01, CORR-02, QR-03 |\n| 2 | `make_agent` | experiments.build | agent name, Env, seed, overrides → Agent | name lookup: random, greedy, tabular, dqn; overrides applied with `dataclasses.replace` | CORE-05, BASE-01–BASE-03, TAB-01–TAB-05, DQN-01–DQN-09 |\n| 3 | `RunWriter.create` | runstore.writer | RunConfig → RunWriter | exclusive `mkdir` of `seed&lt;N&gt;-&lt;timestamp&gt;`, `config.json` with `complete: false` | TRAIN-04, QR-05 |\n| 4 | `train_agent` | train.loop | Env, Agent, RunConfig, RunWriter → Agent | one environment, plain step loop: act with exploration → step → `observe(Transition)` → episode row; a learning-curve point on `CURVE_EVAL_SEEDS` every `eval_every` steps; one progress line every 10 s; Ctrl-C closes the run incomplete; no-op when `steps == 0` | TRAIN-01, TRAIN-03, TRAIN-05, TRAIN-07, CORE-07, QR-01, QR-02, QR-04 |\n| 5 | `evaluate` | evaluate.score | Agent, Env → EvalResult | 100 greedy episodes on `FINAL_EVAL_SEEDS` | EVAL-01, BASE-04 |\n| 6 | `record_highlights` | train.highlights | Agent, Env, EvalResult → Recording | replay the best- and median-scoring evaluation seeds with `record_episode` | TRAIN-06 |\n| 7 | `save_outputs` | train.outputs | RunWriter, Agent, EvalResult, Recording → RunDir | `final_eval.json`, the agent, `best`/`median` recordings, then `complete: true` | TRAIN-04, CORE-06 |\n\n### Entry sketch (pre-build — removed by spine task)\n```python\ndef run_train(config: RunConfig, root: Path = Path(\&quot;runs\&quot;), progress: bool = True) -&gt; RunDir:\n    env = make_env(config.env, config.level, **config.env_overrides)\n    agent = make_agent(config.agent, env, config.seed, **config.agent_overrides)\n    writer = RunWriter.create(root, config)\n    agent = train_agent(env, agent, config, writer, progress=progress)\n    result = evaluate(agent, env)\n    best, median = record_highlights(agent, env, result)\n    return save_outputs(writer, agent, result, best, median)\n```\n\n## PL-02: Run a preset experiment set\n**Entry:** `src/gridlab/train/pipeline.py::run_preset` · **Trigger:** `gridlab preset dqn-l3` (also `corridor-sanity`, `tabular-l1`, `tabular-l2`, `ablations-l3`)\n**Covers:** TRAIN-02, TAB-07, DQN-10, ABL-01, ABL-02, CORR-04, QR-01, QR-02\n\n| # | Step | Owner | In → Out | Spine version | Covers |\n|---|---|---|---|---|---|\n| 1 | `get_preset` | experiments.presets | preset name → ExperimentSet | dictionary lookup; `ValueError` listing the names | ABL-01, ABL-02, CORR-04 |\n| 2 | `train_set` | train.sets | ExperimentSet, runs root → RunDir | every `RunConfig` in order through PL-01 as built; already-complete runs are kept, never skipped silently | TRAIN-02, TAB-07, DQN-10 |\n\n### Entry sketch (pre-build — removed by spine task)\n```python\ndef run_preset(name: str, root: Path = Path(\&quot;runs\&quot;)) -&gt; list[RunDir]:\n    experiment = get_preset(name)\n    return train_set(experiment, root)\n```\n\n## PL-03: Write comparison inputs\n**Entry:** `src/gridlab/compare/pipeline.py::run_compare` · **Trigger:** `gridlab compare dqn-l3`, then run the `null-hypothesis-testing` skill on the written `inputs.json`\n**Covers:** EVAL-02, ABL-03, TAB-07, DQN-10\n\n| # | Step | Owner | In → Out | Spine version | Covers |\n|---|---|---|---|---|---|\n| 1 | `get_preset` | experiments.presets | preset name → ExperimentSet | PL-02 as built | — |\n| 2 | `write_comparisons` | compare.inputs | ExperimentSet, runs root, reports root → Artifact | one `ComparisonInput` per pair from complete runs&#x27; `final_eval.json`; \&quot;greater\&quot; for agent vs baseline, \&quot;two-sided\&quot; for ablation vs full (AD-08) | EVAL-02, ABL-03 |\n\n### Entry sketch (pre-build — removed by spine task)\n```python\ndef run_compare(name: str, runs_root: Path = Path(\&quot;runs\&quot;), reports_root: Path = Path(\&quot;reports\&quot;)) -&gt; Artifact:\n    experiment = get_preset(name)\n    return write_comparisons(name, experiment, runs_root=runs_root, reports_root=reports_root)\n```\n\n## PL-04: Build the results report\n**Entry:** `src/gridlab/compare/pipeline.py::run_report` · **Trigger:** `gridlab report dqn-l3` (after the skill wrote `verdicts.json`)\n**Covers:** EVAL-02, EVAL-04, ABL-03\n\n| # | Step | Owner | In → Out | Spine version | Covers |\n|---|---|---|---|---|---|\n| 1 | `results_table` | compare.table | report dir → ResultsTable | join `verdicts.json` (Verdict) with each group&#x27;s mean ± sd; pass/fail or ablation outcome; \&quot;underpowered\&quot; flag under 5 seeds; write `table.md` | EVAL-02, EVAL-04, ABL-03 |\n\n### Entry sketch (pre-build — removed by spine task)\n```python\ndef run_report(report_dir: Path) -&gt; ResultsTable:\n    return results_table(report_dir)\n```\n\n## PL-05: Plot learning curves\n**Entry:** `src/gridlab/plots/pipeline.py::run_plot` · **Trigger:** `gridlab plot dqn-l3`\n**Covers:** EVAL-03, ABL-04\n\n| # | Step | Owner | In → Out | Spine version | Covers |\n|---|---|---|---|---|---|\n| 1 | `get_preset` | experiments.presets | preset name → ExperimentSet | PL-02 as built | — |\n| 2 | `learning_curve` | plots.curves | ExperimentSet, runs root, out dir → Artifact | Matplotlib lines from `curve.csv`: faint per seed, bold mean, baseline final means as labeled horizontal lines; styled per the `dataviz` skill; PNG | EVAL-03 |\n| 3 | `ablation_curves` | plots.curves | ExperimentSet, runs root, out dir → Artifact | mean line per learning group with the baselines; returns None for a set with one learning group | ABL-04 |\n\n### Entry sketch (pre-build — removed by spine task)\n```python\ndef run_plot(name: str, runs_root: Path = Path(\&quot;runs\&quot;), reports_root: Path = Path(\&quot;reports\&quot;)) -&gt; tuple[Artifact, Artifact | None]:\n    experiment = get_preset(name)\n    curve = learning_curve(experiment, runs_root, reports_root / name)\n    overlay = ablation_curves(experiment, runs_root, reports_root / name)\n    return curve, overlay\n```\n\n## PL-06: View a recording\n**Entry:** `src/gridlab/viewer/pipeline.py::run_view` · **Trigger:** `gridlab view runs/.../recordings/best.npz`\n**Covers:** VIEW-01–VIEW-03, VIEW-06\n\n| # | Step | Owner | In → Out | Spine version | Covers |\n|---|---|---|---|---|---|\n| 1 | `load_recording` | runstore.reader | path → Recording | `np.load` of the `.npz`; `ValueError` naming a corrupt file | VIEW-01 |\n| 2 | `view` | viewer.window | Recording → ViewResult | one Matplotlib figure: cell-code image from `Frame.legend`, status text, action-value bars (or \&quot;n/a\&quot;), play/pause/step/start/end buttons, 1–30 steps/s slider | VIEW-01–VIEW-03, VIEW-06 |\n\n### Entry sketch (pre-build — removed by spine task)\n```python\ndef run_view(path: Path) -&gt; ViewResult:\n    recording = load_recording(path)\n    return view(recording)\n```\n\n## PL-07: Play a saved agent live\n**Entry:** `src/gridlab/viewer/pipeline.py::run_play` · **Trigger:** `gridlab play runs/dqn-l3/dqn-snake-L3/seed1-... --seed 42`\n**Covers:** VIEW-04\n\n| # | Step | Owner | In → Out | Spine version | Covers |\n|---|---|---|---|---|---|\n| 1 | `open_run` | runstore.reader | run path → RunDir | read `config.json` | VIEW-04 |\n| 2 | `load_agent` | runstore.reader | RunDir → Agent, Env | `make_env` and `make_agent` from the config, then the agent&#x27;s `load` (baselines are rebuilt from the seed) | VIEW-04, CORE-06 |\n| 3 | `record_episode` | evaluate.record | Agent, Env, seed → Recording | one greedy episode, frames and action values each step | VIEW-04 |\n| 4 | `save_recording` | runstore.writer | RunDir, Recording → Artifact | `recordings/live-&lt;seed&gt;.npz` in the run | VIEW-04 |\n| 5 | `view` | viewer.window | Recording → ViewResult | PL-06 as built | VIEW-04 |\n\n### Entry sketch (pre-build — removed by spine task)\n```python\ndef run_play(run_path: Path, seed: int) -&gt; ViewResult:\n    run = open_run(run_path)\n    agent, env = load_agent(run)\n    recording = record_episode(agent, env, seed, run.config.level)\n    save_recording(run, recording)\n    return view(recording)\n```\n\n## PL-08: Export an animation\n**Entry:** `src/gridlab/viewer/pipeline.py::run_export` · **Trigger:** `gridlab export runs/.../recordings/best.npz --out snake.gif`\n**Covers:** VIEW-05\n\n| # | Step | Owner | In → Out | Spine version | Covers |\n|---|---|---|---|---|---|\n| 1 | `load_recording` | runstore.reader | path → Recording | PL-06 as built | — |\n| 2 | `export_animation` | viewer.export | Recording, out path, fps → Artifact | `FuncAnimation` over the frames, Pillow writer, GIF; no display needed | VIEW-05 |\n\n### Entry sketch (pre-build — removed by spine task)\n```python\ndef run_export(path: Path, out: Path, fps: int = 10) -&gt; Artifact:\n    recording = load_recording(path)\n    return export_animation(recording, out, fps=fps)\n```\n\n## PL-09: Inspect the Q-table\n**Entry:** `src/gridlab/cli/pipeline.py::run_inspect_table` · **Trigger:** `gridlab inspect-table runs/tabular-l2/tabular-snake-L2/seed1-...`\n**Covers:** TAB-06\n\n| # | Step | Owner | In → Out | Spine version | Covers |\n|---|---|---|---|---|---|\n| 1 | `open_run` | runstore.reader | run path → RunDir | PL-07 as built | — |\n| 2 | `load_agent` | runstore.reader | RunDir → Agent, Env | PL-07 as built | — |\n| 3 | `inspect_table` | tabular.table_view | Agent, Env obs labels → TableRow | one row per observation seen, most-visited first; `ValueError` for a non-tabular agent | TAB-06 |\n\n### Entry sketch (pre-build — removed by spine task)\n```python\ndef run_inspect_table(run_path: Path) -&gt; list[TableRow]:\n    run = open_run(run_path)\n    agent, env = load_agent(run)\n    return inspect_table(agent, env.obs_labels)\n```\n\n## Planned layout (pre-build — removed by spine task)\n```\nsrc/gridlab/\n  __init__.py\n  core/        __init__.py (contract exports)  types.py (Env, Agent, LearningAgent, StepResult, Transition, Frame, Recording, Artifact, EpsilonSchedule)\n  snake/       __init__.py  env.py (SnakeEnv, SnakeConfig, LEVELS, FEATURES)\n  corridor/    __init__.py  env.py\n  baselines/   __init__.py  uniform.py  greedy.py\n  tabular/     __init__.py  agent.py  table_view.py\n  dqn/         __init__.py  agent.py  network.py  replay.py\n  experiments/ __init__.py  types.py (RunConfig, ExperimentSet)  build.py  presets.py\n  evaluate/    __init__.py  types.py (EvalResult)  seeds.py  score.py  record.py\n  runstore/    __init__.py  types.py (RunDir, RunData)  writer.py  reader.py\n  train/       __init__.py  pipeline.py (PL-01, PL-02)  loop.py  highlights.py  outputs.py  sets.py\n  compare/     __init__.py  pipeline.py (PL-03, PL-04)  types.py (ComparisonInput, Verdict, ResultsTable)  inputs.py  table.py\n  plots/       __init__.py  pipeline.py (PL-05)  curves.py\n  viewer/      __init__.py  pipeline.py (PL-06–PL-08)  types.py (ViewResult)  window.py  export.py\n  cli/         __init__.py  __main__.py  main.py (argument parsing → entries)  pipeline.py (PL-09)\ntests/intent/gridlab/  tests/unit/gridlab/\n```\n\n## Open questions\n- **Contract changes needed** (routed to `architecture-design` Revise; until they land, `dt lint` reports `step-io-types` errors for the names marked *new*):\n  1. Retitle `core.Env`, `core.Agent`, `core.LearningAgent` and `runstore.RunWriter` as `type` sections (shape unchanged).\n  2. `core.Env` gains `obs_labels: tuple[str, ...]` (Snake: `FEATURES`; corridor: `pos_0…pos_{n-1}`), so `inspect_table` and the viewer label features without importing `snake`.\n  3. *New* `core.Artifact: type`, `@dataclass(frozen=True) class Artifact: path: Path; kind: Literal[\&quot;inputs\&quot;, \&quot;plot\&quot;, \&quot;animation\&quot;, \&quot;recording\&quot;]`. Returned by `write_comparisons`, `learning_curve`, `ablation_curves` (or None), `export_animation` and `save_recording`.\n  4. *New* `compare.ResultsTable: type` (`markdown: str; path: Path; underpowered: bool`), returned by `results_table` instead of `str`.\n  5. *New* `viewer.ViewResult: type` (`last_step: int; closed_at_end: bool`), returned by `view` instead of `None`.\n  6. Entries replace entry-like functions: `train.train_run` → `train.run_train`; `train.train_seeds` → `train.run_preset(name, root)` (TRAIN-02 runs through presets); `viewer.play_live` → `viewer.run_play`. Add the entries `compare.run_compare`, `compare.run_report`, `plots.run_plot`, `viewer.run_view`, `viewer.run_export` and `cli.run_inspect_table`.\n  7. *New* `experiments.get_preset(name) -&gt; ExperimentSet`, `runstore.open_run(path) -&gt; RunDir` and `runstore.save_recording(run, rec) -&gt; Artifact`.\n  8. `plots.learning_curve` and `plots.ablation_curves` take `(experiment: ExperimentSet, runs_root: Path, out_dir: Path)`, and group the runs themselves.\n  9. `tabular.inspect_table` raises `ValueError` for a non-tabular agent.\n\n## Retired\n&quot;
+}</pre><div class="lbl">output</div><pre>File created successfully at: /Users/connorott/plugins/dev-team-workspace/iteration-7/rl-incremental/with_skill/project/docs/packages/gridlab/pipelines.md (file state is current in your context — no need to Read it back)</pre></details></div><div class="step" id="SD73"><span class="sid">D73</span><span class="kind">Bash</span>python3 ../plugin/dev-team/scripts/dt.py status --skill pipeline-design | grep -E &#x27;uncovered|unowned|drift|retired|misplaced|mode&#x27;; python3 ../plugin/dev-team/scripts/dt.py lint docs/ 2&gt;&amp;1 | tail -25<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;python3 ../plugin/dev-team/scripts/dt.py status --skill pipeline-design | grep -E &#x27;uncovered|unowned|drift|retired|misplaced|mode&#x27;; python3 ../plugin/dev-team/scripts/dt.py lint docs/ 2&gt;&amp;1 | tail -25&quot;,
+  &quot;description&quot;: &quot;Run pipeline gate checks and lint&quot;
+}</pre><div class="lbl">output</div><pre>mode: extend
+uncovered_ids: none
+components_unowned: core, snake, corridor, baselines, dqn, cli
+drift: none
+retired_refs: none
+misplaced: none
+docs/packages/gridlab/pipelines.md:14: step-io-types PL-01 step `train_agent` names RunWriter, which no contract.md type section defines (`### &lt;component&gt;.RunWriter: type`)
+docs/packages/gridlab/pipelines.md:15: step-io-types PL-01 step `evaluate` names Agent, which no contract.md type section defines (`### &lt;component&gt;.Agent: type`)
+docs/packages/gridlab/pipelines.md:15: step-io-types PL-01 step `evaluate` names Env, which no contract.md type section defines (`### &lt;component&gt;.Env: type`)
+docs/packages/gridlab/pipelines.md:16: step-io-types PL-01 step `record_highlights` names Agent, which no contract.md type section defines (`### &lt;component&gt;.Agent: type`)
+docs/packages/gridlab/pipelines.md:16: step-io-types PL-01 step `record_highlights` names Env, which no contract.md type section defines (`### &lt;component&gt;.Env: type`)
+docs/packages/gridlab/pipelines.md:17: step-io-types PL-01 step `save_outputs` names Agent, which no contract.md type section defines (`### &lt;component&gt;.Agent: type`)
+docs/packages/gridlab/pipelines.md:17: step-io-types PL-01 step `save_outputs` names RunWriter, which no contract.md type section defines (`### &lt;component&gt;.RunWriter: type`)
+docs/packages/gridlab/pipelines.md:54: step-io-types PL-03 step `write_comparisons` names Artifact, which no contract.md type section defines (`### &lt;component&gt;.Artifact: type`)
+docs/packages/gridlab/pipelines.md:69: step-io-types PL-04 step `results_table` names ResultsTable, which no contract.md type section defines (`### &lt;component&gt;.ResultsTable: type`)
+docs/packages/gridlab/pipelines.md:84: step-io-types PL-05 step `learning_curve` names Artifact, which no contract.md type section defines (`### &lt;component&gt;.Artifact: type`)
+docs/packages/gridlab/pipelines.md:85: step-io-types PL-05 step `ablation_curves` names Artifact, which no contract.md type section defines (`### &lt;component&gt;.Artifact: type`)
+docs/packages/gridlab/pipelines.md:103: step-io-types PL-06 step `view` names ViewResult, which no contract.md type section defines (`### &lt;component&gt;.ViewResult: type`)
+docs/packages/gridlab/pipelines.md:119: step-io-types PL-07 step `load_agent` names Agent, which no contract.md type section defines (`### &lt;component&gt;.Agent: type`)
+docs/packages/gridlab/pipelines.md:119: step-io-types PL-07 step `load_agent` names Env, which no contract.md type section defines (`### &lt;component&gt;.Env: type`)
+docs/packages/gridlab/pipelines.md:120: step-io-types PL-07 step `record_episode` names Agent, which no contract.md type section defines (`### &lt;component&gt;.Agent: type`)
+docs/packages/gridlab/pipelines.md:120: step-io-types PL-07 step `record_episode` names Env, which no contract.md type section defines (`### &lt;component&gt;.Env: type`)
+docs/packages/gridlab/pipelines.md:121: step-io-types PL-07 step `save_recording` names Artifact, which no contract.md type section defines (`### &lt;component&gt;.Artifact: type`)
+docs/packages/gridlab/pipelines.md:122: step-io-types PL-07 step `view` names ViewResult, which no contract.md type section defines (`### &lt;component&gt;.ViewResult: type`)
+docs/packages/gridlab/pipelines.md:141: step-io-types PL-08 step `export_animation` names Artifact, which no contract.md type section defines (`### &lt;component&gt;.Artifact: type`)
+docs/packages/gridlab/pipelines.md:157: step-io-types PL-09 step `load_agent` names Agent, which no contract.md type section defines (`### &lt;component&gt;.Agent: type`)
+docs/packages/gridlab/pipelines.md:157: step-io-types PL-09 step `load_agent` names Env, which no contract.md type section defines (`### &lt;component&gt;.Env: type`)
+docs/packages/gridlab/pipelines.md:158: step-io-types PL-09 step `inspect_table` names Agent, which no contract.md type section defines (`### &lt;component&gt;.Agent: type`)
+docs/packages/gridlab/pipelines.md:158: step-io-types PL-09 step `inspect_table` names Env, which no contract.md type section defines (`### &lt;component&gt;.Env: type`)
+docs/roadmap.md:13: roadmap-skill S1 Skills names dataviz: not installed (.claude/skills or the plugin)
+29 errors, 2 warnings</pre></details></div><div class="step" id="SD74"><span class="sid">D74</span><span class="kind">say</span>All 29 lint errors are the expected ones: types the contract doesn&#x27;t define yet. The gate also lists six components that own no step, so I&#x27;ll record why under Open questions.<details><summary>full text</summary><pre>All 29 lint errors are the expected ones: types the contract doesn&#x27;t define yet. The gate also lists six components that own no step, so I&#x27;ll record why under Open questions.</pre></details></div><div class="step" id="SD75"><span class="sid">D75</span><span class="kind">Edit</span>/Users/connorott/plugins/dev-team-workspace/iteration-7/rl-incremental/with_skill/project/docs/packages/gridlab/pipelines.md | old: &#x27;9. `tabular.inspect_table` raises `ValueError` for a non-tabular agent.&#x27; | new: &#x27;9. `tabular.inspect_table` raises `ValueError` for a non-tabular agent. ⏎ - Co&#x27;<div class="lbl">edited /Users/connorott/plugins/dev-team-workspace/iteration-7/rl-incremental/with_skill/project/docs/packages/gridlab/pipelines.md · old</div><pre>  9. `tabular.inspect_table` raises `ValueError` for a non-tabular agent.
+</pre><div class="lbl">new</div><pre>  9. `tabular.inspect_table` raises `ValueError` for a non-tabular agent.
+- **Components on no step:** `core`, `snake`, `corridor`, `baselines` and `dqn` are libraries reached through steps: `make_env` and `make_agent` build them, and `train_agent`, `evaluate` and `record_episode` drive them through the `core` protocols (CORE-07). `cli` only parses arguments into the entries and hosts PL-09&#x27;s entry. (assumed: no pipeline of their own)
+</pre><div class="hook">⛔ hook PostToolUse:Edit blocked: dt lint found problems in docs/packages/gridlab/pipelines.md:
+docs/packages/gridlab/pipelines.md:11: step-io-types PL-01 step `make_env` names Env, which no contract.md type section defines (`### &lt;component&gt;.Env: type`)
+docs/packages/gridlab/pipelines.md:12: step-io-types PL-01 step `make_agent` names Agent, which no contract.md type section defines (`### &lt;component&gt;.Agent: type`)
+docs/packages/gridlab/pipelines.md:12: step-io-types PL-01 step `make_agent` names Env, which no contract.md type section defines (`### &lt;component&gt;.Env: type`)
+docs/packages/gridlab/pipelines.md:13: step-io-types PL-01 step `RunWriter.create` names RunWriter, which no contract.md type section defines (`### &lt;component&gt;.RunWriter: type`)
+docs/packages/gridlab/pipelines.md:14: step-io-types PL-01 step `train_agent` names Agent, which no contract.md type section defines (`### &lt;component&gt;.Agent: type`)
+docs/packages/gridlab/pipelines.md:14: step-io-types PL-01 step `train_agent` names Env, which no contract.md type section defines (`### &lt;component&gt;.Env: type`)
+docs/packages/gridlab/pipelines.md:14: step-io-types PL-01 step `train_agent` names RunWriter, which no contract.md type section defines (`### &lt;component&gt;.RunWriter: type`)
+docs/packages/gridlab/pipelines.md:15: step-io-types PL-01 step `evaluate` names Agent, which no contract.md type section defines (`### &lt;component&gt;.Agent: type`)
+docs/packages/gridlab/pipelines.md:15: step-io-types PL-01 step `evaluate` names Env, which no contract.md type section defines (`### &lt;component&gt;.Env: type`)
+docs/packages/gridlab/pipelines.md:16: step-io-types PL-01 step `record_highlights` names Agent, which no contract.md type section defines (`### &lt;component&gt;.Agent: type`)
+docs/packages/gridlab/pipelines.md:16: step-io-types PL-01 step `record_highlights` names Env, which no contract.md type section defines (`### &lt;component&gt;.Env: type`)
+docs/packages/gridlab/pipelines.md:17: step-io-types PL-01 step `save_outputs` names Agent, which no contract.md type section defines (`### &lt;component&gt;.Agent: type`)
+docs/packages/gridlab/pipelines.md:17: step-io-types PL-01 step `save_outputs` names RunWriter, which no contract.md type section defines (`### &lt;component&gt;.RunWriter: type`)
+docs/packages/gridlab/pipelines.md:54: step-io-types PL-03 step `write_comparisons` names Artifact, which no contract.md type section defines (`### &lt;component&gt;.Artifact: type`)
+docs/packages/gridlab/pipelines.md:69: step-io-types PL-04 step `results_table` names ResultsTable, which no contract.md type section defines (`### &lt;component&gt;.ResultsTable: type`)
+docs/packages/gridlab/pipelines.md:84: step-io-types PL-05 step `learning_curve` names Artifact, which no contract.md type section defines (`### &lt;component&gt;.Artifact: type`)
+docs/packages/gridlab/pipelines.md:85: step-io-types PL-05 step `ablation_curves` names Artifact, which no contract.md type section defines (`### &lt;component&gt;.Artifact: type`)
+docs/packages/gridlab/pipelines.md:103: step-io-types PL-06 step `view` names ViewResult, which no contract.md type section defines (`### &lt;component&gt;.ViewResult: type`)
+docs/packages/gridlab/pipelines.md:119: step-io-types PL-07 step `load_agent` names Agent, which no contract.md type section defines (`### &lt;component&gt;.Agent: type`)
+docs/packages/gridlab/pipelines.md:119: step-io-types PL-07 step `load_agent` names Env, which no contract.md type section defines (`### &lt;component&gt;.Env: type`)
+docs/packages/gridlab/pipelines.md:120: step-io-types PL-07 step `record_episode` names Agent, which no contract.md type section defines (`### &lt;component&gt;.Agent: type`)
+docs/packages/gridlab/pipelines.md:120: step-io-types PL-07 step `record_episode` names Env, which no contract.md type section defines (`### &lt;component&gt;.Env: type`)
+docs/packages/gridlab/pipelines.md:121: step-io-types PL-07 step `save_recording` names Artifact, which no contract.md type section defines (`### &lt;component&gt;.Artifact: type`)
+docs/packages/gridlab/pipelines.md:122: step-io-types PL-07 step `view` names ViewResult, which no contract.md type section defines (`### &lt;component&gt;.ViewResult: type`)
+docs/packages/gridlab/pipelines.md:141: step-io-types PL-08 step `export_animation` names Artifact, which no contract.md type section defines (`### &lt;component&gt;.Artifact: type`)
+docs/packages/gridlab/pipelines.md:157: step-io-types PL-09 step `load_agent` names Agent, which no contract.md type section defines (`### &lt;component&gt;.Agent: type`)
+docs/packages/gridlab/pipelines.md:157: step-io-types PL-09 step `load_agent` names Env, which no contract.md type section defines (`### &lt;component&gt;.Env: type`)
+docs/packages/gridlab/pipelines.md:158: step-io-types PL-09 step `inspect_table` names Agent, which no contract.md type section defines (`### &lt;component&gt;.Agent: type`)
+docs/packages/gridlab/pipelines.md:158: step-io-types PL-09 step `inspect_table` names Env, which no contract.md type section defines (`### &lt;component&gt;.Env: type`)
+29 errors, 0 warnings</div><details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;replace_all&quot;: false,
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-7/rl-incremental/with_skill/project/docs/packages/gridlab/pipelines.md&quot;,
+  &quot;old_string&quot;: &quot;  9. `tabular.inspect_table` raises `ValueError` for a non-tabular agent.\n&quot;,
+  &quot;new_string&quot;: &quot;  9. `tabular.inspect_table` raises `ValueError` for a non-tabular agent.\n- **Components on no step:** `core`, `snake`, `corridor`, `baselines` and `dqn` are libraries reached through steps: `make_env` and `make_agent` build them, and `train_agent`, `evaluate` and `record_episode` drive them through the `core` protocols (CORE-07). `cli` only parses arguments into the entries and hosts PL-09&#x27;s entry. (assumed: no pipeline of their own)\n&quot;
+}</pre><div class="lbl">output</div><pre>The file /Users/connorott/plugins/dev-team-workspace/iteration-7/rl-incremental/with_skill/project/docs/packages/gridlab/pipelines.md has been updated successfully. (file state is current in your context — no need to Read it back)</pre></details></div><div class="step" id="SD76"><span class="sid">D76</span><span class="kind">say</span>I&#x27;ve written the draft pipelines to `docs/packages/gridlab/pipelines.md`. It can&#x27;t be approved yet: it needs a contract revision first. Details below. ⏎ What was written ⏎ | ID | Pipeline | Trigger | Steps | ⏎ |---|---|---|---| ⏎ | PL-01 | Train one run | `gridlab train …` | make_env → make_agent → RunWriter.create → train_agent → evaluate → record_highlights → save_outputs | ⏎ | PL-02 | Run a preset set | `gridlab preset dqn-l3` | get_preset → train_set (runs PL-01 for each configuration) | ⏎ | PL-03 | Write comparison inputs | `gridlab compare dqn-l3` | get_preset → write_comparisons …[+3227 chars]<details><summary>full text</summary><pre>I&#x27;ve written the draft pipelines to `docs/packages/gridlab/pipelines.md`. It **can&#x27;t be approved yet**: it needs a contract revision first. Details below.
+
+**What was written**
+| ID | Pipeline | Trigger | Steps |
+|---|---|---|---|
+| PL-01 | Train one run | `gridlab train …` | make_env → make_agent → RunWriter.create → train_agent → evaluate → record_highlights → save_outputs |
+| PL-02 | Run a preset set | `gridlab preset dqn-l3` | get_preset → train_set (runs PL-01 for each configuration) |
+| PL-03 | Write comparison inputs | `gridlab compare dqn-l3` | get_preset → write_comparisons → *(you run the `null-hypothesis-testing` skill)* |
+| PL-04 | Build results report | `gridlab report dqn-l3` | results_table |
+| PL-05 | Plot learning curves | `gridlab plot dqn-l3` | get_preset → learning_curve → ablation_curves |
+| PL-06 | View a recording | `gridlab view &lt;npz&gt;` | load_recording → view |
+| PL-07 | Play a saved agent live | `gridlab play &lt;run&gt; --seed 42` | open_run → load_agent → record_episode → save_recording → view |
+| PL-08 | Export an animation | `gridlab export &lt;npz&gt; --out x.gif` | load_recording → export_animation |
+| PL-09 | Inspect the Q-table | `gridlab inspect-table &lt;run&gt;` | open_run → load_agent → inspect_table |
+
+The planned layout has one folder per component. Pipeline entries go in `train/`, `compare/`, `plots/`, `viewer/` and `cli/` `pipeline.py`. Shared types go in each component&#x27;s `types.py`.
+
+**Why it can&#x27;t be approved yet:** `dt lint` reports 29 errors, all of one kind. The step tables use types the contract doesn&#x27;t define as types. This exposed some gaps in the approved contract, and fixing them is `architecture-design`&#x27;s job (a Revise), not mine. The nine changes are listed under Open questions in the doc:
+1. Mark `Env`, `Agent`, `LearningAgent` and `RunWriter` as type sections, with no shape change.
+2. `Env` gets `obs_labels`, so the Q-table dump and the viewer can label features without importing Snake.
+3. New types for things these commands return:
+   - `core.Artifact` for any written file;
+   - `compare.ResultsTable`;
+   - `viewer.ViewResult`.
+4. Entry-like functions become pipeline entries:
+   - `train_run` → `run_train`;
+   - `train_seeds` → `run_preset`, so TRAIN-02 now runs through presets and the &quot;same configuration over several seeds&quot; command goes away;
+   - `play_live` → `run_play`;
+   - plus the new entries.
+5. New small functions:
+   - `experiments.get_preset`;
+   - `runstore.open_run`;
+   - `runstore.save_recording`.
+6. The plot functions take the experiment set and group the runs themselves.
+7. `inspect_table` rejects an agent that isn&#x27;t tabular.
+
+**Assumptions**
+- Step names, owners and modules are as in the table and layout.
+- Baselines go through PL-01 with zero training steps.
+- Ctrl-C handling lives inside `train_agent`.
+- `ablation_curves` returns None for a set with only one learning group.
+- The PL-09 entry lives in `cli`.
+- `--seeds` on `train` is dropped in favour of presets.
+
+**Uncovered:** none. Every spec ID lands on a step. Six components own no step: `core`, `snake`, `corridor`, `baselines`, `dqn` and `cli`. That&#x27;s by design, since they&#x27;re libraries built by `make_env` and `make_agent` or argument parsing, and the reason is recorded in the doc.
+
+**Not done yet:** adding the PL IDs to the contract&#x27;s &quot;Used by&quot; lines. I&#x27;ll do that after the Revise, so I don&#x27;t edit symbols that are about to be renamed.
+
+**Proposed order:**
+1. You approve these workflows and step tables.
+2. `architecture-design` Revise applies the 9 contract changes.
+3. I add the PL IDs to &quot;Used by&quot; and re-run lint to confirm 0 errors.
+4. Then I mark this Approved.
+
+Approve the pipelines as designed and go ahead with the contract revision, or tell me what to change.</pre></details></div><div class="step" id="SD77"><span class="sid">D77</span><span class="kind">hook</span><span class="hook">Stop said: {&quot;systemMessage&quot;: &quot;dt lint: 29 problems\ndocs/packages/gridlab/pipelines.md:11: step-io-types PL-01 step `make_env` names Env, which no contract.md type section defines (`### &lt;component&gt;.Env: type`)\ndocs/packages/gridlab/pipelines.md:12: step-io-types PL-01 step `make_agent` names Agent, which no contract.md type section defines (`### &lt;component&gt;.Agent: type`)\ndocs/packages/gridlab/pipelines.md:12: step-io-types PL-01 step `make_agent` names Env, which no contract.md type section defines (`### &lt;component&gt;.Env: type`)\ndocs/packages/gridlab/pipelines.md:13: step-io-types PL-01 step `RunWriter.create` names RunWriter, which no contract.md type section defines (`### &lt;component&gt;.RunWriter: type`)\ndocs/packages/gridlab/pipelines.md:14: step-io-types PL-01 step `train_agent` names Agent, which no contract.md type section defines (`### &lt;component&gt;.Agent: type`)\ndocs/packages/gridlab/pipelines.md:14: step-io-types PL-01 step `train_agent` names Env, which no contract.md type section defines (`### &lt;component&gt;.Env: type`)\ndocs/packages/gridlab/pipelines.md:14: step-io-types PL-01 step `train_agent` names RunWriter, which no contract.md type section defines (`### &lt;component&gt;.RunWriter: type`)\ndocs/packages/gridlab/pipelines.md:15: step-io-types PL-01 step `evaluate` names Agent, which no contract.md type section defines (`### &lt;component&gt;.Agent: type`)\ndocs/packages/gridlab/pipelines.md:15: step-io-types PL-01 step `evaluate` names Env, which no contract.md type section defines (`### &lt;component&gt;.Env: type`)\ndocs/packages/gridlab/pipelines.md:16: step-io-types PL-01 step `record_highlights` names Agent, which no contract.md type section defines (`### &lt;component&gt;.Agent: type`)\ndocs/packages/gridlab/pipelines.md:16: step-io-types PL-01 step `record_highlights` names Env, which no contract.md type section defines (`### &lt;component&gt;.Env: type`)\ndocs/packages/gridlab/pipelines.md:17: step-io-types PL-01 step `save_outputs` names Agent, which no contract.md type section defines (`### &lt;component&gt;.Agent: type`)\ndocs/packages/gridlab/pipelines.md:17: step-io-types PL-01 step `save_outputs` names RunWriter, which no contract.md type section defines (`### &lt;component&gt;.RunWriter: type`)\ndocs/packages/gridlab/pipelines.md:54: step-io-types PL-03 step `write_comparisons` names Artifact, which no contract.md type section defines (`### &lt;component&gt;.Artifact: type`)\ndocs/packages/gridlab/pipelines.md:69: step-io-types PL-04 step `results_table` names ResultsTable, which no contract.md type section defines (`### &lt;component&gt;.ResultsTable: type`)\ndocs/packages/gridlab/pipelines.md:84: step-io-types PL-05 step `learning_curve` names Artifact, which no contract.md type section defines (`### &lt;component&gt;.Artifact: type`)\ndocs/packages/gridlab/pipelines.md:85: step-io-types PL-05 step `ablation_curves` names Artifact, which no contract.md type section defines (`### &lt;component&gt;.Artifact: type`)\ndocs/packages/gridlab/pipelines.md:103: step-io-types PL-06 step `view` names ViewResult, which no contract.md type section defines (`### &lt;component&gt;.ViewResult: type`)\ndocs/packages/gridlab/pipelines.md:119: step-io-types PL-07 step `load_agent` names Agent, which no contract.md type section defines (`### &lt;component&gt;.Agent: type`)\ndocs/packages/gridlab/pipelines.md:119: step-io-types PL-07 step `load_agent` names Env, which no contract.md type section defines (`### &lt;component&gt;.Env: type`)\ndocs/packages/gridlab/pipelines.md:120: step-io-types PL-07 step `record_episode` names Agent, which no contract.md type section defines (`### &lt;component&gt;.Agent: type`)\ndocs/packages/gridlab/pipelines.md:120: step-io-types PL-07 step `record_episode` names Env, which no contract.md type section defines (`### &lt;component&gt;.Env: type`)\ndocs/packages/gridlab/pipelines.md:121: step-io-types PL-07 step `save_recording` names Artifact, which no contract.md type section defines (`### &lt;component&gt;.Artifact: type`)\ndocs/packages/gridlab/pipelines.md:122: step-io-types PL-07 step `view` names ViewResult, which no contract.md type section defines (`### &lt;component&gt;.ViewResult: type`)\ndocs/packages/gridlab/pipelines.md:141: step-io-types PL-08 step `export_animation` names Artifact, which no contract.md type section defines (`### &lt;component&gt;.Artifact: type`)\ndocs/packages/gridlab/pipelines.md:157: step-io-types PL-09 step `load_agent` names Agent, which no contract.md type section defines (`### &lt;component&gt;.Agent: type`)\ndocs/packages/gridlab/pipelines.md:157: step-io-types PL-09 step `load_agent` names Env, which no contract.md type section defines (`### &lt;component&gt;.Env: type`)\ndocs/packages/gridlab/pipelines.md:158: step-io-types PL-09 step `inspect_table` names Agent, which no contract.md type section defines (`### &lt;component&gt;.Agent: type`)\ndocs/packages/gridlab/pipelines.md:158: step-io-types PL-09 step `inspect_table` names Env, which no contract.md type section defines (`### &lt;component&gt;.Env: type`)&quot;}
+</span></div><div class="step" id="SD78"><span class="sid">D78</span><span class="kind">hook</span><span class="hook">SessionStart:resume said: milestone: none (no tasks/plan.md)
+draft (waiting for approval): docs/packages/gridlab/pipelines.md
+dt: python3 /Users/connorott/plugins/dev-team-workspace/iteration-7/rl-incremental/with_skill/plugin/dev-team/scripts/dt.py
+</span></div>
+<h2>Commits</h2>
+<p>None.</p>
+<h2>Returned</h2>
+<pre>I&#x27;ve written the draft pipelines to `docs/packages/gridlab/pipelines.md`. It **can&#x27;t be approved yet**: it needs a contract revision first. Details below.
+
+**What was written**
+| ID | Pipeline | Trigger | Steps |
+|---|---|---|---|
+| PL-01 | Train one run | `gridlab train …` | make_env → make_agent → RunWriter.create → train_agent → evaluate → record_highlights → save_outputs |
+| PL-02 | Run a preset set | `gridlab preset dqn-l3` | get_preset → train_set (runs PL-01 for each configuration) |
+| PL-03 | Write comparison inputs | `gridlab compare dqn-l3` | get_preset → write_comparisons → *(you run the `null-hypothesis-testing` skill)* |
+| PL-04 | Build results report | `gridlab report dqn-l3` | results_table |
+| PL-05 | Plot learning curves | `gridlab plot dqn-l3` | get_preset → learning_curve → ablation_curves |
+| PL-06 | View a recording | `gridlab view &lt;npz&gt;` | load_recording → view |
+| PL-07 | Play a saved agent live | `gridlab play &lt;run&gt; --seed 42` | open_run → load_agent → record_episode → save_recording → view |
+| PL-08 | Export an animation | `gridlab export &lt;npz&gt; --out x.gif` | load_recording → export_animation |
+| PL-09 | Inspect the Q-table | `gridlab inspect-table &lt;run&gt;` | open_run → load_agent → inspect_table |
+
+The planned layout has one folder per component. Pipeline entries go in `train/`, `compare/`, `plots/`, `viewer/` and `cli/` `pipeline.py`. Shared types go in each component&#x27;s `types.py`.
+
+**Why it can&#x27;t be approved yet:** `dt lint` reports 29 errors, all of one kind. The step tables use types the contract doesn&#x27;t define as types. This exposed some gaps in the approved contract, and fixing them is `architecture-design`&#x27;s job (a Revise), not mine. The nine changes are listed under Open questions in the doc:
+1. Mark `Env`, `Agent`, `LearningAgent` and `RunWriter` as type sections, with no shape change.
+2. `Env` gets `obs_labels`, so the Q-table dump and the viewer can label features without importing Snake.
+3. New types for things these commands return:
+   - `core.Artifact` for any written file;
+   - `compare.ResultsTable`;
+   - `viewer.ViewResult`.
+4. Entry-like functions become pipeline entries:
+   - `train_run` → `run_train`;
+   - `train_seeds` → `run_preset`, so TRAIN-02 now runs through presets and the &quot;same configuration over several seeds&quot; command goes away;
+   - `play_live` → `run_play`;
+   - plus the new entries.
+5. New small functions:
+   - `experiments.get_preset`;
+   - `runstore.open_run`;
+   - `runstore.save_recording`.
+6. The plot functions take the experiment set and group the runs themselves.
+7. `inspect_table` rejects an agent that isn&#x27;t tabular.
+
+**Assumptions**
+- Step names, owners and modules are as in the table and layout.
+- Baselines go through PL-01 with zero training steps.
+- Ctrl-C handling lives inside `train_agent`.
+- `ablation_curves` returns None for a set with only one learning group.
+- The PL-09 entry lives in `cli`.
+- `--seeds` on `train` is dropped in favour of presets.
+
+**Uncovered:** none. Every spec ID lands on a step. Six components own no step: `core`, `snake`, `corridor`, `baselines`, `dqn` and `cli`. That&#x27;s by design, since they&#x27;re libraries built by `make_env` and `make_agent` or argument parsing, and the reason is recorded in the doc.
+
+**Not done yet:** adding the PL IDs to the contract&#x27;s &quot;Used by&quot; lines. I&#x27;ll do that after the Revise, so I don&#x27;t edit symbols that are about to be renamed.
+
+**Proposed order:**
+1. You approve these workflows and step tables.
+2. `architecture-design` Revise applies the 9 contract changes.
+3. I add the PL IDs to &quot;Used by&quot; and re-run lint to confirm 0 errors.
+4. Then I mark this Approved.
+
+Approve the pipelines as designed and go ahead with the contract revision, or tell me what to change.</pre>
+</body></html>

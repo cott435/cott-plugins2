@@ -861,6 +861,16 @@ if project == "quant":
     check("no_live_trading", "Real-money / live trading is explicitly out of scope", bool(re.search(r"live|real[- ]money|brokerage", excluded, re.I)), "")
     check("spec_oos", "Out-of-sample / held-out evaluation is required for features and models",
           len(re.findall(r"out[- ]of[- ]sample|held[- ]out|walk[- ]forward", spec, re.I)) >= 3, f"{len(re.findall(r'out[- ]of[- ]sample|held[- ]out|walk[- ]forward', spec, re.I))} mentions")
+    # The user names Sharadar (subscribed) and yahooquery (cross-check); the agent should raise more sources itself,
+    # among them one for company fundamentals, as a chosen source or an alternative considered.
+    src_docs = {p.relative_to(proj).as_posix(): p.read_text() for p in
+                [docs / "brief.md", docs / "spec.md", docs / "architecture.md", *pkg_docs, *ideas] if p.exists()}
+    src_docs = {rel: txt for rel, txt in src_docs.items() if status(txt) in ("Approved", "Accepted", "Specced")}
+    found, fundamentals = dtrun.data_sources(src_docs)
+    check("data_sources_suggested", "quant: approved docs name a data source beyond the user's two (Sharadar prices, "
+          "yahooquery), at least one of them for company fundamentals", bool(fundamentals),
+          f"found: {found}; fundamentals: {fundamentals}; docs searched: {sorted(src_docs)}",
+          {"sources": sorted(found), "fundamentals": fundamentals, "where": found})
     viz = {k: bool(re.search(pat, arch_all, re.I)) for k, pat in
            [("typescript", r"TypeScript"), ("react", r"\bReact\b"), ("websocket", r"WebSocket"), ("json_schema", r"JSON Schema")]}
     check("arch_viz_boundary", "Architecture puts the viz app's TypeScript + React frontend across a WebSocket/HTTP boundary from the Python backend, "

@@ -265,6 +265,19 @@ case("types_in_contract", True, "library types, comments and prose are left out"
 case("types_in_contract", True, "a type defined inline resolves", d.defined_in("CovMethod", "`CovMethod = Literal['sample', 'shrink']`"))
 
 
+# ---- data_sources_suggested (iteration-8 follow-up): the agent's own sources beyond Sharadar prices and yahooquery
+f, fund = d.data_sources({"docs/architecture.md": "- **Alternatives:** Tiingo (raw closes); SEC EDGAR company facts "
+                          "(XBRL) for fundamentals, deferred to S3."})
+case("data_sources_suggested", True, "a fundamentals source among the alternatives counts", fund == ["SEC EDGAR / XBRL"] and "Tiingo" in f)
+f, fund = d.data_sources({"docs/architecture.md": "Fundamentals from Sharadar's SF1 table, on the same subscription."})
+case("data_sources_suggested", True, "Sharadar SF1, named as the fundamentals source, counts", fund == ["Sharadar SF1"])
+f, fund = d.data_sources({"docs/architecture.md": "Prices from Sharadar SEP; cross-checked against Yahoo via yahooquery, "
+                          "with EODHD and Polygon considered for prices."})
+case("data_sources_suggested", False, "price sources alone, and Sharadar without SF1, don't count", not fund and sorted(f) == ["EODHD", "Polygon"])
+f, fund = d.data_sources({"docs/brief.md": "- Intraday data, fundamentals or live streaming — daily prices first."})
+case("data_sources_suggested", False, "fundamentals ruled out, no source named", not f and not fund)
+
+
 def run(verbose=True):
     """The cases that came out wrong (empty when all hold)."""
     wrong = [c for c in CASES if not c[3]]

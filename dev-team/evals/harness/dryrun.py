@@ -49,7 +49,7 @@ PLANNING = [l for l in LAYERS if l[0]]
 
 # What a single-package sample mid-M1 can't meet, in every replay.
 CONTENT = {"quant_multi_from_data", "approval_after_user", "nh_named", "nh_at_features", "nh_routed_in_plan",
-           "spec_bias_guards", "spec_classical", "spec_ml_beats_classical", "spec_oos", "arch_viz_boundary",
+           "spec_bias_guards", "spec_classical", "spec_ml_beats_classical", "spec_oos", "data_sources_suggested", "arch_viz_boundary",
            "refs_milestones", "skills_on_data_tasks", "skills_on_structure_tasks"}
 BAD_FAIL = {"graph_metrics", "writes_disjoint", "edges_mitigated", "unmitigated_reasoned", "no_edge_to_code_when_interface",
             "edge_table_consistent", "phase0_split", "step_tasks_small", "tester_starts_early", "fakes_only_cross_pipeline",

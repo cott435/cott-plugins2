@@ -611,6 +611,38 @@ def routed_revise(layers, prev_turn, changed, prev_layers=()):
     return left_draft and bool(REVISE_ASK.search(text)) and bool(UPSTREAM.search(text))
 
 
+# data_sources_suggested (grade.py): sources the agent may raise beyond the user's Sharadar prices and yahooquery cross-check,
+# matched by name: {name: (pattern, is a fundamentals source)}. Sharadar counts only as SF1 or "Sharadar
+# Fundamentals"; EODHD counts as fundamentals only where its fundamentals are named.
+DATA_SOURCES = {
+    "SEC EDGAR / XBRL": (r"\bEDGAR\b|\bXBRL\b|companyfacts|company[- ]facts API", True),
+    "SimFin": (r"\bSimFin\b", True),
+    "Financial Modeling Prep": (r"Financial Modeling Prep|\bFMP\b", True),
+    "Sharadar SF1": (r"\bSF1\b|Sharadar(?:'s)? (?:Core US )?Fundamentals", True),
+    "EODHD fundamentals": (r"\bEODHD?\b[^.\n]{0,80}fundamental|fundamental[^.\n]{0,80}\bEODHD?\b", True),
+    "Compustat": (r"\bCompustat\b", True),
+    "EODHD": (r"\bEODHD?\b|EOD Historical Data", False),
+    "Tiingo": (r"\bTiingo\b", False),
+    "Polygon": (r"\bPolygon(?:\.io)?\b", False),
+    "Alpha Vantage": (r"Alpha ?Vantage", False),
+    "Alpaca": (r"\bAlpaca\b", False),
+    "Norgate": (r"\bNorgate\b", False),
+    "CRSP": (r"\bCRSP\b|\bWRDS\b", False),
+    "Stooq": (r"\bStooq\b", False),
+    "Databento": (r"\bDatabento\b", False),
+    "Intrinio": (r"\bIntrinio\b", False),
+    "FRED": (r"\bFRED\b", False),
+}
+
+
+def data_sources(texts):
+    """({source: [doc, ...]} for every DATA_SOURCES name found in `texts` ({doc: text}), the fundamentals ones)."""
+    found = {name: sorted(rel for rel, txt in texts.items() if re.search(pat, txt, re.I))
+             for name, (pat, _) in DATA_SOURCES.items()}
+    found = {name: rels for name, rels in found.items() if rels}
+    return found, sorted(name for name in found if DATA_SOURCES[name][1])
+
+
 # spec_ml_beats_classical: the ML bar names the classical portfolios or the earlier stage's named benchmark.
 ML_BEATS_CLASSICAL = re.compile(
     r"(PPO|agent|forecast[- ]driven|ML[- ]driven).{0,600}(min(imum)?[- ]variance|classical|HRP|risk parity|"

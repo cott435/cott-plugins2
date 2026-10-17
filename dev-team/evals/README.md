@@ -56,16 +56,16 @@ On dt's sample, `simulate.py` passes every Replan, Advance, Ready and contract-c
 
 The dry run replays the fixture's `references/` and `docs/references.md` as a reference-intake turn (with one fake Agent launch per file) before the M2 idea. To exercise the driver's reference copying and Agent parsing, run the fake loop on `quant-all-at-once` with `MAX_TURNS=5`: turn 4 is the intake layer and should record one launch per file. The fake loop also writes one plan snapshot per turn to `plans/`.
 
-The dry run is also the grader's self-test. It first runs `selftest/checks.py` (at least one good and one bad case for each of the 14 checks the iteration-7 fixes changed), then grades eight replays, exports each planning replay's `plan.json`, and compares every check with the result pinned in `dryrun.py` and `dryrun_probe.py`, exiting 1 on anything unexpected:
+The dry run is also the grader's self-test. It first runs `selftest/checks.py` (at least one good and one bad case for each of the 14 checks the iteration-7 fixes changed, and for `data_sources_suggested`), then grades eight replays, exports each planning replay's `plan.json`, and compares every check with the result pinned in `dryrun.py` and `dryrun_probe.py`, exiting 1 on anything unexpected:
 
 | Replay | What it is | Checks passing |
 |---|---|---|
-| `quant-incremental` | The sample as it is (its interface-first M1), then its M1 code as a build turn | 66 of 80 |
-| `quant-incremental-ifd` | The sample with the interface-first M1 from `selftest/`; no code | 67 of 80 |
-| `quant-incremental-ifdbad` | That plan broken once per check, plus a `types.py` written in a planning turn and a frozen type revised after the plan | 47 of 80 |
-| `quant-incremental-ifdserial` | The spines chained one after another and the testers solo | 60 of 80 |
-| `quant-incremental-probe` | The ifd replay with a Sharadar decision (AD-04, Proposed, citing PB-01), api-probe New (`selftest/quant-probe/`), the user's run of PB-01 against the fake Sharadar, Record, and an architecture Revise that accepts AD-04 with the findings. PB-01 is routed to M1, so M1-T02 also reads `PB-01:samples` | 77 of 90 |
-| `quant-incremental-probebad` | That run broken once per probe check | 66 of 90 |
+| `quant-incremental` | The sample as it is (its interface-first M1), then its M1 code as a build turn | 66 of 81 |
+| `quant-incremental-ifd` | The sample with the interface-first M1 from `selftest/`; no code | 67 of 81 |
+| `quant-incremental-ifdbad` | That plan broken once per check, plus a `types.py` written in a planning turn and a frozen type revised after the plan | 47 of 81 |
+| `quant-incremental-ifdserial` | The spines chained one after another and the testers solo | 60 of 81 |
+| `quant-incremental-probe` | The ifd replay with a Sharadar decision (AD-04, Proposed, citing PB-01), api-probe New (`selftest/quant-probe/`), the user's run of PB-01 against the fake Sharadar, Record, and an architecture Revise that accepts AD-04 with the findings. PB-01 is routed to M1, so M1-T02 also reads `PB-01:samples` | 77 of 91 |
+| `quant-incremental-probebad` | That run broken once per probe check | 66 of 91 |
 | `api-probe-good` | The api-probe fixture with the gold PB-03, its user run against the fake Plaid, and Record | 12 of 12 |
 | `api-probe-bad` | That run broken once per fixture check | 0 of 13 |
 
@@ -191,6 +191,7 @@ These are the §13 assertions. Each is a named check in `grading.json`.
 | `first_planned_rest_designed` | Both modes: the first milestone has a plan, every later milestone is at least Designed (task plans are written for the next milestone only), and every revealed stage has milestone rows (a stage still Idea, Specced or Designed fails, by name; Cut, which dt now calls Split, and above pass), so the final roadmaps of the two modes compare like for like |
 | `brief_goals_stage_neutral` | 5 goals or fewer, none worded per stage |
 | `quant_multi_from_data` | No turn's architecture is single-package (the data stage's TypeScript frontend is a runtime boundary), and the final shape has two or more packages |
+| `data_sources_suggested` | quant: the Approved or Accepted brief, spec, ideas and architecture docs (decisions, Alternatives included) name a data source beyond the user's two (Sharadar prices, yahooquery), and at least one is a fundamentals source, chosen or considered. Matched by name from `grade.py`'s `DATA_SOURCES`: fundamentals are SEC EDGAR / XBRL, SimFin, Financial Modeling Prep, Compustat, EODHD where its fundamentals are named, and Sharadar SF1 (it counts when named as SF1 or Sharadar Fundamentals, not as Sharadar alone); price sources such as EODHD, Tiingo, Polygon, Alpha Vantage, Stooq and CRSP are listed but don't pass it. `metrics`: the sources found, where, and which are fundamentals. The persona never raises fundamentals; asked, it wants a suggestion |
 | `no_code_during_planning` | Nothing under `src/`, `tests/intent/` or `tests/unit/`, no code under `tests/contracts/` and no `types.py` anywhere, in any turn, beyond empty or docstring-only files. Types, signatures, schemas, fakes and samples are the build's interface task's work; planning names a type's cases. A data file under `tests/contracts/` isn't code, so this check doesn't flag one |
 | `gate_discipline` | No turn adds 12 or more lines to two layers. The layers are brief/idea, references (`docs/references.md`), spec, architecture, pipelines, tests, plan and setup. A routed Revise round trip passes: architecture plus pipelines (or tests) in a turn after one that drafted at most that other layer, left its doc Draft and asked to run the architecture revision. The same two layers in one turn with no such ask still fail. Its evidence also lists the routed turns, and contract type sections added in pipeline-design turns, the sign of pipeline-design finding missing types and revising the architecture itself. A turn counts as a skill's when it invokes the skill, runs `dt status --skill <skill>`, or reads `skills/<skill>/` files, so a turn that continues a skill without invoking it again still counts |
 | `skills_invoked`, `test_planning_invoked`, `plan_docs_approved`, `approval_after_user` | Every planning skill ran, and the docs ended Approved only after the user said yes |

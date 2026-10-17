@@ -45,10 +45,12 @@ Usage:
   trace.py build SESSION [--plugin NAME] [--project TEXT] [--out DIR] [--full]
       Writes DIR/run.md, DIR/index.json, DIR/driver/seg-<n>.md (with --plugin),
       DIR/units/U<nn>.{md,json,html,system.md}, DIR/turns/T<nn>.{json,html}, and
-      DIR/flow.html, the run as a page. DIR defaults to the session's workspace.
+      DIR/flow.html, the run as a page (and DIR/plan/ when DIR holds a plan.json). DIR defaults
+      to the session's workspace.
       --full raises every truncation limit fivefold.
   trace.py flow DIR
-      Re-render DIR/flow.html and the unit and turn pages from DIR/index.json.
+      Re-render DIR/flow.html and the unit and turn pages from DIR/index.json, and DIR/plan/
+      from DIR/plan.json when there is one (planmap.py).
   trace.py view --agent TYPE (--sessions a,b | --branch GLOB) [--plugin NAME] [--root DIR] [--flat]
       Every run of one agent type across several sessions. Each session is built into its
       workspace under DIR (default $RUN_FLOW_HOME; DIR/<id8>/ with --flat, as plugin-dev's

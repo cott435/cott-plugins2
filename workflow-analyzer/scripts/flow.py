@@ -46,7 +46,8 @@ per turn (one loop of the main thread) for its skill, wall time, output tokens a
 and a matrix of every file read, written or edited, by turn. Each turn has its own page,
 `turns/T<nn>.html`, from `turns/T<nn>.json`. When the workspace holds an `eval.json` (written by
 dev-team's `evals/harness/runviz.py`), the page also shows the eval's grade, stage and cost per turn,
-and links to the comparisons it lists.
+and links to the comparisons it lists. When it holds a `plan.json`, `planmap.py` draws `plan/`, the
+page gains a Plan section, and each turn page links to the plan as of that turn.
 """
 
 from __future__ import annotations
@@ -581,10 +582,10 @@ def files_table(ops: list[dict], project: str | None) -> str:
 
 def unit_page(d: dict, unit_of_agent: dict, marks: list | None = None, here: Path | None = None,
               narr: dict | None = None, units_href: str = "", project: str | None = None,
-              timeline: str = "") -> str:
+              timeline: str = "", plan: str = "") -> str:
     """One unit's page, from its `units/U<nn>.json` only, plus its issue marks and its
     narration, if any. A turn's page (`turns/T<nn>.json`) is drawn the same way, with
-    `units_href` pointing at `../units/`."""
+    `units_href` pointing at `../units/` and `plan` a link to the plan as of that turn."""
     mins = minutes(d.get("first_ts", ""), d.get("last_ts", ""))
     spawned = f"{d.get('spawner')}" + (f" at {d['spawn_step']}" if d.get("spawn_step") else "")
     if d.get("spawner") in unit_of_agent.values():
@@ -629,6 +630,7 @@ def unit_page(d: dict, unit_of_agent: dict, marks: list | None = None, here: Pat
 <style>{CSS}{charts.CHART_CSS}{PAGE_CSS}</style></head>
 <body>
 <p class="top"><a href="../flow.html">← the run's flow chart</a></p>
+{plan}
 <h1>{esc(d['unit'])} · {esc(d['type'])} · {esc(d.get('description', ''))}</h1>
 <table class="head">{''.join(f'<tr><td>{k}</td><td>{v}</td></tr>' for k, v in rows)}</table>
 {narration_block(narr, d.get("step_count", len(d.get("steps", []))))}
@@ -664,6 +666,7 @@ def write_unit_pages(out: Path, index: dict, marks: dict | None = None) -> list[
 
 
 def write_turn_pages(out: Path, index: dict) -> list[str]:
+    import planmap  # imported here: planmap imports this module
     unit_of_agent = {u["agent_id"]: u["unit"] for u in index["units"]}
     written = []
     for t in index.get("turns") or []:
@@ -681,7 +684,8 @@ def write_turn_pages(out: Path, index: dict) -> list[str]:
                                     lambda _: "#", width=900)
             tl = (f'<h2>Timeline</h2><p class="legend">This turn only: the main thread on top, its agents below, '
                   f'stacked when they ran at once. {legend}</p><div class="scroll">{chart}</div>')
-        page = unit_page(d, unit_of_agent, units_href="../units/", project=index.get("project"), timeline=tl)
+        page = unit_page(d, unit_of_agent, units_href="../units/", project=index.get("project"), timeline=tl,
+                         plan=planmap.turn_link(out, t["n"]))
         (out / "turns" / f"{t['turn']}.html").write_text(page, encoding="utf-8")
         written.append(t["turn"])
     return written
@@ -861,7 +865,9 @@ def turns_table(index: dict, extra: dict) -> str:
 
 
 def write_html(out: Path, issues: Path | None = None) -> Path:
+    import planmap  # imported here: planmap imports this module
     index = json.loads((out / "index.json").read_text(encoding="utf-8"))
+    planmap.write(out)
     marks = issue_marks(Path(issues) if issues else default_issues(out), index["session"][:8])
     m = model(index, out, marks)
     units = index["units"]
@@ -977,6 +983,7 @@ Output tokens split into <span><i class="sw cmain" style="background:var(--main)
 <span><i class="sw cx"></i>agents</span>. Skills: {skill_legend or 'none invoked'}</p>
 <div class="scroll">{charts.turn_bars(index, skills, lambda t: f"turns/{t}.html", extra)}</div>
 {turns_table(index, extra)}
+{planmap.section(out)}
 
 <h2>Files by turn</h2>
 {charts.files_matrix(index, lambda t: f"turns/{t}.html")}

@@ -2,16 +2,20 @@
 """Draw the plan a run wrote, from its `plan.json`: how it grew turn by turn, and per milestone
 what would be built in parallel and what in series.
 
-`plan.json` (schema `plan-map/1`) sits in a run's workspace beside `index.json`. A producer
+`plan.json` (schema `plan-map/2`) sits in a run's workspace beside `index.json`. A producer
 (dev-team's `planexport.py`, or anything else) writes it; nothing here knows dev-team:
 
-  {"schema": "plan-map/1", "producer": "...", "levels": ["stage", "milestone", "task", ...],
+  {"schema": "plan-map/2", "producer": "...", "levels": ["goal", "stage", "feature", "requirement", ...],
    "snapshots": [{"turn": 14, "commit": "ab12", "ts": "...", "skill": "build-planning",
                   "nodes": [{"id", "level", "parent", "title", "hash", "attrs": {...},
                              "expects": {"acceptance", "verify", "reads", "writes", "tests", ...}}],
                   "edges": [{"from", "to", "kind", "mitigated_by"?, "reason"?}],
                   "builds": [{"milestone", "state", "critical_path", "waves"}]},
                  {"turn": 15, "same_as": 14}]}
+
+Goals, features and requirements are the plan's why: a feature `serves` goals and sits under its stage, a
+requirement sits under its feature, and pipelines, steps, tests and tasks `cover` requirements. `plan-map/1`
+(no such levels or edges) still draws; its plan has no trace page.
 
 One snapshot per turn that changed the plan. The producer reports state; the diffs are
 computed here: a node is added, removed, or changed by its `hash` and fields (title, parent,
@@ -25,6 +29,9 @@ Pages, all static HTML and inline SVG with no scripts, written into `<out>/plan/
               per level the live nodes, added above the line and removed below); a node × turn
               matrix, one collapsible table per level and one column per turn that changed the
               plan (A added, C changed, R removed); and a change ledger.
+  trace.html  the final plan from goals to build: goals, stages and their features, the pipelines that
+              cover them and the milestones that build those, as columns; then per goal and per feature how
+              many requirements a pipeline, a test and a task cover, and each requirement's coverage.
   T<nn>.html  the plan as of that turn as a tree, what it added, changed and removed marked,
               each node's expectations.
   M<n>.html   one milestone's build: columns are waves, lanes are task kinds; interface tasks
@@ -54,16 +61,17 @@ from pathlib import Path
 import charts
 import flow
 
-SCHEMA = "plan-map/1"
-LEVELS = ["stage", "milestone", "task", "pipeline", "step", "test", "type", "symbol"]
+SCHEMA = "plan-map/2"
+KNOWN = ("plan-map/1", SCHEMA)
+LEVELS = ["goal", "stage", "feature", "requirement", "milestone", "task", "pipeline", "step", "test", "type", "symbol"]
 KINDS = ["interface", "spine", "wiring", "thicken", "system"]
 KIND_COLOR = {"interface": "c6", "spine": "c0", "wiring": "c2", "thicken": "c1", "system": "c3"}
 GRAPH_KINDS = ("data", "call", "file", "code", "contract-change", "order")
 SIZE_W = {"XS": 1, "S": 2, "M": 4, "L": 8, "XL": 16}
 CP_CAP = 15
-PLURAL = {"stage": "Stages", "milestone": "Milestones", "task": "Tasks", "pipeline": "Pipelines",
+PLURAL = {"goal": "Goals", "feature": "Features", "requirement": "Requirements", "stage": "Stages", "milestone": "Milestones", "task": "Tasks", "pipeline": "Pipelines",
           "step": "Steps", "test": "Tests", "type": "Types", "symbol": "Symbols"}
-TITLED = {"stage", "milestone", "pipeline"}  # levels whose ledger chips carry the title
+TITLED = {"goal", "stage", "feature", "milestone", "pipeline"}  # levels whose ledger chips carry the title
 CHIPS = 40
 
 esc = charts.esc
@@ -139,7 +147,8 @@ def node_fields(n: dict, out_edges: dict[str, set[str]]) -> dict[str, tuple[str,
     for k, v in n["expects"].items():
         f[k] = ("expects", v)
     for k, v in out_edges.items():
-        f[k] = ("edges", v)
+        if k not in n["expects"]:  # an edge kind the expectations already list (covers) is compared there
+            f[k] = ("edges", v)
     return f
 
 
@@ -195,7 +204,7 @@ class Plan:
         self.notes: list[str] = []
         if not self.schema.startswith("plan-map/"):
             self.notes.append(f"schema is {self.schema or 'missing'}, not {SCHEMA}; drawn as {SCHEMA}")
-        elif self.schema != SCHEMA:
+        elif self.schema not in KNOWN:
             self.notes.append(f"schema {self.schema} is not {SCHEMA}; fields this page does not know are skipped")
         raw = sorted((s for s in doc.get("snapshots") or [] if isinstance(s, dict) and isinstance(s.get("turn"), int)),
                      key=lambda s: s["turn"])
@@ -623,6 +632,9 @@ svg .arrowhead{fill:var(--muted)}svg .arrowcp{fill:var(--fg)}svg a:hover .nb{str
 background:var(--box);font-size:11.5px;color:var(--muted);text-decoration:none}.thumb.cur{border-color:var(--fg)}
 .thumb b{color:var(--fg)}svg.th .e{stroke-width:1}svg.th .e.cp{stroke-width:2}
 .warnp{color:var(--warn)}
+svg.tr .band{opacity:.09}svg.mg .nb.gap{stroke:var(--warn);stroke-width:2}
+details.ft{margin:3px 0 3px 4px}details.ft>summary{cursor:pointer;font-size:13.5px}details.ft .ttl{margin-right:4px}
+table.rq td{vertical-align:top;font-size:12.5px}h3 .sw{margin-right:6px}
 """
 
 
@@ -912,11 +924,21 @@ def write_index(plan: Plan, d: Path) -> Path:
     nav = back_nav(plan, here_index=True)
     if plan.changed:
         nav.append(f'<a href="{tpage(plan.changed[-1].turn)}">the final plan (T{plan.changed[-1].turn:02d})</a>')
+    trace = ""
+    if has_trace(f):
+        nav.append('<a href="trace.html">goals to build</a>')
+        t = Trace(f)
+        rs = [r["id"] for r in t.reqs]
+        trace = (f'<h2>Goals to build</h2><p><a href="trace.html"><b>Goals to build</b></a>: {len(t.goals)} goals, '
+                 f'{len(t.features)} features in {len(t.stages)} stages, {len(rs)} requirements, of which '
+                 + ", ".join(f"{t.covered(rs, k)} are on a {k}" for k in COVER)
+                 + '. How each goal reaches features, stages, pipelines and milestones.</p>')
     body = f"""<h1>Plan map · {esc(run_title(plan))}</h1>
 <div class="sub">{esc(plan.producer or 'unknown producer')} · {esc(plan.schema or 'no schema')} · {len(plan.snaps)} snapshots,
 turns T{plan.snaps[0].turn:02d}–T{plan.snaps[-1].turn:02d}</div>
 {notes}
 {charts.tiles(tiles)}
+{trace}
 <h2>Milestones</h2>
 <p class="legend">Each opens its build view: what would run in parallel and what in series. Critical path is in tasks
 (cap {CP_CAP}); waves count boxes, a split task's tester and implementer apart, with the waves of whole tasks in
@@ -939,18 +961,356 @@ fields</span><span class="chip rem">−removed</span>. Each opens that node on t
     return path
 
 
+# ---------------------------------------------------------------- trace.html
+
+
+COVER = ("pipeline", "test", "task")  # what a requirement's coverage is counted by; a step counts for its pipeline
+
+
+class Trace:
+    """One snapshot from goals to build: which goals each feature serves, the stages it sits in, its
+    requirements, and per requirement the pipelines (and steps), tests and tasks that cover it."""
+
+    def __init__(self, s: Snap):
+        self.s = s
+        lv = s.by_level
+        self.goals = sorted(lv("goal"), key=lambda n: natural(n["id"]))
+        self.stages = sorted(lv("stage"), key=lambda n: natural(n["id"]))
+        self.features = lv("feature")  # the producer's order, which is the spec's
+        self.reqs = lv("requirement")
+        self.milestones = sorted(lv("milestone"), key=lambda n: natural(n["id"]))
+        self.pipelines = sorted(lv("pipeline"), key=lambda n: natural(n["id"]))
+        self.serves = {f["id"]: sorted({e["to"] for e in s.edges if e["from"] == f["id"] and e["kind"] == "serves"},
+                                       key=natural) for f in self.features}
+        self.freqs = {f["id"]: [r["id"] for r in self.reqs if r["parent"] == f["id"]] for f in self.features}
+        self.cov: dict[str, dict[str, set[str]]] = {r["id"]: {k: set() for k in (*COVER, "step")} for r in self.reqs}
+        for e in s.edges:
+            src = s.nodes.get(e["from"])
+            if e["kind"] != "covers" or e["to"] not in self.cov or not src:
+                continue
+            c = self.cov[e["to"]]
+            if src["level"] == "step":
+                c["step"].add(src["id"])
+                if src["parent"]:
+                    c["pipeline"].add(src["parent"])
+            elif src["level"] in c:
+                c[src["level"]].add(src["id"])
+        self.stage_ix = {st["id"]: i for i, st in enumerate(self.stages)}
+        self.pipe_ms: dict[str, list[str]] = {}
+        for m in self.milestones:
+            listed = m["attrs"].get("pipelines") or [p["id"] for p in self.pipelines if p["parent"] == m["id"]]
+            for p in listed:
+                self.pipe_ms.setdefault(str(p), []).append(m["id"])
+
+    def stages_of(self, f: dict) -> list[str]:
+        return [str(x) for x in f["attrs"].get("stages") or ([f["parent"]] if f["parent"] else [])]
+
+    def covered(self, reqs: list[str], kind: str) -> int:
+        return sum(1 for r in reqs if self.cov.get(r, {}).get(kind))
+
+    def union(self, reqs: list[str], kind: str) -> list[str]:
+        return sorted(set().union(*(self.cov[r][kind] for r in reqs if r in self.cov)), key=natural)
+
+    def feature_ms(self, reqs: list[str]) -> list[str]:
+        """Milestones that build these requirements: those listing a covering pipeline, and those whose tasks
+        cover them."""
+        ms = {m for p in self.union(reqs, "pipeline") for m in self.pipe_ms.get(p, [])}
+        ms |= {self.s.nodes[t]["parent"] for t in self.union(reqs, "task") if self.s.nodes[t]["parent"]}
+        return sorted(ms, key=natural)
+
+    def color(self, stage: str | None) -> str:
+        return f"var(--c{self.stage_ix[stage] % 8})" if stage in self.stage_ix else "var(--cx)"
+
+
+def frac(n: int, of: int) -> str:
+    return f"{n}/{of}" if of else "—"
+
+
+def cov_cell(n: int, of: int) -> str:
+    cls = "" if not of else "ok" if n == of else "bad" if n == 0 else "warnp"
+    return f'<td class="{cls}">{frac(n, of)}</td>'
+
+
+TW = {"goal": 220, "feature": 250, "pipeline": 230, "milestone": 210}
+TH, TG, TGAP, TTOP = 36, 8, 110, 44
+
+
+def stack(items: list[tuple[str, float | None]], top: float) -> dict[str, float]:
+    """Each item's box top, as near its wanted centre as the boxes above it allow; those with no wanted
+    centre (nothing links them) go below the rest."""
+    out, y = {}, top
+    for k, want in sorted(items, key=lambda kv: (kv[1] is None, kv[1] or 0, natural(kv[0]))):
+        y = max(y, want - TH / 2) if want is not None else y
+        out[k] = y
+        y += TH + TG
+    return out
+
+
+def trace_svg(t: Trace, href) -> str:
+    """Four columns: goals, features in stage bands, the pipelines that cover them, the milestones that list
+    those pipelines. Edges: serves; covers (thicker for more requirements); builds."""
+    xg = 10
+    xf = xg + TW["goal"] + TGAP
+    xp = xf + TW["feature"] + TGAP
+    xm = xp + TW["pipeline"] + TGAP
+    out, edges = [], []
+    # features, banded by their first stage
+    bands = [(st["id"], st["title"]) for st in t.stages] + [("", "no single stage")]
+    fy, y = {}, TTOP
+    for sid, title in bands:
+        fs = [f for f in t.features if (f["parent"] or "") == sid]
+        if not fs:
+            continue
+        h = 22 + len(fs) * (TH + TG)
+        out.append(f'<rect x="{xf - 8}" y="{y}" width="{TW["feature"] + 16}" height="{h}" rx="6" class="band" '
+                   f'style="fill:{t.color(sid) if sid else "var(--cx)"}"/>'
+                   f'<text x="{xf}" y="{y + 15}" class="head">{esc(fit((sid + " · " if sid else "") + title, 34))}</text>')
+        y += 22
+        for f in fs:
+            fy[f["id"]] = y
+            y += TH + TG
+        y += 14
+    bottom = y
+
+    def mid(yy: float) -> float:
+        return yy + TH / 2
+
+    def bary(pairs: list[tuple[float, float]]) -> float | None:
+        """The weighted mean of (centre, weight) pairs, or None for none."""
+        w = sum(n for _, n in pairs)
+        return sum(c * n for c, n in pairs) / w if w else None
+
+    gy = stack([(g["id"], bary([(mid(fy[f]), 1) for f in fy if g["id"] in t.serves[f]])) for g in t.goals], TTOP)
+    weight: dict[tuple[str, str], list[str]] = {}
+    for f in t.features:
+        for r in t.freqs[f["id"]]:
+            for p in t.cov[r]["pipeline"]:
+                weight.setdefault((f["id"], p), []).append(r)
+    pipes = [p for p in t.pipelines if any(k[1] == p["id"] for k in weight) or p["id"] in t.pipe_ms]
+    py = stack([(p["id"], bary([(mid(fy[f]), len(rs)) for (f, q), rs in weight.items() if q == p["id"]]))
+                for p in pipes], TTOP)
+    mpipes = {m["id"]: [p for p in py if m["id"] in t.pipe_ms.get(p, [])] for m in t.milestones}
+    my = stack([(m["id"], bary([(mid(py[p]), 1) for p in mpipes[m["id"]]])) for m in t.milestones], TTOP)
+    for col in (gy, py, my):
+        bottom = max([bottom, *(v + TH + TG for v in col.values())])
+    width, height = xm + TW["milestone"] + 10, bottom + 6
+
+    def curve(x1, y1, x2, y2, w, color, tip, dash=False):
+        dx = (x2 - x1) / 2
+        edges.append(f'<path d="M{x1:.1f},{y1:.1f} C{x1 + dx:.1f},{y1:.1f} {x2 - dx:.1f},{y2:.1f} {x2:.1f},{y2:.1f}" '
+                     f'class="e{" unb" if dash else ""}" style="stroke:{color};stroke-width:{w:.1f}">'
+                     f'<title>{esc(tip)}</title></path>')
+
+    for f in t.features:
+        for g in t.serves[f["id"]]:
+            if g in gy:
+                curve(xg + TW["goal"], mid(gy[g]), xf, mid(fy[f["id"]]), 1.4, "var(--muted)", f"{f['id']} serves {g}")
+    for (f, p), rs in weight.items():
+        if p in py:
+            n = t.s.nodes[f]
+            curve(xf + TW["feature"], mid(fy[f]), xp, mid(py[p]), 1 + min(5, len(rs) / 2), t.color(n["parent"]),
+                  f"{p} covers {len(rs)} of {f}'s {len(t.freqs[f])} requirements: {', '.join(sorted(rs, key=natural))}")
+    for m in t.milestones:
+        for p in mpipes[m["id"]]:
+            curve(xp + TW["pipeline"], mid(py[p]), xm, mid(my[m["id"]]), 1.2, t.color(m["parent"]),
+                  f"{m['id']} builds {p}", dash=True)
+
+    def box(n: dict, x: float, yy: float, w: int, stripe: str, meta: str, tip: str, gap: bool = False) -> str:
+        l1 = fit(n["title"], max(8, int((w - 22) / 6.3) - len(n["id"])))
+        return (f'<a href="{href(n["id"])}"><g><title>{esc(tip)}</title>'
+                f'<rect x="{x}" y="{yy}" width="{w}" height="{TH}" rx="5" class="nb{" gap" if gap else ""}"/>'
+                f'<rect x="{x}" y="{yy}" width="5" height="{TH}" rx="2" style="fill:{stripe}"/>'
+                f'<text x="{x + 11}" y="{yy + 14}"><tspan class="nid">{esc(n["id"])}</tspan> '
+                f'<tspan class="ntl">{esc(l1)}</tspan></text>'
+                f'<text x="{x + 11}" y="{yy + 28}" class="nmeta">{esc(meta)}</text></g></a>')
+
+    for g in t.goals:
+        fs = [f for f in t.features if g["id"] in t.serves[f["id"]]]
+        st = sorted({s for f in fs for s in t.stages_of(f)}, key=natural)
+        out.append(box(g, xg, gy[g["id"]], TW["goal"], "var(--cx)",
+                       f"{len(fs)} feature{'' if len(fs) == 1 else 's'}" + (f" · {', '.join(st)}" if st else ""),
+                       f"{g['id']} · {g['title']}", gap=not fs))
+    for f in t.features:
+        rs = t.freqs[f["id"]]
+        also = [s for s in t.stages_of(f) if s != f["parent"]]
+        meta = (f"{len(rs)} req · pipeline {frac(t.covered(rs, 'pipeline'), len(rs))} · test "
+                f"{frac(t.covered(rs, 'test'), len(rs))} · task {frac(t.covered(rs, 'task'), len(rs))}")
+        tip = (f"{f['id']} · {f['title']}\nserves {', '.join(t.serves[f['id']]) or 'no goal'}"
+               + (f"\nalso in {', '.join(also)}" if also else "")
+               + (f"\nstage from {f['attrs']['stage_via']}" if f["attrs"].get("stage_via") else "\nno stage found"))
+        out.append(box(f, xf, fy[f["id"]], TW["feature"], t.color(f["parent"]), meta, tip,
+                       gap=not t.covered(rs, "pipeline")))
+    for p in pipes:
+        ms = t.pipe_ms.get(p["id"], [])
+        # its first milestone's stage, else the stage of most of the requirements it covers
+        share: dict[str, int] = {}
+        for (f, q), rs in weight.items():
+            if q == p["id"] and t.s.nodes[f]["parent"]:
+                share[t.s.nodes[f]["parent"]] = share.get(t.s.nodes[f]["parent"], 0) + len(rs)
+        first = (t.s.nodes[ms[0]]["parent"] if ms and ms[0] in t.s.nodes else None) or \
+            (max(share, key=lambda k: (share[k], -t.stage_ix.get(k, 0))) if share else None)
+        tests = sum(1 for n in t.s.by_level("test") if n["parent"] == p["id"])
+        meta = " · ".join(x for x in (str(p["attrs"].get("package") or ""), f"{tests} test{'' if tests == 1 else 's'}",
+                                      ", ".join(ms) or "no milestone") if x)
+        out.append(box(p, xp, py[p["id"]], TW["pipeline"], t.color(first), meta, f"{p['id']} · {p['title']}"))
+    for m in t.milestones:
+        tasks = sum(1 for n in t.s.by_level("task") if n["parent"] == m["id"])
+        meta = " · ".join(x for x in (m["parent"] or "", m["status"], f"{tasks} tasks" if tasks else "") if x)
+        out.append(box(m, xm, my[m["id"]], TW["milestone"], t.color(m["parent"]), meta, f"{m['id']} · {m['title']}"))
+    heads = "".join(f'<text x="{x}" y="18" class="head">{h}</text>'
+                    for x, h in ((xg, "Goals"), (xf, "Stages and their features"), (xp, "Pipelines that cover them"),
+                                 (xm, "Milestones that build them")))
+    return (f'<svg class="mg tr" xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" '
+            f'viewBox="0 0 {width} {height}" role="img" aria-label="Goals to build">{heads}{"".join(edges)}'
+            f'{"".join(out)}</svg>')
+
+
+def trace_tables(t: Trace, link) -> tuple[str, str]:
+    """(the goals table, the per-stage feature blocks with each requirement's coverage)."""
+    rows = []
+    for g in t.goals:
+        fs = [f for f in t.features if g["id"] in t.serves[f["id"]]]
+        rs = [r for f in fs for r in t.freqs[f["id"]]]
+        st = sorted({s for f in fs for s in t.stages_of(f)}, key=natural)
+        rows.append(f'<tr><td>{link(g["id"])}</td><td>{esc(g["title"])}</td>'
+                    f'<td class="{"" if fs else "bad"}">{", ".join(link(f["id"]) for f in fs) or "none"}</td>'
+                    f'<td>{esc(", ".join(st)) or "—"}</td><td>{len(rs)}</td>'
+                    + "".join(cov_cell(t.covered(rs, k), len(rs)) for k in COVER)
+                    + f'<td>{esc(", ".join(t.feature_ms(rs))) or "—"}</td></tr>')
+    goals = ('<table><tr><th>Goal</th><th></th><th>Features serving it</th><th>Stages</th><th>Requirements</th>'
+             '<th>On a pipeline</th><th>On a test</th><th>On a task</th><th>Milestones</th></tr>' + "".join(rows)
+             + "</table>") if rows else "<p>No goals in this plan.</p>"
+
+    def req_rows(ids: list[str]) -> str:
+        out = []
+        for r in ids:
+            n, c = t.s.nodes[r], t.cov[r]
+            pipes = ", ".join(link(p) for p in sorted(c["pipeline"], key=natural))
+            steps = ", ".join(sorted(c["step"], key=natural))
+            cells = [f'<td title="{esc(steps)}">{pipes}</td>' if pipes else '<td class="bad">—</td>']
+            cells += [f'<td>{", ".join(link(x) for x in sorted(c[k], key=natural))}</td>' if c[k]
+                      else '<td class="warnp">—</td>' for k in ("test", "task")]
+            out.append(f'<tr><td class="nw">{link(r)}</td><td title="{esc(n["title"])}">{esc(fit(n["title"], 110))}</td>'
+                       + "".join(cells) + "</tr>")
+        return ('<table class="rq"><tr><th>Requirement</th><th></th><th>Pipelines (hover for steps)</th><th>Tests</th>'
+                '<th>Tasks</th></tr>' + "".join(out) + "</table>")
+
+    def feature_block(f: dict) -> str:
+        rs = t.freqs[f["id"]]
+        also = [s for s in t.stages_of(f) if s != f["parent"]]
+        bits = [f"serves {', '.join(t.serves[f['id']]) or 'no goal'}", f"{len(rs)} requirements"]
+        bits += [f"{k} {frac(t.covered(rs, k), len(rs))}" for k in COVER]
+        ms = t.feature_ms(rs)
+        bits.append("built in " + ", ".join(ms) if ms else "no milestone yet")
+        if also:
+            bits.append("also in " + ", ".join(also))
+        warn = rs and t.covered(rs, "pipeline") < len(rs)
+        return (f'<details class="ft" id="{anchor(f["id"])}"><summary><span class="nid">{esc(f["id"])}</span>'
+                f'<span class="ttl">{esc(f["title"])}</span><span class="tags{" warnp" if warn else ""}">'
+                f'{esc(" · ".join(bits))}</span></summary>{req_rows(rs) if rs else "<p>No requirements.</p>"}</details>')
+
+    parts = []
+    for st in [*t.stages, None]:
+        sid = st["id"] if st else ""
+        fs = [f for f in t.features if (f["parent"] or "") == sid]
+        if not fs:
+            continue
+        rs = [r for f in fs for r in t.freqs[f["id"]]]
+        head = (f'{esc(sid)} · {esc(st["title"])}' + (f' · {esc(st["status"])}' if st["status"] else "")
+                if st else "Features with no single stage")
+        note = ""
+        if not st:
+            via = {f["id"]: ", ".join(t.stages_of(f)) for f in fs}
+            note = ('<p class="legend">The plan does not tie these to one stage. ' + "; ".join(
+                f"{esc(k)}: covered by pipelines of {esc(v)}" if v else f"{esc(k)}: no stage" for k, v in via.items())
+                    + ".</p>")
+        parts.append(f'<h3><i class="sw" style="background:{t.color(sid or None)}"></i>{head}</h3>'
+                     f'<p class="legend">{len(fs)} features, {len(rs)} requirements: on a pipeline '
+                     f'{frac(t.covered(rs, "pipeline"), len(rs))}, on a test {frac(t.covered(rs, "test"), len(rs))}, '
+                     f'on a task {frac(t.covered(rs, "task"), len(rs))}.</p>{note}'
+                     + "".join(feature_block(f) for f in fs))
+    loose = [r["id"] for r in t.reqs if not r["parent"] or r["parent"] not in t.freqs]
+    if loose:
+        by_sec: dict[str, list[str]] = {}
+        for r in loose:
+            by_sec.setdefault(str(t.s.nodes[r]["attrs"].get("section") or "no section"), []).append(r)
+        parts.append("<h3>Requirements outside any feature</h3>" + "".join(
+            f'<details class="ft"><summary><span class="ttl">{esc(sec)}</span><span class="tags">{len(ids)} requirements · '
+            + " · ".join(f"{k} {frac(t.covered(ids, k), len(ids))}" for k in COVER)
+            + f"</span></summary>{req_rows(ids)}</details>" for sec, ids in by_sec.items()))
+    return goals, "".join(parts)
+
+
+def has_trace(s: Snap | None) -> bool:
+    return bool(s and (s.by_level("goal") or s.by_level("feature") or s.by_level("requirement")))
+
+
+def write_trace(plan: Plan, d: Path) -> Path:
+    s = plan.final
+    t = Trace(s)
+    at = plan.page_for(s.turn)
+    tp = tpage(at.turn) if at else ""
+
+    def href(k: str) -> str:
+        return f"{tp}#{anchor(k)}" if tp else "#"
+
+    def link(k: str) -> str:
+        if k in t.freqs:
+            return f'<a href="#{anchor(k)}">{esc(k)}</a>'
+        return f'<a href="{href(k)}">{esc(k)}</a>' if k in s.nodes else esc(k)
+
+    rs = [r["id"] for r in t.reqs]
+    unplaced = [f for f in t.features if not f["parent"]]
+    via: dict[str, int] = {}
+    for f in t.features:
+        k = str(f["attrs"].get("stage_via") or "not found")
+        via[k] = via.get(k, 0) + 1
+    tiles = [(str(len(t.goals)), "goals", f'<i class="bad">{n} with no feature</i>' if (n := sum(
+                 1 for g in t.goals if not any(g["id"] in v for v in t.serves.values()))) else ""),
+             (str(len(t.features)), "features", f'<i class="warnp">{len(unplaced)} in no single stage</i>' if unplaced else ""),
+             (str(len(rs)), "requirements", "")]
+    tiles += [(frac(t.covered(rs, k), len(rs)), f"requirements on a {k}",
+               f"<i>{t.covered(rs, k) / len(rs):.0%}</i>" if rs else "") for k in COVER]
+    goals, stages = trace_tables(t, link)
+    nav = back_nav(plan)
+    if tp:
+        nav.append(f'<a href="{tp}">the final plan (T{at.turn:02d})</a>')
+    body = f"""<h1>Goals to build · {esc(run_title(plan))}</h1>
+<div class="sub">as of T{s.turn:02d}{' · ' + esc(s.skill) if s.skill else ''} · each feature's stage from
+{esc(', '.join(f'{k} ({n})' for k, n in via.items())) or 'no features'}</div>
+{charts.tiles(tiles)}
+<h2>From goals to milestones</h2>
+<p class="legend">Left to right: the brief's goals; the spec's features in bands by stage; the pipelines whose
+Covers name their requirements, the line thicker for more requirements; the milestones that list those pipelines,
+dashed. A box with an amber border is a goal no feature serves or a feature no pipeline covers. Hover a box or line
+for detail; click a box for that node in the final plan.</p>
+<div class="scroll">{trace_svg(t, href)}</div>
+<h2>Goals</h2>
+<p class="legend">A requirement counts for a goal through the features that serve it. On a pipeline: a pipeline or one
+of its steps covers it. On a test: a golden case covers it. On a task: a planned task covers it (only the milestones
+with a plan have tasks).</p>
+{goals}
+<h2>Stages and features</h2>
+<p class="legend">Each feature opens to its requirements and what covers each one. <span class="bad">—</span> under
+Pipelines is a requirement no design holds yet.</p>
+{stages}"""
+    path = d / "trace.html"
+    path.write_text(page(f"Goals to build · {run_title(plan)}", " · ".join(nav), body), encoding="utf-8")
+    return path
+
+
 # ---------------------------------------------------------------- T<nn>.html
 
 
 def expects_table(n: dict) -> str:
     rows = []
-    order = ["acceptance", "verify", "reads", "writes", "tests", "covers"]
+    order = ["acceptance", "criteria", "verify", "reads", "writes", "tests", "covers"]
     ex = n["expects"]
     for k in [*[k for k in order if k in ex], *[k for k in ex if k not in order]]:
         v = ex[k]
         if v in (None, "", []):
             continue
-        if k == "acceptance" and isinstance(v, list):
+        if k in ("acceptance", "criteria") and isinstance(v, list):
             cell = "<ul>" + "".join(f"<li>{esc(x)}</li>" for x in v) + "</ul>"
         elif isinstance(v, list):
             code = k in ("verify", "writes", "reads")
@@ -976,6 +1336,10 @@ def diff_table(ch: list) -> str:
     return '<table class="diff">' + "".join(rows) + "</table>"
 
 
+LISTED = ("depends", "implements", "covers", "serves")  # edge kinds shown as one comma list
+BACK = {"implements": "implemented by", "verifies": "verified by", "covers": "covered by", "serves": "served by"}
+
+
 def edges_block(s: Snap, nid: str, link) -> str:
     rows = []
     for kind, vals in sorted(s.out.get(nid, {}).items()):
@@ -985,12 +1349,12 @@ def edges_block(s: Snap, nid: str, link) -> str:
                      else f" — none: {esc(e['reason'])}" if e["reason"] else "")
             items.append(link(e["to"]) + extra)
         label = "depends on" if kind == "depends" else kind
-        rows.append(f"<tr><td>{esc(label)}</td><td>{(', ' if kind in ('depends', 'implements') else '<br>').join(items)}</td></tr>")
-    back = [e for e in s.into.get(nid, []) if e["kind"] in ("verifies", "implements")]
-    for kind in ("implements", "verifies"):
-        who = [link(e["from"]) for e in back if e["kind"] == kind]
+        rows.append(f"<tr><td>{esc(label)}</td><td>{(', ' if kind in LISTED else '<br>').join(items)}</td></tr>")
+    back = s.into.get(nid, [])
+    for kind, label in BACK.items():
+        who = sorted((e["from"] for e in back if e["kind"] == kind), key=natural)
         if who:
-            rows.append(f"<tr><td>{'implemented by' if kind == 'implements' else 'verified by'}</td><td>{', '.join(who)}</td></tr>")
+            rows.append(f"<tr><td>{label}</td><td>{', '.join(link(w) for w in who)}</td></tr>")
     return "<table>" + "".join(rows) + "</table>" if rows else ""
 
 
@@ -1345,6 +1709,8 @@ def write(out: Path) -> Path | None:
         write_turn(plan, s, d)
     for mid in plan.milestones():
         write_milestone(plan, mid, d)
+    if has_trace(plan.final):
+        write_trace(plan, d)
     return write_index(plan, d)
 
 
@@ -1356,9 +1722,11 @@ def section(out: Path) -> str:
     f = plan.final
     counts = ", ".join(f"{len(f.by_level(lv))} {PLURAL.get(lv, lv).lower()}" for lv in plan.levels if f.by_level(lv))
     ms = " · ".join(f'<a href="plan/{mpage(m)}">{esc(m)} build view</a>' for m in plan.milestones())
+    trace = (' <a href="plan/trace.html">Goals to build</a>: goals through features and stages to pipelines and '
+             'milestones.' if (Path(out) / "plan" / "trace.html").exists() and has_trace(f) else "")
     return (f'<h2>Plan</h2><p>The plan this run wrote: {esc(counts) or "no nodes"}, changed in {len(plan.changed)} '
             f'turns. <a href="plan/index.html"><b>Plan map</b></a>: how it grew turn by turn, and every node against '
-            f'the turns that changed it.{" " + ms if ms else ""}</p>')
+            f'the turns that changed it.{trace}{" " + ms if ms else ""}</p>')
 
 
 def turn_link(out: Path, n: int) -> str:

@@ -231,7 +231,7 @@ This design doesn't settle the build orchestrator ([build-phase-notes.md](build-
 
 ## 8. workflow-analyzer: the plan map
 
-run-flow shows what a run *did*. The plan map shows what the run *planned*: in series, turn by turn with the skill that ran, how the plan grows from stages to milestones to tasks to pipeline steps and what each is expected to do, and per milestone what would be built in parallel and what in series.
+run-flow shows what a run *did*. The plan map shows what the run *planned*: in series, turn by turn with the skill that ran, how the plan grows from goals and stages to features and requirements, milestones, tasks and pipeline steps and what each is expected to do; how each goal reaches the pipelines and milestones that build it; and per milestone what would be built in parallel and what in series.
 
 ### 8.1 Boundary
 
@@ -242,11 +242,11 @@ dev-team produces, workflow-analyzer renders. workflow-analyzer stays stdlib-onl
 - **Eval runs:** `evals/harness/planexport.py` walks the run's `turn N` commits (`driver.py:263-293`), skips commits where `git diff --quiet sha^ sha -- docs tasks` holds, extracts each changed snapshot with `git archive` into a temp dir (never checking out `run/project`), runs the run's own dt snapshot on it (`dtrun.dt_path`, dtprobe-style fallbacks), and writes `run/flow/plan.json`. `runviz.build_run` calls it before `trace.build`.
 - **Interactive sessions:** `dt plan --json` on each commit the session made (trace already records them, `trace.py:676,716`); a best-effort rebuild from Write/Edit contents is labelled as such.
 
-### 8.3 `plan.json` (schema `plan-map/1`)
+### 8.3 `plan.json` (schema `plan-map/2`)
 
 ```json
-{ "schema": "plan-map/1", "producer": "dev-team planexport (dt 0.x)",
-  "levels": ["stage", "milestone", "task", "pipeline", "step", "test", "type", "symbol"],
+{ "schema": "plan-map/2", "producer": "dev-team planexport (dt 0.x)",
+  "levels": ["goal", "stage", "feature", "requirement", "milestone", "task", "pipeline", "step", "test", "type", "symbol"],
   "snapshots": [
     { "turn": 14, "commit": "ab12…", "skill": "build-planning",
       "nodes": [
@@ -263,6 +263,8 @@ dev-team produces, workflow-analyzer renders. workflow-analyzer stays stdlib-onl
     { "turn": 15, "same_as": 14 } ] }
 ```
 
+Goals (`G<n>`) come from the brief; a feature (its spec code) sits under its stage and has a `serves` edge to each goal; a requirement sits under its feature; pipelines, steps, test cases and tasks have a `covers` edge to each requirement they cover. `plan-map/1` is the same without those three levels and two edge kinds, and still draws.
+
 The producer reports state; the renderer computes diffs (added, removed, changed by `hash`, classified as status / attrs / expects / text, status-only hidden by default).
 
 ### 8.4 Renderer (workflow-analyzer)
@@ -272,6 +274,7 @@ New `scripts/planmap.py` with `write(out) -> Path`, reusing `charts` and `flow` 
 | Page | Shows |
 |---|---|
 | `plan/index.html` | Tiles (final count per level, turns that changed the plan, replans, longest track). A growth strip on the run page's turn axis: the skill row, then one row per level with live nodes per turn, added above and removed below. A node × turn matrix like the files matrix: rows are the outline stage → milestone → task → step, cells A/C/R, tooltip citing the step that wrote the doc. A change ledger, one row per changed turn: `+M2 Portfolio`, `~M1-T11 depends`, `−M1-T05` |
+| `plan/trace.html` | Goals to build, as of the final plan: four columns (goals; features in bands by stage; the pipelines covering their requirements, thicker for more; the milestones listing those pipelines), then per goal and per feature how many requirements a pipeline, a test and a task cover, and each requirement's coverage. A goal no feature serves and a feature no pipeline covers are marked |
 | `plan/T<nn>.html` | The plan as of that turn as a collapsible tree: added green, changed amber with the field diff, removed struck; each task's expectations (acceptance, verify, reads, writes, tests) |
 | `plan/M<n>.html` | The build view. Columns are waves; lanes are kinds (interface, spine, wiring, thicken, system). Interface nodes as diamonds with dashed "unblocks" edges; `Depends on` as arrows; the critical path in a thick stroke. A split task is drawn as two segments (tester → implementer), so series within a task shows too. Metrics: tasks, critical path vs cap, width per wave, parallelism, share of edges mitigated. A thumbnail row shows how this milestone's graph changed across turns |
 
@@ -281,7 +284,7 @@ Once a build eval exists, its units (matched to task IDs) are drawn over `plan/M
 
 ### 8.5 workflow-analyzer docs
 
-README (Skills table: run-flow gains the Plan section; Scripts: `planmap.py`), PURPOSE "What it does" gains one line, only once the user agrees the goal now covers the plans a run writes, CLAUDE.md's stable-API list gains `planmap.write` and the `plan-map/1` schema. No new skill until interactive sessions produce `plan.json`.
+README (Skills table: run-flow gains the Plan section; Scripts: `planmap.py`), PURPOSE "What it does" gains one line, only once the user agrees the goal now covers the plans a run writes, CLAUDE.md's stable-API list gains `planmap.write` and the `plan-map/2` schema. No new skill until interactive sessions produce `plan.json`.
 
 ---
 
@@ -508,8 +511,8 @@ Nobody edits this design doc, `PURPOSE.md`, `CHANGELOG.md`, versions or the cata
 
 **CLI** (dt-core):
 - `dt ready [--json]` → `[{"id", "title", "kind", "writes"}]` for the active plan.
-- `dt plan --json` → one `plan-map/1` snapshot body as in §8.3, without `turn`/`commit`/`skill`: `{"schema": "plan-map/1", "producer": "dt <version>", "nodes": [...], "edges": [...], "builds": [...]}`. Node levels: `stage milestone task pipeline step test type symbol`. Edge kinds: `depends implements verifies` plus the graph-table kinds with `mitigated_by`.
+- `dt plan --json` → one `plan-map/2` snapshot body as in §8.3, without `turn`/`commit`/`skill`: `{"schema": "plan-map/2", "producer": "dt <version>", "nodes": [...], "edges": [...], "builds": [...]}`. Node levels: `goal stage feature requirement milestone task pipeline step test type symbol`. Edge kinds: `serves covers depends implements verifies` plus the graph-table kinds with `mitigated_by`.
 - `dt status --json` gains, under the active plan, `critical_path`, `waves`, `width`, `parallelism`.
 - Lint check names: `writes`, `edges`, `step-io-types` (`parallel` removed; `Parallel` and `Files likely` still parse, with a deprecation warning).
 
-**`plan.json`** (plan-evals writes it, planmap reads it): `{"schema": "plan-map/1", "producer": "...", "levels": [...], "snapshots": [ {"turn": int, "commit": str, "ts": str, "skill": str, ...snapshot body} | {"turn": int, "same_as": int} ]}` at `<run>/flow/plan.json`. planmap's entry point: `planmap.write(out: Path) -> Path | None` (reads `out/plan.json`, writes `out/plan/*.html`, returns the index path or None when there is no plan.json). runviz calls it after `trace.build`.
+**`plan.json`** (plan-evals writes it, planmap reads it): `{"schema": "plan-map/2", "producer": "...", "levels": [...], "snapshots": [ {"turn": int, "commit": str, "ts": str, "skill": str, ...snapshot body} | {"turn": int, "same_as": int} ]}` at `<run>/flow/plan.json`. planmap's entry point: `planmap.write(out: Path) -> Path | None` (reads `out/plan.json`, writes `out/plan/*.html`, returns the index path or None when there is no plan.json). runviz calls it after `trace.build`.

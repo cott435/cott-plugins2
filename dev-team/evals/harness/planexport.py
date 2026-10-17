@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""The plan map's data: `<run>/flow/plan.json` (schema `plan-map/1`), one plan snapshot per turn that changed the plan
+"""The plan map's data: `<run>/flow/plan.json` (schema `plan-map/2`), one plan snapshot per turn that changed the plan
 (design/interface-first-design.md §8.2–8.3). workflow-analyzer's `planmap.write` draws it.
 
 For each `turn N` commit of the run's project (driver.py commits one per turn), a turn whose commit leaves `docs/`
@@ -9,10 +9,11 @@ comes from, in order:
 2. the run's own dt snapshot run on that commit, extracted with `git archive` into a temp dir (the run's
    project is never checked out): `dt plan --json` when that dt has it, else built here from dtprobe facts
    with the same node levels, edge kinds and builds.
-A snapshot identical to the last one is also recorded as `same_as`. Each snapshot's `skill` is the last skill invoked
+`--dt` runs another dt (the repo's, to redraw an old run with what a newer `dt plan` reports) and skips the kept
+snapshots. A snapshot identical to the last one is also recorded as `same_as`. Each snapshot's `skill` is the last skill invoked
 by that turn (from `turns.json`), carried forward over turns that invoke none.
 
-Usage: planexport.py <run-dir> [--out <dir>]   (default out: <run-dir>/flow; prints the plan.json path)
+Usage: planexport.py <run-dir> [--out <dir>] [--dt <dt.py>]   (default out: <run-dir>/flow; prints the plan.json path)
 """
 import argparse, hashlib, io, json, pathlib, re, shutil, subprocess, sys, tarfile, tempfile
 
@@ -20,8 +21,8 @@ HERE = pathlib.Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 import dtrun  # noqa: E402
 
-SCHEMA = "plan-map/1"
-LEVELS = ["stage", "milestone", "task", "pipeline", "step", "test", "type", "symbol"]
+SCHEMA = "plan-map/2"
+LEVELS = ["goal", "stage", "feature", "requirement", "milestone", "task", "pipeline", "step", "test", "type", "symbol"]
 
 
 def digest(obj):
@@ -166,7 +167,7 @@ def turn_skills(run):
     return out
 
 
-def export(run, out=None):
+def export(run, out=None, dt=None):
     """Write <out>/plan.json for one run folder; returns its path (None when the run has no project repo)."""
     run = pathlib.Path(run).resolve()
     proj = run / "project"
@@ -174,7 +175,8 @@ def export(run, out=None):
         return None
     out = pathlib.Path(out) if out else run / "flow"
     out.mkdir(parents=True, exist_ok=True)
-    dt = dtrun.dt_path(run)
+    kept_ok = dt is None
+    dt = pathlib.Path(dt) if dt else dtrun.dt_path(run)
     skills = turn_skills(run)
     snaps, prev_sha, last_turn, last_digest, source = [], None, None, None, set()
     for n, sha, ts in turn_commits(proj):
@@ -188,7 +190,7 @@ def export(run, out=None):
             continue
         kept = run / "plans" / f"T{n:03d}.json"
         body = None
-        if kept.exists():
+        if kept_ok and kept.exists():
             try:
                 k = json.loads(kept.read_text())
                 body = k["body"] if k.get("commit") == sha else None
@@ -215,8 +217,9 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("run")
     ap.add_argument("--out")
+    ap.add_argument("--dt", help="the dt.py to run instead of the run's own")
     a = ap.parse_args()
-    path = export(pathlib.Path(a.run), a.out)
+    path = export(pathlib.Path(a.run), a.out, a.dt)
     if path is None:
         sys.exit(f"planexport: {a.run} has no project/ git repo")
     print(path)

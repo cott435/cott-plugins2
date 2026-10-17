@@ -443,6 +443,87 @@ def strategy_rows(doc: Doc) -> list[dict[str, str]]:
     return out
 
 
+# ---- brief and spec --------------------------------------------------------------------------
+#
+# The brief's numbered `## Goals` are `G<n>`. A spec feature is a `### Name (`CODE`)` heading whose `**Serves:**`
+# line names goals; its requirements are the live `CODE-NN` lines in its section. A spec may group features under
+# a heading that starts with a stage ID (`### S2 — Risk structure`).
+
+
+@dataclass
+class Goal:
+    id: str                            # G<n>
+    text: str
+
+
+def goals(doc: Doc) -> list[Goal]:
+    """The brief's numbered `## Goals` list: `2. text` is G2."""
+    h = next((h for h in doc.headings if h.level == 2 and md.strip_md(h.text).lower() == "goals"), None)
+    out = []
+    for i in range(h.line + 1, h.end) if h else ():
+        m = re.match(r"^(\d+)[.)]\s+(.+)$", doc.lines[i].strip())
+        if m and not doc.mask[i]:
+            out.append(Goal(f"G{m.group(1)}", md.strip_md(m.group(2))))
+    return out
+
+
+@dataclass
+class Requirement:
+    id: str
+    text: str
+    criteria: list[str]                # its indented sub-bullets (Given/when/then)
+    feature: str                       # the code of the feature whose section holds it, or ""
+    section: str                       # the heading it sits under
+
+
+@dataclass
+class Feature:
+    code: str
+    name: str
+    serves: list[str]                  # G<n>
+    source: str
+    stage: str                         # S<n> of the spec heading that groups it, or ""
+    requirements: list[str]
+
+
+FEATURE_HEADING = re.compile(r"^(.*?)\s*\(`([A-Z][A-Z0-9]*)`\)\s*$")
+
+
+def spec_features(doc: Doc) -> tuple[list[Feature], list[Requirement]]:
+    """(features, live requirements) of the spec, in line order."""
+    reqs, at = [], {}
+    for d in doc.definitions():
+        if d.how != "requirement" or d.retired:
+            continue
+        line = re.sub(rf"^\s*(?:[-*]\s+)?\*\*{re.escape(d.id)}\*\*\s*", "", doc.lines[d.start])
+        crit = [md.strip_md(re.sub(r"^\s*[-*]\s+", "", x)) for x in doc.lines[d.start + 1:d.end] if x.strip()]
+        reqs.append(Requirement(d.id, md.strip_md(line), crit, "", ""))
+        at[d.id] = d.start
+    feats, stage, stage_level = [], "", 0
+    for h in doc.headings:  # in line order, so a nested heading's section overrides its parent's
+        inside = [r for r in reqs if h.line < at[r.id] < h.end]
+        for r in inside:
+            r.section = md.strip_md(h.title)
+        sm = re.match(rf"^({md.STAGE_ID})\b(?!-)", md.strip_md(h.text))
+        if sm:
+            stage, stage_level = sm.group(1), h.level
+            continue
+        if stage and h.level < stage_level:
+            stage = ""
+        fm = FEATURE_HEADING.match(h.text)
+        if not fm:
+            continue
+        fields = md.fields_in(doc.lines, h.line + 1, h.end)
+        serves = re.sub(r"\([^)]*\)", "", fields.get("Serves", ""))
+        mine = inside
+        for r in mine:
+            r.feature = fm.group(2)
+        feats.append(Feature(fm.group(2), md.strip_md(fm.group(1)),
+                             [f"G{n}" for n in re.findall(r"\d+", serves)] if "goal" in serves.lower() else [],
+                             md.strip_md(fields.get("Source", "")), stage, [r.id for r in mine]))
+    return feats, reqs
+
+
 # ---- roadmap ---------------------------------------------------------------------------------
 #
 # Two tables. Stages (`S<n>`, written by idea-refine) are outcomes the user agreed: Name, Source, Status*,

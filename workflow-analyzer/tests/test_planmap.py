@@ -219,6 +219,82 @@ class TesterAfterInterface(unittest.TestCase):
         self.assertEqual(planmap.wrap2("Bulk download"), ("Bulk download", ""))
 
 
+def n(id_: str, level: str, parent: str | None = None, title: str = "", attrs: dict | None = None) -> dict:
+    return {"id": id_, "level": level, "parent": parent, "title": title or id_, "attrs": attrs or {}, "expects": {}}
+
+
+def traced() -> dict:
+    """A plan-map/2 plan: goals at T01, then the whole chain from goals to tasks at T02."""
+    goals = [n("G1", "goal", title="Trust the data"), n("G2", "goal", title="Honest risk"),
+             n("G3", "goal", title="A goal no feature serves")]
+    rest = [n("S1", "stage", title="Data"), n("S2", "stage", title="Risk"),
+            n("DATA", "feature", "S1", "Prices", {"stages": ["S1"], "stage_via": "spec heading"}),
+            n("STAT", "feature", "S2", "Statistics", {"stages": ["S2"], "stage_via": "stage source"}),
+            n("PORT", "feature", None, "Portfolios", {"stages": ["S1", "S2"], "stage_via": "milestone pipelines"}),
+            n("DATA-01", "requirement", "DATA"), n("DATA-02", "requirement", "DATA"),
+            n("STAT-01", "requirement", "STAT"), n("PORT-01", "requirement", "PORT"),
+            n("QR-01", "requirement", None, attrs={"section": "Quality"}),
+            n("M1", "milestone", "S1", "Data", {"pipelines": ["PL-01"]}), n("M2", "milestone", "S2", "Nothing yet"),
+            n("M1-T01", "task", "M1", "load spine", {"kind": "spine"}),
+            n("PL-01", "pipeline", "M1", "Load"), n("PL-01.load", "step", "PL-01"), n("PL-02", "pipeline", None, "Risk"),
+            n("TC-01", "test", "PL-01")]
+    edges = [{"from": a, "to": b, "kind": k} for a, b, k in [
+        ("DATA", "G1", "serves"), ("STAT", "G1", "serves"), ("STAT", "G2", "serves"), ("PORT", "G2", "serves"),
+        ("PL-01.load", "DATA-01", "covers"), ("PL-01", "DATA-02", "covers"), ("TC-01", "DATA-01", "covers"),
+        ("M1-T01", "DATA-01", "covers"), ("PL-02", "STAT-01", "covers"), ("PL-02", "PORT-01", "covers"),
+        ("TC-01", "PL-01", "verifies")]]
+    return {"schema": "plan-map/2", "producer": "test", "levels": planmap.LEVELS, "snapshots": [
+        {"turn": 1, "skill": "idea-refine", "nodes": goals, "edges": []},
+        {"turn": 2, "skill": "build-planning", "nodes": goals + rest, "edges": edges}]}
+
+
+class GoalsToBuild(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.out, _ = render(traced())
+        cls.pages = pages(cls.out)
+        cls.trace = cls.pages["trace.html"]
+        cls.t = planmap.Trace(planmap.load(cls.out).final)
+
+    def test_pages_are_static_balanced_and_linked(self):
+        self.assertEqual(set(self.pages), {"index.html", "trace.html", "M1.html", "T01.html", "T02.html"})
+        for name, text in self.pages.items():
+            self.assertNotIn("<script", text, name)
+            p = Balance()
+            p.feed(text)
+            self.assertEqual((p.errors, p.stack), ([], []), name)
+            for href in re.findall(r'href="([^"#]+)', text):
+                self.assertTrue(href.startswith("../") or (self.out / "plan" / href).exists(), f"{name} → {href}")
+        self.assertIn('href="trace.html"', self.pages["index.html"])
+        self.assertNotIn("is not plan-map", self.pages["index.html"])
+        self.assertIn("plan/trace.html", planmap.section(self.out))
+
+    def test_coverage(self):
+        c = self.t.cov["DATA-01"]
+        self.assertEqual((c["pipeline"], c["step"], c["test"], c["task"]), ({"PL-01"}, {"PL-01.load"}, {"TC-01"}, {"M1-T01"}))
+        data = self.t.freqs["DATA"]
+        self.assertEqual([self.t.covered(data, k) for k in planmap.COVER], [2, 1, 1])
+        self.assertEqual(self.t.feature_ms(data), ["M1"])
+        self.assertEqual(self.t.cov["QR-01"]["pipeline"], set())
+
+    def test_gaps_are_named(self):
+        self.assertRegex(self.trace, r'G3</a></td><td>A goal no feature serves</td><td class="bad">none')
+        self.assertIn("Features with no single stage", self.trace)
+        self.assertIn("PORT: covered by pipelines of S1, S2", self.trace)
+        self.assertIn("Requirements outside any feature", self.trace)
+
+    def test_unlinked_boxes_stay_on_the_page(self):
+        h = float(re.search(r'<svg class="mg tr"[^>]*height="([\d.]+)"', self.trace).group(1))
+        self.assertLess(h, 1000)
+
+    def test_turn_page_links_both_ways(self):
+        t2 = self.pages["T02.html"]
+        row = re.search(r'id="n-DATA-01".*?</details>|id="n-DATA-01".*?</div>', t2, re.S).group(0)
+        self.assertRegex(row, r"covered by</td><td>.*M1-T01.*PL-01.*PL-01\.load.*TC-01")
+        self.assertRegex(t2, r'id="n-STAT".*?<td>serves</td><td><a href="#n-G1">G1</a>, <a href="#n-G2">G2</a>')
+        self.assertRegex(t2, r'id="n-G1".*?served by</td><td><a href="#n-DATA">DATA</a>, <a href="#n-STAT">STAT</a>')
+
+
 class WithARun(unittest.TestCase):
     def test_axis_and_skills_come_from_the_run(self):
         index = {"title": "a run", "project": "/p", "turns": [

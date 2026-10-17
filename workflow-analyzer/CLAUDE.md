@@ -15,10 +15,12 @@ plugin here is held to are printed by plugin-dev's SessionStart hook with this p
   `flow.load_eval`, `flow.run_stats`, `flow.CSS`, `charts.CHART_CSS`, `charts.dur`,
   `charts.kt`, `charts.esc` and `planmap.write(out) -> Path | None` stable, or update runviz.py
   with them.
-- The `plan-map/1` schema of `plan.json` (documented in `scripts/planmap.py`) is a contract with
+- The `plan-map/2` schema of `plan.json` (documented in `scripts/planmap.py`) is a contract with
   dev-team's `planexport.py` and `dt plan --json`: read it without knowing dev-team, accept what
-  older producers leave out, and change it only with a new schema version both sides agree on.
-  `tests/test_planmap.py` renders the sample `tests/fixtures/plan.json`; run it after a change.
+  older producers leave out (`plan-map/1` has no goals, features or requirements), and change it
+  only with a new schema version both sides agree on. `tests/test_planmap.py` renders the
+  `plan-map/1` sample `tests/fixtures/plan.json` and a `plan-map/2` plan built in the test; run it
+  after a change.
 - Scripts use the standard library only.
 - Test a change against two real sessions: one interactive chat and one dev-team eval run
   (`trace.py find --all --project dev-team-workspace`). `check.py <eval> <original

@@ -74,16 +74,17 @@ class PlanSnapshotTest(unittest.TestCase):
         return [n for n in self.snap["nodes"] if n["level"] == level]
 
     def test_envelope(self):
-        self.assertEqual(self.snap["schema"], "plan-map/1")
+        self.assertEqual(self.snap["schema"], "plan-map/2")
         self.assertRegex(self.snap["producer"], r"^dt \d+\.\d+\.\d+$")
-        self.assertEqual(self.snap["levels"], ["stage", "milestone", "task", "pipeline", "step", "test", "type", "symbol"])
+        self.assertEqual(self.snap["levels"], ["goal", "stage", "feature", "requirement", "milestone", "task", "pipeline",
+                                               "step", "test", "type", "symbol"])
         self.assertNotIn("turn", self.snap)
         self.assertEqual([n["level"] for n in self.snap["nodes"]],
                          sorted((n["level"] for n in self.snap["nodes"]), key=self.snap["levels"].index))
 
     def test_counts(self):
         counts = {lv: len(self.nodes(lv)) for lv in self.snap["levels"]}
-        self.assertEqual(counts, {"stage": 0, "milestone": 2, "task": 14, "pipeline": 3, "step": 10, "test": 3,
+        self.assertEqual(counts, {"goal": 3, "stage": 0, "feature": 3, "requirement": 10, "milestone": 2, "task": 14, "pipeline": 3, "step": 10, "test": 3,
                                   "type": 8, "symbol": 4})
 
     def test_task_node(self):
@@ -110,7 +111,8 @@ class PlanSnapshotTest(unittest.TestCase):
     def test_edges(self):
         edges = self.snap["edges"]
         kinds = {e["kind"] for e in edges}
-        self.assertEqual(kinds, {"depends", "implements", "verifies", "data", "call", "code", "file", "order"})
+        self.assertEqual(kinds, {"depends", "implements", "verifies", "serves", "covers", "data", "call", "code", "file",
+                                 "order"})
         self.assertIn({"from": "M1-T05", "to": "M1-T01", "kind": "depends"}, edges)
         self.assertIn({"from": "M1-T05", "to": "PL-02.clean_eigen", "kind": "implements"}, edges)
         self.assertIn({"from": "M1-T09", "to": "PL-02", "kind": "implements"}, edges)
@@ -119,6 +121,26 @@ class PlanSnapshotTest(unittest.TestCase):
                        "reason": ""}, edges)
         self.assertIn({"from": "M1-T11", "to": "M1-T05", "kind": "code", "mitigated_by": "",
                        "reason": "thickens the same module"}, edges)
+
+    def test_goals_features_requirements(self):
+        g1 = next(n for n in self.nodes("goal") if n["id"] == "G1")
+        self.assertEqual((g1["parent"], g1["title"]), (None, "A reliable daily US equity dataset, free of survivorship "
+                                                             "and look-ahead bias."))
+        stat = next(n for n in self.nodes("feature") if n["id"] == "STAT")
+        self.assertEqual((stat["parent"], stat["title"], stat["attrs"]["stages"]), (None, "Statistics", []))
+        reqs = {n["id"]: n for n in self.nodes("requirement")}
+        self.assertNotIn("DATA-03", reqs)  # removed in the spec
+        self.assertEqual((reqs["STAT-03"]["parent"], reqs["STAT-03"]["title"]),
+                         ("STAT", "Random-matrix cleaning removes eigenvalues below the Marchenko–Pastur edge."))
+        self.assertEqual(reqs["STAT-03"]["expects"]["criteria"],
+                         ["Given pure noise, when cleaned, then no eigenvalue exceeds the edge."])
+        self.assertEqual((reqs["QR-01"]["parent"], reqs["QR-01"]["attrs"]), (None, {"section": "Quality"}))
+        edges = self.snap["edges"]
+        self.assertIn({"from": "STAT", "to": "G2", "kind": "serves"}, edges)
+        covers = {(e["from"], e["to"]) for e in edges if e["kind"] == "covers"}
+        self.assertTrue({("PL-02", "STAT-03"), ("PL-02.clean_eigen", "STAT-03"), ("TC-02", "STAT-03"),
+                         ("M1-T11", "STAT-03")} <= covers)
+        self.assertEqual({t for _, t in covers} - set(reqs), set())
 
     def test_builds(self):
         (b,) = self.snap["builds"]
@@ -131,6 +153,7 @@ class PlanSnapshotTest(unittest.TestCase):
         code, out, _ = run_dt(QUANT, "plan")
         self.assertEqual(code, 0)
         self.assertIn("M1 (active): 14 tasks · critical path 4", out)
+        self.assertIn("requirements: 10 · 10 on a pipeline · 3 on a test · 8 on a task\n", out)
         self.assertIn("  wave 1: M1-T02, M1-T03, M1-T04, M1-T05, M1-T06, M1-T07\n", out)
 
 
@@ -156,6 +179,45 @@ class PlanSnapshotCopyTest(FixtureCopy):
         (self.root / "tasks/plan.md").unlink()
         snap = json.loads(self.dt("plan", "--json")[1])
         self.assertEqual((snap["builds"], [n for n in snap["nodes"] if n["level"] == "task"]), ([], []))
+
+
+class FeatureStageTest(FixtureCopy):
+    """The stage a feature sits in, by each rule in turn."""
+    STAGES = "| Stage | Name | Source | Status* |\n|---|---|---|---|\n| S1 | Data + stats | brief | Planned |\n{s2}\n\n"
+    MILESTONES = ("| Milestone | Stage | Name | Packages | Pipelines | Depends | Status* |\n|---|---|---|---|---|---|---|\n"
+                  "| M1 | S1 | Data + stats | quant | PL-01, PL-02 | — | Building |\n"
+                  "| M2 | S2 | Classical portfolios | quant | PL-03 | M1 | Designed |\n")
+
+    def roadmap(self, s2_source: str):
+        old = self.read("docs/roadmap.md")
+        head, _, tail = old.partition("| Milestone |")
+        tail = tail[tail.index("\n\n"):]
+        s2 = f"| S2 | Classical portfolios | {s2_source} | Designed |"
+        self.write("docs/roadmap.md", head + self.STAGES.format(s2=s2) + self.MILESTONES + tail)
+
+    def features(self) -> dict[str, tuple]:
+        snap = json.loads(self.dt("plan", "--json")[1])
+        return {n["id"]: (n["parent"], n["attrs"]["stages"], n["attrs"]["stage_via"])
+                for n in snap["nodes"] if n["level"] == "feature"}
+
+    def test_spec_heading(self):
+        self.roadmap("brief")
+        self.replace("docs/spec.md", "### Prices (`DATA`)", "### S1 — Data and statistics\n\n### Prices (`DATA`)")
+        self.replace("docs/spec.md", "### Portfolios (`PORT`)", "### S2: Portfolios\n\n### Portfolios (`PORT`)")
+        self.assertEqual(self.features(), {"DATA": ("S1", ["S1"], "spec heading"), "STAT": ("S1", ["S1"], "spec heading"),
+                                           "PORT": ("S2", ["S2"], "spec heading")})
+
+    def test_stage_source(self):
+        self.roadmap("ideas/classical-portfolios.md")
+        self.assertEqual(self.features(), {"DATA": ("S1", ["S1"], "stage source"), "STAT": ("S1", ["S1"], "stage source"),
+                                           "PORT": ("S2", ["S2"], "stage source")})
+
+    def test_milestone_pipelines(self):
+        # Both stages cite the brief, so only pipelines tell them apart; PL-03 reuses estimate_cov (STAT-02).
+        self.roadmap("brief")
+        self.assertEqual(self.features(), {"DATA": ("S1", ["S1"], "milestone pipelines"),
+                                           "STAT": (None, ["S1", "S2"], "milestone pipelines"),
+                                           "PORT": ("S2", ["S2"], "milestone pipelines")})
 
 
 class PlanSnapshotLegacyTest(FixtureCopy):

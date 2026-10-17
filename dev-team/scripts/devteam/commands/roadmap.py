@@ -58,15 +58,17 @@ def is_specced(repo: Repo, ms: model.Milestone | model.Stage) -> bool:
     return bool(brief and brief.status == "Accepted" and spec and spec.status == "Approved")
 
 
-def source_ids(repo: Repo, ms: model.Milestone | model.Stage) -> set[str]:
+def source_ids(repo: Repo, ms: model.Milestone | model.Stage, added_only: bool = False) -> set[str]:
     """The IDs the row's Source adds: those of the spec Changelog rows that cite its idea files (or brief.md for
-    a `brief` row), minus those marked removed. A row whose IDs cell reads `all` adds every live requirement."""
+    a `brief` row), minus those marked removed (and, with `added_only`, those marked changed). A row whose IDs
+    cell reads `all` adds every live requirement."""
     files = {f.removeprefix("docs/") for f in source_files(ms.source)} or {"brief.md"}
+    skip = {"removed", "changed"} if added_only else {"removed"}
     ids = set()
     for row in specdocs.changelog(repo.spec.text if repo.spec else None):
         cites_brief = not row.files and re.search(r"\bbrief\b", row.source, re.I)
         if row.files & files or ("brief.md" in files and cites_brief):
-            ids |= {i for i, mark in row.ids.items() if mark != "removed"}
+            ids |= {i for i, mark in row.ids.items() if mark not in skip}
             if row.all_ids:
                 ids |= live_requirement_ids(repo)
     return ids

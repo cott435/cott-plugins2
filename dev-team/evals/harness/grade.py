@@ -992,7 +992,8 @@ PR = probegrade.Run(run, DT)
 vendor_cfg = scn["projects"][project].get("fake_vendors", {})
 served = bool(PR.summary.get("fake_vendors"))
 probing = PR.has_probes or served
-planted = {k: v for n in vendor_cfg for k, v in getattr(fakevendor.VENDORS.get(n), "PLANTED", {}).items()}
+# The primary source's planted facts (the first fake vendor, Sharadar); a cross-check source has its own check below.
+planted = getattr(fakevendor.VENDORS.get(next(iter(vendor_cfg), "")), "PLANTED", {})
 src_rx = re.compile("|".join(re.escape(c.get("decision", n)) for n, c in vendor_cfg.items()) or r"(?!)", re.I)
 NOT_PROBING = "no probes, and the driver served no fake vendor"
 
@@ -1088,6 +1089,21 @@ else:
     check("planted_facts_reached_design", T_PLANTED, answered and adj and start and not missing,
           f"answered: {answered}; decisions {sorted(src_ids)} say split-adjusted + closeunadj: {adj}; "
           f"{planted.get('start')} in decision or spec question: {start}; missing names not in the Verdict: {missing}")
+
+T_CROSS = ("After Record: the Yahoo cross-check probe is Answered, its Verdict names the 7 delisted names Yahoo has lost, "
+           "and the design says Yahoo has no raw close and that BUD, DNA and WB now answer for other companies")
+yahoo = fakevendor.VENDORS["yahoo"].PLANTED if "yahoo" in vendor_cfg else None
+y_entries = [e for e in PR.probes if re.search(r"yahoo|yfinance", e["title"] + e["folder"] + e["question"], re.I)]
+if not probing or yahoo is None:
+    graded_or_na("crosscheck_facts_reached_design", T_CROSS, (None, NOT_PROBING if not probing else "the project has no proxied cross-check source"))
+elif not y_entries:
+    check("crosscheck_facts_reached_design", T_CROSS, False, "no probe of the Yahoo cross-check")
+else:
+    y_design = "\n".join(d["text"] for d in final_decs if re.search(r"yahoo", d["text"], re.I)) + "\n" + pf.risks(arch_all)
+    ok, m = dtrun.crosscheck_facts(y_entries, y_design, yahoo)
+    check("crosscheck_facts_reached_design", T_CROSS, ok,
+          f"yahoo probes {[e['id'] for e in y_entries]}, answered {m['answered']}; lost names not in the Verdict: "
+          f"{m['missing_not_named']}; no raw close in the design: {m['adjusted_only']}; ticker reuse named: {m['reused']}", m)
 
 T_BLOCK = "Probe simulation: build-planning is blocked on an open probe for its milestone, and not once it is Answered"
 if not PR.has_probes:

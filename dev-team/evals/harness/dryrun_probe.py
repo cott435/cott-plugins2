@@ -33,6 +33,8 @@ PROBE_FAIL = {"probe_not_guess", "probe_checks_cover", "docs_before_probe", "pla
               "no_secret_seen", "runner_split", "probe_small_isolated", "probe_code_in_probe_turns", "evidence_scan_clean"}
 # dt lints the same planted defects (probe-fields, probe-leak, probe-runner), so its lint and the archived plan's
 # lint fail too in the broken run.
+# The replays probe Sharadar only, so the Yahoo cross-check check fails in both (selftest/checks.py has its cases).
+NO_CROSSCHECK = {"crosscheck_facts_reached_design"}
 PROBEBAD_DT_FAIL = {"dt_lint_clean", "sim_advance_3"}
 # PB-01 is routed to M1 (its Milestones), so a task of M1's plan reads its samples (refs_skills_routed).
 PROBE_READ = ("M1-T02", "**Read:** PL-01, data.Universe", "**Read:** PL-01, PB-01:samples, data.Universe")
@@ -180,7 +182,7 @@ def run(out, tmp, good_fixture):
         runs = [json.loads(l) for l in (out / f"{name}.user_runs.jsonl").read_text().splitlines() if l.strip()]
         if not any(r["script"].endswith("probe.py") and r["rc"] == 0 for r in runs):
             bad.append(f"{name}: the user run of probe.py failed: {runs}")
-        bad += verdict(name, res, summ, CONTENT | (PROBE_FAIL | PROBEBAD_DT_FAIL if broken else set()),
+        bad += verdict(name, res, summ, CONTENT | NO_CROSSCHECK | (PROBE_FAIL | PROBEBAD_DT_FAIL if broken else set()),
                        either=DT_DEPENDENT if broken else ())
     for name, broken in (("api-probe-good", False), ("api-probe-bad", True)):
         g = probe_skill.replay(out, name, broken)

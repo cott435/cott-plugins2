@@ -643,6 +643,20 @@ def data_sources(texts):
     return found, sorted(name for name in found if DATA_SOURCES[name][1])
 
 
+def crosscheck_facts(entries, design, planted):
+    """crosscheck_facts_reached_design (grade.py): (passed, metrics) for the cross-check source's probe `entries`
+    (probefacts entries), the `design` text (its decisions and the Risks) and the vendor's PLANTED facts: a probe
+    Answered, its Verdict, Caveats or results naming every lost name, the design saying the close isn't raw, and the
+    ticker reuse named in either."""
+    answered = [e["id"] for e in entries if e["kind"] == "answered"]
+    text = " ".join(e["verdict"] + " " + e["caveats"] + " " + " ".join(c["result"] for c in e["checks"]) for e in entries)
+    m = {"answered": answered, "missing_not_named": [n for n in planted["missing"] if not re.search(rf"\b{n}\b", text)],
+         "adjusted_only": bool(re.search(planted["adjusted_only"], design, re.I)),
+         "reused": bool(re.search(planted["reused"], design + " " + text, re.I)),
+         "not_point_in_time": bool(re.search(planted["not_pit"], design + " " + text, re.I))}
+    return bool(answered and not m["missing_not_named"] and m["adjusted_only"] and m["reused"]), m
+
+
 # spec_ml_beats_classical: the ML bar names the classical portfolios or the earlier stage's named benchmark.
 ML_BEATS_CLASSICAL = re.compile(
     r"(PPO|agent|forecast[- ]driven|ML[- ]driven).{0,600}(min(imum)?[- ]variance|classical|HRP|risk parity|"

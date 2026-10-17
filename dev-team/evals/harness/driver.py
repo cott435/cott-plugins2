@@ -19,10 +19,12 @@ After every turn the whole project is git-committed ("turn N") so doc evolution,
 planning, can be diffed.
 
 Probes (design/probes.md §10.1): a project's `fake_vendors` (scenarios.json) are served on 127.0.0.1 for the
-whole run (fakevendor/), and the agent is never told where. When the simulated user says "ran it", the driver
-runs each Ready probe as the user would: it writes the probe's .env from its .env.example (keys get the canary
-`sk-canary-<run id>`, base URLs the fake vendor), runs public.py with no environment at all, then probe.py with
-the fake vendor's environment, logs both to <out>/user_runs.jsonl and commits "user run before turn N".
+whole run (fakevendor/), and the agent is never told where. A vendor whose client takes no base URL (Yahoo) is
+served on its real hosts behind an HTTPS proxy whose environment the whole run gets (`start_vendors`). When the
+simulated user says "ran it", the driver runs each Ready probe as the user would: it writes the probe's .env from its
+.env.example (keys get the canary `sk-canary-<run id>`, base URLs the fake vendor), runs public.py with no
+environment but the proxy's, then each probe.py step its README gives with the fake vendors' environment, logs them
+to <out>/user_runs.jsonl and commits "user run before turn N".
 
 Usage: driver.py <trajectory-id> <out-dir>
 
@@ -42,6 +44,7 @@ import json, os, re, subprocess, sys, time, uuid, shutil, pathlib
 HERE = pathlib.Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 import dtrun, fakevendor, planexport, plugin, probefacts  # noqa: E402
+from fakevendor import proxy  # noqa: E402
 
 CLAUDE_BIN = os.environ.get("CLAUDE_BIN", "claude")
 ISOLATE = ["--setting-sources", "project,local"]
@@ -377,25 +380,44 @@ def setup_project(out, project, ref_stages=()):
 
 
 def start_vendors(out, project, run_id):
-    """The project's fake vendors, each logging to <out>/vendor_<name>.jsonl: {name: {url, server, key, cfg}}."""
-    vendors = {}
+    """The project's fake vendors, each logging to <out>/vendor_<name>.jsonl: {name: {url, server, key, cfg}}.
+
+    A vendor with `proxy_hosts` (a client that takes no base URL, like yahooquery) is served on those hosts behind
+    one HTTPS proxy (fakevendor/proxy.py) for the whole run: its environment goes into ENV, so the agent, the
+    simulated user and the user's runs use it, and shims for python3, python, uv and curl lead PATH, so
+    `env -i PATH="$PATH" python3 public.py` still does. Such a vendor takes no key."""
+    vendors, routes = {}, {}
     for name, cfg in project.get("fake_vendors", {}).items():
+        if cfg.get("proxy_hosts"):
+            handler = fakevendor.handler_class(name, out / f"vendor_{name}.jsonl")
+            routes.update({h: handler for h in cfg["proxy_hosts"]})
+            vendors[name] = {"url": None, "server": None, "key": None, "cfg": cfg}
+            continue
         key = f"sk-canary-{run_id}"
         url, server = fakevendor.start(name, out / f"vendor_{name}.jsonl", expect_key=key)
         vendors[name] = {"url": url + cfg.get("path", ""), "server": server, "key": key, "cfg": cfg}
+    if routes:
+        url, server, env = proxy.start_proxy(str(out / "proxy" / "certs"), routes, log=out / "proxy.jsonl")
+        bindir = proxy.shims(str(out / "proxy" / "bin"), env)
+        ENV.update(env)
+        ENV["PATH"] = bindir + os.pathsep + ENV.get("PATH", "")
+        for v in vendors.values():
+            if v["server"] is None:
+                v.update(url=url, server=server, env=env)
     return vendors
 
 
 def vendor_env(names, vendors):
     """What the user puts in .env for these variable names: keys → the canary, base URLs → the fake vendor.
-    A name is matched to the vendor it mentions (or its aliases), else to the only vendor."""
+    A name goes to the vendor it names (or one of its aliases), or to none: a variable has to say whose it is. A
+    proxied vendor (no key, no base URL) gets nothing here."""
     env = {}
+    vendors = {k: v for k, v in vendors.items() if v.get("key")}
     for v in vendors.values():
         env.update({n: v["url"] for n in v["cfg"].get("base_env", [])})
         env.update({n: v["key"] for n in v["cfg"].get("key_env", [])})
     for n in names:
-        v = next((v for k, v in vendors.items() if any(a.upper() in n.upper() for a in [k, *v["cfg"].get("aliases", [])])),
-                 next(iter(vendors.values())) if len(vendors) == 1 else None)
+        v = next((v for k, v in vendors.items() if any(a.upper() in n.upper() for a in [k, *v["cfg"].get("aliases", [])])), None)
         if v is None:
             continue
         if re.search(r"URL|HOST|BASE", n, re.I):
@@ -435,7 +457,8 @@ def run_user_checks(proj, vendors, log_path, ids=None, timeout=600):
     fails. Returns one record per run; the canary is scrubbed from what is kept, and `printed_key` says whether a
     script printed it."""
     text = (proj / "docs" / "probes.md").read_text(errors="ignore") if (proj / "docs" / "probes.md").exists() else ""
-    runs, keys = [], [v["key"] for v in vendors.values()]
+    runs, keys = [], [v["key"] for v in vendors.values() if v.get("key")]
+    proxied = next((v["env"] for v in vendors.values() if v.get("env")), {})  # no secret: the proxy and its CA
     scrub = lambda t: re.sub("|".join(map(re.escape, keys)) or r"(?!)", "<canary>", t or "")
     for e in probefacts.parse_probes(text)["entries"]:
         if e["kind"] != "ready" or (ids is not None and e["id"] not in ids):
@@ -448,11 +471,11 @@ def run_user_checks(proj, vendors, log_path, ids=None, timeout=600):
         names = [l.split("=", 1)[0].strip().lstrip("# ") for l in example.read_text().splitlines() if "=" in l] if example.exists() else []
         env = vendor_env(names, vendors)
         dot = folder / ".env"
-        dot.write_text("".join(f"{k}={v}\n" for k, v in env.items() if k in names or not names))
+        dot.write_text("".join(f"{k}={v}\n" for k, v in env.items() if k in names))
         dot.chmod(0o600)
         readme = (folder / "README.md").read_text(errors="ignore") if (folder / "README.md").exists() else ""
-        user_env = {**{k: os.environ[k] for k in ("PATH", "HOME") if k in os.environ}, **env}
-        for script, script_env, args in [("public.py", {}, [])] + [("probe.py", user_env, a) for a in user_steps(readme)]:
+        user_env = {**{k: ENV[k] for k in ("PATH", "HOME") if k in ENV}, **proxied, **env}
+        for script, script_env, args in [("public.py", dict(proxied), [])] + [("probe.py", user_env, a) for a in user_steps(readme)]:
             if not (folder / script).exists():
                 continue
             if script == "probe.py" and any(r_["probe"] == e["id"] and r_["script"].endswith("probe.py") and r_["rc"] != 0
@@ -495,8 +518,8 @@ def main():
     try:
         run_loop(scn, traj, project, stages, out, proj, plugin_root, dt, extra, msg, n_revealed, refs, vendors)
     finally:
-        for v in vendors.values():
-            v["server"].shutdown()
+        for server in {id(v["server"]): v["server"] for v in vendors.values() if v.get("server")}.values():
+            server.shutdown()
 
 
 def run_loop(scn, traj, project, stages, out, proj, plugin_root, dt, extra, msg, n_revealed, refs, vendors):
@@ -619,7 +642,7 @@ def run_loop(scn, traj, project, stages, out, proj, plugin_root, dt, extra, msg,
                "sessions": [{k: s[k] for k in ("n", "id", "skill", "seen", "turns")} | {"cost_usd": round(s["cost_usd"], 3),
                             "output_tokens": s["output_tokens"]} for s in sessions],
                "finished": any("sim_user_final" in x for x in turns), "stop_reason": stop_reason,
-               "fake_vendors": sorted(vendors), "probe_canary": next(iter(vendors.values()))["key"] if vendors else None,
+               "fake_vendors": sorted(vendors), "probe_canary": next((v["key"] for v in vendors.values() if v.get("key")), None),
                "user_runs": sum(1 for x in turns if x.get("user_run") is not None),
                "agent_model": AGENT_MODEL, "user_model": USER_MODEL}
     (out / "summary.json").write_text(json.dumps(summary, indent=1))

@@ -9,43 +9,27 @@ The architecture (`docs/architecture.md`) says **how** the spec gets built: comp
 
 **Not for:** what or why (`spec-writing`, `idea-refine`); pipelines, file layout and tasks (`pipeline-design`, `build-planning`); API style rules (`api-and-interface-design` if available).
 
-`dt` means `python3 ../../scripts/dt.py`, relative to this skill's folder, run from the project root. Examples: `examples.md` (a single-package proof of concept), `references/examples-multi.md`, `references/examples-modes.md`.
+It owns `docs/architecture.md`, each package's `contract.md` and, in a multi-package design, each package's `architecture.md`. It mints the `AD-NN` decision IDs, the System pipelines' `PL-NN` IDs, and the contract IDs `<id>.<symbol>`.
 
-## Modes
-
-Start with `dt status --skill architecture-design`. Take the mode, shape, gap keys and next `AD` and `PL` IDs from it, never from counting.
-
-| Mode | When | Do |
-|---|---|---|
-| **New** | No `docs/architecture.md` | The process below |
-| **Extend** | Uncovered or changed spec requirements | `references/modes.md` |
-| **Revise** | A technical change with no spec change | `references/modes.md` |
-| **Grow** | A Grow trigger fires, or the user wants a split | `references/modes.md` |
-| **Sync** | Code and doc disagree, or code has no doc | `references/modes.md` |
+`dt` means `python3 ../../scripts/dt.py`, relative to this skill's folder, run from the project root.
 
 **Preconditions:** an `Approved` spec (else ask). Read the brief's constraints, the spec in full, and in a codebase its structure, dependencies and ADRs. Read the `docs/references.md` entries for the milestone in scope (references waiting: `reference-intake` first).
 
-**Old layout:** if `legacy_layout` or `contracts_missing` is non-empty, fix it this round (`references/modes.md`).
+## Modes
+
+Start with `dt status --skill architecture-design`. Take the mode, shape, gap keys and next `AD` and `PL` IDs from it, never from counting. Load the mode's file and only the references it names.
+
+| Mode | When | Do |
+|---|---|---|
+| **New** | No `docs/architecture.md` | `references/new.md` |
+| **Extend** | Uncovered or changed spec requirements | `references/extend.md` |
+| **Revise** | A technical change with no spec change | `references/revise.md` |
+| **Grow** | A Grow trigger fires, or the user wants a split | `references/grow.md` |
+| **Sync** | Code and doc disagree, or code has no doc | `references/sync.md` |
+
+**Old layout:** if `legacy_layout` or `contracts_missing` is non-empty, fix it this round, whatever the mode: `git mv` each `docs/architecture/<pkg>.md` to `docs/packages/<pkg>/architecture.md`, fix links, and move each Interfaces section into its `contract.md`, leaving a link.
 
 **Asking.** One question at a time, with your recommendation and a default, only on what the user must decide: the shape, expensive-to-reverse choices, scope cuts. Infer the rest as ASSUMPTIONS. Headless: write the Draft with the questions under Risks and open questions, and leave Draft.
-
-## Process (New)
-
-```
-READ ─→ SHAPE ─→ COMPONENTS ─→ CONTRACTS ─→ DECISIONS ─→ WRITE ─→ [user approves] ─→ pipeline-design
-```
-
-**1. Shape.** Read `references/shape.md`, propose single or multi-package with a one-line reason, and record it in the header. Multi-package: first propose the package ids, dependency direction and cross-package flows.
-
-**2. Components.** Each: one responsibility in a sentence, the spec IDs it covers, what it depends on. Every live requirement (`QR-`, `DATA-` included) is covered, cross-cutting ones under Cross-cutting concerns. Dependencies point one way; two components needing each other are one, or miss an interface. Single package: one subfolder per component, its `__init__` exporting its contract.
-
-**3. Contracts.** Read `references/contracts.md`. One section per public symbol: functions with signature, Invariants, Errors and Used by; each type passed between steps as a `type` section (`### stats.Cov: type`). A symbol consumed across components or packages gets a `**Boundary:**` line naming its fixture cases.
-
-**4. Decisions.** For each significant open choice (language, libraries, storage, deployment, data sources, model approach): 2-3 real options checked against the requirements that constrain them (`DATA-`; model criteria and baseline), and a recommendation. Ask about expensive-to-reverse ones. Record each as `AD-NN`, citing an informing reference by `RF-NN`, never its path. Small reversible choices go only in the tech stack table. A repo with its own ADRs keeps that convention.
-
-**Route steps to installed skills.** Each skill on the stage's `**Skills:**` line, and any installed skill owning a step (a hypothesis test, a security review), is named on the component running the step, whose contract takes what the skill needs. Never design a replacement procedure.
-
-**5. Write** from `references/templates.md`, following `references/writing-rules.md`.
 
 ## Review Gate (CRITICAL)
 

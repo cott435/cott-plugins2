@@ -10,7 +10,7 @@ The protocol every plugin in this repo is built under. `PURPOSE.md` says what it
 | `hooks/session_start.py` | Prints the protocol and the plugin's `PURPOSE.md` when a session opens inside a plugin or at the marketplace root |
 | `hooks/on_edit.py` | After an edit to a plugin file, fails the edit back to Claude if the file is over its word limit |
 | `hooks/on_stop.py` | Before a session that edited a plugin stops, runs the whole check and reports new failures |
-| `scripts/check.py` | The check: purpose, sizes, frontmatter, version, and the claims in `contracts.yml`. The limits are set here |
+| `scripts/check.py` | The check: purpose, sizes, frontmatter, version, modes, and the claims in `contracts.yml`. The limits are set here |
 | `scripts/new_plugin.py` | Scaffolds a plugin from `templates/` and registers it |
 | `scripts/build_site.py` | Renders a plugin as a reading site: its README, its goal, its flow page, and every agent, skill, script and plan |
 | `skills/` | Workflow skill you type: `new-plugin`. Knowledge: `check-contracts`, `build-site`, and `bump-version` (proposed, then run on your yes) |

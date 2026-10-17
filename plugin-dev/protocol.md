@@ -28,6 +28,15 @@ Word limits, counted after the frontmatter: {limits}. A description is at most
 {description} characters. A file is raised above its limit only in the plugin's
 `contracts.yml`, with a reason the user accepted.
 
+## A skill is its role, plus one file per mode
+
+`SKILL.md` says what the skill is for: the documents it makes or edits, the part of the work
+it owns, the IDs it creates, what it never does, and how it picks a mode. A skill with modes
+lists them in a `## Modes` table. Each mode that does work, the first or New mode included,
+lives in its own `references/<mode>.md`, named in that mode's row and in no other, so a run
+loads the role and one mode, never the others. A row that only stops (blocked, current) says
+so in its cell. A rule several modes share goes in a topic reference the mode files name.
+
 ## Checks run themselves
 
 Hooks run `scripts/check.py` for you: the size limit after each edit to a plugin file, and

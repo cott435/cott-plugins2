@@ -32,7 +32,7 @@ session stops. Its skills act on the plugin at or above the session's directory:
 
 | Skill | Does |
 |---|---|
-| `check-contracts` | Purpose, sizes, frontmatter, version agreement and the claims in `contracts.yml` |
+| `check-contracts` | Purpose, sizes, frontmatter, version agreement, mode files and the claims in `contracts.yml` |
 | `build-site` | Renders the plugin as a reading site |
 | `bump-version` | Releases the plugin: manifest, catalog row, changelog, tag. Runs only on your yes |
 | `/plugin-dev:new-plugin` | Starts a new plugin here from an agreed purpose |

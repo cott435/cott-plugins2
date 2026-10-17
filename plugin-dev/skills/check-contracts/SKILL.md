@@ -29,6 +29,7 @@ Every plugin is held to these with nothing declared:
 | frontmatter | a skill or agent uses a key the platform does not document, an agent uses one plugins ignore (`hooks`, `mcpServers`, `permissionMode`, `initialPrompt`), or a description is missing or holds an XML-style tag |
 | version | `plugin.json`, the marketplace row and the newest `CHANGELOG.md` heading disagree |
 | flow page | the plugin has an agent or a workflow skill and lacks `site/flow.md`, a `flow:` block in `site/site.yml`, a `flow` claim in `contracts.yml`, or a `site/workflows/{skill}.md` page for a workflow skill |
+| modes | a skill names modes without a `## Modes` table, a working mode names no `references/<mode>.md` or shares one, or a SKILL.md heading holds a mode's process (`protocol.md`, *A skill is its role, plus one file per mode*) |
 
 The limits are `LIMITS` in `check.py`, and that is the only place they are set.
 

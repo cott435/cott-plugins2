@@ -12,6 +12,9 @@ Built in, with nothing to declare:
   flow page    a plugin with an agent or a workflow skill has site/flow.md, a `flow:` block
                in site/site.yml and a `flow` claim in contracts.yml, and every workflow
                skill has its page, site/workflows/<skill>.md
+  modes        a skill with modes lists them in a `## Modes` table; each row that does work
+               names its own references/<mode>.md, which exists and no other row names; a
+               row that names no file only stops; no SKILL.md heading holds a mode's process
 
 Declared in the plugin's `contracts.yml` (optional; the check-contracts skill has the schema):
 
@@ -202,6 +205,76 @@ def check_version(root: Path) -> list[str]:
         problems.append(f"plugin.json is {version}, the newest CHANGELOG heading is "
                         f"{newest.group(1) if newest else 'missing'}")
     return problems
+
+
+MODE_HEADING = re.compile(r"^##+ .*\bmodes\b", re.I | re.M)
+MODE_MENTION = re.compile(r"\b(New|Extend|Revise|Replan|Grow|Sync) mode\b")
+
+
+def mode_rows(body: str) -> list[tuple[int, str, str]] | None:
+    """(line, mode, row text) per row of the `## Modes` table; None with no such heading."""
+    m = MODE_HEADING.search(body)
+    if not m:
+        return None
+    rows, lines = [], body[m.end():].split("\n")
+    start = body[:m.end()].count("\n") + 1
+    for n, line in enumerate(lines[1:], start + 1):
+        if line.startswith("#"):
+            break
+        cells = [c.strip() for c in line.strip().strip("|").split("|")] if line.startswith("|") else []
+        if cells and not re.fullmatch(r"[-: ]+", cells[0]) and cells[0].lower() != "mode":
+            rows.append((n, md_plain(cells[0]), line))
+    return rows
+
+
+def md_plain(cell: str) -> str:
+    return re.sub(r"[*_`]", "", cell).strip()
+
+
+def check_modes(root: Path) -> list[str]:
+    """protocol.md, A skill is its role, plus one file per mode."""
+    problems = []
+    for p in sorted(root.glob("skills/*/SKILL.md")):
+        rel, body = p.relative_to(root).as_posix(), split(p)[1]
+        offset = split(p)[0].count("\n") + 3 if split(p)[0] else 0
+        rows = mode_rows(body)
+        if rows is None:
+            if MODE_MENTION.search(body):
+                problems.append(f"{rel}: names modes but has no `## Modes` table; list each "
+                                f"mode there, its work in references/<mode>.md")
+            continue
+        if not rows:
+            problems.append(f"{rel}: the Modes section has no table; one row per mode, each "
+                            f"naming its references/<mode>.md")
+        seen: dict[str, str] = {}
+        for n, mode, line in rows:
+            refs = sorted(set(re.findall(r"references/[\w./-]+\.md", line)))
+            where = f"{rel}:{n + offset} {mode}"
+            if not refs:
+                if not re.search(r"\bstop\b", line, re.I):
+                    problems.append(f"{where}: the mode does work but names no file; move it to "
+                                    f"references/{slug(mode)}.md")
+                continue
+            if len(refs) > 1:
+                problems.append(f"{where}: names {', '.join(refs)}; a mode has one file")
+            for ref in refs:
+                if not (p.parent / ref).is_file():
+                    problems.append(f"{where}: {ref} does not exist")
+                if ref in seen:
+                    problems.append(f"{where}: {ref} is also {seen[ref]}'s file; one file per mode")
+                seen.setdefault(ref, mode)
+                if Path(ref).stem != slug(mode):
+                    problems.append(f"{where}: {ref} should be references/{slug(mode)}.md")
+        for m in re.finditer(r"^#+ .*\((" + "|".join(re.escape(r[1]) for r in rows) + r")\)",
+                             body, re.M) if rows else ():
+            problems.append(f"{rel}:{body[:m.start()].count(chr(10)) + 1 + offset} heading "
+                            f"`{m.group(0).lstrip('# ')}` holds a mode's process; it belongs in "
+                            f"references/{slug(m.group(1))}.md")
+    return problems
+
+
+def slug(mode: str) -> str:
+    return re.sub(r"[^a-z0-9]+", "-", mode.lower()).strip("-")
 
 
 def authored(root: Path, globs: list[str]) -> list[Path]:
@@ -457,6 +530,7 @@ def run(root: Path) -> list[tuple[str, list[str]]]:
         rows.insert(1, ("sizes", size_problems(root)))
         claims = declared(root)
         rows.append(("flow page", check_flow_page(root)))
+        rows.append(("modes", check_modes(root)))
     except LookupError as e:
         return rows + [("contracts.yml", [str(e)])]
     for kind, specs in claims.items():

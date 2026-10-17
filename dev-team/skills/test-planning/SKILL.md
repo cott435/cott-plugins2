@@ -56,3 +56,4 @@ Fix what `dt lint docs/packages/<pkg>/tests.md` reports. Rerun `dt status --skil
 | "Approved, go ahead" | As above | Start `build-planning` (run its `dt status`). Never start code |
 | A hedge on any oracle ("looks fine I guess") | Keep Draft. Ask again, naming the cases and values | Repeat this gate |
 | Changes to a case, or a case dropped | Edit; list drops explicitly; keep Draft | Repeat this gate |
+| Approved, plus an upstream change (a contract, a pipeline, a spec ID) | Set Approved; route the change to its owner's Revise, never make it this turn | Stop |

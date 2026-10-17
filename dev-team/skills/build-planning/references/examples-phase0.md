@@ -68,7 +68,7 @@ The graph, excerpted (one row per `Depends on` other than on T01, 16, plus the m
 | From | To | Kind | Mitigated by |
 |---|---|---|---|
 | M1-T05 clean_eigen spine | M1-T04 estimate_cov spine | data | stats.Cov sample (M1-T01) |
-| M1-T09 wire PL-02 | M1-T05 clean_eigen spine | code | none: the smoke runs it |
+| M1-T09 wire PL-02 | M1-T05 clean_eigen spine | order | none: integration: the smoke runs it |
 | M1-T09 wire PL-02 | M1-T08 wire PL-01 | call | data.load_prices fake (M1-T01) |
 | M1-T11 MP cleaning | M1-T05 clean_eigen spine | code | none: thickens the same module |
 | M1-T11 MP cleaning | M1-T12 shrinkage | data | stats.Cov sample (M1-T01): cleaning takes any Cov |

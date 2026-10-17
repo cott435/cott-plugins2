@@ -92,8 +92,8 @@ M2-T05 Out-of-sample comparison (`compare`, split, PORT-02, on M2-T03): Given a 
 | From | To | Kind | Mitigated by |
 |---|---|---|---|
 | M2-T03 compare spine | M2-T02 min_variance spine | data | portfolio.Weights sample (M2-T01) |
-| M2-T04 wire PL-03 | M2-T02 min_variance spine | code | none: the smoke runs it |
-| M2-T04 wire PL-03 | M2-T03 compare spine | code | none: the smoke runs it |
+| M2-T04 wire PL-03 | M2-T02 min_variance spine | order | none: integration: the smoke runs it |
+| M2-T04 wire PL-03 | M2-T03 compare spine | order | none: integration: the smoke runs it |
 | M2-T05 comparison | M2-T03 compare spine | code | none: thickens the same module |
 | M2-T06 min-var weights | M2-T02 min_variance spine | code | none: thickens the same module |
 | M2-T07 shrinkage default | M2-T04 wire PL-03 | code | none: changes the entry it wrote |

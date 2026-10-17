@@ -12,4 +12,4 @@ STATUS ─→ WORKFLOWS (ask) ─→ STEPS ─→ LAYOUT ─→ WRITE ─→ [ga
 
 **3. Layout.** One entry module per component or package, one module per step owner, each under `build-setup`'s size bar (`steps.md`, Layout).
 
-**4. Write** `docs/packages/<pkg>/pipelines.md` from `template.md`, each pipeline about 35 lines (`dt lint` `budget`). Append the calling PL IDs to each called contract symbol's `Used by:` line (`- **Used by:** portfolio; PL-02, PL-03`); that leaves an Approved contract Approved. A step needing a different signature, type or error is a contract change: list it and route to `architecture-design` Revise. Fix what `dt lint` reports on every file touched.
+**4. Write** `docs/packages/<pkg>/pipelines.md` from `template.md`, each pipeline about 35 lines (`dt lint` `budget`). Append the calling PL IDs to each called contract symbol's `Used by:` line (`- **Used by:** portfolio; PL-02, PL-03`); that leaves an Approved contract Approved. A step needing a different signature, type or error is a contract change: list it and route to `architecture-design` Revise. Fix every error and `budget` warning `dt lint` reports on every file touched.

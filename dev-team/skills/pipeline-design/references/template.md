@@ -41,5 +41,6 @@ tests/intent/<pkg>/  tests/unit/<pkg>/
 ````
 
 - Multi-package segment of a system pipeline: add `· **Part of:** PL-NN` to the pipeline's Entry/Trigger line.
+- Multi-package layout: the code block starts at the package's path from the root architecture (`packages/<pkg>/src/<pkg>/`); the test line stays `tests/intent/<pkg>/  tests/unit/<pkg>/`, at the repo root (`steps.md`, Layout).
 - After the wiring task, `dt prebuild-clear` replaces each entry sketch with `Layout: \`dt layout <pkg>\`` and drops the planned layout.
 

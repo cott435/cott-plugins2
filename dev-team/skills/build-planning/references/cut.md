@@ -36,7 +36,7 @@ Write each milestone, IDs from `dt next-id M` (write the row before asking again
 **Outline:** One linked account syncs through the relay and its transactions list in the app.
 ```
 
-When a stage gets more than one milestone, give each section a `**Skills:**` and a `**References:**` line from the stage's (`milestone_skills`, `milestone_references`); every stage skill and reference lands on at least one milestone (`stage_unrouted` empty). A single milestone inherits its stage's. Then `dt roadmap` (the stage → Cut). The cut is presented with the first plan at the gate; until a milestone is Planned, its row may be re-cut, and a dropped row becomes a retired line whose ID is never reused.
+When a stage gets more than one milestone, give each section a `**Skills:**` and a `**References:**` line from the stage's (`milestone_skills`, `milestone_references`); every stage skill and reference lands on at least one milestone (`stage_unrouted` empty). A single milestone inherits its stage's. Then `dt roadmap` (the stage → Split). The cut is presented with the first plan at the gate; until a milestone is Planned, its row may be re-cut, and a dropped row becomes a retired line whose ID is never reused.
 
 ## 3. Scope the milestone
 

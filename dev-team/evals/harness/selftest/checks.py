@@ -5,10 +5,11 @@ the bad cases are the defects each check must still catch. No dt, no model calls
 
 Usage: checks.py   prints one line per case; exit 1 if any case comes out wrong
 """
-import pathlib, sys
+import json, pathlib, sys, tempfile
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
 import dtrun as d  # noqa: E402
+import probefacts as pf  # noqa: E402
 
 
 def task(id_, kind, step="", writes=(), mode="solo", reads=(), read_symbols=(), acceptance=(), reason="", title=""):
@@ -239,6 +240,24 @@ case("gate_discipline", True, "a turn running `dt status --skill pipeline-design
 case("gate_discipline", True, "a turn reading architecture-design's references is architecture-design's", sk[12] == {"architecture-design"})
 case("gate_discipline", False, "a turn with no Skill call, dt status or skill read is no skill's",
      d.turn_skill_map([{"turn": 13, "skills": []}], [{"turn": 13, "input": {"command": "git status"}}])[13] == set())
+# One `claude -p` call (turn 2) prints four inits, as background agents finish: turn 3's calls stay turn 3's.
+INIT, RESULT = {"type": "system", "subtype": "init"}, {"type": "result"}
+def use(cmd):
+    return {"type": "assistant", "message": {"content": [{"type": "tool_use", "name": "Bash", "input": {"command": cmd}}]}}
+lines = [INIT, use("ls"), RESULT, INIT, use("git log"), INIT, INIT, INIT, use("git diff"), RESULT, RESULT, RESULT, RESULT,
+         INIT, use("python3 dt.py status --skill pipeline-design"), RESULT]
+turns = [{"turn": 1, "tools": ["Bash"], "skills": []}, {"turn": 2, "tools": ["Bash", "Bash"], "skills": []},
+         {"turn": 3, "tools": ["Bash"], "skills": []}]
+with tempfile.TemporaryDirectory() as tmp:
+    stream = pathlib.Path(tmp) / "agent_stream.jsonl"
+    stream.write_text("\n".join(json.dumps(x) for x in lines) + "\n")
+    by_init = [c["turn"] for c in pf.tool_calls(stream)]
+    (stream.parent / "turns.json").write_text(json.dumps(turns))
+    sk = d.turn_skill_map(turns, pf.tool_calls(stream))
+case("gate_discipline", True, "a turn after a call that printed four inits keeps its own calls (turns.json counts)",
+     sk[3] == {"pipeline-design"})
+case("gate_discipline", False, "the four-init call's turn gets no later turn's skill", sk[2] == set())
+case("gate_discipline", True, "with no turns.json, inits still split the stream", by_init == [1, 2, 5, 6])
 
 # ---- intake_subagent_per_file (flow F7e): intake turns without a Skill call
 tt = [{"turn": 41, "skills": [], "agents": [{"description": "Summarize tft_model.py"}, {"description": "Summarize tft_targets.py"}]},

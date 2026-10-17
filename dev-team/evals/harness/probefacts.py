@@ -201,13 +201,19 @@ def env_values(folder):
     return vals
 
 
-def tool_calls(stream_path):
-    """Every tool call in a stream-json transcript: {turn_index, name, input, parent, id}. The driver appends
-    each turn's stream to one file; a `system/init` line starts a turn."""
+def tool_calls(stream_path, turns=None):
+    """Every tool call in a stream-json transcript: {turn, name, input, parent, id}. The driver appends each
+    turn's stream to one file and records that turn's tool names in turns.json (`turns`; read beside the stream
+    when not given), so the calls split by those counts. One `claude -p` call can print several `system/init`
+    lines (each background agent that finishes resumes it), so an init starts a turn only when there are no
+    counts or they don't add up to the stream's calls (the dry run's synthetic streams)."""
     out, turn = [], 0
     p = pathlib.Path(stream_path)
     if not p.exists():
         return out
+    if turns is None:
+        tj = p.with_name("turns.json")
+        turns = json.loads(tj.read_text()) if tj.exists() else []
     for line in p.read_text(errors="ignore").splitlines():
         try:
             d = json.loads(line)
@@ -220,6 +226,13 @@ def tool_calls(stream_path):
                 if isinstance(c, dict) and c.get("type") == "tool_use":
                     out.append({"turn": max(turn, 1), "name": c.get("name"), "input": c.get("input") or {},
                                 "parent": d.get("parent_tool_use_id"), "id": c.get("id")})
+    counts = [(t["turn"], len(t.get("tools") or [])) for t in turns]
+    if counts and sum(n for _, n in counts) == len(out):
+        i = 0
+        for n_turn, n in counts:
+            for c in out[i:i + n]:
+                c["turn"] = n_turn
+            i += n
     return out
 
 

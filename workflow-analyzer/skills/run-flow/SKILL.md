@@ -19,7 +19,7 @@ Everything in the arguments before the first flag names it:
 
 - a path to a `.jsonl`, or a session id or a unique prefix of one: use it;
 - `latest`: the newest session other than this chat;
-- words from the chat's title, as the app's sidebar shows it: pass them as the session. `T`
+- words from the chat's title: pass them as the session. `T`
   resolves them when exactly one chat matches; otherwise it prints the matches and exits 1;
 - nothing: run `T find --limit 8` (add `--project <text>` when the user named a project or
   repo; `--all` includes headless eval runs in temp dirs) and, if the user's words point at
@@ -31,9 +31,8 @@ segments at each `/NAME:<command>` and each agent is tied to its definition in t
 
 When several chats match, ask once with `AskUserQuestion`: one option per session, at most
 four, newest first. The label is the chat's title in quotes; the description is its project,
-its span, its agent count and commands, and `fork of <id8>` when `find` says so. A forked or
-resumed chat shares its history up to the split with the original, so two chats with the same
-title are usually a chat and its fork. Never pick between them yourself.
+its span, its agent count and commands, and `fork of <id8>` when `find` says so. Two chats with
+the same title are usually a chat and its fork. Never pick between them yourself.
 
 With `--sessions a,b` or `--branch GLOB` there is no positional session: those list one agent
 type across sessions, so they need `--agent`. Without it, say
@@ -43,8 +42,7 @@ type across sessions, so they need `--agent`. Without it, say
 
 - One session: `T build <session> [--project TEXT] [--plugin NAME]`. It writes the workspace,
   `~/.claude/run-flow/<project>/<id8>/` (`$RUN_FLOW_HOME` overrides the root), and prints it.
-  Rebuild on every call: it takes a second, and a running session gains turns and units
-  with its step ids unchanged.
+  Rebuild on every call: it takes a second.
 - Across sessions: `T view --agent TYPE (--sessions a,b | --branch GLOB) [--plugin NAME]`,
   one command that builds every session into its own workspace and then
   `~/.claude/run-flow/views/<type>-<date>.html`. Never stitch `T build` calls by hand.
@@ -62,6 +60,9 @@ The workspace holds:
   tables of turns and units.
 - `turns/T<nn>.html` and `units/U<nn>.html`: every step with its full input and output, each
   Write's content and each Edit's old and new text, commits, hooks, and what came back.
+- `plan/`, when the workspace holds a `plan.json`: `index.html` shows the plan growing turn by
+  turn, `T<nn>.html` the plan as of a turn, `M<n>.html` a milestone's build waves. `flow.html`
+  links it under **Plan**.
 - `index.json`, `turns/T<nn>.json`, `units/U<nn>.json`, `run.md`: the same as data (what
   `ask-run` reads).
 

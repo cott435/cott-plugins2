@@ -9,7 +9,8 @@ comes from, in order:
 2. the run's own dt snapshot run on that commit, extracted with `git archive` into a temp dir (the run's
    project is never checked out): `dt plan --json` when that dt has it, else built here from dtprobe facts
    with the same node levels, edge kinds and builds.
-A snapshot identical to the last one is also recorded as `same_as`.
+A snapshot identical to the last one is also recorded as `same_as`. Each snapshot's `skill` is the last skill invoked
+by that turn (from `turns.json`), carried forward over turns that invoke none.
 
 Usage: planexport.py <run-dir> [--out <dir>]   (default out: <run-dir>/flow; prints the plan.json path)
 """
@@ -150,15 +151,18 @@ def body_at(proj, sha, dt):
 
 
 def turn_skills(run):
+    """{turn: the skill at work}. A skill runs on over later turns without a new `Skill` call, so a turn with
+    none carries the last invoked skill forward until another one is invoked."""
     try:
         turns = json.loads((run / "turns.json").read_text())
     except (OSError, json.JSONDecodeError):
         return {}
-    out = {}
-    for t in turns:
+    out, last = {}, ""
+    for t in sorted(turns, key=lambda t: int(t["turn"])):
         own = [dtrun.skill_name(s) for s in t.get("skills", []) if str(s).startswith("dev-team")] or \
               [dtrun.skill_name(s) for s in t.get("skills", [])]
-        out[int(t["turn"])] = own[-1] if own else ""
+        last = own[-1] if own else last
+        out[int(t["turn"])] = last
     return out
 
 

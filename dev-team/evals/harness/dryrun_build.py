@@ -167,6 +167,14 @@ class Replayer:
                 out[w] = (SOL / "spine" / w).read_text()
             else:
                 out[w] = sol(w)
+        if role == "solo" and t["mode"] == "split":
+            # One builder, Mode overridden: tests/intent/ is protected from it (CR-06), so the golden-case tests
+            # go into the task's own unit-test file.
+            unit = next((w for w in t["writes"] if w.startswith("tests/unit/")), None)
+            for w in [w for w in list(out) if w.startswith("tests/intent/")]:
+                text = out.pop(w)
+                if unit:
+                    out[unit] = out.get(unit, sol(unit)) + "\n\n" + text
         return out
 
     def jobs_of(self, tid: str, roles: list[str]) -> list[Job]:
@@ -284,6 +292,7 @@ class Replayer:
         return r.returncode == 0
 
     def run_job_here(self, job: Job, when: int):
+        self.git("update-ref", "refs/checks/base", "HEAD")   # the orchestrator, before each builder
         self.write(self.proj, job.files)
         self.commit(f"{job.task} {job.role}: {job.title}", when)
         self.check(job, self.proj)
@@ -301,6 +310,8 @@ class Replayer:
             st["clock"] = t0 + JOB_SECONDS + 10
             return [f"{j} on main" for j in jobs]
         base = self.git("rev-parse", "HEAD").stdout.strip()
+        # refs/ are shared by every worktree, so one base serves the whole wave: the commit it dispatches from.
+        self.git("update-ref", "refs/checks/base", base)
         branches = []
         for k, j in enumerate(jobs):
             name = f"{j.task.lower()}-{j.role}-{st['segment']}{k}"
@@ -346,7 +357,12 @@ class Replayer:
         doc.write_text(doc.read_text().replace(cc["doc_find"], cc["doc_replace"], 1))
         files = {rel: sol(rel) for rel in cc["files"]}
         job = Job(tid, "interface", f"contract-change: {cc['task_title']}", files, "interface")
-        self.run_job_here(job, when + JOB_SECONDS // 2)
+        # A re-freeze writes contracts frozen at the base (CR-09), so it runs in the main session, not as an
+        # implementer: commit, then gate with the new freeze as the base.
+        self.write(self.proj, job.files)
+        self.commit(f"{job.task} {job.role}: {job.title}", when + JOB_SECONDS // 2)
+        self.git("update-ref", "refs/checks/base", "HEAD")
+        self.check(job, self.proj)
         self.tick([tid], when + JOB_SECONDS - 1)
 
     def tick(self, ids: list[str], when: int):

@@ -164,7 +164,8 @@ def graph_facts(plan: dict, arm: dict | None = None) -> dict:
     # ready after it plus every split task's tester.
     iface = [t["id"] for t in tasks if t["kind"] == "interface"]
     ready_after_iface = [t["id"] for t in tasks if t["id"] not in iface and set(t["depends"]) <= set(iface)]
-    testers_early = [i for i in split if i not in ready_after_iface] if iface else []
+    interface_first = bool(iface) and any(t["claims_exclusive"] for t in tasks)
+    testers_early = [i for i in split if i not in ready_after_iface] if interface_first else []
     return {"tasks": len(tasks), "critical_path": cp, "cp_tasks": n_cp, "cp_weighted": n_cpw, "cp_weighted_path": cpw,
             "waves": w, "width": max((len(x) for x in w), default=0), "parallelism": round(len(tasks) / max(n_cp, 1), 2),
             "dispatch_rounds": rounds, "dispatch_width": max((len(r) for r in rounds), default=0),
@@ -290,8 +291,13 @@ class Grader:
         g0 = graph_facts(self.plan0, self.arm)
         self.extra["graph"] = {k: v for k, v in g0.items()}
         idx = self.load("flow/index.json") or {}
-        units = [u for u in idx.get("units", []) if u.get("first_ts") and u.get("last_ts")]
-        intervals = [(ts(u["first_ts"]), ts(u["last_ts"]), u) for u in units]
+        intervals = []
+        for u in idx.get("units", []):
+            try:
+                intervals.append((ts(u["first_ts"]), ts(u["last_ts"]), u))
+            except (KeyError, TypeError, ValueError):
+                continue  # a unit without timestamps (never started) has no interval
+        units = [u for _, _, u in intervals]
         wall = self.summary.get("total_seconds") or 0
         agent_s = sum(b - a for a, b, _ in intervals)
         per_role: dict[str, dict] = {}
@@ -305,14 +311,13 @@ class Grader:
         eff = round(agent_s / (wall * width), 3) if wall and width and agent_s else None
         # From git: each builder commit spans from its parent (where the agent started: the dispatch base of a
         # worktree branch, the previous commit on a serial checkout) to itself. Rounds are maximal overlapping
-        # groups of task spans; concurrency is the most commits in flight at once.
+        # groups of those spans; concurrency is the most commits in flight at once.
         times = {c["sha"]: c["time"] for c in self.commits}
         spans, commit_iv = {}, []
         for c in self.builders:
             start = times.get(c["parents"][0], c["time"]) if c["parents"] else c["time"]
             commit_iv.append((start, c["time"]))
-            a, b = spans.get(c["task"], (start, c["time"]))
-            spans[c["task"]] = (min(a, start), max(b, c["time"]))
+            spans[f"{c['task']} {c['role']} {c['sha'][:7]}"] = (start, c["time"])
         achieved = rounds_from_spans(spans)
         conc_git = max_overlap([(a, b) for a, b in commit_iv if b > a])
         self.extra["efficiency"] = {
@@ -320,7 +325,8 @@ class Grader:
             "cost_usd": self.summary.get("agent_cost_usd"), "output_tokens": self.summary.get("agent_output_tokens"),
             "per_role": per_role, "achieved_max_concurrency": conc, "planned_max_width": width,
             "parallel_efficiency": eff, "planned_rounds": len(g0["dispatch_rounds"]), "planned_cp_tasks": g0["cp_tasks"],
-            "achieved_rounds_git": len(achieved), "achieved_max_concurrency_git": conc_git, "tasks_with_commits": len(spans)}
+            "achieved_rounds_git": len(achieved), "achieved_max_concurrency_git": conc_git,
+            "tasks_with_commits": len({c["task"] for c in self.builders})}
         self.check("wall_clock", "efficiency", "Wall clock and agent time measured (informational)", bool(wall),
                    f"wall {wall}s, agent {round(agent_s)}s over {len(units)} units, cost {self.summary.get('agent_cost_usd')}",
                    value=wall)
@@ -413,6 +419,13 @@ class Grader:
         integ = [r for r in gates if not r.get("passed") and by.get(r.get("task"), {}).get("kind") in ("wiring", "system")]
         self.extra["gates"] = {"records": len(gates), "failed": sum(not r.get("passed") for r in gates),
                                "integration_failures": [f"{r['task']} try {r.get('try')}: {r.get('failed')}" for r in integ][:20]}
+        last = {}
+        for r in gates:
+            if r.get("mode") != "collect":
+                last[r.get("task")] = r
+        red_at_end = sorted(t for t, r in last.items() if not r.get("passed") and t in by)
+        self.check("gates_pass", "process", "Every implementer and solo task's last gate passed (no GATE FAILED left behind)",
+                   not red_at_end, red_at_end[:12] or f"{len(last)} tasks green", value=len(red_at_end))
         self.check("integration_failures", "integration",
                    "Wiring and system gates pass first time (no failure when fakes swap for real)",
                    not integ, self.extra["gates"]["integration_failures"] or f"{len(gates)} gate records", value=len(integ))

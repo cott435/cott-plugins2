@@ -16,6 +16,7 @@ from functools import cached_property
 from pathlib import Path
 
 from .. import git, graph, md, model
+from .. import probes as pb
 from .. import references as refs
 from ..repo import Repo
 from ..status.common import available_skills
@@ -31,6 +32,8 @@ SEVERITY = {
     "fixture-size": "W",                # missing fixture files are reported as E
     "ref-file": "E", "ref-hash": "W", "ref-large": "W", "ref-prefix": "E", "roadmap-skill": "W",
     "roadmap-stage": "E",
+    "probe-fields": "E", "probe-informs": "E", "probe-cite": "E", "probe-runner": "E", "probe-leak": "E",
+    "probe-sample": "E", "probe-results": "E", "probe-stale": "W", "probe-large": "W",
 }
 
 # Size budgets (planning-stage.md §3), in lines. Package docs are budgeted per unit (lines per unit × units +
@@ -40,6 +43,7 @@ UNIT_BUDGETS = {"contract": (8, 12, "symbol"), "pipelines": (35, 10, "pipeline")
 # Past these a package holds too much for one set of docs: consider a Grow.
 GROW_CEILINGS = {"contract": 200, "pipelines": 300, "tests": 300}
 ROADMAP_SECTION_MAX = 6
+PROBE_ENTRY_MAX = 10          # a PB entry: ~8 lines, plus the checks table (header, separator, one line per check)
 AGENTS_DOC_MAP_MAX = 25
 
 FIXTURE_MAX_BYTES = 100 * 1024
@@ -270,6 +274,13 @@ def check_budget(ctx: Context):
                     n = sum(1 for line in doc.lines[h.line + 1:h.end] if line.strip())
                     if n > ROADMAP_SECTION_MAX:
                         yield _p(doc, h.line, "budget", f"{h.id} section is {n} lines, budget {ROADMAP_SECTION_MAX}")
+        if doc.kind == "probes":
+            for e in model.probes(doc):
+                n = sum(1 for line in doc.lines[e.start:e.end] if line.strip())
+                limit = PROBE_ENTRY_MAX + (len(e.checks) + 2 if e.checks else 0)
+                if n > limit:
+                    yield _p(doc, e.start, "budget", f"{e.id} is {n} lines, budget {limit} "
+                             f"({PROBE_ENTRY_MAX} + the checks table)")
         if doc.kind == "agents":
             docs_h = doc.heading("Docs")
             if docs_h:
@@ -299,7 +310,7 @@ def _approved_body(doc_kind: str, lines: list[str]) -> list[str]:
     body = _body_without_header(lines)
     if doc_kind == "contract":
         body = [line for line in body if not USED_BY_LINE.match(line)]
-    if doc_kind == "references":
+    if doc_kind in ("references", "probes"):
         body = [HASH_VALUE.sub(r"\1 ", line) for line in body]
     return body
 
@@ -530,6 +541,146 @@ def check_roadmap_stage(ctx: Context):
             yield _p(roadmap, ms.row_line, "roadmap-stage", f"{ms.id} Stage {cell!r}: not a stage ID (S<n>)")
         elif not ms.stage and md.strip_md(ms.row.get("Source", "")) in NONE_VALUES:
             yield _p(roadmap, ms.row_line, "roadmap-stage", f"{ms.id} names no stage: fill its Stage cell")
+
+
+# ---- probe checks (design/probes.md §4, §5) --------------------------------------------------------
+
+PROBE_FIELDS = ("Folder", "Question", "Informs")
+# What `public.py` (the agent's checks) must never touch: a credential of any kind (§5.1).
+ENV_ACCESS = re.compile(r"\bos\.environ\b|\benviron\b|\bgetenv\b|\.env\b|\bload_env\b|\bdotenv\b")
+SAMPLE_REF = re.compile(rf"\b({model.PROBE_ID})[ :]+(?:evidence/)?(samples/[\w.-]+(?:/[\w.-]+)*?)(?=#|[\s),;`]|$)")
+
+
+def check_probe_fields(ctx: Context):
+    """A PB entry with no Folder, Question or Informs, no checks table, a check with no Pass, or a Status that
+    isn't Draft, Ready, Answered or Waived; past Draft, its folder must exist."""
+    for e in model.all_probes(ctx.repo):
+        missing = [k for k in PROBE_FIELDS if not e._get(k)]
+        if missing:
+            yield _p(e.doc, e.start, "probe-fields", f"{e.id} has no {', '.join(f'**{k}:**' for k in missing)}")
+        if e.state not in model.PROBE_STATES:
+            yield _p(e.doc, e.start, "probe-fields",
+                     f"{e.id} Status {e.status or '(none)'!r}: not Draft, Ready, Answered · pass|fail, or Waived")
+        elif e.state == "Answered" and not e.verdict:
+            yield _p(e.doc, e.start, "probe-fields", f"{e.id} is Answered with no pass or fail")
+        if not e.checks:
+            yield _p(e.doc, e.start, "probe-fields",
+                     f"{e.id} has no checks table (`| Check | What | How | Pass | Runner | Result |`)")
+        for c in e.checks:
+            if not c.passes:
+                yield _p(e.doc, c.line, "probe-fields", f"{e.id}.{c.id} has no Pass criterion")
+        if e.folder and e.state != "Draft" and not (ctx.repo.root / e.folder).is_dir():
+            yield _p(e.doc, e.start, "probe-fields", f"{e.id} folder {e.folder}/ is missing")
+
+
+def check_probe_informs(ctx: Context):
+    """An Informs ID (decision, requirement or contract symbol) that isn't defined anywhere."""
+    for e in model.all_probes(ctx.repo):
+        line = md.field_line(e.doc.lines, e.start + 1, e.end, "Informs")
+        for id_ in e.informs:
+            if not ctx.resolves(id_):
+                yield _p(e.doc, e.start if line is None else line, "probe-informs",
+                         f"{e.id} Informs {id_}: not defined")
+
+
+def check_probe_cite(ctx: Context):
+    """A decision's `**Probe:**` line naming a retired PB, `none` with no reason, or neither."""
+    for c in model.probe_citations(ctx.repo):
+        where = c.decision or "a decision"
+        if c.is_none:
+            if not c.reason:
+                yield _p(c.doc, c.line, "probe-cite", f"{where} Probe: none needs the reason the docs settle it")
+        elif not c.probe:
+            yield _p(c.doc, c.line, "probe-cite", f"{where} Probe: {c.value!r} names neither PB-NN nor none")
+        elif ctx.repo.is_retired(c.probe):
+            note = ctx.repo.lookup(c.probe).retired_note
+            yield _p(c.doc, c.line, "probe-cite", f"{where} Probe: {c.probe} is retired ({note})")
+
+
+def check_probe_runner(ctx: Context):
+    """`public.py` (the agent's checks) reads the environment or a `.env`; or a check's Runner isn't agent or
+    user."""
+    for folder in pb.folders(ctx.repo):
+        path = folder / "public.py"
+        try:
+            lines = path.read_text(encoding="utf-8").splitlines()
+        except (OSError, UnicodeDecodeError):
+            continue
+        rel = path.relative_to(ctx.repo.root).as_posix()
+        for i, line in enumerate(lines):
+            code = line.split("#", 1)[0]
+            if ENV_ACCESS.search(code):
+                yield Problem(rel, i + 1, "probe-runner", "public.py runs as the agent and reads no environment, "
+                              "`.env` or key: move this check to probe.py (runner user)")
+    for e in model.all_probes(ctx.repo):
+        for c in e.checks:
+            if c.runner not in pb.RUNNERS:
+                yield _p(e.doc, c.line, "probe-runner",
+                         f"{e.id}.{c.id} Runner {c.runner or '(empty)'!r}: agent, user or user (manual)")
+
+
+def check_probe_leak(ctx: Context):
+    """Evidence holding a secret or personal-data pattern (`dt probes --scan`). Names the pattern, never the text."""
+    for h in pb.scan(ctx.repo):
+        yield Problem(h.path, h.line, "probe-leak", f"{h.pattern} in committed evidence: fix the probe's allow-list, "
+                      "re-run it, and keep this file out of git")
+
+
+def check_probe_sample(ctx: Context):
+    """A doc names a probe sample (`PB-01 samples/sync_added.json#0`) that doesn't exist."""
+    entries = {e.id: e for e in model.all_probes(ctx.repo)}
+    for doc in ctx.docs:
+        skip = _changelog_ranges(doc)
+        for i, line in enumerate(doc.lines):
+            if doc.mask[i] or "samples/" not in line or _inside(i, skip):
+                continue
+            for m in SAMPLE_REF.finditer(line):
+                pid, sample = m.group(1), m.group(2)
+                e = entries.get(pid)
+                if e is None:
+                    if not ctx.repo.is_retired(pid):
+                        yield _p(doc, i, "probe-sample", f"{pid} {sample}: {pid} has no entry in docs/probes.md")
+                elif not e.folder or not (ctx.repo.root / e.folder / "evidence" / sample).is_file():
+                    yield _p(doc, i, "probe-sample",
+                             f"{pid} {sample}: no {e.folder or '(no Folder)'}/evidence/{sample} (has the probe run?)")
+
+
+def check_probe_results(ctx: Context):
+    """An `evidence/results.json` that isn't the shape in design/probes.md §4.3, or names a check its entry's
+    table doesn't have."""
+    for e in model.all_probes(ctx.repo):
+        res = pb.read_results(ctx.repo, e)
+        if res is not None:
+            for line, message in res.problems:
+                yield Problem(res.path, line, "probe-results", message)
+
+
+def check_probe_stale(ctx: Context):
+    """The entry's Hash isn't its code's (unstamped or changed), or results.json is for other code."""
+    for e in model.all_probes(ctx.repo):
+        folder = pb.folder_of(ctx.repo, e)
+        current = pb.code_hash(folder) if folder is not None else None
+        if current is None:
+            continue
+        if current != e.hash.lower():
+            what = f"Hash {e.hash} is stale (code now {current})" if e.hash else "has no Hash"
+            yield _p(e.doc, e.start, "probe-stale", f"{e.id} {what}: run `dt probes --stamp {e.id}`")
+        res = pb.read_results(ctx.repo, e)
+        if res is not None and res.script_hash and res.script_hash != current:
+            yield _p(e.doc, e.start, "probe-stale",
+                     f"{e.id} results.json is for code {res.script_hash}, not {current}: re-run before recording")
+
+
+def check_probe_large(ctx: Context):
+    """A probe over 400 code lines (probe_kit.py aside): a probe answers its checks and nothing else."""
+    for e in model.all_probes(ctx.repo):
+        folder = pb.folder_of(ctx.repo, e)
+        if folder is None or not folder.is_dir():
+            continue
+        n = pb.code_lines(folder)
+        if n > pb.LARGE_LINES:
+            yield _p(e.doc, e.start, "probe-large", f"{e.id} is {n} code lines (budget {pb.LARGE_LINES}, "
+                     f"{pb.KIT} aside): keep to what the checks need")
 
 
 # ---- task checks ----------------------------------------------------------------------------------
@@ -916,7 +1067,7 @@ def check_header(ctx: Context):
         if doc.header_line is None:
             line = doc.title_line if doc.title_line is not None else 0
             yield _p(doc, line, "header", "no header line (`**Status:** … · **Last updated:** …` after the H1)")
-        elif doc.kind != "roadmap" and not doc.status:
+        elif doc.kind not in ("roadmap", "probes") and not doc.status:
             yield _p(doc, doc.header_line, "header", "no **Status:** in the header line")
 
 
@@ -936,6 +1087,8 @@ CHECKS = [
     check_step_io_types,
     check_todo_mismatch, check_finding_disposition, check_foreign_plan,
     check_ref_file, check_ref_hash, check_ref_large, check_ref_prefix, check_roadmap_skill, check_roadmap_stage,
+    check_probe_fields, check_probe_informs, check_probe_cite, check_probe_runner, check_probe_leak,
+    check_probe_sample, check_probe_results, check_probe_stale, check_probe_large,
 ]
 
 
@@ -1021,7 +1174,7 @@ def run(args, repo) -> int:
 # ---- hook mode ------------------------------------------------------------------------------------
 
 def _is_doc_path(rel: str) -> bool:
-    return rel.startswith(("docs/", "tasks/")) or rel in LINTED_ROOT_FILES
+    return rel.startswith(("docs/", "tasks/", "probes/")) or rel in LINTED_ROOT_FILES
 
 
 def run_hook(stdin_text: str) -> int:

@@ -4,8 +4,8 @@ from __future__ import annotations
 from ..repo import Repo
 from .common import Report, add_common, available_skills, fmt
 
-# Planning ID prefixes: a spec requirement must not use them (`RF` collides with reference entries).
-RESERVED_PREFIXES = ["AD", "CR", "EX", "PL", "RF", "TC"]
+# Planning ID prefixes: a spec requirement must not use them (`RF` and `PB` collide with reference and probe entries).
+RESERVED_PREFIXES = ["AD", "CR", "EX", "PB", "PL", "RF", "TC"]
 
 
 def spec_writing(repo: Repo, r: Report) -> None:

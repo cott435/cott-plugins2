@@ -20,6 +20,20 @@ import dt  # noqa: E402
 
 QUANT = HERE / "fixtures" / "quant"
 LEGACY_PLAN = HERE / "fixtures" / "legacy-plan"
+PROBES = HERE / "fixtures" / "probes"
+
+# What `add_probes` writes into the architecture: PB-01 on the Accepted AD-03, and AD-04 (Proposed) citing PB-02.
+AD03_PROBE = "- **Probe:** PB-01 — are Sharadar's raw and adjusted closes told apart?\n"
+AD04 = """### AD-04: FRED for the risk-free rate
+**Status:** Proposed · **Date:** 2026-10-17 · **Scope:** portfolio
+- **Context:** PORT-02 compares portfolios on excess returns.
+- **Decision:** FRED's DTB3 series, read daily.
+- **Alternatives:** A constant rate — hides the 2008 drop.
+- **Consequences:** One free key, held by the user.
+- **Probe:** PB-02 — does DTB3 reach 2006, under terms that allow local storage?
+
+"""
+FAKE_KEY = "fk7Qp2xLm9Rt4Wz8"           # the probe's .env value: evidence must never hold it
 
 
 def copy_quant(dest: Path, legacy: bool = False) -> None:
@@ -28,6 +42,25 @@ def copy_quant(dest: Path, legacy: bool = False) -> None:
     if legacy:
         for name in ("plan.md", "todo.md"):
             shutil.copyfile(LEGACY_PLAN / name, dest / "tasks" / name)
+def add_probes(root: Path) -> None:
+    """Lay fixtures/probes over a quant copy: docs/probes.md (PB-01 Answered pass, PB-02 Ready with the agent's
+    C1 run, PB-03 retired) and probes/ (PB-02's sample holds a planted email); cite them from the architecture;
+    and write what git must never hold: PB-02's `.env` and `.env.example`, and PB-01's `out/`."""
+    shutil.copytree(PROBES, root, dirs_exist_ok=True)
+    arch = root / "docs" / "architecture.md"
+    text = arch.read_text(encoding="utf-8")
+    text = text.replace("- **Consequences:** Binary files; needs pyarrow.\n",
+                        "- **Consequences:** Binary files; needs pyarrow.\n" + AD03_PROBE, 1)
+    text = text.replace("## Risks and open questions", AD04 + "## Risks and open questions", 1)
+    arch.write_text(text, encoding="utf-8")
+    pb02 = root / "probes" / "PB-02-fred-rates"
+    (pb02 / ".env").write_text(f"FRED_API_KEY={FAKE_KEY}\nFRED_ENV=production\n", encoding="utf-8")
+    (pb02 / ".env.example").write_text("FRED_API_KEY=\n", encoding="utf-8")
+    out = root / "probes" / "PB-01-sharadar-prices" / "out"
+    out.mkdir()
+    (out / "raw.json").write_text('{"access_token": "access-production-0000"}\n', encoding="utf-8")
+
+
 HAS_GIT = shutil.which("git") is not None
 
 
@@ -44,13 +77,16 @@ def run_dt(root: Path, *args: str) -> tuple[int, str, str]:
 
 class FixtureCopy(unittest.TestCase):
     """Each test gets its own copy of fixtures/quant at self.root; the shared fixture is never touched. A subclass
-    sets `legacy = True` for the old-style plan."""
+    sets `legacy = True` for the old-style plan, or `probes = True` to lay fixtures/probes over it (`add_probes`)."""
     legacy = False
+    probes = False
 
     def setUp(self):
         self._tmp = tempfile.TemporaryDirectory()
         self.root = Path(self._tmp.name) / "quant"
         copy_quant(self.root, self.legacy)
+        if self.probes:
+            add_probes(self.root)
 
     def tearDown(self):
         self._tmp.cleanup()

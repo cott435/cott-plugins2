@@ -25,6 +25,7 @@ COMMANDS = {
     "layout": "layout",
     "outline": "outline",
     "references": "references",
+    "probes": "probes",
     "lint": "lint",
     "roadmap": "roadmap",
     "guard": "guard",

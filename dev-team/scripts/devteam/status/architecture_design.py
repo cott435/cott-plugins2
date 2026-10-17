@@ -5,6 +5,7 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
+from .. import probes as pb
 from .. import specdocs
 from ..repo import Repo
 from .common import Report, add_common, available_skills, doc_state, fmt, live_spec_ids, next_decision
@@ -12,7 +13,8 @@ from .packages import WALK_IGNORE, grow_triggers, known_packages, stale_contract
 
 MANIFESTS = {"pyproject.toml", "setup.py", "package.json", "Cargo.toml", "go.mod"}
 KEYS = ("uncovered", "changed_since", "spec_rows_pending", "stale", "package_docs", "packages_found", "skills",
-        "broken_fences", "contracts_missing", "legacy_layout", "grow_triggers", "stale_contracts")
+        "broken_fences", "contracts_missing", "legacy_layout", "grow_triggers", "stale_contracts", "probes_answered",
+        "probes_failed")
 
 
 def packages_found(root: Path) -> list[str]:
@@ -59,8 +61,11 @@ def architecture_design(repo: Repo, r: Report) -> None:
             ([] if repo.docs("contract") else ["(no package id yet)"])
     legacy = sorted(d.rel for d in pkg_docs if d.rel.startswith("docs/architecture/"))
 
+    probe_state = pb.state(repo)
     if arch is None:
         r.mode("new")
+    elif probe_state.answered:
+        r.mode("revise")      # a probe's results go into its decisions before anything else (§4.4)
     else:
         r.mode("extend" if uncovered or changed_since or contracts_missing or legacy else "current")
     add_common(repo, r)
@@ -84,3 +89,5 @@ def architecture_design(repo: Repo, r: Report) -> None:
     r.add("legacy_layout", legacy)
     r.add("grow_triggers", grow_triggers(repo))
     r.add("stale_contracts", stale_contracts(repo))
+    r.add("probes_answered", probe_state.answered)
+    r.add("probes_failed", probe_state.failed)

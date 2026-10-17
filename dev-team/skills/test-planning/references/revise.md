@@ -1,8 +1,4 @@
-# Revise, Extend and Grow
-
-Read when `dt status` gives one of these modes.
-
-## Revise: an oracle changes
+# Revise: an oracle changes
 
 An expected output or tolerance must change: the user corrected an example, a paper has an erratum, a contract changed the output type, or a tolerance proved wrong *for a stated reason*. "The build can't make it pass" is not a reason; that's a bug until the source says the oracle was wrong. A looser tolerance is an oracle change too.
 
@@ -11,14 +7,6 @@ An expected output or tolerance must change: the user corrected an example, a pa
 3. At the gate, name the tasks that cite the case. They pause: while `tests.md` is Draft, `build-planning`'s `dt status` says `blocked`. After approval, `build-planning` Replan follows (`changed_since_plan` lists `tests.md`).
 
 A case that no longer applies collapses to one line under Retired (form in `../examples.md`) and its fixture folder is deleted. Its ID is never reused.
-
-## Extend
-
-New pipelines get a Strategy row and cases; new user pairs become new cases; a bug found in a golden path gets a `regression` case whose expected output comes from the user or the reference that showed the bug, never from the fixed code. Existing cases stay untouched. **Rebuild** reuses existing cases unchanged: they're what proves the new implementation matches the old.
-
-## Grow
-
-Move each TC section to the `tests.md` of the package that now owns its pipeline, `git mv tests/fixtures/<old>/TC-NN tests/fixtures/<new>/TC-NN`, and update its Fixture field. IDs and fixture contents don't change; `git diff -M --stat` should show pure renames. Docs touched go to Draft; then the Review Gate.
 
 ## Example: an oracle changes
 

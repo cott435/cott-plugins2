@@ -8,7 +8,7 @@ New spec IDs or components arrived. Take `uncovered_ids` and `components_unowned
 
 **Layout in Extend.** A `## Planned layout (pre-build — removed by spine task)` section lives only while some pipeline in the doc is unbuilt; `dt lint` flags `prebuild-left` once every pipeline is built. So:
 - **A new, unbuilt pipeline:** add its modules to the planned layout. If the spine already removed it, write a new one holding only the new modules, marked against the existing tree from `dt layout <pkg>`.
-- **Only new steps on built pipelines:** write no planned layout. Name each new module at the gate (owner → `<owner>/<module>.py`); `build-planning` puts it in the task's `Files likely`.
+- **Only new steps on built pipelines:** write no planned layout. Name each new module at the gate (owner → `<owner>/<module>.py`); `build-planning` puts it in the task's `Writes:`.
 
 Status back to Draft, then the Review Gate, highlighting only what changed.
 

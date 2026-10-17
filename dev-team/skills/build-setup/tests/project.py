@@ -20,6 +20,7 @@ SCRIPTS = [
     "scripts/check_size.py",
     "scripts/floor_guard.sh",
     "scripts/floor_guard.py",
+    "scripts/red_check.py",
     "scripts/vulture_whitelist.py",
     "scripts/hooks/path_guard.sh",
     "scripts/hooks/post_edit.sh",
@@ -259,3 +260,4 @@ def reset(root: Path) -> None:
     for counter in (root / ".claude").glob(".stop_attempts_*"):
         counter.unlink()
     (root / ".claude" / ".check_pkg").unlink(missing_ok=True)
+    (root / ".claude" / ".task_writes").unlink(missing_ok=True)

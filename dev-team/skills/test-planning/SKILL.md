@@ -34,11 +34,11 @@ For Extend, Revise and Grow, read `references/revise-grow.md`.
 STATUS ─→ ASK ─→ CASES ─→ STRATEGY ─→ WRITE ─→ [gate: user approves oracles; stop]
 ```
 
-**1. Ask**, one question at a time with your guess and a default, the two things only the user knows: **which workflows matter most** (cases go where a wrong answer hurts) and **input/output pairs they already trust** (files, notebook outputs, paper tables). Infer the rest (names, seeds, sizes, tolerances) and list it under ASSUMPTIONS.
+**1. Ask**, one question at a time with your guess and a default, the two things only the user knows: **which workflows matter most** (cases go where a wrong answer hurts) and **input/output pairs they already trust** (files, notebook outputs, paper tables). Infer the rest (names, seeds, sizes, tolerances) as ASSUMPTIONS.
 
 **2. Cases.** Read `references/cases.md` first. Real pairs become two-layer fixtures (raw `source/`, transcribed `input.json`, a Parse line); synthetic cases are a generator plus a property, never a number you computed; a claim an installed skill owns ("beats chance": `null-hypothesis-testing`) is designed with it.
 
-**3. Strategy.** One row per pipeline: smoke command, step unit tests, golden cases, model evaluation.
+**3. Strategy.** One row per pipeline: smoke command, step unit tests, golden cases with the step boundaries each exercises, model evaluation.
 
 **4. Write.** Each ID comes from `dt next-id TC`, the section written before the next; never count by hand. Write `tests.md` from the template, and the fixtures. **Every write of an `expected.json` brings a `dt guard` permission prompt**, here and in the build: the user approves every oracle write. Never route around it (no Bash `echo >`, no copying over). Fix what `dt lint docs/packages/<pkg>/tests.md` reports.
 

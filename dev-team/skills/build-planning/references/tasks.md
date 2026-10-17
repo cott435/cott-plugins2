@@ -1,12 +1,12 @@
-# Thickening, routing, modes, checkpoints, order, writing
+# Thickening, routing, modes, checkpoints, the graph, writing
 
-Read when writing Phase 1 and the files. Templates: `../examples.md`; routing example: `examples-phase0.md`.
+Read when writing thicken tasks, the dependency graph and the files. Templates: `../examples.md`; routing and graph example: `examples-phase0.md`.
 
 ## 5. Thicken
 
-`## Phase 1: Thicken`: one task per step upgrade, **riskiest first**. In data and ML work that means data loading, leak checks and the evaluation before any model. **Contract changes come first**, then the tasks that use them.
+`**Kind:** thicken`, under Phase 2: one task per step upgrade, depending on its step's spine. Order in the file sets nothing: every thicken task can start once its spine lands. Risk orders tasks only when a later one must learn from an earlier one, as an `order` edge with its reason (step 9). In data and ML work, data loading, leak checks and the evaluation get thicken tasks of their own, never left until after the model.
 
-**Split a task** when it needs more than one session, has more than 3 acceptance bullets, touches two packages or two steps, or has "and" in its title. Sizes (lint-enforced by `Files likely` count): XS = 1 file, S = 1–2, M = 3–5. Nothing larger.
+**Split a task** when it needs more than one session, has more than 3 acceptance bullets, touches two packages or two steps, or has "and" in its title. Sizes count `Writes:` entries outside `tests/` (`task-size`; a folder glob counts as one): XS = 1, S = 1–2, M = 3–5. Nothing larger. Spine and thicken tasks are XS or S.
 
 **Acceptance is test-backed.** Each bullet is checkable: a `TC-NN` passes, a Given/When/Then, a model criterion by ID, the smoke command. With no `tests.md`, write the criterion so a tester can encode it.
 
@@ -19,24 +19,37 @@ Read when writing Phase 1 and the files. Templates: `../examples.md`; routing ex
 ## 7. Build mode
 
 - `split` (tester, then implementer) when the task adds or changes behavior with a checkable outcome: anything a TC case, Given/When/Then or model criterion covers.
-- `solo` for contract, spine, refactor, glue and doc-sync tasks.
+- `solo` for interface, spine, wiring, system, refactor, glue and doc-sync tasks.
 
-`mode_violations` flags a task that breaks the rule. An override needs `**Reason:** <one line>` on the task. **A split task only tests symbols that already exist** (from the spine or an earlier solo task), so the tester never writes against a guess.
+`mode_violations` flags a task that breaks the rule. An override needs `**Reason:** <one line>` on the task. **A split task tests symbols a frozen interface declares** (the interface task's types and signatures), so the tester never writes against a guess and starts right after the interface, beside the implementers. Its `Depends on` is the implementer half's; the tester half waits only on the interface.
 
 ## 8. Checkpoints
 
-`### Checkpoint after M<n>-T<nn>` every 2–3 tasks, and `### Checkpoint: milestone exit` last. Use the block in `../examples.md`. A separate read-only reviewer runs each one; its findings are recorded under the block with `dt finding`, not by this skill.
+`### Checkpoint after M<n>-T<nn>` at the end of a wave, naming the wave's last task in plan order: usually once after the wiring and thicken wave, when every pipeline runs end to end. `### Checkpoint: milestone exit` last. Use the blocks in `../examples.md`. A separate read-only reviewer runs each one; the orchestrator records its findings with `dt finding`, not this skill.
 
-## 9. Order, dependencies, parallel groups, Verify
+## 9. Dependencies, Writes, the graph, Verify
 
-- `**Depends on:**` resolves, points only backward (to a task earlier in the plan; position counts, not ID number) and is acyclic.
-- Package spines of different packages, and after Phase 0 independent tasks, get `**Parallel:** G<n>`. Tasks that share a `Files likely` path or a `Read:` contract symbol never share a group, except a symbol the contract task froze.
-- The contract task's `Verify:` runs the schema check over every fixture. **Every `Verify:` after Phase 0 includes its pipeline's smoke command** (tests.md Strategy, else the Trigger plus ` --smoke`), so each task leaves the system working. Add the focused tests and `scripts/check.sh gate` (`--pkg <pkg>` in multi-package). Only the modes `fast`, `gate` and `full` exist.
-- `**Read:**` lists the IDs (references as `RF-NN[:selector]`) and paths a builder needs, and nothing else. Check each packet with `dt context <task>`: it must resolve and stay under 2,000 lines.
+- **`Depends on:`** resolves, points only backward (position counts, not ID number), is acyclic, and holds only edges nothing mitigates.
+- **`Writes:`** is exact paths, or a folder glob the task owns, and is an exclusive claim: two tasks with no `Depends on` path between them never write the same path (`writes`). Shared files (`__init__.py`, `types.py`, `pipeline.py`, `__main__.py`) belong to the interface, wiring or system task. No `Writes:` under `tasks/`: builders never tick `todo.md` or record findings; the orchestrator does after each merge.
+- **`## Dependency graph`**, after the last checkpoint: one row per edge between tasks, `| From | To | Kind | Mitigated by |`. From is the task that needs, To the one it needs; each cell starts with the task ID. Mitigated by names the interface and the task freezing it (`stats.Cov sample (M1-T01)`), or says `none: <reason>`.
+
+| Kind | Meaning | Mitigation |
+|---|---|---|
+| `data` | One step's output feeds another's input | The type and its sample |
+| `call` | A pipeline calls another pipeline or package | The fixture-backed fake |
+| `file` | Two tasks must write one file | Move the shared part to the interface or wiring task; else serial |
+| `code` | A task changes or runs code another task writes (a stub, a spine) | None: serial |
+| `contract-change` | A task changes a frozen interface | None: serial, plus a new interface task |
+| `order` | Risk or learning ("do X first to learn Y") | None: reason required |
+
+A mitigated edge documents why two tasks run side by side and never appears in `Depends on`; an unmitigated one must (`edges`). Every `Depends on` has its row, except a dependency on the interface task, which every task has and needs none. The table is the reviewable argument for every serial step.
+- **Width.** `dt status` gives `critical_path`, `waves`, `width` and `parallelism`; on the fresh plan `dt ready` lists only the interface task(s). Mostly width-1 waves mean an edge an interface could mitigate is ordering tasks.
+- **`Verify:`** The interface task's runs the schema check over every sample; every other task's runs its focused tests and `scripts/check.sh gate` (`--pkg <pkg>` in multi-package), plus its pipeline's smoke command (tests.md Strategy, else the Trigger plus ` --smoke`) once its `Depends on` path reaches that pipeline's wiring task: wiring and system tasks always. A thicken task running beside the wiring is smoke-tested by the gate after each merge. Only the modes `fast`, `gate` and `full` exist.
+- **`Read:`** lists the IDs (references as `RF-NN[:selector]`) and paths a builder needs, and nothing else. Check each packet with `dt context <task>`: it must resolve and stay under 2,000 lines.
 
 ## 10. Write
 
-Task IDs start at `dt next-id M<n>-T` and count up.
+Task IDs start at `dt next-id M<n>-T` and count up, in phase order.
 - **Next milestone only.** Later milestones stay as roadmap outlines. Write `tasks/queued/M<n>-<slug>.md` only when the user asks.
 - `tasks/plan.md` with Status `Draft` and `**Base:** —` (pending). Never record a sha yourself: `build-setup` runs `dt base` after its bar is approved and committed.
 - `tasks/todo.md`: one unchecked line per task, IDs matching the plan.

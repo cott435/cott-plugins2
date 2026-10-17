@@ -9,6 +9,9 @@ base commit's pyproject.toml. Prints one line per finding and exits 1 if there a
 Rules (CONSTRAINTS.md ID in brackets):
     suppression [CR-01]            a new `type: ignore`, `pyright:`, `noqa`, `pragma: no cover`...
     stub [CR-02]                   a function whose body is only pass, ... or NotImplementedError
+    stub-task [CR-02]              an interface stub, `raise NotImplementedError("M1-T05")`, naming
+                                   a task that is not open in tasks/todo.md (whole repo, not the diff)
+    stub-left [CR-02]              any interface stub, with --exit (the milestone exit)
     swallowed-exception [CR-02]    `except:` / `except Exception:` with only pass
     test-skipped [CR-03]           a new skip, skipif, xfail or importorskip
     test-deleted [CR-03]           a test file removed
@@ -21,6 +24,10 @@ Rules (CONSTRAINTS.md ID in brackets):
     bar-loosened [CR-07]           pyproject.toml tool config weakened, or a new config file
     rule-removed [CR-07]           a CR rule gone from CONSTRAINTS.md
     new-exception [CR-07]          a new row in CONSTRAINTS.md's Exceptions table
+
+An interface stub is the one placeholder body CR-02 allows: the milestone's interface task writes
+each step signature that way, naming the task that replaces it, and testers import it before the
+code exists. It is never a `stub` finding; `stub-task` and `stub-left` judge it instead.
 
 A CR-01 to CR-03 or CR-08 finding is allowed when an unexpired row in CONSTRAINTS.md's
 Exceptions table names that rule and a path glob matching the file. Secrets and CR-07 never are.
@@ -68,6 +75,8 @@ SYS_PATH_CALLS = {"insert", "append", "extend"}
 RULE_IDS = {
     "suppression": "CR-01",
     "stub": "CR-02",
+    "stub-task": "CR-02",
+    "stub-left": "CR-02",
     "swallowed-exception": "CR-02",
     "test-skipped": "CR-03",
     "test-deleted": "CR-03",
@@ -82,6 +91,8 @@ CONFIG_FILES = {
     ".typos.toml", ".deptry.toml",
 }  # fmt: skip
 LOCKFILES = {"uv.lock", "poetry.lock", "pdm.lock", "Pipfile.lock"}
+TASK_ID = re.compile(r"M\d+-T\d{2,}")
+OPEN_TASK = re.compile(r"^\s*- \[ \] (M\d+-T\d{2,})\b", re.MULTILINE)
 EXEMPT_DECORATORS = {"abstractmethod", "abstractproperty", "overload"}
 TRIVIAL_EXCEPT = {None, "Exception", "BaseException"}
 
@@ -225,6 +236,24 @@ def _is_trivial(body: list[ast.stmt]) -> bool:
     return all(_is_placeholder(s) for s in stmts)
 
 
+def _task_stub(body: list[ast.stmt]) -> str | None:
+    """The task an interface stub names: a body that is only `raise NotImplementedError("M1-T05")`."""
+    stmts = body[1:] if body and _is_docstring(body[0]) else body
+    if len(stmts) != 1 or not isinstance(stmts[0], ast.Raise):
+        return None
+    exc = stmts[0].exc
+    if not (isinstance(exc, ast.Call) and _name(exc.func) == "NotImplementedError"):
+        return None
+    arg = exc.args[0] if len(exc.args) == 1 and not exc.keywords else None
+    if (
+        isinstance(arg, ast.Constant)
+        and isinstance(arg.value, str)
+        and TASK_ID.fullmatch(arg.value)
+    ):
+        return arg.value
+    return None
+
+
 def _is_docstring(stmt: ast.stmt) -> bool:
     return (
         isinstance(stmt, ast.Expr)
@@ -350,7 +379,12 @@ def ast_findings(path: str, lines: set[int]) -> list[Finding]:
         if reference := _references_finding(path, node):
             found.append(reference)
         if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
-            if node not in exempt and not path.endswith(".pyi") and _is_trivial(node.body):
+            if (
+                node not in exempt
+                and not path.endswith(".pyi")
+                and _is_trivial(node.body)
+                and not _task_stub(node.body)
+            ):
                 found.append(
                     Finding("stub", path, node.lineno, f"`{node.name}` has a placeholder body")
                 )
@@ -367,6 +401,49 @@ def ast_findings(path: str, lines: set[int]) -> list[Finding]:
             if (None if node.type is None else _name(node.type)) in TRIVIAL_EXCEPT:
                 found.append(
                     Finding("swallowed-exception", path, node.lineno, "exception swallowed")
+                )
+    return found
+
+
+def open_tasks() -> set[str]:
+    """Task IDs with an unchecked line in tasks/todo.md (none when there is no todo)."""
+    path = Path("tasks/todo.md")
+    return set(OPEN_TASK.findall(path.read_text(encoding="utf-8"))) if path.is_file() else set()
+
+
+def task_stub_findings(paths: list[str], at_exit: bool) -> list[Finding]:
+    """Interface stubs anywhere in the project's code: each must name an open task, and at the
+    milestone exit none may be left. Not diff-scoped: the stub was written by an earlier task."""
+    open_ids, found = open_tasks(), []
+    for path in paths:
+        if not is_python(path) or is_test_file(path) or not Path(path).is_file():
+            continue
+        try:
+            tree = ast.parse(Path(path).read_text(encoding="utf-8"))
+        except (SyntaxError, UnicodeDecodeError, OSError):
+            continue
+        for node in ast.walk(tree):
+            if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                continue
+            if not (task := _task_stub(node.body)):
+                continue
+            if at_exit:
+                found.append(
+                    Finding(
+                        "stub-left",
+                        path,
+                        node.lineno,
+                        f"`{node.name}` is still the stub for {task}",
+                    )
+                )
+            elif task not in open_ids:
+                found.append(
+                    Finding(
+                        "stub-task",
+                        path,
+                        node.lineno,
+                        f"`{node.name}` is a stub naming {task}, which is not open in tasks/todo.md",
+                    )
                 )
     return found
 
@@ -555,8 +632,11 @@ def is_excepted(finding: Finding, allowed: list[tuple[str, str]]) -> bool:
 
 
 # ---------------------------------------------------------------------------------- main
-def run(diff: Diff, old_pyproject: Path) -> list[Finding]:
+def run(
+    diff: Diff, old_pyproject: Path, python_files: list[str] | None = None, at_exit: bool = False
+) -> list[Finding]:
     found = line_findings(diff) + test_file_findings(diff)
+    found += task_stub_findings(python_files or [], at_exit)
     for path in diff.added:
         if is_python(path):
             found += ast_findings(path, diff.added_lines(path))
@@ -570,10 +650,17 @@ def main(argv: list[str]) -> int:
     parser.add_argument("--diff", type=Path, required=True)
     parser.add_argument("--untracked", type=Path, required=True)
     parser.add_argument("--old-pyproject", type=Path, required=True)
+    parser.add_argument(
+        "--python", type=Path, help="every Python file in the project, one per line"
+    )
+    parser.add_argument(
+        "--exit", action="store_true", help="the milestone exit: no stub may be left"
+    )
     args = parser.parse_args(argv)
     diff = parse_diff(args.diff.read_text(encoding="utf-8", errors="replace"))
     add_untracked(diff, args.untracked.read_text(encoding="utf-8").splitlines())
-    findings = run(diff, args.old_pyproject)
+    python_files = args.python.read_text(encoding="utf-8").splitlines() if args.python else []
+    findings = run(diff, args.old_pyproject, python_files, args.exit)
     if not findings:
         print("floor_guard: clean", file=sys.stderr)
         return 0

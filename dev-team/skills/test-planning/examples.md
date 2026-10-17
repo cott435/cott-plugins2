@@ -14,7 +14,7 @@ Formats here are what `dt` parses: keep the header line, the Strategy table colu
 ## Strategy
 | Pipeline | Smoke | Step unit tests | Golden cases | Model eval |
 |---|---|---|---|---|
-| PL-NN | `<trigger> --smoke` | <steps or owner modules> | TC-NN, TC-NN | <TC-NN or —> |
+| PL-NN | `<trigger> --smoke` | <steps or owner modules> | TC-NN (<In type> → <step>[…<step>] → <Out type>), … | <TC-NN or —> |
 
 ### TC-NN: <What the case shows>
 **Pipeline:** PL-NN · **Covers:** <spec IDs> · **Kind:** <user example | paper table | closed form | synthetic known-answer | model evaluation | regression> · **Fixture:** tests/fixtures/<pkg>/TC-NN/
@@ -45,7 +45,7 @@ Large data: `{"prices": {"path": "data/raw/<file>.parquet", "sha256": "<hash>"}}
 
 ## Example 1: Quant Lab, M1 (New)
 
-**Context:** `docs/packages/quant/pipelines.md` is Approved with PL-01 (Load prices: `read_raw` → `apply_universe` → `save_prices`) and PL-02 (Covariance report).
+**Context:** `docs/packages/quant/pipelines.md` is Approved with PL-01 (Load prices) and PL-02 (Covariance report).
 
 ```
 $ dt status --skill test-planning
@@ -115,7 +115,7 @@ date,ticker,close
 {"last_date": {"XYZ": "2018-06-29"}, "tol": 0}
 ```
 
-- **Parse test** (tester, later): `read_raw("source/delisted_2018.csv")` returns exactly the rows of `prices.csv`. Date order, separators and the adjusted-close column are where vendor parsing goes wrong.
+- **Parse test** (tester, later): `read_raw("source/delisted_2018.csv")` returns exactly the rows of `prices.csv`.
 - **Pipeline test:** PL-01 on `input.json` keeps XYZ through 2018-06-29 and drops it after.
 
 ### Result — `docs/packages/quant/tests.md`
@@ -128,8 +128,8 @@ date,ticker,close
 ## Strategy
 | Pipeline | Smoke | Step unit tests | Golden cases | Model eval |
 |---|---|---|---|---|
-| PL-01 | `python -m quant.data load --smoke` | read_raw, apply_universe | TC-01 | — |
-| PL-02 | `python -m quant.stats cov-report --smoke` | cov, rmt, pca | TC-02, TC-03 | — |
+| PL-01 | `python -m quant.data load --smoke` | read_raw, apply_universe | TC-01 (RawPrices → apply_universe → Prices) | — |
+| PL-02 | `python -m quant.stats cov-report --smoke` | cov, rmt, pca | TC-02 (Cov → clean_eigen → Cov), TC-03 (Cov → pca → Factors) | — |
 
 ### TC-01: Delisted name drops out
 **Pipeline:** PL-01 · **Covers:** DATA-02 · **Kind:** user example · **Fixture:** tests/fixtures/quant/TC-01/
@@ -145,7 +145,7 @@ date,ticker,close
 ### TC-03: Planted factor is found
 **Pipeline:** PL-02 · **Covers:** STAT-01 · **Kind:** synthetic known-answer · **Fixture:** tests/fixtures/quant/TC-03/
 **Source:** generator `one_factor(T=500, N=20, beta=1.0, seed=3)`
-**Expected:** first factor explains ≥ 40% of variance · **Tolerance:** property, no tolerance; the planted factor carries well over 40% by construction
+**Expected:** first factor explains ≥ 40% of variance · **Tolerance:** property; the planted factor carries well over 40% by construction
 
 ## Open questions
 
@@ -166,14 +166,14 @@ TC-03/expected.json  {"property": "explained[0] >= 0.40"}
 ```
 Wrote docs/packages/quant/tests.md (Draft) and fixtures TC-01..TC-03.
 
-Strategy: PL-01 smoke `python -m quant.data load --smoke`; PL-02 smoke `python -m quant.stats cov-report --smoke`.
+Strategy: one smoke per pipeline (above).
 Oracles — please approve each:
 - TC-01 (PL-01, your file): XYZ present through 2018-06-29, absent after · exact, dates are discrete
 - TC-02 (PL-02, noise T=250 N=50 seed 7): every cleaned eigenvalue ≤ λ+ · 5% of λ+, finite-sample edge
 - TC-03 (PL-02, one factor T=500 N=20 seed 3): first factor explains ≥ 40% · property
 
 Transcription: prices.csv from your export (shown above). Check the dates: DD/MM in the raw.
-ASSUMPTIONS: seeds 7 and 3; sizes chosen to run in under a second; the 5% edge tolerance; case names.
+ASSUMPTIONS: seeds 7 and 3; sizes; the 5% edge tolerance; case names; each case's step span.
 Open questions: none.
 Uncovered: STAT-02 and STAT-04 have step unit tests but no golden case (no trusted output exists).
 
@@ -190,8 +190,8 @@ Do you approve these expected outputs?
 ## Strategy
 | Pipeline | Smoke | Step unit tests | Golden cases | Model eval |
 |---|---|---|---|---|
-| PL-01 | `python -m rllab train snake --agent dqn --smoke` | envs, train, evaluate, runs | TC-01, TC-02 | TC-03 |
-| PL-02 | `python -m rllab replay runs/<id> --smoke` | rollout, render | TC-02 | — |
+| PL-01 | `python -m rllab train snake --agent dqn --smoke` | envs, train, evaluate, runs | TC-01 (Env, Agent → train → Agent), TC-02 (whole pipeline) | TC-03 |
+| PL-02 | `python -m rllab replay runs/<id> --smoke` | rollout, render | TC-02 (whole pipeline) | — |
 
 ### TC-01: Corridor solved by construction
 **Pipeline:** PL-01 · **Covers:** AGT-01, TRN-01 · **Kind:** synthetic known-answer · **Fixture:** tests/fixtures/rllab/TC-01/

@@ -1,71 +1,85 @@
-# Examples: contract-first Phase 0, routing, a foreign plan
+# Examples: an interface-first milestone, routing, a foreign plan
 
 `dt` means `python3 ../../scripts/dt.py`, run from the project root.
 
-## Contract-first Phase 0 across packages (M3 after Grow)
+## Interface-first M1 (quant, single package)
 
-After `architecture-design` Grow split quant into `data`, `stats`, `portfolio` and `features`, the root defines system pipeline PL-05 Research run (data → stats → features → portfolio, grown from PL-03). `pipeline-design` Grow kept PL-03 Min-variance backtest in `portfolio` as PL-05's portfolio segment (`**Part of:** PL-05`), and its Extend round added PL-06 Feature screening in `features`, also `Part of: PL-05`. M3 builds PL-06 and PL-05; PL-03 already exists.
+PL-01 Load prices (`read_raw` → `apply_universe`, owner `data`) and PL-02 Covariance report (`load_prices` as PL-01 built, then `estimate_cov` → `clean_eigen` → `pca` → `write_report`, owner `stats`). Golden cases TC-01 (universe), TC-02 (MP cleaning), TC-03 (PCA). The contract has a `type` section for every `In → Out`: `data.RawPrices`, `data.Prices`, `stats.Returns`, `stats.Cov`, `stats.Factors`, `stats.CovReport`; `data.load_prices` carries a `**Boundary:**` line because PL-02 calls it.
 
-`features.screen` is new and crosses a boundary: `portfolio` consumes it. Its contract section names the boundary:
-
-```markdown
-### features.screen: Screened feature panel
-`def screen(panel: FeaturePanel, *, max_features: int = 50) -> FeaturePanel`
-- **Invariants:** same index as the input; at most `max_features` columns; no column with NaN share > 5%
-- **Errors:** `ValueError` if the panel is empty
-- **Boundary:** portfolio · **Fixtures:** tests/contracts/features.screen/ · **Cases:** typical panel, one feature, all-NaN column dropped
-- **Used by:** portfolio; PL-05, PL-06
+```
+wave 0  T01  interface
+wave 1  spines T02 read_raw · T03 apply_universe · T04 estimate_cov · T05 clean_eigen · T06 pca · T07 write_report
+        testers of T10 universe · T11 MP cleaning · T12 shrinkage · T13 PCA
+wave 2  wiring T08 PL-01 · T09 PL-02 (on the load_prices fake); implementers of T10 ← T03 · T11 ← T05 · T12 ← T04 · T13 ← T06
+wave 3  T14  system: PL-02 on the real PL-01
 ```
 
-Phase 0 freezes that boundary first, then builds both packages side by side, then integrates:
+14 tasks, critical path 4 (T01 → T05 → T11 → T14, or any other four-task chain), 10 agents in wave 1, every spine and thicken XS or S. No fold: each step's spine is a real baseline worth testing alone.
 
 ```markdown
-## Phase 0: Spine
-
-### M3-T01: Freeze the features.screen contract
-**Package:** features · **Step:** contract · **Covers:** — · **Size:** S · **Mode:** solo
-**Read:** features.screen
+### M1-T01: M1 interface
+**Package:** quant · **Step:** contract · **Kind:** interface · **Covers:** — · **Size:** S · **Mode:** solo
+**Read:** PL-01, PL-02, data.RawPrices, data.Prices, stats.Returns, stats.Cov, stats.Factors, stats.CovReport, data.load_prices
 **Acceptance:**
-- [ ] A pandera schema for the screened panel; each case's sample frame validates against it
-- [ ] `portfolio`'s test support has a fake `screen` that returns the sample frames and nothing else
-**Verify:** `pytest tests/contracts/features.screen` · `scripts/check.sh gate --pkg features`
-**Depends on:** — · **Files likely:** packages/features/src/features/schemas.py, tests/contracts/features.screen/test_contract.py
+- [ ] Each type is code in `data/types.py` or `stats/types.py`; each `tests/contracts/<id>.<Type>/` sample validates against its schema
+- [ ] Every step imports with its contract signature, body `raise NotImplementedError("<its spine task>")`; each `__init__.py` exports its contract
+- [ ] The `data.load_prices` fake serves its fixtures
+**Verify:** `pytest tests/contracts` · `scripts/check.sh gate`
+**Depends on:** — · **Writes:** src/quant/data/**, src/quant/stats/**, tests/contracts/**
 
-### M3-T02: PL-06 spine with a univariate screen
-**Package:** features · **Step:** PL-06 · **Covers:** FEAT-01 · **Size:** M · **Mode:** solo
-**Read:** PL-06, features.screen, FEAT-01
+### M1-T05: clean_eigen spine (no cleaning)
+**Package:** quant · **Step:** PL-02.clean_eigen · **Kind:** spine · **Covers:** — · **Size:** XS · **Mode:** solo
+**Read:** PL-02, stats.Cov, stats.clean_eigen
 **Acceptance:**
-- [ ] `python -m features screen --smoke` runs end to end on synthetic features; its output validates against the M3-T01 schema
-- [ ] PL-06 pre-build sections replaced by a `dt layout` pointer
-**Verify:** `python -m features screen --smoke` · `scripts/check.sh gate --pkg features`
-**Depends on:** M3-T01 · **Parallel:** G1 · **Files likely:** packages/features/src/features/__init__.py, packages/features/src/features/pipeline.py, packages/features/src/features/screen.py
+- [ ] `clean_eigen` returns its input on the stats.Cov sample; signature unchanged
+**Verify:** `pytest tests/unit/quant -k clean_eigen` · `scripts/check.sh gate`
+**Depends on:** M1-T01 · **Writes:** src/quant/stats/rmt.py, tests/unit/quant/test_rmt.py
 
-### M3-T03: PL-03 on screened features, against the contract fake
-**Package:** portfolio · **Step:** PL-03 · **Covers:** — · **Size:** S · **Mode:** solo
-**Read:** PL-03, features.screen
+### M1-T09: Wire PL-02
+**Package:** quant · **Step:** PL-02 · **Kind:** wiring · **Covers:** QR-02 · **Size:** S · **Mode:** solo
+**Read:** PL-02, data.load_prices
 **Acceptance:**
-- [ ] `python -m portfolio backtest --smoke` runs end to end on every `features.screen` fixture through the fake
-**Verify:** `python -m portfolio backtest --smoke` · `scripts/check.sh gate --pkg portfolio`
-**Depends on:** M3-T01 · **Parallel:** G1 · **Files likely:** packages/portfolio/src/portfolio/pipeline.py, packages/portfolio/tests/support/fake_screen.py
+- [ ] `python -m quant.stats cov-report --smoke` runs end to end on the `data.load_prices` fake; committed as PL-02's smoke test
+- [ ] PL-02 pre-build sections replaced by a `dt layout` pointer
+**Verify:** `python -m quant.stats cov-report --smoke` · `scripts/check.sh gate`
+**Depends on:** M1-T04, M1-T05, M1-T06, M1-T07 · **Writes:** src/quant/stats/pipeline.py, src/quant/stats/__main__.py, tests/unit/quant/test_pl02_smoke.py
 
-### M3-T04: PL-05 system spine across packages
-**Package:** data · **Step:** PL-05 · **Covers:** — · **Size:** S · **Mode:** solo
-**Reason:** system spine
-**Read:** PL-05, data.load_prices, stats.estimate_cov, features.screen
+### M1-T11: Marchenko–Pastur cleaning
+**Package:** quant · **Step:** PL-02.clean_eigen · **Kind:** thicken · **Covers:** STAT-03 · **Size:** XS · **Mode:** split
+**Skills:** data-science
+**Read:** PL-02, TC-02, STAT-03, stats.clean_eigen, stats.Cov
 **Acceptance:**
-- [ ] `python -m portfolio research --smoke` runs data → stats → features → portfolio on synthetic prices with the real `screen`, no fake
-- [ ] The real `screen` output still validates against the M3-T01 schema; the smoke run is committed as PL-05's smoke test
-**Verify:** `python -m portfolio research --smoke` · `scripts/check.sh gate --pkg data`
-**Depends on:** M3-T02, M3-T03 · **Files likely:** packages/portfolio/src/portfolio/research.py
+- [ ] TC-02 passes: every cleaned eigenvalue ≤ the MP edge on pure noise; no cleaning stays selectable
+**Verify:** `pytest tests/intent/quant tests/unit/quant -k rmt` · `scripts/check.sh gate`
+**Depends on:** M1-T05 · **Writes:** src/quant/stats/rmt.py, tests/intent/quant/test_rmt.py, tests/unit/quant/test_rmt.py
+
+### M1-T14: PL-02 on the real PL-01
+**Package:** quant · **Step:** PL-02 · **Kind:** system · **Covers:** — · **Size:** XS · **Mode:** solo
+**Read:** PL-01, PL-02, data.load_prices, TC-01, TC-02, TC-03
+**Acceptance:**
+- [ ] PL-02 calls the real `load_prices`; the fake stays for the contract tests
+- [ ] Both smoke commands pass; TC-01–TC-03 pass on the real chain
+**Verify:** `python -m quant.data load --smoke` · `python -m quant.stats cov-report --smoke` · `scripts/check.sh gate`
+**Depends on:** M1-T08, M1-T09, M1-T10, M1-T11, M1-T12, M1-T13 · **Writes:** src/quant/stats/pipeline.py
 ```
 
-M3-T02 and M3-T03 share no file, and the only contract symbol both read is the one M3-T01 froze, which is read-only for the rest of the milestone, so both run in G1 (`dt lint`'s `parallel` check skips symbols a contract task froze). The fake in M3-T03 is allowed because it is built from the contract's schema and fixtures, and both sides test against them: M3-T02 asserts its output validates, M3-T03 consumes the fixtures. Neither spine mocks a step of its own package.
+T11's tester starts in wave 1: it tests `clean_eigen` as T01 declares it and fails on `NotImplementedError("M1-T05")`. Its implementer follows its tester and T05, nothing else. Wiring T09 waits on PL-02's spines because its smoke runs them, but not on PL-01: the fake stands in.
 
-**Track:** the contract task and the system spine have no group, so they count in full (2); the chain through the rest is M3-T02 plus the longest thicken chain after it. With the old order (system spine first, then each package spine, all serial), Phase 0 alone would have counted 4.
+The graph, excerpted (one row per `Depends on` other than on T01, 16, plus the mitigated edges):
 
-The system spine's Package is `data`, the owner of PL-05's first step (system pipelines have no Entry). `--pkg data` scopes the gate to data and everything that depends on it, which here is every package. PL-05 is in the root, which has no pre-build sections; PL-06's spine (M3-T02) clears `features`' planned layout. Moving the code under `packages/` (the drift `pipeline-design` Grow listed) is its own solo task, omitted here.
+```markdown
+## Dependency graph
+| From | To | Kind | Mitigated by |
+|---|---|---|---|
+| M1-T05 clean_eigen spine | M1-T04 estimate_cov spine | data | stats.Cov sample (M1-T01) |
+| M1-T09 wire PL-02 | M1-T05 clean_eigen spine | code | none: the smoke runs it |
+| M1-T09 wire PL-02 | M1-T08 wire PL-01 | call | data.load_prices fake (M1-T01) |
+| M1-T11 MP cleaning | M1-T05 clean_eigen spine | code | none: thickens the same module |
+| M1-T11 MP cleaning | M1-T12 shrinkage | data | stats.Cov sample (M1-T01): cleaning takes any Cov |
+| M1-T14 system | M1-T09 wire PL-02 | file | none: swaps the fake in the entry M1-T09 wrote |
+```
 
-Multi-package Verify lines scope the gate with `--pkg`. Phase 1 tasks for PL-06's null test name `null-hypothesis-testing` in `Skills:`. If it isn't installed, it's still named, `dt status` lists it under `skills_missing`, and the gate asks the user whether to install it or accept the gap.
+**Multi-package.** The same shape across packages: the interface task freezes each `**Boundary:**` symbol in its `**Fixtures:**` folder (one interface task per provider when one would pass M), spines run in every package at once, a consumer's wiring runs on the provider's fake, and the system task (one per system pipeline, `**Package:**` the owner of its first step, `**Reason:** system task`, `--pkg` on the gate) swaps in the real providers.
 
 ---
 
@@ -84,23 +98,22 @@ references_changed: none
 references_missing: none
 ```
 
-Nothing is waiting for intake, so plan. `dt section RF-01` gives the entry. *Use for* names the market-removal step, *Key parts* lists `residualize`, and *Caveats* says the reference fits PCA on the whole sample. The file is over 300 lines, so the task reads one function through a selector:
+Nothing is waiting for intake, so plan. `dt section RF-01` gives the entry. *Use for* names the market-removal step, *Key parts* lists `residualize`, and *Caveats* says the reference fits PCA on the whole sample. The file is over 300 lines, so the task, which thickens the `remove_market` spine M2-T03, reads one function through a selector:
 
 ```markdown
-### M2-T04: Per-window market removal
-**Package:** quant · **Step:** PL-03.remove_market · **Covers:** STRUCT-02 · **Size:** S · **Mode:** split
+### M2-T09: Per-window market removal
+**Package:** quant · **Step:** PL-03.remove_market · **Kind:** thicken · **Covers:** STRUCT-02 · **Size:** XS · **Mode:** split
 **Skills:** data-analysis
 **Read:** PL-03, TC-09, stats.residualize, RF-01:residualize
 **Acceptance:**
 - [ ] TC-09 passes: the planted factor is removed within tolerance
 - [ ] Given a walk-forward split, when `remove_market` runs, then each window's factors are fit only on returns inside that window
-- [ ] PL-03 smoke test still passes
-**Verify:** `pytest tests/intent/quant tests/unit/quant -k residualize` · `python -m quant.portfolio backtest --smoke` · `scripts/check.sh gate`
-**Depends on:** M2-T01 · **Files likely:** src/quant/stats/residualize.py, tests/unit/quant/test_residualize.py
+**Verify:** `pytest tests/intent/quant tests/unit/quant -k residualize` · `scripts/check.sh gate`
+**Depends on:** M2-T03 · **Writes:** src/quant/stats/residualize.py, tests/intent/quant/test_residualize.py, tests/unit/quant/test_residualize.py
 ```
 
-- The second bullet comes from TC-09 and the spec, not from the reference. Acceptance never says "reuse RF-01". Whether to reuse the residual arithmetic is the builder's call; `dt context M2-T04` prints the entry, the reference banner with its Caveats, and only `residualize`.
-- `null-hypothesis-testing` goes on M2-T06, the claims task that tests whether the residual structure beats noise. The Scope reads `**Skills:** data-analysis (remove_market, estimate_cov), null-hypothesis-testing (claims)`.
+- The second bullet comes from TC-09 and the spec, not from the reference. Acceptance never says "reuse RF-01". Whether to reuse the residual arithmetic is the builder's call; `dt context M2-T09` prints the entry, the reference banner with its Caveats, and only `residualize`.
+- `null-hypothesis-testing` goes on M2-T10, the claims task that tests whether the residual structure beats noise. The Scope reads `**Skills:** data-analysis (remove_market, estimate_cov), null-hypothesis-testing (claims)`.
 - At the gate, `references_unrouted` and `skills_unrouted` are both `none`. Had a milestone item stayed off every task, it would need a reason under Open questions, such as `- RF-01 unrouted: the per-window fit is specified fully by TC-09; the reference adds nothing`. The user then decides at the gate.
 
 ---

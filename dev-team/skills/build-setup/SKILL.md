@@ -11,7 +11,7 @@ This skill says what "good enough" means and makes it mechanical: `CONSTRAINTS.m
 
 ## What it writes
 
-Only `CONSTRAINTS.md`, tool config in `pyproject.toml` (multi-package: the root's, plus each `packages/<id>/pyproject.toml`'s deptry section), `scripts/**`, `.claude/agents/**` and CI; plus `tests/conftest.py` with the Hypothesis profiles **only if it doesn't exist**, listed at the gate. Templates are in `templates/`, mapped to project files in `references/derive.md`. Load a tool's reference (`references/tools/<tool>.md`) **only when configuring or changing that tool**.
+Only `CONSTRAINTS.md`, tool config in `pyproject.toml` (multi-package: the root's, plus each `packages/<id>/pyproject.toml`'s deptry section), `scripts/**`, `.claude/agents/**` and CI; plus `tests/conftest.py` with the Hypothesis profiles **only if it doesn't exist**, listed at the gate. Templates are in `templates/`, mapped to project files in `references/derive.md`. They carry the parallel build's rules: interface stubs (CR-02), the `Writes:` guard, red for the right reason. Load a tool's reference (`references/tools/<tool>.md`) **only when configuring or changing that tool**.
 
 ## Modes
 
@@ -33,7 +33,7 @@ PRECHECK → DETECT → 4 QUESTIONS → GENERATE → [commit yes] → PROVE → 
 
 **2. Detect, don't ask.** Read, and report in two lines: shape, ids, dependency rules and stack ADs (`docs/architecture.md`); module layout (`pipelines.md`); tests and fixtures; the milestone's dependencies (`tasks/plan.md`); Python version; existing config, CI and `.claude/`.
 
-**3. Four questions**, one at a time, never more, with these defaults: **block or warn mid-task?** (block on the floor and gate; `full` findings become review findings; "warn" adds `--warn` to the Stop hooks); **type gate?** (mypy strict gates, pyright in `full`); **targets or measure-and-hold?** (measure and hold); **slowest gate tolerated?** (90 s; no limit for `full`). Mention once that CI is available; write it only if asked.
+**3. Four questions**, one at a time, with these defaults: **block or warn mid-task?** (block on the floor and gate; `full` findings become review findings; "warn" adds `--warn` to the Stop hooks); **type gate?** (mypy strict gates, pyright in `full`); **targets or measure-and-hold?** (measure and hold); **slowest gate tolerated?** (90 s; no limit for `full`). Mention CI once; write it only if asked.
 
 **4. Generate.** Derive every value per `references/derive.md` and `examples.md`, and fill the templates; `grep -rn '{{[a-z_]*}}'` over the written files must print nothing. `chmod +x scripts/*.sh scripts/hooks/*.sh`; append the `.gitignore` lines. `uv lock && uv sync`, then write the vulture whitelist: the template header plus `uv run --frozen vulture --make-whitelist`. Never edit `check.sh` steps or hook commands by hand.
 
@@ -41,7 +41,7 @@ PRECHECK → DETECT → 4 QUESTIONS → GENERATE → [commit yes] → PROVE → 
 
 ## Review Gate
 
-Rerun `dt status --skill build-setup`. Every gap key must be empty (`unknown` only where the input file doesn't exist yet) or explained under Open questions; after a Ratchet, `expired_exceptions` too. `pkg_scope` in `check.sh` must match `dependents`. Then present:
+Rerun `dt status --skill build-setup`. Every gap key must be empty (`unknown` only where the input file doesn't exist yet) or explained under Open questions; after a Ratchet, `expired_exceptions` too. Then present:
 1. **What was written**, file by file, and the proof run (pass/fail, gate time vs budget).
 2. **ASSUMPTIONS:** every derived value (`references/derive.md`), the coverage floor, vulture whitelist size, and the four answers.
 3. **Loosenings** (Extend, Ratchet, Revise), each as before → after, or say there are none.
@@ -51,7 +51,7 @@ Ask for approval and **stop the turn**.
 
 | The user says | Do |
 |---|---|
-| An unambiguous yes | Set `**Status:** Approved` and `**Last reviewed:**`. Offer to commit the bar; commit only on a yes. **New or Extend:** after that commit, run `python3 ../../scripts/dt.py base` (sets the plan's `**Base:**` to HEAD, so guard-the-bar diffs and Audit start from a commit that holds the bar; `dt status` then reports `current`) and say the next step is `/build`, run by the user. **Ratchet:** no `dt base`; next is `build-planning` Advance. **Stop.** |
+| An unambiguous yes | Set `**Status:** Approved` and `**Last reviewed:**`. Offer to commit the bar; commit only on a yes. **New or Extend:** after that commit, run `python3 ../../scripts/dt.py base` (sets the plan's `**Base:**` to HEAD, so guard-the-bar diffs and Audit start from a commit that holds the bar) and say the next step is `/build`, run by the user. **Ratchet:** no `dt base`; next is `build-planning` Advance. **Stop.** |
 | A hedge on a loosening or exception ("fine I guess") | Not approval. Ask again about that item |
 | Changes | Edit, keep Draft, repeat the gate |
 

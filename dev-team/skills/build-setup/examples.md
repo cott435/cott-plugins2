@@ -81,7 +81,7 @@ DEFAULT if unsure: mypy strict as the gate; pyright runs in check.sh full.
 **Review gate**
 ```
 Wrote: CONSTRAINTS.md (Draft), pyproject.toml tool config, scripts/check.sh, check_size.py,
-floor_guard.sh/.py, vulture_whitelist.py, scripts/hooks/*.sh, .claude/agents/{tester,implementer,
+floor_guard.sh/.py, red_check.py, vulture_whitelist.py, scripts/hooks/*.sh, .claude/agents/{tester,implementer,
 reviewer}.md, tests/conftest.py (didn't exist), .gitignore (+8 lines). No CI (not requested).
 Proof run, after the skeleton commit: ruff --show-settings ok; check.sh gate passed in 14 s
 (fresh venv; budget 90 s).

@@ -42,7 +42,7 @@ references_missing: none
 
 With no plan yet, `uncovered`, `no_spine` and the unrouted lists have nothing to check; they count at the gate's re-run. S1 has no milestone rows, so it is the stage to cut, and `dt` inferred its pipelines, PL-01 and PL-02, from its Source (the brief's spec IDs). `milestone_skills` comes from S1's section (`**Skills:** data-science`); S1 has no references.
 
-**Cut:** PL-02 needs PL-01's prices, but its spine runs on synthetic returns, so both spines fit one milestone: Phase 0 is 2 tasks and the longest chain after it about 3, far under 15. S1 becomes one milestone, M1 Data + stats (`dt next-id M`), which inherits S1's Skills. S2 isn't designed yet, so it stays uncut. Task IDs start at `dt next-id M1-T` (M1-T01).
+**Cut:** PL-02 needs PL-01's prices, but only through `data.load_prices`, which the interface task freezes with a fake, so both pipelines fit one milestone: a critical path of 4, far under 15. S1 becomes one milestone, M1 Data + stats (`dt next-id M`), which inherits S1's Skills. S2 isn't designed yet, so it stays uncut. Task IDs start at `dt next-id M1-T` (M1-T01).
 
 **Grow check:** no measurable trigger; numpy and pandas only; nothing deploys on its own. Passes.
 
@@ -53,16 +53,16 @@ With no plan yet, `uncovered`, `no_spine` and the unrouted lists have nothing to
 **User:** "All of it."
 
 **Written:**
-- `tasks/plan.md`: Phase 0 with M1-T01 (PL-01 spine) and M1-T02 (PL-02 spine, which calls PL-01's `load_prices`, so it depends on M1-T01). Phase 1: M1-T03 delisting-aware universe (riskiest: survivorship bias poisons every later number), M1-T04 MP cleaning, checkpoint, M1-T05 shrinkage, M1-T06 planted-factor PCA, exit checkpoint. M1-T03 and M1-T04 share no file or contract symbol, so both are `Parallel: G1`.
-- `tasks/todo.md`: six unchecked lines.
+- `tasks/plan.md`, the 14 tasks of `examples-phase0.md`: M1-T01 interface; six step spines M1-T02–M1-T07; wiring M1-T08 (PL-01) and M1-T09 (PL-02, on the `load_prices` fake); thicken M1-T10 delisting-aware universe, M1-T11 MP cleaning, M1-T12 shrinkage, M1-T13 planted-factor PCA; checkpoint after M1-T13; M1-T14 system; exit checkpoint; the dependency graph.
+- `tasks/todo.md`: fourteen unchecked lines.
 - Roadmap: the milestone table with row `| M1 | S1 | Data + stats | quant | PL-01, PL-02 | — | |`, and `## M1: Data + stats` with Outline, Exit and Plan link. S2 keeps its stage row only. Then `dt roadmap` (M1 → Planned, S1 → Planned).
 - `AGENTS.md`: the doc map, with `data-science — stats steps`.
 
 **Review gate message:**
 
-> Cut S1 into one milestone, M1 Data + stats (both pipelines, track 5 tasks). Wrote the M1 plan (6 tasks: 2 spine, 4 thicken; checkpoints after M1-T04 and at exit), its todo, the M1 roadmap row and the AGENTS.md doc map. `dt lint` is clean; `uncovered`, `no_spine` and `mode_violations` are empty; every `dt context` packet is under 2,000 lines.
+> Cut S1 into one milestone, M1 Data + stats (both pipelines). Wrote the M1 plan (14 tasks: interface, 6 spines, 2 wiring, 4 thicken, system; critical path 4, 10 agents in wave 1; checkpoints after M1-T13 and at exit), its todo, the M1 roadmap row and the AGENTS.md doc map. `dt lint` is clean; `uncovered`, `no_spine` and `mode_violations` are empty; `dt ready` lists only M1-T01; every `dt context` packet is under 2,000 lines.
 >
-> **ASSUMPTIONS:** universe before MP cleaning (survivorship bias is the biggest risk); M1-T03 and M1-T04 run in parallel (G1); spine tasks solo, the four thicken tasks split; data-science routed to the three stats tasks; M1-T02 is M (four files) since every PL-02 step needs a baseline module.
+> **ASSUMPTIONS:** M1-T01 freezes six types, every step signature and the `load_prices` fake; the only unmitigated edges are stubs, spines under their thicken tasks and wiring, and the system task; no folds; interface, spines, wiring and system solo, the four thicken tasks split; data-science routed to the three stats thicken tasks.
 >
 > **Open questions:** none. **Uncovered:** none deferred.
 >
@@ -86,19 +86,19 @@ pipelines_inferred: PL-01, PL-02, …, PL-41
 milestone_skills: —
 ```
 
-One milestone can't hold S1: Phase 0 alone would be a contract task, the longest package's spines (core: 13) and two system spines. Order the pipelines by dependency instead. Every later capability needs synced transactions; categories and transfers need the transaction list; the comparison needs categories. Then cut vertical slices along those lines:
+One milestone can't hold S1: 29 pipelines make well over a hundred tasks, far past `tasks/plan.md`'s ~400 lines and any one review. Order the pipelines by dependency instead. Every later capability needs synced transactions; categories and transfers need the transaction list; the comparison needs categories. Then cut vertical slices along those lines:
 
 | Milestone | Slice (runs end to end) | Pipelines | Depends |
 |---|---|---|---|
 | M1 Walking skeleton | Link one account; it syncs through the relay and its transactions list in the app | relay PL-01 link, PL-02 sync; core PL-08 ingest; app PL-20 list; PL-40, PL-41 | — |
-| M2 Categories | Transactions get categories; the user corrects one and it sticks | core PL-09–PL-12; app PL-21, PL-22 | M1 |
-| M3 Transfers and review | Transfers between own accounts drop out of spending; the user reviews new items | relay PL-03; core PL-13–PL-15; app PL-23–PL-25 | M2 |
-| M4 Month comparison | This month vs last, by category | core PL-16–PL-20; app PL-26–PL-28 | M2 |
+| M2 Categories | Transactions get categories; the user corrects one and it sticks | core PL-09–PL-12; app PL-21, PL-22 | M1 (core.Transaction, PL-08 output) |
+| M3 Transfers and review | Transfers between own accounts drop out of spending; the user reviews new items | relay PL-03; core PL-13–PL-15; app PL-23–PL-25 | M2 (core.Category) |
+| M4 Month comparison | This month vs last, by category | core PL-16–PL-20; app PL-26–PL-28 | M2 (core.Category) |
 | … | | | |
 
-Never one milestone per package: "all of the relay" runs nothing a user can see, and it queues `core` and `app` behind it. M3 and M4 both depend only on M2, so they could share a milestone as parallel tracks; they stay apart here because together their track would pass 15.
+Never one milestone per package: "all of the relay" runs nothing a user can see, and it queues `core` and `app` behind it. M3 and M4 both depend only on M2, so they could share a milestone as parallel tracks; they stay apart here because together their critical path would pass 15.
 
-M1's Phase 0 then has: two contract tasks, one per provider, freezing the boundaries M1 uses: `relay.sync_response` (consumed by `core`) and `core.transaction_list` (consumed by `app`). Each gets a JSON Schema (the three runtimes share no types), one JSON fixture per case the contract lists, and a fake: a fake relay endpoint in `core`'s test support, a fake `core` in `app`'s. Then the four package spines in parallel groups (relay's two chained, since they share files), `core` and `app` running against the fakes; then PL-40 and PL-41's system spines, which swap the fakes for the real relay and core. Track: 2 contract tasks + 2 system spines + the longest chain through the rest (core: PL-08's spine, then its thicken tasks), well under 15.
+M1 then starts with two interface tasks, one per provider, freezing the boundaries M1 uses: `relay.sync_response` (consumed by `core`) and `core.transaction_list` (consumed by `app`), plus each package's step types and signatures. Each boundary gets a JSON Schema (the three runtimes share no types), one JSON fixture per case the contract lists, and a fake: a fake relay endpoint in `core`'s test support, a fake `core` in `app`'s. Then every step spine of all three packages at once; the four wirings, `core` and `app` on the fakes; then PL-40 and PL-41's system tasks, which swap the fakes for the real relay and core. Critical path: interface, spine, the longest thicken chain, system, well under 15.
 
 **Roadmap:**
 
@@ -106,9 +106,9 @@ M1's Phase 0 then has: two contract tasks, one per provider, freezing the bounda
 | Milestone | Stage | Name | Packages | Pipelines | Depends | Status* |
 |---|---|---|---|---|---|---|
 | M1 | S1 | Walking skeleton | relay, core, app | PL-01, PL-02, PL-08, PL-20, PL-40, PL-41 | — | Planned |
-| M2 | S1 | Categories | core, app | PL-09–PL-12, PL-21, PL-22, PL-41 | M1 | Designed |
-| M3 | S1 | Transfers and review | relay, core, app | PL-03, PL-13–PL-15, PL-23–PL-25, PL-40 | M2 | Designed |
-| M4 | S1 | Month comparison | core, app | PL-16–PL-20, PL-26–PL-28, PL-41 | M2 | Designed |
+| M2 | S1 | Categories | core, app | PL-09–PL-12, PL-21, PL-22, PL-41 | M1 (core.Transaction, PL-08 output) | Designed |
+| M3 | S1 | Transfers and review | relay, core, app | PL-03, PL-13–PL-15, PL-23–PL-25, PL-40 | M2 (core.Category) | Designed |
+| M4 | S1 | Month comparison | core, app | PL-16–PL-20, PL-26–PL-28, PL-41 | M2 (core.Category) | Designed |
 
 ## M1: Walking skeleton
 **Outline:** One linked account syncs through the relay and its transactions list in the app.

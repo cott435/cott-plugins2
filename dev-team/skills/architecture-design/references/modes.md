@@ -25,7 +25,7 @@ The spec gained requirements (usually from a specced idea) or changed some.
 
 ## Revise
 
-A technical change with no spec change. Write a new decision whose Context explains what was learned ("the simulator is 40× too slow for QR-02 at 1M steps"). Then supersede the old decision if the new one reverses it, or revise it in place if the new one changes only part of it (Extend step 4). Update every section and contract the change touches (tech stack, components, Overview), and run the Review Gate. If a contract changes, list its consumers (its **Used by**): their pipelines and tasks need revisiting. A frozen boundary's schema, fixtures and fake change with it, in a task Replan adds.
+A technical change with no spec change. Write a new decision whose Context explains what was learned ("the simulator is 40× too slow for QR-02 at 1M steps"). Then supersede the old decision if the new one reverses it, or revise it in place if the new one changes only part of it (Extend step 4). Update every section and contract the change touches (tech stack, components, Overview), and run the Review Gate. If a contract changes, list its consumers (its **Used by**): their pipelines and tasks need revisiting. A frozen interface's type, samples and fake change with it, in a new interface task Replan adds (a `contract-change` edge).
 
 ## Grow: single package to multi-package
 

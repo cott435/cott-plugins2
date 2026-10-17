@@ -25,12 +25,12 @@ Every skill stops after writing a Draft and waits for your review. Nothing moves
 | `docs/spec.md` | **What** is built: requirements (`CODE-NN`), acceptance criteria, scope | `spec-writing` | As long as needed |
 | `docs/architecture.md` | **How**: components, dependencies, decisions (`AD-NN`); multi-package: system map and system pipelines | `architecture-design` | 1-3 pages (single); 2-4 (root) |
 | `docs/packages/<pkg>/architecture.md` | A package's internals (multi-package only) | `architecture-design` | 1-3 pages |
-| `docs/packages/<pkg>/contract.md` | The package's public API: one section per symbol, with invariants and errors | `architecture-design` | ≤ 1 page |
-| `docs/packages/<pkg>/pipelines.md` | The workflows you run (`PL-NN`): one entry function each, a step table, a real spine version per step, planned layout until the spine lands | `pipeline-design` | ≤ 2 pages |
-| `docs/packages/<pkg>/tests.md` | Test strategy per pipeline and golden cases (`TC-NN`), each with a source outside the agent | `test-planning` | ≤ 2 pages |
+| `docs/packages/<pkg>/contract.md` | The package's public API: one section per symbol and per type its steps pass (`### stats.Cov: type`), with invariants, errors and `**Boundary:**` lines | `architecture-design` | ≤ 1 page |
+| `docs/packages/<pkg>/pipelines.md` | The workflows you run (`PL-NN`): one entry function each, a step table with `In → Out` in contract types, a real spine version per step, planned layout until the wiring lands | `pipeline-design` | ≤ 2 pages |
+| `docs/packages/<pkg>/tests.md` | Test strategy per pipeline and golden cases (`TC-NN`), each with a source outside the agent and the step boundaries it exercises | `test-planning` | ≤ 2 pages |
 | `tests/fixtures/<pkg>/TC-NN/` | `source/`, `input.json`, `expected.json` — the oracles | `test-planning` | Kilobytes |
-| `tests/contracts/<pkg>.<symbol>/` | A cross-package boundary frozen as a schema, fixture payloads and a fixture-backed fake | Cases: `architecture-design` (contract `**Boundary:**` line); files: the Phase 0 contract task | Kilobytes |
-| `tasks/plan.md`, `tasks/todo.md` | The active milestone: Phase 0 (contract, spines, integration), thicken tasks (`M<n>-T<nn>`), checkpoints | `build-planning` | ≤ ~400 lines |
+| `tests/contracts/<id>.<symbol>/` | A frozen interface: a boundary type's schema and samples, or, for a call from another pipeline or package, a fixture-backed fake | Cases: `architecture-design` (contract `**Boundary:**` line); files: the milestone's interface task | Kilobytes |
+| `tasks/plan.md`, `tasks/todo.md` | The active milestone: an interface task, one spine per step, wiring per pipeline, thicken and system tasks (`M<n>-T<nn>`), each with exclusive `Writes:`; the dependency graph; checkpoints | `build-planning` | ≤ ~400 lines |
 | `tasks/queued/`, `tasks/archive/` | Later milestones planned in detail (only on request); finished milestones | `build-planning`, `dt archive` | — |
 | `CONSTRAINTS.md` + `pyproject.toml`, `scripts/check.sh`, `.claude/agents/` | The quality bar (`CR-NN`), its enforcement, and the tester/implementer/reviewer roles | `build-setup` | ≤ 2 pages |
 | `AGENTS.md` / `CLAUDE.md` | Doc map: how agents find their context | `build-planning` | ≤ 25 lines |
@@ -39,7 +39,7 @@ The **brief** is the stable foundation. **Idea files** carry each addition, so t
 
 **One folder per package**, in single- and multi-package repos alike. A single package has one `docs/packages/<pkg>/` with contract sections per component, so when a component later becomes a package (Grow), its sections move with it and nothing is rewritten.
 
-**Intent until code exists, then code is truth.** Planned layout and entry sketches are *pre-build* sections; the spine task replaces them with a pointer to `dt layout`. Contracts stay as docs and are checked against the code.
+**Intent until code exists, then code is truth.** Planned layout and entry sketches are *pre-build* sections; the pipeline's wiring task replaces them with a pointer to `dt layout`. Contracts stay as docs and are checked against the code.
 
 ## References and skills per stage
 
@@ -77,7 +77,7 @@ idea-refine (New) → brief + roadmap stages S1… ─ accept
 → architecture-design (New): shape, components, contract.md ─ approve
 → pipeline-design (New): pipelines + planned layout ─ approve
 → test-planning (New, optional): golden cases + fixtures ─ approve the expected outputs
-→ build-planning (New): cut each designed stage into milestones, M1 plan (Phase 0 contract → spines → system spine, thicken, checkpoints), AGENTS.md ─ approve
+→ build-planning (New): cut each designed stage into milestones, M1 plan (interface → step spines → wiring and thicken → system, dependency graph, checkpoints), AGENTS.md ─ approve
 → build-setup (New): CONSTRAINTS.md, tool config, check scripts, agent roles ─ approve
 → /build
 ```
@@ -94,18 +94,21 @@ Up front (all stages known) or one stage at a time land in the same place: desig
 
 ### Stages and milestones
 
-A **stage** is an outcome the user agreed in `idea-refine` ("See my spending"), unsized. Once its pipelines are approved, `build-planning` **cuts** it into **milestones** along dependency lines: vertical slices that each run end to end, the first a walking skeleton through every package the stage touches. Only one milestone is active at a time, so independent tracks stay inside one milestone as parallel groups; a cut happens only where a later slice needs an earlier one's outputs. A milestone's size is counted per track: the serial Phase 0 tasks plus the longest `Depends on` chain through the rest, at most about 15.
+A **stage** is an outcome the user agreed in `idea-refine` ("See my spending"), unsized. Once its pipelines are approved, `build-planning` **cuts** it into **milestones** along dependency lines: vertical slices that each run end to end, the first a walking skeleton through every package the stage touches. Only one milestone is active at a time, so independent tracks stay inside one milestone, building side by side; a cut happens only where a later slice needs an earlier one's outputs, and the milestone row's `Depends` names them (`M1 (stats.Cov, PL-01 output)`). A milestone's size is its critical path, the longest `Depends on` chain, at most about 15.
 
-### Phase 0: contract first
+### Interface first
 
-In a multi-package milestone, Phase 0 doesn't queue every package behind one system-spine task:
-1. **Contract task** (solo, first): freezes each cross-package boundary the milestone uses as executable artifacts in `tests/contracts/<pkg>.<symbol>/`: a schema (JSON Schema, a typed model, or a pandera schema for a dataframe), golden fixture payloads, and a fixture-backed fake of the provider.
-2. **Package spines** in parallel groups: consumers run against the contract fake, providers assert their output validates against the schema.
-3. **System spine** (last): integration, swapping the fake for the real provider.
+A milestone is planned so many agents build it at once. Its unit is the pipeline step: one owner, one module, typed `In → Out`.
+1. **Interface task** (solo, first): freezes every step boundary that crosses tasks, as code: each boundary type in its owner's `types.py` with a schema and one sample per case in `tests/contracts/<id>.<Type>/`, every step signature with the body `raise NotImplementedError("<task id>")` naming the task that replaces it, a fixture-backed fake for each call from another pipeline or package, and the exports.
+2. **Step spines**, one per step, all at once, each writing only its owner module; **testers** of every split task start beside them, against the frozen signatures and samples.
+3. **Wiring**, one per pipeline (entry, trigger, smoke test, on the fakes), beside the **thicken** tasks.
+4. **System task** (last): swaps each fake for the real provider and runs every smoke and golden case on the real chain.
 
-A boundary fake generated from an approved contract is allowed, because both sides are tested against the same fixtures. Mocking a step inside a package is still forbidden: every spine step is a real baseline.
+Every task declares `**Kind:**` and an exclusive `**Writes:**`: two tasks with no `Depends on` path between them never write the same file. The plan's `## Dependency graph` gives every edge between tasks a kind (`data`, `call`, `file`, `code`, `contract-change`, `order`) and either the interface that mitigates it, so the tasks run side by side, or the reason it can't (`none: …`), so `Depends on` orders them. Waves are derived from the graph, never typed.
 
-Once the contract task is done, its folder is frozen (CR-09): `build-setup`'s protected list covers every `tests/contracts/` folder that exists at a task's base, so only the contract task creating it can write it, and the plugin's `dt guard` asks before any edit no open contract task covers. A frozen contract changes only through `architecture-design` Revise and a new contract task.
+Mocking a step is forbidden: every spine is a real baseline, and a step's consumer builds against the type's sample. The interface stubs are the floor's one stub carve-out: allowed while the task they name is open, failing the gate once it's done and the milestone exit if any is left.
+
+Once the interface task is done, its contract folders are frozen (CR-09): `build-setup`'s protected list covers every `tests/contracts/` folder that exists at a task's base, no other task's `Writes:` names its types, and the plugin's `dt guard` asks before any edit no open interface task covers. A frozen interface changes only through `architecture-design` Revise and a new interface task. Builders never write `tasks/`: the orchestrator ticks tasks and records findings after each merge.
 
 ### Finishing a milestone (Advance)
 
@@ -143,14 +146,14 @@ Data decisions are spread across the stages on purpose:
 | Brief / idea (`idea-refine`) | Whether usable data **exists** and is affordable and legal. The non-ML baseline. | "Need daily US prices including delisted companies, under $100/month" |
 | Spec (`spec-writing`) | What the data must **contain and guarantee** (`DATA-` requirements). Model targets against a baseline. | "No value published after date D is visible to a backtest on D" |
 | Architecture (`architecture-design`) | **Which** API, vendor, or dataset, and which model type, each recorded as a decision | Candidates are checked against the `DATA-` requirements and the brief's budget |
-| Pipelines (`pipeline-design`) | The **spine** version of each step: a real baseline, never a mock (only another package across a frozen contract may be faked) | Sample covariance before shrinkage; equal weight before min-variance |
+| Pipelines (`pipeline-design`) | The **spine** version of each step: a real baseline, never a mock (only a call to another pipeline or package may be faked, across a frozen interface) | Sample covariance before shrinkage; equal weight before min-variance |
 | Tests (`test-planning`) | **Known-answer** cases: planted signals, pure noise, closed forms, and the model evaluation protocol | Every cleaned eigenvalue ≤ the Marchenko–Pastur edge on pure noise |
 
 A data source is named earlier only when it's a fixed constraint, such as your own database or a required benchmark. Thicken tasks put data loading, leak checks and evaluation before any model.
 
 ## Tooling: `dt` and hooks
 
-`scripts/dt.py` parses every doc with one parser, so skills, hooks and agents see the same IDs, statuses and sections. Every skill starts with `dt status --skill <name>`; mechanical edits (`dt tick`, `dt prebuild-clear`, `dt archive`, `dt finding`, `dt roadmap`, `dt base`) go through `dt` so approved docs aren't reset to Draft. Reference: [scripts/README.md](scripts/README.md).
+`scripts/dt.py` parses every doc with one parser, so skills, hooks and agents see the same IDs, statuses and sections. Every skill starts with `dt status --skill <name>`; mechanical edits (`dt tick`, `dt prebuild-clear`, `dt archive`, `dt finding`, `dt roadmap`, `dt base`) go through `dt` so approved docs aren't reset to Draft. For the build, `dt status` reports the active plan's critical path, waves and width, `dt ready` lists every task that can start now with its `Writes:`, so an orchestrator dispatches a whole wave at once, and `dt plan --json` exports the plan for workflow-analyzer's plan map. Reference: [scripts/README.md](scripts/README.md).
 
 The plugin's hooks run in every session, subagents included:
 
@@ -173,7 +176,7 @@ Code tooling (`check.sh`, Ruff, mypy, import-linter, the agent role files and th
 | [`architecture-design`](skills/architecture-design/SKILL.md) | Design | `docs/architecture.md`, `docs/packages/*/{architecture,contract}.md` |
 | [`pipeline-design`](skills/pipeline-design/SKILL.md) | Design | `docs/packages/*/pipelines.md` |
 | [`test-planning`](skills/test-planning/SKILL.md) | Plan (optional) | `docs/packages/*/tests.md`, `tests/fixtures/**` |
-| [`build-planning`](skills/build-planning/SKILL.md) | Plan | Roadmap milestone rows (each stage cut into slices), `tasks/plan.md`, `tasks/todo.md`, AGENTS.md doc map |
+| [`build-planning`](skills/build-planning/SKILL.md) | Plan | Roadmap milestone rows (each stage cut into slices), `tasks/plan.md` (tasks with `Writes:`, the dependency graph), `tasks/todo.md`, AGENTS.md doc map |
 | [`build-setup`](skills/build-setup/SKILL.md) | Bar | `CONSTRAINTS.md`, tool config, `scripts/`, `.claude/agents/` |
 
-Design notes: [design/planning-stage.md](design/planning-stage.md), [design/build-setup.md](design/build-setup.md); proposed: [design/interface-first-design.md](design/interface-first-design.md).
+Design notes: [design/planning-stage.md](design/planning-stage.md), [design/build-setup.md](design/build-setup.md), [design/interface-first-design.md](design/interface-first-design.md).

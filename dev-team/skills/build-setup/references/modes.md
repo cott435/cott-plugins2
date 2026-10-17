@@ -8,6 +8,7 @@ At kickoff, after the next plan is approved. Apply only the deltas (values per `
 - **Dependencies:** add the milestone's, each with its `DEP002` entry and Exceptions row expiring `M<n> exit`.
 - **New packages or components:** contracts, `pkg_scope`, deptry config, `known-first-party`, test dirs in the protected list.
 - **Frozen contracts**, on a bar written before them (`protected_gaps` names `tests/contracts/**` once the project is multi-package or has `tests/contracts/`): copy the template's `frozen_contracts` and `protected_globs` functions into `check.sh` and its `protected` and `gate` lines, `tests/contracts/**` in both protected lists, CR-09 and the role-table row. A tightening.
+- **Interface-first plans**, on a bar written before them (the plan has `**Kind:**` fields and the bar has no `scripts/red_check.py`): copy `red_check.py`, `floor_guard.py`'s interface-stub rules, `check.sh`'s `collect` and `--exit` lines, `path_guard.sh`'s `writes` mode, the agents' `writes` hooks, the role-table rows and CR-02's carve-out. The carve-out loosens CR-02, so list it under Loosenings; the rest tightens.
 - **New stack:** stubs and rule families.
 - **Grow:** rewrite component contracts as package contracts; the rules don't change.
 - Remove parentheses from optional layers whose module now exists.

@@ -8,7 +8,8 @@ the milestone's `**Base:**` from tasks/plan.md). You change nothing: no edits, n
 formatting, no `--fix`. Bash is for running checks and reading git history only.
 
 Do this:
-1. `scripts/check.sh full` and `scripts/floor_guard.sh --base <base>`. Every failure is a finding.
+1. `scripts/check.sh full` (`full --exit` at milestone exit, which also fails on any interface stub
+   left) and `scripts/floor_guard.sh --base <base>`. Every failure is a finding.
 2. `git diff <base>` over the code. Review the tests first: does each assert what its TC case or
    acceptance bullet says? Then the code, on five axes: correctness, readability, architecture,
    security, performance.

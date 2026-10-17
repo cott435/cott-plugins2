@@ -1,24 +1,37 @@
-# Phase 0: contract, spines, integration
+# Milestone shape: interface, step spines, wiring, system
 
-Read when writing Phase 0. Examples: `examples-phase0.md`.
+Read when writing a milestone's tasks. Examples: `examples-phase0.md`.
 
-`## Phase 0: Spine` makes every new pipeline of the milestone run end to end, contract first, so packages build in parallel instead of queueing behind one task.
+A milestone is planned from its pipelines' steps: each step has one owner, one module and typed `In → Out`, so it is the unit of work. The plan freezes every boundary between steps first, so the work on both sides starts at once instead of queueing behind one spine. Every task carries `**Kind:**`:
 
-**a. Contract task** (multi-package, when the milestone crosses a package boundary). One solo task, first, `**Step:** contract`, no Parallel group, `**Package:**` the provider's. Boundaries that don't fit one M task, or have different providers, get one contract task each, still serial and first. It freezes each boundary the milestone uses (every contract symbol with a `**Boundary:**` line naming a consumer in the milestone) as executable artifacts in the symbol's `**Fixtures:**` folder:
-- a schema: JSON Schema or a typed model for a payload; for a Python or data project, a pandera schema for a frame
-- golden fixture payloads that validate against it (a sample frame for data), one per case the contract section lists
-- a fixture-backed fake of the provider side, written where the consumer's tooling can load it, serving only those fixtures
+```
+## Phase 0: Interface              interface (solo, first)       types, signatures, samples, fakes, exports
+## Phase 1: Step spines            spine, one per step           each writes its owner module only
+## Phase 2: Wiring and thicken     wiring, one per pipeline      entry, trigger, smoke test
+                                   thicken (tasks.md)            each after its step's spine
+## Phase 3: System                 system (solo, last)           fakes swapped for real providers
+```
 
-Its Acceptance: every fixture validates against the schema; the fake serves each fixture. Its `Read:` is the boundary symbols. A boundary already frozen by an earlier milestone isn't frozen again.
+Phases name the usual waves; the dependency graph (`tasks.md` step 9) decides what may start. Tester halves of split tasks start right after the interface.
 
-**b. Package spines.** One task per new package pipeline, `**Step:** PL-NN`, solo. Each depends on the contract task, and on an earlier spine of the same package only when it calls it or shares its files. Spines of different packages share no file, and the boundary symbols they both read are frozen, so they carry a `**Parallel:**` group and build side by side. A consumer's spine runs against the contract fake; a provider's spine asserts that its output validates against the boundary schema.
+**a. Interface task** (`**Kind:** interface`, `**Step:** contract`, solo, `**Depends on:** —`). It freezes, as code, every boundary in the milestone whose two sides belong to different tasks:
+- each contract `type` section the milestone's steps pass (`In → Out`), written into its owner's `types.py`, with a schema (pandera for a frame, JSON Schema across runtimes) and one sample per case in `tests/contracts/<component>.<Type>/`
+- each new step's signature in its owner module, with the body `raise NotImplementedError("<task id>")` naming the task that replaces it
+- for each function a pipeline calls from another pipeline or package (its `**Boundary:**` line): a fixture-backed fake serving its fixtures, where the caller's tests load it
+- each component's `__init__.py` exports
 
-**c. System spine, last.** One task per new system pipeline, no Parallel group, depending on the package spines it joins: the integration. It swaps each fake for the real provider and runs the system pipeline end to end; the boundary fixtures still validate against the real output. System pipelines have no Entry, so its Package is the package that owns the system pipeline's first step, with `**Reason:** system spine`. The root has no pre-build sections, so its acceptance has no `dt layout` bullet; each package spine clears its own package's.
+Not frozen: helpers, private functions, anything one task owns end to end, and boundaries an earlier milestone froze. `Read:` the type and boundary symbols. Acceptance: every sample validates against its type; every signature imports; each fake serves its fixtures. `Writes:` each component folder as one glob (`src/quant/stats/**`) plus its contract folders; `task-size` doesn't count them. A milestone across packages may have one interface task per provider, all solo and first.
 
-Single package, or a milestone whose packages share no boundary: no contract task, no system spine; spines as in b, with `Depends on` where one calls another.
+**b. Step spines** (`**Kind:** spine`, `**Step:** PL-NN.<function>`, solo, XS or S). One per new step, each depending only on the interface task: it replaces the stub naming it with the step's spine version from the step table. `Writes:` its owner module and that module's unit test, nothing else; steps sharing one module share one spine task. Acceptance: the step's input sample gives a schema-valid output; the signature is unchanged. A step another pipeline provides (`PL-01 as built`) gets no spine.
 
-Every spine task (b and c):
-- builds every step at its spine version (a real baseline), so the pipeline runs end to end on fixture or synthetic data
-- commits the smoke command, and replaces the pipeline's pre-build sections with a `dt layout` pointer (`dt tick` prompts `dt prebuild-clear`)
+**c. Wiring** (`**Kind:** wiring`, `**Step:** PL-NN`, solo). One per new pipeline: the entry function, its `__main__.py` trigger and its smoke test. It depends on its pipeline's spines, since the smoke runs them. A call to another pipeline or package runs against that boundary's fake, so wiring PL-02 never waits for PL-01. Acceptance: the smoke command runs end to end and is committed as the pipeline's smoke test; the pipeline's pre-build sections are replaced by a `dt layout` pointer (`dt tick` prompts `dt prebuild-clear`).
 
-**Fakes.** A boundary fake generated from an approved contract is allowed: both sides are tested against the same fixtures (the provider asserts its output validates, the consumer consumes the fixtures), so neither can drift from the contract unseen. Mocking a step inside a package is still forbidden: a spine step is the real baseline from the step table. Changing a frozen schema or fixture is a contract change: `architecture-design` Revise, never an edit to make a test pass. The bar enforces it (CR-09): once a contract folder exists at a task's base, the implementer can't write it and `dt guard` asks before any edit no open contract task covers. The re-freeze after a Revise is a new contract task naming the symbol in `Read:`; it runs in the main session, since the implementer's guard blocks a folder frozen at the base.
+**d. System task** (`**Kind:** system`, solo, last). It swaps each fake for the real provider, in the entry its wiring wrote (a `file` edge), and runs every smoke command and the milestone's golden cases on the real chain; the boundary samples still validate against real output. Multi-package: one per new system pipeline, `**Step:**` that pipeline, `**Package:**` the owner of its first step, `**Reason:** system task`; the root has no pre-build sections, so no `dt layout` bullet. Single package: `**Step:**` the calling pipeline. A milestone with no fake has no system task.
+
+**Folds** keep the task count down. Apply one only where it doesn't lengthen the critical path, and list each under ASSUMPTIONS:
+- A step whose spine and thicken are both in the milestone, and which has a golden case, may be one split thicken task that replaces the stub itself; its acceptance keeps the baseline selectable.
+- A trivial step (pass-through, print) is built by its pipeline's wiring task; its stub names the wiring task.
+
+**Fakes and stubs.** A fake is allowed only where a pipeline calls another pipeline or package: both sides test against the same fixtures, so neither drifts from the contract unseen. Mocking a step is forbidden: a step's spine is the real baseline, and its consumer builds against the type's sample. The interface stubs are the floor's one stub carve-out (`build-setup`'s CR-02): allowed while the task they name is open; the gate fails on one naming a done task, the milestone exit on any.
+
+**Frozen means frozen.** Changing a frozen type, sample, signature or fake is a `contract-change`: `architecture-design` Revise, then a new interface task naming the symbol in `Read:`, never an edit to make a test pass. The bar enforces it (CR-09): once a contract folder exists at a task's base the implementer can't write it, and `dt guard` asks before any edit no open interface task covers. The re-freeze runs in the main session, since the implementer's guard blocks a folder frozen at the base.

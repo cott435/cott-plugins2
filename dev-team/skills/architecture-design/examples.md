@@ -132,9 +132,10 @@ class ExecutionEnv(gymnasium.Env):
 - **Errors:** `FileNotFoundError` if a Parquet day is missing (historical source only)
 - **Used by:** market
 
-### data.PricePath: One episode's prices
+### data.PricePath: type
 `@dataclass(frozen=True) class PricePath: mid: np.ndarray; volume: np.ndarray`
 - **Invariants:** both arrays have one entry per step, same length as the episode; `mid` > 0
+- **Boundary:** market · **Fixtures:** tests/contracts/data.PricePath/ · **Cases:** one 390-step synthetic day
 - **Used by:** market
 
 ## reward
@@ -146,4 +147,4 @@ class ExecutionEnv(gymnasium.Env):
 - **Used by:** env
 ````
 
-**About two pages plus a one-page contract.** No packages table, no dependency rules section, and no separate package docs. The seam that might become a package later (`DataSource`) is named and nothing more. Each component is a folder exporting only its contract section, so a later split moves `data/` and its `## data` group as they are. `Used by` names components: the pipelines that use each symbol don't exist until `pipeline-design` runs.
+**About two pages plus a one-page contract.** No packages table, no dependency rules section, and no separate package docs. The seam that might become a package later (`DataSource`) is named and nothing more. Each component is a folder exporting only its contract section, so a later split moves `data/` and its `## data` group as they are. `PricePath` passes from `data` to `market`, so it is a `type` section with a `**Boundary:**` line: the build's interface task freezes it with one sample, and both components build against that sample at once (`Fills`, under `## market`, is omitted here). `Used by` names components: the pipelines that use each symbol don't exist until `pipeline-design` runs.

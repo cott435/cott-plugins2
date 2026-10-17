@@ -5,7 +5,7 @@ description: Designs each package's pipelines (docs/packages/{pkg}/pipelines.md)
 
 # Pipeline Design
 
-A pipeline is one workflow the user runs: an entry function reading as calls to named steps, each owned by one component, each with a **spine version** (the simplest real implementation) so the first build task runs it end to end. The planned layout is pre-build: the spine task replaces it with `dt layout`, and then the code is the truth for layout, the step table for call order.
+A pipeline is one workflow the user runs: an entry function reading as calls to named steps, each owned by one component, each with a **spine version** (the simplest real implementation) so the first milestone runs it end to end. The planned layout is pre-build: the pipeline's wiring task replaces it with `dt layout`, and then the code is the truth for layout, the step table for call order.
 
 **Not for:** components or technologies (`architecture-design`), golden cases (`test-planning`), tasks (`build-planning`), code or contract changes. This skill writes `docs/packages/*/pipelines.md`, plus PL IDs appended to `contract.md`'s `Used by:` lines, and nothing else.
 
@@ -37,7 +37,7 @@ STATUS ─→ WORKFLOWS (ask) ─→ STEPS ─→ LAYOUT ─→ WRITE ─→ [ga
 
 **1. Workflows.** A pipeline exists because someone runs it, so never derive workflows from the component list. Show the numbered candidates in your message first (trigger, what it does, milestone), saying nothing is written until they confirm. Then one `AskUserQuestion`, this milestone's workflows recommended: 2–4 as one multi-select; more as "All of them" vs "The core set only (1, 2, 4)". Ask separately, one at a time with a guess and default, only what is genuinely unclear. Infer names, triggers, types, order and module split; list them under ASSUMPTIONS.
 
-**2. Steps.** Read `references/steps.md` first. Per pipeline: an ID from `dt next-id PL` (write the section before the next; never count by hand), Entry, Trigger, Covers, a step table with one owner and a real spine version per step (never a mock), and a pre-build entry sketch of step calls only.
+**2. Steps.** Read `references/steps.md` first. Per pipeline: an ID from `dt next-id PL` (write the section before the next; never count by hand), Entry, Trigger, Covers, a step table with one owner, `In → Out` in contract types and a real spine version per step, and a pre-build entry sketch of step calls only.
 
 **3. Layout.** One entry module per component or package, one module per step owner, each under `build-setup`'s size bar (`references/steps.md`).
 

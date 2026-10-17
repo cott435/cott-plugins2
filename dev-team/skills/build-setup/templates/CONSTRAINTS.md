@@ -5,14 +5,14 @@ The standing quality bar. `pyproject.toml` and `scripts/check.sh` enforce it; ev
 
 ## Floor
 - **CR-01** No new suppressions. Ruff runs with `--ignore-noqa` in gate and full, so a Ruff exception is a `per-file-ignores` entry in protected config with a row in Exceptions. `# type: ignore`, `pyright:` comments and `pragma: no cover` are caught by `floor_guard.sh` on the diff
-- **CR-02** No stubs: `raise NotImplementedError` outside abstract methods, `pass`-only bodies, bare `except: pass`
+- **CR-02** No stubs: `raise NotImplementedError` outside abstract methods, `pass`-only bodies, bare `except: pass`. One carve-out: the interface task's step signatures, whose body is only `raise NotImplementedError("<task id>")` naming the open task that replaces it. `check.sh gate` fails on one naming a task that isn't open in `tasks/todo.md`; `check.sh full --exit` (the milestone exit) fails on any
 - **CR-03** No skipped, deleted or assertion-free tests, unless a row in Exceptions names the test file
 - **CR-04** No secrets in source
 - **CR-05** Oracle files (`tests/fixtures/**/expected.json`) change only with the user's approval
 - **CR-06** The implementer never changes `tests/intent/**`
 - **CR-07** This file, `pyproject.toml` tool config, `scripts/` and `.claude/agents/` are not weakened to make a change pass
 - **CR-08** Nothing imports from `references/` or adds it to `sys.path` (or `PYTHONPATH`, pytest `pythonpath`). References are outside the tooling, so imported code would bypass the bar; `floor_guard.sh` checks the diff for both. Code copied from a reference is project code and meets the same bar
-- **CR-09** A boundary contract (`tests/contracts/<pkg>.<symbol>/`: schema, fixtures, fake) is frozen once its folder exists at the task's base. Only the contract task freezing it (`**Step:** contract`) writes a new folder; a frozen one changes only through `architecture-design` Revise, never to make a test pass
+- **CR-09** A frozen interface (`tests/contracts/<id>.<symbol>/`: schema, samples, fake; and the types, signatures and exports the interface task wrote) is frozen once it exists at the task's base. Only the interface task freezing it (`**Kind:** interface`) writes a new folder, and no other task's `Writes:` names its `types.py` or `__init__.py`; a frozen interface changes only through `architecture-design` Revise, never to make a test pass
 
 ## Readability
 - **CR-10** One entry function per pipeline; it reads top to bottom as its named steps (reviewer + `dt layout`)
@@ -44,16 +44,16 @@ The standing quality bar. `pyproject.toml` and `scripts/check.sh` enforce it; ev
 ## Roles and protected paths
 | Role | May edit | May not edit | Stop gate |
 |---|---|---|---|
-| tester | `tests/intent/**` | everything else; reads no source | `check.sh collect` |
-| implementer / solo | `src/**`, `tests/unit/**`; a contract task also its new `tests/contracts/<pkg>.<symbol>/` | the protected list | `check.sh gate` + protected-path diff against `refs/checks/base` |
+| tester | `tests/intent/**`, within the task's `Writes:` | everything else; reads no source | `check.sh collect` (lint, collect, red for the right reason) |
+| implementer / solo | `src/**`, `tests/unit/**`, within the task's `Writes:`; the interface task also its new `tests/contracts/<id>.<symbol>/` | the protected list; `tasks/` | `check.sh gate` + protected-path diff against `refs/checks/base` |
 | reviewer | nothing (the orchestrator records findings with `dt finding`) | everything | runs `check.sh full` by hand |
 
-**Protected list** (`PROTECTED` in `scripts/check.sh`; `path_guard.sh deny --protected` reads the same list): {{protected_globs_md}}. `tests/contracts/**` covers the contract folders that exist at the task's base (CR-09).
+**Protected list** (`PROTECTED` in `scripts/check.sh`; `path_guard.sh deny --protected` reads the same list): {{protected_globs_md}}. `tests/contracts/**` covers the contract folders that exist at the task's base (CR-09). **`Writes:`**: the orchestrator puts a task's `Writes:` in `.claude/.task_writes` in the builder's worktree, and `path_guard.sh writes` blocks every edit outside it. Only the orchestrator writes `tasks/` (`dt tick`, `dt finding`), after each merge.
 
 ## Review
 Run by the reviewer agent at every checkpoint and at milestone exit, over the diff since the checkpoint's base.
 1. **Five axes:** correctness, readability, architecture, security, performance.
-2. **Pipelines:** each entry function matches its step table (`dt layout`); step owners are respected; spine baselines are still selectable.
+2. **Pipelines:** each entry function matches its step table (`dt layout`); step owners are respected; spine baselines are still selectable; each task's commits stay inside its `Writes:`, and no frozen type changed outside a contract Revise. At milestone exit, `check.sh full --exit` finds no interface stub left.
 3. **Guard the bar:** diff this file, `pyproject.toml`, `scripts/` and `.claude/agents/` against the milestone's Base. Any loosening is a Critical finding. New exceptions need an owner and expiry.
 4. **Tests:** no assertion-free tests, no weakened intent tests, golden cases still loaded from fixtures, Hypothesis on the `ci` profile.
 5. **Docs:** `dt lint` clean, contracts fresh, no pre-build sections left after the spine.

@@ -29,7 +29,7 @@ Run `dt status --skill build-planning` first. It prints the mode, progress, cove
 
 | Mode | When | Do |
 |---|---|---|
-| **blocked** | A needed `pipelines.md` or `tests.md` is Draft or missing, or `probes_blocking` names the milestone | Name what must come first. Stop |
+| **blocked** | A needed `pipelines.md` or `tests.md` is Draft or missing (in New up front, every stage's), or `probes_blocking` names the milestone | Name what must come first. Stop |
 | **foreign** | `tasks/plan.md` has no `**Milestone:**` header and unchecked tasks | **Stop and ask.** Never overwrite, rename or delete it |
 | **New** | No active or archived plan; the roadmap has stages | `references/new.md` |
 | **Extend** | A stage is newly designed (`stage_to_cut`), or the next milestone needs a plan | `references/extend.md` |

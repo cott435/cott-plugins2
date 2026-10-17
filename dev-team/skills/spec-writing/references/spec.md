@@ -44,7 +44,7 @@ Read before writing or extending `docs/spec.md`, and again for the hygiene check
   - Given [...], when [...], then [...].
 
 ## Quality requirements
-- **QR-01** [Measurable non-functional requirement: speed, reliability, accessibility, privacy, security.]
+- **QR-01** [Measurable non-functional requirement: speed, reliability, accessibility, privacy, security, cost, licence.]
   - [How it's checked.]
 
 ## Assumptions
@@ -66,7 +66,7 @@ Read before writing or extending `docs/spec.md`, and again for the hygiene check
 - **Describe behavior, not implementation.** "The customer sees their usual order" — not "the app queries the orders table."
 - **Use exact numbers.** "≤ 2 seconds", "up to 50 regulars", never "fast" or "many".
 - **Requirement IDs are permanent.** `CODE-NN`, numbered within the feature, never reused or renumbered.
-- **Quality requirements only when measurable.** Leave out generic wishes ("should be secure"); keep checkable ones ("passwords are never shown in full").
+- **Quality requirements only when measurable.** Leave out generic wishes ("should be secure"); keep checkable ones ("passwords are never shown in full"). Cost, licence and budget limits are `QR-` items ("data costs ≤ $50 a month"), never `DATA-` or feature requirements.
 - **No tech stack, libraries, vendors, schemas, endpoints, or file structure, even when the user names them.** Write the behavior the name stands for. The name itself belongs to `architecture-design`, which reads the idea file and the conversation.
 - **Describe the product as it is now, not how it got here.** Requirement text, scope lists and assumptions carry no change notes, provenance tags ("from the tank idea") or process notes ("numbers chosen for review"). History goes in one Changelog row per round, and in git.
 

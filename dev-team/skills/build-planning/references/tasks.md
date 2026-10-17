@@ -8,7 +8,7 @@ Read when writing thicken tasks, the dependency graph and the files. Templates: 
 
 **Split a task** when it needs more than one session, has more than 3 acceptance bullets, touches two packages or two steps, or has "and" in its title. Sizes count `Writes:` entries outside `tests/` (`task-size`; a folder glob counts as one): XS = 1, S = 1–2, M = 3–5. Nothing larger. Spine and thicken tasks are XS or S.
 
-**Acceptance is test-backed.** Each bullet is checkable: a `TC-NN` passes, a Given/When/Then, a model criterion by ID, the smoke command. With no `tests.md`, write the criterion so a tester can encode it.
+**Acceptance is test-backed.** Each bullet is checkable: a `TC-NN` passes, a Given/When/Then, a model criterion by ID, the smoke command. With no `tests.md`, write the criterion so a tester can encode it. A TC that runs the whole pipeline is the wiring or system task's acceptance, never a thicken's, so no thicken waits on wiring.
 
 ## 6. Route skills and references
 
@@ -37,15 +37,15 @@ Read when writing thicken tasks, the dependency graph and the files. Templates: 
 |---|---|---|
 | `data` | One step's output feeds another's input | The type and its sample |
 | `call` | A pipeline calls another pipeline or package | The fixture-backed fake |
-| `file` | Two tasks must write one file | Move the shared part to the interface or wiring task; else serial |
-| `code` | A task changes or runs code another task writes (a stub, a spine) | None: serial |
+| `file` | Two tasks must write one file | Move the shared part to the interface or wiring task; else serial. Two steps' thicken tasks on one module: the interface task's layout splits it (each step its own file, the old module re-exporting); never chain them |
+| `code` | A task changes code another task wrote (a thicken after its step's spine or an earlier thicken of that step) | None: serial |
 | `contract-change` | A task changes a frozen interface | None: serial, plus a new interface task |
-| `order` | Risk or learning ("do X first to learn Y") | None: reason required |
+| `order` | Integration (a wiring or system task runs the steps it wires: `none: integration: the smoke runs it`), or risk or learning ("do X first to learn Y") | None: reason required |
 
-A mitigated edge documents why two tasks run side by side and never appears in `Depends on`; an unmitigated one must (`edges`). Every `Depends on` has its row, except a dependency on the interface task, which every task has and needs none. The table is the reviewable argument for every serial step.
+A spine never has an edge to another step's task: it builds against the interface's samples and doubles. A mitigated edge documents why two tasks run side by side and never appears in `Depends on`; an unmitigated one must (`edges`). Every `Depends on` has its row, except a dependency on the interface task, which every task has and needs none. The table is the reviewable argument for every serial step.
 - **Width.** `dt status` gives `critical_path`, `waves`, `width` and `parallelism`; on the fresh plan `dt ready` lists only the interface task(s). Mostly width-1 waves mean an edge an interface could mitigate is ordering tasks.
 - **`Verify:`** The interface task's runs the schema check over every sample; every other task's runs its focused tests and `scripts/check.sh gate` (`--pkg <pkg>` in multi-package), plus its pipeline's smoke command (tests.md Strategy, else the Trigger plus ` --smoke`) once its `Depends on` path reaches that pipeline's wiring task: wiring and system tasks always. A thicken task running beside the wiring is smoke-tested by the gate after each merge. Only the modes `fast`, `gate` and `full` exist.
-- **`Read:`** lists the IDs (references as `RF-NN[:selector]`, probes as `PB-NN:<file>[:<symbol>]`, `PB-NN:outline` or `PB-NN:samples`) and paths a builder needs, and nothing else. Check each packet with `dt context <task>`: it must resolve and stay under 2,000 lines.
+- **`Read:`** lists the IDs (references as `RF-NN[:selector]`, probes as `PB-NN:<file>[:<symbol>]`, `PB-NN:outline` or `PB-NN:samples`) and paths a builder needs, and nothing else. A split task's names its step's function, so the tester knows the signature it tests. Check each packet with `dt context <task>`: it must resolve and stay under 2,000 lines.
 
 ## 10. Write
 

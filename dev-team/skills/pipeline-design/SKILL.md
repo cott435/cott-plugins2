@@ -33,11 +33,11 @@ Right after an architecture Grow, the new packages show `new` while the old `pip
 
 ## Asking about workflows
 
-A pipeline exists because someone runs it, so never derive workflows from the component list. Show the numbered candidates in your message first (trigger, what it does, milestone), saying nothing is written until they confirm. Then one `AskUserQuestion`, this milestone's workflows recommended: 2–4 as one multi-select; more as "All of them" vs "The core set only (1, 2, 4)". Ask separately, one at a time with a guess and default, only what is genuinely unclear. Infer names, triggers, types, order and module split; list them under ASSUMPTIONS.
+A pipeline exists because someone runs it, so never derive workflows from the component list. Show the numbered candidates in your message first (trigger, what it does, milestone), saying nothing is written until they confirm. Then one `AskUserQuestion`, the next stage's workflows recommended (up front, every stage's): 2–4 as one multi-select; more as "All of them" vs "The core set only (1, 2, 4)". Ask separately, one at a time with a guess and default, only what is genuinely unclear. Infer names, triggers, types, order and module split; list them under ASSUMPTIONS.
 
 ## Review Gate (CRITICAL)
 
-Rerun `dt status --skill pipeline-design`. `retired_refs` must be empty; `uncovered_ids` and `components_unowned` too, or each gap under Open questions with a reason (up front, every stage's IDs land on a pipeline). Present:
+Rerun `dt status --skill pipeline-design`. `retired_refs` must be empty; `uncovered_ids` and `components_unowned` too, or each gap under Open questions with a reason (up front, every stage's IDs land on a pipeline). Up front, every stage's workflows have pipelines in every package: no package is left `new`. Present:
 1. **What was written:** one line per pipeline (ID, title, trigger, steps); the planned layout.
 2. **ASSUMPTIONS:** every name, trigger, type, step order and module split you chose.
 3. **Open questions.**
@@ -51,4 +51,5 @@ Rerun `dt status --skill pipeline-design`. `retired_refs` must be empty; `uncove
 | An unambiguous yes | Set `Status: Approved` and the date. Offer to commit `pipelines.md` and any `contract.md` whose `Used by:` changed; commit only on a yes | Stop. Next: `test-planning` (optional) or `build-planning` (Replan, after a Revise) |
 | "Approved, go ahead" | As above | Start the next planning skill (run its `dt status`). Never start code |
 | Approved with a small, fully specified change | Make exactly that edit, set Approved | Stop; list the edit |
+| Approved, plus an upstream change (a contract type, a spec ID) | Set Approved; route the change to its owner's Revise, never make it this turn | Stop |
 | Changes, or a hedge ("looks fine I guess") | Edit or ask again; keep Draft | Repeat this gate |

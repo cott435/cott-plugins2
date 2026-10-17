@@ -2,8 +2,10 @@
 """Draw what each eval run did, from its session transcripts: the workflow-analyzer plugin's scripts
 over the eval layout.
 
-For a run folder (`<iteration>/<trajectory>/with_skill/`) it finds the agent session the driver
-ran (the `session_id` in `agent_stream.jsonl`, whose transcript is under ~/.claude/projects/),
+For a run folder (`<iteration>/<trajectory>/with_skill/`) it finds the agent sessions the driver
+ran (the `session_id`s in `agent_stream.jsonl`, whose transcripts are under ~/.claude/projects/; with
+several, one per skill run, they are joined in order into `<run>/sessions/run.jsonl`, so the turns
+keep the driver's numbering),
 writes `eval.json` beside the trace (the trajectory, its checks from `grading.json`, and per turn
 the stage and cost from `turns.json`), and builds `<run>/flow/`: `flow.html` with the timeline,
 tokens and time per turn and per agent, files read and edited per turn, the wave chart, and one
@@ -36,6 +38,7 @@ import json
 import os
 import pathlib
 import re
+import shutil
 import sys
 
 HERE = pathlib.Path(__file__).resolve().parent
@@ -63,28 +66,44 @@ try:
 except ImportError:
     planmap = None
 sys.path.insert(0, str(HERE))
-import planexport  # noqa: E402
+import dtrun, planexport  # noqa: E402
 
 WS = pathlib.Path(os.environ.get("EVAL_WS", HERE.parents[3] / "dev-team-workspace"))
 PLUGIN = "dev-team"
 
 
-def session_of(run: pathlib.Path) -> pathlib.Path | None:
-    """The transcript of the agent session the driver ran in this folder."""
+def sessions_of(run: pathlib.Path) -> list[pathlib.Path]:
+    """The transcripts of the agent sessions the driver ran in this folder, in the order it ran them."""
     stream = run / "agent_stream.jsonl"
     if not stream.exists():
-        return None
-    sid = None
+        return []
+    sids = []
     with stream.open(encoding="utf-8", errors="replace") as f:
         for line in f:
             m = re.search(r'"session_id":\s*"([0-9a-f-]{36})"', line)
-            if m:
-                sid = m.group(1)
-                break
-    if not sid:
-        return None
-    hits = sorted(trace.PROJECTS.glob(f"*/{sid}.jsonl"))
-    return hits[0] if hits else None
+            if m and m.group(1) not in sids:
+                sids.append(m.group(1))
+    hits = [sorted(trace.PROJECTS.glob(f"*/{sid}.jsonl")) for sid in sids]
+    return [h[0] for h in hits if h]
+
+
+def session_of(run: pathlib.Path) -> pathlib.Path | None:
+    """The run's one transcript: its only session's, or every session's joined into `<run>/sessions/run.jsonl`
+    with their subagent transcripts linked under `run/subagents/`, so trace.build reads them as one session."""
+    paths = sessions_of(run)
+    if len(paths) <= 1:
+        return paths[0] if paths else None
+    joined = run / "sessions" / "run.jsonl"
+    subagents = joined.with_suffix("") / "subagents"
+    if subagents.exists():
+        shutil.rmtree(subagents)
+    subagents.mkdir(parents=True)
+    with joined.open("w", encoding="utf-8") as out:
+        for p in paths:
+            out.write(p.read_text(encoding="utf-8", errors="replace").rstrip("\n") + "\n")
+            for f in sorted((p.with_suffix("") / "subagents").glob("agent-*")):
+                (subagents / f.name).symlink_to(f)
+    return joined
 
 
 def eval_facts(run: pathlib.Path, compare_links: list[dict] | None = None) -> dict:
@@ -95,12 +114,8 @@ def eval_facts(run: pathlib.Path, compare_links: list[dict] | None = None) -> di
             return None
 
     turns = read("turns.json") or []
-    prev, per_turn = 0.0, []
-    for t in turns:
-        cum = (t.get("usage") or {}).get("cost_usd")  # cumulative over the resumed session
-        per_turn.append({"turn": int(t["turn"]), "stage": t.get("stage"), "seconds": t.get("seconds"),
-                         "cost_usd": round(cum - prev, 4) if cum is not None else None})
-        prev = cum if cum is not None else prev
+    per_turn = [{"turn": int(t["turn"]), "stage": t.get("stage"), "seconds": t.get("seconds"), "cost_usd": cost}
+                for t, cost in zip(turns, dtrun.turn_costs(turns))]
     grading = read("grading.json") or {}
     # Retired check ids (`na`) stay in grading.json for history; the pages show only checks that count.
     checks = [c for c in grading.get("expectations") or [] if not c.get("na")]

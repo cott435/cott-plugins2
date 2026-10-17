@@ -52,6 +52,24 @@ def probe(proj, dt=None):
                 "packages": [], "probes": [], "probes_retired": [], "decisions": [], "dt_probes": None}
 
 
+def turn_costs(turns):
+    """Each turn's own cost from turns.json: total_cost_usd is cumulative within one agent session, so a turn's cost
+    is the difference from the previous turn of the same session (`session.id`; a run from before sessions is one)."""
+    last, out = {}, []
+    for t in turns:
+        sid = (t.get("session") or {}).get("id", "")
+        cum = (t.get("usage") or {}).get("cost_usd")
+        out.append(None if cum is None else round(cum - last.get(sid, 0.0), 4))
+        if cum is not None:
+            last[sid] = cum
+    return out
+
+
+def run_cost(turns):
+    """The run's agent cost: each session's last cumulative total, summed."""
+    return sum(c for c in turn_costs(turns) if c is not None)
+
+
 def skill_name(s):
     """Plugin skills are invoked namespaced (`dev-team:pipeline-design`); compare on the bare name."""
     return (s or "").split(":")[-1]
@@ -541,8 +559,13 @@ SKILL_READ = re.compile(r"(?:^|/)skills/([a-z][\w-]*)/(?:SKILL\.md|references/)"
 def turn_skill_map(turns, calls=()):
     """Turn → the skills it worked in: its Skill calls, plus each `dt status --skill X` and skills/X/ read among
     its tool calls (`calls`: probefacts.tool_calls records), so a turn that continues a skill without a Skill
-    call is still attributed to it."""
+    call is still attributed to it. A turn that opened a session with `/dev-team:<skill>` (`session.new`) worked in
+    that skill too."""
     out = {t["turn"]: {skill_name(s) for s in t.get("skills", [])} for t in turns}
+    for t in turns:
+        s = t.get("session") or {}
+        if s.get("new") and s.get("skill"):
+            out[t["turn"]].add(s["skill"])
     for c in calls:
         i = c.get("input") or {}
         text = " ".join(str(i.get(k) or "") for k in ("command", "file_path", "path", "pattern"))

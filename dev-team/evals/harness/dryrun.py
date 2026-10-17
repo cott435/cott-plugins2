@@ -19,7 +19,8 @@ exports its plan.json. The replays:
 Every check is pinned, pass or fail: the checks the sample can't meet (it isn't a finished four-stage quant run)
 fail in every replay, and in the broken replays dt itself (lint, `dt ready`, `dt archive`) catches the planted
 defects alongside the grader. Before the replays it runs selftest/checks.py: a good and a bad case for each
-structural rule (dtrun.py) that the iteration-7 findings changed.
+structural rule (dtrun.py) that the iteration-7 findings changed; and selftest/sessions.py: when the driver opens a
+fresh agent session.
 
 Usage: dryrun.py [out-dir]   (default: a fresh temp dir; printed at the end). Exit 1 on any unexpected result.
 """
@@ -241,7 +242,9 @@ def main():
     tmp = pathlib.Path(tempfile.mkdtemp(prefix="dt-dryrun-fx-"))
     sys.path.insert(0, str(HERE / "selftest"))
     import checks  # noqa: E402  (the structural rules' good and bad cases, no dt)
+    import sessions  # noqa: E402  (driver.session_step: when a turn opens a fresh agent session)
     bad = [f"selftest/checks.py: {c[0]} {c[1]}: {c[2]}" for c in checks.run()]
+    bad += [f"selftest/sessions.py: {c[0]}" for c in sessions.run()]
     try:
         _, res, summ = replay(out, "quant-incremental", FIXTURE, LAYERS)
         bad += verdict("quant-incremental", res, summ, CONTENT | {"no_code_during_planning"})  # the M1 code turn

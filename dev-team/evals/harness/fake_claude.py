@@ -3,9 +3,11 @@
 
 - `claude plugin validate <dir>` → ok.
 - Agent turn (`-p … --output-format stream-json`): replays dt's sample project (scripts/tests/fixtures/quant)
-  into the cwd one planning layer per turn (dryrun.LAYERS, minus the build), and prints stream-json with a
-  Skill call (plus one Agent call per reference file on the reference-intake layer) and a cumulative
-  total_cost_usd, like the real CLI.
+  into the cwd one planning layer per two turns (dryrun.LAYERS, minus the build): the layer with its first doc
+  Draft (the gate), then the layer as approved. It prints stream-json with the session id, a Skill call unless the
+  message is a `/dev-team:<skill>` command (plus one Agent call per reference file on the reference-intake layer),
+  and total_cost_usd cumulative within the session, like the real CLI. `--resume` of an unknown session, or
+  `--session-id` of a known one, fails as the real CLI does.
 - Simulated user (`-p … --output-format json`): always answers {"action": "finish", "message": "Approved."}.
 - FAKE_MODE=build (build_driver.py): each agent turn replays one checkpoint segment of a good build of the
   target fixture into the cwd (dryrun_build.Replayer, arm from BUILD_ARM): worktree-* branches, merges, gate
@@ -15,7 +17,7 @@
 Usage: CLAUDE_BIN=evals/harness/fake_claude.py python3 evals/harness/driver.py quant-all-at-once <out>
        CLAUDE_BIN=evals/harness/fake_claude.py FAKE_MODE=build python3 evals/harness/build_driver.py minilab A3 <out>
 """
-import json, os, pathlib, sys
+import json, os, pathlib, re, sys
 
 HERE = pathlib.Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
@@ -66,24 +68,55 @@ if fmt == "json":
     print(json.dumps({"type": "result", "result": json.dumps({"action": "finish", "message": "Approved."})}))
     sys.exit(0)
 
-state = pathlib.Path(".git/fake_turn")
-n = int(state.read_text()) if state.exists() else 0
+def flip_to_draft(paths):
+    """Set the first planning doc among `paths` (files, or .md files under folders) to Status Draft."""
+    for rel in paths:
+        p = pathlib.Path(rel)
+        for f in ([p] if p.is_file() else sorted(p.rglob("*.md")) if p.is_dir() else []):
+            text = f.read_text()
+            new = re.sub(r"(\*\*Status:\*\* )[^·\n]+?( ·|\n)", r"\1Draft\2", text, count=1)
+            if f.suffix == ".md" and new != text:
+                f.write_text(new)
+                return
+
+
+state_path = pathlib.Path(".git/fake_state.json")
+state = json.loads(state_path.read_text()) if state_path.exists() else {"layer": 0, "draft": False, "sessions": {}}
+sid = args[args.index("--session-id") + 1] if "--session-id" in args else args[args.index("--resume") + 1]
+if ("--resume" in args) != (sid in state["sessions"]):
+    print(f"Error: {'No conversation found with session ID' if '--resume' in args else 'Session ID already in use'}: {sid}",
+          file=sys.stderr)
+    sys.exit(1)
+msg = args[args.index("-p") + 1]
 layers = [l for l in LAYERS if l[0]]  # planning layers only: a planning run never builds
+n = state["layer"]
 skill, paths = layers[min(n, len(layers) - 1)]
 if n < len(layers):
     copy_layer(FIXTURE, pathlib.Path("."), paths)
-state.write_text(str(n + 1))
-agents = intake_agents(pathlib.Path(".")) if skill == "reference-intake" else []
+    if state["draft"]:
+        state.update(layer=n + 1, draft=False)  # approved: the layer as the fixture has it
+        done = f"(fake) {skill} approved: {', '.join(paths)}."
+    else:
+        flip_to_draft(paths)
+        state["draft"] = True
+        done = f"(fake) wrote the {skill} layer as a Draft: {', '.join(paths)}. Approve?"
+else:
+    done = "(fake) nothing left to plan."
+state["sessions"][sid] = round(state["sessions"].get(sid, 0) + 0.1, 4)
+state_path.write_text(json.dumps(state))
+agents = intake_agents(pathlib.Path(".")) if skill == "reference-intake" and state["draft"] else []
 print(json.dumps({"type": "system", "subtype": "init", "skills": [f"dev-team:{l[0]}" for l in layers],
-                  "mcp_servers": [{"name": "evalperm", "status": "connected"}]}))
-print(json.dumps({"type": "system", "subtype": "hook_response", "hook_event_name": "SessionStart"}))
-print(json.dumps({"type": "assistant", "message": {"content": [
-    {"type": "tool_use", "name": "Skill", "input": {"skill": f"dev-team:{skill}"}},
+                  "mcp_servers": [{"name": "evalperm", "status": "connected"}], "session_id": sid}))
+print(json.dumps({"type": "system", "subtype": "hook_response", "hook_event_name": "SessionStart", "session_id": sid}))
+calls = [] if msg.startswith("/dev-team:") else [{"type": "tool_use", "name": "Skill", "input": {"skill": f"dev-team:{skill}"}}]
+print(json.dumps({"type": "assistant", "session_id": sid, "message": {"content": [
+    *calls,
+    {"type": "tool_use", "name": "Bash", "input": {"command": f"python3 ../../scripts/dt.py status --skill {skill}"}},
     {"type": "tool_use", "name": "Write", "input": {}},
     *({"type": "tool_use", "name": "Agent", "input": a} for a in agents)]}}))
 # A subagent's own tool calls carry parent_tool_use_id; the driver must not count them as launches.
 for a in agents:
-    print(json.dumps({"type": "assistant", "parent_tool_use_id": "toolu_fake", "message": {"content": [
+    print(json.dumps({"type": "assistant", "parent_tool_use_id": "toolu_fake", "session_id": sid, "message": {"content": [
         {"type": "tool_use", "name": "Read", "input": {}}]}}))
-print(json.dumps({"type": "result", "result": f"(fake) wrote the {skill} layer: {', '.join(paths)}. Approve?",
-                  "total_cost_usd": 0.1 * (n + 1), "duration_ms": 1, "num_turns": 1, "usage": {"output_tokens": 10}}))
+print(json.dumps({"type": "result", "result": done, "session_id": sid, "total_cost_usd": state["sessions"][sid],
+                  "duration_ms": 1, "num_turns": 1, "usage": {"output_tokens": 10}}))

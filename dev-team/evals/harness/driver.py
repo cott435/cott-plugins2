@@ -1,8 +1,12 @@
 #!/usr/bin/env python3
 """Multi-turn trajectory driver for the dev-team planning skills, idea through build-setup.
 
-An agent session (claude -p, resumed each turn) works in a fresh project dir with the whole dev-team plugin
-loaded via --plugin-dir (skills, scripts/dt.py, hooks), staged into <out>/plugin/. A simulated user (separate
+Agent sessions (claude -p) work in a fresh project dir with the whole dev-team plugin loaded via --plugin-dir
+(skills, scripts/dt.py, hooks), staged into <out>/plugin/. As a user opens a new chat per skill, each skill run gets
+its own session: before every message the driver asks the run's own dt for the next run (`dt next --json`). A fresh
+session opens with `/dev-team:<skill> <message>` when that run is another skill, or the same skill again once its
+gate was approved; the session is resumed only while one skill works through its questions and gate (`session_step`).
+Each session's id, skill and turns go into turns.json (`session`) and summary.json (`sessions`). A simulated user (separate
 claude -p, no tools) answers questions, approves drafts, and — in incremental mode — reveals the next stage
 only after the current one is fully planned (pipelines approved and milestone rows on the roadmap; for the first
 stage, also an approved build plan and build setup).
@@ -23,8 +27,8 @@ the fake vendor's environment, logs both to <out>/user_runs.jsonl and commits "u
 Usage: driver.py <trajectory-id> <out-dir>
 
 Env: PLUGIN_SRC / SKILLS_SRC (see plugin.py), CLAUDE_BIN (default: claude; fake_claude.py for a no-cost
-loop test), AGENT_MODEL, USER_MODEL, COST_CAP_USD (stop once the agent session has cost this much; default
-none), MAX_TURNS (override the scenario's turn budget, e.g. 1 for a smoke run), PERMISSION_PROMPTS=0 (don't
+loop test), AGENT_MODEL, USER_MODEL, COST_CAP_USD (stop once the agent sessions together have cost this much;
+default none), MAX_TURNS (override the scenario's turn budget, e.g. 1 for a smoke run), PERMISSION_PROMPTS=0 (don't
 answer the oracle guard's "ask" prompts; see permission_mcp.py). Both sessions load project/local settings
 only, no CLAUDE.md files and no MCP servers but the eval's own, so the host's user-level instructions, skills,
 plugins and MCP servers don't leak into the trajectory.
@@ -177,6 +181,36 @@ def mcp_args(out):
     return args + (["--permission-prompt-tool", "mcp__evalperm__approve"] if PERMISSION_PROMPTS else [])
 
 
+STATUS_SKILL = re.compile(r"status\s+--skill[\s=]+([a-z-]+)")
+SLASH = re.compile(r"^/dev-team:([a-z-]+)")
+
+
+def dt_next(proj, dt):
+    """`dt next --json` on the project, or {} if it fails (the driver then keeps the current session)."""
+    r = sh([sys.executable, str(dt), "--root", str(proj), "next", "--json"], proj)
+    try:
+        return json.loads(r.stdout)
+    except Exception:
+        print(f"dt next failed: {r.stderr[-300:]}", flush=True)
+        return {}
+
+
+def session_step(nxt, before, sess, action):
+    """Resume the current session or open a fresh one, for which skill: (fresh, skill).
+
+    `nxt` is `dt next` now, `before` what it said before the current session's last message, `sess` the current
+    session ({skill, seen}: the skills its turns ran) or None, `action` the simulated user's. With nothing left to
+    plan, a new stage goes to idea-refine. A skill the session already ran (its own, or one the agent moved on to)
+    keeps the session through its questions and gate; once that gate is approved, its next run is a fresh session."""
+    skill = nxt.get("skill") or ("idea-refine" if action == "next_stage" else None)
+    if sess is None:
+        return True, skill or "idea-refine"
+    if skill is None:
+        return False, sess["skill"]
+    just_approved = nxt.get("mode") != "gate" and (before or {}).get("mode") == "gate" and before.get("skill") == skill
+    return (False, skill) if skill in sess["seen"] and not just_approved else (True, skill)
+
+
 def agent_turn(proj, sid, msg, first, log_path, plugin_root, extra):
     # --include-hook-events: without it the stream carries only SessionStart and Stop hook events.
     cmd = [CLAUDE_BIN, "-p", msg, "--model", AGENT_MODEL, "--output-format", "stream-json", "--verbose",
@@ -188,7 +222,7 @@ def agent_turn(proj, sid, msg, first, log_path, plugin_root, extra):
     dt = time.time() - t0
     with open(log_path, "a") as f:
         f.write(r.stdout)
-    result, usage, tools, skills, errors, hooks, init, agents = "", {}, [], [], [], 0, {}, []
+    result, usage, tools, skills, errors, hooks, init, agents, seen = "", {}, [], [], [], 0, {}, [], []
     for line in r.stdout.splitlines():
         try:
             d = json.loads(line)
@@ -205,6 +239,8 @@ def agent_turn(proj, sid, msg, first, log_path, plugin_root, extra):
                     tools.append(c["name"])
                     if c["name"] == "Skill":
                         skills.append(dtrun.skill_name(c["input"].get("skill")))
+                    if c["name"] == "Bash":
+                        seen += STATUS_SKILL.findall(str((c.get("input") or {}).get("command", "")))
                     if c["name"] in ("Agent", "Task") and not d.get("parent_tool_use_id"):
                         # Top-level subagent launches (reference-intake sends one per file); graded per file name.
                         inp = c.get("input") or {}
@@ -222,7 +258,9 @@ def agent_turn(proj, sid, msg, first, log_path, plugin_root, extra):
                      "usage": d.get("usage"), "num_turns": d.get("num_turns")}
     if not result and r.returncode != 0:
         result = f"[agent error rc={r.returncode}] {r.stderr[-500:]}"
-    return result, usage, tools, skills, dt, errors, hooks, init, agents
+    m = SLASH.match(msg)
+    seen = list(dict.fromkeys(([m.group(1)] if m else []) + skills + seen))
+    return result, usage, tools, skills, dt, errors, hooks, init, agents, seen
 
 
 PLANNING_CHAIN = """For each stage the assistant takes you through several planning documents, one at a time, each needing your approval: the idea/brief, the spec, the architecture, the pipelines (the workflows you will run and the planned file layout), optionally a test plan with golden test cases, and the build plan (the tasks for that milestone). Before the first build it also sets up the build tooling and quality bar (CONSTRAINTS.md, checks, agent roles); approve that too."""
@@ -436,8 +474,8 @@ def main():
 def run_loop(scn, traj, project, stages, out, proj, plugin_root, dt, extra, msg, n_revealed, refs, vendors):
     tid = traj["id"]
 
-    sid = str(uuid.uuid4())
-    turns, history = [], []
+    turns, history, sessions = [], [], []
+    sess, before, action = None, {}, None  # the current session; dt next before its last message; the user's action
     stage_log = [{"turn": 1, "stage": stages[0]["name"] if traj["mode"] == "incremental" else "all"}]
     t_start = time.time()
     closing, stop_reason = False, "max_turns"
@@ -447,33 +485,51 @@ def run_loop(scn, traj, project, stages, out, proj, plugin_root, dt, extra, msg,
         # The commit the turn starts from (the previous turn's, or the user run's after it): diffing from it,
         # not `git show HEAD`, counts the agent's own commits in this turn as changes.
         base = sh(["git", "rev-parse", "HEAD"], proj).stdout.strip()
-        reply, usage, tools, skills, dt_s, errors, hooks, init, agents = agent_turn(
-            proj, sid, msg, t == 1, out / "agent_stream.jsonl", plugin_root, extra)
+        nxt = dt_next(proj, dt)
+        fresh, skill = session_step(nxt, before, sess, action)
+        if fresh:
+            sess = {"n": len(sessions) + 1, "id": str(uuid.uuid4()), "skill": skill, "seen": [skill], "turns": [],
+                    "cost_usd": 0.0, "output_tokens": 0}
+            sessions.append(sess)
+        sess["skill"] = skill
+        before = nxt
+        sent = f"/dev-team:{skill} {msg}" if fresh else msg
+        reply, usage, tools, skills, dt_s, errors, hooks, init, agents, seen = agent_turn(
+            proj, sess["id"], sent, fresh, out / "agent_stream.jsonl", plugin_root, extra)
+        sess["seen"] = list(dict.fromkeys(sess["seen"] + seen))
+        sess["turns"].append(t)
+        cum = usage.get("cost_usd") or 0  # total_cost_usd is cumulative within one resumed session
+        usage["cost_turn_usd"] = round(max(cum - sess["cost_usd"], 0), 4)
+        sess["cost_usd"] = max(sess["cost_usd"], cum)
+        sess["output_tokens"] += (usage.get("usage") or {}).get("output_tokens") or 0
         commit(proj, f"turn {t}")
         changed = sh(["git", "diff", "--stat", base, "HEAD"], proj).stdout.strip()
         facts, status = snapshot(proj, dt, keep=out / "plans" / f"T{t:03d}.json")
-        rec = {"turn": t, "user": msg, "assistant": reply, "skills": skills, "tools": tools,
+        rec = {"turn": t, "user": sent, "assistant": reply, "skills": skills, "tools": tools,
                "seconds": round(dt_s, 1), "usage": usage, "docs_changed": changed, "status": status,
-               "stage": stage_log[-1]["stage"], "tool_errors": errors, "hook_events": hooks, "agents": agents}
+               "stage": stage_log[-1]["stage"], "tool_errors": errors, "hook_events": hooks, "agents": agents,
+               "session": {"n": sess["n"], "id": sess["id"], "skill": skill, "new": fresh, "next": nxt, "seen": seen}}
         if user_run is not None:
             rec["user_run"] = user_run
             user_run = None
-        if t == 1:
+        if fresh:
             rec["session_init"] = init
+        if t == 1:
             own = [s for s in json.dumps(init.get("skills") or init.get("slash_commands") or []).split('"') if "pipeline-design" in s]
             if init and not own:
                 print(f"[{tid}] WARNING: session init lists no dev-team skills; is the plugin loading? {json.dumps(init)[:400]}", flush=True)
         turns.append(rec)
         history.append(f"USER: {msg[:1500]}\nASSISTANT: {reply[:1500]}")
         (out / "turns.json").write_text(json.dumps(turns, indent=1))
-        print(f"[{tid}] turn {t} stage={rec['stage']} {dt_s:.0f}s skills={skills} changed={changed.splitlines()[-1] if changed else '-'}", flush=True)
+        print(f"[{tid}] turn {t} stage={rec['stage']} session={sess['n']}{'*' if fresh else ''}:{skill} {dt_s:.0f}s "
+              f"skills={skills} changed={changed.splitlines()[-1] if changed else '-'}", flush=True)
 
         if closing:
             turns[-1]["sim_user_final"] = "(closing approval delivered)"
             (out / "turns.json").write_text(json.dumps(turns, indent=1))
             stop_reason = "finished"
             break
-        if (usage.get("cost_usd") or 0) > COST_CAP:
+        if sum(s["cost_usd"] for s in sessions) > COST_CAP:
             stop_reason = f"cost cap {COST_CAP} USD"
             break
         revealed = stages[:n_revealed]
@@ -521,6 +577,7 @@ def run_loop(scn, traj, project, stages, out, proj, plugin_root, dt, extra, msg,
             new_refs = add_references(proj, project, [nxt["name"]])
             refs += new_refs
         msg = (u.get("message") or "Approved. Continue.") + refs_note(new_refs)
+        action = u.get("action")
         if vendors and re.search(r"\bran it\b", msg, re.I):
             user_run = run_user_checks(proj, vendors, out / "user_runs.jsonl")
             commit(proj, f"user run before turn {t + 1}")
@@ -528,9 +585,11 @@ def run_loop(scn, traj, project, stages, out, proj, plugin_root, dt, extra, msg,
     summary = {"trajectory": tid, "turns": len(turns), "stages_reached": n_revealed, "stage_log": stage_log,
                "references": refs,
                "total_seconds": round(time.time() - t_start, 1),
-               # total_cost_usd is cumulative over a resumed session, so the last turn's value is the run's cost.
-               "agent_cost_usd": round(max([(x["usage"].get("cost_usd") or 0) for x in turns] or [0]), 3),
-               "agent_output_tokens": sum(((x["usage"].get("usage") or {}).get("output_tokens") or 0) for x in turns),
+               # Each session's cost is its last cumulative total_cost_usd; the run's is their sum.
+               "agent_cost_usd": round(sum(s["cost_usd"] for s in sessions), 3),
+               "agent_output_tokens": sum(s["output_tokens"] for s in sessions),
+               "sessions": [{k: s[k] for k in ("n", "id", "skill", "seen", "turns")} | {"cost_usd": round(s["cost_usd"], 3),
+                            "output_tokens": s["output_tokens"]} for s in sessions],
                "finished": any("sim_user_final" in x for x in turns), "stop_reason": stop_reason,
                "fake_vendors": sorted(vendors), "probe_canary": next(iter(vendors.values()))["key"] if vendors else None,
                "user_runs": sum(1 for x in turns if x.get("user_run") is not None),

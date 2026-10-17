@@ -15,7 +15,7 @@ The plans are graded as interface-first plans ([design/interface-first-design.md
 
 | File | What it does |
 |---|---|
-| `driver.py` | Runs one trajectory: an agent session (`claude -p`, resumed each turn) plus a simulated user (Sonnet, no tools). The whole plugin is staged into `<out>/plugin/` and loaded with `--plugin-dir`. Commits the project after every turn as `turn N` and keeps that turn's plan snapshot in `<out>/plans/T<nnn>.json`. Records each turn's top-level Agent launches (`agents` in `turns.json`). Serves the project's `fake_vendors` for the whole run; on the user's "ran it" it runs each Ready probe as the user would (below), logs it to `user_runs.jsonl` and commits `user run before turn N`. |
+| `driver.py` | Runs one trajectory: agent sessions (`claude -p`), one per skill run, plus a simulated user (Sonnet, no tools). Before each message it asks the run's `dt next --json` for the next skill run: another skill, or the same skill once its gate was approved, opens a fresh session with `/dev-team:<skill> <message>`; the session is resumed only while one skill works through its questions and gate (`session_step`, cases in `selftest/sessions.py`). Each turn's `session` (`n`, `id`, `skill`, `new`, the `dt next` answer, the skills it ran) goes into `turns.json`, and each session's turns and cost into `summary.json` `sessions`. The whole plugin is staged into `<out>/plugin/` and loaded with `--plugin-dir`. Commits the project after every turn as `turn N` and keeps that turn's plan snapshot in `<out>/plans/T<nnn>.json`. Records each turn's top-level Agent launches (`agents` in `turns.json`). Serves the project's `fake_vendors` for the whole run; on the user's "ran it" it runs each Ready probe as the user would (below), logs it to `user_runs.jsonl` and commits `user run before turn N`. |
 | `plugin.py` | Stages the plugin the way a real install gets it: `.claude-plugin/`, `hooks/`, `scripts/` (without dt's tests), and `skills/`. Then checks that every skill's `../../scripts/dt.py` and every hook path resolves, and runs `claude plugin validate`. |
 | `permission_mcp.py` | A stdio MCP server used as `--permission-prompt-tool`. It answers the plugin guard's "ask" on `tests/fixtures/**/expected.json` (headless runs have nobody to ask) and logs each prompt. |
 | `grade.py` | Writes `grading.json` with a stable `id` per check, and the numbers behind the graph checks as each check's `metrics`. Uses the run's own `dt` snapshot. |
@@ -34,7 +34,7 @@ The plans are graded as interface-first plans ([design/interface-first-design.md
 | `selftest/quant-interface-first/` | An interface-first M1 for dt's quant sample (the §5.3 plan: interface task, six step spines, two wiring tasks, four split thicken tasks, a system task) with its contract types and typed pipelines. The dry run lays it over the sample for its interface-first replays, so their pinned results don't depend on the sample's own plan. |
 | `selftest/checks.py` | Good and bad cases for each structural rule in `dtrun.py` that iteration 7's findings changed: the forms the iteration-7 plans used that the old grader flagged by mistake, and the defects each check must still catch. No dt; the dry run runs it first. |
 | `selftest/quant-probe/`, `selftest/probe_kit.py` | PB-01 for the quant sample: its entry, a probe of Sharadar (C2, C3, C4, C6) that runs against the fake, the user's delisted list and the `.gitignore` lines; and the fixtures' copy of the probe kit (`load_env`, `record`, `shape_sample`, `scan`, `write_evidence`). |
-| `runviz.py` | The workflow analysis that ends every run: exports the run's plan (`planexport.py`), draws what the run did from its session transcripts and saves it in `<run>/flow/`, then draws the plan map when workflow-analyzer has `planmap.write` (below). Uses the `workflow-analyzer` plugin's scripts (`trace.py`, `flow.py`, `charts.py`, `compare.py`), found at `$WORKFLOW_ANALYZER_SCRIPTS`, in this marketplace's `workflow-analyzer/scripts`, or in the installed plugin. |
+| `runviz.py` | The workflow analysis that ends every run: exports the run's plan (`planexport.py`), draws what the run did from its session transcripts (several, one per skill run, joined in order into `<run>/sessions/run.jsonl`) and saves it in `<run>/flow/`, then draws the plan map when workflow-analyzer has `planmap.write` (below). Uses the `workflow-analyzer` plugin's scripts (`trace.py`, `flow.py`, `charts.py`, `compare.py`), found at `$WORKFLOW_ANALYZER_SCRIPTS`, in this marketplace's `workflow-analyzer/scripts`, or in the installed plugin. |
 | `run.sh` | Runs trajectories in parallel, then grades, measures, packages and draws them. |
 | `scenarios.json` | Persona, project facts, stages, turn budgets, and per project the skill stubs (`project_skills`), reference files per stage (`references`) and `fake_vendors` (path, env names, official docs domain). A trajectory's `stages` stops it early: `quant-data-incremental` plans the data stage only. |
 | `stub_*_SKILL.md` | Project skill stubs installed in the run's `.claude/skills/`: `null-hypothesis-testing` (both projects), `data-analysis` and `frontend-design` (quant; the latter stands in for Anthropic's plugin skill, which the isolated run can't load). |
@@ -94,7 +94,7 @@ PLUGIN_SRC=<worktree>/dev-team python3 evals/harness/dryrun.py
 MAX_TURNS=1 python3 evals/harness/driver.py rl-all-at-once ../../dev-team-workspace/smoke/rl-all-at-once/with_skill
 ```
 
-Check `turns.json` → `session_init`. It should list the `dev-team:*` skills, and `mcp_servers` should show `evalperm` connected. The driver prints a warning if no dev-team skill is listed.
+Check `turns.json` → `session_init` (on each session's first turn) and `session`. It should list the `dev-team:*` skills, and `mcp_servers` should show `evalperm` connected. The driver prints a warning if no dev-team skill is listed.
 
 ## Full run
 
@@ -158,7 +158,7 @@ Past runs that stopped at the architecture (iterations 2–4, Opus agent, quant 
 | rl all-at-once | 7 | $3 | 10 min |
 | quant all-at-once | 7 | $3 | 10 min |
 
-`total_cost_usd` is cumulative over a resumed session. Older `summary.json` files summed it per turn and overstated cost about 10×; `grading.json` was right.
+`total_cost_usd` is cumulative within one resumed session, so a run's cost is each session's last total, summed (`dtrun.run_cost`; `dtrun.turn_costs` gives each turn's own). Runs up to iteration 8 resumed one session for every turn, so their whole context grew across skills.
 
 Through build-setup, each stage adds 3–4 gates (pipelines, tests, plan, and setup once), and the context grows longer. Rough expectations:
 

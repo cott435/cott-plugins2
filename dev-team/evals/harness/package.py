@@ -64,7 +64,9 @@ for i, project in enumerate(["rl", "quant"]):
         turns = json.loads((src / "turns.json").read_text())
         md = [f"# Transcript — {project} / {mode}\n"]
         for t in turns:
-            md.append(f"## Turn {t['turn']} · stage `{t['stage']}` · skills {t['skills']} · {t['seconds']}s\n")
+            s = t.get("session") or {}
+            sess = f" · session {s['n']}{' (new)' if s.get('new') else ''} `{s.get('skill')}`" if s else ""
+            md.append(f"## Turn {t['turn']} · stage `{t['stage']}`{sess} · skills {t['skills']} · {t['seconds']}s\n")
             md.append(f"**User:**\n\n{t['user']}\n\n**Assistant:**\n\n{t['assistant']}\n\n**Docs after turn:**\n```\n{t['status']}\n```\n")
         (run / "transcript.md").write_text("\n".join(md))
         evo = ["| Turn | Stage | Skills | Docs changed | Statuses after |", "|---|---|---|---|---|"]

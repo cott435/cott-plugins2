@@ -1,0 +1,656 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1"><title>T38 turn</title>
+<style>
+:root{--bg:#fbfbfa;--fg:#1d1d1f;--muted:#6b6b70;--line:#d9d9de;--box:#fff;--rowp:#eef3fb;--band:#fff4d6;
+--ok:#2e7d32;--bad:#c62828;--warn:#b26a00;--idle:#6b6b70}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#17171a;--fg:#ececf0;--muted:#9a9aa3;
+--line:#34343a;--box:#222227;--rowp:#1d2433;--band:#3a3015;--ok:#6fcf73;--bad:#ff6b6b;--warn:#f0b35a;--idle:#9a9aa3}}
+:root[data-theme="dark"]{--bg:#17171a;--fg:#ececf0;--muted:#9a9aa3;--line:#34343a;--box:#222227;--rowp:#1d2433;
+--band:#3a3015;--ok:#6fcf73;--bad:#ff6b6b;--warn:#f0b35a;--idle:#9a9aa3}
+body{margin:0;padding:16px;background:var(--bg);color:var(--fg);font:14px/1.45 -apple-system,system-ui,sans-serif}
+h1{font-size:18px;margin:0 0 4px}h2{font-size:15px;margin:22px 0 8px}.sub{color:var(--muted)}
+table{border-collapse:collapse;margin:4px 0 8px}td,th{border-bottom:1px solid var(--line);padding:4px 10px;text-align:left;
+vertical-align:top}th{color:var(--muted);font-weight:600}.chips span{display:inline-block;margin:0 4px 2px 0}
+.legend span{margin-right:14px;white-space:nowrap}.sw{display:inline-block;width:10px;height:10px;border-radius:2px;
+margin-right:4px;vertical-align:-1px}.scroll{overflow:auto;max-height:88vh;border:1px solid var(--line);border-radius:8px}
+.chart{display:grid;width:max-content}.chart>div{line-height:0}.corner{position:sticky;top:0;left:0;z-index:3}
+.colhead{position:sticky;top:0;z-index:2}.rowhead{position:sticky;left:0;z-index:2}
+svg.bg{background:var(--bg)}.colhead svg{border-bottom:1px solid var(--line)}.rowhead svg{border-right:1px solid var(--line)}
+.ok{color:var(--ok);fill:var(--ok)}.bad{color:var(--bad);fill:var(--bad)}.warn{color:var(--warn);fill:var(--warn)}
+.idle{color:var(--idle);fill:var(--idle)}
+svg text{fill:var(--fg);font-family:-apple-system,system-ui,sans-serif}
+.box{fill:var(--box);stroke:var(--line)}.unit:hover .box{stroke:var(--fg)}
+.role{font-size:12px;font-weight:600}.uid,.wmeta,.lmeta,.meta{font-size:10px;fill:var(--muted)}
+.sub{font-size:10.5px;fill:var(--muted)}.badge{font-size:11px;font-weight:600}
+.meta.bad{fill:var(--bad);font-weight:600}.lane{font-size:13px;font-weight:700}.wave{font-size:13px;font-weight:700}
+.par{fill:#4e79a7}.ser{fill:var(--muted)}.rowp{fill:var(--rowp)}.rows{fill:transparent}.band{fill:var(--band)}
+.bandt{font-size:11.5px}.grid{stroke:var(--line)}.link{stroke:var(--muted);stroke-width:1.2;opacity:.55}
+.arrowhead{fill:var(--muted)}.marks{font-size:10.5px}.audit{stroke:var(--box);stroke-width:2}.auditn{font-size:10px;font-weight:700;fill:#fff}
+a{color:inherit}svg a .box{cursor:pointer}
+
+:root{--c0:#2a78d6;--c1:#eb6834;--c2:#1baf7a;--c3:#eda100;--c4:#e87ba4;--c5:#008300;--c6:#6250d6;--c7:#e34948;
+--cx:#8a8985;--main:#52514e;--read:#dcdbd5;--readfg:#1d1d1f}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--c0:#3987e5;--c1:#d95926;--c2:#199e70;
+--c3:#c98500;--c4:#d55181;--c5:#008300;--c6:#9085e9;--c7:#e66767;--cx:#77766f;--main:#c3c2b7;--read:#3b3b40;
+--readfg:#ececf0}}
+:root[data-theme="dark"]{--c0:#3987e5;--c1:#d95926;--c2:#199e70;--c3:#c98500;--c4:#d55181;--c5:#008300;
+--c6:#9085e9;--c7:#e66767;--cx:#77766f;--main:#c3c2b7;--read:#3b3b40;--readfg:#ececf0}
+.c0{fill:var(--c0);background:var(--c0)}.c1{fill:var(--c1);background:var(--c1)}.c2{fill:var(--c2);background:var(--c2)}
+.c3{fill:var(--c3);background:var(--c3)}.c4{fill:var(--c4);background:var(--c4)}.c5{fill:var(--c5);background:var(--c5)}
+.c6{fill:var(--c6);background:var(--c6)}.c7{fill:var(--c7);background:var(--c7)}.cx{fill:var(--cx);background:var(--cx)}
+.cmain{fill:var(--main)}.sc0{stroke:var(--c0)}.sc1{stroke:var(--c1)}.sc2{stroke:var(--c2)}
+.tl text,.sm text,.lc text{font-size:10.5px;fill:var(--muted)}.tl .lbl-in,.sm .lbl-in{fill:#fff;font-size:10.5px;font-weight:600}
+.tl .rowl,.sm .rowl,.lc .rowl{fill:var(--fg);font-size:11.5px;font-weight:600}.tl .band{fill:var(--rowp)}
+.tl .brk{stroke:var(--muted);stroke-dasharray:2 3}.tl a:hover rect,.sm a:hover rect{stroke:var(--fg);stroke-width:1.5}
+.axis{stroke:var(--line)}.sm .val{fill:var(--fg);font-weight:600}.lc path.ln{fill:none;stroke-width:2}
+.lc circle{stroke:var(--bg);stroke-width:2}.lc .end{font-weight:600;fill:var(--fg)}
+.tiles{display:flex;flex-wrap:wrap;gap:10px;margin:12px 0}.tile{border:1px solid var(--line);border-radius:8px;
+padding:8px 12px;min-width:110px;background:var(--box)}.tile b{display:block;font-size:20px;line-height:1.2}
+.tile span{font-size:12px;color:var(--muted)}.tile i{font-style:normal;font-size:12px;margin-left:6px}
+.fm{border-collapse:separate;border-spacing:2px}.fm td,.fm th{border:0;padding:0;text-align:center;font-size:11px}
+.fm th{padding:0 2px;font-weight:600}.fm td.f,.fm th.f{text-align:left;padding-right:10px;white-space:nowrap;
+position:sticky;left:0;background:var(--bg);font:11.5px ui-monospace,Menlo,monospace;
+max-width:380px;overflow:hidden;text-overflow:ellipsis}
+.fm td.cell{min-width:22px;height:20px;border-radius:3px}.fm td.fw{background:var(--c0);color:#fff;font-weight:700}
+.fm td.fe{background:var(--c1);color:#fff;font-weight:700}.fm td.fr{background:var(--read);color:var(--readfg)}
+.fm td.n{color:var(--muted);padding:0 6px}.fm tr.grp td{text-align:left;padding-top:8px;color:var(--muted);
+font-weight:600}
+.key{display:inline-block;min-width:18px;text-align:center;border-radius:3px;font-size:11px;margin-right:4px}
+.bar{display:inline-block;height:9px;border-radius:2px;vertical-align:0}
+
+pre{white-space:pre-wrap;word-break:break-word;background:var(--box);border:1px solid var(--line);border-radius:6px;
+padding:8px 10px;margin:4px 0;font:12px/1.45 ui-monospace,SFMono-Regular,Menlo,monospace;max-width:100%;overflow:auto}
+.step{border-top:1px solid var(--line);padding:6px 0}.step:target{background:var(--rowp)}
+.sid{font:12px ui-monospace,Menlo,monospace;color:var(--muted);margin-right:8px}.kind{font-weight:600;margin-right:8px}
+.err{color:var(--bad);font-weight:600}.hook{color:var(--bad);margin:4px 0 0 16px}.lbl{font-size:12px;color:var(--muted);margin-top:6px}
+details summary{cursor:pointer;color:var(--muted);font-size:12px}.head td:first-child{color:var(--muted)}
+.top{font-size:13px}.narr{list-style:none;padding-left:0}.narr li{margin:3px 0}
+</style></head>
+<body>
+<p class="top"><a href="../flow.html">← the run's flow chart</a></p>
+<p class="top"><a href="../plan/T38.html">The plan as of T38</a>: this turn changed the plan (+25 ~3 −0) · <a href="../plan/index.html">plan map</a></p>
+<h1>T38 · turn · Ran it. I can&#x27;t paste the output. Waive PB-01 and PB-02 and plan M1 now. Record the waiver and keep </h1>
+<table class="head"><tr><td>Type</td><td>turn</td></tr><tr><td>Description</td><td>Ran it. I can&#x27;t paste the output. Waive PB-01 and PB-02 and plan M1 now. Record the waiver and keep </td></tr><tr><td>Spawned by</td><td>user</td></tr><tr><td>Model</td><td>claude-opus-5-5</td></tr><tr><td>Start</td><td>2026-10-17 21:40:03 UTC</td></tr><tr><td>Duration</td><td>3 min</td></tr><tr><td>Tool calls</td><td>8</td></tr><tr><td>Errors</td><td>0</td></tr><tr><td>Hook blocks</td><td>1</td></tr><tr><td>Tokens</td><td>23.5k out · 39.1k new in · 7.5M cached in · peak context 953k</td></tr><tr><td>Skills invoked</td><td>none</td></tr><tr><td>Files written or edited</td><td>docs/probes.md, docs/architecture.md, tasks/plan.md, AGENTS.md, tasks/todo.md</td></tr><tr><td>Definition</td><td>none</td></tr><tr><td>Steps</td><td>14</td></tr><tr><td>Finished</td><td>yes</td></tr></table>
+
+
+<h2>Prompt</h2>
+<pre>Ran it. I can&#x27;t paste the output. Waive PB-01 and PB-02 and plan M1 now. Record the waiver and keep the risk lines on AD-04 to AD-06. The real-data checks move to M3&#x27;s first real build.</pre>
+<h2>Files</h2>
+<table><tr><th>Op</th><th>File</th><th>Calls</th><th>By</th><th>Via</th><th>Steps</th></tr><tr><td>write</td><td><code>AGENTS.md</code></td><td>1</td><td>main</td><td>Bash</td><td><a href="#D447">D447</a></td></tr><tr><td>write</td><td><code>tasks/plan.md</code></td><td>1</td><td>main</td><td>Write</td><td><a href="#D444">D444</a></td></tr><tr><td>write</td><td><code>tasks/todo.md</code></td><td>1</td><td>main</td><td>Bash</td><td><a href="#D448">D448</a></td></tr><tr><td>edit</td><td><code>docs/architecture.md</code></td><td>1</td><td>main</td><td>Bash</td><td><a href="#D441">D441</a></td></tr><tr><td>edit</td><td><code>docs/probes.md</code></td><td>1</td><td>main</td><td>Bash</td><td><a href="#D441">D441</a></td></tr><tr><td>edit</td><td><code>tasks/plan.md</code></td><td>1</td><td>main</td><td>Bash</td><td><a href="#D446">D446</a></td></tr><tr><td>read</td><td><code>AGENTS.md</code></td><td>1</td><td>main</td><td>Bash</td><td><a href="#D443">D443</a></td></tr><tr><td>read</td><td><code>CLAUDE.md</code></td><td>1</td><td>main</td><td>Bash</td><td><a href="#D443">D443</a></td></tr><tr><td>read</td><td><code>tasks/plan.md</code></td><td>2</td><td>main</td><td>Bash</td><td><a href="#D447">D447</a> <a href="#D448">D448</a></td></tr></table>
+<h2>Steps</h2>
+<div class="step" id="SD438"><span class="sid">D438</span><span class="kind">user</span>Ran it. I can&#x27;t paste the output. Waive PB-01 and PB-02 and plan M1 now. Record the waiver and keep the risk lines on AD-04 to AD-06. The real-data checks move to M3&#x27;s first real build.<details><summary>full text</summary><pre>Ran it. I can&#x27;t paste the output. Waive PB-01 and PB-02 and plan M1 now. Record the waiver and keep the risk lines on AD-04 to AD-06. The real-data checks move to M3&#x27;s first real build.</pre></details></div><div class="step" id="SD439"><span class="sid">D439</span><span class="kind">Bash</span>python3 -c &quot;
+import json
+for d in [&#x27;PB-01-sharadar-coverage&#x27;,&#x27;PB-02-eodhd-crosscheck&#x27;]:
+    r=json.load(open(f&#x27;probes/{d}/evidence/results.json&#x27;)); print(d, r[&#x27;runner&#x27;], r[&#x27;run_at&#x27;], sorted(r[&#x27;checks&#x27;]))&quot;; grep -n &quot;Status:\*\* Ready&quot; docs/probes.md; grep -n &quot;PB-0&quot; docs/architecture.md<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;python3 -c \&quot;\nimport json\nfor d in [&#x27;PB-01-sharadar-coverage&#x27;,&#x27;PB-02-eodhd-crosscheck&#x27;]:\n    r=json.load(open(f&#x27;probes/{d}/evidence/results.json&#x27;)); print(d, r[&#x27;runner&#x27;], r[&#x27;run_at&#x27;], sorted(r[&#x27;checks&#x27;]))\&quot;; grep -n \&quot;Status:\\*\\* Ready\&quot; docs/probes.md; grep -n \&quot;PB-0\&quot; docs/architecture.md&quot;
+}</pre><div class="lbl">output</div><pre>PB-01-sharadar-coverage agent 2026-10-17T21:39:59Z [&#x27;C1&#x27;, &#x27;C2&#x27;]
+PB-02-eodhd-crosscheck agent 2026-10-17T21:40:02Z [&#x27;C1&#x27;, &#x27;C2&#x27;]
+6:**Folder:** `probes/PB-01-sharadar-coverage/` · **Hash:** 72e6b0ad · **Status:** Ready · **Milestones:** S1 · **Last run:** 2026-10-17T21:39:26Z
+29:**Folder:** `probes/PB-02-eodhd-crosscheck/` · **Hash:** 695bfc42 · **Status:** Ready · **Milestones:** S1 · **Last run:** 2026-10-17T21:39:30Z
+169:- **Probe:** PB-01 — on the researcher&#x27;s key, do `sp500` (from 2005), delisted members&#x27; prices, delisting action types, acquisition values and the bulk export behave as documented? Does `sp500` store tickers as they were at the time or as renamed? Does a full bulk build fit QR-02?
+181:  - Tiingo Power ($30/month; raw close, `divCash`, `splitFactor`: https://www.tiingo.com/documentation/end-of-day) replaces EODHD if PB-02 fails.
+184:- **Probe:** PB-02 — on the researcher&#x27;s EODHD key, what share of S&amp;P 500 member-days since 2010 can be matched, how are renamed and reused symbols handled, do 2010-17 delisted names have splits and dividends, and do the terms allow local storage for personal cross-checks?
+195:- **Probe:** PB-01 — acquisition values and delisting action types on the researcher&#x27;s key decide how many delisting returns are derived rather than assumed.
+299:- PB-01 (Sharadar on the researcher&#x27;s key) is open. AD-04 and AD-06 stay Proposed until it is answered.
+300:- PB-02 (EODHD coverage and terms) is open. AD-05 stays Proposed until it is answered. If it fails, Tiingo is probed before the switch.</pre></details></div><div class="step" id="SD440"><span class="sid">D440</span><span class="kind">say</span>The evidence still has only C1 and C2 (21:39:59), so I&#x27;ll record the waiver as you asked. Then I&#x27;ll fold it into the architecture and plan M1.<details><summary>full text</summary><pre>The evidence still has only C1 and C2 (21:39:59), so I&#x27;ll record the waiver as you asked. Then I&#x27;ll fold it into the architecture and plan M1.</pre></details></div><div class="step" id="SD441"><span class="sid">D441</span><span class="kind">Bash</span>python3 - &lt;&lt;&#x27;EOF&#x27;
+import re
+def rep(p, pairs):
+    s=open(p).read()
+    for a,b in pairs:
+        assert a in s,(p,a[:60]); s=s.replace(a,b,1)
+    open(p,&#x27;w&#x27;).write(s)
+reason=&quot;the real-data checks move to M3&#x27;s first real build&quot;
+p=&#x27;docs/probes.md&#x27;; s=open(p).read()
+s=re.sub(r&quot;(PB-01-sharadar-coverage/` · \*\*Hash:\*\* 72e6b0ad · )\*\*Status:\*\* Ready( · \*\*Milestones:\*\* S1 · \*\*Last run:\*\* )\S+&quot;, r&quot;\g&lt;1&gt;Status: Waived · 2026-10-17 — &quot;+reason+r&quot;\g&lt;2&gt;2026-10-17T21:39:59Z&quot;, s)
+s=re.sub(r&quot; …[+3069 chars]<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;python3 - &lt;&lt;&#x27;EOF&#x27;\nimport re\ndef rep(p, pairs):\n    s=open(p).read()\n    for a,b in pairs:\n        assert a in s,(p,a[:60]); s=s.replace(a,b,1)\n    open(p,&#x27;w&#x27;).write(s)\nreason=\&quot;the real-data checks move to M3&#x27;s first real build\&quot;\np=&#x27;docs/probes.md&#x27;; s=open(p).read()\ns=re.sub(r\&quot;(PB-01-sharadar-coverage/` · \\*\\*Hash:\\*\\* 72e6b0ad · )\\*\\*Status:\\*\\* Ready( · \\*\\*Milestones:\\*\\* S1 · \\*\\*Last run:\\*\\* )\\S+\&quot;, r\&quot;\\g&lt;1&gt;**Status:** Waived · 2026-10-17 — \&quot;+reason+r\&quot;\\g&lt;2&gt;2026-10-17T21:39:59Z\&quot;, s)\ns=re.sub(r\&quot;(PB-02-eodhd-crosscheck/` · \\*\\*Hash:\\*\\* 695bfc42 · )\\*\\*Status:\\*\\* Ready( · \\*\\*Milestones:\\*\\* S1 · \\*\\*Last run:\\*\\* )\\S+\&quot;, r\&quot;\\g&lt;1&gt;**Status:** Waived · 2026-10-17 — \&quot;+reason+r\&quot;\\g&lt;2&gt;2026-10-17T21:40:02Z\&quot;, s)\nopen(p,&#x27;w&#x27;).write(s)\nA=&#x27;docs/architecture.md&#x27;\nrep(A,[\n(\&quot;**Status:** Approved · **Shape:**\&quot;,\&quot;**Status:** Draft · **Shape:**\&quot;),\n(\&quot;  - Together these meet DATA-01–DATA-04.\\n\&quot;,\&quot;  - Together these meet DATA-01–DATA-04.\\n  - PB-01 was waived on 2026-10-17 (the researcher: \\\&quot;the real-data checks move to M3&#x27;s first real build\\\&quot;). Only its public checks ran: every column the design uses exists, and responses are `{count, data:[…]}` rows. The checks on the researcher&#x27;s key (membership events from 2005, ticker mapping, delisted prices, delisting actions, rebuilt returns, bulk timing) run at M3&#x27;s first real build.\\n\&quot;),\n(\&quot;- **Decision:**\\n  - EODHD Historian is the second source.\&quot;,\&quot;- **Decision:**\\n  - PB-02 was waived on 2026-10-17 (the researcher: \\\&quot;the real-data checks move to M3&#x27;s first real build\\\&quot;). Its public checks passed (raw `close`, continuous `adjusted_close`, splits listed, `unadjustedValue` present; rebuilt returns within 1 bp on 99.87% of 8,444 days), and the researcher confirmed the terms allow local storage for personal cross-checks. Coverage, symbol matching and agreement run at M3&#x27;s first real build.\\n  - EODHD Historian is the second source.\&quot;),\n(\&quot;- **Alternatives:** Use `closeadj` returns directly\&quot;,\&quot;- **Waiver:** PB-01 was waived on 2026-10-17; whether acquisition values and delisting types arrive as documented is checked at M3&#x27;s first real build.\\n- **Alternatives:** Use `closeadj` returns directly\&quot;),\n(\&quot;- PB-01 (Sharadar on the researcher&#x27;s key) is open. AD-04 and AD-06 stay Proposed until it is answered.\&quot;,\&quot;- PB-01 (Sharadar on the researcher&#x27;s key) was waived; its checks run at M3&#x27;s first real build. If daily `added`/`removed` membership events, delisted members&#x27; prices or acquisition values are missing, M1&#x27;s `ingest.CleanTables` and `clean_tables` step, and AD-04 and AD-06, are revised then.\&quot;),\n(\&quot;- PB-02 (EODHD coverage and terms) is open. AD-05 stays Proposed until it is answered. If it fails, Tiingo is probed before the switch.\&quot;,\&quot;- PB-02 (EODHD coverage) was waived; its checks run at M3&#x27;s first real build. If coverage is under 50% of member-days per year (DATA-06), Tiingo is probed and AD-05 revised then.\&quot;),\n])\ns=open(A).read()\nfor ad in (\&quot;AD-04\&quot;,\&quot;AD-05\&quot;,\&quot;AD-06\&quot;):\n    s=re.sub(r\&quot;(### \&quot;+ad+r\&quot;:[^\\n]*\\n\\*\\*Status:\\*\\* )Proposed\&quot;, r\&quot;\\g&lt;1&gt;Accepted\&quot;, s)\ns=s.replace(\&quot;| 2026-10-17 | Keep six packages at the first Grow check | researcher | AD-14 |\&quot;,\&quot;| 2026-10-17 | Keep six packages at the first Grow check | researcher | AD-14 |\\n| 2026-10-17 | PB-01 and PB-02 waived; real-data checks move to M3 | researcher | AD-04, AD-05, AD-06 (revised) |\&quot;)\nopen(A,&#x27;w&#x27;).write(s)\nEOF\npython3 ../plugin/dev-team/scripts/dt.py lint docs/ | tail -4; grep -n \&quot;^### AD-0[456]\&quot; -A1 docs/architecture.md | grep Status; python3 ../plugin/dev-team/scripts/dt.py status --skill build-planning | grep -E \&quot;^mode|blocked|probes_blocking\&quot;&quot;
+}</pre><div class="lbl">output</div><pre>docs/probes.md:5: probe-large PB-01 is 446 code lines (budget 400, probe_kit.py aside): keep to what the checks need
+docs/roadmap.md:27: roadmap-skill S1 Skills names dataviz: not installed (.claude/skills or the plugin)
+docs/roadmap.md:48: roadmap-skill M2 Skills names dataviz: not installed (.claude/skills or the plugin)
+0 errors, 3 warnings
+158-**Status:** Accepted · **Date:** 2026-10-17 · **Scope:** `ingest`
+173-**Status:** Accepted · **Date:** 2026-10-17 · **Scope:** `ingest`
+189-**Status:** Accepted · **Date:** 2026-10-17 · **Scope:** `data`, `ingest`
+mode: extend
+blocked_tasks: none
+mode_violations: none
+probes_blocking: none</pre></details></div><div class="step" id="SD442"><span class="sid">D442</span><span class="kind">say</span>Waiver recorded and folded into AD-04 to AD-06, with their risk lines kept. Now I&#x27;ll write the M1 plan.<details><summary>full text</summary><pre>Waiver recorded and folded into AD-04 to AD-06, with their risk lines kept. Now I&#x27;ll write the M1 plan.</pre></details></div><div class="step" id="SD443"><span class="sid">D443</span><span class="kind">Bash</span>ls; ls tasks; cat AGENTS.md CLAUDE.md 2&gt;/dev/null | head -20; python3 ../plugin/dev-team/scripts/dt.py next-id M1-T; grep -n &quot;## M3&quot; -A4 docs/roadmap.md<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;ls; ls tasks; cat AGENTS.md CLAUDE.md 2&gt;/dev/null | head -20; python3 ../plugin/dev-team/scripts/dt.py next-id M1-T; grep -n \&quot;## M3\&quot; -A4 docs/roadmap.md&quot;
+}</pre><div class="lbl">output</div><pre>docs
+probes
+references
+tasks
+tests
+queued
+M1-T01
+51:## M3: Real data, updates and EDA
+52-**Outline:** The first full build on the real Sharadar and EODHD APIs, incremental updates with revisions, re-validation, and the exploratory analysis report.
+53-**Skills:** data-analysis
+54-**References:** PB-01, PB-02
+55-</pre></details></div><div class="step" id="SD444"><span class="sid">D444</span><span class="kind">Write</span>/Users/connorott/plugins/dev-team-workspace/iteration-8/quant-all-at-once/with_skill/project/tasks/plan.md (339 lines)<div class="lbl">wrote /Users/connorott/plugins/dev-team-workspace/iteration-8/quant-all-at-once/with_skill/project/tasks/plan.md</div><pre># M1: Data skeleton — Plan
+
+**Milestone:** M1 · **Status:** Draft · **Base:** — · **Last updated:** 2026-10-17 · **Roadmap:** [../docs/roadmap.md](../docs/roadmap.md)
+
+## Scope
+**Exit:** `python -m qrp_ingest build --smoke`, `python -m qrp_ingest explain --smoke` and the three `qrp_data` smokes run end to end on recorded Sharadar and EODHD fixtures with the real data writer; TC-01–TC-11, TC-13, TC-14 and TC-16 pass.
+**Covers:** LOAD-01–LOAD-06, DATA-01–DATA-05, INGST-01, INGST-04–INGST-06, VALID-01–VALID-07, RUNS-04–RUNS-06, HOLD-01, QR-01, QR-05, QR-07 · **Deferred:** DATA-06 (to M3: cross-check coverage needs the real EODHD run; PB-02 waived), QR-02 (to M3: full-build timing needs the real bulk download; PB-01 waived)
+**Skills:** none (no installed skill owns an M1 step)
+
+PB-01 and PB-02 are waived: the sources are built and tested against recorded fixtures shaped like the probes&#x27; public samples. Their real-data checks run at M3&#x27;s first real build; a failure there replans this milestone&#x27;s `ingest.CleanTables` and `clean_tables`.
+
+## Phase 0: Interface
+
+### M1-T01: data interface
+**Package:** data · **Step:** contract · **Kind:** interface · **Covers:** — · **Size:** S · **Mode:** solo
+**Skills:** —
+**Read:** PL-05, PL-06, PL-07, data.SecurityId, data.SnapshotRef, data.Provenance, data.DelistingDefaults, data.Panel, data.PricePanel, data.Universe, data.SecurityInfo, data.Preregistration, data.Unlock, data.SnapshotWriter, data.load_returns, data.load_prices, data.load_universe, data.security_info
+**Acceptance:**
+- [ ] Each type is code in `qrp_data/types.py` (pandera schemas for the frames); each `tests/contracts/data.&lt;Type&gt;/` sample validates
+- [ ] Every PL-05–PL-07 step imports with its contract signature, body `raise NotImplementedError(&quot;&lt;its task&gt;&quot;)`; `__init__.py` exports the contract
+- [ ] The `data.SnapshotWriter` replay double and the `data.load_*` / `data.security_info` fakes serve their fixtures
+**Verify:** `pytest tests/contracts` · `scripts/check.sh gate --pkg data`
+**Depends on:** — · **Writes:** packages/data/src/qrp_data/**, packages/data/pyproject.toml, tests/contracts/data.*/**
+
+### M1-T02: ingest interface
+**Package:** ingest · **Step:** contract · **Kind:** interface · **Covers:** — · **Size:** S · **Mode:** solo
+**Skills:** —
+**Read:** PL-08, PL-11, ingest.RunKind, ingest.RunHandle, ingest.RunEvent, ingest.EventSink, ingest.RawFetch, ingest.CleanTables, ingest.ValidationItem, ingest.ValidationReport, ingest.start_run, PB-01:samples, PB-02:samples
+**Acceptance:**
+- [ ] Each type is code in `qrp_ingest/types.py`; each `tests/contracts/ingest.&lt;Type&gt;/` sample validates; `RawFetch` samples are derived from the PB-01 and PB-02 sample shapes
+- [ ] Every PL-08 and PL-11 step imports with its contract signature, body `raise NotImplementedError(&quot;&lt;its task&gt;&quot;)`; `__main__.py` dispatches `build`, `update`, `validate` and `explain`
+- [ ] Fixture-backed fake Sharadar and EODHD servers (base URL from the environment) and the `ingest.EventSink` replay double serve their fixtures
+**Verify:** `pytest tests/contracts` · `scripts/check.sh gate --pkg ingest`
+**Depends on:** — · **Writes:** packages/ingest/src/qrp_ingest/**, packages/ingest/pyproject.toml, tests/contracts/ingest.*/**
+
+## Phase 1: Step spines
+
+### M1-T03: Snapshot store spine
+**Package:** data · **Step:** PL-07.commit_snapshot · **Kind:** spine · **Covers:** INGST-04, QR-05 · **Size:** XS · **Mode:** solo
+**Reason:** `check_tables`, `open_snapshot` and `commit_snapshot` share store/snapshot.py
+**Skills:** —
+**Read:** PL-05, PL-07, INGST-04, data.SnapshotRef, data.Provenance
+**Acceptance:**
+- [ ] Staged sample tables pass `check_tables`; `commit_snapshot` writes the manifest with table hashes and renames atomically; `open_snapshot` refuses an unvalidated snapshot
+**Verify:** `pytest tests/unit/data -k snapshot` · `scripts/check.sh gate --pkg data`
+**Depends on:** M1-T01 · **Writes:** packages/data/src/qrp_data/store/snapshot.py, tests/unit/data/test_snapshot.py
+
+### M1-T04: Held-out lock
+**Package:** data · **Step:** PL-05.check_lock · **Kind:** thicken · **Covers:** LOAD-05, HOLD-01 · **Size:** XS · **Mode:** split
+**Reason:** fold: `check_lock` and `set_lock` share lock/lock.py; TC-05 pins the whole behaviour
+**Skills:** —
+**Read:** PL-05, TC-05, HOLD-01, LOAD-05, data.set_lock, data.Provenance, data.Unlock
+**Acceptance:**
+- [ ] TC-05 passes: lock start 2023-10-17; a load ending 2023-10-16 succeeds; ending 2023-10-17 raises `HeldOutError`, or succeeds with an S2 unlock
+**Verify:** `pytest tests/intent/data tests/unit/data -k lock` · `scripts/check.sh gate --pkg data`
+**Depends on:** M1-T01 · **Writes:** packages/data/src/qrp_data/lock/lock.py, tests/intent/data/test_lock.py, tests/unit/data/test_lock.py
+
+### M1-T05: Trading-session check
+**Package:** data · **Step:** PL-07.check_sessions · **Kind:** thicken · **Covers:** DATA-05 · **Size:** XS · **Mode:** split
+**Reason:** fold: rejecting non-session dates is the step&#x27;s whole behaviour; TC-06 pins it
+**Skills:** —
+**Read:** PL-07, TC-06, DATA-05, data.trading_days, data.SnapshotRef
+**Acceptance:**
+- [ ] TC-06 passes: a price on 2012-10-29 fails, naming the date; without it the check passes
+**Verify:** `pytest tests/intent/data tests/unit/data -k sessions` · `scripts/check.sh gate --pkg data`
+**Depends on:** M1-T01 · **Writes:** packages/data/src/qrp_data/calendar.py, tests/intent/data/test_sessions.py, tests/unit/data/test_sessions.py
+
+### M1-T06: Total returns from unadjusted prices
+**Package:** data · **Step:** PL-07.compute_returns · **Kind:** thicken · **Covers:** LOAD-02, LOAD-04 · **Size:** XS · **Mode:** split
+**Reason:** fold: AD-06&#x27;s formula is the step&#x27;s whole behaviour; TC-01 and TC-03 pin it
+**Skills:** —
+**Read:** PL-07, TC-01, TC-03, AD-06, data.Panel, data.SnapshotRef
+**Acceptance:**
+- [ ] TC-01 passes: returns NaN, 0.02, 0.01, 0.01 across the split and dividend
+- [ ] TC-03&#x27;s default branch passes: −0.30 (assumed), +0.20 (acquisition), 0.00 (assumed) on the first session after the last trade
+**Verify:** `pytest tests/intent/data tests/unit/data -k compute_returns` · `scripts/check.sh gate --pkg data`
+**Depends on:** M1-T01 · **Writes:** packages/data/src/qrp_data/loader/build.py, tests/intent/data/test_compute_returns.py, tests/unit/data/test_compute_returns.py
+
+### M1-T07: Point-in-time universe
+**Package:** data · **Step:** PL-05.read_universe · **Kind:** thicken · **Covers:** LOAD-01, DATA-02, DATA-04 · **Size:** XS · **Mode:** split
+**Reason:** fold: expanding membership spans per session is the step&#x27;s whole behaviour; TC-04 pins it
+**Skills:** —
+**Read:** PL-05, TC-04, LOAD-01, data.Universe, data.SnapshotRef
+**Acceptance:**
+- [ ] TC-04&#x27;s universe part passes: 2010-06-01 → [101, 102]; 2013-06-03 → [102]; each row carries the ticker as of that day
+**Verify:** `pytest tests/intent/data tests/unit/data -k universe` · `scripts/check.sh gate --pkg data`
+**Depends on:** M1-T01 · **Writes:** packages/data/src/qrp_data/loader/universe.py, tests/intent/data/test_universe.py, tests/unit/data/test_universe.py
+
+### M1-T08: Return loading with delisting defaults
+**Package:** data · **Step:** PL-05.read_returns · **Kind:** thicken · **Covers:** LOAD-04, LOAD-06 · **Size:** XS · **Mode:** split
+**Reason:** fold: masking non-members and applying `DelistingDefaults` are the step&#x27;s whole behaviour
+**Skills:** —
+**Read:** PL-05, TC-03, TC-04, LOAD-04, LOAD-06, data.Panel, data.Universe, data.DelistingDefaults, data.Provenance
+**Acceptance:**
+- [ ] TC-03&#x27;s override passes: with `DelistingDefaults(performance=-0.5)` the bankruptcy is −0.50; assumed ones listed in `attrs[&quot;assumed_delisting&quot;]`
+- [ ] TC-04&#x27;s return part passes: 102 on 2011-03-15 is NaN, never 0; the panel carries its `Provenance`
+**Verify:** `pytest tests/intent/data tests/unit/data -k read_returns` · `scripts/check.sh gate --pkg data`
+**Depends on:** M1-T01 · **Writes:** packages/data/src/qrp_data/loader/returns.py, tests/intent/data/test_read_returns.py, tests/unit/data/test_read_returns.py
+
+### M1-T09: Member-only prices
+**Package:** data · **Step:** PL-06.read_prices · **Kind:** thicken · **Covers:** LOAD-01 · **Size:** XS · **Mode:** split
+**Reason:** fold: filtering prices to member rows is the step&#x27;s whole behaviour; TC-07 pins it
+**Skills:** —
+**Read:** PL-06, TC-07, data.PricePanel, data.Universe
+**Acceptance:**
+- [ ] TC-07 passes: security 101&#x27;s prices run 2012-06-01 to 2012-06-28, none after its removal
+**Verify:** `pytest tests/intent/data tests/unit/data -k read_prices` · `scripts/check.sh gate --pkg data`
+**Depends on:** M1-T01 · **Writes:** packages/data/src/qrp_data/loader/prices.py, tests/intent/data/test_read_prices.py, tests/unit/data/test_read_prices.py
+
+### M1-T10: Run event log spine
+**Package:** ingest · **Step:** PL-08.open_run · **Kind:** spine · **Covers:** RUNS-04 · **Size:** XS · **Mode:** solo
+**Reason:** `open_run`, `close_run` and the `EventSink` over `meta.sqlite` share runs/events.py
+**Skills:** —
+**Read:** PL-08, ingest.EventSink, ingest.RunEvent
+**Acceptance:**
+- [ ] `open_run` gives an `EventSink` whose events have increasing `seq`; `close_run` writes exactly one terminal `done` event; events validate as `ingest.RunEvent`
+**Verify:** `pytest tests/unit/ingest -k events` · `scripts/check.sh gate --pkg ingest`
+**Depends on:** M1-T02 · **Writes:** packages/ingest/src/qrp_ingest/runs/events.py, tests/unit/ingest/test_events.py
+
+### M1-T11: Worker runs with cancel
+**Package:** ingest · **Step:** PL-08.open_run · **Kind:** thicken · **Covers:** RUNS-05, RUNS-06 · **Size:** S · **Mode:** split
+**Reason:** the worker process lives in its own module (runs/worker.py) beside the event log
+**Skills:** —
+**Read:** PL-08, RUNS-04, RUNS-05, RUNS-06, ingest.start_run, ingest.cancel_run, ingest.run_events, ingest.active_run, ingest.RunHandle
+**Acceptance:**
+- [ ] Given a running worker, when a second data-changing run starts, then `RunActive` names the first
+- [ ] Given a running worker, when cancelled, then it stops within 10 s with a `cancelled` event; the caller exiting doesn&#x27;t stop it
+**Verify:** `pytest tests/intent/ingest tests/unit/ingest -k worker` · `scripts/check.sh gate --pkg ingest`
+**Depends on:** M1-T02 · **Writes:** packages/ingest/src/qrp_ingest/runs/worker.py, tests/intent/ingest/test_worker.py, tests/unit/ingest/test_worker.py
+
+### M1-T12: Sharadar bulk fetch
+**Package:** ingest · **Step:** PL-08.fetch_sharadar · **Kind:** thicken · **Covers:** INGST-01, DATA-01, DATA-03, QR-07 · **Size:** S · **Mode:** split
+**Reason:** fold: the bulk-file download against the fake server and key handling are the step&#x27;s whole behaviour
+**Skills:** —
+**Read:** PL-08, INGST-01, QR-07, AD-04, ingest.RawFetch, ingest.EventSink, PB-01:probe.py:c8_bulk, PB-01:samples
+**Acceptance:**
+- [ ] Given the fake Sharadar server, when fetched, then the four tables land in a temp folder via the `years=full` redirect, with progress events at least every 2 s
+- [ ] Given a missing or rejected key, when fetching, then `CredentialError` is raised before any download and no log line contains the key
+**Verify:** `pytest tests/intent/ingest tests/unit/ingest -k sharadar` · `scripts/check.sh gate --pkg ingest`
+**Depends on:** M1-T02 · **Writes:** packages/ingest/src/qrp_ingest/sources/sharadar.py, packages/ingest/src/qrp_ingest/sources/http.py, tests/intent/ingest/test_sharadar.py, tests/unit/ingest/test_sharadar.py
+
+### M1-T13: Raw store spine
+**Package:** ingest · **Step:** PL-08.store_raw · **Kind:** spine · **Covers:** INGST-05, INGST-06 · **Size:** XS · **Mode:** solo
+**Skills:** —
+**Read:** PL-08, INGST-06, ingest.RawFetch
+**Acceptance:**
+- [ ] `store_raw` moves the `ingest.RawFetch` sample&#x27;s files under `raw/&lt;source&gt;/&lt;fetch-id&gt;/`, records their hashes and makes them read-only
+**Verify:** `pytest tests/unit/ingest -k raw_store` · `scripts/check.sh gate --pkg ingest`
+**Depends on:** M1-T02 · **Writes:** packages/ingest/src/qrp_ingest/raw/store.py, tests/unit/ingest/test_raw_store.py
+
+### M1-T14: Clean tables keyed by permanent id
+**Package:** ingest · **Step:** PL-08.clean_tables · **Kind:** thicken · **Covers:** INGST-01, DATA-01–DATA-04 · **Size:** S · **Mode:** split
+**Reason:** fold: ticker mapping, membership spans and un-split-adjusted dividends are the step&#x27;s whole behaviour; TC-08, TC-09 pin it
+**Skills:** —
+**Read:** PL-08, TC-08, TC-09, AD-06, ingest.CleanTables, ingest.RawFetch, PB-01:probe.py:c4_mapping, PB-01:probe.py:membership
+**Acceptance:**
+- [ ] TC-08 passes: the 0.25 dividend before a 4-for-1 split becomes 1.00; later dividends unchanged
+- [ ] TC-09 passes: `ABC1` and the new `ABC` are two ids with no overlap; `XYZ`/`XYQ` is one continuous id
+**Verify:** `pytest tests/intent/ingest tests/unit/ingest -k clean` · `scripts/check.sh gate --pkg ingest`
+**Depends on:** M1-T02 · **Writes:** packages/ingest/src/qrp_ingest/clean/tables.py, tests/intent/ingest/test_clean.py, tests/unit/ingest/test_clean.py
+
+### M1-T15: EODHD cross-check fetch
+**Package:** ingest · **Step:** PL-08.fetch_crosscheck · **Kind:** thicken · **Covers:** INGST-05, QR-01 · **Size:** XS · **Mode:** split
+**Reason:** fold: per-symbol fetches that skip finished symbols are the step&#x27;s whole behaviour
+**Skills:** —
+**Read:** PL-08, INGST-05, AD-05, ingest.RawFetch, ingest.CleanTables, PB-02:probe.py:fetch, PB-02:samples
+**Acceptance:**
+- [ ] Given the fake EODHD server and 3 matched symbols, when fetched twice, then the second run makes no calls for finished symbols and the call count is recorded
+**Verify:** `pytest tests/intent/ingest tests/unit/ingest -k eodhd` · `scripts/check.sh gate --pkg ingest`
+**Depends on:** M1-T02 · **Writes:** packages/ingest/src/qrp_ingest/sources/eodhd.py, tests/intent/ingest/test_eodhd.py, tests/unit/ingest/test_eodhd.py
+
+### M1-T16: Consistency checks
+**Package:** ingest · **Step:** PL-08.check_consistency · **Kind:** thicken · **Covers:** VALID-01–VALID-03 · **Size:** XS · **Mode:** split
+**Reason:** fold: the checks are the step&#x27;s whole behaviour; TC-10 pins them
+**Skills:** —
+**Read:** PL-08, TC-10, ingest.CleanTables, ingest.ValidationReport, ingest.ValidationItem
+**Acceptance:**
+- [ ] TC-10 passes: exactly duplicate, coverage and jump items; the split day is not flagged
+**Verify:** `pytest tests/intent/ingest tests/unit/ingest -k consistency` · `scripts/check.sh gate --pkg ingest`
+**Depends on:** M1-T02 · **Writes:** packages/ingest/src/qrp_ingest/validate/consistency.py, tests/intent/ingest/test_consistency.py, tests/unit/ingest/test_consistency.py
+
+### M1-T17: Cross-check against the second source
+**Package:** ingest · **Step:** PL-08.cross_check · **Kind:** thicken · **Covers:** VALID-04, VALID-05, VALID-07 · **Size:** XS · **Mode:** split
+**Reason:** fold: rebuilt-return and close comparisons are the step&#x27;s whole behaviour; TC-11 pins them
+**Skills:** —
+**Read:** PL-08, TC-11, AD-05, ingest.CleanTables, ingest.RawFetch, ingest.ValidationReport, PB-02:probe.py:checks
+**Acceptance:**
+- [ ] TC-11 passes: 1 return item, 4 close items, security 4 not checkable, overlap 0.8
+**Verify:** `pytest tests/intent/ingest tests/unit/ingest -k crosscheck` · `scripts/check.sh gate --pkg ingest`
+**Depends on:** M1-T02 · **Writes:** packages/ingest/src/qrp_ingest/validate/crosscheck.py, tests/intent/ingest/test_crosscheck.py, tests/unit/ingest/test_crosscheck.py
+
+### M1-T18: Validation item statuses
+**Package:** ingest · **Step:** PL-08.apply_explanations · **Kind:** thicken · **Covers:** VALID-06 · **Size:** XS · **Mode:** split
+**Reason:** fold: `apply_explanations` and `record_explanation` share validate/status.py; carrying statuses by fingerprint is the behaviour
+**Skills:** —
+**Read:** PL-08, PL-11, VALID-06, ingest.ValidationReport, ingest.ValidationItem, ingest.explain_item
+**Acceptance:**
+- [ ] Given an item explained in snapshot 1, when it recurs in snapshot 2, then it carries the same status and reason; `usable` is true only with no unexplained item
+**Verify:** `pytest tests/intent/ingest tests/unit/ingest -k status` · `scripts/check.sh gate --pkg ingest`
+**Depends on:** M1-T02 · **Writes:** packages/ingest/src/qrp_ingest/validate/status.py, tests/intent/ingest/test_status.py, tests/unit/ingest/test_status.py
+
+### M1-T19: Snapshot writing spine
+**Package:** ingest · **Step:** PL-08.write_snapshot · **Kind:** spine · **Covers:** INGST-04, HOLD-01 · **Size:** XS · **Mode:** solo
+**Reason:** `current_snapshot`, `write_snapshot`, `mark_validated` and `lock_if_first` share snapshot/write.py
+**Skills:** —
+**Read:** PL-08, PL-11, data.SnapshotWriter, data.set_lock, data.SnapshotRef, ingest.CleanTables, ingest.ValidationReport
+**Acceptance:**
+- [ ] On the `data.SnapshotWriter` replay double, `write_snapshot` writes each table, the report and finalizes; a cancel calls `abort`; `lock_if_first` calls `set_lock` only for the first usable snapshot
+**Verify:** `pytest tests/unit/ingest -k write_snapshot` · `scripts/check.sh gate --pkg ingest`
+**Depends on:** M1-T02 · **Writes:** packages/ingest/src/qrp_ingest/snapshot/write.py, tests/unit/ingest/test_write_snapshot.py
+
+## Phase 2: Wiring and thicken
+
+### M1-T20: Wire PL-07
+**Package:** data · **Step:** PL-07 · **Kind:** wiring · **Covers:** INGST-04, QR-05 · **Size:** XS · **Mode:** solo
+**Skills:** —
+**Read:** PL-07, TC-02
+**Acceptance:**
+- [ ] `python -m qrp_data finalize --smoke` stages and commits a synthetic snapshot; committed as PL-07&#x27;s smoke test
+- [ ] TC-02 passes: a split recorded after snapshot 1 leaves snapshot 1&#x27;s returns identical
+**Verify:** `python -m qrp_data finalize --smoke` · `scripts/check.sh gate --pkg data`
+**Depends on:** M1-T03, M1-T05, M1-T06 · **Writes:** packages/data/src/qrp_data/store/pipeline.py, tests/unit/data/test_pl07_smoke.py
+
+### M1-T21: Wire PL-05
+**Package:** data · **Step:** PL-05 · **Kind:** wiring · **Covers:** LOAD-01–LOAD-06 · **Size:** XS · **Mode:** solo
+**Skills:** —
+**Read:** PL-05
+**Acceptance:**
+- [ ] `python -m qrp_data load-returns --smoke` loads returns from a synthetic validated snapshot; committed as PL-05&#x27;s smoke test
+**Verify:** `python -m qrp_data load-returns --smoke` · `scripts/check.sh gate --pkg data`
+**Depends on:** M1-T03, M1-T04, M1-T07, M1-T08 · **Writes:** packages/data/src/qrp_data/loader/pipeline.py, tests/unit/data/test_pl05_smoke.py
+
+### M1-T22: Wire PL-06
+**Package:** data · **Step:** PL-06 · **Kind:** wiring · **Covers:** LOAD-01 · **Size:** XS · **Mode:** solo
+**Skills:** —
+**Read:** PL-06
+**Acceptance:**
+- [ ] `python -m qrp_data load-prices --smoke` loads member prices from a synthetic snapshot; committed as PL-06&#x27;s smoke test
+- [ ] PL-05, PL-06 and PL-07 pre-build sections replaced by a `dt layout` pointer
+**Verify:** `python -m qrp_data load-prices --smoke` · `scripts/check.sh gate --pkg data`
+**Depends on:** M1-T21, M1-T09 · **Writes:** packages/data/src/qrp_data/loader/pipeline.py, tests/unit/data/test_pl06_smoke.py
+
+### M1-T23: Wire PL-08
+**Package:** ingest · **Step:** PL-08 · **Kind:** wiring · **Covers:** INGST-01, INGST-05, RUNS-04 · **Size:** S · **Mode:** solo
+**Skills:** —
+**Read:** PL-08, TC-13, data.SnapshotWriter
+**Acceptance:**
+- [ ] `python -m qrp_ingest build --smoke` runs all eleven steps on the fake servers and the `data.SnapshotWriter` replay double; committed as PL-08&#x27;s smoke test
+- [ ] TC-13 passes: a build stopped after security 3 resumes to the same tables without refetching
+**Verify:** `python -m qrp_ingest build --smoke` · `scripts/check.sh gate --pkg ingest`
+**Depends on:** M1-T10, M1-T11, M1-T12, M1-T13, M1-T14, M1-T15, M1-T16, M1-T17, M1-T18, M1-T19 · **Writes:** packages/ingest/src/qrp_ingest/pipeline.py, tests/unit/ingest/test_pl08_smoke.py
+
+### M1-T24: Wire PL-11
+**Package:** ingest · **Step:** PL-11 · **Kind:** wiring · **Covers:** VALID-06 · **Size:** XS · **Mode:** solo
+**Skills:** —
+**Read:** PL-11
+**Acceptance:**
+- [ ] `python -m qrp_ingest explain --smoke` explains the last open item of a smoke snapshot and marks it validated; committed as PL-11&#x27;s smoke test
+- [ ] PL-08 and PL-11 pre-build sections replaced by a `dt layout` pointer
+**Verify:** `python -m qrp_ingest explain --smoke` · `scripts/check.sh gate --pkg ingest`
+**Depends on:** M1-T23 · **Writes:** packages/ingest/src/qrp_ingest/pipeline.py, tests/unit/ingest/test_pl11_smoke.py
+
+### Checkpoint after M1-T24
+- [ ] Every pipeline in the milestone runs end to end (smoke commands)
+- [ ] All golden cases pass
+- [ ] Entry functions still read top to bottom as the step table says (Sync if not)
+- [ ] No new abstraction without a second implementation or an AD
+- [ ] contract.md matches the contract code (`dt status` freshness check)
+- [ ] `dt layout` output reviewed; Definition of Done holds
+- [ ] `scripts/check.sh full` passes; Review checklist done; every finding has a disposition
+
+## Phase 3: System
+
+### M1-T25: PL-01 on the real data writer
+**Package:** ingest · **Step:** PL-01 · **Kind:** system · **Covers:** INGST-04, HOLD-01, RUNS-06 · **Size:** XS · **Mode:** solo
+**Reason:** system task
+**Skills:** —
+**Read:** PL-01, PL-07, PL-08, PL-11, TC-02, TC-13, TC-14, TC-16, data.SnapshotWriter, data.set_lock
+**Acceptance:**
+- [ ] PL-08 and PL-11 call the real `data.SnapshotWriter` and `data.set_lock`; the replay doubles stay for the contract tests
+- [ ] TC-14 and TC-16 pass on the real chain: a cancelled build keeps snapshot 1 current; explaining the last item sets the lock to 2023-10-17 once
+- [ ] All five smoke commands pass
+**Verify:** `python -m qrp_ingest build --smoke` · `python -m qrp_ingest explain --smoke` · `python -m qrp_data finalize --smoke` · `python -m qrp_data load-returns --smoke` · `python -m qrp_data load-prices --smoke` · `scripts/check.sh gate --pkg ingest`
+**Depends on:** M1-T20, M1-T22, M1-T24 · **Writes:** packages/ingest/src/qrp_ingest/pipeline.py
+
+### Checkpoint: milestone exit
+- [ ] Every pipeline in the milestone runs end to end (smoke commands)
+- [ ] All golden cases pass
+- [ ] Entry functions still read top to bottom as the step table says (Sync if not)
+- [ ] No new abstraction without a second implementation or an AD
+- [ ] contract.md matches the contract code (`dt status` freshness check)
+- [ ] `dt layout` output reviewed; Definition of Done holds
+- [ ] `scripts/check.sh full --exit` passes; Review checklist done; every finding has a disposition
+- [ ] The Scope&#x27;s Exit holds
+
+## Dependency graph
+| From | To | Kind | Mitigated by |
+|---|---|---|---|
+| M1-T08 return loading | M1-T07 universe | data | data.Universe sample (M1-T01) |
+| M1-T14 clean tables | M1-T12 Sharadar fetch | data | ingest.RawFetch sample (M1-T02) |
+| M1-T16 consistency | M1-T14 clean tables | data | ingest.CleanTables sample (M1-T02) |
+| M1-T17 cross-check | M1-T15 EODHD fetch | data | ingest.RawFetch sample (M1-T02) |
+| M1-T19 snapshot writing | M1-T03 snapshot store | call | data.SnapshotWriter replay double (M1-T01) |
+| M1-T20 wire PL-07 | M1-T03 snapshot store | order | none: integration: the smoke runs it |
+| M1-T20 wire PL-07 | M1-T05 sessions | order | none: integration: the smoke runs it |
+| M1-T20 wire PL-07 | M1-T06 compute returns | order | none: integration: the smoke runs it |
+| M1-T21 wire PL-05 | M1-T03 snapshot store | order | none: integration: the smoke runs it |
+| M1-T21 wire PL-05 | M1-T04 lock | order | none: integration: the smoke runs it |
+| M1-T21 wire PL-05 | M1-T07 universe | order | none: integration: the smoke runs it |
+| M1-T21 wire PL-05 | M1-T08 return loading | order | none: integration: the smoke runs it |
+| M1-T22 wire PL-06 | M1-T21 wire PL-05 | file | none: both write loader/pipeline.py |
+| M1-T22 wire PL-06 | M1-T09 member prices | order | none: integration: the smoke runs it |
+| M1-T23 wire PL-08 | M1-T10 event log | order | none: integration: the smoke runs it |
+| M1-T23 wire PL-08 | M1-T11 worker | order | none: integration: the smoke runs it |
+| M1-T23 wire PL-08 | M1-T12 Sharadar fetch | order | none: integration: the smoke runs it |
+| M1-T23 wire PL-08 | M1-T13 raw store | order | none: integration: the smoke runs it |
+| M1-T23 wire PL-08 | M1-T14 clean tables | order | none: integration: the smoke runs it |
+| M1-T23 wire PL-08 | M1-T15 EODHD fetch | order | none: integration: the smoke runs it |
+| M1-T23 wire PL-08 | M1-T16 consistency | order | none: integration: the smoke runs it |
+| M1-T23 wire PL-08 | M1-T17 cross-check | order | none: integration: the smoke runs it |
+| M1-T23 wire PL-08 | M1-T18 statuses | order | none: integration: the smoke runs it |
+| M1-T23 wire PL-08 | M1-T19 snapshot writing | order | none: integration: the smoke runs it |
+| M1-T24 wire PL-11 | M1-T23 wire PL-08 | file | none: both write pipeline.py |
+| M1-T25 system | M1-T20 wire PL-07 | order | none: integration: the real writer runs PL-07 |
+| M1-T25 system | M1-T22 wire PL-06 | order | none: integration: the smokes run PL-05 and PL-06 |
+| M1-T25 system | M1-T24 wire PL-11 | file | none: swaps the doubles in the entry M1-T23 and M1-T24 wrote |
+
+## Risks
+| Risk | Impact | Mitigation |
+|---|---|---|
+| PB-01 waived: Sharadar may lack daily `added`/`removed` events, delisted prices or acquisition values on the researcher&#x27;s key | `ingest.CleanTables`, `clean_tables` and AD-04/AD-06 need a replan after code exists | M3&#x27;s first real build runs PB-01&#x27;s checks first; fixtures here follow the documented shapes |
+| PB-02 waived: EODHD coverage may be under 50% of member-days | DATA-06 fails; AD-05 switches to Tiingo | Cross-check sits behind the source boundary; M3 runs PB-02&#x27;s checks before relying on it |
+| Fixtures drift from the real payloads | Tests pass, real runs fail | Fixtures derive from the probes&#x27; public samples; M3 records real samples and Replans if they differ |
+
+## Open questions
+- DATA-06 and QR-02 are Deferred to M3 because both need the real APIs (waived probes).
+- No installed skill owns an M1 step; `data-analysis` arrives with M3&#x27;s EDA.
+
+## Replan notes
+</pre><div class="hook">⛔ hook PostToolUse:Write blocked: dt lint found problems in tasks/plan.md:
+tasks/plan.md:274: verify-smoke M1-T25 Verify lacks PL-01&#x27;s smoke command `the researcher starts a full build or update from the app or command line --smoke`
+1 error, 0 warnings</div><details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-8/quant-all-at-once/with_skill/project/tasks/plan.md&quot;,
+  &quot;content&quot;: &quot;# M1: Data skeleton — Plan\n\n**Milestone:** M1 · **Status:** Draft · **Base:** — · **Last updated:** 2026-10-17 · **Roadmap:** [../docs/roadmap.md](../docs/roadmap.md)\n\n## Scope\n**Exit:** `python -m qrp_ingest build --smoke`, `python -m qrp_ingest explain --smoke` and the three `qrp_data` smokes run end to end on recorded Sharadar and EODHD fixtures with the real data writer; TC-01–TC-11, TC-13, TC-14 and TC-16 pass.\n**Covers:** LOAD-01–LOAD-06, DATA-01–DATA-05, INGST-01, INGST-04–INGST-06, VALID-01–VALID-07, RUNS-04–RUNS-06, HOLD-01, QR-01, QR-05, QR-07 · **Deferred:** DATA-06 (to M3: cross-check coverage needs the real EODHD run; PB-02 waived), QR-02 (to M3: full-build timing needs the real bulk download; PB-01 waived)\n**Skills:** none (no installed skill owns an M1 step)\n\nPB-01 and PB-02 are waived: the sources are built and tested against recorded fixtures shaped like the probes&#x27; public samples. Their real-data checks run at M3&#x27;s first real build; a failure there replans this milestone&#x27;s `ingest.CleanTables` and `clean_tables`.\n\n## Phase 0: Interface\n\n### M1-T01: data interface\n**Package:** data · **Step:** contract · **Kind:** interface · **Covers:** — · **Size:** S · **Mode:** solo\n**Skills:** —\n**Read:** PL-05, PL-06, PL-07, data.SecurityId, data.SnapshotRef, data.Provenance, data.DelistingDefaults, data.Panel, data.PricePanel, data.Universe, data.SecurityInfo, data.Preregistration, data.Unlock, data.SnapshotWriter, data.load_returns, data.load_prices, data.load_universe, data.security_info\n**Acceptance:**\n- [ ] Each type is code in `qrp_data/types.py` (pandera schemas for the frames); each `tests/contracts/data.&lt;Type&gt;/` sample validates\n- [ ] Every PL-05–PL-07 step imports with its contract signature, body `raise NotImplementedError(\&quot;&lt;its task&gt;\&quot;)`; `__init__.py` exports the contract\n- [ ] The `data.SnapshotWriter` replay double and the `data.load_*` / `data.security_info` fakes serve their fixtures\n**Verify:** `pytest tests/contracts` · `scripts/check.sh gate --pkg data`\n**Depends on:** — · **Writes:** packages/data/src/qrp_data/**, packages/data/pyproject.toml, tests/contracts/data.*/**\n\n### M1-T02: ingest interface\n**Package:** ingest · **Step:** contract · **Kind:** interface · **Covers:** — · **Size:** S · **Mode:** solo\n**Skills:** —\n**Read:** PL-08, PL-11, ingest.RunKind, ingest.RunHandle, ingest.RunEvent, ingest.EventSink, ingest.RawFetch, ingest.CleanTables, ingest.ValidationItem, ingest.ValidationReport, ingest.start_run, PB-01:samples, PB-02:samples\n**Acceptance:**\n- [ ] Each type is code in `qrp_ingest/types.py`; each `tests/contracts/ingest.&lt;Type&gt;/` sample validates; `RawFetch` samples are derived from the PB-01 and PB-02 sample shapes\n- [ ] Every PL-08 and PL-11 step imports with its contract signature, body `raise NotImplementedError(\&quot;&lt;its task&gt;\&quot;)`; `__main__.py` dispatches `build`, `update`, `validate` and `explain`\n- [ ] Fixture-backed fake Sharadar and EODHD servers (base URL from the environment) and the `ingest.EventSink` replay double serve their fixtures\n**Verify:** `pytest tests/contracts` · `scripts/check.sh gate --pkg ingest`\n**Depends on:** — · **Writes:** packages/ingest/src/qrp_ingest/**, packages/ingest/pyproject.toml, tests/contracts/ingest.*/**\n\n## Phase 1: Step spines\n\n### M1-T03: Snapshot store spine\n**Package:** data · **Step:** PL-07.commit_snapshot · **Kind:** spine · **Covers:** INGST-04, QR-05 · **Size:** XS · **Mode:** solo\n**Reason:** `check_tables`, `open_snapshot` and `commit_snapshot` share store/snapshot.py\n**Skills:** —\n**Read:** PL-05, PL-07, INGST-04, data.SnapshotRef, data.Provenance\n**Acceptance:**\n- [ ] Staged sample tables pass `check_tables`; `commit_snapshot` writes the manifest with table hashes and renames atomically; `open_snapshot` refuses an unvalidated snapshot\n**Verify:** `pytest tests/unit/data -k snapshot` · `scripts/check.sh gate --pkg data`\n**Depends on:** M1-T01 · **Writes:** packages/data/src/qrp_data/store/snapshot.py, tests/unit/data/test_snapshot.py\n\n### M1-T04: Held-out lock\n**Package:** data · **Step:** PL-05.check_lock · **Kind:** thicken · **Covers:** LOAD-05, HOLD-01 · **Size:** XS · **Mode:** split\n**Reason:** fold: `check_lock` and `set_lock` share lock/lock.py; TC-05 pins the whole behaviour\n**Skills:** —\n**Read:** PL-05, TC-05, HOLD-01, LOAD-05, data.set_lock, data.Provenance, data.Unlock\n**Acceptance:**\n- [ ] TC-05 passes: lock start 2023-10-17; a load ending 2023-10-16 succeeds; ending 2023-10-17 raises `HeldOutError`, or succeeds with an S2 unlock\n**Verify:** `pytest tests/intent/data tests/unit/data -k lock` · `scripts/check.sh gate --pkg data`\n**Depends on:** M1-T01 · **Writes:** packages/data/src/qrp_data/lock/lock.py, tests/intent/data/test_lock.py, tests/unit/data/test_lock.py\n\n### M1-T05: Trading-session check\n**Package:** data · **Step:** PL-07.check_sessions · **Kind:** thicken · **Covers:** DATA-05 · **Size:** XS · **Mode:** split\n**Reason:** fold: rejecting non-session dates is the step&#x27;s whole behaviour; TC-06 pins it\n**Skills:** —\n**Read:** PL-07, TC-06, DATA-05, data.trading_days, data.SnapshotRef\n**Acceptance:**\n- [ ] TC-06 passes: a price on 2012-10-29 fails, naming the date; without it the check passes\n**Verify:** `pytest tests/intent/data tests/unit/data -k sessions` · `scripts/check.sh gate --pkg data`\n**Depends on:** M1-T01 · **Writes:** packages/data/src/qrp_data/calendar.py, tests/intent/data/test_sessions.py, tests/unit/data/test_sessions.py\n\n### M1-T06: Total returns from unadjusted prices\n**Package:** data · **Step:** PL-07.compute_returns · **Kind:** thicken · **Covers:** LOAD-02, LOAD-04 · **Size:** XS · **Mode:** split\n**Reason:** fold: AD-06&#x27;s formula is the step&#x27;s whole behaviour; TC-01 and TC-03 pin it\n**Skills:** —\n**Read:** PL-07, TC-01, TC-03, AD-06, data.Panel, data.SnapshotRef\n**Acceptance:**\n- [ ] TC-01 passes: returns NaN, 0.02, 0.01, 0.01 across the split and dividend\n- [ ] TC-03&#x27;s default branch passes: −0.30 (assumed), +0.20 (acquisition), 0.00 (assumed) on the first session after the last trade\n**Verify:** `pytest tests/intent/data tests/unit/data -k compute_returns` · `scripts/check.sh gate --pkg data`\n**Depends on:** M1-T01 · **Writes:** packages/data/src/qrp_data/loader/build.py, tests/intent/data/test_compute_returns.py, tests/unit/data/test_compute_returns.py\n\n### M1-T07: Point-in-time universe\n**Package:** data · **Step:** PL-05.read_universe · **Kind:** thicken · **Covers:** LOAD-01, DATA-02, DATA-04 · **Size:** XS · **Mode:** split\n**Reason:** fold: expanding membership spans per session is the step&#x27;s whole behaviour; TC-04 pins it\n**Skills:** —\n**Read:** PL-05, TC-04, LOAD-01, data.Universe, data.SnapshotRef\n**Acceptance:**\n- [ ] TC-04&#x27;s universe part passes: 2010-06-01 → [101, 102]; 2013-06-03 → [102]; each row carries the ticker as of that day\n**Verify:** `pytest tests/intent/data tests/unit/data -k universe` · `scripts/check.sh gate --pkg data`\n**Depends on:** M1-T01 · **Writes:** packages/data/src/qrp_data/loader/universe.py, tests/intent/data/test_universe.py, tests/unit/data/test_universe.py\n\n### M1-T08: Return loading with delisting defaults\n**Package:** data · **Step:** PL-05.read_returns · **Kind:** thicken · **Covers:** LOAD-04, LOAD-06 · **Size:** XS · **Mode:** split\n**Reason:** fold: masking non-members and applying `DelistingDefaults` are the step&#x27;s whole behaviour\n**Skills:** —\n**Read:** PL-05, TC-03, TC-04, LOAD-04, LOAD-06, data.Panel, data.Universe, data.DelistingDefaults, data.Provenance\n**Acceptance:**\n- [ ] TC-03&#x27;s override passes: with `DelistingDefaults(performance=-0.5)` the bankruptcy is −0.50; assumed ones listed in `attrs[\&quot;assumed_delisting\&quot;]`\n- [ ] TC-04&#x27;s return part passes: 102 on 2011-03-15 is NaN, never 0; the panel carries its `Provenance`\n**Verify:** `pytest tests/intent/data tests/unit/data -k read_returns` · `scripts/check.sh gate --pkg data`\n**Depends on:** M1-T01 · **Writes:** packages/data/src/qrp_data/loader/returns.py, tests/intent/data/test_read_returns.py, tests/unit/data/test_read_returns.py\n\n### M1-T09: Member-only prices\n**Package:** data · **Step:** PL-06.read_prices · **Kind:** thicken · **Covers:** LOAD-01 · **Size:** XS · **Mode:** split\n**Reason:** fold: filtering prices to member rows is the step&#x27;s whole behaviour; TC-07 pins it\n**Skills:** —\n**Read:** PL-06, TC-07, data.PricePanel, data.Universe\n**Acceptance:**\n- [ ] TC-07 passes: security 101&#x27;s prices run 2012-06-01 to 2012-06-28, none after its removal\n**Verify:** `pytest tests/intent/data tests/unit/data -k read_prices` · `scripts/check.sh gate --pkg data`\n**Depends on:** M1-T01 · **Writes:** packages/data/src/qrp_data/loader/prices.py, tests/intent/data/test_read_prices.py, tests/unit/data/test_read_prices.py\n\n### M1-T10: Run event log spine\n**Package:** ingest · **Step:** PL-08.open_run · **Kind:** spine · **Covers:** RUNS-04 · **Size:** XS · **Mode:** solo\n**Reason:** `open_run`, `close_run` and the `EventSink` over `meta.sqlite` share runs/events.py\n**Skills:** —\n**Read:** PL-08, ingest.EventSink, ingest.RunEvent\n**Acceptance:**\n- [ ] `open_run` gives an `EventSink` whose events have increasing `seq`; `close_run` writes exactly one terminal `done` event; events validate as `ingest.RunEvent`\n**Verify:** `pytest tests/unit/ingest -k events` · `scripts/check.sh gate --pkg ingest`\n**Depends on:** M1-T02 · **Writes:** packages/ingest/src/qrp_ingest/runs/events.py, tests/unit/ingest/test_events.py\n\n### M1-T11: Worker runs with cancel\n**Package:** ingest · **Step:** PL-08.open_run · **Kind:** thicken · **Covers:** RUNS-05, RUNS-06 · **Size:** S · **Mode:** split\n**Reason:** the worker process lives in its own module (runs/worker.py) beside the event log\n**Skills:** —\n**Read:** PL-08, RUNS-04, RUNS-05, RUNS-06, ingest.start_run, ingest.cancel_run, ingest.run_events, ingest.active_run, ingest.RunHandle\n**Acceptance:**\n- [ ] Given a running worker, when a second data-changing run starts, then `RunActive` names the first\n- [ ] Given a running worker, when cancelled, then it stops within 10 s with a `cancelled` event; the caller exiting doesn&#x27;t stop it\n**Verify:** `pytest tests/intent/ingest tests/unit/ingest -k worker` · `scripts/check.sh gate --pkg ingest`\n**Depends on:** M1-T02 · **Writes:** packages/ingest/src/qrp_ingest/runs/worker.py, tests/intent/ingest/test_worker.py, tests/unit/ingest/test_worker.py\n\n### M1-T12: Sharadar bulk fetch\n**Package:** ingest · **Step:** PL-08.fetch_sharadar · **Kind:** thicken · **Covers:** INGST-01, DATA-01, DATA-03, QR-07 · **Size:** S · **Mode:** split\n**Reason:** fold: the bulk-file download against the fake server and key handling are the step&#x27;s whole behaviour\n**Skills:** —\n**Read:** PL-08, INGST-01, QR-07, AD-04, ingest.RawFetch, ingest.EventSink, PB-01:probe.py:c8_bulk, PB-01:samples\n**Acceptance:**\n- [ ] Given the fake Sharadar server, when fetched, then the four tables land in a temp folder via the `years=full` redirect, with progress events at least every 2 s\n- [ ] Given a missing or rejected key, when fetching, then `CredentialError` is raised before any download and no log line contains the key\n**Verify:** `pytest tests/intent/ingest tests/unit/ingest -k sharadar` · `scripts/check.sh gate --pkg ingest`\n**Depends on:** M1-T02 · **Writes:** packages/ingest/src/qrp_ingest/sources/sharadar.py, packages/ingest/src/qrp_ingest/sources/http.py, tests/intent/ingest/test_sharadar.py, tests/unit/ingest/test_sharadar.py\n\n### M1-T13: Raw store spine\n**Package:** ingest · **Step:** PL-08.store_raw · **Kind:** spine · **Covers:** INGST-05, INGST-06 · **Size:** XS · **Mode:** solo\n**Skills:** —\n**Read:** PL-08, INGST-06, ingest.RawFetch\n**Acceptance:**\n- [ ] `store_raw` moves the `ingest.RawFetch` sample&#x27;s files under `raw/&lt;source&gt;/&lt;fetch-id&gt;/`, records their hashes and makes them read-only\n**Verify:** `pytest tests/unit/ingest -k raw_store` · `scripts/check.sh gate --pkg ingest`\n**Depends on:** M1-T02 · **Writes:** packages/ingest/src/qrp_ingest/raw/store.py, tests/unit/ingest/test_raw_store.py\n\n### M1-T14: Clean tables keyed by permanent id\n**Package:** ingest · **Step:** PL-08.clean_tables · **Kind:** thicken · **Covers:** INGST-01, DATA-01–DATA-04 · **Size:** S · **Mode:** split\n**Reason:** fold: ticker mapping, membership spans and un-split-adjusted dividends are the step&#x27;s whole behaviour; TC-08, TC-09 pin it\n**Skills:** —\n**Read:** PL-08, TC-08, TC-09, AD-06, ingest.CleanTables, ingest.RawFetch, PB-01:probe.py:c4_mapping, PB-01:probe.py:membership\n**Acceptance:**\n- [ ] TC-08 passes: the 0.25 dividend before a 4-for-1 split becomes 1.00; later dividends unchanged\n- [ ] TC-09 passes: `ABC1` and the new `ABC` are two ids with no overlap; `XYZ`/`XYQ` is one continuous id\n**Verify:** `pytest tests/intent/ingest tests/unit/ingest -k clean` · `scripts/check.sh gate --pkg ingest`\n**Depends on:** M1-T02 · **Writes:** packages/ingest/src/qrp_ingest/clean/tables.py, tests/intent/ingest/test_clean.py, tests/unit/ingest/test_clean.py\n\n### M1-T15: EODHD cross-check fetch\n**Package:** ingest · **Step:** PL-08.fetch_crosscheck · **Kind:** thicken · **Covers:** INGST-05, QR-01 · **Size:** XS · **Mode:** split\n**Reason:** fold: per-symbol fetches that skip finished symbols are the step&#x27;s whole behaviour\n**Skills:** —\n**Read:** PL-08, INGST-05, AD-05, ingest.RawFetch, ingest.CleanTables, PB-02:probe.py:fetch, PB-02:samples\n**Acceptance:**\n- [ ] Given the fake EODHD server and 3 matched symbols, when fetched twice, then the second run makes no calls for finished symbols and the call count is recorded\n**Verify:** `pytest tests/intent/ingest tests/unit/ingest -k eodhd` · `scripts/check.sh gate --pkg ingest`\n**Depends on:** M1-T02 · **Writes:** packages/ingest/src/qrp_ingest/sources/eodhd.py, tests/intent/ingest/test_eodhd.py, tests/unit/ingest/test_eodhd.py\n\n### M1-T16: Consistency checks\n**Package:** ingest · **Step:** PL-08.check_consistency · **Kind:** thicken · **Covers:** VALID-01–VALID-03 · **Size:** XS · **Mode:** split\n**Reason:** fold: the checks are the step&#x27;s whole behaviour; TC-10 pins them\n**Skills:** —\n**Read:** PL-08, TC-10, ingest.CleanTables, ingest.ValidationReport, ingest.ValidationItem\n**Acceptance:**\n- [ ] TC-10 passes: exactly duplicate, coverage and jump items; the split day is not flagged\n**Verify:** `pytest tests/intent/ingest tests/unit/ingest -k consistency` · `scripts/check.sh gate --pkg ingest`\n**Depends on:** M1-T02 · **Writes:** packages/ingest/src/qrp_ingest/validate/consistency.py, tests/intent/ingest/test_consistency.py, tests/unit/ingest/test_consistency.py\n\n### M1-T17: Cross-check against the second source\n**Package:** ingest · **Step:** PL-08.cross_check · **Kind:** thicken · **Covers:** VALID-04, VALID-05, VALID-07 · **Size:** XS · **Mode:** split\n**Reason:** fold: rebuilt-return and close comparisons are the step&#x27;s whole behaviour; TC-11 pins them\n**Skills:** —\n**Read:** PL-08, TC-11, AD-05, ingest.CleanTables, ingest.RawFetch, ingest.ValidationReport, PB-02:probe.py:checks\n**Acceptance:**\n- [ ] TC-11 passes: 1 return item, 4 close items, security 4 not checkable, overlap 0.8\n**Verify:** `pytest tests/intent/ingest tests/unit/ingest -k crosscheck` · `scripts/check.sh gate --pkg ingest`\n**Depends on:** M1-T02 · **Writes:** packages/ingest/src/qrp_ingest/validate/crosscheck.py, tests/intent/ingest/test_crosscheck.py, tests/unit/ingest/test_crosscheck.py\n\n### M1-T18: Validation item statuses\n**Package:** ingest · **Step:** PL-08.apply_explanations · **Kind:** thicken · **Covers:** VALID-06 · **Size:** XS · **Mode:** split\n**Reason:** fold: `apply_explanations` and `record_explanation` share validate/status.py; carrying statuses by fingerprint is the behaviour\n**Skills:** —\n**Read:** PL-08, PL-11, VALID-06, ingest.ValidationReport, ingest.ValidationItem, ingest.explain_item\n**Acceptance:**\n- [ ] Given an item explained in snapshot 1, when it recurs in snapshot 2, then it carries the same status and reason; `usable` is true only with no unexplained item\n**Verify:** `pytest tests/intent/ingest tests/unit/ingest -k status` · `scripts/check.sh gate --pkg ingest`\n**Depends on:** M1-T02 · **Writes:** packages/ingest/src/qrp_ingest/validate/status.py, tests/intent/ingest/test_status.py, tests/unit/ingest/test_status.py\n\n### M1-T19: Snapshot writing spine\n**Package:** ingest · **Step:** PL-08.write_snapshot · **Kind:** spine · **Covers:** INGST-04, HOLD-01 · **Size:** XS · **Mode:** solo\n**Reason:** `current_snapshot`, `write_snapshot`, `mark_validated` and `lock_if_first` share snapshot/write.py\n**Skills:** —\n**Read:** PL-08, PL-11, data.SnapshotWriter, data.set_lock, data.SnapshotRef, ingest.CleanTables, ingest.ValidationReport\n**Acceptance:**\n- [ ] On the `data.SnapshotWriter` replay double, `write_snapshot` writes each table, the report and finalizes; a cancel calls `abort`; `lock_if_first` calls `set_lock` only for the first usable snapshot\n**Verify:** `pytest tests/unit/ingest -k write_snapshot` · `scripts/check.sh gate --pkg ingest`\n**Depends on:** M1-T02 · **Writes:** packages/ingest/src/qrp_ingest/snapshot/write.py, tests/unit/ingest/test_write_snapshot.py\n\n## Phase 2: Wiring and thicken\n\n### M1-T20: Wire PL-07\n**Package:** data · **Step:** PL-07 · **Kind:** wiring · **Covers:** INGST-04, QR-05 · **Size:** XS · **Mode:** solo\n**Skills:** —\n**Read:** PL-07, TC-02\n**Acceptance:**\n- [ ] `python -m qrp_data finalize --smoke` stages and commits a synthetic snapshot; committed as PL-07&#x27;s smoke test\n- [ ] TC-02 passes: a split recorded after snapshot 1 leaves snapshot 1&#x27;s returns identical\n**Verify:** `python -m qrp_data finalize --smoke` · `scripts/check.sh gate --pkg data`\n**Depends on:** M1-T03, M1-T05, M1-T06 · **Writes:** packages/data/src/qrp_data/store/pipeline.py, tests/unit/data/test_pl07_smoke.py\n\n### M1-T21: Wire PL-05\n**Package:** data · **Step:** PL-05 · **Kind:** wiring · **Covers:** LOAD-01–LOAD-06 · **Size:** XS · **Mode:** solo\n**Skills:** —\n**Read:** PL-05\n**Acceptance:**\n- [ ] `python -m qrp_data load-returns --smoke` loads returns from a synthetic validated snapshot; committed as PL-05&#x27;s smoke test\n**Verify:** `python -m qrp_data load-returns --smoke` · `scripts/check.sh gate --pkg data`\n**Depends on:** M1-T03, M1-T04, M1-T07, M1-T08 · **Writes:** packages/data/src/qrp_data/loader/pipeline.py, tests/unit/data/test_pl05_smoke.py\n\n### M1-T22: Wire PL-06\n**Package:** data · **Step:** PL-06 · **Kind:** wiring · **Covers:** LOAD-01 · **Size:** XS · **Mode:** solo\n**Skills:** —\n**Read:** PL-06\n**Acceptance:**\n- [ ] `python -m qrp_data load-prices --smoke` loads member prices from a synthetic snapshot; committed as PL-06&#x27;s smoke test\n- [ ] PL-05, PL-06 and PL-07 pre-build sections replaced by a `dt layout` pointer\n**Verify:** `python -m qrp_data load-prices --smoke` · `scripts/check.sh gate --pkg data`\n**Depends on:** M1-T21, M1-T09 · **Writes:** packages/data/src/qrp_data/loader/pipeline.py, tests/unit/data/test_pl06_smoke.py\n\n### M1-T23: Wire PL-08\n**Package:** ingest · **Step:** PL-08 · **Kind:** wiring · **Covers:** INGST-01, INGST-05, RUNS-04 · **Size:** S · **Mode:** solo\n**Skills:** —\n**Read:** PL-08, TC-13, data.SnapshotWriter\n**Acceptance:**\n- [ ] `python -m qrp_ingest build --smoke` runs all eleven steps on the fake servers and the `data.SnapshotWriter` replay double; committed as PL-08&#x27;s smoke test\n- [ ] TC-13 passes: a build stopped after security 3 resumes to the same tables without refetching\n**Verify:** `python -m qrp_ingest build --smoke` · `scripts/check.sh gate --pkg ingest`\n**Depends on:** M1-T10, M1-T11, M1-T12, M1-T13, M1-T14, M1-T15, M1-T16, M1-T17, M1-T18, M1-T19 · **Writes:** packages/ingest/src/qrp_ingest/pipeline.py, tests/unit/ingest/test_pl08_smoke.py\n\n### M1-T24: Wire PL-11\n**Package:** ingest · **Step:** PL-11 · **Kind:** wiring · **Covers:** VALID-06 · **Size:** XS · **Mode:** solo\n**Skills:** —\n**Read:** PL-11\n**Acceptance:**\n- [ ] `python -m qrp_ingest explain --smoke` explains the last open item of a smoke snapshot and marks it validated; committed as PL-11&#x27;s smoke test\n- [ ] PL-08 and PL-11 pre-build sections replaced by a `dt layout` pointer\n**Verify:** `python -m qrp_ingest explain --smoke` · `scripts/check.sh gate --pkg ingest`\n**Depends on:** M1-T23 · **Writes:** packages/ingest/src/qrp_ingest/pipeline.py, tests/unit/ingest/test_pl11_smoke.py\n\n### Checkpoint after M1-T24\n- [ ] Every pipeline in the milestone runs end to end (smoke commands)\n- [ ] All golden cases pass\n- [ ] Entry functions still read top to bottom as the step table says (Sync if not)\n- [ ] No new abstraction without a second implementation or an AD\n- [ ] contract.md matches the contract code (`dt status` freshness check)\n- [ ] `dt layout` output reviewed; Definition of Done holds\n- [ ] `scripts/check.sh full` passes; Review checklist done; every finding has a disposition\n\n## Phase 3: System\n\n### M1-T25: PL-01 on the real data writer\n**Package:** ingest · **Step:** PL-01 · **Kind:** system · **Covers:** INGST-04, HOLD-01, RUNS-06 · **Size:** XS · **Mode:** solo\n**Reason:** system task\n**Skills:** —\n**Read:** PL-01, PL-07, PL-08, PL-11, TC-02, TC-13, TC-14, TC-16, data.SnapshotWriter, data.set_lock\n**Acceptance:**\n- [ ] PL-08 and PL-11 call the real `data.SnapshotWriter` and `data.set_lock`; the replay doubles stay for the contract tests\n- [ ] TC-14 and TC-16 pass on the real chain: a cancelled build keeps snapshot 1 current; explaining the last item sets the lock to 2023-10-17 once\n- [ ] All five smoke commands pass\n**Verify:** `python -m qrp_ingest build --smoke` · `python -m qrp_ingest explain --smoke` · `python -m qrp_data finalize --smoke` · `python -m qrp_data load-returns --smoke` · `python -m qrp_data load-prices --smoke` · `scripts/check.sh gate --pkg ingest`\n**Depends on:** M1-T20, M1-T22, M1-T24 · **Writes:** packages/ingest/src/qrp_ingest/pipeline.py\n\n### Checkpoint: milestone exit\n- [ ] Every pipeline in the milestone runs end to end (smoke commands)\n- [ ] All golden cases pass\n- [ ] Entry functions still read top to bottom as the step table says (Sync if not)\n- [ ] No new abstraction without a second implementation or an AD\n- [ ] contract.md matches the contract code (`dt status` freshness check)\n- [ ] `dt layout` output reviewed; Definition of Done holds\n- [ ] `scripts/check.sh full --exit` passes; Review checklist done; every finding has a disposition\n- [ ] The Scope&#x27;s Exit holds\n\n## Dependency graph\n| From | To | Kind | Mitigated by |\n|---|---|---|---|\n| M1-T08 return loading | M1-T07 universe | data | data.Universe sample (M1-T01) |\n| M1-T14 clean tables | M1-T12 Sharadar fetch | data | ingest.RawFetch sample (M1-T02) |\n| M1-T16 consistency | M1-T14 clean tables | data | ingest.CleanTables sample (M1-T02) |\n| M1-T17 cross-check | M1-T15 EODHD fetch | data | ingest.RawFetch sample (M1-T02) |\n| M1-T19 snapshot writing | M1-T03 snapshot store | call | data.SnapshotWriter replay double (M1-T01) |\n| M1-T20 wire PL-07 | M1-T03 snapshot store | order | none: integration: the smoke runs it |\n| M1-T20 wire PL-07 | M1-T05 sessions | order | none: integration: the smoke runs it |\n| M1-T20 wire PL-07 | M1-T06 compute returns | order | none: integration: the smoke runs it |\n| M1-T21 wire PL-05 | M1-T03 snapshot store | order | none: integration: the smoke runs it |\n| M1-T21 wire PL-05 | M1-T04 lock | order | none: integration: the smoke runs it |\n| M1-T21 wire PL-05 | M1-T07 universe | order | none: integration: the smoke runs it |\n| M1-T21 wire PL-05 | M1-T08 return loading | order | none: integration: the smoke runs it |\n| M1-T22 wire PL-06 | M1-T21 wire PL-05 | file | none: both write loader/pipeline.py |\n| M1-T22 wire PL-06 | M1-T09 member prices | order | none: integration: the smoke runs it |\n| M1-T23 wire PL-08 | M1-T10 event log | order | none: integration: the smoke runs it |\n| M1-T23 wire PL-08 | M1-T11 worker | order | none: integration: the smoke runs it |\n| M1-T23 wire PL-08 | M1-T12 Sharadar fetch | order | none: integration: the smoke runs it |\n| M1-T23 wire PL-08 | M1-T13 raw store | order | none: integration: the smoke runs it |\n| M1-T23 wire PL-08 | M1-T14 clean tables | order | none: integration: the smoke runs it |\n| M1-T23 wire PL-08 | M1-T15 EODHD fetch | order | none: integration: the smoke runs it |\n| M1-T23 wire PL-08 | M1-T16 consistency | order | none: integration: the smoke runs it |\n| M1-T23 wire PL-08 | M1-T17 cross-check | order | none: integration: the smoke runs it |\n| M1-T23 wire PL-08 | M1-T18 statuses | order | none: integration: the smoke runs it |\n| M1-T23 wire PL-08 | M1-T19 snapshot writing | order | none: integration: the smoke runs it |\n| M1-T24 wire PL-11 | M1-T23 wire PL-08 | file | none: both write pipeline.py |\n| M1-T25 system | M1-T20 wire PL-07 | order | none: integration: the real writer runs PL-07 |\n| M1-T25 system | M1-T22 wire PL-06 | order | none: integration: the smokes run PL-05 and PL-06 |\n| M1-T25 system | M1-T24 wire PL-11 | file | none: swaps the doubles in the entry M1-T23 and M1-T24 wrote |\n\n## Risks\n| Risk | Impact | Mitigation |\n|---|---|---|\n| PB-01 waived: Sharadar may lack daily `added`/`removed` events, delisted prices or acquisition values on the researcher&#x27;s key | `ingest.CleanTables`, `clean_tables` and AD-04/AD-06 need a replan after code exists | M3&#x27;s first real build runs PB-01&#x27;s checks first; fixtures here follow the documented shapes |\n| PB-02 waived: EODHD coverage may be under 50% of member-days | DATA-06 fails; AD-05 switches to Tiingo | Cross-check sits behind the source boundary; M3 runs PB-02&#x27;s checks before relying on it |\n| Fixtures drift from the real payloads | Tests pass, real runs fail | Fixtures derive from the probes&#x27; public samples; M3 records real samples and Replans if they differ |\n\n## Open questions\n- DATA-06 and QR-02 are Deferred to M3 because both need the real APIs (waived probes).\n- No installed skill owns an M1 step; `data-analysis` arrives with M3&#x27;s EDA.\n\n## Replan notes\n&quot;
+}</pre><div class="lbl">output</div><pre>File created successfully at: /Users/connorott/plugins/dev-team-workspace/iteration-8/quant-all-at-once/with_skill/project/tasks/plan.md (file state is current in your context — no need to Read it back)</pre></details></div><div class="step" id="SD445"><span class="sid">D445</span><span class="kind">Bash</span>python3 ../plugin/dev-team/scripts/dt.py lint tasks/ 2&gt;&amp;1 | tail -15<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;python3 ../plugin/dev-team/scripts/dt.py lint tasks/ 2&gt;&amp;1 | tail -15&quot;
+}</pre><div class="lbl">output</div><pre>tasks/plan.md:274: verify-smoke M1-T25 Verify lacks PL-01&#x27;s smoke command `the researcher starts a full build or update from the app or command line --smoke`
+1 error, 0 warnings</pre></details></div><div class="step" id="SD446"><span class="sid">D446</span><span class="kind">Bash</span>sed -i &#x27;&#x27; &#x27;s/^\*\*Package:\*\* ingest · \*\*Step:\*\* PL-01 · \*\*Kind:\*\* system/Package: ingest · Step: PL-08 · Kind: system/; s/^\*\*Reason:\*\* system task$/Reason: system task for PL-01 (its Trigger is prose, so the step is the calling pipeline, PL-08)/&#x27; tasks/plan.md &amp;&amp; python3 ../plugin/dev-team/scripts/dt.py lint tasks/ docs/roadmap.md 2&gt;&amp;1 | tail -4; python3 ../plugin/dev-team/scripts/dt.py status --skill build-planning | grep -vE &quot;^(skills|docs|references_)&quot;<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;sed -i &#x27;&#x27; &#x27;s/^\\*\\*Package:\\*\\* ingest · \\*\\*Step:\\*\\* PL-01 · \\*\\*Kind:\\*\\* system/**Package:** ingest · **Step:** PL-08 · **Kind:** system/; s/^\\*\\*Reason:\\*\\* system task$/**Reason:** system task for PL-01 (its Trigger is prose, so the step is the calling pipeline, PL-08)/&#x27; tasks/plan.md &amp;&amp; python3 ../plugin/dev-team/scripts/dt.py lint tasks/ docs/roadmap.md 2&gt;&amp;1 | tail -4; python3 ../plugin/dev-team/scripts/dt.py status --skill build-planning | grep -vE \&quot;^(skills|docs|references_)\&quot;&quot;
+}</pre><div class="lbl">output</div><pre>docs/roadmap.md:27: roadmap-skill S1 Skills names dataviz: not installed (.claude/skills or the plugin)
+docs/roadmap.md:48: roadmap-skill M2 Skills names dataviz: not installed (.claude/skills or the plugin)
+0 errors, 2 warnings
+skill: build-planning
+mode: blocked
+blocked: waiting for docs/architecture.md approval (Revise in progress)
+next ids: AD-15 PL-43 TC-66 S5 M9 M1-T26
+milestone: M1 Draft
+progress: 0/0
+next_task: none
+blocked_tasks: none
+uncovered: INGST-02, INGST-03, RUNS-01, RUNS-02, RUNS-03
+no_spine: PL-01
+mode_violations: none
+boundaries_unfrozen: none
+draft_pipelines: PL-01
+changed_since_plan: none
+interfaces_changed: none
+probes_blocking: none
+stage_to_cut: none
+pipelines_inferred: none
+milestone_references: PB-01, PB-02
+milestone_skills: none
+stage_unrouted: none
+grow_triggers: ingest: 4 pipelines &gt; 3, models: 7 pipelines &gt; 3, research: 9 pipelines &gt; 3, server: 9 pipelines &gt; 3, web: 6 pipelines &gt; 3
+drift: none
+stale_contracts: none
+queued: M4 (tasks/queued/M4-backtest-factors.md), M5 (tasks/queued/M5-covariance-portfolios.md), M6 (tasks/queued/M6-features-significance.md), M7 (tasks/queued/M7-forecasting.md), M8 (tasks/queued/M8-portfolios-agents-verdict.md)
+base: pending
+critical_path: M1-T02 → M1-T11 → M1-T23 → M1-T24 → M1-T25
+waves: M1-T01, M1-T02 | M1-T03, M1-T04, M1-T05, M1-T06, M1-T07, M1-T08, M1-T09, M1-T10, M1-T11, M1-T12, M1-T13, M1-T14, M1-T15, M1-T16, M1-T17, M1-T18, M1-T19 | M1-T20, M1-T21, M1-T23 | M1-T22, M1-T24 | M1-T25
+width: 17
+parallelism: 5.0
+graph_warning: none</pre></details></div><div class="step" id="SD447"><span class="sid">D447</span><span class="kind">Bash</span>python3 - &lt;&lt;&#x27;EOF&#x27;
+def rep(p, pairs):
+    s=open(p).read()
+    for a,b in pairs:
+        assert a in s,(p,a[:60]); s=s.replace(a,b,1)
+    open(p,&#x27;w&#x27;).write(s)
+rep(&#x27;docs/roadmap.md&#x27;,[
+(&quot;| M1 | S1 | Data skeleton | data, ingest | PL-01, PL-05, PL-06, PL-07, PL-08, PL-11 | — |&quot;,&quot;| M1 | S1 | Data skeleton | data, ingest | PL-05, PL-06, PL-07, PL-08, PL-11 | — |&quot;),
+(&quot;| M2 | S1 | Explorer app | server, web | PL-02, PL-13–PL-27 |&quot;,&quot;| M2 | S1 | Explorer app | server, web | PL-01, PL-02, PL-13–PL-27 |&quot;),
+ …[+3123 chars]<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;python3 - &lt;&lt;&#x27;EOF&#x27;\ndef rep(p, pairs):\n    s=open(p).read()\n    for a,b in pairs:\n        assert a in s,(p,a[:60]); s=s.replace(a,b,1)\n    open(p,&#x27;w&#x27;).write(s)\nrep(&#x27;docs/roadmap.md&#x27;,[\n(\&quot;| M1 | S1 | Data skeleton | data, ingest | PL-01, PL-05, PL-06, PL-07, PL-08, PL-11 | — |\&quot;,\&quot;| M1 | S1 | Data skeleton | data, ingest | PL-05, PL-06, PL-07, PL-08, PL-11 | — |\&quot;),\n(\&quot;| M2 | S1 | Explorer app | server, web | PL-02, PL-13–PL-27 |\&quot;,\&quot;| M2 | S1 | Explorer app | server, web | PL-01, PL-02, PL-13–PL-27 |\&quot;),\n(\&quot;**Outline:** A full build on recorded Sharadar and EODHD fixtures produces a validated, locked snapshot, and the point-in-time loader serves its universe, prices and total returns.\\n**Skills:** —\\n**References:** PB-01, PB-02\\n\&quot;,\n \&quot;**Outline:** A full build on recorded Sharadar and EODHD fixtures produces a validated, locked snapshot, and the point-in-time loader serves its universe, prices and total returns.\\n**Skills:** —\\n**References:** PB-01, PB-02\\n**Exit:** The build, explain and three `qrp_data` smoke commands run on recorded fixtures with the real data writer; TC-01–TC-11, TC-13, TC-14 and TC-16 pass.\\n**Plan:** [../tasks/plan.md](../tasks/plan.md)\\n\&quot;),\n(\&quot;**Outline:** The first full build on the real Sharadar and EODHD APIs, incremental updates with revisions, re-validation, and the exploratory analysis report.\&quot;,\&quot;**Outline:** The first full build on the real Sharadar and EODHD APIs, preceded by the waived PB-01 and PB-02 checks on the researcher&#x27;s keys; incremental updates with revisions, re-validation, and the exploratory analysis report.\&quot;),\n])\nrep(&#x27;tasks/plan.md&#x27;,[\n(\&quot;**Deferred:** DATA-06 (to M3: cross-check coverage needs the real EODHD run; PB-02 waived), QR-02 (to M3: full-build timing needs the real bulk download; PB-01 waived)\&quot;,\n \&quot;**Deferred:** DATA-06 (to M3: cross-check coverage needs the real EODHD run; PB-02 waived), QR-02 (to M3: full-build timing needs the real bulk download; PB-01 waived), INGST-02, INGST-03 (to M3: incremental update and revisions, PL-09), RUNS-01–RUNS-03 (to M2: starting and streaming runs from the app, PL-18, PL-19, PL-26)\&quot;),\n(\&quot;**Reason:** system task for PL-01 (its Trigger is prose, so the step is the calling pipeline, PL-08)\&quot;,\&quot;**Reason:** system task: swaps the `data` doubles in PL-08 and PL-11 for the real writer (PL-01 itself lands in M2 with the app)\&quot;),\n])\nEOF\ncat &gt; AGENTS.md &lt;&lt;&#x27;EOF&#x27;\n## Docs\n- Plan with dev-team2&#x27;s `build-planning`, not agent-skills&#x27; `/plan`.\n- Your task&#x27;s context: `dt context &lt;M#-T##&gt;`. Read only what it prints.\n- Any section by ID: `dt section &lt;ID&gt;...` (e.g. PL-08 TC-11 LOAD-04 AD-06)\n- Package docs: `docs/packages/&lt;pkg&gt;/{architecture,contract,pipelines,tests}.md`\n- Real layout: `dt layout &lt;pkg&gt;` (planned layouts are gone once the wiring lands)\n- Quality bar: CONSTRAINTS.md. Oracle files (tests/fixtures/*/expected.json) need user approval to change.\n- Queued plans for M4–M8 live in `tasks/queued/`; only `tasks/plan.md` is active.\n## Project skills\n- data-analysis — EDA (PL-12), factor and covariance reports (PL-29, PL-30), information gain (PL-34), window building and baselines (PL-36, PL-39)\n- null-hypothesis-testing — every claim through `research.record_claim`: estimators, strategies, features, calibration, forecasters, verdicts\n- frontend-design — the `web` app (PL-21–PL-26)\nEOF\npython3 ../plugin/dev-team/scripts/dt.py roadmap | tail -2; python3 ../plugin/dev-team/scripts/dt.py lint tasks/ docs/roadmap.md AGENTS.md 2&gt;&amp;1 | tail -3; python3 ../plugin/dev-team/scripts/dt.py status --skill build-planning | grep -E \&quot;^mode|blocked|uncovered|no_spine|draft_pipelines|critical|width\&quot;; wc -l tasks/plan.md&quot;
+}</pre><div class="lbl">output</div><pre>M2: Designed → Specced
+roadmap: updated 3
+docs/roadmap.md:27: roadmap-skill S1 Skills names dataviz: not installed (.claude/skills or the plugin)
+docs/roadmap.md:50: roadmap-skill M2 Skills names dataviz: not installed (.claude/skills or the plugin)
+0 errors, 2 warnings
+mode: current
+blocked_tasks: none
+uncovered: none
+no_spine: none
+mode_violations: none
+draft_pipelines: none
+critical_path: M1-T02 → M1-T11 → M1-T23 → M1-T24 → M1-T25
+width: 17
+     339 tasks/plan.md</pre></details></div><div class="step" id="SD448"><span class="sid">D448</span><span class="kind">Bash</span>python3 - &lt;&lt;&#x27;EOF&#x27;
+import re
+s=open(&#x27;tasks/plan.md&#x27;).read()
+out=[&quot;# M1: Data skeleton — Todo&quot;,&quot;&quot;]
+for m in re.finditer(r&quot;### (M1-T\d+): (.+)\n\*\*Package:\*\* (\w+) · .*?\*\*Size:\*\* (\w+) · \*\*Mode:\*\* (\w+)&quot;, s):
+    out.append(f&quot;- [ ] {m.group(1)} {m.group(2)} ({m.group(3)}, {m.group(4)}, {m.group(5)})&quot;)
+open(&#x27;tasks/todo.md&#x27;,&#x27;w&#x27;).write(&quot;\n&quot;.join(out)+&quot;\n&quot;)
+print(len(out)-2)
+EOF
+python3 ../plugin/dev-team/scripts/dt.py lint tasks/ | tail -2; python3 ../plugin/dev-team/scripts/dt.py ready 2&gt;&amp; …[+134 chars]<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;python3 - &lt;&lt;&#x27;EOF&#x27;\nimport re\ns=open(&#x27;tasks/plan.md&#x27;).read()\nout=[\&quot;# M1: Data skeleton — Todo\&quot;,\&quot;\&quot;]\nfor m in re.finditer(r\&quot;### (M1-T\\d+): (.+)\\n\\*\\*Package:\\*\\* (\\w+) · .*?\\*\\*Size:\\*\\* (\\w+) · \\*\\*Mode:\\*\\* (\\w+)\&quot;, s):\n    out.append(f\&quot;- [ ] {m.group(1)} {m.group(2)} ({m.group(3)}, {m.group(4)}, {m.group(5)})\&quot;)\nopen(&#x27;tasks/todo.md&#x27;,&#x27;w&#x27;).write(\&quot;\\n\&quot;.join(out)+\&quot;\\n\&quot;)\nprint(len(out)-2)\nEOF\npython3 ../plugin/dev-team/scripts/dt.py lint tasks/ | tail -2; python3 ../plugin/dev-team/scripts/dt.py ready 2&gt;&amp;1 | head; for t in 01 02 12 14 23 25; do printf \&quot;M1-T$t: \&quot;; python3 ../plugin/dev-team/scripts/dt.py context M1-T$t 2&gt;&amp;1 | wc -l; done&quot;
+}</pre><div class="lbl">output</div><pre>25
+0 errors, 0 warnings
+M1-T01 [interface] data interface · writes: packages/data/src/qrp_data/**, packages/data/pyproject.toml, tests/contracts/data.*/**
+M1-T02 [interface] ingest interface · writes: packages/ingest/src/qrp_ingest/**, packages/ingest/pyproject.toml, tests/contracts/ingest.*/**
+M1-T01:      188
+M1-T02:     1076
+M1-T12:      595
+M1-T14:      189
+M1-T23:      115
+M1-T25:      194</pre></details></div><div class="step" id="SD449"><span class="sid">D449</span><span class="kind">say</span>I&#x27;ve recorded the waiver, updated AD-04 to AD-06, and drafted the M1 plan. Both the architecture update and the plan are Drafts waiting for your approval. Lint shows zero errors, every task&#x27;s context packet resolves (the largest is 1,076 lines, under the 2,000 limit), and only the two interface tasks are ready to start. ⏎ ## Waiver ⏎ - `docs/probes.md`: PB-01 and PB-02 are marked `Waived · 2026-10-17 — the real-data checks move to M3&#x27;s first real build`. ⏎ - Architecture update (Draft): ⏎   - AD-04, AD-05 and AD-06 now cite the waiver in their context, along with what the public checks …[+3024 chars]<details><summary>full text</summary><pre>I&#x27;ve recorded the waiver, updated AD-04 to AD-06, and drafted the M1 plan. Both the architecture update and the plan are Drafts waiting for your approval. Lint shows zero errors, every task&#x27;s context packet resolves (the largest is 1,076 lines, under the 2,000 limit), and only the two interface tasks are ready to start.
+
+## Waiver
+- **`docs/probes.md`:** PB-01 and PB-02 are marked `Waived · 2026-10-17 — the real-data checks move to M3&#x27;s first real build`.
+- **Architecture update (Draft):**
+  - AD-04, AD-05 and AD-06 now cite the waiver in their context, along with what the public checks did confirm, and are Accepted.
+  - Their risk lines stay, reworded to say what gets replanned if M3&#x27;s checks fail: M1&#x27;s `ingest.CleanTables` and `clean_tables`, or a switch to Tiingo.
+  - One new Changelog row records the waiver.
+- **Roadmap:**
+  - M3&#x27;s outline now starts with the PB-01 and PB-02 checks on your keys.
+  - PL-01 (build from the app) moved from M1 to M2, where the app arrives.
+
+## M1 plan: Data skeleton (`tasks/plan.md`, 25 tasks)
+- **Exit:** the build, explain and three `qrp_data` smoke commands run on recorded fixtures with the real data writer, and TC-01 to TC-11, TC-13, TC-14 and TC-16 pass.
+- **Deferred:**
+  - DATA-06 and QR-02 to M3, because they need the real APIs.
+  - INGST-02 and INGST-03 to M3, with incremental updates.
+  - RUNS-01 to RUNS-03 to M2, with the app&#x27;s run control.
+
+| Phase | Tasks |
+|---|---|
+| Interface | T01 `data` (types, step stubs, snapshot-writer stand-in, fakes of the loaders for later packages); T02 `ingest` (types, fake Sharadar and EODHD servers built from the probes&#x27; sample shapes) |
+| `data` steps | T03 snapshot store; T04 held-out lock (TC-05); T05 trading sessions (TC-06); T06 total returns (TC-01, TC-03); T07 point-in-time universe (TC-04); T08 return loading with delisting defaults (TC-03, TC-04); T09 member-only prices (TC-07) |
+| `ingest` steps | T10 run event log; T11 worker runs with cancel; T12 Sharadar bulk fetch (no key ever in logs); T13 raw store; T14 cleaned tables keyed by permanent ID (TC-08, TC-09); T15 EODHD fetch; T16 consistency checks (TC-10); T17 cross-check (TC-11); T18 validation statuses; T19 snapshot writing |
+| Wiring | T20 PL-07 (TC-02); T21 PL-05; T22 PL-06; T23 PL-08 (TC-13); T24 PL-11 |
+| System | T25: PL-08 and PL-11 switched to the real data writer and lock (TC-14, TC-16) |
+
+- **Parallelism:** wave 1 runs 17 tasks at once.
+- **Longest chain:** 5 tasks (T02 → T11 → T23 → T24 → T25).
+- **Also written:**
+  - `tasks/todo.md`, with 25 items.
+  - An `AGENTS.md` doc map, listing the project skills and where they&#x27;re used.
+  - The roadmap&#x27;s M1 Exit and Plan lines.
+
+## Assumptions
+- **Ingest steps sharing a module are planned as one task**, e.g. `apply_explanations` with `record_explanation`.
+- **The system task&#x27;s step is PL-08,** because PL-01 belongs to M2 now.
+- **No installed skill owns an M1 step.**
+
+## Risks (in the plan)
+- **The waived Sharadar checks:** if daily membership events, delisted prices or acquisition values are missing on your key, the cleaning step and its types get replanned.
+- **The waived EODHD checks:** if coverage is under 50% of member-days, AD-05 switches to Tiingo.
+- **Fixtures could drift from the real payloads.** M3 records real samples and replans if they differ.
+
+**Do you approve the architecture update and the M1 plan?** I&#x27;ll commit both on a yes. The next step is `build-setup`: the quality bar (`CONSTRAINTS.md`, tool config, check scripts and agent files) that has to be in place before any code is written.</pre></details></div><div class="step" id="SD450"><span class="sid">D450</span><span class="kind">hook</span><span class="hook">Stop said: {&quot;systemMessage&quot;: &quot;dt lint: 3 problems\ndocs/probes.md:5: probe-large PB-01 is 446 code lines (budget 400, probe_kit.py aside): keep to what the checks need\ndocs/roadmap.md:27: roadmap-skill S1 Skills names dataviz: not installed (.claude/skills or the plugin)\ndocs/roadmap.md:50: roadmap-skill M2 Skills names dataviz: not installed (.claude/skills or the plugin)&quot;}
+</span></div><div class="step" id="SD451"><span class="sid">D451</span><span class="kind">hook</span><span class="hook">SessionStart:resume said: milestone: M1 Data skeleton · plan Draft
+progress: 0/25 · next: M1-T01 data interface
+blocked: none
+queued: M4, M5, M6, M7, M8
+draft (waiting for approval): docs/architecture.md, tasks/plan.md
+dt: python3 /Users/connorott/plugins/dev-team-workspace/iteration-8/quant-all-at-once/with_skill/plugin/dev-team/scripts/dt.py
+</span></div>
+<h2>Commits</h2>
+<p>None.</p>
+<h2>Returned</h2>
+<pre>I&#x27;ve recorded the waiver, updated AD-04 to AD-06, and drafted the M1 plan. Both the architecture update and the plan are Drafts waiting for your approval. Lint shows zero errors, every task&#x27;s context packet resolves (the largest is 1,076 lines, under the 2,000 limit), and only the two interface tasks are ready to start.
+
+## Waiver
+- **`docs/probes.md`:** PB-01 and PB-02 are marked `Waived · 2026-10-17 — the real-data checks move to M3&#x27;s first real build`.
+- **Architecture update (Draft):**
+  - AD-04, AD-05 and AD-06 now cite the waiver in their context, along with what the public checks did confirm, and are Accepted.
+  - Their risk lines stay, reworded to say what gets replanned if M3&#x27;s checks fail: M1&#x27;s `ingest.CleanTables` and `clean_tables`, or a switch to Tiingo.
+  - One new Changelog row records the waiver.
+- **Roadmap:**
+  - M3&#x27;s outline now starts with the PB-01 and PB-02 checks on your keys.
+  - PL-01 (build from the app) moved from M1 to M2, where the app arrives.
+
+## M1 plan: Data skeleton (`tasks/plan.md`, 25 tasks)
+- **Exit:** the build, explain and three `qrp_data` smoke commands run on recorded fixtures with the real data writer, and TC-01 to TC-11, TC-13, TC-14 and TC-16 pass.
+- **Deferred:**
+  - DATA-06 and QR-02 to M3, because they need the real APIs.
+  - INGST-02 and INGST-03 to M3, with incremental updates.
+  - RUNS-01 to RUNS-03 to M2, with the app&#x27;s run control.
+
+| Phase | Tasks |
+|---|---|
+| Interface | T01 `data` (types, step stubs, snapshot-writer stand-in, fakes of the loaders for later packages); T02 `ingest` (types, fake Sharadar and EODHD servers built from the probes&#x27; sample shapes) |
+| `data` steps | T03 snapshot store; T04 held-out lock (TC-05); T05 trading sessions (TC-06); T06 total returns (TC-01, TC-03); T07 point-in-time universe (TC-04); T08 return loading with delisting defaults (TC-03, TC-04); T09 member-only prices (TC-07) |
+| `ingest` steps | T10 run event log; T11 worker runs with cancel; T12 Sharadar bulk fetch (no key ever in logs); T13 raw store; T14 cleaned tables keyed by permanent ID (TC-08, TC-09); T15 EODHD fetch; T16 consistency checks (TC-10); T17 cross-check (TC-11); T18 validation statuses; T19 snapshot writing |
+| Wiring | T20 PL-07 (TC-02); T21 PL-05; T22 PL-06; T23 PL-08 (TC-13); T24 PL-11 |
+| System | T25: PL-08 and PL-11 switched to the real data writer and lock (TC-14, TC-16) |
+
+- **Parallelism:** wave 1 runs 17 tasks at once.
+- **Longest chain:** 5 tasks (T02 → T11 → T23 → T24 → T25).
+- **Also written:**
+  - `tasks/todo.md`, with 25 items.
+  - An `AGENTS.md` doc map, listing the project skills and where they&#x27;re used.
+  - The roadmap&#x27;s M1 Exit and Plan lines.
+
+## Assumptions
+- **Ingest steps sharing a module are planned as one task**, e.g. `apply_explanations` with `record_explanation`.
+- **The system task&#x27;s step is PL-08,** because PL-01 belongs to M2 now.
+- **No installed skill owns an M1 step.**
+
+## Risks (in the plan)
+- **The waived Sharadar checks:** if daily membership events, delisted prices or acquisition values are missing on your key, the cleaning step and its types get replanned.
+- **The waived EODHD checks:** if coverage is under 50% of member-days, AD-05 switches to Tiingo.
+- **Fixtures could drift from the real payloads.** M3 records real samples and replans if they differ.
+
+**Do you approve the architecture update and the M1 plan?** I&#x27;ll commit both on a yes. The next step is `build-setup`: the quality bar (`CONSTRAINTS.md`, tool config, check scripts and agent files) that has to be in place before any code is written.</pre>
+</body></html>

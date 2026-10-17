@@ -1,0 +1,994 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1"><title>T13 turn</title>
+<style>
+:root{--bg:#fbfbfa;--fg:#1d1d1f;--muted:#6b6b70;--line:#d9d9de;--box:#fff;--rowp:#eef3fb;--band:#fff4d6;
+--ok:#2e7d32;--bad:#c62828;--warn:#b26a00;--idle:#6b6b70}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#17171a;--fg:#ececf0;--muted:#9a9aa3;
+--line:#34343a;--box:#222227;--rowp:#1d2433;--band:#3a3015;--ok:#6fcf73;--bad:#ff6b6b;--warn:#f0b35a;--idle:#9a9aa3}}
+:root[data-theme="dark"]{--bg:#17171a;--fg:#ececf0;--muted:#9a9aa3;--line:#34343a;--box:#222227;--rowp:#1d2433;
+--band:#3a3015;--ok:#6fcf73;--bad:#ff6b6b;--warn:#f0b35a;--idle:#9a9aa3}
+body{margin:0;padding:16px;background:var(--bg);color:var(--fg);font:14px/1.45 -apple-system,system-ui,sans-serif}
+h1{font-size:18px;margin:0 0 4px}h2{font-size:15px;margin:22px 0 8px}.sub{color:var(--muted)}
+table{border-collapse:collapse;margin:4px 0 8px}td,th{border-bottom:1px solid var(--line);padding:4px 10px;text-align:left;
+vertical-align:top}th{color:var(--muted);font-weight:600}.chips span{display:inline-block;margin:0 4px 2px 0}
+.legend span{margin-right:14px;white-space:nowrap}.sw{display:inline-block;width:10px;height:10px;border-radius:2px;
+margin-right:4px;vertical-align:-1px}.scroll{overflow:auto;max-height:88vh;border:1px solid var(--line);border-radius:8px}
+.chart{display:grid;width:max-content}.chart>div{line-height:0}.corner{position:sticky;top:0;left:0;z-index:3}
+.colhead{position:sticky;top:0;z-index:2}.rowhead{position:sticky;left:0;z-index:2}
+svg.bg{background:var(--bg)}.colhead svg{border-bottom:1px solid var(--line)}.rowhead svg{border-right:1px solid var(--line)}
+.ok{color:var(--ok);fill:var(--ok)}.bad{color:var(--bad);fill:var(--bad)}.warn{color:var(--warn);fill:var(--warn)}
+.idle{color:var(--idle);fill:var(--idle)}
+svg text{fill:var(--fg);font-family:-apple-system,system-ui,sans-serif}
+.box{fill:var(--box);stroke:var(--line)}.unit:hover .box{stroke:var(--fg)}
+.role{font-size:12px;font-weight:600}.uid,.wmeta,.lmeta,.meta{font-size:10px;fill:var(--muted)}
+.sub{font-size:10.5px;fill:var(--muted)}.badge{font-size:11px;font-weight:600}
+.meta.bad{fill:var(--bad);font-weight:600}.lane{font-size:13px;font-weight:700}.wave{font-size:13px;font-weight:700}
+.par{fill:#4e79a7}.ser{fill:var(--muted)}.rowp{fill:var(--rowp)}.rows{fill:transparent}.band{fill:var(--band)}
+.bandt{font-size:11.5px}.grid{stroke:var(--line)}.link{stroke:var(--muted);stroke-width:1.2;opacity:.55}
+.arrowhead{fill:var(--muted)}.marks{font-size:10.5px}.audit{stroke:var(--box);stroke-width:2}.auditn{font-size:10px;font-weight:700;fill:#fff}
+a{color:inherit}svg a .box{cursor:pointer}
+
+:root{--c0:#2a78d6;--c1:#eb6834;--c2:#1baf7a;--c3:#eda100;--c4:#e87ba4;--c5:#008300;--c6:#6250d6;--c7:#e34948;
+--cx:#8a8985;--main:#52514e;--read:#dcdbd5;--readfg:#1d1d1f}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--c0:#3987e5;--c1:#d95926;--c2:#199e70;
+--c3:#c98500;--c4:#d55181;--c5:#008300;--c6:#9085e9;--c7:#e66767;--cx:#77766f;--main:#c3c2b7;--read:#3b3b40;
+--readfg:#ececf0}}
+:root[data-theme="dark"]{--c0:#3987e5;--c1:#d95926;--c2:#199e70;--c3:#c98500;--c4:#d55181;--c5:#008300;
+--c6:#9085e9;--c7:#e66767;--cx:#77766f;--main:#c3c2b7;--read:#3b3b40;--readfg:#ececf0}
+.c0{fill:var(--c0);background:var(--c0)}.c1{fill:var(--c1);background:var(--c1)}.c2{fill:var(--c2);background:var(--c2)}
+.c3{fill:var(--c3);background:var(--c3)}.c4{fill:var(--c4);background:var(--c4)}.c5{fill:var(--c5);background:var(--c5)}
+.c6{fill:var(--c6);background:var(--c6)}.c7{fill:var(--c7);background:var(--c7)}.cx{fill:var(--cx);background:var(--cx)}
+.cmain{fill:var(--main)}.sc0{stroke:var(--c0)}.sc1{stroke:var(--c1)}.sc2{stroke:var(--c2)}
+.tl text,.sm text,.lc text{font-size:10.5px;fill:var(--muted)}.tl .lbl-in,.sm .lbl-in{fill:#fff;font-size:10.5px;font-weight:600}
+.tl .rowl,.sm .rowl,.lc .rowl{fill:var(--fg);font-size:11.5px;font-weight:600}.tl .band{fill:var(--rowp)}
+.tl .brk{stroke:var(--muted);stroke-dasharray:2 3}.tl a:hover rect,.sm a:hover rect{stroke:var(--fg);stroke-width:1.5}
+.axis{stroke:var(--line)}.sm .val{fill:var(--fg);font-weight:600}.lc path.ln{fill:none;stroke-width:2}
+.lc circle{stroke:var(--bg);stroke-width:2}.lc .end{font-weight:600;fill:var(--fg)}
+.tiles{display:flex;flex-wrap:wrap;gap:10px;margin:12px 0}.tile{border:1px solid var(--line);border-radius:8px;
+padding:8px 12px;min-width:110px;background:var(--box)}.tile b{display:block;font-size:20px;line-height:1.2}
+.tile span{font-size:12px;color:var(--muted)}.tile i{font-style:normal;font-size:12px;margin-left:6px}
+.fm{border-collapse:separate;border-spacing:2px}.fm td,.fm th{border:0;padding:0;text-align:center;font-size:11px}
+.fm th{padding:0 2px;font-weight:600}.fm td.f,.fm th.f{text-align:left;padding-right:10px;white-space:nowrap;
+position:sticky;left:0;background:var(--bg);font:11.5px ui-monospace,Menlo,monospace;
+max-width:380px;overflow:hidden;text-overflow:ellipsis}
+.fm td.cell{min-width:22px;height:20px;border-radius:3px}.fm td.fw{background:var(--c0);color:#fff;font-weight:700}
+.fm td.fe{background:var(--c1);color:#fff;font-weight:700}.fm td.fr{background:var(--read);color:var(--readfg)}
+.fm td.n{color:var(--muted);padding:0 6px}.fm tr.grp td{text-align:left;padding-top:8px;color:var(--muted);
+font-weight:600}
+.key{display:inline-block;min-width:18px;text-align:center;border-radius:3px;font-size:11px;margin-right:4px}
+.bar{display:inline-block;height:9px;border-radius:2px;vertical-align:0}
+
+pre{white-space:pre-wrap;word-break:break-word;background:var(--box);border:1px solid var(--line);border-radius:6px;
+padding:8px 10px;margin:4px 0;font:12px/1.45 ui-monospace,SFMono-Regular,Menlo,monospace;max-width:100%;overflow:auto}
+.step{border-top:1px solid var(--line);padding:6px 0}.step:target{background:var(--rowp)}
+.sid{font:12px ui-monospace,Menlo,monospace;color:var(--muted);margin-right:8px}.kind{font-weight:600;margin-right:8px}
+.err{color:var(--bad);font-weight:600}.hook{color:var(--bad);margin:4px 0 0 16px}.lbl{font-size:12px;color:var(--muted);margin-top:6px}
+details summary{cursor:pointer;color:var(--muted);font-size:12px}.head td:first-child{color:var(--muted)}
+.top{font-size:13px}.narr{list-style:none;padding-left:0}.narr li{margin:3px 0}
+</style></head>
+<body>
+<p class="top"><a href="../flow.html">← the run's flow chart</a></p>
+<p class="top"><a href="../plan/T13.html">The plan as of T13</a>: this turn changed the plan (+28 ~5 −0) · <a href="../plan/index.html">plan map</a></p>
+<h1>T13 · turn · Stay single package. Record it as AD-13, commit, then continue with planning. The M1/M2 cut looks fi</h1>
+<table class="head"><tr><td>Type</td><td>turn</td></tr><tr><td>Description</td><td>Stay single package. Record it as AD-13, commit, then continue with planning. The M1/M2 cut looks fi</td></tr><tr><td>Spawned by</td><td>user</td></tr><tr><td>Model</td><td>claude-opus-5-5</td></tr><tr><td>Start</td><td>2026-10-17 20:41:51 UTC</td></tr><tr><td>Duration</td><td>4 min</td></tr><tr><td>Tool calls</td><td>13</td></tr><tr><td>Errors</td><td>1</td></tr><tr><td>Hook blocks</td><td>1</td></tr><tr><td>Tokens</td><td>25.9k out · 40.7k new in · 3.2M cached in · peak context 247k</td></tr><tr><td>Skills invoked</td><td>none</td></tr><tr><td>Files written or edited</td><td>docs/architecture.md, docs/roadmap.md, tasks/plan.md, tasks/todo.md, AGENTS.md</td></tr><tr><td>Definition</td><td>none</td></tr><tr><td>Steps</td><td>20</td></tr><tr><td>Finished</td><td>yes</td></tr></table>
+
+
+<h2>Prompt</h2>
+<pre>Stay single package. Record it as AD-13, commit, then continue with planning. The M1/M2 cut looks fine.</pre>
+<h2>Files</h2>
+<table><tr><th>Op</th><th>File</th><th>Calls</th><th>By</th><th>Via</th><th>Steps</th></tr><tr><td>write</td><td><code>AGENTS.md</code></td><td>1</td><td>main</td><td>Bash</td><td><a href="#D144">D144</a></td></tr><tr><td>write</td><td><code>tasks/plan.md</code></td><td>1</td><td>main</td><td>Write</td><td><a href="#D141">D141</a></td></tr><tr><td>write</td><td><code>tasks/todo.md</code></td><td>1</td><td>main</td><td>Bash</td><td><a href="#D144">D144</a></td></tr><tr><td>edit</td><td><code>docs/architecture.md</code></td><td>1</td><td>main</td><td>Bash</td><td><a href="#D132">D132</a></td></tr><tr><td>edit</td><td><code>docs/roadmap.md</code></td><td>2</td><td>main</td><td>Bash</td><td><a href="#D138">D138</a> <a href="#D139">D139</a></td></tr><tr><td>edit</td><td><code>tasks/plan.md</code></td><td>2</td><td>main</td><td>Bash</td><td><a href="#D142">D142</a> <a href="#D148">D148</a></td></tr><tr><td>read</td><td><code>../plugin/dev-team/skills/build-planning/examples.md</code></td><td>1</td><td>main</td><td>Bash</td><td><a href="#D133">D133</a></td></tr><tr><td>read</td><td><code>../plugin/dev-team/skills/build-planning/references/examples-phase0.md</code></td><td>1</td><td>main</td><td>Bash</td><td><a href="#D134">D134</a></td></tr><tr><td>read</td><td><code>../plugin/dev-team/skills/build-planning/references/tasks.md</code></td><td>1</td><td>main</td><td>Bash</td><td><a href="#D133">D133</a></td></tr><tr><td>read</td><td><code>docs/roadmap.md</code></td><td>1</td><td>main</td><td>Bash</td><td><a href="#D139">D139</a></td></tr><tr><td>read</td><td><code>tasks/plan.md</code></td><td>2</td><td>main</td><td>Bash</td><td><a href="#D144">D144</a> <a href="#D145">D145</a></td></tr></table>
+<h2>Steps</h2>
+<div class="step" id="SD131"><span class="sid">D131</span><span class="kind">user</span>Stay single package. Record it as AD-13, commit, then continue with planning. The M1/M2 cut looks fine.<details><summary>full text</summary><pre>Stay single package. Record it as AD-13, commit, then continue with planning. The M1/M2 cut looks fine.</pre></details></div><div class="step" id="SD132"><span class="sid">D132</span><span class="kind">Bash</span>python3 - &lt;&lt;&#x27;EOF&#x27;
+p=&#x27;docs/architecture.md&#x27;; s=open(p).read()
+i=s.index(&quot;- The contract is about 230 lines&quot;); j=s.index(&quot;\n&quot;,i)+1; s=s[:i]+s[j:]
+s=s.replace(&quot;## Risks and open questions&quot;,&quot;&quot;&quot;### AD-13: Stay a single package through Snake
+Status: Accepted · Date: 2026-10-17 · Scope: system
+- Context: `rllab` passes the Grow guidelines: 5 pipelines (more than 3) and a contract of about 230 lines (more than 200). But there&#x27;s one user, one install and nothing deployed separately. The …[+1088 chars]<div class="lbl">commit 20c4d3a (unconfirmed): Record AD-13: rllab stays a single package through Snake</div><details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;python3 - &lt;&lt;&#x27;EOF&#x27;\np=&#x27;docs/architecture.md&#x27;; s=open(p).read()\ni=s.index(\&quot;- **The contract is about 230 lines\&quot;); j=s.index(\&quot;\\n\&quot;,i)+1; s=s[:i]+s[j:]\ns=s.replace(\&quot;## Risks and open questions\&quot;,\&quot;\&quot;\&quot;### AD-13: Stay a single package through Snake\n**Status:** Accepted · **Date:** 2026-10-17 · **Scope:** system\n- **Context:** `rllab` passes the Grow guidelines: 5 pipelines (more than 3) and a contract of about 230 lines (more than 200). But there&#x27;s one user, one install and nothing deployed separately. The one dependency worth isolating, PyTorch, is confined to `net` by AD-05&#x27;s import-linter rule. All five pipelines are short command-line workflows in `lab`.\n- **Decision:** `rllab` stays one package for the whole Snake stage.\n- **Alternatives:** Split now into shared core, environments and agents — extra packaging and documentation before any code exists, which is the framework-first approach the brief rules out.\n- **Consequences:** Package docs grow past the guidelines, which is accepted. Revisit when the second environment&#x27;s stage is planned. The seam is the shared core (`core`, `train`, `evaluate`, `replay`, `plots`) vs. environments and agents.\n\n## Risks and open questions\&quot;\&quot;\&quot;,1)\ns=s.replace(\&quot;| tests.md | AD-12 |\&quot;,\&quot;| tests.md | AD-12 |\\n| 2026-10-17 | Stay single package through Snake | architecture.md | AD-13 |\&quot;)\nopen(p,&#x27;w&#x27;).write(s)\nEOF\npython3 ../plugin/dev-team/scripts/dt.py lint docs/ | tail -2; git add docs &amp;&amp; git commit -q -m \&quot;Record AD-13: rllab stays a single package through Snake\n\nCo-Authored-By: Claude Opus 5.5 &lt;noreply@anthropic.com&gt;\&quot; &amp;&amp; git log --oneline -1&quot;,
+  &quot;description&quot;: &quot;Add AD-13 and commit&quot;
+}</pre><div class="lbl">output</div><pre>docs/packages/rllab/contract.md:1: grow-size 231 lines, over the 200-line ceiling for one package&#x27;s contract doc: architecture-design should consider a Grow
+0 errors, 2 warnings
+20c4d3a Record AD-13: rllab stays a single package through Snake</pre></details></div><div class="step" id="SD133"><span class="sid">D133</span><span class="kind">Bash</span>cd /Users/connorott/plugins/dev-team-workspace/iteration-8/rl-incremental/with_skill/plugin/dev-team/skills/build-planning &amp;&amp; cat references/tasks.md; cat examples.md | head -250<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;cd /Users/connorott/plugins/dev-team-workspace/iteration-8/rl-incremental/with_skill/plugin/dev-team/skills/build-planning &amp;&amp; cat references/tasks.md; cat examples.md | head -250&quot;,
+  &quot;description&quot;: &quot;Read tasks guide and plan templates&quot;
+}</pre><div class="lbl">output</div><pre># Thickening, routing, modes, checkpoints, the graph, writing
+
+Read when writing thicken tasks, the dependency graph and the files. Templates: `../examples.md`; graph example: `examples-phase0.md`; routing example: `examples-routing.md`.
+
+## 5. Thicken
+
+`**Kind:** thicken`, under Phase 2: one task per step upgrade, depending on its step&#x27;s spine. Order in the file sets nothing: every thicken task can start once its spine lands. Risk orders tasks only when a later one must learn from an earlier one, as an `order` edge with its reason (step 9). In data and ML work, data loading, leak checks and the evaluation get thicken tasks of their own, never left until after the model.
+
+**Split a task** when it needs more than one session, has more than 3 acceptance bullets, touches two packages or two steps, or has &quot;and&quot; in its title. Sizes count `Writes:` entries outside `tests/` (`task-size`; a folder glob counts as one): XS = 1, S = 1–2, M = 3–5. Nothing larger. Spine and thicken tasks are XS or S.
+
+**Acceptance is test-backed.** Each bullet is checkable: a `TC-NN` passes, a Given/When/Then, a model criterion by ID, the smoke command. With no `tests.md`, write the criterion so a tester can encode it. A TC that runs the whole pipeline is the wiring or system task&#x27;s acceptance, never a thicken&#x27;s, so no thicken waits on wiring.
+
+## 6. Route skills and references
+
+**Skills.** Start from `milestone_skills` (the milestone&#x27;s `**Skills:**` line, else its stage&#x27;s): each goes on the `**Skills:**` of every task it fits, and at least one. Then add others whose descriptions fit a task (project `.claude/skills/*/SKILL.md`, `skills_available`). The plan&#x27;s Scope lists the milestone&#x27;s skills. A task that needs a skill that isn&#x27;t installed names it anyway (`dt status` reports it under `skills_missing`) and goes under Open questions. Never quietly plan the step without it.
+
+**References.** Each `RF-NN` or `PB-NN` in `milestone_references` goes in the `Read:` of the tasks whose step it informs; an RF entry&#x27;s *Use for* and *Key parts* say which, a PB entry&#x27;s *Informs* and *Caveats*. Cite the ID, never the `references/` or `probes/` path. A probe&#x27;s code goes to the step that calls the same API (`PB-01:probe.py:sync_all`); its redacted samples (`PB-01:samples`) go to the interface task (`phase0.md`) and, as raw-shaped test input, to that step&#x27;s spine and thicken tasks. Over 300 lines, add a selector so the packet stays small: `RF-01:deseasonalize` (one function or class), `RF-01:outline`, or `RF-03:&lt;heading&gt;` for a doc. With no selector a long file prints as its outline and `dt lint` warns `ref-large`. Whether to reuse the code is the builder&#x27;s call; don&#x27;t write it into Acceptance. A decision whose Consequences adopt what a probe spent (Plaid Items it linked) gets its own task in the milestone that builds that step.
+
+## 7. Build mode
+
+- `split` (tester, then implementer) when the task adds or changes behavior with a checkable outcome: anything a TC case, Given/When/Then or model criterion covers.
+- `solo` for interface, spine, wiring, system, refactor, glue and doc-sync tasks.
+
+`mode_violations` flags a task that breaks the rule. An override needs `**Reason:** &lt;one line&gt;` on the task. **A split task tests symbols a frozen interface declares** (the interface task&#x27;s types and signatures), so the tester never writes against a guess and starts right after the interface, beside the implementers. Its `Depends on` is the implementer half&#x27;s; the tester half waits only on the interface.
+
+## 8. Checkpoints
+
+`### Checkpoint after M&lt;n&gt;-T&lt;nn&gt;` at the end of a wave, naming the wave&#x27;s last task in plan order: usually once after the wiring and thicken wave, when every pipeline runs end to end. `### Checkpoint: milestone exit` last. Use the blocks in `../examples.md`. A separate read-only reviewer runs each one; the orchestrator records its findings with `dt finding`, not this skill.
+
+## 9. Dependencies, Writes, the graph, Verify
+
+- **`Depends on:`** resolves, points only backward (position counts, not ID number), is acyclic, and holds only edges nothing mitigates.
+- **`Writes:`** is exact paths, or a folder glob the task owns, and is an exclusive claim: two tasks with no `Depends on` path between them never write the same path (`writes`). Shared files (`__init__.py`, `types.py`, `pipeline.py`, `__main__.py`) belong to the interface, wiring or system task. No `Writes:` under `tasks/`: builders never tick `todo.md` or record findings; the orchestrator does after each merge.
+- **`## Dependency graph`**, after the last checkpoint: one row per edge between tasks, `| From | To | Kind | Mitigated by |`. From is the task that needs, To the one it needs; each cell starts with the task ID. Mitigated by names the interface and the task freezing it (`profile.Profile sample (M1-T01)`), or says `none: &lt;reason&gt;`.
+
+| Kind | Meaning | Mitigation |
+|---|---|---|
+| `data` | One step&#x27;s output feeds another&#x27;s input | The type and its sample |
+| `call` | A pipeline calls another pipeline or package | The fixture-backed fake |
+| `file` | Two tasks must write one file | Move the shared part to the interface or wiring task; else serial. Two steps&#x27; thicken tasks on one module: the interface task&#x27;s layout splits it (each step its own file, the old module re-exporting); never chain them |
+| `code` | A task changes code another task wrote (a thicken after its step&#x27;s spine or an earlier thicken of that step) | None: serial |
+| `contract-change` | A task changes a frozen interface | None: serial, plus a new interface task |
+| `order` | Integration (a wiring or system task runs the steps it wires: `none: integration: the smoke runs it`), or risk or learning (&quot;do X first to learn Y&quot;) | None: reason required |
+
+A spine never has an edge to another step&#x27;s task: it builds against the interface&#x27;s samples and doubles. A mitigated edge documents why two tasks run side by side and never appears in `Depends on`; an unmitigated one must (`edges`). Every `Depends on` has its row, except a dependency on the interface task, which every task has and needs none. The table is the reviewable argument for every serial step.
+- **Width.** `dt status` gives `critical_path`, `waves`, `width` and `parallelism`; on the fresh plan `dt ready` lists only the interface task(s). Mostly width-1 waves mean an edge an interface could mitigate is ordering tasks.
+- **`Verify:`** The interface task&#x27;s runs the schema check over every sample; every other task&#x27;s runs its focused tests and `scripts/check.sh gate` (`--pkg &lt;pkg&gt;` in multi-package), plus its pipeline&#x27;s smoke command (tests.md Strategy, else the Trigger plus ` --smoke`) once its `Depends on` path reaches that pipeline&#x27;s wiring task: wiring and system tasks always. A thicken task running beside the wiring is smoke-tested by the gate after each merge. Only the modes `fast`, `gate` and `full` exist.
+- **`Read:`** lists the IDs (references as `RF-NN[:selector]`, probes as `PB-NN:&lt;file&gt;[:&lt;symbol&gt;]`, `PB-NN:outline` or `PB-NN:samples`) and paths a builder needs, and nothing else. A split task&#x27;s names its step&#x27;s function, so the tester knows the signature it tests. Check each packet with `dt context &lt;task&gt;`: it must resolve and stay under 2,000 lines.
+
+## 10. Write
+
+Task IDs start at `dt next-id M&lt;n&gt;-T` and count up, in phase order.
+- **Next milestone only.** Later milestones stay as roadmap outlines. Write `tasks/queued/M&lt;n&gt;-&lt;slug&gt;.md` only when the user asks.
+- `tasks/plan.md` with Status `Draft` and `**Base:** —` (pending). Never record a sha yourself: `build-setup` runs `dt base` after its bar is approved and committed.
+- `tasks/todo.md`: one unchecked line per task, IDs matching the plan.
+- Milestone rows and sections (`cut.md` step 2), the planned milestone&#x27;s `**Exit:**` and `**Plan:**`, then `dt roadmap`.
+# Build Planning Templates
+
+The plan, todo and roadmap milestone templates. Each mode&#x27;s worked example is named in its `references/&lt;mode&gt;.md`; `references/examples-cut.md`, `examples-phase0.md` and `examples-routing.md` illustrate the cut, an interface-first milestone and its graph, and skill and reference routing.
+
+## Templates
+
+### `tasks/plan.md` skeleton
+
+A queued plan (`tasks/queued/M&lt;n&gt;-&lt;slug&gt;.md`) uses the same skeleton and has no todo until it&#x27;s promoted.
+
+`**Base:** —` means pending. build-planning always writes `—`; `build-setup` runs `dt base` after its bar is approved and committed, which sets it to HEAD&#x27;s short sha.
+
+````markdown
+# M&lt;n&gt;: &lt;Milestone name&gt; — Plan
+
+**Milestone:** M&lt;n&gt; · **Status:** Draft · **Base:** — · **Last updated:** YYYY-MM-DD · **Roadmap:** [../docs/roadmap.md](../docs/roadmap.md)
+
+## Scope
+**Exit:** &lt;the capability, and the cases that prove it, in one sentence&gt;
+**Covers:** &lt;spec IDs; ranges use an en dash, STAT-01–STAT-04&gt; · **Deferred:** &lt;ID (to M&lt;k&gt;: reason)&gt;, or none
+**Skills:** &lt;skill (which steps)&gt;, or none
+
+## Phase 0: Interface
+
+### M&lt;n&gt;-T01: &lt;the milestone&#x27;s interface&gt;
+…
+
+## Phase 1: Step spines
+
+### M&lt;n&gt;-T02: &lt;step&gt; spine (&lt;baseline&gt;)
+…
+
+## Phase 2: Wiring and thicken
+
+### M&lt;n&gt;-T05: Wire PL-NN
+…
+
+### M&lt;n&gt;-T06: &lt;one step upgrade&gt;
+…
+
+### Checkpoint after M&lt;n&gt;-T06
+…
+
+## Phase 3: System
+
+### M&lt;n&gt;-T07: &lt;system: fakes swapped for real providers&gt;
+…
+
+### Checkpoint: milestone exit
+…
+
+## Dependency graph
+| From | To | Kind | Mitigated by |
+|---|---|---|---|
+| M&lt;n&gt;-T06 &lt;title&gt; | M&lt;n&gt;-T02 &lt;its step&#x27;s spine&gt; | code | none: thickens the same module |
+
+## Risks
+| Risk | Impact | Mitigation |
+|---|---|---|
+| &lt;risk&gt; | &lt;what goes wrong&gt; | &lt;the task or case that catches it&gt; |
+
+## Open questions
+
+## Replan notes
+````
+
+Status runs Draft → Approved → In progress → Done, then `dt archive` replaces the file with the stub.
+
+### Task templates
+
+The interface, wiring and system tasks are worked in `references/examples-phase0.md`.
+
+**Step spine.** One step, solo, its owner module only; no smoke yet.
+
+```markdown
+### M2-T02: allocate spine (equal split)
+**Package:** gridload · **Step:** PL-03.allocate · **Kind:** spine · **Covers:** — · **Size:** S · **Mode:** solo
+**Skills:** —
+**Read:** PL-03, reserve.allocate, reserve.Allocation, profile.Profile
+**Acceptance:**
+- [ ] `allocate` returns an equal reserve split on the profile.Profile sample; the output validates as reserve.Allocation
+**Verify:** `pytest tests/unit/gridload -k allocate` · `scripts/check.sh gate`
+**Depends on:** M2-T01 · **Writes:** src/gridload/reserve/allocate.py, tests/unit/gridload/test_allocate.py
+```
+
+**Thicken task.** One step, one package, at most 3 bullets; it starts once its step&#x27;s spine lands, beside the wiring, so no smoke yet.
+
+```markdown
+### M2-T06: Optimized reserve allocation
+**Package:** gridload · **Step:** PL-03.allocate · **Kind:** thicken · **Covers:** RES-01 · **Size:** S · **Mode:** split
+**Skills:** data-science
+**Read:** PL-03, TC-04, RES-01, reserve.allocate, reserve.Allocation
+**Acceptance:**
+- [ ] TC-04 passes within tolerance; the equal split stays selectable as the baseline
+**Verify:** `pytest tests/intent/gridload tests/unit/gridload -k allocate` · `scripts/check.sh gate`
+**Depends on:** M2-T02 · **Writes:** src/gridload/reserve/allocate.py, tests/intent/gridload/test_allocate.py, tests/unit/gridload/test_allocate.py
+```
+
+| Field | Rule (lint code) |
+|---|---|
+| `Package` | One package id (`task-fields`) |
+| `Step` | `PL-NN.&lt;function&gt;` from the step table (`task-step`) on spine and thicken tasks; `PL-NN` on wiring and system tasks; `contract` on the interface task |
+| `Kind` | `interface`, `spine`, `wiring`, `thicken` or `system` (`phase0.md`) |
+| `Covers` | Spec IDs the task satisfies |
+| `Size` | XS = 1, S = 1–2, M = 3–5 `Writes:` entries outside `tests/`, a folder glob counting as one (`task-size`) |
+| `Mode` | `split` for checkable behavior, `solo` for interface, spine, wiring, system, refactor, glue, doc-sync |
+| `Skills` | Skill names, or `—`. Every skill on the milestone&#x27;s `**Skills:**` line (else its stage&#x27;s) lands on at least one task (`skills_unrouted`). A missing skill is still named |
+| `Read` | IDs and repo paths, comma-separated. Everything the builder needs, nothing more (`missing-ref`). References by ID with an optional selector: `RF-01:deseasonalize`, `RF-01:outline`, `RF-03:&lt;heading&gt;`, `PB-01:probe.py:sync_all`, `PB-01:samples`; a long one with none warns (`ref-large`). Every milestone reference lands on at least one task (`references_unrouted`) |
+| `Acceptance` | ≤ 3 checkbox bullets, each test-backed (`task-acceptance`) |
+| `Verify` | Backticked commands joined by ` · `. Includes the smoke command once the `Depends on` path reaches the pipeline&#x27;s wiring (`verify-smoke`) |
+| `Depends on` | Task IDs earlier in the plan, or `—`; unmitigated edges only, each with a graph row (`depends`, `edges`) |
+| `Writes` | Comma-separated paths or folder globs, exclusive: no other task off its `Depends on` path writes them; none under `tasks/` (`writes`) |
+| `Reason` | Optional one line: a mode override, or a second package or step |
+| `Blocked` | Added when a task is paused; Replan removes it once resolved |
+
+Title rule: no &quot; and &quot; (`task-title`). Required fields: Package, Step, Kind, Size, Mode, Read, Acceptance, Verify, Writes (`task-fields`).
+
+### Checkpoint blocks
+
+At the end of a wave:
+
+```markdown
+### Checkpoint after M2-T06
+- [ ] Every pipeline in the milestone runs end to end (smoke commands)
+- [ ] All golden cases pass
+- [ ] Entry functions still read top to bottom as the step table says (Sync if not)
+- [ ] No new abstraction without a second implementation or an AD
+- [ ] contract.md matches the contract code (`dt status` freshness check)
+- [ ] `dt layout` output reviewed; Definition of Done holds
+- [ ] `scripts/check.sh full` passes; Review checklist done; every finding has a disposition
+```
+
+Last, after the final task: the same list under `### Checkpoint: milestone exit`, with `scripts/check.sh full --exit` (which also fails on any interface stub left), plus `- [ ] The Scope&#x27;s Exit holds`.
+
+Findings are not written by this skill or by builders. The orchestrator records the reviewer&#x27;s findings with `dt finding`, and they look like this:
+
+```markdown
+**Findings:**
+- M2-R01 Important · CR-21 · `reserve/compare.py::compare` complexity 14 → fix task M2-T05
+- M2-R02 Nit · readability · column names → won&#x27;t fix: match the utility&#x27;s report notation
+```
+
+A finding whose disposition is a fix task means Replan adds that task.
+
+### `tasks/todo.md`
+
+One line per task, `&lt;ID&gt; &lt;title&gt; (&lt;package&gt;, &lt;size&gt;, &lt;mode&gt;)`. No checkpoints. Lines start unchecked; only `dt tick` checks them.
+
+```markdown
+# M2: Seasonality &amp; baselines — Todo
+
+- [ ] M2-T01 PL-03 interface (gridload, S, solo)
+- [ ] M2-T02 allocate spine (equal split) (gridload, S, solo)
+- [ ] M2-T03 compare spine (realized shortfall) (gridload, S, solo)
+- [ ] M2-T04 Wire PL-03 (gridload, S, solo)
+- [ ] M2-T05 Out-of-sample comparison (gridload, S, split)
+- [ ] M2-T06 Optimized reserve allocation (gridload, S, split)
+- [ ] M2-T07 Fourier profile as the allocation default (gridload, XS, solo)
+```
+
+### Stub plan (between milestones)
+
+Written by `dt archive`. Never deleted; replaced only by the next plan.
+
+```markdown
+# Between milestones
+
+**Status:** Between milestones · **Last updated:** 2026-11-02 · **Roadmap:** [../docs/roadmap.md](../docs/roadmap.md)
+```
+
+### Milestone rows
+
+`idea-refine` adds the stage (`S&lt;n&gt;`: Name, Source, and a section with Outline and Skills). When the stage&#x27;s pipelines are approved, this skill cuts it: one milestone row per slice under the milestone table (add the table below the stage table if it&#x27;s missing), and a section with the slice&#x27;s `**Outline:**`, then `**Exit:**`, `**Plan:**` and outcome text once planned. `dt roadmap` writes both `Status*` columns; never edit them.
+
+```markdown
+| Stage | Name | Source | Status* |
+|---|---|---|---|
+| S1 | Ingest &amp; clean | brief | Building |
+| S2 | Seasonality &amp; baselines | ideas/seasonality-baselines.md | Planned |
+
+| Milestone | Stage | Name | Packages | Pipelines | Depends | Status* |
+|---|---|---|---|---|---|---|
+| M1 | S1 | Ingest &amp; clean | gridload | PL-01, PL-02 | — | Building |
+| M2 | S2 | Seasonality &amp; baselines | gridload | PL-03 | M1 | Planned |
+
+## M2: Seasonality &amp; baselines
+**Outline:** A walk-forward evaluation over held-out weeks compares an optimized reserve allocation with an equal split.
+**Exit:** The optimized allocation beats the equal split on held-out reserve shortfall; TC-04 passes.
+**Plan:** [../tasks/plan.md](../tasks/plan.md)
+```
+
+A stage that fits one milestone gets one, and the milestone inherits the stage&#x27;s Skills and references. A stage cut into several gives each milestone `**Skills:**` and `**References:**` lines from the stage&#x27;s (`references/examples-cut.md`). Later milestones get only the row and a 3–6 line section (Outline, Exit, and Plan once a plan exists).
+Shell cwd was reset to /Users/connorott/plugins/dev-team-workspace/iteration-8/rl-incremental/with_skill/project</pre></details></div><div class="step" id="SD134"><span class="sid">D134</span><span class="kind">Bash</span>cd /Users/connorott/plugins/dev-team-workspace/iteration-8/rl-incremental/with_skill/plugin/dev-team/skills/build-planning/references &amp;&amp; sed -n 1,200p examples-phase0.md<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;cd /Users/connorott/plugins/dev-team-workspace/iteration-8/rl-incremental/with_skill/plugin/dev-team/skills/build-planning/references &amp;&amp; sed -n 1,200p examples-phase0.md&quot;,
+  &quot;description&quot;: &quot;Read interface-first milestone example&quot;
+}</pre><div class="lbl">output</div><pre># Example: interface-first M1 (gridload, single package)
+
+PL-01 Load meter readings (`read_raw` → `apply_registry`, owner `data`) and PL-02 Seasonality report (`load_readings` as PL-01 built, then `fit_seasonality` → `spectrum` → `deseason` → `write_report`, owner `profile`). Golden cases TC-01 (registry), TC-02 (flat spectrum), TC-03 (planted sine). The contract has a `type` section for every `In → Out`: `data.RawReadings`, `data.Readings`, `profile.Load`, `profile.Profile`, `profile.Spectrum`, `profile.SeasonalityReport`; `data.load_readings` carries a `**Boundary:**` line because PL-02 calls it.
+
+```
+wave 0  T01  interface
+wave 1  spines T02 read_raw · T03 apply_registry · T04 fit_seasonality · T05 spectrum · T06 deseason · T07 write_report
+        testers of T10 registry · T11 LS amplitudes · T12 Fourier seasonality · T13 seasonal removal
+wave 2  wiring T08 PL-01 · T09 PL-02 (on the load_readings fake); implementers of T10 ← T03 · T11 ← T05 · T12 ← T04 · T13 ← T06
+wave 3  T14  system: PL-02 on the real PL-01
+```
+
+14 tasks, critical path 4 (T01 → T05 → T11 → T14, or any other four-task chain), 10 agents in wave 1, every spine and thicken XS or S. No fold: each step&#x27;s spine is a real baseline worth testing alone.
+
+```markdown
+### M1-T01: M1 interface
+**Package:** gridload · **Step:** contract · **Kind:** interface · **Covers:** — · **Size:** S · **Mode:** solo
+**Read:** PL-01, PL-02, data.RawReadings, data.Readings, profile.Load, profile.Profile, profile.Spectrum, profile.SeasonalityReport, data.load_readings
+**Acceptance:**
+- [ ] Each type is code in `data/types.py` or `profile/types.py`; each `tests/contracts/&lt;id&gt;.&lt;Type&gt;/` sample validates against its schema
+- [ ] Every step imports with its contract signature, body `raise NotImplementedError(&quot;&lt;its spine task&gt;&quot;)`; each `__init__.py` exports its contract
+- [ ] The `data.load_readings` fake serves its fixtures
+**Verify:** `pytest tests/contracts` · `scripts/check.sh gate`
+**Depends on:** — · **Writes:** src/gridload/data/**, src/gridload/profile/**, tests/contracts/**
+
+### M1-T05: spectrum spine (raw periodogram)
+**Package:** gridload · **Step:** PL-02.spectrum · **Kind:** spine · **Covers:** — · **Size:** XS · **Mode:** solo
+**Read:** PL-02, profile.Load, profile.Profile, profile.spectrum
+**Acceptance:**
+- [ ] `spectrum` returns the raw periodogram of the residual on the profile.Load and profile.Profile samples; signature unchanged
+**Verify:** `pytest tests/unit/gridload -k spectrum` · `scripts/check.sh gate`
+**Depends on:** M1-T01 · **Writes:** src/gridload/profile/spectrum.py, tests/unit/gridload/test_spectrum.py
+
+### M1-T09: Wire PL-02
+**Package:** gridload · **Step:** PL-02 · **Kind:** wiring · **Covers:** QR-02 · **Size:** S · **Mode:** solo
+**Read:** PL-02, data.load_readings
+**Acceptance:**
+- [ ] `python -m gridload.profile seasonality-report --smoke` runs end to end on the `data.load_readings` fake; committed as PL-02&#x27;s smoke test
+- [ ] PL-02 pre-build sections replaced by a `dt layout` pointer
+**Verify:** `python -m gridload.profile seasonality-report --smoke` · `scripts/check.sh gate`
+**Depends on:** M1-T04, M1-T05, M1-T06, M1-T07 · **Writes:** src/gridload/profile/pipeline.py, src/gridload/profile/__main__.py, tests/unit/gridload/test_pl02_smoke.py
+
+### M1-T11: Least-squares amplitudes
+**Package:** gridload · **Step:** PL-02.spectrum · **Kind:** thicken · **Covers:** STAT-03 · **Size:** XS · **Mode:** split
+**Skills:** data-science
+**Read:** PL-02, TC-02, STAT-03, profile.spectrum, profile.Profile
+**Acceptance:**
+- [ ] TC-02 passes: every fitted Fourier amplitude ≤ the flat-spectrum edge on pure noise; the raw periodogram stays selectable
+**Verify:** `pytest tests/intent/gridload tests/unit/gridload -k spectrum` · `scripts/check.sh gate`
+**Depends on:** M1-T05 · **Writes:** src/gridload/profile/spectrum.py, tests/intent/gridload/test_spectrum.py, tests/unit/gridload/test_spectrum.py
+
+### M1-T14: PL-02 on the real PL-01
+**Package:** gridload · **Step:** PL-02 · **Kind:** system · **Covers:** — · **Size:** XS · **Mode:** solo
+**Read:** PL-01, PL-02, data.load_readings, TC-01, TC-02, TC-03
+**Acceptance:**
+- [ ] PL-02 calls the real `load_readings`; the fake stays for the contract tests
+- [ ] Both smoke commands pass; TC-01–TC-03 pass on the real chain
+**Verify:** `python -m gridload.data load --smoke` · `python -m gridload.profile seasonality-report --smoke` · `scripts/check.sh gate`
+**Depends on:** M1-T08, M1-T09, M1-T10, M1-T11, M1-T12, M1-T13 · **Writes:** src/gridload/profile/pipeline.py
+```
+
+T11&#x27;s tester starts in wave 1: it tests `spectrum` as T01 declares it and fails on `NotImplementedError(&quot;M1-T05&quot;)`. Its implementer follows its tester and T05, nothing else. Wiring T09 waits on PL-02&#x27;s spines because its smoke runs them, but not on PL-01: the fake stands in.
+
+The graph, excerpted (one row per `Depends on` other than on T01, 16, plus the mitigated edges):
+
+```markdown
+## Dependency graph
+| From | To | Kind | Mitigated by |
+|---|---|---|---|
+| M1-T05 spectrum spine | M1-T04 fit_seasonality spine | data | profile.Profile sample (M1-T01) |
+| M1-T09 wire PL-02 | M1-T05 spectrum spine | order | none: integration: the smoke runs it |
+| M1-T09 wire PL-02 | M1-T08 wire PL-01 | call | data.load_readings fake (M1-T01) |
+| M1-T11 LS amplitudes | M1-T05 spectrum spine | code | none: thickens the same module |
+| M1-T11 LS amplitudes | M1-T12 Fourier seasonality | data | profile.Profile sample (M1-T01): the spectrum takes any Profile |
+| M1-T14 system | M1-T09 wire PL-02 | file | none: swaps the fake in the entry M1-T09 wrote |
+```
+
+**Multi-package.** The same shape across packages: the interface task freezes each `**Boundary:**` symbol in its `**Fixtures:**` folder (one interface task per provider when one would pass M), spines run in every package at once, a consumer&#x27;s wiring runs on the provider&#x27;s fake, and the system task (one per system pipeline, `**Package:**` the owner of its first step, `**Reason:** system task`, `--pkg` on the gate) swaps in the real providers.
+Shell cwd was reset to /Users/connorott/plugins/dev-team-workspace/iteration-8/rl-incremental/with_skill/project</pre></details></div><div class="step" id="SD135"><span class="sid">D135</span><span class="kind">say</span>AD-13 is recorded and committed as `20c4d3a`. Next I&#x27;m writing the M1 plan and the roadmap&#x27;s milestone rows.<details><summary>full text</summary><pre>AD-13 is recorded and committed as `20c4d3a`. Next I&#x27;m writing the M1 plan and the roadmap&#x27;s milestone rows.</pre></details></div><div class="step" id="SD136"><span class="sid">D136</span><span class="kind">Bash</span>D=&quot;python3 ../plugin/dev-team/scripts/dt.py&quot;; $D next-id M; $D next-id M1-T; ls; ls tasks 2&gt;/dev/null; ls CLAUDE.md AGENTS.md 2&gt;&amp;1 <span class="err">error</span><details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;D=\&quot;python3 ../plugin/dev-team/scripts/dt.py\&quot;; $D next-id M; $D next-id M1-T; ls; ls tasks 2&gt;/dev/null; ls CLAUDE.md AGENTS.md 2&gt;&amp;1&quot;,
+  &quot;description&quot;: &quot;Get next milestone and task IDs&quot;
+}</pre><div class="lbl">output</div><pre>Exit code 1
+(eval):1: no such file or directory: python3 ../plugin/dev-team/scripts/dt.py
+(eval):1: no such file or directory: python3 ../plugin/dev-team/scripts/dt.py
+docs
+tests
+ls: AGENTS.md: No such file or directory
+ls: CLAUDE.md: No such file or directory</pre></details></div><div class="step" id="SD137"><span class="sid">D137</span><span class="kind">Bash</span>python3 ../plugin/dev-team/scripts/dt.py next-id M; python3 ../plugin/dev-team/scripts/dt.py next-id M1-T<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;python3 ../plugin/dev-team/scripts/dt.py next-id M; python3 ../plugin/dev-team/scripts/dt.py next-id M1-T&quot;,
+  &quot;description&quot;: &quot;Get next milestone and task IDs&quot;
+}</pre><div class="lbl">output</div><pre>M1
+M1-T01</pre></details></div><div class="step" id="SD138"><span class="sid">D138</span><span class="kind">Bash</span>python3 - &lt;&lt;&#x27;EOF&#x27;
+p=&#x27;docs/roadmap.md&#x27;; s=open(p).read()
+a=&quot;*Written by `dt roadmap`&quot;
+b=&quot;&quot;&quot;| Milestone | Stage | Name | Packages | Pipelines | Depends | Status* |
+|---|---|---|---|---|---|---|
+| M1 | S1 | Table ladder | rllab | PL-01, PL-02, PL-03, PL-04, PL-05 | — | |
+
+*Written by `dt roadmap`&quot;&quot;&quot;
+s=s.replace(a,b,1)
+s+=&quot;&quot;&quot;
+## M1: Table ladder
+Outline: The table learner trains, is evaluated against both bots, replayed and written up on L1 (compact view) and L2 (raw grid), through all five comm …[+139 chars]<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;python3 - &lt;&lt;&#x27;EOF&#x27;\np=&#x27;docs/roadmap.md&#x27;; s=open(p).read()\na=\&quot;*Written by `dt roadmap`\&quot;\nb=\&quot;\&quot;\&quot;| Milestone | Stage | Name | Packages | Pipelines | Depends | Status* |\n|---|---|---|---|---|---|---|\n| M1 | S1 | Table ladder | rllab | PL-01, PL-02, PL-03, PL-04, PL-05 | — | |\n\n*Written by `dt roadmap`\&quot;\&quot;\&quot;\ns=s.replace(a,b,1)\ns+=\&quot;\&quot;\&quot;\n## M1: Table ladder\n**Outline:** The table learner trains, is evaluated against both bots, replayed and written up on L1 (compact view) and L2 (raw grid), through all five commands.\n**Skills:** null-hypothesis-testing\n**References:** —\n\&quot;\&quot;\&quot;\nopen(p,&#x27;w&#x27;).write(s)\nEOF\npython3 ../plugin/dev-team/scripts/dt.py next-id M&quot;,
+  &quot;description&quot;: &quot;Add M1 milestone row to roadmap&quot;
+}</pre><div class="lbl">output</div><pre>M2</pre></details></div><div class="step" id="SD139"><span class="sid">D139</span><span class="kind">Bash</span>python3 - &lt;&lt;&#x27;EOF&#x27;
+p=&#x27;docs/roadmap.md&#x27;; s=open(p).read()
+a=&quot;| M1 | S1 | Table ladder | rllab | PL-01, PL-02, PL-03, PL-04, PL-05 | — | |&quot;
+s=s.replace(a,a+&quot;\n| M2 | S1 | Network ladder | rllab | PL-01, PL-02, PL-03, PL-05 | M1 (core.Agent, train.RunSettings, PL-01 and PL-03 output) | |&quot;,1)
+s=s.replace(&quot;References: —\n&quot;,&quot;References: —\nExit: `rung`, `evaluate`, `watch` and `note` run end to end on L1 and L2; L1 beats random and matches scripted, L2 is reported (TC-24, table rungs); TC-0 …[+400 chars]<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;python3 - &lt;&lt;&#x27;EOF&#x27;\np=&#x27;docs/roadmap.md&#x27;; s=open(p).read()\na=\&quot;| M1 | S1 | Table ladder | rllab | PL-01, PL-02, PL-03, PL-04, PL-05 | — | |\&quot;\ns=s.replace(a,a+\&quot;\\n| M2 | S1 | Network ladder | rllab | PL-01, PL-02, PL-03, PL-05 | M1 (core.Agent, train.RunSettings, PL-01 and PL-03 output) | |\&quot;,1)\ns=s.replace(\&quot;**References:** —\\n\&quot;,\&quot;**References:** —\\n**Exit:** `rung`, `evaluate`, `watch` and `note` run end to end on L1 and L2; L1 beats random and matches scripted, L2 is reported (TC-24, table rungs); TC-01–TC-11 and TC-13–TC-23 pass.\\n**Plan:** [../tasks/plan.md](../tasks/plan.md)\\n\&quot;,1)\ns+=\&quot;\&quot;\&quot;\n## M2: Network ladder\n**Outline:** The hand-written network learner trains on L3 (compact) and L4 (raw grid), the seeds of a rung train side by side, and the closing Snake note compares all four rungs.\n**Skills:** null-hypothesis-testing\n**References:** —\n\&quot;\&quot;\&quot;\nopen(p,&#x27;w&#x27;).write(s)\nEOF\ntail -20 docs/roadmap.md&quot;,
+  &quot;description&quot;: &quot;Add M2 row and milestone sections&quot;
+}</pre><div class="lbl">output</div><pre>| M1 | S1 | Table ladder | rllab | PL-01, PL-02, PL-03, PL-04, PL-05 | — | |
+| M2 | S1 | Network ladder | rllab | PL-01, PL-02, PL-03, PL-05 | M1 (core.Agent, train.RunSettings, PL-01 and PL-03 output) | |
+
+*Written by `dt roadmap` from doc statuses and todo checkboxes; never hand-edited.
+
+## S1: Snake
+**Outline:** I can train Snake agents up the ladder (lookup table on a compact view, then a neural network on the compact view and on the raw grid), compare their learning curves against random and scripted bots, watch replays, and explain why the compact view and the raw grid give different results.
+**Skills:** null-hypothesis-testing
+
+## M1: Table ladder
+**Outline:** The table learner trains, is evaluated against both bots, replayed and written up on L1 (compact view) and L2 (raw grid), through all five commands.
+**Skills:** null-hypothesis-testing
+**References:** —
+**Exit:** `rung`, `evaluate`, `watch` and `note` run end to end on L1 and L2; L1 beats random and matches scripted, L2 is reported (TC-24, table rungs); TC-01–TC-11 and TC-13–TC-23 pass.
+**Plan:** [../tasks/plan.md](../tasks/plan.md)
+
+## M2: Network ladder
+**Outline:** The hand-written network learner trains on L3 (compact) and L4 (raw grid), the seeds of a rung train side by side, and the closing Snake note compares all four rungs.
+**Skills:** null-hypothesis-testing
+**References:** —</pre></details></div><div class="step" id="SD140"><span class="sid">D140</span><span class="kind">say</span>Roadmap rows are in. Now the plan itself:<details><summary>full text</summary><pre>Roadmap rows are in. Now the plan itself:</pre></details></div><div class="step" id="SD141"><span class="sid">D141</span><span class="kind">Write</span>/Users/connorott/plugins/dev-team-workspace/iteration-8/rl-incremental/with_skill/project/tasks/plan.md (339 lines)<div class="lbl">wrote /Users/connorott/plugins/dev-team-workspace/iteration-8/rl-incremental/with_skill/project/tasks/plan.md</div><pre># M1: Table ladder — Plan
+
+**Milestone:** M1 · **Status:** Draft · **Base:** — · **Last updated:** 2026-10-17 · **Roadmap:** [../docs/roadmap.md](../docs/roadmap.md)
+
+## Scope
+**Exit:** `rung`, `evaluate`, `watch` and `note` run end to end on L1 and L2; L1 beats random and matches scripted, L2 is reported (TC-24, table rungs); TC-01–TC-11 and TC-13–TC-23 pass.
+**Covers:** GAME-01–GAME-09, VIEW-01–VIEW-05, BOT-01–BOT-04, TAB-01–TAB-06, EVAL-01–EVAL-06, EVAL-08–EVAL-10, WATCH-01–WATCH-07, NOTE-01–NOTE-04, CORE-01, CORE-02, QR-01, QR-03, QR-04 · **Deferred:** NET-01–NET-08 (to M2: the network learner is M2&#x27;s slice), EVAL-07 (to M2: only L4 has &quot;beats scripted&quot;), NOTE-05 (to M2: the closing note needs all four rungs), QR-02 (to M2: network run time)
+**Skills:** null-hypothesis-testing (evaluate.compare, rung bars)
+
+## Phase 0: Interface
+
+### M1-T01: M1 interface
+**Package:** rllab · **Step:** contract · **Kind:** interface · **Covers:** — · **Size:** S · **Mode:** solo
+**Skills:** —
+**Read:** PL-01, PL-02, PL-03, PL-04, PL-05, AD-05, AD-11, core.Ending, core.TimeStep, core.Transition, core.Env, core.Agent, core.LinearSchedule, snake.SnakeState, snake.SnakeEnv, train.RunSettings, train.GameRecord, evaluate.PlayerScores, evaluate.Bar, evaluate.BarResult, evaluate.Summary, evaluate.play, evaluate.compare, replay.Replay, plots.Figure, lab.Note
+**Acceptance:**
+- [ ] Each contract type used by M1 is code in its component&#x27;s `types.py`; each `tests/contracts/&lt;id&gt;.&lt;Type&gt;/` sample validates against its schema
+- [ ] Every M1 step and contract class imports with its contract signature, body `raise NotImplementedError(&quot;&lt;its task id&gt;&quot;)`; each component `__init__.py` exports its contract section
+- [ ] Replay doubles for `core.Env`, `core.Agent`, `evaluate.play` and `evaluate.compare` serve their fixtures
+**Verify:** `pytest tests/contracts` · `scripts/check.sh gate`
+**Depends on:** — · **Writes:** src/rllab/**, tests/contracts/**
+
+## Phase 1: Step spines
+
+### M1-T02: lab.settings spine (L1, L2, corridor)
+**Package:** rllab · **Step:** PL-01.build · **Kind:** spine · **Covers:** EVAL-01, VIEW-05 · **Size:** XS · **Mode:** solo
+**Skills:** —
+**Reason:** one module for `seed_settings`, `build` (PL-01) and `build_env` (PL-04)
+**Read:** PL-01, PL-04, AD-05, lab.LADDER, lab.build, train.RunSettings, core.Env, core.Agent
+**Acceptance:**
+- [ ] `seed_settings(&quot;L1&quot;, 3)` returns L1&#x27;s settings with seed 3; `build` returns a `SnakeEnv` and `TableAgent` for L1 and L2 and a `CorridorEnv` for corridor settings; an unknown `kind` raises `ValueError`
+**Verify:** `pytest tests/unit/rllab -k settings` · `scripts/check.sh gate`
+**Depends on:** M1-T01 · **Writes:** src/rllab/lab/settings.py, tests/unit/rllab/test_settings.py
+
+### M1-T03: train spine (plain loop)
+**Package:** rllab · **Step:** PL-01.train · **Kind:** spine · **Covers:** EVAL-01, EVAL-02, EVAL-10, CORE-01 · **Size:** S · **Mode:** solo
+**Skills:** —
+**Read:** PL-01, train.train, train.load_log, train.RunSettings, train.GameRecord, core.Env, core.Agent, core.Transition
+**Acceptance:**
+- [ ] On the `core.Env` and `core.Agent` replay doubles, `train` plays `games` games, calling `learn` after every step and `end_game` after every game; writes `settings.json`, `train_log.csv` and the agent; `load_log` reads the log back equal
+**Verify:** `pytest tests/unit/rllab -k train_loop` · `scripts/check.sh gate`
+**Depends on:** M1-T01 · **Writes:** src/rllab/train/loop.py, src/rllab/train/log.py, tests/unit/rllab/test_train_loop.py
+
+### M1-T04: lab.runs spine (seeds one after another)
+**Package:** rllab · **Step:** PL-02.train_seeds · **Kind:** spine · **Covers:** EVAL-10 · **Size:** XS · **Mode:** solo
+**Skills:** —
+**Reason:** one module for `train_seeds`, `report_runs` (PL-02) and `load_agents` (PL-03)
+**Read:** PL-02, PL-03, train.RunSettings, train.GameRecord, train.load_log, core.Agent
+**Acceptance:**
+- [ ] `train_seeds` runs seeds 0–4 in turn and returns their settings; `report_runs` returns the last record per seed; `load_agents` reloads each seed&#x27;s saved agent
+**Verify:** `pytest tests/unit/rllab -k runs` · `scripts/check.sh gate`
+**Depends on:** M1-T01 · **Writes:** src/rllab/lab/runs.py, tests/unit/rllab/test_runs.py
+
+### M1-T05: lab.evaluation spine (bars against random only)
+**Package:** rllab · **Step:** PL-03.compare_bars · **Kind:** spine · **Covers:** EVAL-04, EVAL-09 · **Size:** XS · **Mode:** solo
+**Skills:** —
+**Reason:** one module for `play_agents`, `play_bots`, `compare_bars`, `build_summary` and `save_eval`
+**Read:** PL-03, evaluate.play, evaluate.compare, evaluate.PlayerScores, evaluate.BarResult, evaluate.Summary, replay.Replay, replay.save
+**Acceptance:**
+- [ ] On the `evaluate.play` and `evaluate.compare` doubles: 100 games per seed and 500 per bot are requested; `compare_bars` returns one &quot;beats random&quot; bar; `save_eval` writes `eval.json` that reads back as the same `Summary`
+**Verify:** `pytest tests/unit/rllab -k evaluation` · `scripts/check.sh gate`
+**Depends on:** M1-T01 · **Writes:** src/rllab/lab/evaluation.py, tests/unit/rllab/test_evaluation.py
+
+### M1-T06: draw_curves spine (raw score per game)
+**Package:** rllab · **Step:** PL-03.draw_curves · **Kind:** spine · **Covers:** EVAL-03 · **Size:** XS · **Mode:** solo
+**Skills:** —
+**Read:** PL-03, plots.learning_curve, plots.Figure, train.GameRecord, evaluate.Summary
+**Acceptance:**
+- [ ] On the `train.GameRecord` and `evaluate.Summary` samples, `learning_curve` writes a PNG with the score smoothed over 100 games and one labelled line per bot, and returns a valid `plots.Figure`
+**Verify:** `pytest tests/unit/rllab -k curves` · `scripts/check.sh gate`
+**Depends on:** M1-T01 · **Writes:** src/rllab/plots/curves.py, tests/unit/rllab/test_curves.py
+
+### M1-T07: replay.io spine (JSON)
+**Package:** rllab · **Step:** PL-04.load · **Kind:** spine · **Covers:** WATCH-01 · **Size:** XS · **Mode:** solo
+**Skills:** —
+**Read:** PL-04, AD-07, replay.Replay, replay.save, replay.load
+**Acceptance:**
+- [ ] The `replay.Replay` samples round-trip through `save` and `load` unchanged; a missing file raises `FileNotFoundError` and a damaged one `ValueError`
+**Verify:** `pytest tests/unit/rllab -k replay_io` · `scripts/check.sh gate`
+**Depends on:** M1-T01 · **Writes:** src/rllab/replay/io.py, tests/unit/rllab/test_replay_io.py
+
+### M1-T08: rebuild spine (replay the moves)
+**Package:** rllab · **Step:** PL-04.rebuild · **Kind:** spine · **Covers:** WATCH-07 · **Size:** XS · **Mode:** solo
+**Skills:** —
+**Read:** PL-04, AD-07, replay.rebuild, replay.Replay, core.Env
+**Acceptance:**
+- [ ] On the `core.Env` replay double, `rebuild` replays a recorded game&#x27;s moves and reports a match; one changed move reports a mismatch
+**Verify:** `pytest tests/unit/rllab -k replay_record` · `scripts/check.sh gate`
+**Depends on:** M1-T01 · **Writes:** src/rllab/replay/record.py, tests/unit/rllab/test_replay_record.py
+
+### M1-T09: view spine (static board)
+**Package:** rllab · **Step:** PL-04.view · **Kind:** spine · **Covers:** WATCH-06 · **Size:** XS · **Mode:** solo
+**Skills:** —
+**Read:** PL-04, AD-08, replay.view, replay.Replay
+**Acceptance:**
+- [ ] `view(sample, show=False)` draws the first frame with step, score and reward, and returns the replay unchanged
+**Verify:** `pytest tests/unit/rllab -k viewer` · `scripts/check.sh gate`
+**Depends on:** M1-T01 · **Writes:** src/rllab/replay/viewer.py, tests/unit/rllab/test_viewer.py
+
+### M1-T10: lab.notes spine (summary table)
+**Package:** rllab · **Step:** PL-05.render_note · **Kind:** spine · **Covers:** NOTE-01 · **Size:** XS · **Mode:** solo
+**Skills:** —
+**Reason:** one module for `load_summaries`, `render_note` and `write_note`
+**Read:** PL-05, lab.Note, evaluate.Summary
+**Acceptance:**
+- [ ] On the `evaluate.Summary` sample, `render_note` returns a `lab.Note` with the summary table and curve links; `write_note` writes it and refuses to overwrite
+**Verify:** `pytest tests/unit/rllab -k notes` · `scripts/check.sh gate`
+**Depends on:** M1-T01 · **Writes:** src/rllab/lab/notes.py, tests/unit/rllab/test_notes.py
+
+## Phase 2: Wiring and thicken
+
+### M1-T11: Snake views
+**Package:** rllab · **Step:** PL-01.build · **Kind:** thicken · **Covers:** VIEW-01, VIEW-02, VIEW-03, VIEW-04 · **Size:** XS · **Mode:** split
+**Skills:** —
+**Reason:** library module behind `build`, reached through `core.Env` (AD-05)
+**Read:** PL-01, TC-08, TC-09, TC-10, VIEW-01, VIEW-02, VIEW-03, VIEW-04, snake.SnakeState, docs/packages/rllab/tests.md
+**Acceptance:**
+- [ ] TC-08, TC-09 and TC-10 pass on the view functions given the `snake.SnakeState` inputs
+**Verify:** `pytest tests/intent/rllab tests/unit/rllab -k views` · `scripts/check.sh gate`
+**Depends on:** M1-T01 · **Writes:** src/rllab/snake/views.py, tests/intent/rllab/test_snake_views.py, tests/unit/rllab/test_snake_views.py
+
+### M1-T12: Snake rules
+**Package:** rllab · **Step:** PL-01.build · **Kind:** thicken · **Covers:** GAME-01–GAME-09 · **Size:** XS · **Mode:** split
+**Skills:** —
+**Reason:** library module behind `build`, reached through `core.Env` (AD-05, AD-12)
+**Read:** PL-01, AD-12, TC-01, TC-02, TC-03, TC-04, TC-05, TC-06, TC-07, GAME-01, GAME-02, GAME-09, snake.SnakeEnv, snake.SnakeState, core.TimeStep, docs/packages/rllab/tests.md
+**Acceptance:**
+- [ ] TC-01–TC-07 pass through `SnakeEnv.from_state`
+- [ ] Given a new 10×10 game, the snake has 3 cells with the head in the centre and food off the body; the same seed and moves give identical games (GAME-09)
+**Verify:** `pytest tests/intent/rllab tests/unit/rllab -k snake_rules` · `scripts/check.sh gate`
+**Depends on:** M1-T11 · **Writes:** src/rllab/snake/game.py, tests/intent/rllab/test_snake_rules.py, tests/unit/rllab/test_snake_game.py
+
+### M1-T13: Corridor environment
+**Package:** rllab · **Step:** PL-01.build · **Kind:** thicken · **Covers:** CORE-02 · **Size:** XS · **Mode:** split
+**Skills:** —
+**Reason:** library module behind `build`, reached through `core.Env` (AD-05)
+**Read:** PL-01, CORE-02, corridor.CorridorEnv, core.Env, core.TimeStep
+**Acceptance:**
+- [ ] Reaching the right end gives +1 and `won`; 20 steps without winning gives `cut_off` with terminal false; the same seed and moves give identical frames
+**Verify:** `pytest tests/unit/rllab -k corridor` · `scripts/check.sh gate`
+**Depends on:** M1-T01 · **Writes:** src/rllab/corridor/env.py, tests/unit/rllab/test_corridor.py
+
+### M1-T14: Exploration schedule
+**Package:** rllab · **Step:** PL-01.build · **Kind:** thicken · **Covers:** TAB-04 · **Size:** XS · **Mode:** split
+**Skills:** —
+**Reason:** library module behind `build`, used by the table learner
+**Read:** PL-01, TAB-04, core.LinearSchedule
+**Acceptance:**
+- [ ] The default schedule gives 1.0 at game 0, 0.505 at game 500 and 0.01 from game 1,000 on, never rising; bad bounds raise `ValueError`
+**Verify:** `pytest tests/unit/rllab -k schedule` · `scripts/check.sh gate`
+**Depends on:** M1-T01 · **Writes:** src/rllab/core/schedule.py, tests/unit/rllab/test_schedule.py
+
+### M1-T15: Table learner
+**Package:** rllab · **Step:** PL-01.build · **Kind:** thicken · **Covers:** TAB-01, TAB-02, TAB-03, TAB-05, TAB-06 · **Size:** XS · **Mode:** split
+**Skills:** —
+**Reason:** library module behind `build`, reached through `core.Agent` (AD-05)
+**Read:** PL-01, AD-03, TC-11, TAB-05, TAB-06, tabular.TableAgent, core.Agent, core.Transition, core.LinearSchedule, docs/packages/rllab/tests.md
+**Acceptance:**
+- [ ] TC-11 passes
+- [ ] `n_situations` counts distinct observations seen; save then `load` gives the same values; the module imports nothing but NumPy and `rllab.core`
+**Verify:** `pytest tests/intent/rllab tests/unit/rllab -k tabular` · `scripts/check.sh gate`
+**Depends on:** M1-T01 · **Writes:** src/rllab/tabular/agent.py, tests/intent/rllab/test_table_update.py, tests/unit/rllab/test_tabular.py
+
+### M1-T16: Random bot
+**Package:** rllab · **Step:** PL-03.play_bots · **Kind:** thicken · **Covers:** BOT-01 · **Size:** XS · **Mode:** split
+**Skills:** —
+**Reason:** library module behind `play_bots`, reached through `core.Agent` (AD-05)
+**Read:** PL-03, TC-15, bots.RandomBot, core.Agent
+**Acceptance:**
+- [ ] TC-15 passes
+**Verify:** `pytest tests/intent/rllab -k random_bot` · `scripts/check.sh gate`
+**Depends on:** M1-T01 · **Writes:** src/rllab/bots/random_bot.py, tests/intent/rllab/test_random_bot.py
+
+### M1-T17: Scripted bot
+**Package:** rllab · **Step:** PL-03.play_bots · **Kind:** thicken · **Covers:** BOT-02, BOT-03 · **Size:** XS · **Mode:** split
+**Skills:** —
+**Reason:** library module behind `play_bots`, reached through `core.Agent` (AD-05)
+**Read:** PL-03, TC-16, bots.ScriptedBot, snake.SnakeState, snake.SnakeEnv, docs/packages/rllab/tests.md
+**Acceptance:**
+- [ ] TC-16 passes on the four boards, read through an object exposing `state`
+**Verify:** `pytest tests/intent/rllab -k scripted_bot` · `scripts/check.sh gate`
+**Depends on:** M1-T01 · **Writes:** src/rllab/bots/scripted.py, tests/intent/rllab/test_scripted_bot.py
+
+### M1-T18: Evaluation games
+**Package:** rllab · **Step:** PL-03.play_agents · **Kind:** thicken · **Covers:** EVAL-04, WATCH-01 · **Size:** XS · **Mode:** split
+**Skills:** —
+**Reason:** `evaluate.play`, called by `play_agents` and `play_bots`
+**Read:** PL-03, EVAL-04, evaluate.play, evaluate.PlayerScores, replay.Replay, core.Env, core.Agent
+**Acceptance:**
+- [ ] On the `core.Env` and `core.Agent` doubles: `explore=False` throughout, no `learn` calls, one score per game, ending counts summing to the game count, and the first `record` games returned as valid `replay.Replay`s
+**Verify:** `pytest tests/unit/rllab -k play` · `scripts/check.sh gate`
+**Depends on:** M1-T01 · **Writes:** src/rllab/evaluate/play.py, tests/unit/rllab/test_play.py
+
+### M1-T19: Bar tests
+**Package:** rllab · **Step:** PL-03.compare_bars · **Kind:** thicken · **Covers:** EVAL-05, EVAL-06 · **Size:** XS · **Mode:** split
+**Skills:** null-hypothesis-testing
+**Reason:** `evaluate.compare`, called by `compare_bars` (AD-10)
+**Read:** PL-03, AD-10, TC-18, TC-19, TC-20, TC-21, EVAL-05, EVAL-06, evaluate.compare, evaluate.Bar, evaluate.BarResult, evaluate.PlayerScores, docs/packages/rllab/tests.md
+**Acceptance:**
+- [ ] TC-18 and TC-20 pass; TC-21 fails its bar as expected
+- [ ] TC-19 passes on at most 3 of 20 seeds; `BarResult.test` names the procedure the skill chose
+**Verify:** `pytest tests/intent/rllab tests/unit/rllab -k compare` · `scripts/check.sh gate`
+**Depends on:** M1-T01 · **Writes:** src/rllab/evaluate/compare.py, tests/intent/rllab/test_compare.py, tests/unit/rllab/test_compare.py
+
+### M1-T20: Rung-specific bars
+**Package:** rllab · **Step:** PL-03.compare_bars · **Kind:** thicken · **Covers:** EVAL-08, TAB-06 · **Size:** XS · **Mode:** split
+**Skills:** null-hypothesis-testing
+**Read:** PL-03, TC-17, EVAL-08, TAB-06, lab.LADDER, evaluate.compare, evaluate.Summary, docs/packages/rllab/tests.md
+**Acceptance:**
+- [ ] TC-17 passes; a rung&#x27;s two bars are Holm-corrected together
+- [ ] The L1 and L2 summaries carry each rung&#x27;s situation count; L2&#x27;s has no bars
+**Verify:** `pytest tests/intent/rllab tests/unit/rllab -k evaluation` · `scripts/check.sh gate`
+**Depends on:** M1-T05 · **Writes:** src/rllab/lab/evaluation.py, tests/intent/rllab/test_rung_bars.py
+
+### M1-T21: Viewer controls
+**Package:** rllab · **Step:** PL-04.view · **Kind:** thicken · **Covers:** WATCH-02, WATCH-03, WATCH-04, WATCH-05 · **Size:** XS · **Mode:** split
+**Skills:** —
+**Read:** PL-04, AD-08, WATCH-02, WATCH-03, WATCH-04, WATCH-05, replay.view, replay.Replay
+**Acceptance:**
+- [ ] With `show=False` and simulated keys: ← → step and clamp at both ends; + − keep the speed within 1–20 steps per second
+- [ ] Agent replays show three labelled move values with the taken move marked; bot replays say &quot;no values&quot;
+**Verify:** `pytest tests/unit/rllab -k viewer` · `scripts/check.sh gate`
+**Depends on:** M1-T09 · **Writes:** src/rllab/replay/viewer.py, tests/unit/rllab/test_viewer.py
+
+### M1-T22: Wire PL-01
+**Package:** rllab · **Step:** PL-01 · **Kind:** wiring · **Covers:** CORE-01, CORE-02, QR-01, QR-03 · **Size:** S · **Mode:** solo
+**Skills:** —
+**Read:** PL-01, TC-13, TC-14, QR-01, QR-03, docs/packages/rllab/tests.md
+**Acceptance:**
+- [ ] `python -m rllab train L1 --seed 0 --smoke` runs end to end; committed as PL-01&#x27;s smoke test
+- [ ] TC-13 and TC-14 pass on the corridor; import-linter confirms the shared pieces import only `core`
+- [ ] PL-01&#x27;s pre-build sections replaced by a `dt layout` pointer
+**Verify:** `python -m rllab train L1 --seed 0 --smoke` · `pytest tests/intent/rllab -k pl01` · `scripts/check.sh gate`
+**Depends on:** M1-T02, M1-T03, M1-T12, M1-T13, M1-T14, M1-T15 · **Writes:** src/rllab/lab/pipeline.py, src/rllab/__main__.py, tests/intent/rllab/test_pl01.py, tests/unit/rllab/test_pl01_smoke.py
+
+### M1-T23: Wire PL-02
+**Package:** rllab · **Step:** PL-02 · **Kind:** wiring · **Covers:** EVAL-02 · **Size:** S · **Mode:** solo
+**Skills:** —
+**Read:** PL-02, PL-01
+**Acceptance:**
+- [ ] `python -m rllab rung L1 --smoke` runs end to end and leaves five run folders with seeds 0–4; committed as PL-02&#x27;s smoke test
+- [ ] PL-02&#x27;s pre-build sections replaced by a `dt layout` pointer
+**Verify:** `python -m rllab rung L1 --smoke` · `python -m rllab train L1 --seed 0 --smoke` · `scripts/check.sh gate`
+**Depends on:** M1-T22, M1-T04 · **Writes:** src/rllab/lab/pipeline.py, src/rllab/__main__.py, tests/unit/rllab/test_pl02_smoke.py
+
+### M1-T24: Wire PL-03
+**Package:** rllab · **Step:** PL-03 · **Kind:** wiring · **Covers:** BOT-04, QR-04 · **Size:** S · **Mode:** solo
+**Skills:** —
+**Read:** PL-03, BOT-04, QR-04
+**Acceptance:**
+- [ ] `python -m rllab evaluate L1 --smoke` runs end to end, with bots on the rung&#x27;s board size; committed as PL-03&#x27;s smoke test
+- [ ] PL-03&#x27;s pre-build sections replaced by a `dt layout` pointer
+**Verify:** `python -m rllab evaluate L1 --smoke` · `python -m rllab rung L1 --smoke` · `scripts/check.sh gate`
+**Depends on:** M1-T23, M1-T05, M1-T06, M1-T07, M1-T16, M1-T17, M1-T18, M1-T19 · **Writes:** src/rllab/lab/pipeline.py, src/rllab/__main__.py, tests/unit/rllab/test_pl03_smoke.py
+
+### M1-T25: Wire PL-04
+**Package:** rllab · **Step:** PL-04 · **Kind:** wiring · **Covers:** WATCH-07 · **Size:** S · **Mode:** solo
+**Skills:** —
+**Read:** PL-04, TC-22, docs/packages/rllab/tests.md
+**Acceptance:**
+- [ ] `python -m rllab watch &lt;fixture replay&gt; --smoke` runs end to end with the viewer hidden; committed as PL-04&#x27;s smoke test
+- [ ] TC-22 passes; PL-04&#x27;s pre-build sections replaced by a `dt layout` pointer
+**Verify:** `python -m rllab watch tests/contracts/replay.Replay/agent-6x6.json --smoke` · `pytest tests/intent/rllab -k pl04` · `scripts/check.sh gate`
+**Depends on:** M1-T24, M1-T08, M1-T09 · **Writes:** src/rllab/lab/pipeline.py, src/rllab/__main__.py, tests/intent/rllab/test_pl04.py, tests/unit/rllab/test_pl04_smoke.py
+
+### M1-T26: Wire PL-05
+**Package:** rllab · **Step:** PL-05 · **Kind:** wiring · **Covers:** NOTE-01, NOTE-02, NOTE-03, NOTE-04 · **Size:** S · **Mode:** solo
+**Skills:** —
+**Read:** PL-05, TC-23, NOTE-02, NOTE-03, NOTE-04, docs/packages/rllab/tests.md
+**Acceptance:**
+- [ ] `python -m rllab note L2 --smoke` runs end to end; committed as PL-05&#x27;s smoke test
+- [ ] TC-23 passes; PL-05&#x27;s pre-build sections replaced by a `dt layout` pointer
+**Verify:** `python -m rllab note L2 --smoke` · `pytest tests/intent/rllab -k pl05` · `scripts/check.sh gate`
+**Depends on:** M1-T25, M1-T10 · **Writes:** src/rllab/lab/pipeline.py, src/rllab/__main__.py, tests/intent/rllab/test_pl05.py, tests/unit/rllab/test_pl05_smoke.py
+
+### Checkpoint after M1-T26
+- [ ] Every pipeline in the milestone runs end to end (smoke commands)
+- [ ] All golden cases pass
+- [ ] Entry functions still read top to bottom as the step table says (Sync if not)
+- [ ] No new abstraction without a second implementation or an AD
+- [ ] contract.md matches the contract code (`dt status` freshness check)
+- [ ] `dt layout` output reviewed; Definition of Done holds
+- [ ] `scripts/check.sh full` passes; Review checklist done; every finding has a disposition
+
+### Checkpoint: milestone exit
+- [ ] Every pipeline in the milestone runs end to end (smoke commands)
+- [ ] All golden cases pass
+- [ ] Entry functions still read top to bottom as the step table says (Sync if not)
+- [ ] No new abstraction without a second implementation or an AD
+- [ ] contract.md matches the contract code (`dt status` freshness check)
+- [ ] `dt layout` output reviewed; Definition of Done holds
+- [ ] `scripts/check.sh full --exit` passes; Review checklist done; every finding has a disposition
+- [ ] The Scope&#x27;s Exit holds: `rung L1`, `rung L2`, `evaluate L1`, `evaluate L2` on real runs; TC-24&#x27;s table rungs hold; `note L1` and `note L2` drafts written
+
+## Dependency graph
+| From | To | Kind | Mitigated by |
+|---|---|---|---|
+| M1-T12 Snake rules | M1-T11 Snake views | data | none: every `step` builds its observation with the view functions, so the rule tests need real views |
+| M1-T15 Table learner | M1-T14 Exploration schedule | data | core.LinearSchedule sample (M1-T01) |
+| M1-T17 Scripted bot | M1-T12 Snake rules | data | snake.SnakeState sample (M1-T01): the bot reads only `state` |
+| M1-T18 Evaluation games | M1-T08 rebuild spine | data | replay.Replay sample (M1-T01) |
+| M1-T05 lab.evaluation spine | M1-T18 Evaluation games | call | evaluate.play replay double (M1-T01) |
+| M1-T05 lab.evaluation spine | M1-T19 Bar tests | call | evaluate.compare replay double (M1-T01) |
+| M1-T03 train spine | M1-T15 Table learner | data | core.Agent replay double (M1-T01) |
+| M1-T20 Rung-specific bars | M1-T05 lab.evaluation spine | code | none: thickens the same module |
+| M1-T21 Viewer controls | M1-T09 view spine | code | none: thickens the same module |
+| M1-T22 Wire PL-01 | M1-T02 lab.settings spine | order | none: integration: the smoke runs it |
+| M1-T22 Wire PL-01 | M1-T03 train spine | order | none: integration: the smoke runs it |
+| M1-T22 Wire PL-01 | M1-T12 Snake rules | order | none: integration: the L1 smoke builds a `SnakeEnv` |
+| M1-T22 Wire PL-01 | M1-T13 Corridor environment | order | none: integration: TC-13 runs on the corridor |
+| M1-T22 Wire PL-01 | M1-T14 Exploration schedule | order | none: integration: training runs it |
+| M1-T22 Wire PL-01 | M1-T15 Table learner | order | none: integration: the smoke trains it |
+| M1-T23 Wire PL-02 | M1-T22 Wire PL-01 | file | none: both write `lab/pipeline.py` and `__main__.py`; PL-02 also runs PL-01 as built |
+| M1-T23 Wire PL-02 | M1-T04 lab.runs spine | order | none: integration: the smoke runs it |
+| M1-T24 Wire PL-03 | M1-T23 Wire PL-02 | file | none: same entry module and trigger; the smoke evaluates PL-02&#x27;s runs |
+| M1-T24 Wire PL-03 | M1-T05 lab.evaluation spine | order | none: integration: the smoke runs it |
+| M1-T24 Wire PL-03 | M1-T06 draw_curves spine | order | none: integration: the smoke runs it |
+| M1-T24 Wire PL-03 | M1-T07 replay.io spine | order | none: integration: `save_eval` saves replays |
+| M1-T24 Wire PL-03 | M1-T16 Random bot | order | none: integration: the smoke plays it |
+| M1-T24 Wire PL-03 | M1-T17 Scripted bot | order | none: integration: the smoke plays it |
+| M1-T24 Wire PL-03 | M1-T18 Evaluation games | order | none: integration: the smoke runs it |
+| M1-T24 Wire PL-03 | M1-T19 Bar tests | order | none: integration: the smoke runs it |
+| M1-T25 Wire PL-04 | M1-T24 Wire PL-03 | file | none: same entry module and trigger |
+| M1-T25 Wire PL-04 | M1-T08 rebuild spine | order | none: integration: the smoke runs it |
+| M1-T25 Wire PL-04 | M1-T09 view spine | order | none: integration: the smoke runs it |
+| M1-T26 Wire PL-05 | M1-T25 Wire PL-04 | file | none: same entry module and trigger |
+| M1-T26 Wire PL-05 | M1-T10 lab.notes spine | order | none: integration: the smoke runs it |
+
+## Risks
+| Risk | Impact | Mitigation |
+|---|---|---|
+| L1 levels off below the scripted bot | The &quot;matches&quot; bar fails at exit | TC-24 shows it; the L1 note records the limit; learning settings are tuned within EVAL-01&#x27;s saved settings |
+| L2&#x27;s table grows too large for memory | The L2 run can&#x27;t finish in 10 minutes (QR-01) | `n_situations` is logged; the step cut-off bounds game length; L2 is an experiment with no bar |
+| The bar-test design changes when the skill reviews it | TC-18–TC-21 expectations move | Any change goes through test-planning Revise with your approval (M1-T19) |
+
+## Open questions
+- None.
+
+## Replan notes
+</pre><div class="hook">⛔ hook PostToolUse:Write blocked: dt lint found problems in tasks/plan.md:
+tasks/plan.md:256: verify-smoke M1-T25 Verify lacks PL-04&#x27;s smoke command `python -m rllab watch &lt;fixture replay&gt; --smoke`
+1 error, 0 warnings</div><details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-8/rl-incremental/with_skill/project/tasks/plan.md&quot;,
+  &quot;content&quot;: &quot;# M1: Table ladder — Plan\n\n**Milestone:** M1 · **Status:** Draft · **Base:** — · **Last updated:** 2026-10-17 · **Roadmap:** [../docs/roadmap.md](../docs/roadmap.md)\n\n## Scope\n**Exit:** `rung`, `evaluate`, `watch` and `note` run end to end on L1 and L2; L1 beats random and matches scripted, L2 is reported (TC-24, table rungs); TC-01–TC-11 and TC-13–TC-23 pass.\n**Covers:** GAME-01–GAME-09, VIEW-01–VIEW-05, BOT-01–BOT-04, TAB-01–TAB-06, EVAL-01–EVAL-06, EVAL-08–EVAL-10, WATCH-01–WATCH-07, NOTE-01–NOTE-04, CORE-01, CORE-02, QR-01, QR-03, QR-04 · **Deferred:** NET-01–NET-08 (to M2: the network learner is M2&#x27;s slice), EVAL-07 (to M2: only L4 has \&quot;beats scripted\&quot;), NOTE-05 (to M2: the closing note needs all four rungs), QR-02 (to M2: network run time)\n**Skills:** null-hypothesis-testing (evaluate.compare, rung bars)\n\n## Phase 0: Interface\n\n### M1-T01: M1 interface\n**Package:** rllab · **Step:** contract · **Kind:** interface · **Covers:** — · **Size:** S · **Mode:** solo\n**Skills:** —\n**Read:** PL-01, PL-02, PL-03, PL-04, PL-05, AD-05, AD-11, core.Ending, core.TimeStep, core.Transition, core.Env, core.Agent, core.LinearSchedule, snake.SnakeState, snake.SnakeEnv, train.RunSettings, train.GameRecord, evaluate.PlayerScores, evaluate.Bar, evaluate.BarResult, evaluate.Summary, evaluate.play, evaluate.compare, replay.Replay, plots.Figure, lab.Note\n**Acceptance:**\n- [ ] Each contract type used by M1 is code in its component&#x27;s `types.py`; each `tests/contracts/&lt;id&gt;.&lt;Type&gt;/` sample validates against its schema\n- [ ] Every M1 step and contract class imports with its contract signature, body `raise NotImplementedError(\&quot;&lt;its task id&gt;\&quot;)`; each component `__init__.py` exports its contract section\n- [ ] Replay doubles for `core.Env`, `core.Agent`, `evaluate.play` and `evaluate.compare` serve their fixtures\n**Verify:** `pytest tests/contracts` · `scripts/check.sh gate`\n**Depends on:** — · **Writes:** src/rllab/**, tests/contracts/**\n\n## Phase 1: Step spines\n\n### M1-T02: lab.settings spine (L1, L2, corridor)\n**Package:** rllab · **Step:** PL-01.build · **Kind:** spine · **Covers:** EVAL-01, VIEW-05 · **Size:** XS · **Mode:** solo\n**Skills:** —\n**Reason:** one module for `seed_settings`, `build` (PL-01) and `build_env` (PL-04)\n**Read:** PL-01, PL-04, AD-05, lab.LADDER, lab.build, train.RunSettings, core.Env, core.Agent\n**Acceptance:**\n- [ ] `seed_settings(\&quot;L1\&quot;, 3)` returns L1&#x27;s settings with seed 3; `build` returns a `SnakeEnv` and `TableAgent` for L1 and L2 and a `CorridorEnv` for corridor settings; an unknown `kind` raises `ValueError`\n**Verify:** `pytest tests/unit/rllab -k settings` · `scripts/check.sh gate`\n**Depends on:** M1-T01 · **Writes:** src/rllab/lab/settings.py, tests/unit/rllab/test_settings.py\n\n### M1-T03: train spine (plain loop)\n**Package:** rllab · **Step:** PL-01.train · **Kind:** spine · **Covers:** EVAL-01, EVAL-02, EVAL-10, CORE-01 · **Size:** S · **Mode:** solo\n**Skills:** —\n**Read:** PL-01, train.train, train.load_log, train.RunSettings, train.GameRecord, core.Env, core.Agent, core.Transition\n**Acceptance:**\n- [ ] On the `core.Env` and `core.Agent` replay doubles, `train` plays `games` games, calling `learn` after every step and `end_game` after every game; writes `settings.json`, `train_log.csv` and the agent; `load_log` reads the log back equal\n**Verify:** `pytest tests/unit/rllab -k train_loop` · `scripts/check.sh gate`\n**Depends on:** M1-T01 · **Writes:** src/rllab/train/loop.py, src/rllab/train/log.py, tests/unit/rllab/test_train_loop.py\n\n### M1-T04: lab.runs spine (seeds one after another)\n**Package:** rllab · **Step:** PL-02.train_seeds · **Kind:** spine · **Covers:** EVAL-10 · **Size:** XS · **Mode:** solo\n**Skills:** —\n**Reason:** one module for `train_seeds`, `report_runs` (PL-02) and `load_agents` (PL-03)\n**Read:** PL-02, PL-03, train.RunSettings, train.GameRecord, train.load_log, core.Agent\n**Acceptance:**\n- [ ] `train_seeds` runs seeds 0–4 in turn and returns their settings; `report_runs` returns the last record per seed; `load_agents` reloads each seed&#x27;s saved agent\n**Verify:** `pytest tests/unit/rllab -k runs` · `scripts/check.sh gate`\n**Depends on:** M1-T01 · **Writes:** src/rllab/lab/runs.py, tests/unit/rllab/test_runs.py\n\n### M1-T05: lab.evaluation spine (bars against random only)\n**Package:** rllab · **Step:** PL-03.compare_bars · **Kind:** spine · **Covers:** EVAL-04, EVAL-09 · **Size:** XS · **Mode:** solo\n**Skills:** —\n**Reason:** one module for `play_agents`, `play_bots`, `compare_bars`, `build_summary` and `save_eval`\n**Read:** PL-03, evaluate.play, evaluate.compare, evaluate.PlayerScores, evaluate.BarResult, evaluate.Summary, replay.Replay, replay.save\n**Acceptance:**\n- [ ] On the `evaluate.play` and `evaluate.compare` doubles: 100 games per seed and 500 per bot are requested; `compare_bars` returns one \&quot;beats random\&quot; bar; `save_eval` writes `eval.json` that reads back as the same `Summary`\n**Verify:** `pytest tests/unit/rllab -k evaluation` · `scripts/check.sh gate`\n**Depends on:** M1-T01 · **Writes:** src/rllab/lab/evaluation.py, tests/unit/rllab/test_evaluation.py\n\n### M1-T06: draw_curves spine (raw score per game)\n**Package:** rllab · **Step:** PL-03.draw_curves · **Kind:** spine · **Covers:** EVAL-03 · **Size:** XS · **Mode:** solo\n**Skills:** —\n**Read:** PL-03, plots.learning_curve, plots.Figure, train.GameRecord, evaluate.Summary\n**Acceptance:**\n- [ ] On the `train.GameRecord` and `evaluate.Summary` samples, `learning_curve` writes a PNG with the score smoothed over 100 games and one labelled line per bot, and returns a valid `plots.Figure`\n**Verify:** `pytest tests/unit/rllab -k curves` · `scripts/check.sh gate`\n**Depends on:** M1-T01 · **Writes:** src/rllab/plots/curves.py, tests/unit/rllab/test_curves.py\n\n### M1-T07: replay.io spine (JSON)\n**Package:** rllab · **Step:** PL-04.load · **Kind:** spine · **Covers:** WATCH-01 · **Size:** XS · **Mode:** solo\n**Skills:** —\n**Read:** PL-04, AD-07, replay.Replay, replay.save, replay.load\n**Acceptance:**\n- [ ] The `replay.Replay` samples round-trip through `save` and `load` unchanged; a missing file raises `FileNotFoundError` and a damaged one `ValueError`\n**Verify:** `pytest tests/unit/rllab -k replay_io` · `scripts/check.sh gate`\n**Depends on:** M1-T01 · **Writes:** src/rllab/replay/io.py, tests/unit/rllab/test_replay_io.py\n\n### M1-T08: rebuild spine (replay the moves)\n**Package:** rllab · **Step:** PL-04.rebuild · **Kind:** spine · **Covers:** WATCH-07 · **Size:** XS · **Mode:** solo\n**Skills:** —\n**Read:** PL-04, AD-07, replay.rebuild, replay.Replay, core.Env\n**Acceptance:**\n- [ ] On the `core.Env` replay double, `rebuild` replays a recorded game&#x27;s moves and reports a match; one changed move reports a mismatch\n**Verify:** `pytest tests/unit/rllab -k replay_record` · `scripts/check.sh gate`\n**Depends on:** M1-T01 · **Writes:** src/rllab/replay/record.py, tests/unit/rllab/test_replay_record.py\n\n### M1-T09: view spine (static board)\n**Package:** rllab · **Step:** PL-04.view · **Kind:** spine · **Covers:** WATCH-06 · **Size:** XS · **Mode:** solo\n**Skills:** —\n**Read:** PL-04, AD-08, replay.view, replay.Replay\n**Acceptance:**\n- [ ] `view(sample, show=False)` draws the first frame with step, score and reward, and returns the replay unchanged\n**Verify:** `pytest tests/unit/rllab -k viewer` · `scripts/check.sh gate`\n**Depends on:** M1-T01 · **Writes:** src/rllab/replay/viewer.py, tests/unit/rllab/test_viewer.py\n\n### M1-T10: lab.notes spine (summary table)\n**Package:** rllab · **Step:** PL-05.render_note · **Kind:** spine · **Covers:** NOTE-01 · **Size:** XS · **Mode:** solo\n**Skills:** —\n**Reason:** one module for `load_summaries`, `render_note` and `write_note`\n**Read:** PL-05, lab.Note, evaluate.Summary\n**Acceptance:**\n- [ ] On the `evaluate.Summary` sample, `render_note` returns a `lab.Note` with the summary table and curve links; `write_note` writes it and refuses to overwrite\n**Verify:** `pytest tests/unit/rllab -k notes` · `scripts/check.sh gate`\n**Depends on:** M1-T01 · **Writes:** src/rllab/lab/notes.py, tests/unit/rllab/test_notes.py\n\n## Phase 2: Wiring and thicken\n\n### M1-T11: Snake views\n**Package:** rllab · **Step:** PL-01.build · **Kind:** thicken · **Covers:** VIEW-01, VIEW-02, VIEW-03, VIEW-04 · **Size:** XS · **Mode:** split\n**Skills:** —\n**Reason:** library module behind `build`, reached through `core.Env` (AD-05)\n**Read:** PL-01, TC-08, TC-09, TC-10, VIEW-01, VIEW-02, VIEW-03, VIEW-04, snake.SnakeState, docs/packages/rllab/tests.md\n**Acceptance:**\n- [ ] TC-08, TC-09 and TC-10 pass on the view functions given the `snake.SnakeState` inputs\n**Verify:** `pytest tests/intent/rllab tests/unit/rllab -k views` · `scripts/check.sh gate`\n**Depends on:** M1-T01 · **Writes:** src/rllab/snake/views.py, tests/intent/rllab/test_snake_views.py, tests/unit/rllab/test_snake_views.py\n\n### M1-T12: Snake rules\n**Package:** rllab · **Step:** PL-01.build · **Kind:** thicken · **Covers:** GAME-01–GAME-09 · **Size:** XS · **Mode:** split\n**Skills:** —\n**Reason:** library module behind `build`, reached through `core.Env` (AD-05, AD-12)\n**Read:** PL-01, AD-12, TC-01, TC-02, TC-03, TC-04, TC-05, TC-06, TC-07, GAME-01, GAME-02, GAME-09, snake.SnakeEnv, snake.SnakeState, core.TimeStep, docs/packages/rllab/tests.md\n**Acceptance:**\n- [ ] TC-01–TC-07 pass through `SnakeEnv.from_state`\n- [ ] Given a new 10×10 game, the snake has 3 cells with the head in the centre and food off the body; the same seed and moves give identical games (GAME-09)\n**Verify:** `pytest tests/intent/rllab tests/unit/rllab -k snake_rules` · `scripts/check.sh gate`\n**Depends on:** M1-T11 · **Writes:** src/rllab/snake/game.py, tests/intent/rllab/test_snake_rules.py, tests/unit/rllab/test_snake_game.py\n\n### M1-T13: Corridor environment\n**Package:** rllab · **Step:** PL-01.build · **Kind:** thicken · **Covers:** CORE-02 · **Size:** XS · **Mode:** split\n**Skills:** —\n**Reason:** library module behind `build`, reached through `core.Env` (AD-05)\n**Read:** PL-01, CORE-02, corridor.CorridorEnv, core.Env, core.TimeStep\n**Acceptance:**\n- [ ] Reaching the right end gives +1 and `won`; 20 steps without winning gives `cut_off` with terminal false; the same seed and moves give identical frames\n**Verify:** `pytest tests/unit/rllab -k corridor` · `scripts/check.sh gate`\n**Depends on:** M1-T01 · **Writes:** src/rllab/corridor/env.py, tests/unit/rllab/test_corridor.py\n\n### M1-T14: Exploration schedule\n**Package:** rllab · **Step:** PL-01.build · **Kind:** thicken · **Covers:** TAB-04 · **Size:** XS · **Mode:** split\n**Skills:** —\n**Reason:** library module behind `build`, used by the table learner\n**Read:** PL-01, TAB-04, core.LinearSchedule\n**Acceptance:**\n- [ ] The default schedule gives 1.0 at game 0, 0.505 at game 500 and 0.01 from game 1,000 on, never rising; bad bounds raise `ValueError`\n**Verify:** `pytest tests/unit/rllab -k schedule` · `scripts/check.sh gate`\n**Depends on:** M1-T01 · **Writes:** src/rllab/core/schedule.py, tests/unit/rllab/test_schedule.py\n\n### M1-T15: Table learner\n**Package:** rllab · **Step:** PL-01.build · **Kind:** thicken · **Covers:** TAB-01, TAB-02, TAB-03, TAB-05, TAB-06 · **Size:** XS · **Mode:** split\n**Skills:** —\n**Reason:** library module behind `build`, reached through `core.Agent` (AD-05)\n**Read:** PL-01, AD-03, TC-11, TAB-05, TAB-06, tabular.TableAgent, core.Agent, core.Transition, core.LinearSchedule, docs/packages/rllab/tests.md\n**Acceptance:**\n- [ ] TC-11 passes\n- [ ] `n_situations` counts distinct observations seen; save then `load` gives the same values; the module imports nothing but NumPy and `rllab.core`\n**Verify:** `pytest tests/intent/rllab tests/unit/rllab -k tabular` · `scripts/check.sh gate`\n**Depends on:** M1-T01 · **Writes:** src/rllab/tabular/agent.py, tests/intent/rllab/test_table_update.py, tests/unit/rllab/test_tabular.py\n\n### M1-T16: Random bot\n**Package:** rllab · **Step:** PL-03.play_bots · **Kind:** thicken · **Covers:** BOT-01 · **Size:** XS · **Mode:** split\n**Skills:** —\n**Reason:** library module behind `play_bots`, reached through `core.Agent` (AD-05)\n**Read:** PL-03, TC-15, bots.RandomBot, core.Agent\n**Acceptance:**\n- [ ] TC-15 passes\n**Verify:** `pytest tests/intent/rllab -k random_bot` · `scripts/check.sh gate`\n**Depends on:** M1-T01 · **Writes:** src/rllab/bots/random_bot.py, tests/intent/rllab/test_random_bot.py\n\n### M1-T17: Scripted bot\n**Package:** rllab · **Step:** PL-03.play_bots · **Kind:** thicken · **Covers:** BOT-02, BOT-03 · **Size:** XS · **Mode:** split\n**Skills:** —\n**Reason:** library module behind `play_bots`, reached through `core.Agent` (AD-05)\n**Read:** PL-03, TC-16, bots.ScriptedBot, snake.SnakeState, snake.SnakeEnv, docs/packages/rllab/tests.md\n**Acceptance:**\n- [ ] TC-16 passes on the four boards, read through an object exposing `state`\n**Verify:** `pytest tests/intent/rllab -k scripted_bot` · `scripts/check.sh gate`\n**Depends on:** M1-T01 · **Writes:** src/rllab/bots/scripted.py, tests/intent/rllab/test_scripted_bot.py\n\n### M1-T18: Evaluation games\n**Package:** rllab · **Step:** PL-03.play_agents · **Kind:** thicken · **Covers:** EVAL-04, WATCH-01 · **Size:** XS · **Mode:** split\n**Skills:** —\n**Reason:** `evaluate.play`, called by `play_agents` and `play_bots`\n**Read:** PL-03, EVAL-04, evaluate.play, evaluate.PlayerScores, replay.Replay, core.Env, core.Agent\n**Acceptance:**\n- [ ] On the `core.Env` and `core.Agent` doubles: `explore=False` throughout, no `learn` calls, one score per game, ending counts summing to the game count, and the first `record` games returned as valid `replay.Replay`s\n**Verify:** `pytest tests/unit/rllab -k play` · `scripts/check.sh gate`\n**Depends on:** M1-T01 · **Writes:** src/rllab/evaluate/play.py, tests/unit/rllab/test_play.py\n\n### M1-T19: Bar tests\n**Package:** rllab · **Step:** PL-03.compare_bars · **Kind:** thicken · **Covers:** EVAL-05, EVAL-06 · **Size:** XS · **Mode:** split\n**Skills:** null-hypothesis-testing\n**Reason:** `evaluate.compare`, called by `compare_bars` (AD-10)\n**Read:** PL-03, AD-10, TC-18, TC-19, TC-20, TC-21, EVAL-05, EVAL-06, evaluate.compare, evaluate.Bar, evaluate.BarResult, evaluate.PlayerScores, docs/packages/rllab/tests.md\n**Acceptance:**\n- [ ] TC-18 and TC-20 pass; TC-21 fails its bar as expected\n- [ ] TC-19 passes on at most 3 of 20 seeds; `BarResult.test` names the procedure the skill chose\n**Verify:** `pytest tests/intent/rllab tests/unit/rllab -k compare` · `scripts/check.sh gate`\n**Depends on:** M1-T01 · **Writes:** src/rllab/evaluate/compare.py, tests/intent/rllab/test_compare.py, tests/unit/rllab/test_compare.py\n\n### M1-T20: Rung-specific bars\n**Package:** rllab · **Step:** PL-03.compare_bars · **Kind:** thicken · **Covers:** EVAL-08, TAB-06 · **Size:** XS · **Mode:** split\n**Skills:** null-hypothesis-testing\n**Read:** PL-03, TC-17, EVAL-08, TAB-06, lab.LADDER, evaluate.compare, evaluate.Summary, docs/packages/rllab/tests.md\n**Acceptance:**\n- [ ] TC-17 passes; a rung&#x27;s two bars are Holm-corrected together\n- [ ] The L1 and L2 summaries carry each rung&#x27;s situation count; L2&#x27;s has no bars\n**Verify:** `pytest tests/intent/rllab tests/unit/rllab -k evaluation` · `scripts/check.sh gate`\n**Depends on:** M1-T05 · **Writes:** src/rllab/lab/evaluation.py, tests/intent/rllab/test_rung_bars.py\n\n### M1-T21: Viewer controls\n**Package:** rllab · **Step:** PL-04.view · **Kind:** thicken · **Covers:** WATCH-02, WATCH-03, WATCH-04, WATCH-05 · **Size:** XS · **Mode:** split\n**Skills:** —\n**Read:** PL-04, AD-08, WATCH-02, WATCH-03, WATCH-04, WATCH-05, replay.view, replay.Replay\n**Acceptance:**\n- [ ] With `show=False` and simulated keys: ← → step and clamp at both ends; + − keep the speed within 1–20 steps per second\n- [ ] Agent replays show three labelled move values with the taken move marked; bot replays say \&quot;no values\&quot;\n**Verify:** `pytest tests/unit/rllab -k viewer` · `scripts/check.sh gate`\n**Depends on:** M1-T09 · **Writes:** src/rllab/replay/viewer.py, tests/unit/rllab/test_viewer.py\n\n### M1-T22: Wire PL-01\n**Package:** rllab · **Step:** PL-01 · **Kind:** wiring · **Covers:** CORE-01, CORE-02, QR-01, QR-03 · **Size:** S · **Mode:** solo\n**Skills:** —\n**Read:** PL-01, TC-13, TC-14, QR-01, QR-03, docs/packages/rllab/tests.md\n**Acceptance:**\n- [ ] `python -m rllab train L1 --seed 0 --smoke` runs end to end; committed as PL-01&#x27;s smoke test\n- [ ] TC-13 and TC-14 pass on the corridor; import-linter confirms the shared pieces import only `core`\n- [ ] PL-01&#x27;s pre-build sections replaced by a `dt layout` pointer\n**Verify:** `python -m rllab train L1 --seed 0 --smoke` · `pytest tests/intent/rllab -k pl01` · `scripts/check.sh gate`\n**Depends on:** M1-T02, M1-T03, M1-T12, M1-T13, M1-T14, M1-T15 · **Writes:** src/rllab/lab/pipeline.py, src/rllab/__main__.py, tests/intent/rllab/test_pl01.py, tests/unit/rllab/test_pl01_smoke.py\n\n### M1-T23: Wire PL-02\n**Package:** rllab · **Step:** PL-02 · **Kind:** wiring · **Covers:** EVAL-02 · **Size:** S · **Mode:** solo\n**Skills:** —\n**Read:** PL-02, PL-01\n**Acceptance:**\n- [ ] `python -m rllab rung L1 --smoke` runs end to end and leaves five run folders with seeds 0–4; committed as PL-02&#x27;s smoke test\n- [ ] PL-02&#x27;s pre-build sections replaced by a `dt layout` pointer\n**Verify:** `python -m rllab rung L1 --smoke` · `python -m rllab train L1 --seed 0 --smoke` · `scripts/check.sh gate`\n**Depends on:** M1-T22, M1-T04 · **Writes:** src/rllab/lab/pipeline.py, src/rllab/__main__.py, tests/unit/rllab/test_pl02_smoke.py\n\n### M1-T24: Wire PL-03\n**Package:** rllab · **Step:** PL-03 · **Kind:** wiring · **Covers:** BOT-04, QR-04 · **Size:** S · **Mode:** solo\n**Skills:** —\n**Read:** PL-03, BOT-04, QR-04\n**Acceptance:**\n- [ ] `python -m rllab evaluate L1 --smoke` runs end to end, with bots on the rung&#x27;s board size; committed as PL-03&#x27;s smoke test\n- [ ] PL-03&#x27;s pre-build sections replaced by a `dt layout` pointer\n**Verify:** `python -m rllab evaluate L1 --smoke` · `python -m rllab rung L1 --smoke` · `scripts/check.sh gate`\n**Depends on:** M1-T23, M1-T05, M1-T06, M1-T07, M1-T16, M1-T17, M1-T18, M1-T19 · **Writes:** src/rllab/lab/pipeline.py, src/rllab/__main__.py, tests/unit/rllab/test_pl03_smoke.py\n\n### M1-T25: Wire PL-04\n**Package:** rllab · **Step:** PL-04 · **Kind:** wiring · **Covers:** WATCH-07 · **Size:** S · **Mode:** solo\n**Skills:** —\n**Read:** PL-04, TC-22, docs/packages/rllab/tests.md\n**Acceptance:**\n- [ ] `python -m rllab watch &lt;fixture replay&gt; --smoke` runs end to end with the viewer hidden; committed as PL-04&#x27;s smoke test\n- [ ] TC-22 passes; PL-04&#x27;s pre-build sections replaced by a `dt layout` pointer\n**Verify:** `python -m rllab watch tests/contracts/replay.Replay/agent-6x6.json --smoke` · `pytest tests/intent/rllab -k pl04` · `scripts/check.sh gate`\n**Depends on:** M1-T24, M1-T08, M1-T09 · **Writes:** src/rllab/lab/pipeline.py, src/rllab/__main__.py, tests/intent/rllab/test_pl04.py, tests/unit/rllab/test_pl04_smoke.py\n\n### M1-T26: Wire PL-05\n**Package:** rllab · **Step:** PL-05 · **Kind:** wiring · **Covers:** NOTE-01, NOTE-02, NOTE-03, NOTE-04 · **Size:** S · **Mode:** solo\n**Skills:** —\n**Read:** PL-05, TC-23, NOTE-02, NOTE-03, NOTE-04, docs/packages/rllab/tests.md\n**Acceptance:**\n- [ ] `python -m rllab note L2 --smoke` runs end to end; committed as PL-05&#x27;s smoke test\n- [ ] TC-23 passes; PL-05&#x27;s pre-build sections replaced by a `dt layout` pointer\n**Verify:** `python -m rllab note L2 --smoke` · `pytest tests/intent/rllab -k pl05` · `scripts/check.sh gate`\n**Depends on:** M1-T25, M1-T10 · **Writes:** src/rllab/lab/pipeline.py, src/rllab/__main__.py, tests/intent/rllab/test_pl05.py, tests/unit/rllab/test_pl05_smoke.py\n\n### Checkpoint after M1-T26\n- [ ] Every pipeline in the milestone runs end to end (smoke commands)\n- [ ] All golden cases pass\n- [ ] Entry functions still read top to bottom as the step table says (Sync if not)\n- [ ] No new abstraction without a second implementation or an AD\n- [ ] contract.md matches the contract code (`dt status` freshness check)\n- [ ] `dt layout` output reviewed; Definition of Done holds\n- [ ] `scripts/check.sh full` passes; Review checklist done; every finding has a disposition\n\n### Checkpoint: milestone exit\n- [ ] Every pipeline in the milestone runs end to end (smoke commands)\n- [ ] All golden cases pass\n- [ ] Entry functions still read top to bottom as the step table says (Sync if not)\n- [ ] No new abstraction without a second implementation or an AD\n- [ ] contract.md matches the contract code (`dt status` freshness check)\n- [ ] `dt layout` output reviewed; Definition of Done holds\n- [ ] `scripts/check.sh full --exit` passes; Review checklist done; every finding has a disposition\n- [ ] The Scope&#x27;s Exit holds: `rung L1`, `rung L2`, `evaluate L1`, `evaluate L2` on real runs; TC-24&#x27;s table rungs hold; `note L1` and `note L2` drafts written\n\n## Dependency graph\n| From | To | Kind | Mitigated by |\n|---|---|---|---|\n| M1-T12 Snake rules | M1-T11 Snake views | data | none: every `step` builds its observation with the view functions, so the rule tests need real views |\n| M1-T15 Table learner | M1-T14 Exploration schedule | data | core.LinearSchedule sample (M1-T01) |\n| M1-T17 Scripted bot | M1-T12 Snake rules | data | snake.SnakeState sample (M1-T01): the bot reads only `state` |\n| M1-T18 Evaluation games | M1-T08 rebuild spine | data | replay.Replay sample (M1-T01) |\n| M1-T05 lab.evaluation spine | M1-T18 Evaluation games | call | evaluate.play replay double (M1-T01) |\n| M1-T05 lab.evaluation spine | M1-T19 Bar tests | call | evaluate.compare replay double (M1-T01) |\n| M1-T03 train spine | M1-T15 Table learner | data | core.Agent replay double (M1-T01) |\n| M1-T20 Rung-specific bars | M1-T05 lab.evaluation spine | code | none: thickens the same module |\n| M1-T21 Viewer controls | M1-T09 view spine | code | none: thickens the same module |\n| M1-T22 Wire PL-01 | M1-T02 lab.settings spine | order | none: integration: the smoke runs it |\n| M1-T22 Wire PL-01 | M1-T03 train spine | order | none: integration: the smoke runs it |\n| M1-T22 Wire PL-01 | M1-T12 Snake rules | order | none: integration: the L1 smoke builds a `SnakeEnv` |\n| M1-T22 Wire PL-01 | M1-T13 Corridor environment | order | none: integration: TC-13 runs on the corridor |\n| M1-T22 Wire PL-01 | M1-T14 Exploration schedule | order | none: integration: training runs it |\n| M1-T22 Wire PL-01 | M1-T15 Table learner | order | none: integration: the smoke trains it |\n| M1-T23 Wire PL-02 | M1-T22 Wire PL-01 | file | none: both write `lab/pipeline.py` and `__main__.py`; PL-02 also runs PL-01 as built |\n| M1-T23 Wire PL-02 | M1-T04 lab.runs spine | order | none: integration: the smoke runs it |\n| M1-T24 Wire PL-03 | M1-T23 Wire PL-02 | file | none: same entry module and trigger; the smoke evaluates PL-02&#x27;s runs |\n| M1-T24 Wire PL-03 | M1-T05 lab.evaluation spine | order | none: integration: the smoke runs it |\n| M1-T24 Wire PL-03 | M1-T06 draw_curves spine | order | none: integration: the smoke runs it |\n| M1-T24 Wire PL-03 | M1-T07 replay.io spine | order | none: integration: `save_eval` saves replays |\n| M1-T24 Wire PL-03 | M1-T16 Random bot | order | none: integration: the smoke plays it |\n| M1-T24 Wire PL-03 | M1-T17 Scripted bot | order | none: integration: the smoke plays it |\n| M1-T24 Wire PL-03 | M1-T18 Evaluation games | order | none: integration: the smoke runs it |\n| M1-T24 Wire PL-03 | M1-T19 Bar tests | order | none: integration: the smoke runs it |\n| M1-T25 Wire PL-04 | M1-T24 Wire PL-03 | file | none: same entry module and trigger |\n| M1-T25 Wire PL-04 | M1-T08 rebuild spine | order | none: integration: the smoke runs it |\n| M1-T25 Wire PL-04 | M1-T09 view spine | order | none: integration: the smoke runs it |\n| M1-T26 Wire PL-05 | M1-T25 Wire PL-04 | file | none: same entry module and trigger |\n| M1-T26 Wire PL-05 | M1-T10 lab.notes spine | order | none: integration: the smoke runs it |\n\n## Risks\n| Risk | Impact | Mitigation |\n|---|---|---|\n| L1 levels off below the scripted bot | The \&quot;matches\&quot; bar fails at exit | TC-24 shows it; the L1 note records the limit; learning settings are tuned within EVAL-01&#x27;s saved settings |\n| L2&#x27;s table grows too large for memory | The L2 run can&#x27;t finish in 10 minutes (QR-01) | `n_situations` is logged; the step cut-off bounds game length; L2 is an experiment with no bar |\n| The bar-test design changes when the skill reviews it | TC-18–TC-21 expectations move | Any change goes through test-planning Revise with your approval (M1-T19) |\n\n## Open questions\n- None.\n\n## Replan notes\n&quot;
+}</pre><div class="lbl">output</div><pre>File created successfully at: /Users/connorott/plugins/dev-team-workspace/iteration-8/rl-incremental/with_skill/project/tasks/plan.md (file state is current in your context — no need to Read it back)</pre></details></div><div class="step" id="SD142"><span class="sid">D142</span><span class="kind">Bash</span>sed -i &#x27;&#x27; &#x27;s#`python -m rllab watch tests/contracts/replay.Replay/agent-6x6.json --smoke`#`python -m rllab watch &lt;fixture replay&gt; --smoke`#&#x27; tasks/plan.md &amp;&amp; python3 ../plugin/dev-team/scripts/dt.py lint tasks/ docs/roadmap.md<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;sed -i &#x27;&#x27; &#x27;s#`python -m rllab watch tests/contracts/replay.Replay/agent-6x6.json --smoke`#`python -m rllab watch &lt;fixture replay&gt; --smoke`#&#x27; tasks/plan.md &amp;&amp; python3 ../plugin/dev-team/scripts/dt.py lint tasks/ docs/roadmap.md&quot;,
+  &quot;description&quot;: &quot;Match PL-04 smoke command and relint plan&quot;
+}</pre><div class="lbl">output</div><pre>0 errors, 0 warnings</pre></details></div><div class="step" id="SD143"><span class="sid">D143</span><span class="kind">say</span>Now the todo list and the AGENTS.md doc map.<details><summary>full text</summary><pre>Now the todo list and the AGENTS.md doc map.</pre></details></div><div class="step" id="SD144"><span class="sid">D144</span><span class="kind">Bash</span>python3 - &lt;&lt;&#x27;EOF&#x27;
+import re
+s=open(&#x27;tasks/plan.md&#x27;).read()
+out=[&quot;# M1: Table ladder — Todo&quot;,&quot;&quot;]
+for m in re.finditer(r&#x27;### (M1-T\d\d): (.+)\n\*\*Package:\*\* (\S+) .*?\*\*Size:\*\* (\w+) · \*\*Mode:\*\* (\w+)&#x27;,s):
+    out.append(f&quot;- [ ] {m.group(1)} {m.group(2)} ({m.group(3)}, {m.group(4)}, {m.group(5)})&quot;)
+open(&#x27;tasks/todo.md&#x27;,&#x27;w&#x27;).write(&quot;\n&quot;.join(out)+&quot;\n&quot;)
+print(len(out)-2)
+EOF
+cat &gt; AGENTS.md &lt;&lt;&#x27;EOF&#x27;
+# RL Lab
+
+## Docs
+- Plan with dev-team2&#x27;s `build-planning`, not agent-skills&#x27; `/plan`.
+- Your …[+962 chars]<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;python3 - &lt;&lt;&#x27;EOF&#x27;\nimport re\ns=open(&#x27;tasks/plan.md&#x27;).read()\nout=[\&quot;# M1: Table ladder — Todo\&quot;,\&quot;\&quot;]\nfor m in re.finditer(r&#x27;### (M1-T\\d\\d): (.+)\\n\\*\\*Package:\\*\\* (\\S+) .*?\\*\\*Size:\\*\\* (\\w+) · \\*\\*Mode:\\*\\* (\\w+)&#x27;,s):\n    out.append(f\&quot;- [ ] {m.group(1)} {m.group(2)} ({m.group(3)}, {m.group(4)}, {m.group(5)})\&quot;)\nopen(&#x27;tasks/todo.md&#x27;,&#x27;w&#x27;).write(\&quot;\\n\&quot;.join(out)+\&quot;\\n\&quot;)\nprint(len(out)-2)\nEOF\ncat &gt; AGENTS.md &lt;&lt;&#x27;EOF&#x27;\n# RL Lab\n\n## Docs\n- Plan with dev-team2&#x27;s `build-planning`, not agent-skills&#x27; `/plan`.\n- Your task&#x27;s context: `dt context &lt;M#-T##&gt;`. Read only what it prints.\n- Any section by ID: `dt section &lt;ID&gt;...` (e.g. PL-03 TC-11 GAME-05 AD-05)\n- Package docs: `docs/packages/rllab/{contract,pipelines,tests}.md`; system design in `docs/architecture.md`\n- Real layout: `dt layout rllab` (planned layouts are gone once the wiring lands)\n- Quality bar: CONSTRAINTS.md. Oracle files (tests/fixtures/*/expected.json) need user approval to change.\n## Project skills\n- null-hypothesis-testing — `evaluate.compare` bar tests (M1-T19) and rung bars (M1-T20)\nEOF\nD=\&quot;python3 ../plugin/dev-team/scripts/dt.py\&quot;; python3 ../plugin/dev-team/scripts/dt.py roadmap; python3 ../plugin/dev-team/scripts/dt.py lint tasks/ docs/roadmap.md AGENTS.md; python3 ../plugin/dev-team/scripts/dt.py status --skill build-planning | grep -E &#x27;mode|uncovered|no_spine|mode_viol|boundaries|unrouted|missing|critical|waves|width|parallel|graph_warning&#x27;; python3 ../plugin/dev-team/scripts/dt.py ready&quot;,
+  &quot;description&quot;: &quot;Write todo and AGENTS.md, run gate checks&quot;
+}</pre><div class="lbl">output</div><pre>26
+S1: Designed → Planned
+M1: — → Planned
+M2: — → Designed
+roadmap: updated 3
+0 errors, 0 warnings
+mode: extend
+docs: brief Accepted · spec Approved · architecture Approved (Single package) · roadmap ok · plan M1 Draft · constraints missing
+references_missing: none
+uncovered: none
+no_spine: none
+mode_violations: none
+boundaries_unfrozen: net.NetSettings (lab)
+references_unrouted: none
+skills_unrouted: none
+stage_unrouted: none
+skills_missing: none
+critical_path: M1-T01 → M1-T11 → M1-T12 → M1-T22 → M1-T23 → M1-T24 → M1-T25 → M1-T26
+waves: M1-T01 | M1-T02, M1-T03, M1-T04, M1-T05, M1-T06, M1-T07, M1-T08, M1-T09, M1-T10, M1-T11, M1-T13, M1-T14, M1-T15, M1-T16, M1-T17, M1-T18, M1-T19 | M1-T12, M1-T20, M1-T21 | M1-T22 | M1-T23 | M1-T24 | M1-T25 | M1-T26
+width: 17
+parallelism: 3.25
+graph_warning: 6 of 8 waves have width 1: freeze interfaces so more tasks can start at once
+M1-T01 [interface] M1 interface · writes: src/rllab/**, tests/contracts/**</pre></details></div><div class="step" id="SD145"><span class="sid">D145</span><span class="kind">Bash</span>for i in $(seq -w 1 26); do n=$(python3 ../plugin/dev-team/scripts/dt.py context M1-T$i 2&gt;&amp;1 | wc -l); e=$(python3 ../plugin/dev-team/scripts/dt.py context M1-T$i 2&gt;&amp;1 | grep -ciE &quot;unresolved|not found|error&quot;); echo &quot;T$i $n $e&quot;; done | tr &#x27;\n&#x27; &#x27; &#x27;; wc -l tasks/plan.md<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;for i in $(seq -w 1 26); do n=$(python3 ../plugin/dev-team/scripts/dt.py context M1-T$i 2&gt;&amp;1 | wc -l); e=$(python3 ../plugin/dev-team/scripts/dt.py context M1-T$i 2&gt;&amp;1 | grep -ciE \&quot;unresolved|not found|error\&quot;); echo \&quot;T$i $n $e\&quot;; done | tr &#x27;\\n&#x27; &#x27; &#x27;; wc -l tasks/plan.md&quot;,
+  &quot;description&quot;: &quot;Check each task&#x27;s context packet resolves&quot;
+}</pre><div class="lbl">output</div><pre>T01      285 5 T02      113 3 T03      100 3 T04       95 1 T05       90 1 T06       79 0 T07       63 2 T08       73 1 T09       58 0 T10       50 0 T11      274 6 T12      317 8 T13      100 3 T14       95 4 T15      277 8 T16       95 1 T17      244 5 T18      106 1 T19      266 6 T20      243 5 T21       75 0 T22      270 7 T23       72 0 T24      117 0 T25      238 6 T26      222 5      339 tasks/plan.md</pre></details></div><div class="step" id="SD146"><span class="sid">D146</span><span class="kind">Bash</span>for i in 01 02 07 12 14; do python3 ../plugin/dev-team/scripts/dt.py context M1-T$i 2&gt;&amp;1 | grep -iE &quot;unresolved|not found|error&quot; | head -4; done<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;for i in 01 02 07 12 14; do python3 ../plugin/dev-team/scripts/dt.py context M1-T$i 2&gt;&amp;1 | grep -iE \&quot;unresolved|not found|error\&quot; | head -4; done&quot;,
+  &quot;description&quot;: &quot;Show matched error lines in context packets&quot;
+}</pre><div class="lbl">output</div><pre>- **Errors:** `ValueError` for an action outside [0, n_actions) or a step after the end, leaving state unchanged
+- **Errors:** `ValueError` unless 0 ≤ end ≤ start ≤ 1 and games ≥ 1
+- **Errors:** `ValueError` if size &lt; 5, the view is unknown, or a `from_state` state breaks `SnakeState`&#x27;s invariants
+- **Errors:** `ValueError` for empty or unequal-length score sets
+- **Errors:** `ValueError` for an unknown `kind`
+- **Errors:** `ValueError` for an action outside [0, n_actions) or a step after the end, leaving state unchanged
+- [ ] `seed_settings(&quot;L1&quot;, 3)` returns L1&#x27;s settings with seed 3; `build` returns a `SnakeEnv` and `TableAgent` for L1 and L2 and a `CorridorEnv` for corridor settings; an unknown `kind` raises `ValueError`
+- **Errors:** `FileNotFoundError` if missing; `ValueError` if damaged
+- [ ] The `replay.Replay` samples round-trip through `save` and `load` unchanged; a missing file raises `FileNotFoundError` and a damaged one `ValueError`
+**Expected:** move 3 raises `ValueError` with the state unchanged; any move after TC-01&#x27;s death raises `ValueError` · **Tolerance:** exact
+- **Errors:** `ValueError` if size &lt; 5, the view is unknown, or a `from_state` state breaks `SnakeState`&#x27;s invariants
+**Expected:** move 3 raises `ValueError` with the state unchanged; any move after TC-01&#x27;s death raises `ValueError` · **Tolerance:** exact
+**Expected:** each move&#x27;s share is between 32% and 35%, and `values` is None · **Tolerance:** the spec&#x27;s band; at 30,000 moves one standard error is 0.27 points, so the band sits ≥ 4.9 standard errors from 33.3% on each side
+- **Errors:** `ValueError` unless 0 ≤ end ≤ start ≤ 1 and games ≥ 1
+- **Errors:** `ValueError` for an action outside [0, n_actions) or a step after the end, leaving state unchanged
+- **Errors:** `ValueError` for an unknown `kind`
+- [ ] The default schedule gives 1.0 at game 0, 0.505 at game 500 and 0.01 from game 1,000 on, never rising; bad bounds raise `ValueError`</pre></details></div><div class="step" id="SD147"><span class="sid">D147</span><span class="kind">say</span>Every task&#x27;s context packet resolves, and the largest is 317 lines, well under the 2,000-line limit. Two things still need recording in the plan&#x27;s open questions.<details><summary>full text</summary><pre>Every task&#x27;s context packet resolves, and the largest is 317 lines, well under the 2,000-line limit. Two things still need recording in the plan&#x27;s open questions.</pre></details></div><div class="step" id="SD148"><span class="sid">D148</span><span class="kind">Bash</span>python3 - &lt;&lt;&#x27;EOF&#x27;
+p=&#x27;tasks/plan.md&#x27;; s=open(p).read()
+s=s.replace(&quot;## Open questions\n- None.\n&quot;,&quot;## Open questions\n- `net.NetSettings` (and the rest of `net`) isn&#x27;t frozen here: no M1 step passes it. M2&#x27;s interface task freezes it.\n- `pyproject.toml`, the dependency pins and `scripts/check.sh` come from `build-setup`, not from a task here.\n&quot;)
+open(p,&#x27;w&#x27;).write(s)
+EOF
+python3 ../plugin/dev-team/scripts/dt.py lint tasks/ docs/roadmap.md AGENTS.md<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;python3 - &lt;&lt;&#x27;EOF&#x27;\np=&#x27;tasks/plan.md&#x27;; s=open(p).read()\ns=s.replace(\&quot;## Open questions\\n- None.\\n\&quot;,\&quot;## Open questions\\n- `net.NetSettings` (and the rest of `net`) isn&#x27;t frozen here: no M1 step passes it. M2&#x27;s interface task freezes it.\\n- `pyproject.toml`, the dependency pins and `scripts/check.sh` come from `build-setup`, not from a task here.\\n\&quot;)\nopen(p,&#x27;w&#x27;).write(s)\nEOF\npython3 ../plugin/dev-team/scripts/dt.py lint tasks/ docs/roadmap.md AGENTS.md&quot;,
+  &quot;description&quot;: &quot;Add open questions and relint&quot;
+}</pre><div class="lbl">output</div><pre>0 errors, 0 warnings</pre></details></div><div class="step" id="SD149"><span class="sid">D149</span><span class="kind">say</span>I&#x27;ve drafted the M1 build plan (status Draft). It passes the linter and all of build planning&#x27;s checks except one small known gap, explained below. Nothing has been built. ⏎ Files ⏎ - `tasks/plan.md` (339 lines) and `tasks/todo.md` (26 tasks). ⏎ - `docs/roadmap.md` now has the cut: M1 Table ladder and M2 Network ladder. M2 depends on M1&#x27;s shared types and on its training and evaluation pipelines. ⏎ - `AGENTS.md` (new): a short doc map for the agents that will build the code. ⏎ - The roadmap now shows S1 and M1 as Planned, and M2 as Designed. ⏎ M1 scope ⏎ - Exit: ⏎   - ` …[+2839 chars]<details><summary>full text</summary><pre>I&#x27;ve drafted the M1 build plan (status **Draft**). It passes the linter and all of build planning&#x27;s checks except one small known gap, explained below. Nothing has been built.
+
+**Files**
+- `tasks/plan.md` (339 lines) and `tasks/todo.md` (26 tasks).
+- `docs/roadmap.md` now has the cut: **M1 Table ladder** and **M2 Network ladder**. M2 depends on M1&#x27;s shared types and on its training and evaluation pipelines.
+- `AGENTS.md` (new): a short doc map for the agents that will build the code.
+- The roadmap now shows S1 and M1 as Planned, and M2 as Designed.
+
+**M1 scope**
+- **Exit:**
+  - `rung`, `evaluate`, `watch` and `note` run end to end on L1 and L2;
+  - L1 beats random and matches scripted, and L2 is reported (the table-rung part of TC-24);
+  - TC-01 to TC-11 and TC-13 to TC-23 pass.
+- **Deferred to M2:**
+  - NET-01 to NET-08: the network learner;
+  - EVAL-07: only L4 has to beat the scripted bot;
+  - NOTE-05: the closing note needs all four rungs;
+  - QR-02: network training time.
+
+**Phases**
+
+| Phase | Tasks | What |
+|---|---|---|
+| 0 Interface | 1 | T01 freezes every M1 contract type, with samples and stand-in versions for testing, and creates every function signature as a stub |
+| 1 Step spines | 9 | T02–T10: the simplest working version of each pipeline step |
+| 2 Thicken | 11 | T11–T21: Snake views and rules, corridor, schedule, table learner, both bots, evaluation games, bar tests, rung-specific bars, viewer controls |
+| 2 Wiring | 5 | T22–T26: one per pipeline, each with its smoke test |
+| Checkpoints | 2 | after T26, and the milestone exit |
+
+- **Critical path:** 8 tasks: T01 → views → rules → wire PL-01 → PL-02 → PL-03 → PL-04 → PL-05.
+- **Widest wave:** 17 tasks can start at once right after T01.
+- There&#x27;s no system task, because nothing in M1 needs a stand-in for another pipeline.
+
+**Assumptions**
+- **The five wiring tasks run one after another.** They all edit `lab/pipeline.py` and `__main__.py`, as the approved layout says. That&#x27;s why the planning tool warns that 6 of 8 waves are one task wide. The chain is 5 short tasks; splitting the entry module would mean changing the pipeline layout.
+- **Library components get thicken tasks.** Snake, corridor, the table learner, the bots and `evaluate.play`/`compare` each get a thicken task under the step that uses them. Each task notes that the component is reached through the shared `Env`/`Agent` interfaces (AD-05).
+- **Snake rules wait for Snake views.** This is the only real dependency between library tasks, because every game step builds the agent&#x27;s view of the board.
+- **Bar tests:** `null-hypothesis-testing` is routed to T19 (bar tests) and T20 (rung-specific bars, Holm-corrected across a rung&#x27;s two bars).
+- **Task sizes:** every spine and thicken task is XS or S. Tasks with checkable behaviour are split between a tester and an implementer; the rest are built by one agent.
+
+**Open questions**
+- `net.NetSettings` isn&#x27;t frozen in M1. No M1 step uses it, so M2&#x27;s interface task freezes it.
+- `pyproject.toml`, the dependency pins and `scripts/check.sh` come from the next skill, `build-setup`, not from any task here.
+
+**Uncovered requirements:** none outside the deferred list above.
+
+Please **approve** the plan or ask for changes. Once it&#x27;s approved, the next step is `build-setup`, which sets up the quality rules and tool configuration before any code gets written.</pre></details></div><div class="step" id="SD150"><span class="sid">D150</span><span class="kind">hook</span><span class="hook">SessionStart:resume said: milestone: M1 Table ladder · plan Draft
+progress: 0/26 · next: M1-T01 M1 interface
+blocked: none
+draft (waiting for approval): tasks/plan.md
+dt: python3 /Users/connorott/plugins/dev-team-workspace/iteration-8/rl-incremental/with_skill/plugin/dev-team/scripts/dt.py
+</span></div>
+<h2>Commits</h2>
+<table><tr><th>Commit</th><th>Message</th><th>Files</th></tr><tr><td><code>20c4d3a</code> <span class=err>unconfirmed</span></td><td>Record AD-13: rllab stays a single package through Snake</td><td>docs/architecture.md</td></tr></table>
+<h2>Returned</h2>
+<pre>I&#x27;ve drafted the M1 build plan (status **Draft**). It passes the linter and all of build planning&#x27;s checks except one small known gap, explained below. Nothing has been built.
+
+**Files**
+- `tasks/plan.md` (339 lines) and `tasks/todo.md` (26 tasks).
+- `docs/roadmap.md` now has the cut: **M1 Table ladder** and **M2 Network ladder**. M2 depends on M1&#x27;s shared types and on its training and evaluation pipelines.
+- `AGENTS.md` (new): a short doc map for the agents that will build the code.
+- The roadmap now shows S1 and M1 as Planned, and M2 as Designed.
+
+**M1 scope**
+- **Exit:**
+  - `rung`, `evaluate`, `watch` and `note` run end to end on L1 and L2;
+  - L1 beats random and matches scripted, and L2 is reported (the table-rung part of TC-24);
+  - TC-01 to TC-11 and TC-13 to TC-23 pass.
+- **Deferred to M2:**
+  - NET-01 to NET-08: the network learner;
+  - EVAL-07: only L4 has to beat the scripted bot;
+  - NOTE-05: the closing note needs all four rungs;
+  - QR-02: network training time.
+
+**Phases**
+
+| Phase | Tasks | What |
+|---|---|---|
+| 0 Interface | 1 | T01 freezes every M1 contract type, with samples and stand-in versions for testing, and creates every function signature as a stub |
+| 1 Step spines | 9 | T02–T10: the simplest working version of each pipeline step |
+| 2 Thicken | 11 | T11–T21: Snake views and rules, corridor, schedule, table learner, both bots, evaluation games, bar tests, rung-specific bars, viewer controls |
+| 2 Wiring | 5 | T22–T26: one per pipeline, each with its smoke test |
+| Checkpoints | 2 | after T26, and the milestone exit |
+
+- **Critical path:** 8 tasks: T01 → views → rules → wire PL-01 → PL-02 → PL-03 → PL-04 → PL-05.
+- **Widest wave:** 17 tasks can start at once right after T01.
+- There&#x27;s no system task, because nothing in M1 needs a stand-in for another pipeline.
+
+**Assumptions**
+- **The five wiring tasks run one after another.** They all edit `lab/pipeline.py` and `__main__.py`, as the approved layout says. That&#x27;s why the planning tool warns that 6 of 8 waves are one task wide. The chain is 5 short tasks; splitting the entry module would mean changing the pipeline layout.
+- **Library components get thicken tasks.** Snake, corridor, the table learner, the bots and `evaluate.play`/`compare` each get a thicken task under the step that uses them. Each task notes that the component is reached through the shared `Env`/`Agent` interfaces (AD-05).
+- **Snake rules wait for Snake views.** This is the only real dependency between library tasks, because every game step builds the agent&#x27;s view of the board.
+- **Bar tests:** `null-hypothesis-testing` is routed to T19 (bar tests) and T20 (rung-specific bars, Holm-corrected across a rung&#x27;s two bars).
+- **Task sizes:** every spine and thicken task is XS or S. Tasks with checkable behaviour are split between a tester and an implementer; the rest are built by one agent.
+
+**Open questions**
+- `net.NetSettings` isn&#x27;t frozen in M1. No M1 step uses it, so M2&#x27;s interface task freezes it.
+- `pyproject.toml`, the dependency pins and `scripts/check.sh` come from the next skill, `build-setup`, not from any task here.
+
+**Uncovered requirements:** none outside the deferred list above.
+
+Please **approve** the plan or ask for changes. Once it&#x27;s approved, the next step is `build-setup`, which sets up the quality rules and tool configuration before any code gets written.</pre>
+</body></html>

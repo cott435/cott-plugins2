@@ -1,0 +1,132 @@
+{
+ "winner": "A",
+ "reasoning": "Set A is the stronger plan for this project. Its RL design is precise and correct: rewards are defined for every world, cut-off is kept apart from terminal so bootstrapping is right for Q-learning, DQN and GAE, and the closed-form golden cases check out (returns 1.75/1.5/1, advantage 1.095, corridor Q 0.729-1.0, table update 0.46). Catch distances are checked against per-step motion so bodies can't pass through each other, and all three stages are laid out as step-by-step ladders (L1-L4, T1-T4 REINFORCE to PPO, P1-P5 with a snapshot pool and cross-play), which fits a learner. Its six milestones depend on each other correctly and M1 is a real vertical slice. A's weaknesses: stale scope text left behind as the plan grew, a few contract/pipeline mismatches (rebuild returns bool, clip_to_wall vs reflect), very bloated packets that paste the whole 75-case tests.md into split tasks, no named signature for the Snake view functions, and a fully serialized wiring chain. Set B reads well and its per-package Phase 0 / spine / system shape is textbook. But it never defines a reward for any world, even though reward shaping is a concept the user named. It adds a reference-library package and per-milestone comparisons nobody asked for, and its brief invents a cloud-GPU budget. M3 depends falsely on M2's Snake comparison. Its lean packets leave out what builders need: the Learner/Transition protocol, the chain2 world definition, a way to build hand-built Snake states, and coordinate conventions. RunWriter has no snapshot method even though run_loop must save snapshots through it, and TC-38's tolerance is statistically flaky.",
+ "rubric": {
+  "A": {
+   "content": {
+    "rl_soundness": 5,
+    "stage_completeness": 5,
+    "internal_consistency": 3,
+    "right_sizing": 3,
+    "milestone_quality": 4,
+    "pipeline_clarity": 4,
+    "interface_quality": 4,
+    "dependency_graph_soundness": 3,
+    "task_buildability": 3
+   },
+   "structure": {
+    "organization": 4,
+    "readability_for_solo_learner": 3,
+    "ease_of_finding_next_build_step": 4,
+    "layout_sensibility": 4
+   },
+   "content_score": 3.8,
+   "structure_score": 3.8,
+   "overall_score": 7.6
+  },
+  "B": {
+   "content": {
+    "rl_soundness": 3,
+    "stage_completeness": 4,
+    "internal_consistency": 3,
+    "right_sizing": 3,
+    "milestone_quality": 3,
+    "pipeline_clarity": 4,
+    "interface_quality": 3,
+    "dependency_graph_soundness": 3,
+    "task_buildability": 2
+   },
+   "structure": {
+    "organization": 4,
+    "readability_for_solo_learner": 4,
+    "ease_of_finding_next_build_step": 4,
+    "layout_sensibility": 3
+   },
+   "content_score": 3.1,
+   "structure_score": 3.8,
+   "overall_score": 6.9
+  }
+ },
+ "output_quality": {
+  "A": {
+   "score": 8,
+   "strengths": [
+    "Every reward, distance, speed and catch rule is numeric and testable; cut-off vs terminal is handled explicitly for table, DQN, REINFORCE and PPO",
+    "Ladders bring in one RL idea per rung (compact vs raw grid, REINFORCE vs PPO, compass vs continuous, P1-P5 co-evolution with pool and cross-play forgetting counts)",
+    "75 golden cases with derivable expected values and justified statistical tolerances (TC-19 false-pass band explained)",
+    "Milestone dependencies are consistent; M1 delivers train/rung/evaluate/watch/note end to end on the table rungs",
+    "Viewer shows per-step move values, policy and critic, which directly serves 'explain why it works'"
+   ],
+   "weaknesses": [
+    "Stale scope text: spec still says shared pieces cover 'Snake and the tank', and the fish-tank idea says its spec starts after M1",
+    "Packets for split tasks paste the whole 41KB tests.md, including tank and hunt cases the task doesn't need",
+    "Snake view functions have no contract signature, yet one split task builds them and another calls them",
+    "Wiring tasks T22-T26 fully serialized on one pipeline.py; M1-T27 appended out of order",
+    "Bars use 'matches scripted' (non-inferiority) on most rungs, softer than the user's 'beats a simple scripted baseline'"
+   ]
+  },
+  "B": {
+   "strengths": [
+    "Clean multi-package M1: per-package interface tasks first, parallel spines, then a system task integrating last",
+    "Plain-language spec, with break-it ablation runs and lab-note freshness checks that are strong teaching tools",
+    "Ego-centric fixed-size observations with visibility flags; truncation bootstraps in Transition",
+    "Lean, readable step tables with spines named for every pipeline"
+   ],
+   "weaknesses": [
+    "No reward function is defined for Snake, tank or predator-prey anywhere in the docs",
+    "Scope creep: a whole 'compare' package (Stable-Baselines3) and per-world library comparisons gate milestones",
+    "Roadmap has M3 depending on M2's Snake library comparison, a false serialization; M2 bundles network, lab note and comparison",
+    "Packets omit needed types and definitions (Learner/Transition protocol, chain2 world, Snake state construction, coordinate conventions)",
+    "Four packages and 22 pipelines is heavy for a solo learning project"
+   ],
+   "score": 6
+  }
+ },
+ "unbuildable_tasks": {
+  "A": [
+   "M1-T11: no contract signature for the snake.views functions, so in split mode the tester and implementer can't agree on the function names or batch shape",
+   "M1-T12: SnakeEnv.step must call the view functions from M1-T11, but the packet has no signature or module API for them",
+   "M1-T05: the lab.evaluation spine must build bots and envs per RunSettings and count situations, but the packet has no train.RunSettings, bots.RandomBot/ScriptedBot, lab.build, lab.LADDER, evaluate.Bar or TableAgent.n_situations"
+  ],
+  "B": [
+   "M1-T04: no API for starting the Snake world from the hand-built states TC-01-TC-05 need; StepResult, WorldSpec, ActionSpace and Scene are not in the packet; the coordinate convention (x right, y down) and the full-view cell codes are missing",
+   "M1-T10: the internal Learner protocol and Transition type are missing, as are the lookup-table update rule and defaults (alpha, gamma, epsilon schedule); snapshots must be saved 'through the RunWriter', but RunWriter has no snapshot method",
+   "M1-T21: the chain2 test world definition (transitions, rewards, 20-step limit) is not in the packet, nor are the World/StepResult/WorldSpec types needed to write worlds_chain2.py or the Learner protocol",
+   "M1-T12: one XS solo task builds eight cli steps across three pipelines, too big for its size; it covers REPLAY-02, which the scope defers to M3"
+  ]
+ },
+ "defects": {
+  "A": [
+   "spec.md: \"The shared pieces are only what Snake and the tank need.\" \u2014 stale: predator-prey is in scope and the brief says shared pieces cover Snake, the tank and predator-prey",
+   "spec.md Assumptions: \"'Game' means a Snake game or a tank episode wherever the shared requirements ... use it\" \u2014 stale, leaves out predator-prey episodes",
+   "ideas__fish-tank.md: \"Its spec starts only after M1's exit, once the shared core is proven on Snake\" \u2014 stale: the tank is already specced and AD-14 changed the core before M1",
+   "ideas__fish-tank.md Not doing: \"Changing the shared core before M1's exit\" \u2014 contradicted by AD-14/AD-18, which batched and team-keyed core before M1 froze it",
+   "architecture.md AD-13: \"6 pipelines (more than 3) ... All five pipelines are short command-line workflows\" \u2014 counts disagree (PL-06 exists)",
+   "architecture.md AD-20: \"tank exposes ... (tank.move, tank.clip_to_wall)\" \u2014 the contract and layout define tank.move and tank.reflect; no clip_to_wall exists",
+   "pipelines.md PL-04: \"rebuild | replay.record | Replay, Env \u2192 Replay\" \u2014 contract says replay.rebuild(...) -> bool",
+   "architecture.md AD-18: \"M1's plan is revised to freeze the team-keyed types\" \u2014 process history left in a decision record",
+   "tasks__plan.md: \"M1-T06: draw_curves spine (raw score per game)\" \u2014 its acceptance requires the score smoothed over 100 games",
+   "tasks__plan.md: M1-T27 sits between M1-T21 and M1-T22 \u2014 IDs read out of build order",
+   "tasks__plan.md Dependency graph: \"M1-T18 Evaluation games | M1-T08 rebuild spine | data\" \u2014 evaluate.play doesn't use rebuild; spurious edge",
+   "tasks__plan.md Dependency graph: \"M1-T12 Snake rules | M1-T11 Snake views | none: every step builds its observation with the view functions\" \u2014 a frozen views signature would remove this critical-path serialization",
+   "roadmap.md M2: \"the seeds of a rung train side by side\" \u2014 parallel seeding tacked onto the network milestone",
+   "context__M1-T11.md: includes the entire tests.md (TC-01-TC-75) for a task needing TC-08-TC-10 \u2014 packet bloat"
+  ],
+  "B": [
+   "spec.md: SNAKE, TANK and HUNT never define a per-step reward (no death penalty, survival reward or predator step cost) \u2014 reward design, a stated learning goal, is missing",
+   "brief.md: \"A few dollars of cloud GPU is a fallback, not the plan.\" \u2014 contradicts the user's 'no budget beyond free tools'; architecture Risks also leans on \"the cloud GPU or CPU box the brief allows\"",
+   "roadmap.md M3: \"Depends: M2 (learn.RunWriter, PL-22 Snake comparison)\" \u2014 the tank needs nothing from the Snake comparison and RunWriter comes from M1; false dependency",
+   "roadmap.md M2: \"Snake value network, lab note, library comparison\" \u2014 three unrelated pieces in one milestone",
+   "learn contract RunWriter: methods episode/evaluation/scores/close only \u2014 yet AD-07 says \"learn.RunWriter is the only code that writes this layout\" including snapshots, and M1-T10 saves s000-s100 \"through the RunWriter\"",
+   "learn pipelines layout: \"evaluate.py evaluate, final_scores, play_pairs, beats\" \u2014 plan M1-T02/M1-T22 put beats in verdicts.py",
+   "tasks__plan.md M1-T12: \"Covers: TRAIN-01, EVAL-04, REPLAY-02\" \u2014 the scope defers REPLAY-02 to M3",
+   "tasks__plan.md M1-T17: smoke on \"configs/smoke/chain2-qtable.toml\" but the chain2 world is written by M1-T21 (tests/intent/learn/worlds_chain2.py), with no dependency edge",
+   "worlds pipelines PL-07: \"play_episode | core | World, Policy, seed \u2192 StepResult\" while the entry sketch passes {\"snake\": policy} \u2014 the step's In type disagrees",
+   "lab tests TC-38: \"at most 1 of the 20 seeds ... since the false-pass rate is \u2264 \u03b1 = 0.05\" \u2014 at \u03b1=0.05, P(\u22652 of 20) is about 26%; the justification is wrong and the test is flaky",
+   "tasks__plan.md: \"M1-T04: Snake rules ... Kind: thicken ... Mode: split\" listed under \"Phase 1: Step spines\"",
+   "learn architecture: Learner/Transition are \"frozen here\" as prose bullets, not contract code shapes, and are missing from every packet that implements or calls them",
+   "plan Open questions: \"learn.TournamentTable (consumed by lab in M6) is frozen now by M1-T02\" \u2014 freezes a type no M1 consumer needs",
+   "CONSTRAINTS.md: \"CR-29 ... no torch.distributions anywhere (AD-02)\" \u2014 AD-02 doesn't state that rule; ID out of order"
+  ]
+ }
+}

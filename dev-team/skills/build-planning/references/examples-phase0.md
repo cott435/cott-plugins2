@@ -1,12 +1,12 @@
-# Example: interface-first M1 (quant, single package)
+# Example: interface-first M1 (gridload, single package)
 
-PL-01 Load prices (`read_raw` → `apply_universe`, owner `data`) and PL-02 Covariance report (`load_prices` as PL-01 built, then `estimate_cov` → `clean_eigen` → `pca` → `write_report`, owner `stats`). Golden cases TC-01 (universe), TC-02 (MP cleaning), TC-03 (PCA). The contract has a `type` section for every `In → Out`: `data.RawPrices`, `data.Prices`, `stats.Returns`, `stats.Cov`, `stats.Factors`, `stats.CovReport`; `data.load_prices` carries a `**Boundary:**` line because PL-02 calls it.
+PL-01 Load meter readings (`read_raw` → `apply_registry`, owner `data`) and PL-02 Seasonality report (`load_readings` as PL-01 built, then `fit_seasonality` → `spectrum` → `deseason` → `write_report`, owner `profile`). Golden cases TC-01 (registry), TC-02 (flat spectrum), TC-03 (planted sine). The contract has a `type` section for every `In → Out`: `data.RawReadings`, `data.Readings`, `profile.Load`, `profile.Profile`, `profile.Spectrum`, `profile.SeasonalityReport`; `data.load_readings` carries a `**Boundary:**` line because PL-02 calls it.
 
 ```
 wave 0  T01  interface
-wave 1  spines T02 read_raw · T03 apply_universe · T04 estimate_cov · T05 clean_eigen · T06 pca · T07 write_report
-        testers of T10 universe · T11 MP cleaning · T12 shrinkage · T13 PCA
-wave 2  wiring T08 PL-01 · T09 PL-02 (on the load_prices fake); implementers of T10 ← T03 · T11 ← T05 · T12 ← T04 · T13 ← T06
+wave 1  spines T02 read_raw · T03 apply_registry · T04 fit_seasonality · T05 spectrum · T06 deseason · T07 write_report
+        testers of T10 registry · T11 LS amplitudes · T12 Fourier seasonality · T13 seasonal removal
+wave 2  wiring T08 PL-01 · T09 PL-02 (on the load_readings fake); implementers of T10 ← T03 · T11 ← T05 · T12 ← T04 · T13 ← T06
 wave 3  T14  system: PL-02 on the real PL-01
 ```
 
@@ -14,52 +14,52 @@ wave 3  T14  system: PL-02 on the real PL-01
 
 ```markdown
 ### M1-T01: M1 interface
-**Package:** quant · **Step:** contract · **Kind:** interface · **Covers:** — · **Size:** S · **Mode:** solo
-**Read:** PL-01, PL-02, data.RawPrices, data.Prices, stats.Returns, stats.Cov, stats.Factors, stats.CovReport, data.load_prices
+**Package:** gridload · **Step:** contract · **Kind:** interface · **Covers:** — · **Size:** S · **Mode:** solo
+**Read:** PL-01, PL-02, data.RawReadings, data.Readings, profile.Load, profile.Profile, profile.Spectrum, profile.SeasonalityReport, data.load_readings
 **Acceptance:**
-- [ ] Each type is code in `data/types.py` or `stats/types.py`; each `tests/contracts/<id>.<Type>/` sample validates against its schema
+- [ ] Each type is code in `data/types.py` or `profile/types.py`; each `tests/contracts/<id>.<Type>/` sample validates against its schema
 - [ ] Every step imports with its contract signature, body `raise NotImplementedError("<its spine task>")`; each `__init__.py` exports its contract
-- [ ] The `data.load_prices` fake serves its fixtures
+- [ ] The `data.load_readings` fake serves its fixtures
 **Verify:** `pytest tests/contracts` · `scripts/check.sh gate`
-**Depends on:** — · **Writes:** src/quant/data/**, src/quant/stats/**, tests/contracts/**
+**Depends on:** — · **Writes:** src/gridload/data/**, src/gridload/profile/**, tests/contracts/**
 
-### M1-T05: clean_eigen spine (no cleaning)
-**Package:** quant · **Step:** PL-02.clean_eigen · **Kind:** spine · **Covers:** — · **Size:** XS · **Mode:** solo
-**Read:** PL-02, stats.Cov, stats.clean_eigen
+### M1-T05: spectrum spine (raw periodogram)
+**Package:** gridload · **Step:** PL-02.spectrum · **Kind:** spine · **Covers:** — · **Size:** XS · **Mode:** solo
+**Read:** PL-02, profile.Load, profile.Profile, profile.spectrum
 **Acceptance:**
-- [ ] `clean_eigen` returns its input on the stats.Cov sample; signature unchanged
-**Verify:** `pytest tests/unit/quant -k clean_eigen` · `scripts/check.sh gate`
-**Depends on:** M1-T01 · **Writes:** src/quant/stats/rmt.py, tests/unit/quant/test_rmt.py
+- [ ] `spectrum` returns the raw periodogram of the residual on the profile.Load and profile.Profile samples; signature unchanged
+**Verify:** `pytest tests/unit/gridload -k spectrum` · `scripts/check.sh gate`
+**Depends on:** M1-T01 · **Writes:** src/gridload/profile/spectrum.py, tests/unit/gridload/test_spectrum.py
 
 ### M1-T09: Wire PL-02
-**Package:** quant · **Step:** PL-02 · **Kind:** wiring · **Covers:** QR-02 · **Size:** S · **Mode:** solo
-**Read:** PL-02, data.load_prices
+**Package:** gridload · **Step:** PL-02 · **Kind:** wiring · **Covers:** QR-02 · **Size:** S · **Mode:** solo
+**Read:** PL-02, data.load_readings
 **Acceptance:**
-- [ ] `python -m quant.stats cov-report --smoke` runs end to end on the `data.load_prices` fake; committed as PL-02's smoke test
+- [ ] `python -m gridload.profile seasonality-report --smoke` runs end to end on the `data.load_readings` fake; committed as PL-02's smoke test
 - [ ] PL-02 pre-build sections replaced by a `dt layout` pointer
-**Verify:** `python -m quant.stats cov-report --smoke` · `scripts/check.sh gate`
-**Depends on:** M1-T04, M1-T05, M1-T06, M1-T07 · **Writes:** src/quant/stats/pipeline.py, src/quant/stats/__main__.py, tests/unit/quant/test_pl02_smoke.py
+**Verify:** `python -m gridload.profile seasonality-report --smoke` · `scripts/check.sh gate`
+**Depends on:** M1-T04, M1-T05, M1-T06, M1-T07 · **Writes:** src/gridload/profile/pipeline.py, src/gridload/profile/__main__.py, tests/unit/gridload/test_pl02_smoke.py
 
-### M1-T11: Marchenko–Pastur cleaning
-**Package:** quant · **Step:** PL-02.clean_eigen · **Kind:** thicken · **Covers:** STAT-03 · **Size:** XS · **Mode:** split
+### M1-T11: Least-squares amplitudes
+**Package:** gridload · **Step:** PL-02.spectrum · **Kind:** thicken · **Covers:** STAT-03 · **Size:** XS · **Mode:** split
 **Skills:** data-science
-**Read:** PL-02, TC-02, STAT-03, stats.clean_eigen, stats.Cov
+**Read:** PL-02, TC-02, STAT-03, profile.spectrum, profile.Profile
 **Acceptance:**
-- [ ] TC-02 passes: every cleaned eigenvalue ≤ the MP edge on pure noise; no cleaning stays selectable
-**Verify:** `pytest tests/intent/quant tests/unit/quant -k rmt` · `scripts/check.sh gate`
-**Depends on:** M1-T05 · **Writes:** src/quant/stats/rmt.py, tests/intent/quant/test_rmt.py, tests/unit/quant/test_rmt.py
+- [ ] TC-02 passes: every fitted Fourier amplitude ≤ the flat-spectrum edge on pure noise; the raw periodogram stays selectable
+**Verify:** `pytest tests/intent/gridload tests/unit/gridload -k spectrum` · `scripts/check.sh gate`
+**Depends on:** M1-T05 · **Writes:** src/gridload/profile/spectrum.py, tests/intent/gridload/test_spectrum.py, tests/unit/gridload/test_spectrum.py
 
 ### M1-T14: PL-02 on the real PL-01
-**Package:** quant · **Step:** PL-02 · **Kind:** system · **Covers:** — · **Size:** XS · **Mode:** solo
-**Read:** PL-01, PL-02, data.load_prices, TC-01, TC-02, TC-03
+**Package:** gridload · **Step:** PL-02 · **Kind:** system · **Covers:** — · **Size:** XS · **Mode:** solo
+**Read:** PL-01, PL-02, data.load_readings, TC-01, TC-02, TC-03
 **Acceptance:**
-- [ ] PL-02 calls the real `load_prices`; the fake stays for the contract tests
+- [ ] PL-02 calls the real `load_readings`; the fake stays for the contract tests
 - [ ] Both smoke commands pass; TC-01–TC-03 pass on the real chain
-**Verify:** `python -m quant.data load --smoke` · `python -m quant.stats cov-report --smoke` · `scripts/check.sh gate`
-**Depends on:** M1-T08, M1-T09, M1-T10, M1-T11, M1-T12, M1-T13 · **Writes:** src/quant/stats/pipeline.py
+**Verify:** `python -m gridload.data load --smoke` · `python -m gridload.profile seasonality-report --smoke` · `scripts/check.sh gate`
+**Depends on:** M1-T08, M1-T09, M1-T10, M1-T11, M1-T12, M1-T13 · **Writes:** src/gridload/profile/pipeline.py
 ```
 
-T11's tester starts in wave 1: it tests `clean_eigen` as T01 declares it and fails on `NotImplementedError("M1-T05")`. Its implementer follows its tester and T05, nothing else. Wiring T09 waits on PL-02's spines because its smoke runs them, but not on PL-01: the fake stands in.
+T11's tester starts in wave 1: it tests `spectrum` as T01 declares it and fails on `NotImplementedError("M1-T05")`. Its implementer follows its tester and T05, nothing else. Wiring T09 waits on PL-02's spines because its smoke runs them, but not on PL-01: the fake stands in.
 
 The graph, excerpted (one row per `Depends on` other than on T01, 16, plus the mitigated edges):
 
@@ -67,11 +67,11 @@ The graph, excerpted (one row per `Depends on` other than on T01, 16, plus the m
 ## Dependency graph
 | From | To | Kind | Mitigated by |
 |---|---|---|---|
-| M1-T05 clean_eigen spine | M1-T04 estimate_cov spine | data | stats.Cov sample (M1-T01) |
-| M1-T09 wire PL-02 | M1-T05 clean_eigen spine | order | none: integration: the smoke runs it |
-| M1-T09 wire PL-02 | M1-T08 wire PL-01 | call | data.load_prices fake (M1-T01) |
-| M1-T11 MP cleaning | M1-T05 clean_eigen spine | code | none: thickens the same module |
-| M1-T11 MP cleaning | M1-T12 shrinkage | data | stats.Cov sample (M1-T01): cleaning takes any Cov |
+| M1-T05 spectrum spine | M1-T04 fit_seasonality spine | data | profile.Profile sample (M1-T01) |
+| M1-T09 wire PL-02 | M1-T05 spectrum spine | order | none: integration: the smoke runs it |
+| M1-T09 wire PL-02 | M1-T08 wire PL-01 | call | data.load_readings fake (M1-T01) |
+| M1-T11 LS amplitudes | M1-T05 spectrum spine | code | none: thickens the same module |
+| M1-T11 LS amplitudes | M1-T12 Fourier seasonality | data | profile.Profile sample (M1-T01): the spectrum takes any Profile |
 | M1-T14 system | M1-T09 wire PL-02 | file | none: swaps the fake in the entry M1-T09 wrote |
 ```
 

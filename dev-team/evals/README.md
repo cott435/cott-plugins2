@@ -305,7 +305,13 @@ python3 evals/harness/modecmp.py iteration-7 quant [--judge <averaged judge json
 
 `frozen_interface_churn` is reported beside the band with the expectation that all-at-once revises frozen interfaces no more than incremental does. Anything outside the band is listed under `findings`; it is a finding to read, not a failure, because each mode is one run.
 
+## Readiness and the simulated user
+
+The driver's readiness works on the roadmap's stages (`dtprobe`'s `stages`), not on row counts. Moving to the next stage, or finishing, is blocked while any revealed stage has no milestone row of its own; in all-at-once it is also blocked while any stage is below Designed. Both `Cut` and `Split` count as cut. Each blocking reason becomes a concrete ask in the re-ask note (for example "ask for S2 and S3 to be cut into milestone rows"), saved per turn as `readiness_asks`. A stage is fully planned when its pipelines are approved and it has milestone rows; the first stage also needs an approved build plan and build setup. A turn's `docs_changed` is `git diff --stat` from the commit the turn started on, so commits the agent makes itself count against a stall. In `flow/plan.json`, each snapshot's `skill` is the last skill invoked by that turn, carried forward over turns that invoke none.
+
 ## Blind judge
+
+The blind judge never reads the packaged `outputs/` folders: `judge_prompt.py` copies each to a neutral `set-1` / `set-2` (in the `--both` folder, or `--sets`) without `transcript.md` and `doc_evolution.md`, and refuses to write a prompt if a path the judge would see names a mode. `package.py` keeps those two files in `run-1/`, beside `outputs/`.
 
 ```bash
 python3 evals/harness/judge_prompt.py quant <bench/eval-1-quant/incremental/run-1/outputs> \

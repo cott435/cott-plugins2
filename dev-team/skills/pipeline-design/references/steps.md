@@ -1,6 +1,6 @@
 # Steps, layout and readability rules
 
-Read before writing or changing a step table or the planned layout. The file format is the template in `../examples.md`.
+Read before writing or changing a step table or the planned layout. The file format is `template.md`.
 
 ## Steps
 
@@ -14,6 +14,14 @@ Per pipeline:
 **Contract `Used by:` lines** get the calling PL IDs after the consumer components; symbol IDs are component-qualified even in a single package (`### stats.estimate_cov: …`).
 
 **Multi-package:** cross-package *system pipelines* are `architecture-design`'s, in the root. A package-local pipeline that is one segment of one names it: `**Entry:** … · **Trigger:** … · **Part of:** PL-05`. Never edit the root.
+
+## Changing a step table
+
+Revise, and Sync when the doc changes, edit an existing table this way:
+
+- Keep step names where the function survives; a split step gets new rows with new function names. Keep the pipeline's ID: a rebuilt package keeps its PL IDs where it can, so its golden cases still apply.
+- If the entry sketch is gone (the spine was built), don't recreate it. The step table is the contract the code must match; the code change becomes a task.
+- Keep `Used by:` lines true: add the PL ID to a symbol a new step calls, and remove it from one no step of that pipeline calls any more.
 
 ## Layout
 

@@ -1,6 +1,6 @@
 # Grow
 
-Read when `dt status --skill pipeline-design` reports `grow`, or right after an `architecture-design` Grow. Ends at the Review Gate in `../SKILL.md`.
+Read when `dt status --skill pipeline-design` reports `grow`, or right after an `architecture-design` Grow. Read `steps.md` (Multi-package) and `template.md` for the sections you move. Ends at the Review Gate in `../SKILL.md`.
 
 `architecture-design` Grow has split the package and written the root's System pipelines, each with a new ID, naming the package pipeline it grew from. If it hasn't, stop and route there.
 

@@ -8,7 +8,6 @@ Read only `dt status`, the roadmap, the packages' `pipelines.md`, `contract.md` 
 
 Before planning, check the Grow triggers. `grow_triggers` lists the measurable ones (> 3 pipelines, > 12 modules, package docs > 2,000 lines). Check the others yourself:
 - The milestone brings a dependency stack the rest shouldn't carry (torch, CUDA).
-- A one-way dependency is worth enforcing (data must never import models).
 - A part runs or deploys on its own (a paper-trading service).
 
 If one fires and no `AD-NN` already records the decision to stay single, **stop** and route to `architecture-design` Grow. Plan after Grow, pipeline-design Grow and build-setup Extend have caught up.
@@ -20,7 +19,7 @@ When `stage_to_cut` names a stage, its pipelines are `pipelines_inferred`: the o
 - **Order by dependency.** Which pipeline needs another's outputs? A consumer needs its provider's *interface*, not its finished build: a boundary the interface task freezes lets both sides build in the same milestone.
 - **The first milestone is a walking skeleton:** the thinnest end-to-end path through every package the stage touches, one pipeline per package at spine version, joined across each boundary, so the user can run it end to end.
 - **Each later milestone is a vertical slice:** it adds a capability the user can run end to end (categories, transfers, the review screen), thickening the skeleton. Never a horizontal layer ("all of the relay", "every model"), which can't run on its own.
-- **Cut along dependency lines,** only where a later milestone needs an earlier one's outputs, and name them in the row's `Depends`: `M1 (profile.Profile, PL-01 output)`. Independent tracks stay in one milestone as parallel waves: one milestone is active at a time, so splitting them only serializes them.
+- **Cut along dependency lines,** only where a later milestone needs an earlier one's outputs, and name them in the row's `Depends`: `M1 (profile.Profile, PL-01 output)`. Depends lists only the milestones whose outputs this one needs, never a build order or a note naming another milestone: `dt` reads every `M<n>` in the cell as an edge. Independent tracks stay in one milestone as parallel waves: one milestone is active at a time, so splitting them only serializes them.
 - **Size each one** against the cap (step 3): a critical path of at most about 15 tasks. Cut until each fits; fewer, larger milestones beat many thin ones. A stage that fits one milestone gets one.
 - **Every pipeline lands** in the milestone that first wires it; a later slice that thickens it lists it again. Every spec ID of the stage lands in a milestone or is Deferred later.
 

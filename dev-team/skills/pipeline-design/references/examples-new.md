@@ -118,7 +118,7 @@ tests/intent/gridload/  tests/unit/gridload/
 Wrote docs/packages/gridload/pipelines.md (Draft).
 - PL-01 Load readings · `python -m gridload.data load` · read_raw → apply_registry → save_readings
 - PL-02 Seasonality report · `python -m gridload.profile season-report` · load_readings → fit_seasonality → trim_terms → residual_spectrum → write_report
-- Layout: data/ and profile/ subfolders, one module per step owner; contracts exported from each __init__.
+- Layout: data/ and profile/ subfolders, one entry module per pipeline, one module per step owner; contracts exported from each __init__.
 
 ASSUMPTIONS: names above; one Parquet file per run (AD-03); demand via `Readings.demand()`.
 contract.md: PL IDs appended to Used by for data.load_readings, profile.fit_seasonality, profile.trim_terms.
@@ -156,12 +156,14 @@ User:    1 and 2. Training should show it beats majority-class and the logistic 
 
 | # | Step | Owner | In → Out | Spine version | Covers |
 |---|---|---|---|---|---|
-| 1 | `make_dataset` | core.datasets | dataset name, seed → Dataset | 200 synthetic leaves, fixed split; lookup by name (AD-03) | DS-01–DS-04 |
-| 2 | `make_model` | models.cnn | DatasetSpec, ModelConfig → Model | uniform random guess | MOD-01 |
-| 3 | `train` | core.train | Dataset, Model, epochs → Model, Log | epoch loop calling fit_batch; CSV log | TRN-01 |
-| 4 | `run_baselines` | baselines | Dataset, seeds → Scores | majority class only | EVAL-01 |
-| 5 | `evaluate` | core.evaluate | Model, Dataset, Scores → Curve | held-out accuracy over 5 seeds | EVAL-01 |
-| 6 | `save_run` | core.runs | Model, Log, Curve → RunDir | folder with config.json, weights.pt, log.csv | QR-02 |
+| 1 | `make_dataset` | core.datasets | dataset name, seed → Dataset | lookup by name (AD-03) | DS-01 |
+| 2 | `SingleCropSet` | singlecrop.dataset | seed → Dataset | 200 synthetic leaves, fixed split | DS-02–DS-04 |
+| 3 | `make_model` | models.factory | DatasetSpec, ModelConfig → Model | always the CNN | MOD-01 |
+| 4 | `SmallCnn` | models.cnn | DatasetSpec → Model | uniform random guess | MOD-01 |
+| 5 | `train` | core.train | Dataset, Model, epochs → Model, Log | epoch loop calling fit_batch; CSV log | TRN-01 |
+| 6 | `run_baselines` | baselines | Dataset, seeds → Scores | majority class only | EVAL-01 |
+| 7 | `evaluate` | core.evaluate | Model, Dataset, Scores → Curve | held-out accuracy over 5 seeds | EVAL-01 |
+| 8 | `save_run` | core.runs | Model, Log, Curve → RunDir | folder with config.json, weights.pt, log.csv | QR-02 |
 
 ### Entry sketch (pre-build — removed by spine task)
 ```python
@@ -192,9 +194,10 @@ src/leaflab/
     __init__.py   contract exports only (Dataset, Model, Run)
     pipeline.py   PL-01 entry
     datasets.py   name → dataset constructor (AD-03)
-    train.py  evaluate.py  runs.py  predict.py
+    train/        core.train's folder: its private helpers (batches.py, checkpoint.py)
+    evaluate.py  runs.py  predict.py
   singlecrop/ __init__.py  dataset.py
-  models/     __init__.py  cnn.py
+  models/     __init__.py  factory.py  cnn.py
   baselines/  __init__.py  majority.py
   viewer/     __init__.py  pipeline.py (PL-02 entry)  render.py
 tests/intent/leaflab/  tests/unit/leaflab/
@@ -202,6 +205,8 @@ tests/intent/leaflab/  tests/unit/leaflab/
 ````
 
 Notes:
+- `SingleCropSet` and `SmallCnn` are rows of their own: the factories return them and `train` drives them through `Dataset` and `Model`, so each gets its own spine, and wiring waits on those spines, never on the real CNN.
 - The random-guess model and the text table are real spines: the floor the CNN and the image gallery must beat.
+- Each pipeline has its own entry module (`core/pipeline.py`, `viewer/pipeline.py`), so their wiring tasks never share a file; `__main__.py` dispatches both triggers.
 - The dataset lookup is a registry, allowed only because AD-03 names it on the row.
 - The logistic baseline is a later step upgrade of `run_baselines` (a task), not a new step.

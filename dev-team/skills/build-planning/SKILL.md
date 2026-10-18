@@ -5,11 +5,11 @@ description: Cuts each roadmap stage into build-sized milestones once its pipeli
 
 # Build Planning
 
-The build plan says **in what order** the pipelines get built. Once a roadmap stage's pipelines are approved, this skill cuts it into milestones (`M<n>`), vertical slices each runnable end to end, then writes one milestone at a time into `tasks/plan.md` and `tasks/todo.md`: small tasks, many built at once, each ending with a check that leaves the system working. It never builds or runs code and stops at every gate.
+The build plan says **in what order** the pipelines get built. Once a stage's pipelines are approved, this skill cuts it into milestones (`M<n>`), vertical slices each runnable end to end, then writes one milestone at a time into `tasks/plan.md` and `tasks/todo.md`: small tasks, many built at once, each ending with a check that leaves the system working.
 
-**Not for:** plans from agent-skills' `/plan` (foreign); pipelines, oracles or the quality bar (`pipeline-design`, `test-planning`, `build-setup`); building tasks.
+**Not for:** plans from agent-skills' `/plan` (foreign); pipelines, oracles or the quality bar (`pipeline-design`, `test-planning`, `build-setup`); building tasks. A fix their docs need (a `tests.md` smoke command, a contract type) goes to `dt route <owner> "<change>" --from build-planning`.
 
-`dt` means `python3 ../../scripts/dt.py`, relative to this skill's folder, run from the project root. Take IDs, coverage and lint from `dt`, never by hand. Templates: `examples.md`.
+`dt` means `python3 ../../scripts/dt.py`, relative to this skill's folder, run from the project root. IDs, coverage and lint come from `dt`, never by hand. Templates: `examples.md`.
 
 ## Documents and IDs
 
@@ -20,12 +20,12 @@ The build plan says **in what order** the pipelines get built. Once a roadmap st
 ## Preconditions
 
 - No roadmap stage for the work: route to `idea-refine`.
-- **References waiting:** route to `reference-intake` before planning.
-- **Probes open:** `probes_blocking` (`PB-01 → service, ledger.BankTxn (M1)`) blocks New and Extend for that milestone: name the probe and route to `api-probe`. Cutting stages into milestone rows (`cut.md` steps 1–2) still runs. Only the user waives a probe, through `api-probe`, and never on a headless run.
+- **References waiting:** route to `reference-intake`.
+- **Probes open:** `probes_blocking` (`PB-01 → service, ledger.BankTxn (M1)`) blocks New and Extend for that milestone: name the probe and route to `api-probe`. Cutting stages into milestone rows (`cut.md` steps 1–2) still runs. While blocked, offer one queued plan at most, never one per milestone. Only the user waives a probe (`api-probe`), never on a headless run.
 
 ## Modes
 
-Run `dt status --skill build-planning` first. It prints the mode, progress, coverage, routing lists and `next ids`. Read the mode's file and only the topic references it names.
+Run `dt status --skill build-planning` first: it prints the mode, progress, coverage, routing lists and `next ids`. Read the mode's file and only the references it names.
 
 | Mode | When | Do |
 |---|---|---|
@@ -48,13 +48,13 @@ A foreign plan's question: `references/examples-foreign.md`.
 Before presenting the Draft:
 - `dt lint tasks/ docs/roadmap.md AGENTS.md` is clean.
 - `dt status --skill build-planning`: `uncovered`, `no_spine`, `mode_violations`, `boundaries_unfrozen`, `references_unrouted`, `skills_unrouted` and `stage_unrouted` empty, or each item explained on its task or under Open questions; `skills_missing` listed for the user. `dt ready` lists only the interface task(s).
-- `dt context` resolves for every task, under 2,000 lines. A contract symbol that doesn't resolve routes to `architecture-design`; never fix the contract yourself.
+- `dt context` resolves for every task, under 2,000 lines; a contract symbol that doesn't resolve is routed (Not for).
 - Every plan header field is set; `tasks/plan.md` is ≤ ~400 lines.
 
 Then present:
-1. **What was written:** files; any cut (milestones, pipelines, the dependency line between them); scope, exit, phases with task counts, critical path and widest wave, checkpoints.
+1. **What was written:** files; any cut (milestones, pipelines, the dependency lines); scope, exit, phases with task counts, critical path and widest wave, checkpoints.
 2. **ASSUMPTIONS:** the cut, interfaces frozen, every unmitigated edge with its reason, folds, sizes, modes and overrides, skill and reference routing, `Read:` choices.
-3. **Open questions:** missing skills, overrides to confirm, anything Deferred.
+3. **Open questions:** missing skills, overrides to confirm, anything Deferred, routed fixes.
 4. **Uncovered:** each Deferred ID with its target.
 5. Ask the user to approve or request changes. **STOP YOUR TURN.**
 

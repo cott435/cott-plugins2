@@ -8,7 +8,7 @@ Read when writing thicken tasks, the dependency graph and the files. Templates: 
 
 **Split a task** when it needs more than one session, has more than 3 acceptance bullets, touches two packages or two steps, or has "and" in its title. Sizes count `Writes:` entries outside `tests/` (`task-size`; a folder glob counts as one): XS = 1, S = 1–2, M = 3–5. Nothing larger. Spine and thicken tasks are XS or S.
 
-**Acceptance is test-backed.** Each bullet is checkable: a `TC-NN` passes, a Given/When/Then, a model criterion by ID, the smoke command. With no `tests.md`, write the criterion so a tester can encode it. A TC that runs the whole pipeline is the wiring or system task's acceptance, never a thicken's, so no thicken waits on wiring.
+**Acceptance is test-backed.** Each bullet is checkable: a `TC-NN` passes, a Given/When/Then, a model criterion by ID, the smoke command. With no `tests.md`, write the criterion so a tester can encode it. A TC that runs the whole pipeline is the wiring or system task's acceptance (`phase0.md`), never a thicken's, so no thicken waits on wiring.
 
 ## 6. Route skills and references
 
@@ -30,14 +30,14 @@ Read when writing thicken tasks, the dependency graph and the files. Templates: 
 ## 9. Dependencies, Writes, the graph, Verify
 
 - **`Depends on:`** resolves, points only backward (position counts, not ID number), is acyclic, and holds only edges nothing mitigates.
-- **`Writes:`** is exact paths, or a folder glob the task owns, and is an exclusive claim: two tasks with no `Depends on` path between them never write the same path (`writes`). Shared files (`__init__.py`, `types.py`, `pipeline.py`, `__main__.py`) belong to the interface, wiring or system task. No `Writes:` under `tasks/`: builders never tick `todo.md` or record findings; the orchestrator does after each merge.
+- **`Writes:`** is exact paths, or a folder glob the task owns, and is an exclusive claim: two tasks with no `Depends on` path between them never write the same path (`writes`). Shared files (`__init__.py`, `types.py`, `__main__.py`) belong to the interface task; each pipeline's entry module to its wiring and system tasks (`phase0.md`). No `Writes:` under `tasks/`: builders never tick `todo.md` or record findings; the orchestrator does after each merge.
 - **`## Dependency graph`**, after the last checkpoint: one row per edge between tasks, `| From | To | Kind | Mitigated by |`. From is the task that needs, To the one it needs; each cell starts with the task ID. Mitigated by names the interface and the task freezing it (`profile.Profile sample (M1-T01)`), or says `none: <reason>`.
 
 | Kind | Meaning | Mitigation |
 |---|---|---|
 | `data` | One step's output feeds another's input | The type and its sample |
 | `call` | A pipeline calls another pipeline or package | The fixture-backed fake |
-| `file` | Two tasks must write one file | Move the shared part to the interface or wiring task; else serial. Two steps' thicken tasks on one module: the interface task's layout splits it (each step its own file, the old module re-exporting); never chain them |
+| `file` | Two tasks must write one file | Move the shared part to the interface task; else serial. Two wiring tasks never share a file: each writes its own entry module. Two steps' thicken tasks on one module: the interface task's layout splits it (each step its own file, the old module re-exporting); never chain them |
 | `code` | A task changes code another task wrote (a thicken after its step's spine or an earlier thicken of that step) | None: serial |
 | `contract-change` | A task changes a frozen interface | None: serial, plus a new interface task |
 | `order` | Integration (a wiring or system task runs the steps it wires: `none: integration: the smoke runs it`), or risk or learning ("do X first to learn Y") | None: reason required |

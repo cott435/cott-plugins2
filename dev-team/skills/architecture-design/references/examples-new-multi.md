@@ -4,7 +4,7 @@
 
 **Context:** The GridLoad project has grown. The spec now covers meter and weather ingestion on a schedule, an as-of store, feature research, held-out forecast evaluation, a live day-ahead forecast service, and reporting. Parts run on different schedules (nightly ingestion, interactive research, a long-running day-ahead service), and the team wants research code unable to import the live service's code.
 
-**Step 1 — Shape:** "Multi-package. Ingestion and the day-ahead service are deployed separately from the research library, and you want `features` blocked from importing `dispatch`, which tooling can enforce between packages. Proposed packages and direction:"
+**Step 1 — Shape:** "Multi-package. Ingestion and the day-ahead service are deployed separately from the research library. Proposed packages and direction:"
 
 ```
 reports → forecast → features → data → core
@@ -103,9 +103,16 @@ Each cross-package symbol names its boundary, so `build-planning` can freeze it 
 - **Errors:** constructing one from a frame that fails `FeatureSchema` raises `pandera.errors.SchemaError`
 - **Boundary:** forecast, dispatch · **Fixtures:** tests/contracts/features.Features/ · **Cases:** two days × three regions, a meter decommissioned mid-sample, a region with a flat-load day
 - **Used by:** forecast, dispatch
+
+### features.build_features: Hourly features
+`def build_features(store: AsOfStore, start: datetime, end: datetime) -> Features`
+- **Invariants:** each hour uses only weather forecasts issued before it (DATA-03)
+- **Errors:** `ValueError` if `end` is not after `start`
+- **Boundary:** forecast, dispatch · **Fixtures:** tests/contracts/features.build_features/ · **Cases:** the two-day sample above
+- **Used by:** forecast, dispatch
 ```
 
-Both sides are Python, so the schema is a pandera schema and the fixtures are sample frames. Between runtimes that share no types (a TypeScript service and a Swift app), the schema would be JSON Schema and the fixtures JSON payloads. The contract names the cases; the milestone's interface task writes the schema and one fixture per case. A fake `features` is written only where a pipeline calls `features` (a function symbol); a type needs only its samples.
+Both sides are Python, so the schema is a pandera schema and the fixtures are sample frames. Between runtimes that share no types (a TypeScript service and a Swift app), the schema would be JSON Schema and the fixtures JSON payloads. The contract names the cases; the milestone's interface task writes the schema and one fixture per case. `build_features` is a function other packages call, so its Boundary line gets a fake `features` too; a type needs only its samples.
 
 **Notice:**
 - The data provider decision is checked against specific `DATA-` requirements and the brief's budget. That's how "which API?" gets answered. The spec stayed vendor-neutral, and the decision lives here.

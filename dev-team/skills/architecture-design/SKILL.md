@@ -44,7 +44,7 @@ Approval is an unambiguous yes in the user's words; a hedge ("looks fine I guess
 
 | The user says | Do | Then |
 |---|---|---|
-| Approved, nothing to change | Set `Approved` on every doc and contract touched, `Proposed` decisions to `Accepted`, the date; `dt route --done architecture-design` if `routed_changes` listed any. A decision whose `**Probe:**` names a probe not Answered or Waived stays `Proposed`, with its Risks line. Offer to commit; commit only on a yes | **Stop.** Next is `pipeline-design`, and `api-probe` for each probe with no entry yet |
+| Approved, nothing to change | 1. Run `dt probes`: each decision whose `**Probe:**` names a probe not Answered or Waived stays `Proposed`, with its Risks line. 2. Set `Approved` on every doc and contract touched, the other `Proposed` decisions to `Accepted`, the date; `dt route --done architecture-design` if `routed_changes` listed any. 3. Offer to commit; commit only on a yes | **Stop.** Next is `pipeline-design`, and `api-probe` for each probe with no entry yet |
 | Approved, with a change | Make exactly that edit. Fully specified and changing no decision or contract: set Approved. Otherwise keep Draft | **Stop.** List what you changed |
 | Changes requested | Edit, keep Draft | Repeat this gate |
 

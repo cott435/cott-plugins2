@@ -29,20 +29,27 @@ be changed later. Nothing runs until you have agreed to it.>
 
 ## Steps, in order
 
-1. <Command> — <how long it takes>; <what it spends>. <What stops the run, such as C2 failing
-   before C3 spends anything.>
+<Order across probes, or "None": "Run PB-01's steps first: step 2 reads
+`../PB-01-<slug>/out/<file>`.">
+
+1. <Command, with its step name> — <how long it takes>; <what it spends>. <What stops the run,
+   such as C2 failing before C3 spends anything.>
 2. <Command, a day later if a check needs a second run.>
 
-When you've finished, say "ran it". Don't paste the output: the scripts write
-`evidence/results.json`, and api-probe reads that.
+When you've finished, say "ran it", whether or not a step failed. Don't paste the output: every
+run writes `evidence/results.json`, a failed one with its error, and api-probe reads that.
 
 ## If a run stops
 
 - `evidence NOT written: matched <pattern>`: the leak scan found something that looks like a
   secret or personal data. Open `out/evidence.rejected.json` yourself, and tell the agent only
   which pattern matched and which check it was in.
+- `usage: python3 probe.py <steps>`: the step name was missing or misspelt. Copy the command
+  from the steps above.
 - `missing <NAME>`: that variable isn't in `.env` or the environment.
-- An HTTP error prints the status and the vendor's error code, never the request headers.
+- `<step> stopped: FileNotFoundError, <file>`: an earlier step, or another probe's, hasn't run.
+- `<step> stopped: HTTPError, <status>`: the vendor refused a call. Nothing prints the request
+  or its headers.
 
 ## Files
 

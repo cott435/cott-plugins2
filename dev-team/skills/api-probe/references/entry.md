@@ -64,7 +64,8 @@ probes/PB-NN-<slug>/
 - **Raw HTTP.** Stdlib `urllib` against the documented endpoints, so the evidence is the payload the adapter will see. When an SDK is unavoidable, declare it in PEP 723 inline metadata and run with `uv run`. `pyproject.toml` never changes.
 - **Settings from the environment, real by default:** `os.environ.get("PLAID_BASE_URL", <real host>)`, `PLAID_ENV`. The evals point a probe at a fake vendor this way. `.env` holds keys only (`safety.md`).
 - **Use the build's settings** wherever a setting can't be changed later (Plaid's `days_requested`).
-- **One entry per check** in the code: a `cN_<what>()` function that ends in `record("CN", …)`. `main()` calls them in the README's order, then `write_evidence()`, once.
+- **One entry per check** in the code: a `cN_<what>()` function that ends in `record("CN", …)`. A step is a function calling checks in the README's order, and returns rather than exits. The script ends in `run({"<step>": function, …}, keys=[…])`, which runs `probe.py <step>` and writes evidence once, also when the run fails.
+- **Order across probes.** A step that reads another probe's `out/` is named in both READMEs' "Steps, in order", with the step it waits for.
 - Errors print the HTTP status and the vendor's error code, never headers, URLs with keys in them, or bodies.
 
 ## Evidence
@@ -77,4 +78,4 @@ probes/PB-NN-<slug>/
  "checks": {"C2": {"pass": true, "observed": {"listed": 6, "found": 6}, "note": "brokerage: investments only"}}}
 ```
 
-`pass` is `true`, `false`, or `null` for a measured check the script leaves to Record to judge against the Pass cell. A re-run of the same code keeps the checks it didn't record again, so a second-day run adds C6 and C7 to the first day's. A run of changed code replaces them all. `samples/<name>.json` holds shape-faithful rows from `shape_sample()`. `schema.json` lists each field path seen, with its types and null count. Contract `**Cases:**` cells and adapter tests cite samples as `PB-01 samples/sync_added.json#0`.
+`pass` is `true`, `false`, or `null` for a measured check the script leaves to Record to judge against the Pass cell. A failed run adds `error`: `{"kind": "usage", "steps": […]}` for a missing or unknown step, `missing` with the key names, or `exception` with the step, the class, and an HTTP status or file name when there is one. A re-run of the same code keeps the checks it didn't record again, so a second-day run adds C6 and C7 to the first day's. A run of changed code replaces them all. `samples/<name>.json` holds shape-faithful rows from `shape_sample()`. `schema.json` lists each field path seen, with its types and null count. Contract `**Cases:**` cells and adapter tests cite samples as `PB-01 samples/sync_added.json#0`.

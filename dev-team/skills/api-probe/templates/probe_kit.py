@@ -3,6 +3,7 @@
 Never imported across folders. Stdlib only. Keys come from the environment, else this folder's .env.
 Evidence is written only through record(), allow() and shape_sample(), and scan() checks it before
 anything reaches evidence/. On a hit, the output goes to out/evidence.rejected.json and the run fails.
+probe.py ends in run({"<step>": function, ...}): every run writes evidence, a failed one with its error.
 
     python3 probe_kit.py --self-test     # no network, no keys: a planted secret must stop the write
 """
@@ -49,10 +50,18 @@ def load_env(names: list[str]) -> dict[str, str]:
     values = {n: os.environ.get(n) or file.get(n, "") for n in names}
     missing = [n for n, v in values.items() if not v]
     if missing:
-        sys.exit(f"missing {', '.join(missing)}: set them in {HERE.name}/.env (see .env.example)")
+        raise Missing(missing)
     os.environ.update(values)
     _secrets.update(v for k, v in {**file, **values}.items() if len(v) >= 4)
     return values
+
+
+class Missing(SystemExit):
+    """Keys absent from the environment and .env. Uncaught, it exits 1 with the message."""
+
+    def __init__(self, names: list[str]):
+        super().__init__(f"missing {', '.join(names)}: set them in {HERE.name}/.env (see .env.example)")
+        self.names = names
 
 
 def private(name: str) -> Path:
@@ -181,10 +190,37 @@ def script_hash(folder: Path = HERE) -> str:
     return h.hexdigest()[:8]
 
 
-def write_evidence(runner: str = "user", env: str = "", base_url: str = "") -> None:
+def run(steps: dict, runner: str = "user", env: str = "", base_url: str = "", keys: list[str] = ()) -> None:
+    """`python3 probe.py <step>`: load_env(keys), run that step, then write_evidence() once. A missing or
+    unknown step, a missing key or a step that raises still writes evidence, with `error` {kind: usage,
+    missing or exception, step}, then exits 1: a failed run is never invisible to Record."""
+    step = sys.argv[1] if len(sys.argv) > 1 else ""
+    error, message = None, ""
+    if step not in steps:  # the given text is never recorded: it could be anything the user typed
+        error = {"kind": "usage", "steps": list(steps)}
+        message = f"usage: python3 {Path(sys.argv[0]).name} {'|'.join(steps)}"
+    else:
+        try:
+            if keys:
+                load_env(list(keys))
+            steps[step]()
+        except Missing as e:
+            error, message = {"kind": "missing", "step": step, "names": e.names}, str(e)
+        except Exception as e:  # the class, an HTTP status, a file name: never the message or the request
+            error = {"kind": "exception", "step": step, "type": type(e).__name__,
+                     **({"status": e.code} if isinstance(getattr(e, "code", None), int) else {}),
+                     **({"file": Path(e.filename).name} if getattr(e, "filename", None) else {})}
+            message = f"{step} stopped: " + ", ".join(str(v) for k, v in error.items() if k not in ("kind", "step"))
+    write_evidence(runner, env, base_url, error)
+    if error:
+        sys.exit(f"{message}\nevidence written with error {error['kind']}: say \"ran it\" all the same")
+
+
+def write_evidence(runner: str = "user", env: str = "", base_url: str = "", error: dict | None = None) -> None:
     """Scan, then write evidence/results.json, samples/ and schema.json. A re-run of the
     same code keeps the checks it didn't record again (a day-2 run adds C6, C7); other code replaces them.
-    On a scan hit nothing reaches evidence/: the output goes to out/evidence.rejected.json and we exit 1."""
+    `error` comes from run(); a clean run has none. On a scan hit nothing reaches evidence/: the output
+    goes to out/evidence.rejected.json and we exit 1."""
     digest = script_hash()
     old = {}
     if (EVIDENCE / "results.json").is_file():
@@ -193,7 +229,8 @@ def write_evidence(runner: str = "user", env: str = "", base_url: str = "") -> N
     results = {"probe": "-".join(HERE.name.split("-")[:2]), "script_hash": digest,
                "run_at": dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
                "runner": runner, "env": env, "base_url": base_url,
-               "checks": dict(sorted({**old, **_checks}.items(), key=lambda kv: (len(kv[0]), kv[0])))}
+               "checks": dict(sorted({**old, **_checks}.items(), key=lambda kv: (len(kv[0]), kv[0]))),
+               **({"error": error} if error else {})}
     files = {"results.json": results, **({"schema.json": _schema} if _schema else {}),
              **{f"samples/{n}.json": s for n, s in _samples.items()}}
     text = {rel: json.dumps(obj, indent=1, sort_keys=False) + "\n" for rel, obj in files.items()}
@@ -268,10 +305,26 @@ def _self_test() -> None:
                 failures.append(f"sample not shape-faithful: {sample}")
             if oct((probe / "out").stat().st_mode & 0o777) != "0o700":
                 failures.append("out/ is not 0700")
+        (probe / "steps.py").write_text("from probe_kit import *\n"
+                                        "def ok(): record('C1', {'found': 1}, passed=True)\n"
+                                        "def boom(): load_private('x') or open(private('members.json'))\n"
+                                        "run({'ok': ok, 'boom': boom})\n")
+        for args, want in (([], {"kind": "usage", "steps": ["ok", "boom"]}),
+                           (["s3cr3t-typed"], {"kind": "usage", "steps": ["ok", "boom"]}),
+                           (["boom"], {"kind": "exception", "step": "boom", "type": "FileNotFoundError",
+                                       "file": "members.json"}),
+                           (["ok"], None)):
+            r = subprocess.run([sys.executable, "steps.py", *args], cwd=probe, capture_output=True, text=True,
+                               env={"PATH": os.environ["PATH"]})
+            text = results.read_text() if results.is_file() else ""
+            got = json.loads(text).get("error") if text else "no results.json"
+            if got != want or (r.returncode == 0) != (want is None) or "s3cr3t" in text:
+                failures.append(f"run {args}: rc {r.returncode}, error {got}")
     if failures:
         sys.exit("self-test FAILED:\n  " + "\n  ".join(failures))
     print("self-test passed: a planted .env secret, card, email, digit run and URL key each stopped the write; "
-          "a clean run wrote results.json and a shape-faithful sample")
+          "a clean run wrote results.json and a shape-faithful sample; a missing, unknown or failing step "
+          "wrote its error")
 
 
 if __name__ == "__main__" and sys.argv[1:] == ["--self-test"]:

@@ -14,6 +14,7 @@
 | The docs settle it | Docs read, cited; no check |
 | The docs are silent, vague ("up to 24 months"), or contradict the design | A check |
 | It depends on the user's account, plan, institutions or data | A user check |
+| The user gave test facts: known cases the source must hold (GridLoad's ten decommissioned meters, which history must still include) | One check covering every listed case, by count ("10 of 10 have readings"). The list goes in the script, or in `out/` when it is private |
 
 A contradiction between the docs and the decision (the weather API's timestamps are UTC, and the decision says local time) goes to the gate summary at once, as a hand-off to architecture-design, before anything runs.
 
@@ -23,8 +24,8 @@ Draft, with the checks table. Each check's Pass comes from the requirement it in
 
 ## 4. Write the folder
 
-1. Copy `templates/probe_kit.py` unchanged, and `templates/README.md` and `templates/.env.example`; fill both in.
-2. Write `public.py` for the agent's checks, if any, and `probe.py` for the user's. Each check is one function ending in `record()`. Allow-list every field that reaches evidence.
+1. Copy `templates/probe_kit.py` unchanged, and `templates/README.md` and `templates/.env.example`; fill both in, the README's order across probes included (`entry.md`).
+2. Write `public.py` for the agent's checks, if any, and `probe.py` for the user's, ending in `run()`. Each check is one function ending in `record()`. Allow-list every field that reaches evidence.
 3. Add the `.gitignore` lines from `safety.md` that are missing.
 4. `dt probes --stamp PB-NN` writes the Hash.
 

@@ -13,8 +13,8 @@
 
 | Finding | Idea file | Brief |
 |---|---|---|
-| Serves an existing goal (including the next stage of the same project) | Write it | **No change.** This is the common case. |
-| Needs a new goal, same problem and user | Write it | Only if the project's outcome itself widens; a new stage is not a new goal. Add it with the next number. If that makes more than five, ask the user which to merge. |
+| Serves an existing goal. Every new stage of the same project does | Write it | **No change.** This is the common case. A new stage never adds a goal, even when the user asks for one: the stage is its roadmap row and the idea's *Serves* line. |
+| Needs a new goal: the project's outcome itself widens, same problem and user | Write it | Add the goal with the next number. If that makes more than five, merge before writing: propose which goals fold together, your merge as the default, and write the merged set. Never write a sixth goal. |
 | Changes a constraint (deadline, budget, a rule) | Write it | Update Constraints. |
 | Contradicts the Not Doing list | Write it only if the user reverses that decision | Remove the item, with the user's agreement. Otherwise park the idea. |
 | Different problem or different user | Don't write it | Push back: this may be a separate project with its own brief. |
@@ -70,7 +70,7 @@
 - **One idea per file.** If the conversation produced two separable ideas, write two files (ask the user which to do first).
 - **Write it as a record, in the brief's voice.** The file outlives the review. Notes to the user ("my proposed limit, for you to check") belong in the conversation. Questions belong under *Open questions*.
 - **Tool preferences live here, not in the spec.** If the user names a library, dataset or service ("hand-write the CNN, then compare with a torchvision model"), record it under *Recommended direction* or *Data*. `spec-writing` writes the behavior without the name, and `architecture-design` reads the name from here.
-- **Never paste the idea into the brief.** Brief edits are limited to the fit-check table above. Goal numbers stay stable; new goals take the next number. If a goal is dropped, tell the user which spec requirements referenced it.
+- **Never paste the idea into the brief.** Brief edits are limited to the fit-check table above. Goal numbers stay stable; new goals take the next number, and a merged goal keeps the lower one. If a goal is dropped or merged away, tell the user which spec requirements referenced it.
 
 **Review Gate** (`../SKILL.md`): also say whether the brief changed and which sections.
 

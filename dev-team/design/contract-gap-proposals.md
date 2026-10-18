@@ -9,6 +9,12 @@ The fixes that live outside build-planning are on branch `claude/contract-gap-fi
 below names what that branch already does, so the planning text can point at it instead of restating it.
 None of this is implemented in `skills/build-planning`, because another session owns that skill.
 
+**Reference example:** [examples/contract_first_pipeline.py](examples/contract_first_pipeline.py) (on
+`build-phase`, commit 6805e9c; not on this branch until it is merged). It is a runnable, stdlib-only pipeline that
+marks which task kind builds each part (interface, spine, wiring, thicken), with a fake and a real source passing
+the same conformance cases and contract tests that check shape only. Proposals 1 and 3 can point at it as the
+shape they ask for.
+
 ## 1. Interface acceptance that invites a stub test
 
 **Evidence.** rl9-all-at-once r1: M1-T01's acceptance read "Every M1 step and entry function imports with its

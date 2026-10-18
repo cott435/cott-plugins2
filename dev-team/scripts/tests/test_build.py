@@ -347,6 +347,14 @@ class LandTest(BuildCase):
         self.assertEqual((res["reopened_tester"], res["escalations_cleared"]), (True, ["M1-T03.implementer"]))
         self.assertIn(("M1-T03", "tester"), [(r["id"], r["role"]) for r in self.ready()["rows"]])
 
+    def test_escalated_with_its_worktree_gone(self):
+        self.to_phase1()
+        wt = self.run_half("M1-T02", "solo", {})
+        self.dt("escalate", "needs-dep", "needs numpy", root=wt)
+        git(self.root, "worktree", "remove", "--force", str(wt))               # Claude Code drops a clean worktree
+        out = self.land("M1-T02", "solo")
+        self.assertEqual((out["reject"], out["kind"], out["harness_failures"]), ("escalated", "NEEDS-DEP", 0))
+
     def test_test_stands_retries_the_implementer(self):
         self.to_phase1()
         git(self.root, "branch", "dt/M1-T03-tests")

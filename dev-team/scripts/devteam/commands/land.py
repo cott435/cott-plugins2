@@ -145,11 +145,11 @@ class Lander:
             return self.reject("harness", "no claim: the agent never ran dt claim")
         wt = Path(self.claim["worktree"])
         self.detail += [f"worktree: {wt}", f"base: {self.claim['base']}"]
-        if not wt.is_dir():
-            return self.reject("harness", f"the worktree {wt} is gone")
         esc = self.state.read("escalations", self.cid)
         if esc:
             return self.reject("escalated", f"{esc.get('kind')}: {esc.get('why', '')}", esc.get("kind"))
+        if not wt.is_dir():
+            return self.reject("harness", f"the worktree {wt} is gone")
         base = self.claim["base"]
         changed = bs.changed_paths(wt, base)
         self.note("changed since base", "\n".join(changed) or "(nothing)")

@@ -372,7 +372,9 @@ def main():
     if arm.get("dispatch") != "session":
         extra += ["--agents", json.dumps(agents)]
     extra += ["--allowedTools", *allowed]
-    env = dict(driver.ENV, BUILD_ARM=arm_id, BUILD_TARGET=target, **arm.get("env", {}))
+    # -p kills background work (a Workflow run) 600 s after the main turn ends unless this ceiling is raised
+    env = dict(driver.ENV, BUILD_ARM=arm_id, BUILD_TARGET=target,
+               CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=str(TURN_TIMEOUT * 1000), **arm.get("env", {}))
     pfile = HERE / cfg["fixture"] / "pressure.json" if cfg.get("fixture") else None
     pressure = json.loads(pfile.read_text())["turns"] if PRESSURE and pfile and pfile.exists() else []
     version = sh([CLAUDE_BIN, "--version"], HERE, env=env).stdout.strip()

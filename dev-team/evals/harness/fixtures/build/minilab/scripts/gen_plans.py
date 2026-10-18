@@ -11,7 +11,8 @@
   tests/intent/ path added), `Kind` (the contract task and the three pipeline spines `interface`, which they are:
   they create and freeze the step modules) and a barrier checkpoint after the contract task added, `Parallel` removed,
   a `## Dependency graph` row per `Depends on` so `dt lint` reads the order as declared, and the smoke tests'
-  shape-only rule (SMOKE_SHAPE, as in the interface plans); nothing else moves.
+  shape-only rule (SMOKE_SHAPE, as in the interface plans); the `dt layout` pointer bullet dropped (`dt land` runs
+  prebuild-clear for a wiring task, and pipelines.md is in no task's Writes); nothing else moves.
 
 The output is hand-checked and committed; `--check` fails if any file drifts.
 """
@@ -154,8 +155,7 @@ def build(variant="interface"):
     body += ["## Phase 2: Wiring", ""]
     for tid, pl, pkg, entry, smoke, spines, call in WIRING:
         fake = f" on the {call[1]} fake" if call else ""
-        acc = [f"`pytest {smoke}` runs {pl} end to end{fake}", SMOKE_SHAPE,
-               f"{pl} entry sketch replaced by a `dt layout` pointer"]
+        acc = [f"`pytest {smoke}` runs {pl} end to end{fake}", SMOKE_SHAPE]
         add(task(tid, f"Wire {pl}{fake}", pkg, pl, "wiring", "S", "solo",
                  f"{pl}, " + ", ".join(f"{pkg_of(STEP_OF[s][3])}.{STEP_OF[s][2]}" for s in spines) + (f", {call[1]}" if call else ""),
                  acc, f"`pytest {smoke}` · `scripts/check.sh gate`", spines, [entry, smoke]))
@@ -251,6 +251,7 @@ def convert_spine():
         b = re.sub(r"(\*\*Step:\*\* [^·\n]+?) ·", rf"\1 · **Kind:** {kind} ·", b, count=1)
         b = re.sub(r" · \*\*Parallel:\*\* G\d+", "", b)
         b = re.sub(r"(- \[ \] `pytest tests/unit/\w+/test_pl0\d_smoke\.py` runs [^\n]*)", r"\1\n- [ ] " + SMOKE_SHAPE, b)
+        b = re.sub(r"- \[ \] [^\n]*replaced by a `dt layout` pointer\n", "", b)
         likely = [f.strip() for f in re.search(r"\*\*Files likely:\*\* ([^\n]*)", b).group(1).split(",")]
         b = re.sub(r"\*\*Files likely:\*\* [^\n]*", "**Writes:** " + ", ".join(spine_writes(tid, likely)), b)
         deps = re.findall(r"M1-T\d+", re.search(r"\*\*Depends on:\*\* ([^·\n]*)", b).group(1))

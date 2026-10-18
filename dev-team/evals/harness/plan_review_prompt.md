@@ -8,7 +8,15 @@ You are the final reviewer of a finished set of planning documents. An assistant
 - `.review/packets/context__<task>.md`: the exact context packet a builder agent gets for each task (generated from the docs by the plan tool). The builder sees only its packet, CONSTRAINTS.md and the files it edits.
 - `.review/lint.txt`: the plan tool's own lint output. Its findings are already known; don't repeat them.
 
-Read `.review/user_messages.md` first, all of it, then every doc, then the plan, then the packets (all of them if there are fewer than 40, else every spine and interface task's packet plus at least ten others).
+## Step 1: the developer's facts, before anything else
+Finish this step before you read any packet or look for any other class of defect.
+1. Read `.review/user_messages.md`, all of it. From each message, list every fact, number and named choice as one checklist item with its turn: shapes, counts, goals and scoring rules, algorithms and methods, libraries, vendors, protocols, budgets, hardware and where things run, time limits, what each stage or environment contains, what is in or out of scope. Turn 1 usually holds the most; list every item in it.
+2. Apply later overrides. An item changes only where a later message names the new value in the developer's own words; quote that message. An approval ("go ahead", "converge", "your lean works", "approved") of a proposal is not an override of an item the developer stated: the item stands.
+3. Check every item against `docs/spec.md`, `docs/architecture.md`, `docs/brief.md`, `docs/ideas.md` and `docs/roadmap.md` by Grep: search the item's own words, then the words a doc would use for a different value (another shape, count, library or place), and read the passage you find. Mark it `kept` (the docs state it), `changed` (a doc states something else), `dropped` (no doc states it, and the stage it belongs to is planned or designed) or `later` (it belongs to a stage not yet written up).
+4. Every `changed` or `dropped` item is a user_fact defect, listed before any other class.
+
+## Step 2: everything else
+Then read every doc, the plan, and the packets (all of them if there are fewer than 40, else every spine and interface task's packet plus at least ten others), and list the other classes.
 
 ## Defect classes
 1. **user_fact**: a fact, choice or constraint the developer stated is lost, changed or overridden in the docs. Examples: a shape, count, scoring rule, library, vendor, protocol, budget, hardware or stage scope the developer named that the spec, architecture or plan states differently or drops; a stage the developer described whose parts silently vanished. Quote the developer's words (turn number) and the doc's words. Don't flag a change the developer later agreed to in their own words.
@@ -29,6 +37,6 @@ Out of scope: files that build setup writes (CONSTRAINTS.md, pyproject.toml, scr
 
 ## Output
 Reply with ONLY a JSON object, no other text:
-{"defects": [{"id": "R01", "class": "...", "severity": "...", "file": "...", "quote": "...", "evidence": "...", "fix": "..."}, ...], "checked": {"user_messages": <turns read>, "docs": <files read>, "packets": <packets read>}}
+{"facts": [{"turn": 1, "fact": "...", "override": "<turn and quote, or empty>", "status": "kept|changed|dropped|later", "doc": "<file and quote, or empty>"}, ...], "defects": [{"id": "R01", "class": "...", "severity": "...", "file": "...", "quote": "...", "evidence": "...", "fix": "..."}, ...], "checked": {"user_messages": <turns read>, "docs": <files read>, "packets": <packets read>}}
 
 Order the list by severity, then by file. List each defect once; if one fact is wrong in several files, list it once with every file in the fix.

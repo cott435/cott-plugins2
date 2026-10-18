@@ -83,7 +83,7 @@ Measured against iteration 9's own scores, the reviewed sets gain +0.35, +0.45, 
 
 **2. A defect both sets share goes unpunished.** rl-all-at-once's square tank, hits-per-fish scoring and two predators survive in the reviewed copy (§What the reviewer missed). No verdict here cites them. stage_completeness for that original is 4 here, against 3 in iteration 9.
 
-So +0.86 is the size of the fix as this judge sees it side by side, and +0.5 is closer to what the reviewed plans would score in a normal run. Re-judging the reviewed incremental against the reviewed all-at-once for each project (4 calls) would settle the absolute number on iteration 9's own scale.
+So +0.86 is the size of the fix as this judge sees it side by side. Re-judging the reviewed incremental against the reviewed all-at-once puts the gain on iteration 9's own scale at about zero, not +0.5 (§Calibration).
 
 ## What the reviewer found, and the judge's lists
 
@@ -163,7 +163,7 @@ Of the remaining 53, the reviewer found **30 (57%)**.
 - **rl-all-at-once.** The spec's "FISH-01 The tank is a square with walls", "FISH-04 … hits per fish per episode" and "PREY-01 … 2 predators", with no opponent pool, all contradict turn 1: "a circular tank", "survive as long as possible", "a learning predator", "co-evolution / self-play". No later message changes them.
   - The reviewer read all 16 messages and still filed only four user_fact defects, none of these. It seems to have read turn 2's "go ahead and converge" as approving whatever the brief then said.
   - This was the judge's top rl-all-at-once complaint, and it survives in the reviewed copy.
-- **quant-incremental.** "every model trains on the user's machine" (spec, ideas) contradicts turn 2 ("an occasional rented GPU") and turn 47 ("I can rent a cloud GPU for a few dollars").
+- **quant-incremental: not a miss.** "every model trains on the user's machine" follows turn 48: offered a constraint edit for the GPU, the user answered "Keep training local on Apple Silicon, no brief change." That is a cut in the user's own words, like the PPO cut. The judge's scenario facts don't know it, so the judge keeps citing it (§Facts-checklist reviewer v2).
 - **Fix for the prompt:** a separate first step that lists every fact, number and named choice in each user message as a checklist, then checks each against spec and architecture by grep, before any other class. Free-form reading lets packet defects crowd out the user's facts. 35 of rl-incremental's 46 defects were stale or packet.
 
 **2. Stale brief framing.**
@@ -217,7 +217,7 @@ The new judges cite these in the reviewed sets, and they weren't in the original
 
 ## Verdict
 
-**A final review pays off.** It raised every trajectory in both orders, by +0.86 paired, or about +0.5 on iteration 9's scale. The gain lands on exactly the content items the skills have been stuck on: internal_consistency, task_buildability, interface_quality and milestone_quality. It costs about a quarter of a planning run.
+**Not yet.** Side by side with its own original, the reviewed copy won every verdict by +0.86. The gain lands on the content items the skills have been stuck on: internal_consistency, task_buildability, interface_quality and milestone_quality. But judged against the other mode, as iteration 9 was, the reviewed plans score the same as the originals (§Calibration). The cross-set verdicts turn on user-fact and scope defects that v1 left in place, and on the fixer's own regressions. The review costs about a quarter of a planning run.
 
 What it needs before it goes into the skills:
 1. **A user-facts checklist pass first** (missed item 1). That is where the largest single defect in iteration 9 sits, and free reading missed it.
@@ -257,3 +257,72 @@ Each is checkable from the parsed docs alone. Each lists the defects in this run
 - Domain errors.
 
 These stay with a reviewer. The lints above would cut its list by about a third and leave it the part only a model can do.
+
+## Calibration: the reviewed plans on iteration 9's own scale
+
+The blind judge compared the reviewed incremental set with the reviewed all-at-once set for each project, in both orders. This is iteration 9's pairing exactly, with the same `judge_prompt.py --both`, `run` and `average`, and prompt folders `judge-rl` and `judge-quant` in the scratchpad. That is 4 calls. Keys and verdicts are in `review-ab/calibration/`. Each reviewed score is set against the same project's score in iteration 9's `judge-{rl,quant}.json`.
+
+| Overall | Iteration 9 (original) | Reviewed | Δ | Paired Δ (above) |
+|---|---|---|---|---|
+| rl-incremental | 7.65 | 7.4 | −0.25 | +1.05 |
+| rl-all-at-once | 7.45 | 7.35 | −0.10 | +0.75 |
+| quant-incremental | 7.7 | 7.8 | +0.10 | +0.5 |
+| quant-all-at-once | 7.45 | 7.65 | +0.20 | +1.15 |
+| **mean** | 7.56 | 7.55 | **−0.01** | +0.86 |
+
+- **The review gain on iteration 9's scale is about zero.** The four Δs fall on both sides of zero, and none is bigger than the 0.4–0.45 position effect iteration 9 measured. The +0.5 estimate above, which put a paired score beside an unpaired one, was an artifact of the near-twin pairing.
+- **The items the paired judges moved don't move here.** Mean Δ over the four sets:
+  - internal_consistency 0 (+1.38 paired).
+  - interface_quality 0 (+1.0).
+  - task_buildability +0.25 (+1.0).
+  - milestone_quality −0.38 (+0.88).
+- **The fixes are seen, then outweighed.** The calibration judges no longer cite what was fixed: SSE, yfinance, the $49 line, the missing References lines on quant-all-at-once's M4–M8. Their top complaints are the defects the review left in place:
+  - rl-all-at-once's square tank, hits-per-fish scoring, 2 predators and no opponent pool. Both rl judges cite them.
+  - quant-all-at-once's missing yahooquery and 10 delisted names. These are out of reach: that run's user never named them.
+  - quant-incremental's deferred PPO agents and local-only training. Both are cuts in the user's own words.
+- **A fixer regression costs a set points.** Both rl judges cite rl-incremental's M1 interface freezing FishTank, PPOAgent and OpponentPool, which v1's R02 fix put there (§What the fixes broke). They name it an unbuildable task. rl-incremental's interface_quality fell 4 → 3 and its milestone_quality 3.5 → 2.5, its two largest drops.
+- **Winners.** rl again splits by order (incremental in AB, all-at-once in BA), as in iteration 9. In quant, incremental now wins both orders; iteration 9 split.
+
+So against a plan from the other mode, the defects that decide a verdict are the user's facts and stage scope, not the stale text and packet gaps the reviewer mostly fixes. A review that ships has to catch the facts, and its fixer must not add a defect of its own.
+
+## Facts-checklist reviewer v2
+
+`harness/plan_review_prompt.md` now opens with a Step 1 that must finish before any other class:
+1. List every fact, number and named choice in each user message as a checklist item with its turn.
+2. Apply later overrides, only where the user names the new value in their own words. An approval of a proposal is not an override.
+3. Grep each item against brief, spec, architecture, ideas and roadmap, and mark it kept, changed, dropped or later.
+4. Every changed or dropped item is a user_fact defect.
+
+The reply gains a `facts` array. The prompt names no project's facts, and its search hint is generic. v1 is the prompt at commit 7063212.
+
+Only the reviewer was run (`plan_review.py <copy> review`), on fresh copies of the original iteration-9 projects in `dev-team-workspace/review-ab-v2/<traj>/with_skill/`, laid out as above. There is one run per project, so any single item could flip on a rerun. Records are in `review-ab/v2/<traj>/`.
+
+**The target facts.**
+
+| Fact (user's turn) | Doc | v1 | v2 |
+|---|---|---|---|
+| rl-aao: circular tank (1) | FISH-01 "a square with walls" | missed | **R01, high** |
+| rl-aao: survive as long as possible (1) | FISH-04 "hits per fish per episode" | missed | **R02, high** |
+| rl-aao: a learning predator (1) | PREY-01 "2 predators" | missed | **R03, medium** |
+| rl-aao: co-evolution / self-play (1) | no opponent pool or past opponents | missed | missed: marked kept on TRAIN-07 "Both teams learn at the same time" |
+| quant-inc: rented cloud GPU (47) | spec "every model trains on the user's machine" | not flagged | not flagged, correctly: v2's checklist records the turn-48 override "Keep training local on Apple Silicon" |
+
+- **v2 catches 3 of the 4 real misses.** These include iteration 9's top rl-all-at-once complaint, which the calibration judges still cite in the reviewed copy.
+- **Self-play is half caught.** "Both sides learn at once" is kept, but "self-play" asks for play against the agent's own past versions. The checklist matched the item on its weaker reading. The prompt could ask that a named concept be checked for its mechanism, not its label.
+- **The checklist is honest.** On the rl run it marked 7 of 40 items changed. Its other changed items are real too: QR-02's 90 minutes per variant against "under ~1 hour training per env", $10 per world against "a few dollars", and the CI digest against "No CI needed" (v1 had all three). On the quant run it marked 4 of 92 items changed: WebSocket twice, yahooquery and the $49 placeholder. All four were already in v1's list.
+
+**Cost and breadth.**
+
+| | v1 cost | v2 cost | v1 defects | v2 defects | v1 / v2 packets read | Facts listed |
+|---|---|---|---|---|---|---|
+| rl-all-at-once | $1.71 (19 turns, 281 s) | $1.78 (18, 317 s) | 27 | 29 | 30 / 30 | 40 |
+| quant-incremental | $4.88 (62, 642 s) | $4.25 (47, 577 s) | 47 | 31 | 46 / 14 | 92 |
+
+- **The checklist itself costs little:** +$0.07 on rl. On quant, v2 came out $0.63 cheaper, but only because it skipped the packets.
+- **On the long run it traded breadth for the facts.** On quant-incremental, v2 read 14 of 46 packets. The prompt asks for every spine and interface packet plus ten others once there are 40 or more, and v1 read all 46. Its list shrank from 47 to 31. It dropped v1's nine "no Exit" defects on M2–M10, the qdata golden cases that iteration 9's judge cited (v1's R23), and four packet defects. On the shorter rl run, breadth held: 30 packets each, with the same packet and stale findings.
+
+**Next.** Keep the Step 1 checklist, and add two things before the skills adopt it:
+1. A hard packet floor ("read every packet; if there are more than 40, read every spine and interface packet and at least ten others, and say how many you read").
+2. Check each named concept for its mechanism, not its label.
+
+The missing-Exit and other mechanical defects should move to the dt lints above, so breadth matters less. One calibration rerun after a v2 review plus fix would show whether the facts close the gap the calibration found.

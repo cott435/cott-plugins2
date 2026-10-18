@@ -1,0 +1,119 @@
+{
+ "winner": "A",
+ "reasoning": "Set A sticks closely to the ground truth. Its fish tank is circular and fish are scored on survival. It has one learning predator with self-play against an opponent pool and a cross-play table. Its ladders run tabular \u2192 DQN \u2192 CNN and REINFORCE \u2192 PPO, with ablations and a library reference for each stage. Its test oracles are very rigorous: TC-07, TC-12, TC-42, TC-52 and TC-58 all check out by hand, and truncation vs termination is handled correctly in GAE. A has three main weaknesses. First, each stage is one very large milestone rather than a walking skeleton. Second, the M1 interface task freezes stage-2 and stage-3 symbols (FishTank, PPOAgent, OpponentPool, the predator-prey fields in RunSettings) that no M1 task builds, which clashes with the CR-02 no-stub exit check. Third, some text is stale: the brief's 'Not doing: designing future environments now' and the CONSTRAINTS boundaries, which leave out selfplay. Set B scopes its interface better: only M1 symbols are frozen, and unfrozen ones are listed explicitly. Its spines are real baselines (online Q-learning, REINFORCE as the PPO spine), its check-world gate is a good idea, and S2 is split cleanly into one fish \u2192 many fish \u2192 local sight. But B departs from the user's project: the tank is square, fish are scored on hits with respawn instead of survival, predator-prey has 2 predators, and there is no self-play against past opponents. Its milestone IDs run out of order (M4 is built after M6). M2 is a leftover bundle of replay, reference check, write-ups and the full DQN, so M1 does not let the user watch a replay. Some of B's packets also have gaps: the Snake task's packet leaves out WorldSpec, TeamSpec and ActionSpace, and the PL-02 wiring smoke command `rllab train` actually runs through the PL-03 batch, which isn't wired yet. On balance, A's RL soundness, completeness and buildable packets outweigh B's better milestone and interface scoping.",
+ "rubric": {
+  "A": {
+   "content": {
+    "rl_soundness": 5,
+    "stage_completeness": 5,
+    "internal_consistency": 3,
+    "right_sizing": 3,
+    "milestone_quality": 3,
+    "pipeline_clarity": 4,
+    "interface_quality": 3,
+    "dependency_graph_soundness": 4,
+    "task_buildability": 4
+   },
+   "structure": {
+    "organization": 4,
+    "readability_for_solo_learner": 3,
+    "ease_of_finding_next_build_step": 4,
+    "layout_sensibility": 4
+   },
+   "content_score": 3.8,
+   "structure_score": 3.8,
+   "overall_score": 7.6
+  },
+  "B": {
+   "content": {
+    "rl_soundness": 3,
+    "stage_completeness": 3,
+    "internal_consistency": 3,
+    "right_sizing": 3,
+    "milestone_quality": 3,
+    "pipeline_clarity": 4,
+    "interface_quality": 4,
+    "dependency_graph_soundness": 4,
+    "task_buildability": 3
+   },
+   "structure": {
+    "organization": 4,
+    "readability_for_solo_learner": 4,
+    "ease_of_finding_next_build_step": 3,
+    "layout_sensibility": 4
+   },
+   "content_score": 3.3,
+   "structure_score": 3.8,
+   "overall_score": 7.1
+  }
+ },
+ "output_quality": {
+  "A": {
+   "score": 8,
+   "strengths": [
+    "Faithful to the user's three environments: circular tank, survival scoring, one learning predator, and self-play with an opponent pool plus cross-play",
+    "Each stage has a clear RL ladder (tabular/DQN/CNN; REINFORCE/PPO; fixed \u2192 naive co-learning \u2192 pool), with ablations and a library reference",
+    "Golden cases are precise and hand-checkable, with cited sources (Sutton & Barto, GAE, PPO)",
+    "Context packets include every needed type, test case and sample reference, e.g. M1-T13 and M1-T21",
+    "Ideas docs record why stages 2 and 3 look the way they do"
+   ],
+   "weaknesses": [
+    "M1 covers the whole Snake stage (31 tasks) instead of starting with a walking skeleton",
+    "The M1 interface freezes M2/M3 types and step stubs that no M1 task owns",
+    "Stale framing in the brief and in the CONSTRAINTS boundaries",
+    "The contract is very long (about 460 lines) and RunSettings is overloaded with fields for later stages"
+   ]
+  },
+  "B": {
+   "score": 7,
+   "strengths": [
+    "Interface freezes only M1 symbols, and the unfrozen boundaries are listed explicitly",
+    "Spines are real minimal baselines (online Q-learning; REINFORCE as the PPO spine)",
+    "Check-world gate (two-exit corridor) catches silent RL bugs before any batch",
+    "S2 is split cleanly along dependency lines (one fish \u2192 many \u2192 local sight)",
+    "Paired permutation test with Holm correction is fully specified"
+   ],
+   "weaknesses": [
+    "Departs from ground truth: square tank, hit/respawn scoring instead of survival, 2 predators, no self-play against past opponents",
+    "Milestone IDs run out of build order (M4 comes after M6), and M2 is a leftover bundle",
+    "M1 has no replay, even though watching a replay is a core success criterion",
+    "Some packets leave out needed types, and one wiring smoke command depends on an unwired pipeline",
+    "No exploration or reward ablations, so fewer of the concepts the user named are actually taught"
+   ]
+  }
+ },
+ "unbuildable_tasks": {
+  "A": [
+   "M1-T01: told to stub every PL-01 step, including FishTank, PredatorPrey, ReinforceAgent, PPOAgent, the scripted predator/prey and OpponentPool, with NotImplementedError naming an open task, but no M1 task owns these, so CR-02's gate and exit check can't be met"
+  ],
+  "B": [
+   "M1-T06: the packet lacks core.WorldSpec's dependencies core.TeamSpec, core.ActionSpace (Discrete/Box) and MeasureSpec definitions, and the ActionError type, yet the Snake world must expose `spec: WorldSpec` and TC-12 checks team membership",
+   "M1-T20: Verify `rllab train --smoke` goes through cli `train` as 'a one-seed batch' (PL-03 run_batch plus the check gate), which isn't wired until M1-T21; the task writes neither the cli nor a smoke config",
+   "M1-T09: Verify `pytest -k train_loop` won't select tests in the planned file `test_loop.py` unless the test names happen to contain 'train_loop'"
+  ]
+ },
+ "defects": {
+  "A": [
+   "brief.md: \"Designing future environments now. Each gets refined in its turn.\" \u2014 stale; spec, architecture and tests now fully design the fish tank and predator-prey",
+   "brief.md: \"For Snake, the first environment: a learning curve\u2026\" \u2014 success criteria cover Snake only, though the plan now spans all three environments",
+   "CONSTRAINTS.md: \"`train` \u2192 core, runs, evaluate \u00b7 \u2026 \u00b7 `viz` \u2192 runs\" \u2014 stale boundaries; architecture has train \u2192 selfplay, viz \u2192 evaluate and selfplay, and selfplay isn't listed at all",
+   "tasks__plan.md M1-T01: Read includes \"envs.FishTank \u2026 agents.PPOAgent, selfplay.OpponentPool\" and acceptance stubs \"every step\" \u2014 freezes M2/M3 symbols that no M1 task builds",
+   "contract.md core.RunSettings: \"opponents\u2026 self_play\u2026 pool_latest; generations\" \u2014 fields no M1 consumer needs, frozen in the M1 interface",
+   "roadmap.md M1: one milestone spans tabular, DQN, CNN, three ablations, the reference, the report and replay \u2014 lopsided, and not a walking skeleton",
+   "tasks__plan.md M1-T31: \"Size: S\" for real 5-seed ladder, ablation and reference runs across 7 run families",
+   "contract.md core.ActionSpace: \"the environment clips each action itself (FISH-02)\" \u2014 FISH-02 shortens the vector rather than clipping it, wording AD-11 is careful to distinguish"
+  ],
+  "B": [
+   "spec.md FISH-01: \"The tank is a square with walls\" \u2014 the user specified a circular tank",
+   "spec.md FISH-04: \"the score is hits per fish per episode (lower is better)\" with respawn \u2014 the user's goal was to survive as long as possible",
+   "spec.md PREY-01: \"6 prey, 2 predators\" \u2014 the user described 'a learning predator'; there is also no self-play against past opponents, only naive co-learning",
+   "roadmap.md: \"| M4 | S3 | Predator-prey | \u2026 | M6 \u2026\" \u2014 milestone IDs run out of build order",
+   "roadmap.md M2: \"See, check and explain the snake\" bundles full DQN, replay, video, refcheck and notes \u2014 a leftover milestone; M1 exit has no replay",
+   "CONSTRAINTS.md: \"`charts` \u2192 runlog, evaluate\" \u2014 architecture has charts depending on baselines too",
+   "contract.md: \"## Retired - ~~train.run~~ \u2026 ~~replay.trace~~\" \u2014 superseded symbols kept in the live contract",
+   "tasks__plan.md M1-T20: \"**Covers:** TRAIN-01\u2013TRAIN-04, TRAIN-02\" \u2014 repeated ID",
+   "tasks__plan.md M1-T20: Verify \"`rllab train --smoke`\" \u2014 per cli.main, `train` is a one-seed batch through PL-03, which is wired in M1-T21",
+   "tests.md Open questions: \"No regression case yet for FISH-11 and PREY-11\" \u2014 requirements left without an oracle"
+  ]
+ }
+}

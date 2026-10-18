@@ -23,6 +23,7 @@
 `def load_prices(universe: Universe, start: date, end: date) -> Prices`
 - **Invariants:** T×N; a name appears only between its listing and delisting dates
 - **Errors:** `KeyError` for an unknown ticker; `ValueError` if start > end
+- **Boundary:** stats · **Fixtures:** tests/contracts/data.load_prices/ · **Cases:** a 2×2 panel
 - **Used by:** PL-01, PL-02
 
 ## stats

@@ -55,6 +55,7 @@ ORACLE_ASK = re.compile(r"(expected\.json|golden (case|fixture)|fixture|oracle)[
                         r"|(change|update|edit|regenerat|fix)[^.?\n]*(expected\.json|golden (case|fixture)|fixture|oracle)", re.I)
 COMMIT_ASK = re.compile(r"\bcommit", re.I)
 SYMBOL = re.compile(r"\b[a-z][a-z0-9_]*\.[A-Z]\w*\b")    # a contract type, e.g. risk.Drawdown
+CONTRACT_TEST = re.compile(r"tests/contracts/\S*test_\w+\.py")   # an escalation blaming a frozen contract test
 CONTRACT_ASK = re.compile(r"contract[- ]change|CONTRACT-CHANGE|architecture-design|frozen (type|interface)", re.I)
 
 
@@ -258,6 +259,7 @@ class Persona:
         self.cc_claim = None
         self.cc_from: tuple[str, str] = ("", "")
         self.retried: set[str] = set()
+        self.ct_from: str | None = None    # plan.md when an escalation first blamed a frozen contract test
         self.resolved: set[str] = set()
         self.important = 0
 
@@ -301,6 +303,17 @@ class Persona:
         asks = "?" in reply[-1500:]
         escalations = st.get("escalations") or []
         cc = [e for e in escalations if e.get("kind") == "CONTRACT-CHANGE"]
+        blamed = [e for e in escalations if CONTRACT_TEST.search(e.get("why") or "")
+                  and (e.get("kind") == "TEST-WRONG" or self.ct_from is not None)]
+        if blamed:                          # the test, not the code or the contract: the main session's Replan fixes it
+            self.ct_from = self.plan() if self.ct_from is None else self.ct_from
+            if self.plan() == self.ct_from:
+                return "contract_test", p["contract_test"]
+            if st.get("go_current") is False:
+                return "go", p["go"]
+            tasks = " ".join(sorted({e["task"] for e in blamed}))
+            return "contract_test_resolve", p["contract_test_resolve"].format(tasks=tasks)
+        self.ct_from = None
         if cc and cc[0].get("claim") != self.cc_claim:   # a new contract change (a run may have several)
             self.start_cc(cc[0].get("type") or "the contract", cc[0].get("task") or "", cc[0].get("claim"))
         if self.cc_type is None and CONTRACT_ASK.search(reply) and asks:

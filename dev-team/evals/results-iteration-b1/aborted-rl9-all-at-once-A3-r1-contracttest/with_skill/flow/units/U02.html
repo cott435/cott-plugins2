@@ -1,0 +1,1868 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1"><title>U02 implementer</title>
+<style>
+:root{--bg:#fbfbfa;--fg:#1d1d1f;--muted:#6b6b70;--line:#d9d9de;--box:#fff;--rowp:#eef3fb;--band:#fff4d6;
+--ok:#2e7d32;--bad:#c62828;--warn:#b26a00;--idle:#6b6b70}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#17171a;--fg:#ececf0;--muted:#9a9aa3;
+--line:#34343a;--box:#222227;--rowp:#1d2433;--band:#3a3015;--ok:#6fcf73;--bad:#ff6b6b;--warn:#f0b35a;--idle:#9a9aa3}}
+:root[data-theme="dark"]{--bg:#17171a;--fg:#ececf0;--muted:#9a9aa3;--line:#34343a;--box:#222227;--rowp:#1d2433;
+--band:#3a3015;--ok:#6fcf73;--bad:#ff6b6b;--warn:#f0b35a;--idle:#9a9aa3}
+body{margin:0;padding:16px;background:var(--bg);color:var(--fg);font:14px/1.45 -apple-system,system-ui,sans-serif}
+h1{font-size:18px;margin:0 0 4px}h2{font-size:15px;margin:22px 0 8px}.sub{color:var(--muted)}
+table{border-collapse:collapse;margin:4px 0 8px}td,th{border-bottom:1px solid var(--line);padding:4px 10px;text-align:left;
+vertical-align:top}th{color:var(--muted);font-weight:600}.chips span{display:inline-block;margin:0 4px 2px 0}
+.legend span{margin-right:14px;white-space:nowrap}.sw{display:inline-block;width:10px;height:10px;border-radius:2px;
+margin-right:4px;vertical-align:-1px}.scroll{overflow:auto;max-height:88vh;border:1px solid var(--line);border-radius:8px}
+.chart{display:grid;width:max-content}.chart>div{line-height:0}.corner{position:sticky;top:0;left:0;z-index:3}
+.colhead{position:sticky;top:0;z-index:2}.rowhead{position:sticky;left:0;z-index:2}
+svg.bg{background:var(--bg)}.colhead svg{border-bottom:1px solid var(--line)}.rowhead svg{border-right:1px solid var(--line)}
+.ok{color:var(--ok);fill:var(--ok)}.bad{color:var(--bad);fill:var(--bad)}.warn{color:var(--warn);fill:var(--warn)}
+.idle{color:var(--idle);fill:var(--idle)}
+svg text{fill:var(--fg);font-family:-apple-system,system-ui,sans-serif}
+.box{fill:var(--box);stroke:var(--line)}.unit:hover .box{stroke:var(--fg)}
+.role{font-size:12px;font-weight:600}.uid,.wmeta,.lmeta,.meta{font-size:10px;fill:var(--muted)}
+.sub{font-size:10.5px;fill:var(--muted)}.badge{font-size:11px;font-weight:600}
+.meta.bad{fill:var(--bad);font-weight:600}.lane{font-size:13px;font-weight:700}.wave{font-size:13px;font-weight:700}
+.par{fill:#4e79a7}.ser{fill:var(--muted)}.rowp{fill:var(--rowp)}.rows{fill:transparent}.band{fill:var(--band)}
+.bandt{font-size:11.5px}.grid{stroke:var(--line)}.link{stroke:var(--muted);stroke-width:1.2;opacity:.55}
+.arrowhead{fill:var(--muted)}.marks{font-size:10.5px}.audit{stroke:var(--box);stroke-width:2}.auditn{font-size:10px;font-weight:700;fill:#fff}
+a{color:inherit}svg a .box{cursor:pointer}
+
+:root{--c0:#2a78d6;--c1:#eb6834;--c2:#1baf7a;--c3:#eda100;--c4:#e87ba4;--c5:#008300;--c6:#6250d6;--c7:#e34948;
+--cx:#8a8985;--main:#52514e;--read:#dcdbd5;--readfg:#1d1d1f}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--c0:#3987e5;--c1:#d95926;--c2:#199e70;
+--c3:#c98500;--c4:#d55181;--c5:#008300;--c6:#9085e9;--c7:#e66767;--cx:#77766f;--main:#c3c2b7;--read:#3b3b40;
+--readfg:#ececf0}}
+:root[data-theme="dark"]{--c0:#3987e5;--c1:#d95926;--c2:#199e70;--c3:#c98500;--c4:#d55181;--c5:#008300;
+--c6:#9085e9;--c7:#e66767;--cx:#77766f;--main:#c3c2b7;--read:#3b3b40;--readfg:#ececf0}
+.c0{fill:var(--c0);background:var(--c0)}.c1{fill:var(--c1);background:var(--c1)}.c2{fill:var(--c2);background:var(--c2)}
+.c3{fill:var(--c3);background:var(--c3)}.c4{fill:var(--c4);background:var(--c4)}.c5{fill:var(--c5);background:var(--c5)}
+.c6{fill:var(--c6);background:var(--c6)}.c7{fill:var(--c7);background:var(--c7)}.cx{fill:var(--cx);background:var(--cx)}
+.cmain{fill:var(--main)}.sc0{stroke:var(--c0)}.sc1{stroke:var(--c1)}.sc2{stroke:var(--c2)}
+.tl text,.sm text,.lc text{font-size:10.5px;fill:var(--muted)}.tl .lbl-in,.sm .lbl-in{fill:#fff;font-size:10.5px;font-weight:600}
+.tl .rowl,.sm .rowl,.lc .rowl{fill:var(--fg);font-size:11.5px;font-weight:600}.tl .band{fill:var(--rowp)}
+.tl .brk{stroke:var(--muted);stroke-dasharray:2 3}.tl a:hover rect,.sm a:hover rect{stroke:var(--fg);stroke-width:1.5}
+.axis{stroke:var(--line)}.sm .val{fill:var(--fg);font-weight:600}.lc path.ln{fill:none;stroke-width:2}
+.lc circle{stroke:var(--bg);stroke-width:2}.lc .end{font-weight:600;fill:var(--fg)}
+.tiles{display:flex;flex-wrap:wrap;gap:10px;margin:12px 0}.tile{border:1px solid var(--line);border-radius:8px;
+padding:8px 12px;min-width:110px;background:var(--box)}.tile b{display:block;font-size:20px;line-height:1.2}
+.tile span{font-size:12px;color:var(--muted)}.tile i{font-style:normal;font-size:12px;margin-left:6px}
+.fm{border-collapse:separate;border-spacing:2px}.fm td,.fm th{border:0;padding:0;text-align:center;font-size:11px}
+.fm th{padding:0 2px;font-weight:600}.fm td.f,.fm th.f{text-align:left;padding-right:10px;white-space:nowrap;
+position:sticky;left:0;background:var(--bg);font:11.5px ui-monospace,Menlo,monospace;
+max-width:380px;overflow:hidden;text-overflow:ellipsis}
+.fm td.cell{min-width:22px;height:20px;border-radius:3px}.fm td.fw{background:var(--c0);color:#fff;font-weight:700}
+.fm td.fe{background:var(--c1);color:#fff;font-weight:700}.fm td.fr{background:var(--read);color:var(--readfg)}
+.fm td.n{color:var(--muted);padding:0 6px}.fm tr.grp td{text-align:left;padding-top:8px;color:var(--muted);
+font-weight:600}
+.key{display:inline-block;min-width:18px;text-align:center;border-radius:3px;font-size:11px;margin-right:4px}
+.bar{display:inline-block;height:9px;border-radius:2px;vertical-align:0}
+
+pre{white-space:pre-wrap;word-break:break-word;background:var(--box);border:1px solid var(--line);border-radius:6px;
+padding:8px 10px;margin:4px 0;font:12px/1.45 ui-monospace,SFMono-Regular,Menlo,monospace;max-width:100%;overflow:auto}
+.step{border-top:1px solid var(--line);padding:6px 0}.step:target{background:var(--rowp)}
+.sid{font:12px ui-monospace,Menlo,monospace;color:var(--muted);margin-right:8px}.kind{font-weight:600;margin-right:8px}
+.err{color:var(--bad);font-weight:600}.hook{color:var(--bad);margin:4px 0 0 16px}.lbl{font-size:12px;color:var(--muted);margin-top:6px}
+details summary{cursor:pointer;color:var(--muted);font-size:12px}.head td:first-child{color:var(--muted)}
+.top{font-size:13px}.narr{list-style:none;padding-left:0}.narr li{margin:3px 0}
+</style></head>
+<body>
+<p class="top"><a href="../flow.html">← the run's flow chart</a></p>
+
+<h1>U02 · implementer · M1-T01 solo</h1>
+<table class="head"><tr><td>Type</td><td>implementer</td></tr><tr><td>Description</td><td>M1-T01 solo</td></tr><tr><td>Spawned by</td><td>driver at D22</td></tr><tr><td>Turn</td><td><a href="../turns/T02.html">T02</a></td></tr><tr><td>Model</td><td>claude-opus-5-5</td></tr><tr><td>Start</td><td>2026-10-18 19:15:13 UTC</td></tr><tr><td>Duration</td><td>2 min</td></tr><tr><td>Tool calls</td><td>22</td></tr><tr><td>Errors</td><td>2</td></tr><tr><td>Hook blocks</td><td>3</td></tr><tr><td>Tokens</td><td>7.0k out · 62.7k new in · 997k cached in · peak context 67.4k</td></tr><tr><td>Skills invoked</td><td>none</td></tr><tr><td>Files written or edited</td><td>none</td></tr><tr><td>Definition</td><td>none</td></tr><tr><td>Steps</td><td>31</td></tr><tr><td>Finished</td><td>yes</td></tr></table>
+
+
+<h2>Prompt</h2>
+<pre>You are the solo for M1-T01. Run `python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r1/with_skill/plugin/dev-team/scripts/dt.py claim M1-T01 --role solo`, then read the packet it names.</pre>
+<h2>Files</h2>
+<table><tr><th>Op</th><th>File</th><th>Calls</th><th>By</th><th>Via</th><th>Steps</th></tr><tr><td>read</td><td><code>.claude/worktrees/agent-aa1f567e6413ec498/.claude/packet.md</code></td><td>1</td><td>U02</td><td>Read</td><td><a href="#3">U02.S3</a></td></tr><tr><td>read</td><td><code>.claude/worktrees/agent-aa1f567e6413ec498/CONSTRAINTS.md</code></td><td>1</td><td>U02</td><td>Read</td><td><a href="#7">U02.S7</a></td></tr><tr><td>read</td><td><code>.claude/worktrees/agent-aa1f567e6413ec498/pyproject.toml</code></td><td>1</td><td>U02</td><td>Read</td><td><a href="#8">U02.S8</a></td></tr><tr><td>read</td><td><code>.claude/worktrees/agent-aa1f567e6413ec498/scripts/check.sh</code></td><td>1</td><td>U02</td><td>Read</td><td><a href="#12">U02.S12</a></td></tr><tr><td>read</td><td><code>.claude/worktrees/agent-aa1f567e6413ec498/scripts/hooks/stop_gate.sh</code></td><td>1</td><td>U02</td><td>Read</td><td><a href="#15">U02.S15</a></td></tr><tr><td>read</td><td><code>.git/dt-build/claims/M1-T01.solo.json</code></td><td>1</td><td>U02</td><td>Bash</td><td><a href="#14">U02.S14</a></td></tr><tr><td>read</td><td><code>.git/dt-build/details/M1-T01.solo-1.txt</code></td><td>1</td><td>U02</td><td>Read</td><td><a href="#4">U02.S4</a></td></tr><tr><td>read</td><td><code>.git/dt-build/log.jsonl</code></td><td>1</td><td>U02</td><td>Bash</td><td><a href="#14">U02.S14</a></td></tr><tr><td>read</td><td><code>.git/dt-build/rejects/M1-T01.solo.json</code></td><td>1</td><td>U02</td><td>Bash</td><td><a href="#14">U02.S14</a></td></tr></table>
+<h2>Steps</h2>
+<div class="step" id="S1"><span class="sid">U02.S1</span><span class="kind">user</span>You are the solo for M1-T01. Run `python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r1/with_skill/plugin/dev-team/scripts/dt.py claim M1-T01 --role solo`, then read the packet it names.<details><summary>full text</summary><pre>You are the solo for M1-T01. Run `python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r1/with_skill/plugin/dev-team/scripts/dt.py claim M1-T01 --role solo`, then read the packet it names.</pre></details></div><div class="step" id="S2"><span class="sid">U02.S2</span><span class="kind">Bash</span>python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r1/with_skill/plugin/dev-team/scripts/dt.py claim M1-T01 --role solo<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r1/with_skill/plugin/dev-team/scripts/dt.py claim M1-T01 --role solo&quot;,
+  &quot;description&quot;: &quot;Claim task M1-T01 as solo&quot;
+}</pre><div class="lbl">output</div><pre>packet: /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r1/with_skill/project/.claude/worktrees/agent-aa1f567e6413ec498/.claude/packet.md (556 lines; read it in full)
+task: M1-T01 M1 interface · role solo · package rllab · kind interface
+writes: src/rllab/__init__.py, src/rllab/core/**, src/rllab/worlds/**, src/rllab/baselines/**, src/rllab/methods/**, src/rllab/train/**, src/rllab/runlog/**, src/rllab/charts/**, src/rllab/evaluate/**, src/rllab/cli/**, tests/contracts/**
+done: Done when `scripts/check.sh gate` passes (the gate passes on your Writes); the Stop hook runs it. End with one line: `DONE M1-T01 solo`. If you can&#x27;t finish: `python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r1/with_skill/plugin/dev-team/scripts/dt.py escalate &lt;TEST-WRONG|NEEDS-DEP&gt; &quot;&lt;why&gt;&quot;`, or `python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r1/with_skill/plugin/dev-team/scripts/dt.py escalate CONTRACT-CHANGE &quot;&lt;why&gt;&quot; --type &lt;the contract symbol&gt;`, then end with one line: `STOPPED M1-T01 solo: see dt escalate`.
+previous rejection: gate, details in /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r1/with_skill/project/.git/dt-build/details/M1-T01.solo-1.txt
+  dt land M1-T01 --role solo
+  claim: M1-T01.solo
+  worktree: /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r1/with_skill/project/.claude/worktrees/agent-ac28a5666649e518e
+  base: 862593e701fe89c989e922ad0612dc70fff7ef88
+  
+  ## changed since base
+  src/rllab/__init__.py
+  src/rllab/baselines/__init__.py
+  src/rllab/baselines/means.py
+  src/rllab/baselines/random.py
+  src/rllab/baselines/snake.py
+  src/rllab/baselines/types.py</pre></details></div><div class="step" id="S3"><span class="sid">U02.S3</span><span class="kind">Read</span>/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r1/with_skill/project/.claude/worktrees/agent-aa1f567e6413ec498/.claude/packet.md<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r1/with_skill/project/.claude/worktrees/agent-aa1f567e6413ec498/.claude/packet.md&quot;
+}</pre><div class="lbl">output</div><pre>1	# Packet: M1-T01 solo
+2	You are the solo for M1-T01. Your edit boundary is your Writes below (`.claude/.task_writes`); the guard blocks everything else.
+3	
+4	Done when `scripts/check.sh gate` passes (the gate passes on your Writes); the Stop hook runs it. End with one line: `DONE M1-T01 solo`. If you can&#x27;t finish: `python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r1/with_skill/plugin/dev-team/scripts/dt.py escalate &lt;TEST-WRONG|NEEDS-DEP&gt; &quot;&lt;why&gt;&quot;`, or `python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r1/with_skill/plugin/dev-team/scripts/dt.py escalate CONTRACT-CHANGE &quot;&lt;why&gt;&quot; --type &lt;the contract symbol&gt;`, then end with one line: `STOPPED M1-T01 solo: see dt escalate`.
+5	
+6	# Context for M1-T01: package rllab · mode solo · kind interface
+7	Read only what is below, plus CONSTRAINTS.md and the files you edit. Your task is the last section.
+8	
+9	&lt;!-- docs/packages/rllab/pipelines.md:5 --&gt;
+10	## PL-01: Method check
+11	**Entry:** `src/rllab/train/pipelines/pl01_check.py::run_check` · **Trigger:** `rllab check &lt;config.toml&gt;`; also PL-03 rows 2–5
+12	**Covers:** TRAIN-06
+13	
+14	| # | Step | Owner | In → Out | Spine version | Covers |
+15	|---|---|---|---|---|---|
+16	| 1 | `load_run_configs` | train.config | config path, seeds → list[RunConfig] | `tomllib` into frozen dataclasses, method defaults filled, name `&lt;stem&gt;-s&lt;seed&gt;` | TRAIN-01 |
+17	| 2 | `check_plan` | train.check | list[RunConfig] → MethodConfig per method | each distinct team method with `check_settings` applied | TRAIN-06 |
+18	| 3 | `train_checks` | train.check | MethodConfig per method, seed → Learner per method | make the method&#x27;s check world and learner, step it for the fixed check budget | TRAIN-06 |
+19	| 4 | `CheckDiscrete` | worlds.checks | overrides → CheckWorld | 6-state corridor, exits left of 0 (0.8) and right of 5 (1.0), γ = 0.9 (AD-09) | TRAIN-06 |
+20	| 5 | `CheckContinuous` | worlds.checks | overrides → CheckWorld | 1-D point, reward −distance to the target | TRAIN-06 |
+21	| 6 | `score_checks` | train.check | Learner per method, MethodConfig per method → list[CheckResult] | share of `states()` where `policy().act` matches `best_actions()` | TRAIN-06 |
+22	
+23	### Entry sketch (pre-build — removed by spine task)
+24	```python
+25	def run_check(config_path: Path, seed: int = 0) -&gt; list[CheckResult]:
+26	    configs = load_run_configs(config_path, [seed])
+27	    plan = check_plan(configs)
+28	    learners = train_checks(plan, seed)
+29	    return score_checks(learners, plan)
+30	```
+31	
+32	&lt;!-- docs/packages/rllab/pipelines.md:27 --&gt;
+33	## PL-02: Training run
+34	**Entry:** `src/rllab/train/pipelines/pl02_train.py::run_train` · **Trigger:** PL-03 `run_parallel`, once per config (`rllab train &lt;config.toml&gt; --seed N` is a one-seed batch)
+35	**Covers:** TRAIN-01–TRAIN-04, TRAIN-07, LOG-01, LOG-02, CHECK-01, WORLD-01–WORLD-07, SNAKE-01–SNAKE-06, FISH-01–FISH-08, FISH-11, PREY-01–PREY-06, PREY-11, QR-01, QR-03, QR-06
+36	
+37	| # | Step | Owner | In → Out | Spine version | Covers |
+38	|---|---|---|---|---|---|
+39	| 1 | `make` | worlds.make | world, variant, overrides → World | name → class lookup, snake only | WORLD-01–WORLD-07 |
+40	| 2 | `Snake` | worlds.snake | overrides → World | 10 × 10 grid, relative turns, food, death, 100-step hunger limit | SNAKE-01–SNAKE-06 |
+41	| 3 | `FishTank` | worlds.fish | variant, overrides → World | &quot;one&quot; variant: bouncing ball, smooth pushes, respawn on hit | FISH-01–FISH-08 |
+42	| 4 | `PredatorPrey` | worlds.prey | overrides → World | fish movement, catches remove prey, pellets without respawn | PREY-01–PREY-06 |
+43	| 5 | `make_learners` | train.setup | RunConfig, WorldSpec → Learner per team | `methods.make_learner` per team, seeded from the run seed | TRAIN-07, CHECK-01 |
+44	| 6 | `DQN` | methods.dqn | MethodConfig, WorldSpec → Learner | online one-step Q-learning on an MLP, ε-greedy; no replay buffer or target net | CHECK-01 |
+45	| 7 | `PPO` | methods.ppo | MethodConfig, WorldSpec → Learner | REINFORCE with a Gaussian policy and mean-return baseline; no clipping or GAE | CHECK-01 |
+46	| 8 | `train_loop` | train.loop | World, Learner per team, RunConfig, root → RunRecord | steps to the budget, writing the run folder through `runlog.RunWriter`; checkpoints at 0–100%; 20-seed evals at every 5% via `core.play_episode`; stops on `NonFiniteError` | TRAIN-01–TRAIN-04, LOG-01, LOG-02, QR-01, QR-03 |
+47	
+48	### Entry sketch (pre-build — removed by spine task)
+49	```python
+50	def run_train(config: RunConfig, root: Path) -&gt; RunRecord:
+51	    world = make(config.world, config.variant)
+52	    learners = make_learners(config, world.spec)
+53	    return train_loop(world, learners, config, root)
+54	```
+55	
+56	&lt;!-- docs/packages/rllab/pipelines.md:50 --&gt;
+57	## PL-03: Training batch
+58	**Entry:** `src/rllab/train/pipelines/pl03_batch.py::run_batch` · **Trigger:** `rllab batch &lt;config.toml&gt; --seeds 1-5` (and `rllab train`, one seed)
+59	**Covers:** TRAIN-05, TRAIN-06, QR-02
+60	
+61	| # | Step | Owner | In → Out | Spine version | Covers |
+62	|---|---|---|---|---|---|
+63	| 1 | `load_run_configs` | train.config | config path, seeds → list[RunConfig] | PL-01 as built | TRAIN-01 |
+64	| 2 | `check_plan` | train.check | list[RunConfig] → MethodConfig per method | PL-01 as built | TRAIN-06 |
+65	| 3 | `train_checks` | train.check | MethodConfig per method, seed → Learner per method | PL-01 as built | TRAIN-06 |
+66	| 4 | `score_checks` | train.check | Learner per method, MethodConfig per method → list[CheckResult] | PL-01 as built | TRAIN-06 |
+67	| 5 | `require_pass` | train.check | list[CheckResult] → list[CheckResult] | raise `CheckFailedError` on the first failure | TRAIN-06 |
+68	| 6 | `run_parallel` | train.batch | list[RunConfig], root, workers → list[RunRecord] | `spawn` process pool, one `run_train` (PL-02 as built) per config, one torch thread each (AD-05) | TRAIN-05, QR-02 |
+69	
+70	### Entry sketch (pre-build — removed by spine task)
+71	```python
+72	def run_batch(config_path: Path, seeds: Sequence[int], root: Path, *, workers: int | None = None, check_seed: int = 0) -&gt; list[RunRecord]:
+73	    configs = load_run_configs(config_path, seeds)
+74	    plan = check_plan(configs)
+75	    learners = train_checks(plan, check_seed)
+76	    results = score_checks(learners, plan)
+77	    require_pass(results)
+78	    return run_parallel(configs, root, workers)
+79	```
+80	
+81	&lt;!-- docs/packages/rllab/pipelines.md:74 --&gt;
+82	## PL-04: Watch a run
+83	**Entry:** `src/rllab/cli/pipelines/pl04_watch.py::run_watch` · **Trigger:** `rllab watch &lt;run-path&gt;`
+84	**Covers:** LOG-06
+85	
+86	| # | Step | Owner | In → Out | Spine version | Covers |
+87	|---|---|---|---|---|---|
+88	| 1 | `progress` | runlog.progress | run path → Progress | last line of `evals.jsonl` plus `run.json`, one snapshot; `--follow` re-reading at each evaluation point is its upgrade | LOG-06 |
+89	
+90	### Entry sketch (pre-build — removed by spine task)
+91	```python
+92	def run_watch(run_path: Path) -&gt; Progress:
+93	    return progress(run_path)
+94	```
+95	
+96	&lt;!-- docs/packages/rllab/pipelines.md:88 --&gt;
+97	## PL-05: Learning-curve chart
+98	**Entry:** `src/rllab/cli/pipelines/pl05_chart.py::run_chart` · **Trigger:** `rllab chart &lt;world&gt; &lt;variant&gt; [--measure M] [--include NAME]`
+99	**Covers:** LOG-03–LOG-05, PREY-10, EVAL-01, EVAL-02, SNAKE-07, FISH-09, PREY-07
+100	
+101	| # | Step | Owner | In → Out | Spine version | Covers |
+102	|---|---|---|---|---|---|
+103	| 1 | `find_runs` | runlog.read | root, world, variant, include → list[Run] | glob run folders, keep `finished` plus named ones | LOG-03 |
+104	| 2 | `baseline_means` | baselines.means | world, variant → BaselineMeans | random and rule per team on the 20 `EVAL_SEEDS`, rule-based opponents | EVAL-01, EVAL-02 |
+105	| 3 | `RandomPolicy` | baselines.random | ActionSpace → Policy | uniform draws from the passed `rng` | EVAL-01 |
+106	| 4 | `SnakeRule` | baselines.snake | none → RulePolicy | toward food on the shorter axis unless fatal next step | SNAKE-07 |
+107	| 5 | `FishRule` | baselines.fish | none → RulePolicy | full push away from the seen ball, else random | FISH-09 |
+108	| 6 | `PreyRule` | baselines.prey | none → RulePolicy | flee nearest seen predator, else toward nearest seen pellet | PREY-07 |
+109	| 7 | `PredatorRule` | baselines.prey | none → RulePolicy | chase nearest seen prey, else random wander | PREY-07 |
+110	| 8 | `learning_curve` | charts.curve | list[Run], BaselineMeans, out → Output | matplotlib mean line, min–max band, two baseline lines, per team; `dataviz` checks | LOG-03–LOG-05, PREY-10 |
+111	
+112	### Entry sketch (pre-build — removed by spine task)
+113	```python
+114	def run_chart(root: Path, world: str, variant: str, out: Path, *, include: Sequence[str] = (), measure: str | None = None) -&gt; Output:
+115	    runs = find_runs(root, world, variant, include=include)
+116	    lines = baseline_means(world, variant)
+117	    return learning_curve(runs, lines, out, measure=measure)
+118	```
+119	
+120	&lt;!-- docs/packages/rllab/pipelines.md:111 --&gt;
+121	## PL-06: Final evaluation
+122	**Entry:** `src/rllab/cli/pipelines/pl06_evaluate.py::run_evaluate` · **Trigger:** `rllab evaluate &lt;world&gt; &lt;variant&gt; [--include NAME]`
+123	**Covers:** EVAL-03–EVAL-06, SNAKE-08, FISH-10, PREY-08, QR-05
+124	
+125	| # | Step | Owner | In → Out | Spine version | Covers |
+126	|---|---|---|---|---|---|
+127	| 1 | `find_runs` | runlog.read | root, world, variant, include → list[Run] | PL-05 as built | EVAL-03 |
+128	| 2 | `final_evaluation` | evaluate.final | list[Run], out → list[Summary] | serial play of final checkpoints and both baselines on `FINAL_SEEDS`; `compare` per baseline with the `null-hypothesis-testing` skill, Holm, EVAL-05 verdict, `summary.json` | EVAL-03–EVAL-06, PREY-08, QR-05 |
+129	
+130	### Entry sketch (pre-build — removed by spine task)
+131	```python
+132	def run_evaluate(root: Path, world: str, variant: str, out: Path, *, include: Sequence[str] = (), workers: int | None = None) -&gt; list[Summary]:
+133	    runs = find_runs(root, world, variant, include=include)
+134	    return final_evaluation(runs, out, workers=workers)
+135	```
+136	
+137	&lt;!-- docs/packages/rllab/pipelines.md:145 --&gt;
+138	## PL-08: Replay video
+139	**Entry:** `src/rllab/cli/pipelines/pl08_video.py::run_video` · **Trigger:** `rllab video &lt;world&gt; &lt;variant&gt; &lt;side&gt; --seed N --out FILE [--sight]`
+140	**Covers:** REPLAY-07, REPLAY-02, QR-06
+141	
+142	| # | Step | Owner | In → Out | Spine version | Covers |
+143	|---|---|---|---|---|---|
+144	| 1 | `open_sources` | replay.sources | world, variant, side spec → Checkpoint or baseline per team | as `open_sides`, one side | REPLAY-07 |
+145	| 2 | `make` | worlds.make | world, variant → World | PL-02 as built | WORLD-06 |
+146	| 3 | `policies_for` | replay.sources | Checkpoint or baseline per team, WorldSpec → Policy per team | `methods.load_policy` or `baselines` per team; a team left out takes the first checkpoint&#x27;s | REPLAY-01, REPLAY-06 |
+147	| 4 | `play_episode` | core.episode | World, Policy per team, seed → Episode | reset, act per team, step until done or `max_steps`, frames kept | REPLAY-02, WORLD-02 |
+148	| 5 | `to_trace` | replay.tracing | Episode, WorldSpec, label → Trace | copy frames, set label and step-limit flag | REPLAY-02 |
+149	| 6 | `save_video` | replay.video | Trace, out → Output | draw each frame off-screen, imageio-ffmpeg H.264 at 30 fps | REPLAY-07, QR-06 |
+150	
+151	### Entry sketch (pre-build — removed by spine task)
+152	```python
+153	def run_video(world: str, variant: str, side: str, seed: int, out: Path, *, overlay: bool = False) -&gt; Output:
+154	    sources = open_sources(world, variant, side)
+155	    w = make(world, variant)
+156	    policies = policies_for(sources, w.spec)
+157	    episode = play_episode(w, policies, seed, trace=True)
+158	    trace = to_trace(episode, w.spec, side)
+159	    return save_video(trace, out, overlay_sight=overlay)
+160	```
+161	
+162	&lt;!-- docs/packages/rllab/contract.md:9 --&gt;
+163	### core.ActionSpace: type
+164	`ActionSpace = Discrete(n: int) | Box(dims: int, low: float, high: float)`, both frozen dataclasses
+165	- **Invariants:** `Discrete` actions are ints in `[0, n)`; `Box` actions are `dims` floats in `[low, high]`
+166	- **Boundary:** worlds, baselines, methods, refcheck · **Fixtures:** tests/contracts/core.ActionSpace/ · **Cases:** snake `Discrete(3)`; fish `Box(2, -1.0, 1.0)`
+167	- **Used by:** worlds, baselines, methods, refcheck
+168	
+169	&lt;!-- docs/packages/rllab/contract.md:15 --&gt;
+170	### core.TeamSpec: type
+171	`@dataclass(frozen=True) class TeamSpec: name: str; agents: tuple[int, ...]; score_name: str; direction: Direction`
+172	- **Invariants:** `agents` are indices into the world&#x27;s agent axis; teams of one world are disjoint and cover every agent
+173	- **Boundary:** worlds, train, evaluate, charts · **Fixtures:** tests/contracts/core.TeamSpec/ · **Cases:** snake&#x27;s one team; predator-prey&#x27;s prey (6) and predator (2) teams
+174	- **Used by:** every component reading scores
+175	
+176	&lt;!-- docs/packages/rllab/contract.md:21 --&gt;
+177	### core.WorldSpec: type
+178	`@dataclass(frozen=True) class WorldSpec: world: str; variant: str; agents: tuple[str, ...]; teams: tuple[TeamSpec, ...]; obs_len: int; action: ActionSpace; max_steps: int; measures: tuple[MeasureSpec, ...]; sight: float | None`
+179	`MeasureSpec(name: str, team: str, direction: Direction)`
+180	- **Invariants:** available without running an episode (WORLD-04); `sight` is the radius in world units for local-sight variants, else `None`; equality of two specs is field by field
+181	- **Boundary:** worlds, methods, runlog, replay, refcheck · **Fixtures:** tests/contracts/core.WorldSpec/ · **Cases:** snake default; fish local-sight (8 agents, sight set); predator-prey
+182	- **Used by:** all components; PL-02, PL-08
+183	
+184	&lt;!-- docs/packages/rllab/contract.md:28 --&gt;
+185	### core.Step: type
+186	`@dataclass(frozen=True) class Step: obs: Array; rewards: Array; active: Array; done: bool; truncated: bool`
+187	- **Invariants:** `obs` float32 `n_agents × obs_len`; `rewards` float32 `n_agents`; `active` bool `n_agents`, and an inactive agent&#x27;s row is zeros with reward 0 (WORLD edge case); `truncated` is true only when `max_steps` ended the episode
+188	- **Boundary:** worlds, methods, refcheck · **Fixtures:** tests/contracts/core.Step/ · **Cases:** a snake mid-episode step; a predator-prey step with one prey caught
+189	- **Used by:** core.play_episode, train, refcheck
+190	
+191	&lt;!-- docs/packages/rllab/contract.md:34 --&gt;
+192	### core.EpisodeResult: type
+193	`@dataclass(frozen=True) class EpisodeResult: seed: int; length: int; scores: Mapping[str, float]; team_rewards: Mapping[str, float]; measures: Mapping[str, float]`
+194	- **Invariants:** `scores` and `team_rewards` keyed by team name (WORLD-05, LOG-02); `measures` keyed by every `MeasureSpec.name`
+195	- **Boundary:** train, runlog, evaluate, refcheck · **Fixtures:** tests/contracts/core.EpisodeResult/ · **Cases:** a snake episode with 12 food; a predator-prey episode with both team scores
+196	- **Used by:** train, runlog, evaluate, refcheck
+197	
+198	&lt;!-- docs/packages/rllab/contract.md:40 --&gt;
+199	### core.DrawState: type
+200	`@dataclass(frozen=True) class DrawState: width: float; height: float; objects: tuple[Drawable, ...]`
+201	`Drawable(kind: str, x: float, y: float, size: float, team: str | None, agent: int | None)`
+202	- **Invariants:** lists every object on screen at that step (WORLD-06); snake cells use grid coordinates with `size` 1; `agent` set for agents, so the viewer can draw `WorldSpec.sight` around them
+203	- **Boundary:** worlds, replay · **Fixtures:** tests/contracts/core.DrawState/ · **Cases:** a snake board; an 8-fish tank with the ball
+204	- **Used by:** replay
+205	
+206	&lt;!-- docs/packages/rllab/contract.md:47 --&gt;
+207	### core.Frame: type
+208	`@dataclass(frozen=True) class Frame: step: int; draw: DrawState; scores: Mapping[str, float]; rewards: Array`
+209	- **Invariants:** `scores` is each team&#x27;s running score after this step; `rewards` the latest per agent (REPLAY-05); frame 0 is the reset state with zero rewards
+210	- **Boundary:** replay · **Fixtures:** tests/contracts/core.Frame/ · **Cases:** frame 0 and frame 1 of seed 7 snake
+211	- **Used by:** replay
+212	
+213	&lt;!-- docs/packages/rllab/contract.md:53 --&gt;
+214	### core.Episode: type
+215	`@dataclass(frozen=True) class Episode: result: EpisodeResult; frames: tuple[Frame, ...] | None; hit_step_limit: bool`
+216	- **Invariants:** `frames` is set only when traced, with `result.length + 1` entries
+217	- **Boundary:** train, evaluate, replay, refcheck · **Fixtures:** tests/contracts/core.Episode/ · **Cases:** an untraced snake episode; a traced 3-step check-world episode
+218	- **Used by:** train, evaluate, replay, refcheck; PL-08
+219	
+220	&lt;!-- docs/packages/rllab/contract.md:59 --&gt;
+221	### core.World: type
+222	```python
+223	class World(Protocol):
+224	    spec: WorldSpec
+225	    def reset(self, seed: int) -&gt; Step: ...
+226	    def step(self, actions: Array) -&gt; Step: ...
+227	    def result(self) -&gt; EpisodeResult: ...
+228	    def draw(self) -&gt; DrawState: ...
+229	```
+230	- **Invariants:** same seed → same start (WORLD-01); same seed and actions → same steps (WORLD-02); `actions` has one row per agent, rows of inactive agents ignored
+231	- **Errors:** `step` raises `ActionError(agent: str, value: object)`, a `ValueError`, for an action outside `spec.action`, never clipping it; `step` after `done` raises `RuntimeError`
+232	- **Boundary:** train, evaluate, replay, refcheck · **Fixtures:** tests/contracts/core.World/ · **Cases:** a replay double of a recorded 5-step snake episode from seed 42
+233	- **Used by:** every component that plays episodes; PL-02, PL-08
+234	
+235	&lt;!-- docs/packages/rllab/contract.md:73 --&gt;
+236	### core.Policy: type
+237	`class Policy(Protocol): def act(self, obs: Array, rng: np.random.Generator) -&gt; Array`
+238	- **Invariants:** `obs` is `k × obs_len` for the `k` agents of one team; returns `k` actions inside the world&#x27;s `ActionSpace`; deterministic for a given `obs` and `rng` state
+239	- **Boundary:** baselines, methods, evaluate, replay, refcheck · **Fixtures:** tests/contracts/core.Policy/ · **Cases:** a replay double of the snake rule policy over 5 observations
+240	- **Used by:** core.play_episode, train, evaluate, replay, refcheck; PL-08
+241	
+242	&lt;!-- docs/packages/rllab/contract.md:79 --&gt;
+243	### core.play_episode: The one episode loop
+244	`def play_episode(world: World, policies: Mapping[str, Policy], seed: int, *, trace: bool = False) -&gt; Episode`
+245	- **Invariants:** `policies` keyed by team; the seed spawns the world&#x27;s and each policy&#x27;s generator (AD-05), so the same inputs give the same `Episode`; stops at `done` or `spec.max_steps`
+246	- **Errors:** `KeyError` naming a team with no policy; `ActionError` propagates from `World.step`
+247	- **Boundary:** train, evaluate, replay, refcheck · **Fixtures:** tests/contracts/core.play_episode/ · **Cases:** snake rule policy, seed 7, traced
+248	- **Used by:** train, evaluate, replay, refcheck; PL-02, PL-08
+249	
+250	&lt;!-- docs/packages/rllab/contract.md:86 --&gt;
+251	### core.EVAL_SEEDS: In-training evaluation seeds
+252	`EVAL_SEEDS: tuple[int, ...] = tuple(range(1_000_000, 1_000_020))`
+253	- **Invariants:** 20 seeds, disjoint from training seeds `[0, 10⁶)` and from `FINAL_SEEDS` (TRAIN-04)
+254	- **Boundary:** train, evaluate · **Fixtures:** tests/contracts/core.EVAL_SEEDS/ · **Cases:** the 20 seeds as listed
+255	- **Used by:** train, evaluate; PL-02, PL-05, PL-12
+256	
+257	&lt;!-- docs/packages/rllab/contract.md:92 --&gt;
+258	### core.FINAL_SEEDS: Final evaluation seeds
+259	`FINAL_SEEDS: tuple[int, ...] = tuple(range(2_000_000, 2_000_100))`
+260	- **Invariants:** 100 seeds, shared by every run, baseline and reference (EVAL-03, CHECK-02)
+261	- **Boundary:** evaluate, refcheck · **Fixtures:** tests/contracts/core.FINAL_SEEDS/ · **Cases:** the 100 seeds as listed
+262	- **Used by:** evaluate, refcheck; PL-06, PL-09
+263	
+264	&lt;!-- docs/packages/rllab/contract.md:98 --&gt;
+265	### core.Output: type
+266	`@dataclass(frozen=True) class Output: path: Path; kind: Literal[&quot;chart&quot;, &quot;video&quot;, &quot;writeup&quot;]; made_from: tuple[str, ...]`
+267	- **Invariants:** `path` exists when returned; `made_from` names the runs, checkpoints and seeds behind the file, so a write-up can cite it (NOTES-02)
+268	- **Boundary:** charts, replay, notes, cli · **Fixtures:** tests/contracts/core.Output/ · **Cases:** a 5-run snake learning-curve PNG; a seed-7 snake video
+269	- **Used by:** charts, replay, notes, cli; PL-05, PL-08, PL-10, PL-12
+270	
+271	&lt;!-- docs/packages/rllab/contract.md:106 --&gt;
+272	### worlds.make: World factory
+273	`def make(world: str, variant: str = &quot;default&quot;, **overrides: int | float) -&gt; World`
+274	- **Invariants:** worlds `snake` (`default`), `fish` (`one`, `many`, `local`), `prey` (`default`), `check-discrete`, `check-continuous`; `overrides` change only the spec&#x27;s starting values (grid size, counts, step limits; spec Assumptions)
+275	- **Errors:** `ValueError` naming an unknown world, variant or override
+276	- **Boundary:** baselines, train, evaluate, replay, refcheck · **Fixtures:** tests/contracts/worlds.make/ · **Cases:** a fake returning the recorded seed-42 snake double for `make(&quot;snake&quot;)`
+277	- **Used by:** train, evaluate, replay, refcheck, baselines; PL-02, PL-08
+278	
+279	&lt;!-- docs/packages/rllab/contract.md:113 --&gt;
+280	### worlds.CheckWorld: type
+281	`class CheckWorld(World, Protocol): def states(self) -&gt; Array; def best_actions(self) -&gt; Array`
+282	- **Invariants:** `states()` is the observation of every check-world state, `n × obs_len`; `best_actions()` the hand-derived best action for each, to within 0.1 per dimension for `Box` actions
+283	- **Boundary:** train · **Fixtures:** tests/contracts/worlds.CheckWorld/ · **Cases:** a replay double of the 6-state two-exit corridor; one of the 1-D target point
+284	- **Used by:** train; PL-01
+285	
+286	&lt;!-- docs/packages/rllab/contract.md:121 --&gt;
+287	### baselines.RandomPolicy: Uniform random play
+288	`class RandomPolicy(Policy): def __init__(self, action: ActionSpace) -&gt; None`
+289	- **Invariants:** each action drawn uniformly from the declared action format (EVAL-01), using only the `rng` passed to `act`
+290	- **Boundary:** train, evaluate, replay · **Fixtures:** tests/contracts/baselines.RandomPolicy/ · **Cases:** 5 snake actions from a fixed `rng`; 5 fish pushes from a fixed `rng`
+291	- **Used by:** train, evaluate, replay; PL-05
+292	
+293	&lt;!-- docs/packages/rllab/contract.md:127 --&gt;
+294	### baselines.RulePolicy: type
+295	`class RulePolicy(Policy, Protocol): description: str`
+296	- **Invariants:** acts on observations only; `description` is the world&#x27;s one sentence (EVAL-02)
+297	- **Boundary:** evaluate, replay, cli · **Fixtures:** tests/contracts/baselines.RulePolicy/ · **Cases:** a replay double of the snake rule over 5 observations; the fish rule seeing no ball
+298	- **Used by:** evaluate, replay, cli; PL-05
+299	
+300	&lt;!-- docs/packages/rllab/contract.md:133 --&gt;
+301	### baselines.rule_for: Rule baseline lookup
+302	`def rule_for(world: str, variant: str, team: str) -&gt; RulePolicy`
+303	- **Invariants:** SNAKE-07, FISH-09 and PREY-07 rules; deterministic except FISH-09&#x27;s and PREY-07&#x27;s random fallbacks, which use the `rng` passed to `act`
+304	- **Errors:** `KeyError` naming a world, variant or team with no rule
+305	- **Boundary:** train, evaluate, replay · **Fixtures:** tests/contracts/baselines.rule_for/ · **Cases:** a fake returning the recorded snake rule double
+306	- **Used by:** train, evaluate, replay
+307	
+308	&lt;!-- docs/packages/rllab/contract.md:140 --&gt;
+309	### baselines.BaselineMeans: type
+310	`@dataclass(frozen=True) class BaselineMeans: world: str; variant: str; random: Mapping[str, float]; rule: Mapping[str, float]`
+311	- **Invariants:** `random` and `rule` keyed by team; means over the 20 `EVAL_SEEDS` episodes, the seeds the in-training curve uses; in predator-prey each team&#x27;s baselines play the rule-based opponent
+312	- **Boundary:** charts, cli · **Fixtures:** tests/contracts/baselines.BaselineMeans/ · **Cases:** snake; predator-prey with both teams
+313	- **Used by:** charts, cli; PL-05
+314	
+315	&lt;!-- docs/packages/rllab/contract.md:146 --&gt;
+316	### baselines.baseline_means: Baseline score lines
+317	`def baseline_means(world: str, variant: str) -&gt; BaselineMeans`
+318	- **Invariants:** plays `RandomPolicy` and `rule_for` per team through `core.play_episode`; deterministic
+319	- **Errors:** `KeyError` from `rule_for`
+320	- **Boundary:** cli · **Fixtures:** tests/contracts/baselines.baseline_means/ · **Cases:** a fake returning the snake `BaselineMeans`
+321	- **Used by:** cli; PL-05
+322	
+323	&lt;!-- docs/packages/rllab/contract.md:155 --&gt;
+324	### methods.MethodConfig: type
+325	`@dataclass(frozen=True) class MethodConfig: method: Literal[&quot;dqn&quot;, &quot;ppo&quot;]; settings: Settings`
+326	- **Invariants:** `settings` holds only keys the method declares; missing keys take the method&#x27;s defaults, written back in full to the run record
+327	- **Boundary:** train, runlog, refcheck · **Fixtures:** tests/contracts/methods.MethodConfig/ · **Cases:** snake DQN defaults; PPO with one overridden learning rate
+328	- **Used by:** train, runlog, refcheck; PL-01, PL-03
+329	
+330	&lt;!-- docs/packages/rllab/contract.md:161 --&gt;
+331	### methods.Transition: type
+332	`@dataclass(frozen=True) class Transition: obs: Array; actions: Array; rewards: Array; next_obs: Array; done: bool; truncated: bool; active: Array`
+333	- **Invariants:** rows are the team&#x27;s agents in `TeamSpec.agents` order; `active` masks agents that had already left before this step
+334	- **Boundary:** train · **Fixtures:** tests/contracts/methods.Transition/ · **Cases:** a snake transition; a many-fish transition of 8 agents
+335	- **Used by:** train
+336	
+337	&lt;!-- docs/packages/rllab/contract.md:167 --&gt;
+338	### methods.Learner: type
+339	```python
+340	class Learner(Protocol):
+341	    def act(self, obs: Array, rng: np.random.Generator) -&gt; Array: ...   # exploring
+342	    def observe(self, t: Transition) -&gt; None: ...                       # updates on its own schedule
+343	    def policy(self) -&gt; Policy: ...                                      # frozen, deterministic copy
+344	    def state_dict(self) -&gt; dict[str, object]: ...
+345	```
+346	- **Invariants:** hand-written learning code only (CHECK-01); `policy()` is greedy (DQN) or the mean action (PPO) and does not change as the learner trains
+347	- **Errors:** `observe` raises `NonFiniteError(value: float)` when a loss or parameter is NaN or infinite, before changing any parameter
+348	- **Boundary:** train · **Fixtures:** tests/contracts/methods.Learner/ · **Cases:** a replay double of a DQN learner over 10 snake transitions
+349	- **Used by:** train; PL-01, PL-02, PL-03
+350	
+351	&lt;!-- docs/packages/rllab/contract.md:180 --&gt;
+352	### methods.make_learner: Learner factory
+353	`def make_learner(config: MethodConfig, spec: WorldSpec, team: str, rng: np.random.Generator) -&gt; Learner`
+354	- **Invariants:** `dqn` needs a `Discrete` action space and `ppo` a `Box` one
+355	- **Errors:** `ValueError` naming the method and the action format on a mismatch
+356	- **Boundary:** train · **Fixtures:** tests/contracts/methods.make_learner/ · **Cases:** a fake returning the recorded DQN learner double
+357	- **Used by:** train; PL-02
+358	
+359	&lt;!-- docs/packages/rllab/contract.md:187 --&gt;
+360	### methods.load_policy: Checkpoint to policy
+361	`def load_policy(ckpt: Checkpoint, team: str, spec: WorldSpec) -&gt; Policy`
+362	- **Invariants:** the same checkpoint and team give a policy that acts identically every time
+363	- **Errors:** `SpecMismatchError` naming each differing field (observation length, action format) when `ckpt.spec` doesn&#x27;t match `spec` (REPLAY edge case)
+364	- **Boundary:** evaluate, replay · **Fixtures:** tests/contracts/methods.load_policy/ · **Cases:** a fake returning the snake rule policy for any snake checkpoint
+365	- **Used by:** evaluate, replay; PL-08
+366	
+367	&lt;!-- docs/packages/rllab/contract.md:196 --&gt;
+368	### train.RunConfig: type
+369	`@dataclass(frozen=True) class RunConfig: name: str; world: str; variant: str; methods: Mapping[str, MethodConfig]; seed: int; budget: int; check_settings: Mapping[str, Settings]; device: str = &quot;cpu&quot;`
+370	- **Invariants:** `methods` has one entry per team (TRAIN-07); `budget` counts world steps, not agent steps; `check_settings` overrides settings for the check world only (AD-09)
+371	- **Boundary:** runlog, refcheck, cli · **Fixtures:** tests/contracts/train.RunConfig/ · **Cases:** a snake config from `configs/snake-default.toml`; a predator-prey config with two methods
+372	- **Used by:** runlog, refcheck, cli; PL-01, PL-02, PL-03, PL-09
+373	
+374	&lt;!-- docs/packages/rllab/contract.md:202 --&gt;
+375	### train.load_run_configs: Config loader
+376	`def load_run_configs(path: Path, seeds: Sequence[int]) -&gt; list[RunConfig]`
+377	- **Invariants:** one config per seed, named `&lt;file stem&gt;-s&lt;seed&gt;`; method settings missing from the TOML take the method&#x27;s defaults
+378	- **Errors:** `FileNotFoundError` for a missing file; `ValueError` naming an unknown key, world, variant or method
+379	- **Boundary:** refcheck, cli · **Fixtures:** tests/contracts/train.load_run_configs/ · **Cases:** a fake returning snake configs for seeds 1 and 2
+380	- **Used by:** refcheck, cli; PL-01, PL-03, PL-09
+381	
+382	&lt;!-- docs/packages/rllab/contract.md:209 --&gt;
+383	### train.run_check: Method check
+384	`def run_check(config_path: Path, seed: int = 0) -&gt; list[CheckResult]`
+385	- **Invariants:** one result per distinct team method in the config, trained on its check world (`check-discrete` for `dqn`, `check-continuous` for `ppo`) with `check_settings`, for the fixed check budget; under a minute on the laptop (TRAIN-06, AD-09)
+386	- **Boundary:** cli · **Fixtures:** tests/contracts/train.run_check/ · **Cases:** a fake returning the passing DQN check
+387	- **Used by:** cli; PL-01
+388	
+389	&lt;!-- docs/packages/rllab/contract.md:215 --&gt;
+390	### train.run_train: One training run
+391	`def run_train(config: RunConfig, root: Path) -&gt; RunRecord`
+392	- **Invariants:** exactly `budget` world steps (TRAIN-01); checkpoints at 0%, 10%, … 100% (TRAIN-03); evaluation of every team on `EVAL_SEEDS` at every 5% (TRAIN-04); same config on the same machine → identical logs and checkpoints (TRAIN-02)
+393	- **Errors:** `RunExistsError` before any work if the run folder exists; `NonFiniteError` ends the run as `failed` with step and value, keeping the last good checkpoint; interruption marks it `incomplete`
+394	- **Boundary:** PL-03 · **Fixtures:** tests/contracts/train.run_train/ · **Cases:** a fake writing the finished 3-checkpoint snake run folder
+395	- **Used by:** train.run_batch; PL-02, PL-03
+396	
+397	&lt;!-- docs/packages/rllab/contract.md:222 --&gt;
+398	### train.run_batch: Training batch
+399	`def run_batch(config_path: Path, seeds: Sequence[int], root: Path, *, workers: int | None = None, check_seed: int = 0) -&gt; list[RunRecord]`
+400	- **Invariants:** loads one config per seed, runs the method check with `check_seed` before any run, then one process per config up to `workers` (default: the core count), each with one torch thread (TRAIN-05, TRAIN-06, AD-05)
+401	- **Errors:** `CheckFailedError(result: CheckResult)` before any run starts; a failing run doesn&#x27;t stop the others
+402	- **Boundary:** cli · **Fixtures:** tests/contracts/train.run_batch/ · **Cases:** a fake returning 2 finished snake records
+403	- **Used by:** cli; PL-03
+404	
+405	&lt;!-- docs/packages/rllab/contract.md:229 --&gt;
+406	### train.CheckResult: type
+407	`@dataclass(frozen=True) class CheckResult: method: str; world: str; agreement: float; passed: bool`
+408	- **Invariants:** `agreement` is the share of check-world states where the trained policy picks the best action; `passed` is `agreement &gt;= 0.95` (TRAIN-06)
+409	- **Boundary:** cli · **Fixtures:** tests/contracts/train.CheckResult/ · **Cases:** a passing DQN check; a failing PPO check at 0.80
+410	- **Used by:** cli; PL-01, PL-03
+411	
+412	&lt;!-- docs/packages/rllab/contract.md:237 --&gt;
+413	### runlog.RunRecord: type
+414	`@dataclass(frozen=True) class RunRecord: config: RunConfig; spec: WorldSpec; started: datetime; ended: datetime | None; status: Literal[&quot;running&quot;, &quot;finished&quot;, &quot;incomplete&quot;, &quot;failed&quot;]; failure: Failure | None; path: Path`
+415	`Failure(step: int, value: float, checkpoint: Path)`
+416	- **Invariants:** every LOG-01 field present once the run ends; `config.methods` holds full settings, defaults included
+417	- **Boundary:** train, evaluate, charts, refcheck, cli · **Fixtures:** tests/contracts/runlog.RunRecord/ · **Cases:** a finished snake run; a failed run with a NaN at step 41,200; an incomplete run
+418	- **Used by:** train, evaluate, charts, refcheck, cli; PL-02, PL-03
+419	
+420	&lt;!-- docs/packages/rllab/contract.md:244 --&gt;
+421	### runlog.EvalPoint: type
+422	`@dataclass(frozen=True) class EvalPoint: step: int; scores: Mapping[str, float]; measures: Mapping[str, float]`
+423	- **Invariants:** means over the 20 `EVAL_SEEDS` episodes, per team and per measure; a finished run has 21, at 0%, 5%, … 100% (TRAIN-04)
+424	- **Boundary:** charts, evaluate, cli · **Fixtures:** tests/contracts/runlog.EvalPoint/ · **Cases:** snake point at 50%; predator-prey point with both teams
+425	- **Used by:** charts, evaluate, cli
+426	
+427	&lt;!-- docs/packages/rllab/contract.md:250 --&gt;
+428	### runlog.Checkpoint: type
+429	`@dataclass(frozen=True) class Checkpoint: run: str; pct: int; step: int; spec: WorldSpec; methods: Mapping[str, MethodConfig]; state: Mapping[str, dict[str, object]]; path: Path`
+430	- **Invariants:** `pct` in {0, 10, …, 100}; `state` keyed by team; saved and loaded through `torch.save`/`torch.load(weights_only=True)`
+431	- **Boundary:** methods, evaluate, replay · **Fixtures:** tests/contracts/runlog.Checkpoint/ · **Cases:** the 0% and 100% checkpoints of a short snake run
+432	- **Used by:** methods, evaluate, replay; PL-07, PL-08
+433	
+434	&lt;!-- docs/packages/rllab/contract.md:256 --&gt;
+435	### runlog.Run: type
+436	```python
+437	class Run(Protocol):
+438	    record: RunRecord
+439	    def episodes(self) -&gt; list[EpisodeResult]: ...
+440	    def evals(self) -&gt; list[EvalPoint]: ...
+441	    def checkpoints(self) -&gt; list[Checkpoint]: ...
+442	```
+443	- **Invariants:** read-only view of one run folder; readable while the run writes (LOG-06)
+444	- **Boundary:** charts, evaluate, replay, refcheck, cli · **Fixtures:** tests/contracts/runlog.Run/ · **Cases:** a replay double of a finished 3-checkpoint snake run folder
+445	- **Used by:** charts, evaluate, replay, refcheck, cli; PL-05, PL-06, PL-12
+446	
+447	&lt;!-- docs/packages/rllab/contract.md:268 --&gt;
+448	### runlog.RunWriter: Run folder writer
+449	```python
+450	class RunWriter:
+451	    def __init__(self, root: Path, config: RunConfig, spec: WorldSpec) -&gt; None: ...
+452	    def episode(self, result: EpisodeResult) -&gt; None: ...
+453	    def eval(self, point: EvalPoint) -&gt; None: ...      # flushes every log
+454	    def checkpoint(self, pct: int, step: int, state: Mapping[str, dict[str, object]]) -&gt; Checkpoint: ...
+455	    def close(self, status: str, failure: Failure | None = None) -&gt; RunRecord: ...
+456	```
+457	- **Errors:** `RunExistsError` naming the path if `runs/&lt;world&gt;/&lt;variant&gt;/&lt;name&gt;` exists (TRAIN edge case)
+458	- **Boundary:** train · **Fixtures:** tests/contracts/runlog.RunWriter/ · **Cases:** a replay double of the writes of a 3-checkpoint snake run
+459	- **Used by:** train; PL-02
+460	
+461	&lt;!-- docs/packages/rllab/contract.md:281 --&gt;
+462	### runlog.find_runs: Run lookup
+463	`def find_runs(root: Path, world: str, variant: str, *, include: Sequence[str] = ()) -&gt; list[Run]`
+464	- **Invariants:** finished runs only, plus incomplete or failed runs named in `include` (TRAIN edge case); a `running` run with no live process is reported as incomplete
+465	- **Boundary:** charts, evaluate, refcheck, cli · **Fixtures:** tests/contracts/runlog.find_runs/ · **Cases:** a fake returning 5 finished snake runs plus one named incomplete run
+466	- **Used by:** charts, evaluate, refcheck, cli; PL-05, PL-06
+467	
+468	&lt;!-- docs/packages/rllab/contract.md:287 --&gt;
+469	### runlog.open_run: Open one run
+470	`def open_run(path: Path) -&gt; Run`
+471	- **Invariants:** any status, including `running`, `incomplete` and `failed`
+472	- **Errors:** `FileNotFoundError` if no `run.json` is at `path`
+473	- **Boundary:** replay, cli · **Fixtures:** tests/contracts/runlog.open_run/ · **Cases:** a fake returning the finished 3-checkpoint snake run double
+474	- **Used by:** replay, cli; PL-12
+475	
+476	&lt;!-- docs/packages/rllab/contract.md:294 --&gt;
+477	### runlog.Progress: type
+478	`@dataclass(frozen=True) class Progress: step: int; budget: int; latest: EvalPoint | None; elapsed: timedelta; status: str`
+479	- **Invariants:** at most one evaluation point behind the run (LOG-06)
+480	- **Boundary:** cli · **Fixtures:** tests/contracts/runlog.Progress/ · **Cases:** a run at 35% with the 35% point written
+481	- **Used by:** cli; PL-04
+482	
+483	&lt;!-- docs/packages/rllab/contract.md:300 --&gt;
+484	### runlog.progress: Live run view
+485	`def progress(path: Path) -&gt; Progress`
+486	- **Errors:** `FileNotFoundError` if no run is at `path`
+487	- **Boundary:** cli · **Fixtures:** tests/contracts/runlog.progress/ · **Cases:** a fake returning the 35% progress
+488	- **Used by:** cli; PL-04
+489	
+490	&lt;!-- docs/packages/rllab/contract.md:308 --&gt;
+491	### charts.learning_curve: Learning-curve chart
+492	`def learning_curve(runs: Sequence[Run], baselines: BaselineMeans, out: Path, *, measure: str | None = None) -&gt; Output`
+493	- **Invariants:** draws per team a mean line, a min–max band and both baseline lines against &quot;environment steps&quot; (LOG-03, PREY-10), or a declared measure the same way (LOG-05); follows the `dataviz` skill (LOG-04); under 3 runs, titled with the count and a band note
+494	- **Errors:** `MixedRunsError` naming the differing settings when runs differ by more than seed
+495	- **Boundary:** cli · **Fixtures:** tests/contracts/charts.learning_curve/ · **Cases:** a fake writing a placeholder PNG for 5 snake runs
+496	- **Used by:** cli; PL-05
+497	
+498	&lt;!-- docs/packages/rllab/contract.md:323 --&gt;
+499	### evaluate.Comparison: type
+500	`@dataclass(frozen=True) class Comparison: baseline: Literal[&quot;random&quot;, &quot;rule&quot;]; team: str; learned_mean: float; baseline_mean: float; difference: float; p_raw: float; p_holm: float; rejected: bool`
+501	- **Invariants:** `difference` is signed so positive means better in the team&#x27;s direction
+502	- **Boundary:** refcheck, cli · **Fixtures:** tests/contracts/evaluate.Comparison/ · **Cases:** a rejected snake-vs-random; a kept snake-vs-rule
+503	- **Used by:** evaluate.Summary
+504	
+505	&lt;!-- docs/packages/rllab/contract.md:329 --&gt;
+506	### evaluate.compare: Paired permutation test
+507	`def compare(learned: Array, baseline: Array, direction: Direction, *, permutations: int = 10_000, rng: np.random.Generator) -&gt; tuple[float, float]`
+508	- **Invariants:** `learned` is runs × seeds, averaged over runs per seed; `baseline` has one score per seed, on the same seeds; swaps labels within each seed; returns (difference, one-sided p) as EVAL-04 states; built and checked with the `null-hypothesis-testing` skill
+509	- **Errors:** `ValueError` if seed counts differ
+510	- **Used by:** evaluate.final_evaluation
+511	
+512	&lt;!-- docs/packages/rllab/contract.md:335 --&gt;
+513	### evaluate.Summary: type
+514	`@dataclass(frozen=True) class Summary: world: str; variant: str; team: str; runs: tuple[str, ...]; learned_mean: float; learned_range: tuple[float, float]; run_means: Mapping[str, float]; random_mean: float; rule_mean: float; comparisons: tuple[Comparison, ...]; verdict: Verdict; collapse: int | None`
+515	`Verdict(beats_baselines: bool, failing_runs: tuple[str, ...], runs_needed: int)`
+516	- **Invariants:** one per world, variant and team (EVAL-06, PREY-08); `comparisons` empty and `runs_needed &gt; 0` with fewer than 5 runs; `collapse` is set when the team&#x27;s in-training eval score stays at or below its random-baseline mean for the last 4+ consecutive eval points, and is the step of the first of them
+517	- **Boundary:** charts, refcheck, cli · **Fixtures:** tests/contracts/evaluate.Summary/ · **Cases:** a passing snake summary; one with a failing run; one with 3 runs
+518	- **Used by:** refcheck, cli; PL-06
+519	
+520	&lt;!-- docs/packages/rllab/contract.md:342 --&gt;
+521	### evaluate.final_evaluation: Final evaluation
+522	`def final_evaluation(runs: Sequence[Run], out: Path, *, workers: int | None = None) -&gt; list[Summary]`
+523	- **Invariants:** plays every final checkpoint and both baselines on `FINAL_SEEDS` (EVAL-03); Holm across the 2 comparisons per team; a pass needs both nulls rejected (EVAL-04) and every run&#x27;s mean beating the rule mean (EVAL-05); in predator-prey each team plays against the rule-based opponent (PREY-08); within 10 minutes (QR-05)
+524	- **Boundary:** refcheck, cli · **Fixtures:** tests/contracts/evaluate.final_evaluation/ · **Cases:** a fake returning the passing snake summary
+525	- **Used by:** refcheck, cli; PL-06
+526	
+527	&lt;!-- docs/packages/rllab/contract.md:465 --&gt;
+528	### cli.main: The rllab command
+529	`def main(argv: Sequence[str] | None = None) -&gt; int`
+530	- **Invariants:** subcommands `check`, `train`, `batch`, `watch`, `chart`, `evaluate`, `grid`, `refcheck`, `replay`, `video`, `notes new`, `notes check`, each dispatched to its pipeline entry (`train` is a one-seed `batch`); prints the entry&#x27;s returned contract type; owns no pipeline step (AD-10); every error is printed as one line naming its cause, exit code 1
+531	- **Used by:** the learner
+532	
+533	## Writes (edit only these files; the plan gives every other file to another task)
+534	- src/rllab/__init__.py (new)
+535	- src/rllab/core/** (folder)
+536	- src/rllab/worlds/** (folder)
+537	- src/rllab/baselines/** (folder)
+538	- src/rllab/methods/** (folder)
+539	- src/rllab/train/** (folder)
+540	- src/rllab/runlog/** (folder)
+541	- src/rllab/charts/** (folder)
+542	- src/rllab/evaluate/** (folder)
+543	- src/rllab/cli/** (folder)
+544	- tests/contracts/** (folder)
+545	
+546	&lt;!-- tasks/plan.md:11 --&gt;
+547	### M1-T01: M1 interface
+548	**Package:** rllab · **Step:** contract · **Kind:** interface · **Covers:** — · **Size:** S · **Mode:** solo
+549	**Skills:** —
+550	**Read:** PL-01, PL-02, PL-03, PL-04, PL-05, PL-06, PL-08, core.ActionSpace, core.TeamSpec, core.WorldSpec, core.Step, core.EpisodeResult, core.DrawState, core.Frame, core.Episode, core.World, core.Policy, core.play_episode, core.EVAL_SEEDS, core.FINAL_SEEDS, core.Output, worlds.make, worlds.CheckWorld, baselines.RandomPolicy, baselines.RulePolicy, baselines.rule_for, baselines.BaselineMeans, baselines.baseline_means, methods.MethodConfig, methods.Transition, methods.Learner, methods.make_learner, methods.load_policy, train.RunConfig, train.load_run_configs, train.run_check, train.run_train, train.run_batch, train.CheckResult, runlog.RunRecord, runlog.EvalPoint, runlog.Checkpoint, runlog.Run, runlog.RunWriter, runlog.find_runs, runlog.open_run, runlog.Progress, runlog.progress, charts.learning_curve, evaluate.Comparison, evaluate.compare, evaluate.Summary, evaluate.final_evaluation, cli.main
+551	**Acceptance:**
+552	- [ ] Each M1 contract type is code in its component&#x27;s `types.py` (`core` holds the protocols and seed sets); each `tests/contracts/&lt;id&gt;.&lt;Type&gt;/` sample validates against its schema, and each Protocol&#x27;s replay double serves its recording
+553	- [ ] Every M1 step and entry function imports with its contract signature, body `raise NotImplementedError(&quot;&lt;its spine or wiring task&gt;&quot;)`; each `__init__.py` exports its contract; `cli/__main__.py` dispatches `check`, `train`, `batch`, `watch`, `chart` and `evaluate`
+554	- [ ] Every M1 `**Boundary:**` function&#x27;s fake serves its fixtures; import-linter contracts encode the component directions and forbid `stable_baselines3` and `gymnasium` outside `refcheck` (CHECK-01)
+555	**Verify:** `pytest tests/contracts` · `scripts/check.sh gate`
+556	**Depends on:** — · **Writes:** src/rllab/__init__.py, src/rllab/core/**, src/rllab/worlds/**, src/rllab/baselines/**, src/rllab/methods/**, src/rllab/train/**, src/rllab/runlog/**, src/rllab/charts/**, src/rllab/evaluate/**, src/rllab/cli/**, tests/contracts/**
+557	</pre></details></div><div class="step" id="S4"><span class="sid">U02.S4</span><span class="kind">Read</span>/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r1/with_skill/project/.git/dt-build/details/M1-T01.solo-1.txt<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r1/with_skill/project/.git/dt-build/details/M1-T01.solo-1.txt&quot;
+}</pre><div class="lbl">output</div><pre>1	dt land M1-T01 --role solo
+2	claim: M1-T01.solo
+3	worktree: /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r1/with_skill/project/.claude/worktrees/agent-ac28a5666649e518e
+4	base: 862593e701fe89c989e922ad0612dc70fff7ef88
+5	
+6	## changed since base
+7	src/rllab/__init__.py
+8	src/rllab/baselines/__init__.py
+9	src/rllab/baselines/means.py
+10	src/rllab/baselines/random.py
+11	src/rllab/baselines/snake.py
+12	src/rllab/baselines/types.py
+13	src/rllab/charts/__init__.py
+14	src/rllab/charts/curve.py
+15	src/rllab/charts/types.py
+16	src/rllab/cli/__init__.py
+17	src/rllab/cli/__main__.py
+18	src/rllab/cli/pipelines/__init__.py
+19	src/rllab/cli/pipelines/pl04_watch.py
+20	src/rllab/cli/pipelines/pl05_chart.py
+21	src/rllab/cli/pipelines/pl06_evaluate.py
+22	src/rllab/core/__init__.py
+23	src/rllab/core/episode.py
+24	src/rllab/core/seeds.py
+25	src/rllab/core/types.py
+26	src/rllab/evaluate/__init__.py
+27	src/rllab/evaluate/final/__init__.py
+28	src/rllab/evaluate/final/play.py
+29	src/rllab/evaluate/final/stats.py
+30	src/rllab/evaluate/final/verdict.py
+31	src/rllab/evaluate/types.py
+32	src/rllab/methods/__init__.py
+33	src/rllab/methods/dqn/__init__.py
+34	src/rllab/methods/dqn/learner.py
+35	src/rllab/methods/dqn/settings.py
+36	src/rllab/methods/factory.py
+37	src/rllab/methods/types.py
+38	src/rllab/runlog/__init__.py
+39	src/rllab/runlog/progress.py
+40	src/rllab/runlog/read.py
+41	src/rllab/runlog/types.py
+42	src/rllab/runlog/writer.py
+43	src/rllab/train/__init__.py
+44	src/rllab/train/batch.py
+45	src/rllab/train/check.py
+46	src/rllab/train/config.py
+47	src/rllab/train/loop/__init__.py
+48	src/rllab/train/pipelines/__init__.py
+49	src/rllab/train/pipelines/pl01_check.py
+50	src/rllab/train/pipelines/pl02_train.py
+51	src/rllab/train/pipelines/pl03_batch.py
+52	src/rllab/train/setup.py
+53	src/rllab/train/types.py
+54	src/rllab/worlds/__init__.py
+55	src/rllab/worlds/checks.py
+56	src/rllab/worlds/make.py
+57	src/rllab/worlds/snake.py
+58	src/rllab/worlds/types.py
+59	tests/contracts/baselines.BaselineMeans/samples/prey.json
+60	tests/contracts/baselines.BaselineMeans/samples/snake.json
+61	tests/contracts/baselines.BaselineMeans/schema.json
+62	tests/contracts/baselines.RandomPolicy/double.py
+63	tests/contracts/baselines.RandomPolicy/recording.json
+64	tests/contracts/baselines.RulePolicy/double.py
+65	tests/contracts/baselines.RulePolicy/recording.json
+66	tests/contracts/baselines.baseline_means/fake.py
+67	tests/contracts/baselines.rule_for/fake.py
+68	tests/contracts/charts.learning_curve/fake.py
+69	tests/contracts/contracts.py
+70	tests/contracts/core.ActionSpace/samples/fish.json
+71	tests/contracts/core.ActionSpace/samples/snake.json
+72	tests/contracts/core.ActionSpace/schema.json
+73	tests/contracts/core.DrawState/samples/fish_tank.json
+74	tests/contracts/core.DrawState/samples/snake_board.json
+75	tests/contracts/core.DrawState/schema.json
+76	tests/contracts/core.EVAL_SEEDS/samples/seeds.json
+77	tests/contracts/core.EVAL_SEEDS/schema.json
+78	tests/contracts/core.Episode/samples/traced_check_world.json
+79	tests/contracts/core.Episode/samples/untraced_snake.json
+80	tests/contracts/core.Episode/schema.json
+81	tests/contracts/core.EpisodeResult/samples/prey_both_teams.json
+82	tests/contracts/core.EpisodeResult/samples/snake_12_food.json
+83	tests/contracts/core.EpisodeResult/schema.json
+84	tests/contracts/core.FINAL_SEEDS/samples/seeds.json
+85	tests/contracts/core.FINAL_SEEDS/schema.json
+86	tests/contracts/core.Frame/samples/seed7_frame0.json
+87	tests/contracts/core.Frame/samples/seed7_frame1.json
+88	tests/contracts/core.Frame/schema.json
+89	tests/contracts/core.Output/samples/snake_curve.json
+90	tests/contracts/core.Output/samples/snake_video.json
+91	tests/contracts/core.Output/schema.json
+92	tests/contracts/core.Policy/double.py
+93	tests/contracts/core.Policy/recording.json
+94	tests/contracts/core.Step/samples/prey_one_caught.json
+95	tests/contracts/core.Step/samples/snake_mid.json
+96	tests/contracts/core.Step/schema.json
+97	tests/contracts/core.TeamSpec/samples/predator.json
+98	tests/contracts/core.TeamSpec/samples/prey.json
+99	tests/contracts/core.TeamSpec/samples/snake.json
+100	tests/contracts/core.TeamSpec/schema.json
+101	tests/contracts/core.World/double.py
+102	tests/contracts/core.World/recording.json
+103	tests/contracts/core.WorldSpec/samples/fish_local.json
+104	tests/contracts/core.WorldSpec/samples/prey.json
+105	tests/contracts/core.WorldSpec/samples/snake.json
+106	tests/contracts/core.WorldSpec/schema.json
+107	tests/contracts/core.play_episode/fake.py
+108	tests/contracts/core.play_episode/samples/seed7_traced.json
+109	tests/contracts/core.play_episode/schema.json
+110	tests/contracts/evaluate.Comparison/samples/snake_vs_random_rejected.json
+111	tests/contracts/evaluate.Comparison/samples/snake_vs_rule_kept.json
+112	tests/contracts/evaluate.Comparison/schema.json
+113	tests/contracts/evaluate.Summary/samples/snake_failing_run.json
+114	tests/contracts/evaluate.Summary/samples/snake_pass.json
+115	tests/contracts/evaluate.Summary/samples/snake_three_runs.json
+116	tests/contracts/evaluate.Summary/schema.json
+117	tests/contracts/evaluate.final_evaluation/fake.py
+118	tests/contracts/methods.Learner/double.py
+119	tests/contracts/methods.Learner/recording.json
+120	tests/contracts/methods.MethodConfig/samples/ppo_lr_override.json
+121	tests/contracts/methods.MethodConfig/samples/snake_dqn_defaults.json
+122	tests/contracts/methods.MethodConfig/schema.json
+123	tests/contracts/methods.Transition/samples/many_fish.json
+124	tests/contracts/methods.Transition/samples/snake.json
+125	tests/contracts/methods.Transition/schema.json
+126	tests/contracts/methods.load_policy/fake.py
+127	tests/contracts/methods.make_learner/fake.py
+128	tests/contracts/runlog.Checkpoint/samples/snake_0pct.json
+129	tests/contracts/runlog.Checkpoint/samples/snake_100pct.json
+130	tests/contracts/runlog.Checkpoint/schema.json
+131	tests/contracts/runlog.EvalPoint/samples/prey_both_teams.json
+132	tests/contracts/runlog.EvalPoint/samples/snake_50pct.json
+133	tests/contracts/runlog.EvalPoint/schema.json
+134	tests/contracts/runlog.Progress/fake.py
+135	tests/contracts/runlog.Progress/samples/snake_35pct.json
+136	tests/contracts/runlog.Progress/schema.json
+137	tests/contracts/runlog.Run/double.py
+138	tests/contracts/runlog.Run/recording.json
+139	tests/contracts/runlog.RunRecord/samples/failed_nan.json
+140	tests/contracts/runlog.RunRecord/samples/finished.json
+141	tests/contracts/runlog.RunRecord/samples/incomplete.json
+142	tests/contracts/runlog.RunRecord/schema.json
+143	tests/contracts/runlog.RunWriter/double.py
+144	tests/contracts/runlog.RunWriter/recording.json
+145	tests/contracts/runlog.find_runs/fake.py
+146	tests/contracts/runlog.open_run/fake.py
+147	tests/contracts/test_doubles.py
+148	tests/contracts/test_exports.py
+149	tests/contracts/test_fakes.py
+150	tests/contracts/test_samples.py
+151	tests/contracts/train.CheckResult/samples/dqn_pass.json
+152	tests/contracts/train.CheckResult/samples/ppo_fail.json
+153	tests/contracts/train.CheckResult/schema.json
+154	tests/contracts/train.RunConfig/samples/prey_two_methods.json
+155	tests/contracts/train.RunConfig/samples/snake.json
+156	tests/contracts/train.RunConfig/schema.json
+157	tests/contracts/train.load_run_configs/fake.py
+158	tests/contracts/train.load_run_configs/samples/snake_s1_s2.json
+159	tests/contracts/train.load_run_configs/schema.json
+160	tests/contracts/train.run_batch/fake.py
+161	tests/contracts/train.run_check/fake.py
+162	tests/contracts/train.run_check/samples/dqn_pass.json
+163	tests/contracts/train.run_check/schema.json
+164	tests/contracts/train.run_train/fake.py
+165	tests/contracts/worlds.CheckWorld/double.py
+166	tests/contracts/worlds.CheckWorld/recording.json
+167	tests/contracts/worlds.make/fake.py
+168	
+169	## gate (gate)
+170	reused the Stop gate&#x27;s verdict from 2026-10-18T15:15:01-0400: failed (rc 64)
+171	
+172	## reject: gate
+173	the role&#x27;s gate failed in the worktree (output above)
+174	</pre></details></div><div class="step" id="S5"><span class="sid">U02.S5</span><span class="kind">Bash</span>ls -la /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r1/with_skill/project/.claude/worktrees/ /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r1/with_skill/project/.claude/worktrees/agent-aa1f567e6413ec498 /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r1/with_skill/project/.claude/worktrees/agent-aa1f567e6413ec498/src /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r1/with_skill/pr …[+53 chars] <span class="err">error</span><details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;ls -la /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r1/with_skill/project/.claude/worktrees/ /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r1/with_skill/project/.claude/worktrees/agent-aa1f567e6413ec498 /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r1/with_skill/project/.claude/worktrees/agent-aa1f567e6413ec498/src /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r1/with_skill/project/.claude/worktrees/agent-aa1f567e6413ec498/tests&quot;,
+  &quot;description&quot;: &quot;List worktrees and project layout&quot;
+}</pre><div class="lbl">output</div><pre>Exit code 1
+ls: /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r1/with_skill/project/.claude/worktrees/agent-aa1f567e6413ec498/src: No such file or directory
+/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r1/with_skill/project/.claude/worktrees/:
+total 0
+drwxr-xr-x@  3 connorott  staff   96 Oct 18 15:15 .
+drwxr-xr-x@  6 connorott  staff  192 Oct 18 14:50 ..
+drwxr-xr-x@ 14 connorott  staff  448 Oct 18 15:15 agent-aa1f567e6413ec498
+
+/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r1/with_skill/project/.claude/worktrees/agent-aa1f567e6413ec498:
+total 1008
+drwxr-xr-x@ 14 connorott  staff     448 Oct 18 15:15 .
+drwxr-xr-x@  3 connorott  staff      96 Oct 18 15:15 ..
+drwxr-xr-x@  9 connorott  staff     288 Oct 18 15:15 .claude
+-rw-r--r--@  1 connorott  staff     145 Oct 18 15:15 .git
+-rw-r--r--@  1 connorott  staff     406 Oct 18 15:15 .gitignore
+-rw-r--r--@  1 connorott  staff       5 Oct 18 15:15 .python-version
+-rw-r--r--@  1 connorott  staff     776 Oct 18 15:15 AGENTS.md
+-rw-r--r--@  1 connorott  staff   10899 Oct 18 15:15 CONSTRAINTS.md
+drwxr-xr-x@  8 connorott  staff     256 Oct 18 15:15 docs
+-rw-r--r--@  1 connorott  staff    8730 Oct 18 15:15 pyproject.toml
+drwxr-xr-x@  9 connorott  staff     288 Oct 18 15:15 scripts
+drwxr-xr-x@  4 connorott  staff     128 Oct 18 15:15 tasks
+drwxr-xr-x@  4 connorott  staff     128 Oct 18 15:15 tests
+-rw-r--r--@  1 connorott  staff  473893 Oct 18 15:15 uv.lock
+
+/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r1/with_skill/project/.claude/worktrees/agent-aa1f567e6413ec498/tests:
+total 8
+drwxr-xr-x@  4 connorott  staff  128 Oct 18 15:15 .
+drwxr-xr-x@ 14 connorott  staff  448 Oct 18 15:15 ..
+-rw-r--r--@  1 connorott  staff  304 Oct 18 15:15 conftest.py
+drwxr-xr-x@  3 connorott  staff   96 Oct 18 15:15 fixtures</pre></details></div><div class="step" id="S6"><span class="sid">U02.S6</span><span class="kind">Bash</span>git branch -a<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;git branch -a&quot;,
+  &quot;description&quot;: &quot;List branches&quot;
+}</pre><div class="lbl">output</div><pre>+ build/M1
+  main
+* worktree-agent-aa1f567e6413ec498
+  worktree-agent-ac28a5666649e518e</pre></details></div><div class="step" id="S7"><span class="sid">U02.S7</span><span class="kind">Read</span>/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r1/with_skill/project/.claude/worktrees/agent-aa1f567e6413ec498/CONSTRAINTS.md<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r1/with_skill/project/.claude/worktrees/agent-aa1f567e6413ec498/CONSTRAINTS.md&quot;
+}</pre><div class="lbl">output</div><pre>1	# Constraints
+2	**Status:** Approved · **Last reviewed:** 2026-10-17 by @connor · **Ratcheted:** —
+3	
+4	The standing quality bar. `pyproject.toml` and `scripts/check.sh` enforce it; every number here names its config key, and `dt status` fails if the two disagree. Only `build-setup` changes this file, with the user: tightening is routine, loosening needs an explicit yes.
+5	
+6	## Floor
+7	- **CR-01** No new suppressions. Ruff runs with `--ignore-noqa` in gate and full, so a Ruff exception is a `per-file-ignores` entry in protected config with a row in Exceptions. `# type: ignore`, `pyright:` comments and `pragma: no cover` are caught by `floor_guard.sh` on the diff
+8	- **CR-02** No stubs: `raise NotImplementedError` outside abstract methods, `pass`-only bodies, bare `except: pass`. One carve-out: the interface task&#x27;s step signatures, whose body is only `raise NotImplementedError(&quot;&lt;task id&gt;&quot;)` naming the open task that replaces it. `check.sh gate` fails on one naming a task that isn&#x27;t open in `tasks/todo.md`; `check.sh full --exit` (the milestone exit) fails on any
+9	- **CR-03** No skipped, deleted or assertion-free tests, unless a row in Exceptions names the test file
+10	- **CR-04** No secrets in source
+11	- **CR-05** Oracle files (`tests/fixtures/**/expected.json`) change only with the user&#x27;s approval
+12	- **CR-06** The implementer never changes `tests/intent/**`
+13	- **CR-07** This file, `pyproject.toml` tool config, `scripts/` and `.claude/agents/` are not weakened to make a change pass
+14	- **CR-08** Nothing imports from `references/` or `probes/`, or adds either to `sys.path` (or `PYTHONPATH`, pytest `pythonpath`). References and probe scripts are outside the tooling, so imported code would bypass the bar; `floor_guard.sh` checks the diff for both. Code copied from either is project code and meets the same bar
+15	- **CR-09** A frozen interface (`tests/contracts/&lt;id&gt;.&lt;symbol&gt;/`: schema, samples, fake; and the types, signatures and exports the interface task wrote) is frozen once it exists at the task&#x27;s base. Only the interface task freezing it (`**Kind:** interface`) writes a new folder, and no other task&#x27;s `Writes:` names its `types.py` or `__init__.py`; a frozen interface changes only through `architecture-design` Revise, never to make a test pass
+16	
+17	## Readability
+18	- **CR-10** One entry function per pipeline; it reads top to bottom as its named steps (reviewer + `dt layout`)
+19	- **CR-11** No registries, plugin dispatch or config-driven wiring without an AD
+20	- **CR-12** New abstraction only with a second real implementation or a named seam
+21	- **CR-13** No global random state: every generator is spawned from a seed (`np.random.SeedSequence`, a `torch.Generator`), never `np.random.seed` or `torch.manual_seed` (AD-05)
+22	
+23	## Enforced with numbers
+24	| ID | Dimension | Rule | Checked by | Config key | Runs at |
+25	|---|---|---|---|---|---|
+26	| CR-20 | Lint | zero errors; standing per-file-ignores only for `tests/**` and `__init__.py` | ruff | `tool.ruff.lint.select` | edit, gate |
+27	| CR-21 | Complexity | ≤ 10 per function | ruff C901 | `tool.ruff.lint.mccabe.max-complexity` | gate |
+28	| CR-22 | Size | ≤ 500 lines/module, ≤ 60/function | check_size.py | `tool.size_limits` | edit, gate |
+29	| CR-23 | Types | zero errors, strict | mypy | `tool.mypy.strict` | gate |
+30	| CR-24 | Boundaries | import contracts hold | import-linter | `tool.importlinter.contracts` | gate |
+31	| CR-25 | Dependencies | none missing or unused | deptry | `tool.deptry` | gate |
+32	| CR-26 | Deps security | nothing known-vulnerable | pip-audit | — | full, CI nightly |
+33	| CR-27 | Reproducibility | same seed, same result: `repro` tests pass (TRAIN-02, WORLD-02, REPLAY-02) | pytest `-m repro` | `tool.pytest.ini_options.markers` | gate |
+34	
+35	## Measured, not yet enforced
+36	| ID | Metric | Today | Direction |
+37	|---|---|---|---|
+38	| CR-40 | Coverage (branch) | — (no code) (`tool.coverage.report.fail_under`, raised by Ratchet) | must not fall |
+39	| CR-41 | vulture findings at `min_confidence = 60` (`scripts/vulture_whitelist.py`) | 0 | must not grow by `full --exit` (earlier `full` runs report) |
+40	| CR-42 | Duplicate blocks of ≥ 8 similar source lines (pylint `duplicate-code`, `[tool.pylint.similarities]` in pyproject.toml) | 0 | must not grow |
+41	
+42	## Boundaries (generated from architecture — do not edit)
+43	- `rllab.core` imports nothing first-party · `worlds` → core · `runlog` → core · `baselines` → core, worlds · `methods` → core, runlog · `train`, `evaluate`, `replay` → core, worlds, baselines, methods, runlog · `charts` → runlog, evaluate · `refcheck` → core, worlds, train, evaluate, runlog · `notes` → nothing · `cli` → all · only `refcheck` imports Stable-Baselines3 or Gymnasium
+44	
+45	## Roles and protected paths
+46	| Role | May edit | May not edit | Stop gate |
+47	|---|---|---|---|
+48	| tester | `tests/intent/**`, within the task&#x27;s `Writes:` | everything else; reads no source | `check.sh collect` (lint, collect, red for the right reason) |
+49	| implementer / solo | `src/**`, `tests/unit/**`, within the task&#x27;s `Writes:`; an interface task also the `tests/contracts/&lt;id&gt;.&lt;symbol&gt;/` its `Writes:` names | the protected list; `tasks/` | `check.sh gate` + protected-path diff against the worktree&#x27;s base |
+50	| reviewer | its worktree, for the mutation check, and its findings file; nothing lands (the orchestrator records findings with `dt finding`) | everything else | runs `check.sh full` by hand |
+51	
+52	**Protected list** (`PROTECTED` in `scripts/check.sh`; `path_guard.sh deny --protected` reads the same list): `tests/intent/**`, `tests/fixtures/**`, `tests/conftest.py`, `pyproject.toml`, `uv.lock`, `CONSTRAINTS.md`, `scripts/**`, `.claude/agents/**`, `.claude/settings.json`, `references/**`, `probes/**`, `tests/contracts/**`. `tests/contracts/**` covers the contract folders that exist at the task&#x27;s base (CR-09). **`Writes:`**: `dt claim`, in the builder&#x27;s worktree, writes the role&#x27;s share of the task&#x27;s `Writes:` to `.claude/.task_writes` and sets the worktree&#x27;s base (`refs/worktree/checks-base`); `path_guard.sh writes` blocks edits outside the list, and a tester&#x27;s or implementer&#x27;s edits before the claim. Only the orchestrator writes `tasks/` (`dt land`, `dt finding`).
+53	
+54	**Worktree links:** none
+55	
+56	## Review
+57	Run by the reviewer agent over what it is given (base, package, tasks, paths): the interface review after Phase 0, a phase review per package at each checkpoint, and the milestone exit. `dt land` already checked each landing&#x27;s `Writes:`, protected paths and gates; review judges what tools can&#x27;t.
+58	
+59	**Interface** (after Phase 0): the code is the contract, no more and no less.
+60	1. Types match `contract.md`: fields, types, invariants. Nothing a step&#x27;s In → Out needs is missing; no helper is frozen.
+61	2. Signatures match the step tables, in their owner modules. Each stub names the open task that owns its step; no logic beyond types and validation.
+62	3. One sample per case the contract names, valid and realistically shaped, never carrying a TC&#x27;s expected value. Replay doubles replay an interaction the Protocol allows; fakes serve their fixtures.
+63	4. `__init__.py` exports exactly the contract; each `Mitigated by` in the plan&#x27;s dependency graph exists; each split task&#x27;s tester can write its tests from the frozen interface and its `Read:`.
+64	
+65	**Each phase**, per package, tests before code:
+66	1. **Interfaces followed** (CR-09): no frozen type, signature or contract folder changed outside a Revise. Consumers use the declared types: no dict for a dataclass, no reaching into a provider&#x27;s internals, no local redefinition. A stub is replaced only by the task it names; no cross-package import outside the contract; spine tests run on samples and doubles, not another step&#x27;s code.
+67	2. **Tests prove something:** each intent test asserts its TC case or acceptance bullet, loading expected values and tolerances from fixtures; none is assertion-free or weakened; Hypothesis runs the `ci` profile. Unit tests are specific, never computing the expected value with the code under test or testing only a mock. **Mutation check** (`.claude/agents/reviewer.md`): per acceptance bullet, the smallest change that should break it; a mutation no test catches is a finding.
+68	3. **Correct to the spec:** each acceptance bullet truly met, not special-cased to the sample; the error paths the requirement names; seeding and determinism; numerical edge cases.
+69	4. **Simple** (CR-11, CR-12, CR-42): no abstraction with one implementation outside the contract or an AD; no forwarding wrapper, one-method class, or class where a function does; no parameter, flag or config key every caller sets the same; no `try/except` that only re-raises or swallows, no checks the types already guarantee; no loop the library already provides. No near-copies within or across the phase&#x27;s tasks: one concept is one function in its owner module (tests may repeat for readability). Each finding names the simpler form, with the same tests passing.
+70	5. **Pipelines** (CR-10): entry functions read as their step tables (`dt layout`); step owners respected; spine baselines still selectable.
+71	6. **The bar** (CR-07): diff this file, `pyproject.toml`, `scripts/` and `.claude/agents/` against the milestone&#x27;s Base. Any loosening is Critical; new exceptions need an owner and expiry.
+72	7. **Hidden and parallel risks:** where a real provider could act differently from its double (flagged for the system phase); fixed output paths, global state, test-order dependence.
+73	8. **The rest:** readability, security, performance where a QR sets a number; reused reference or probe code has its Caveats handled and fits the contract; `dt lint` clean, pre-build sections replaced by `dt layout` pointers.
+74	
+75	**Milestone exit**, over the whole diff, adds: the Scope&#x27;s Exit holds; every Covers ID has a test; `check.sh full --exit` finds no stub; system tests use real providers; the same sample through a real provider and its double agrees; deferred requirements untouched; pip-audit ran.
+76	
+77	**Severity:** Critical: a frozen interface changed, a weakened test, an intent test that misses a mutation changing its TC&#x27;s expected output, a wrong answer, a loosened bar, a security hole, lost data; it stops the build. Important: a consumer bypassing a type, any other surviving mutation, an unneeded abstraction, a duplicate across tasks. Suggestion and Nit: local. Findings go under the checkpoint block in `tasks/plan.md` (`dt finding`), each with a fix task or a reason.
+78	
+79	## Done
+80	agent-skills `references/definition-of-done.md`, tailored once:
+81	- **Correctness and Quality:** checked per task by the gate.
+82	- **Integration and Documentation:** checked at each checkpoint.
+83	- **The full list:** checked at milestone exit.
+84	
+85	## Exceptions
+86	| ID | Rule | Path | Reason | Owner | Expires |
+87	|---|---|---|---|---|---|
+88	| EX-01 | CR-25 DEP002 | `numpy`, `torch`, `matplotlib` | M1 dependencies, declared before the code imports them | @connor | M1 exit |
+89	</pre></details></div><div class="step" id="S8"><span class="sid">U02.S8</span><span class="kind">Read</span>/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r1/with_skill/project/.claude/worktrees/agent-aa1f567e6413ec498/pyproject.toml<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r1/with_skill/project/.claude/worktrees/agent-aa1f567e6413ec498/pyproject.toml&quot;
+}</pre><div class="lbl">output</div><pre>1	# Single package. build-setup writes [build-system], [dependency-groups] and every [tool.*]
+2	# section; [project] dependencies come from the plan (Extend adds each milestone&#x27;s).
+3	# CONSTRAINTS.md cites these keys: change a number in both, through build-setup.
+4	# references/ (reference files from docs/references.md) and probes/ (probe scripts from
+5	# docs/probes.md) are not project code: every tool below excludes them, they are protected, and
+6	# nothing imports from them (CR-08).
+7	[project]
+8	name = &quot;rllab&quot;
+9	version = &quot;0.1.0&quot;
+10	requires-python = &quot;&gt;=3.12&quot;
+11	dependencies = [
+12	    &quot;numpy&gt;=2.1&quot;,
+13	    &quot;torch&gt;=2.5&quot;,
+14	    &quot;matplotlib&gt;=3.9&quot;,
+15	]
+16	
+17	[build-system]
+18	requires = [&quot;uv_build&gt;=0.11,&lt;0.12&quot;]
+19	build-backend = &quot;uv_build&quot;
+20	
+21	[dependency-groups]
+22	dev = [
+23	    &quot;ruff&quot;,
+24	    &quot;mypy&quot;,
+25	    &quot;pyright&quot;,
+26	    &quot;pytest&quot;,
+27	    &quot;pytest-cov&quot;,
+28	    &quot;hypothesis&quot;,
+29	    &quot;deptry&quot;,
+30	    &quot;vulture&quot;,
+31	    &quot;pylint&quot;,
+32	    &quot;typos&quot;,
+33	    &quot;import-linter&quot;,
+34	    &quot;pip-audit&quot;,
+35	
+36	]
+37	
+38	# ================================================================ Ruff (CR-20, CR-21)
+39	[tool.ruff]
+40	line-length = 100
+41	target-version = &quot;py312&quot;
+42	src = [&quot;src&quot;, &quot;tests&quot;]
+43	output-prefer-rule-codes = true # preview mode prints rule names; noqa and CONSTRAINTS.md use codes
+44	extend-exclude = [&quot;scripts/vulture_whitelist.py&quot;, &quot;references&quot;, &quot;probes&quot;, &quot;.claude&quot;, &quot;docs&quot;]  # vendored skill scripts; Python blocks in the docs
+45	force-exclude = true            # excluded even when a path is passed explicitly (check.sh fast)
+46	
+47	[tool.ruff.lint]
+48	preview = true                  # needed for PLR0914 / PLR1702 / PLR0904 below
+49	explicit-preview-rules = true   # ...but only turn on preview rules named here
+50	
+51	select = [
+52	    # Core bug-finders and modernisers
+53	    &quot;E&quot;, &quot;F&quot;, &quot;I&quot;, &quot;B&quot;, &quot;UP&quot;, &quot;SIM&quot;, &quot;C4&quot;, &quot;RUF&quot;,
+54	    # Quality
+55	    &quot;A&quot;, &quot;RET&quot;, &quot;PTH&quot;, &quot;PERF&quot;, &quot;PGH&quot;, &quot;G&quot;, &quot;TRY&quot;,
+56	    &quot;PLE&quot;, &quot;PLW&quot;,               # only the Pylint error/warning groups
+57	    # Security and tests
+58	    &quot;S&quot;, &quot;PT&quot;,
+59	    # Domain (from the tech stack ADs)
+60	    &quot;DTZ&quot;, &quot;NPY&quot;,
+61	    # Complexity and size
+62	    &quot;C901&quot;,                     # cyclomatic complexity
+63	    &quot;PLR0911&quot;,                  # too many returns
+64	    &quot;PLR0912&quot;,                  # too many branches
+65	    &quot;PLR0913&quot;,                  # too many arguments
+66	    &quot;PLR0915&quot;,                  # too many statements
+67	    &quot;PLR0917&quot;,                  # too many positional arguments
+68	    &quot;PLR0914&quot;,                  # too many locals          (preview)
+69	    &quot;PLR1702&quot;,                  # too many nested blocks   (preview)
+70	    &quot;PLR0904&quot;,                  # too many public methods  (preview)
+71	]
+72	ignore = [
+73	    &quot;E501&quot;,     # line length is handled by the formatter
+74	    &quot;TRY003&quot;,   # long messages in exception constructors: too noisy
+75	]
+76	
+77	[tool.ruff.lint.mccabe]
+78	max-complexity = 10
+79	
+80	[tool.ruff.lint.pylint]
+81	max-args = 5
+82	max-positional-args = 4
+83	max-branches = 10
+84	max-returns = 5
+85	max-statements = 40
+86	max-locals = 12
+87	max-nested-blocks = 4
+88	max-public-methods = 20
+89	
+90	# Standing entries (CR-20). Any other entry is an exception: one row in CONSTRAINTS.md&#x27;s table.
+91	[tool.ruff.lint.per-file-ignores]
+92	&quot;tests/**&quot;    = [&quot;S101&quot;, &quot;S105&quot;, &quot;S106&quot;,                      # asserts and fake secrets are fine
+93	                 &quot;C901&quot;, &quot;PLR0912&quot;, &quot;PLR0913&quot;, &quot;PLR0915&quot;, &quot;PLR0917&quot;]  # fixtures and parametrize are long
+94	&quot;__init__.py&quot; = [&quot;F401&quot;]                                      # re-exports
+95	
+96	[tool.ruff.lint.isort]
+97	known-first-party = [&quot;rllab&quot;]
+98	
+99	[tool.ruff.format]
+100	quote-style = &quot;double&quot;
+101	
+102	# ================================================================ Size limits (CR-22)
+103	# Read by scripts/check_size.py (Ruff has no module-length rule)
+104	[tool.size_limits]
+105	max_module_lines = 500          # code lines per file
+106	min_module_lines = 3            # __init__.py is skipped
+107	max_function_lines = 60         # code lines per function or method
+108	
+109	# ================================================================= mypy (CR-23)
+110	[tool.mypy]
+111	python_version = &quot;3.12&quot;
+112	files = [&quot;src&quot;]
+113	exclude = [&quot;^references/&quot;, &quot;^probes/&quot;]
+114	strict = true
+115	show_error_codes = true
+116	pretty = true
+117	
+118	# =============================================================== pyright
+119	# One type checker gates (CONSTRAINTS.md CR-23); check.sh full runs the other.
+120	[tool.pyright]
+121	include = [&quot;src&quot;]
+122	pythonVersion = &quot;3.12&quot;
+123	typeCheckingMode = &quot;standard&quot;
+124	reportUnnecessaryTypeIgnoreComment = true
+125	enableTypeIgnoreComments = false  # a used `type: ignore[code]` still fails here (CR-01)
+126	
+127	# ======================================================= pytest + coverage (CR-27, CR-40)
+128	[tool.pytest.ini_options]
+129	minversion = &quot;8.0&quot;
+130	testpaths = [&quot;tests&quot;]
+131	norecursedirs = [&quot;.*&quot;, &quot;*.egg&quot;, &quot;build&quot;, &quot;dist&quot;, &quot;node_modules&quot;, &quot;venv&quot;, &quot;references&quot;, &quot;probes&quot;]
+132	addopts = &quot;-ra --strict-markers --strict-config --import-mode=importlib&quot;
+133	xfail_strict = true
+134	markers = [
+135	    &quot;intent: tester-written specification tests&quot;,
+136	    &quot;unit: implementer-written unit tests&quot;,
+137	    &quot;repro: same seed, same result&quot;,
+138	    &quot;slow: skipped in the fast loop&quot;,
+139	]
+140	
+141	[tool.coverage.run]
+142	source = [&quot;src&quot;]
+143	omit = [&quot;references/*&quot;, &quot;probes/*&quot;]
+144	branch = true
+145	
+146	[tool.coverage.report]
+147	skip_covered = true
+148	show_missing = true
+149	exclude_also = [&quot;if TYPE_CHECKING:&quot;, &quot;raise NotImplementedError&quot;]
+150	fail_under = 0   # CR-40; check.sh full reads it; Ratchet raises it
+151	
+152	# =============================================================== deptry (CR-25)
+153	[tool.deptry]
+154	known_first_party = [&quot;rllab&quot;]
+155	extend_exclude = [&quot;references&quot;, &quot;probes&quot;, &quot;.claude&quot;]
+156	[tool.deptry.per_rule_ignores]
+157	DEP002 = [&quot;numpy&quot;, &quot;torch&quot;, &quot;matplotlib&quot;]
+158	
+159	# ======================================================== import-linter (CR-24)
+160	# Generated from the architecture&#x27;s dependency rules. &quot;(pkg.x)&quot; marks a module that
+161	# doesn&#x27;t exist yet: optional until it does, enforced after.
+162	[tool.importlinter]
+163	root_package = &quot;rllab&quot;
+164	include_external_packages = true
+165	
+166	[[tool.importlinter.contracts]]
+167	name = &quot;Layers: cli &gt; refcheck | charts | notes &gt; train | evaluate | replay &gt; baselines | methods &gt; worlds | runlog &gt; core&quot;
+168	type = &quot;layers&quot;
+169	layers = [
+170	    &quot;(rllab.cli)&quot;,
+171	    &quot;(rllab.refcheck) | (rllab.charts) | (rllab.notes)&quot;,
+172	    &quot;(rllab.train) | (rllab.evaluate) | (rllab.replay)&quot;,
+173	    &quot;(rllab.baselines) | (rllab.methods)&quot;,
+174	    &quot;(rllab.worlds) | (rllab.runlog)&quot;,
+175	    &quot;(rllab.core)&quot;,
+176	]
+177	
+178	# Narrower rules: each layer below is a set of siblings that never import each other
+179	[[tool.importlinter.contracts]]
+180	name = &quot;Independent: notes | refcheck | charts | replay&quot;
+181	type = &quot;layers&quot;
+182	layers = [&quot;(rllab.notes) | (rllab.refcheck) | (rllab.charts) | (rllab.replay)&quot;]
+183	
+184	[[tool.importlinter.contracts]]
+185	name = &quot;Independent: notes | train | evaluate | replay&quot;
+186	type = &quot;layers&quot;
+187	layers = [&quot;(rllab.notes) | (rllab.train) | (rllab.evaluate) | (rllab.replay)&quot;]
+188	
+189	[[tool.importlinter.contracts]]
+190	name = &quot;Independent: charts | train&quot;
+191	type = &quot;layers&quot;
+192	layers = [&quot;(rllab.charts) | (rllab.train)&quot;]
+193	
+194	[[tool.importlinter.contracts]]
+195	name = &quot;Independent: notes | baselines | methods&quot;
+196	type = &quot;layers&quot;
+197	layers = [&quot;(rllab.notes) | (rllab.baselines) | (rllab.methods)&quot;]
+198	
+199	[[tool.importlinter.contracts]]
+200	name = &quot;Independent: notes | worlds | runlog&quot;
+201	type = &quot;layers&quot;
+202	layers = [&quot;(rllab.notes) | (rllab.worlds) | (rllab.runlog)&quot;]
+203	
+204	[[tool.importlinter.contracts]]
+205	name = &quot;Independent: methods | worlds&quot;
+206	type = &quot;layers&quot;
+207	layers = [&quot;(rllab.methods) | (rllab.worlds)&quot;]
+208	
+209	[[tool.importlinter.contracts]]
+210	name = &quot;Independent: baselines | runlog&quot;
+211	type = &quot;layers&quot;
+212	layers = [&quot;(rllab.baselines) | (rllab.runlog)&quot;]
+213	
+214	[[tool.importlinter.contracts]]
+215	name = &quot;Independent: notes | core&quot;
+216	type = &quot;layers&quot;
+217	layers = [&quot;(rllab.notes) | (rllab.core)&quot;]
+218	
+219	[[tool.importlinter.contracts]]
+220	name = &quot;Only refcheck imports Stable-Baselines3 or Gymnasium (CHECK-01, AD-08)&quot;
+221	type = &quot;forbidden&quot;
+222	source_modules = [&quot;rllab&quot;]
+223	forbidden_modules = [&quot;stable_baselines3&quot;, &quot;gymnasium&quot;]
+224	ignore_imports = [&quot;rllab.refcheck.** -&gt; stable_baselines3&quot;, &quot;rllab.refcheck.** -&gt; gymnasium&quot;]
+225	unmatched_ignore_imports_alerting = &quot;none&quot;   # refcheck&#x27;s SB3 import lands in M2
+226	
+227	# ============================================================== vulture (CR-41)
+228	# Today&#x27;s findings are in the whitelist, so &quot;must not grow&quot; means vulture passes.
+229	# New and Ratchet regenerate it from `uv run vulture --make-whitelist`.
+230	[tool.vulture]
+231	paths = [&quot;src&quot;, &quot;scripts/vulture_whitelist.py&quot;]
+232	exclude = [&quot;references/&quot;, &quot;probes/&quot;]
+233	min_confidence = 60
+234	
+235	# ================================================== pylint duplicate-code (CR-42)
+236	# Only duplicate-code runs (check.sh full); Ruff does all other linting.
+237	[tool.pylint.similarities]
+238	min-similarity-lines = 8
+239	ignore-imports = true
+240	ignore-signatures = true
+241	ignore-docstrings = true
+242	ignore-comments = true
+243	
+244	# ================================================================ typos
+245	[tool.typos.files]
+246	extend-exclude = [&quot;references/&quot;, &quot;probes/&quot;, &quot;.claude/skills/&quot;]
+247	
+248	[tool.typos.default]
+249	extend-ignore-identifiers-re = [&quot;^GAE$&quot;]  # generalized advantage estimation (AD-03)
+250	</pre></details></div><div class="step" id="S9"><span class="sid">U02.S9</span><span class="kind">Bash</span>git log --oneline -3 worktree-agent-ac28a5666649e518e<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;git log --oneline -3 worktree-agent-ac28a5666649e518e&quot;,
+  &quot;description&quot;: &quot;Check previous attempt branch commits&quot;
+}</pre><div class="lbl">output</div><pre>862593e M1: build started
+e93be98 M1: record the bar&#x27;s base
+366d79b bar: current build-setup templates</pre></details></div><div class="step" id="S10"><span class="sid">U02.S10</span><span class="kind">Bash</span>ls -laR /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r1/with_skill/project/.git/dt-build<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;ls -laR /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r1/with_skill/project/.git/dt-build&quot;,
+  &quot;description&quot;: &quot;List dt-build state directory&quot;
+}</pre><div class="lbl">output</div><pre>total 8
+drwxr-xr-x@ 13 connorott  staff   416 Oct 18 15:15 .
+drwxr-xr-x@ 16 connorott  staff   512 Oct 18 15:15 ..
+drwxr-xr-x@  3 connorott  staff    96 Oct 18 15:15 claims
+drwxr-xr-x@  3 connorott  staff    96 Oct 18 15:15 details
+drwxr-xr-x@  2 connorott  staff    64 Oct 18 14:50 escalations
+drwxr-xr-x@  2 connorott  staff    64 Oct 18 15:15 gates
+drwxr-xr-x@  3 connorott  staff    96 Oct 18 14:50 go
+-rw-r--r--@  1 connorott  staff     0 Oct 18 15:15 land.lock
+-rw-r--r--@  1 connorott  staff  2079 Oct 18 15:15 log.jsonl
+drwxr-xr-x@  3 connorott  staff    96 Oct 18 15:15 rejects
+drwxr-xr-x@  2 connorott  staff    64 Oct 18 15:15 reserved
+drwxr-xr-x@  2 connorott  staff    64 Oct 18 14:50 resolved
+drwxr-xr-x@  2 connorott  staff    64 Oct 18 14:50 reviews
+
+/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r1/with_skill/project/.git/dt-build/claims:
+total 8
+drwxr-xr-x@  3 connorott  staff   96 Oct 18 15:15 .
+drwxr-xr-x@ 13 connorott  staff  416 Oct 18 15:15 ..
+-rw-r--r--@  1 connorott  staff  431 Oct 18 15:15 M1-T01.solo.json
+
+/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r1/with_skill/project/.git/dt-build/details:
+total 16
+drwxr-xr-x@  3 connorott  staff    96 Oct 18 15:15 .
+drwxr-xr-x@ 13 connorott  staff   416 Oct 18 15:15 ..
+-rw-r--r--@  1 connorott  staff  7355 Oct 18 15:15 M1-T01.solo-1.txt
+
+/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r1/with_skill/project/.git/dt-build/escalations:
+total 0
+drwxr-xr-x@  2 connorott  staff   64 Oct 18 14:50 .
+drwxr-xr-x@ 13 connorott  staff  416 Oct 18 15:15 ..
+
+/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r1/with_skill/project/.git/dt-build/gates:
+total 0
+drwxr-xr-x@  2 connorott  staff   64 Oct 18 15:15 .
+drwxr-xr-x@ 13 connorott  staff  416 Oct 18 15:15 ..
+
+/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r1/with_skill/project/.git/dt-build/go:
+total 8
+drwxr-xr-x@  3 connorott  staff   96 Oct 18 14:50 .
+drwxr-xr-x@ 13 connorott  staff  416 Oct 18 15:15 ..
+-rw-r--r--@  1 connorott  staff  149 Oct 18 14:50 go.json
+
+/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r1/with_skill/project/.git/dt-build/rejects:
+total 8
+drwxr-xr-x@  3 connorott  staff   96 Oct 18 15:15 .
+drwxr-xr-x@ 13 connorott  staff  416 Oct 18 15:15 ..
+-rw-r--r--@  1 connorott  staff  312 Oct 18 15:15 M1-T01.solo.json
+
+/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r1/with_skill/project/.git/dt-build/reserved:
+total 0
+drwxr-xr-x@  2 connorott  staff   64 Oct 18 15:15 .
+drwxr-xr-x@ 13 connorott  staff  416 Oct 18 15:15 ..
+
+/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r1/with_skill/project/.git/dt-build/resolved:
+total 0
+drwxr-xr-x@  2 connorott  staff   64 Oct 18 14:50 .
+drwxr-xr-x@ 13 connorott  staff  416 Oct 18 15:15 ..
+
+/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r1/with_skill/project/.git/dt-build/reviews:
+total 0
+drwxr-xr-x@  2 connorott  staff   64 Oct 18 14:50 .
+drwxr-xr-x@ 13 connorott  staff  416 Oct 18 15:15 ..</pre></details></div><div class="step" id="S11"><span class="sid">U02.S11</span><span class="kind">Bash</span>ls /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r1/with_skill/project/.claude/worktrees/agent-aa1f567e6413ec498/scripts /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r1/with_skill/project/.claude/worktrees/agent-aa1f567e6413ec498/tasks /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r1/with_skill/project/.claude/worktrees/agent-aa1f567e6413ec498/tests/fixtures /Users/connorott/plugins/dev-team-workspace/iter …[+96 chars]<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;ls /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r1/with_skill/project/.claude/worktrees/agent-aa1f567e6413ec498/scripts /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r1/with_skill/project/.claude/worktrees/agent-aa1f567e6413ec498/tasks /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r1/with_skill/project/.claude/worktrees/agent-aa1f567e6413ec498/tests/fixtures /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r1/with_skill/project/.claude/worktrees/agent-aa1f567e6413ec498/docs&quot;,
+  &quot;description&quot;: &quot;List scripts, tasks, fixtures, docs&quot;
+}</pre><div class="lbl">output</div><pre>/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r1/with_skill/project/.claude/worktrees/agent-aa1f567e6413ec498/docs:
+architecture.md
+brief.md
+packages
+roadmap.md
+routes.md
+spec.md
+
+/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r1/with_skill/project/.claude/worktrees/agent-aa1f567e6413ec498/scripts:
+check.sh
+check_size.py
+floor_guard.py
+floor_guard.sh
+hooks
+red_check.py
+vulture_whitelist.py
+
+/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r1/with_skill/project/.claude/worktrees/agent-aa1f567e6413ec498/tasks:
+plan.md
+todo.md
+
+/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r1/with_skill/project/.claude/worktrees/agent-aa1f567e6413ec498/tests/fixtures:
+rllab</pre></details></div><div class="step" id="S12"><span class="sid">U02.S12</span><span class="kind">Read</span>/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r1/with_skill/project/.claude/worktrees/agent-aa1f567e6413ec498/scripts/check.sh<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r1/with_skill/project/.claude/worktrees/agent-aa1f567e6413ec498/scripts/check.sh&quot;
+}</pre><div class="lbl">output</div><pre>1	#!/usr/bin/env bash
+2	# One entry point for every quality check. Hooks call it; so do CI and people.
+3	# Written by dev-team2 build-setup. Change it through build-setup (Revise), not by hand:
+4	# CONSTRAINTS.md names the rule each step enforces.
+5	#
+6	#   scripts/check.sh fast FILE...        per edit, instant               (PostToolUse: tester, implementer)
+7	#   scripts/check.sh collect             tester&#x27;s finish gate            (Stop: tester)
+8	#   scripts/check.sh gate [--pkg ID]     implementer&#x27;s finish gate       (Stop: implementer and solo; dt land)
+9	#   scripts/check.sh full [--pkg ID]     checkpoints, CI                 (reviewer)
+10	#   scripts/check.sh full --exit         the milestone exit: also no interface stub left
+11	#   scripts/check.sh protected           print the protected-path globs  (path_guard.sh deny --protected)
+12	#
+13	# The base is refs/worktree/checks-base, one per worktree (dt claim sets it in a builder&#x27;s worktree,
+14	# dt land in the main checkout), else HEAD.
+15	#
+16	# tests/contracts/** in the protected list means the boundary contracts frozen at the base (CR-09);
+17	# a contract folder new since the base belongs to the interface task freezing it, which may write it,
+18	# and so does a frozen folder the task&#x27;s .claude/.task_writes names (a re-freeze interface task).
+19	#
+20	# collect runs the intent tests changed since the base and fails unless they are red for the right
+21	# reason (scripts/red_check.py): AssertionError or an interface stub&#x27;s NotImplementedError, never
+22	# an ImportError or AttributeError.
+23	#
+24	# --pkg ID runs the tests of package ID and of every package that depends on it (multi-package:
+25	# deptry too); gate and full also run tests/contracts, whole, when it exists. Lint, types, size
+26	# and boundaries always cover the whole repo; they take seconds.
+27	# FILE paths are absolute or relative to the project root.
+28	# Prints every failure (it does not stop at the first) and exits 1 if any step failed.
+29	set -u
+30	cd &quot;$(dirname &quot;$0&quot;)/..&quot; || exit 1   # hooks may run from another directory
+31	export NO_COLOR=1                   # plain output for the agent reading it
+32	
+33	# ---- Generated by build-setup. Do not edit by hand. ----------------------------------------
+34	# The protected list (CONSTRAINTS.md, &quot;Roles and protected paths&quot;). One list serves as git
+35	# pathspecs here and as path_guard.sh globs; in both, * also matches /.
+36	PROTECTED=(&#x27;tests/intent/**&#x27; &#x27;tests/fixtures/**&#x27; &#x27;tests/conftest.py&#x27; &#x27;pyproject.toml&#x27; &#x27;uv.lock&#x27; &#x27;CONSTRAINTS.md&#x27; &#x27;scripts/**&#x27; &#x27;.claude/agents/**&#x27; &#x27;.claude/settings.json&#x27; &#x27;references/**&#x27; &#x27;probes/**&#x27; &#x27;tests/contracts/**&#x27;)
+37	SRC_DIRS=(src)            # single package: src · multi-package: packages/&lt;id&gt;/src ...
+38	PACKAGES_DIR=&quot;&quot;    # empty for a single package; multi-package: packages
+39	TYPE_GATE=&quot;mypy&quot;          # mypy | pyright: the type checker that gates (CR-23); full runs both
+40	
+41	# A package (or, in a single package, a component) and every package that depends on it,
+42	# from the architecture&#x27;s dependency rules.
+43	pkg_scope() {
+44	  case &quot;$1&quot; in
+45	    core) echo &quot;core worlds baselines methods train runlog charts evaluate replay refcheck cli&quot; ;;
+46	    worlds) echo &quot;worlds baselines train charts evaluate replay refcheck cli&quot; ;;
+47	    baselines) echo &quot;baselines train charts evaluate replay refcheck cli&quot; ;;
+48	    methods) echo &quot;methods train charts evaluate replay refcheck cli&quot; ;;
+49	    train) echo &quot;train refcheck cli&quot; ;;
+50	    runlog) echo &quot;runlog methods train charts evaluate replay refcheck cli&quot; ;;
+51	    charts) echo &quot;charts cli&quot; ;;
+52	    evaluate) echo &quot;evaluate charts refcheck cli&quot; ;;
+53	    replay) echo &quot;replay cli&quot; ;;
+54	    refcheck) echo &quot;refcheck cli&quot; ;;
+55	    notes) echo &quot;notes cli&quot; ;;
+56	    cli) echo &quot;cli&quot; ;;
+57	    *) return 1 ;;
+58	  esac
+59	}
+60	
+61	# Non-Python parts (CONSTRAINTS.md names them): their own check commands, run in gate and full.
+62	other_parts() {
+63	  : # e.g. step npm --prefix web run check
+64	}
+65	# ---------------------------------------------------------------------------------------------
+66	
+67	mode=&quot;${1:-gate}&quot;
+68	shift || true
+69	pkg=&quot;&quot;
+70	exit_check=()
+71	args=()
+72	while [ $# -gt 0 ]; do
+73	  case &quot;$1&quot; in
+74	    --pkg) pkg=&quot;${2:-}&quot;; shift 2 || shift ;;
+75	    --exit) exit_check=(--exit); shift ;;
+76	    *) args+=(&quot;$1&quot;); shift ;;
+77	  esac
+78	done
+79	
+80	if [ -n &quot;$pkg&quot; ] &amp;&amp; ! pkg_scope &quot;$pkg&quot; &gt;/dev/null; then
+81	  echo &quot;unknown package &#x27;$pkg&#x27; (see pkg_scope in scripts/check.sh)&quot; &gt;&amp;2
+82	  exit 64
+83	fi
+84	
+85	rc=0
+86	failed=()
+87	
+88	# A step that is not a Python tool (a script, git, another toolchain).
+89	step() {
+90	  echo &quot;-&gt; $*&quot; &gt;&amp;2
+91	  &quot;$@&quot; || { rc=1; failed+=(&quot;$*&quot;); }
+92	}
+93	
+94	# A tool from the project&#x27;s locked environment, never whatever is first on PATH.
+95	run() {
+96	  echo &quot;-&gt; $*&quot; &gt;&amp;2
+97	  uv run --frozen --quiet &quot;$@&quot; || { rc=1; failed+=(&quot;$*&quot;); }
+98	}
+99	
+100	# A measured check that fails only at the milestone exit: it prints its findings, and the reviewer
+101	# records them, but a mid-milestone run passes.
+102	report() {
+103	  echo &quot;-&gt; $* (reported; fails only with --exit)&quot; &gt;&amp;2
+104	  uv run --frozen --quiet &quot;$@&quot; || echo &quot;(reported, not failing: $*)&quot; &gt;&amp;2
+105	}
+106	
+107	# pytest exits 5 when it collects nothing. That is fine for gate and full on a project with no
+108	# tests yet; collect calls pytest through run() so an empty tests/intent fails.
+109	run_tests() {
+110	  echo &quot;-&gt; pytest $*&quot; &gt;&amp;2
+111	  uv run --frozen --quiet pytest &quot;$@&quot;
+112	  local status=$?
+113	  [ &quot;$status&quot; -eq 5 ] &amp;&amp; { echo &quot;(no tests collected)&quot; &gt;&amp;2; return; }
+114	  [ &quot;$status&quot; -eq 0 ] || { rc=1; failed+=(&quot;pytest $*&quot;); }
+115	}
+116	
+117	# The commit this task started from: refs/worktree/checks-base, set per worktree by `dt claim` (and
+118	# by `dt land` in the main checkout). Without it, HEAD, which misses changes already committed.
+119	BASE_REF=&quot;refs/worktree/checks-base&quot;
+120	base_commit() {
+121	  git rev-parse -q --verify &quot;$BASE_REF&quot; 2&gt;/dev/null || git rev-parse -q --verify HEAD 2&gt;/dev/null
+122	}
+123	
+124	# A boundary contract is frozen once its folder exists at the base (CR-09): each folder under
+125	# tests/contracts/ at the base, and any file directly in it. A folder new since the base is the
+126	# interface task freezing it, so that task may write it; the next task&#x27;s base freezes it. A frozen
+127	# folder the task&#x27;s .claude/.task_writes names (from its Writes:, by dt claim) is a re-freeze
+128	# interface task&#x27;s, so it is open to that task; dt land checks the Writes: against the plan.
+129	CONTRACTS_GLOB=&quot;tests/contracts/**&quot;
+130	claimed_contract() {
+131	  local line
+132	  [ -s .claude/.task_writes ] || return 1
+133	  while IFS= read -r line; do
+134	    line=&quot;${line%%[[:space:]]}&quot;
+135	    line=&quot;${line%/}&quot;; line=&quot;${line%/\*\*}&quot;
+136	    [ &quot;$line&quot; = &quot;$1&quot; ] &amp;&amp; return 0
+137	  done &lt;.claude/.task_writes
+138	  return 1
+139	}
+140	frozen_contracts() {
+141	  local base meta path
+142	  base=$(base_commit) || return 0
+143	  git ls-tree &quot;$base&quot; -- tests/contracts/ 2&gt;/dev/null | while IFS=$&#x27;\t&#x27; read -r meta path; do
+144	    case &quot;$meta&quot; in
+145	      *&quot; tree &quot;*) claimed_contract &quot;$path&quot; || echo &quot;$path/**&quot; ;;
+146	      *) echo &quot;$path&quot; ;;
+147	    esac
+148	  done
+149	}
+150	
+151	# The protected list as enforced: PROTECTED, with tests/contracts/** narrowed to the frozen contracts.
+152	protected_globs() {
+153	  local g
+154	  for g in &quot;${PROTECTED[@]}&quot;; do
+155	    if [ &quot;$g&quot; = &quot;$CONTRACTS_GLOB&quot; ]; then frozen_contracts; else echo &quot;$g&quot;; fi
+156	  done
+157	}
+158	
+159	# Fail if anything matching the given pathspecs changed since the base, untracked files included.
+160	unchanged_since_base() {
+161	  local label=&quot;$1&quot; base new
+162	  shift
+163	  echo &quot;-&gt; $label unchanged since $(git rev-parse -q --verify &quot;$BASE_REF&quot; &gt;/dev/null 2&gt;&amp;1 &amp;&amp; echo &quot;$BASE_REF&quot; || echo HEAD)&quot; &gt;&amp;2
+164	  if ! base=$(base_commit); then
+165	    echo &quot;no commit to compare against: commit the tester&#x27;s work first&quot; &gt;&amp;2
+166	    rc=1; failed+=(&quot;$label: no commit&quot;); return
+167	  fi
+168	  git --no-pager diff --exit-code --stat &quot;$base&quot; -- &quot;$@&quot; &gt;&amp;2 || { rc=1; failed+=(&quot;$label changed&quot;); }
+169	  new=$(git ls-files --others --exclude-standard -- &quot;$@&quot;)
+170	  if [ -n &quot;$new&quot; ]; then
+171	    printf &#x27;new untracked files in %s:\n%s\n&#x27; &quot;$label&quot; &quot;$new&quot; &gt;&amp;2
+172	    rc=1; failed+=(&quot;$label changed&quot;)
+173	  fi
+174	}
+175	
+176	# The tester may change tests/intent only. Docs and plans are the plugin&#x27;s business, not this check&#x27;s.
+177	only_intent_changed() {
+178	  local specs=(tests &quot;${SRC_DIRS[@]}&quot; &quot;${PROTECTED[@]}&quot;)
+179	  [ -n &quot;$PACKAGES_DIR&quot; ] &amp;&amp; specs+=(&quot;$PACKAGES_DIR&quot;)
+180	  unchanged_since_base &quot;files outside tests/intent&quot; &quot;${specs[@]}&quot; &#x27;:(exclude)tests/intent&#x27;
+181	}
+182	
+183	# The intent test files the tester changed since the base, committed or not.
+184	changed_intent_tests() {
+185	  local base
+186	  base=$(base_commit) || return 0
+187	  { git diff --relative --name-only --diff-filter=d &quot;$base&quot; -- &#x27;tests/intent/*.py&#x27;
+188	    git ls-files --others --exclude-standard -- &#x27;tests/intent/*.py&#x27;; } | sort -u |
+189	    while IFS= read -r f; do case &quot;${f##*/}&quot; in test_*|*_test.py) echo &quot;$f&quot; ;; esac; done
+190	}
+191	
+192	# Test directories for this run: all of them, or the --pkg scope; tests/contracts always whole.
+193	test_dirs() {
+194	  local scope=&quot;&quot; d p
+195	  [ -n &quot;$pkg&quot; ] &amp;&amp; scope=$(pkg_scope &quot;$pkg&quot;)
+196	  for d in tests/intent tests/unit; do
+197	    if [ -z &quot;$scope&quot; ]; then
+198	      [ -d &quot;$d&quot; ] &amp;&amp; echo &quot;$d&quot;
+199	    else
+200	      for p in $scope; do [ -d &quot;$d/$p&quot; ] &amp;&amp; echo &quot;$d/$p&quot;; done
+201	    fi
+202	  done
+203	  [ -d tests/contracts ] &amp;&amp; echo tests/contracts
+204	}
+205	
+206	# deptry checks what each package imports against what it declares.
+207	dependencies() {
+208	  local p scope
+209	  if [ -z &quot;$PACKAGES_DIR&quot; ]; then
+210	    run deptry . --no-ansi
+211	    return
+212	  fi
+213	  if [ -n &quot;$pkg&quot; ]; then
+214	    scope=$(pkg_scope &quot;$pkg&quot;)
+215	  else
+216	    scope=$(cd &quot;$PACKAGES_DIR&quot; &amp;&amp; for d in */pyproject.toml; do [ -f &quot;$d&quot; ] &amp;&amp; dirname &quot;$d&quot;; done)
+217	  fi
+218	  for p in $scope; do
+219	    echo &quot;-&gt; deptry $PACKAGES_DIR/$p&quot; &gt;&amp;2
+220	    (cd &quot;$PACKAGES_DIR/$p&quot; &amp;&amp; uv run --frozen --quiet deptry . --no-ansi) || { rc=1; failed+=(&quot;deptry $PACKAGES_DIR/$p&quot;); }
+221	  done
+222	}
+223	
+224	static_checks() {
+225	  run ruff check --ignore-noqa .   # exceptions go in per-file-ignores, which is protected (CR-01)
+226	  run ruff format --check .
+227	  run &quot;$TYPE_GATE&quot;
+228	  run python scripts/check_size.py &quot;${SRC_DIRS[@]}&quot;
+229	  dependencies
+230	  run lint-imports --no-logo
+231	}
+232	
+233	case &quot;$mode&quot; in
+234	  fast)
+235	    # Only Python files, only the files just edited. Fixes what it can in place.
+236	    files=()
+237	    for f in ${args[@]+&quot;${args[@]}&quot;}; do [[ $f == *.py ]] &amp;&amp; files+=(&quot;$f&quot;); done
+238	    [ ${#files[@]} -eq 0 ] &amp;&amp; exit 0
+239	    run ruff check --fix --quiet &quot;${files[@]}&quot;
+240	    run ruff format --quiet &quot;${files[@]}&quot;
+241	    run typos &quot;${files[@]}&quot;
+242	    run python scripts/check_size.py &quot;${files[@]}&quot;
+243	    ;;
+244	  collect)
+245	    if [ ! -d tests/intent ]; then
+246	      echo &quot;tests/intent does not exist: write the intent tests there&quot; &gt;&amp;2
+247	      exit 1
+248	    fi
+249	    run ruff check --ignore-noqa tests/intent
+250	    run ruff format --check tests/intent
+251	    run typos tests/intent
+252	    run pytest tests/intent --collect-only -q --no-cov
+253	    changed=()
+254	    while IFS= read -r f; do changed+=(&quot;$f&quot;); done &lt; &lt;(changed_intent_tests)
+255	    run python scripts/red_check.py ${changed[@]+&quot;${changed[@]}&quot;}
+256	    step bash scripts/floor_guard.sh
+257	    only_intent_changed
+258	    ;;
+259	  gate)
+260	    static_checks
+261	    other_parts
+262	    dirs=$(test_dirs)
+263	    # shellcheck disable=SC2086  # one directory per word, by construction
+264	    [ -n &quot;$dirs&quot; ] &amp;&amp; run_tests $dirs --no-cov -q -x
+265	    step bash scripts/floor_guard.sh
+266	    protected=()
+267	    while IFS= read -r g; do protected+=(&quot;$g&quot;); done &lt; &lt;(protected_globs)
+268	    unchanged_since_base &quot;protected files&quot; &quot;${protected[@]}&quot;
+269	    ;;
+270	  full)
+271	    static_checks
+272	    other_parts
+273	    if [ &quot;$TYPE_GATE&quot; = mypy ]; then run pyright; else run mypy; fi
+274	    # CR-41: the interface task&#x27;s stubs and fields stay unused until later tasks use them.
+275	    if [ ${#exit_check[@]} -gt 0 ]; then run vulture; else report vulture; fi
+276	    run pylint --disable=all --enable=duplicate-code --recursive=y --score=n --fail-under=10 &quot;${SRC_DIRS[@]}&quot;   # CR-42
+277	    run typos
+278	    run pip-audit --skip-editable   # the external opinion: a vulnerability database (CR-26)
+279	    step bash scripts/floor_guard.sh ${exit_check[@]+&quot;${exit_check[@]}&quot;}
+280	    dirs=$(test_dirs)
+281	    # Coverage threshold comes from [tool.coverage.report] fail_under (CR-40).
+282	    # shellcheck disable=SC2086
+283	    [ -n &quot;$dirs&quot; ] &amp;&amp; HYPOTHESIS_PROFILE=ci run_tests $dirs --cov -q
+284	    ;;
+285	  protected)
+286	    protected_globs
+287	    ;;
+288	  *)
+289	    echo &quot;unknown mode: $mode (fast | collect | gate | full | protected)&quot; &gt;&amp;2
+290	    exit 64
+291	    ;;
+292	esac
+293	[ $rc -ne 0 ] &amp;&amp; printf &#x27;FAILED: %s\n&#x27; &quot;${failed[@]}&quot; &gt;&amp;2
+294	exit $rc
+295	</pre></details></div><div class="step" id="S13"><span class="sid">U02.S13</span><span class="kind">Bash</span>ls /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r1/with_skill/project/.claude/worktrees/agent-aa1f567e6413ec498/scripts/hooks /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r1/with_skill/project/.claude/worktrees/agent-aa1f567e6413ec498/.claude<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;ls /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r1/with_skill/project/.claude/worktrees/agent-aa1f567e6413ec498/scripts/hooks /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r1/with_skill/project/.claude/worktrees/agent-aa1f567e6413ec498/.claude&quot;,
+  &quot;description&quot;: &quot;List hooks and .claude dir&quot;
+}</pre><div class="lbl">output</div><pre>/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r1/with_skill/project/.claude/worktrees/agent-aa1f567e6413ec498/.claude:
+agents
+packet.md
+settings.json
+skills
+
+/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r1/with_skill/project/.claude/worktrees/agent-aa1f567e6413ec498/scripts/hooks:
+path_guard.sh
+post_edit.sh
+project_root.sh
+stop_gate.sh</pre></details></div><div class="step" id="S14"><span class="sid">U02.S14</span><span class="kind">Bash</span>cat /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r1/with_skill/project/.git/dt-build/log.jsonl /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r1/with_skill/project/.git/dt-build/rejects/M1-T01.solo.json /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r1/with_skill/project/.git/dt-build/claims/M1-T01.solo.json<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;cat /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r1/with_skill/project/.git/dt-build/log.jsonl /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r1/with_skill/project/.git/dt-build/rejects/M1-T01.solo.json /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r1/with_skill/project/.git/dt-build/claims/M1-T01.solo.json&quot;,
+  &quot;description&quot;: &quot;Show dt log, reject, and claim records&quot;
+}</pre><div class="lbl">output</div><pre>{&quot;time&quot;: &quot;2026-10-18T14:50:39-0400&quot;, &quot;event&quot;: &quot;start&quot;, &quot;milestone&quot;: &quot;M1&quot;, &quot;branch&quot;: &quot;build/M1&quot;, &quot;commit&quot;: &quot;862593e701fe89c989e922ad0612dc70fff7ef88&quot;}
+{&quot;time&quot;: &quot;2026-10-18T14:50:41-0400&quot;, &quot;event&quot;: &quot;reserve&quot;, &quot;claim&quot;: &quot;M1-T01.solo&quot;, &quot;task&quot;: &quot;M1-T01&quot;, &quot;role&quot;: &quot;solo&quot;}
+{&quot;time&quot;: &quot;2026-10-18T14:50:48-0400&quot;, &quot;event&quot;: &quot;claim&quot;, &quot;claim&quot;: &quot;M1-T01.solo&quot;, &quot;task&quot;: &quot;M1-T01&quot;, &quot;role&quot;: &quot;solo&quot;, &quot;worktree&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r1/with_skill/project/.claude/worktrees/agent-ac28a5666649e518e&quot;, &quot;branch&quot;: &quot;worktree-agent-ac28a5666649e518e&quot;, &quot;base&quot;: &quot;862593e701fe89c989e922ad0612dc70fff7ef88&quot;}
+{&quot;time&quot;: &quot;2026-10-18T15:14:28-0400&quot;, &quot;event&quot;: &quot;finished&quot;, &quot;claim&quot;: &quot;M1-T01.solo&quot;, &quot;agent_type&quot;: &quot;implementer&quot;}
+{&quot;time&quot;: &quot;2026-10-18T15:14:28-0400&quot;, &quot;event&quot;: &quot;verdict&quot;, &quot;claim&quot;: &quot;M1-T01.solo&quot;, &quot;mode&quot;: &quot;gate&quot;, &quot;passed&quot;: false}
+{&quot;time&quot;: &quot;2026-10-18T15:14:52-0400&quot;, &quot;event&quot;: &quot;verdict&quot;, &quot;claim&quot;: &quot;M1-T01.solo&quot;, &quot;mode&quot;: &quot;gate&quot;, &quot;passed&quot;: false}
+{&quot;time&quot;: &quot;2026-10-18T15:14:58-0400&quot;, &quot;event&quot;: &quot;verdict&quot;, &quot;claim&quot;: &quot;M1-T01.solo&quot;, &quot;mode&quot;: &quot;gate&quot;, &quot;passed&quot;: false}
+{&quot;time&quot;: &quot;2026-10-18T15:15:01-0400&quot;, &quot;event&quot;: &quot;verdict&quot;, &quot;claim&quot;: &quot;M1-T01.solo&quot;, &quot;mode&quot;: &quot;gate&quot;, &quot;passed&quot;: false}
+{&quot;time&quot;: &quot;2026-10-18T15:15:05-0400&quot;, &quot;event&quot;: &quot;reject&quot;, &quot;claim&quot;: &quot;M1-T01.solo&quot;, &quot;task&quot;: &quot;M1-T01&quot;, &quot;role&quot;: &quot;solo&quot;, &quot;reject&quot;: &quot;gate&quot;, &quot;kind&quot;: null, &quot;detail_file&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r1/with_skill/project/.git/dt-build/details/M1-T01.solo-1.txt&quot;}
+{&quot;time&quot;: &quot;2026-10-18T15:15:07-0400&quot;, &quot;event&quot;: &quot;release&quot;, &quot;claim&quot;: &quot;M1-T01.solo&quot;, &quot;landed&quot;: false}
+{&quot;time&quot;: &quot;2026-10-18T15:15:10-0400&quot;, &quot;event&quot;: &quot;reserve&quot;, &quot;claim&quot;: &quot;M1-T01.solo&quot;, &quot;task&quot;: &quot;M1-T01&quot;, &quot;role&quot;: &quot;solo&quot;}
+{&quot;time&quot;: &quot;2026-10-18T15:15:16-0400&quot;, &quot;event&quot;: &quot;claim&quot;, &quot;claim&quot;: &quot;M1-T01.solo&quot;, &quot;task&quot;: &quot;M1-T01&quot;, &quot;role&quot;: &quot;solo&quot;, &quot;worktree&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r1/with_skill/project/.claude/worktrees/agent-aa1f567e6413ec498&quot;, &quot;branch&quot;: &quot;worktree-agent-aa1f567e6413ec498&quot;, &quot;base&quot;: &quot;862593e701fe89c989e922ad0612dc70fff7ef88&quot;}
+{
+  &quot;id&quot;: &quot;M1-T01.solo&quot;,
+  &quot;count&quot;: 1,
+  &quot;harness&quot;: 0,
+  &quot;last&quot;: {
+    &quot;reject&quot;: &quot;gate&quot;,
+    &quot;kind&quot;: null,
+    &quot;detail_file&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r1/with_skill/project/.git/dt-build/details/M1-T01.solo-1.txt&quot;,
+    &quot;time&quot;: &quot;2026-10-18T15:15:05-0400&quot;
+  }
+}
+{
+  &quot;id&quot;: &quot;M1-T01.solo&quot;,
+  &quot;task&quot;: &quot;M1-T01&quot;,
+  &quot;role&quot;: &quot;solo&quot;,
+  &quot;agent_type&quot;: &quot;implementer&quot;,
+  &quot;pkg&quot;: &quot;rllab&quot;,
+  &quot;worktree&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r1/with_skill/project/.claude/worktrees/agent-aa1f567e6413ec498&quot;,
+  &quot;branch&quot;: &quot;worktree-agent-aa1f567e6413ec498&quot;,
+  &quot;base&quot;: &quot;862593e701fe89c989e922ad0612dc70fff7ef88&quot;,
+  &quot;time&quot;: &quot;2026-10-18T15:15:16-0400&quot;,
+  &quot;finished&quot;: false
+}</pre></details></div><div class="step" id="S15"><span class="sid">U02.S15</span><span class="kind">Read</span>/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r1/with_skill/project/.claude/worktrees/agent-aa1f567e6413ec498/scripts/hooks/stop_gate.sh<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r1/with_skill/project/.claude/worktrees/agent-aa1f567e6413ec498/scripts/hooks/stop_gate.sh&quot;
+}</pre><div class="lbl">output</div><pre>1	#!/usr/bin/env bash
+2	# Stop hook (becomes SubagentStop inside a subagent): block finishing until the gate passes.
+3	#   stop_gate.sh collect|gate|full [--warn]
+4	# Blocks by printing {&quot;decision&quot;: &quot;block&quot;, &quot;reason&quot;: ...} and exiting 0, not by exit 2:
+5	# Claude Code treats an exit-2 Stop hook whose stderr mentions a missing file
+6	# (&quot;No such file or directory&quot;) as non-blocking, and test output often does.
+7	# Loop guard: after MAX_TRIES failed attempts the agent may stop. Outside a dt build the last
+8	# block tells it to start its report with &quot;GATE FAILED&quot;, because that report is all the parent
+9	# sees: a SubagentStop systemMessage doesn&#x27;t reach the main view (checked live, Claude Code 2.1.292).
+10	# --warn never blocks: a failing gate only leaves a systemMessage (CONSTRAINTS.md says when).
+11	# For gate and full, .claude/.check_pkg (written by dt claim, optional) holds the task&#x27;s package
+12	# and becomes --pkg.
+13	# In a dt build, .claude/.dt (written by dt claim) holds the path to dt.py: an agent whose claim
+14	# has an escalation record (dt escalate) may stop without the gate, and every gate result is
+15	# recorded with `dt build verdict`, which dt land reuses when the tree hasn&#x27;t changed since.
+16	mode=gate
+17	warn=0
+18	for a in &quot;$@&quot;; do
+19	  case &quot;$a&quot; in
+20	    --warn) warn=1 ;;
+21	    *) mode=&quot;$a&quot; ;;
+22	  esac
+23	done
+24	MAX_TRIES=3
+25	source &quot;$(dirname &quot;$0&quot;)/project_root.sh&quot;
+26	
+27	# Without jq there is no safe way to write the JSON answer: block the plain way (exit 2,
+28	# fixed message) rather than let the agent stop on a gate nobody ran.
+29	say_block() {
+30	  if command -v jq &gt;/dev/null 2&gt;&amp;1; then
+31	    jq -n --arg reason &quot;$1&quot; &#x27;{decision: &quot;block&quot;, reason: $reason}&#x27;
+32	    exit 0
+33	  fi
+34	  echo &quot;stop_gate: the gate failed and jq is not installed to report it; install jq, then run scripts/check.sh $mode&quot; &gt;&amp;2
+35	  exit 2
+36	}
+37	say_user() {
+38	  command -v jq &gt;/dev/null 2&gt;&amp;1 &amp;&amp; jq -n --arg msg &quot;$1&quot; &#x27;{systemMessage: $msg}&#x27;
+39	  exit 0
+40	}
+41	
+42	cd &quot;$root&quot; || say_block &quot;stop_gate: cannot enter the project root $root&quot;
+43	id=$(jq -r &#x27;.agent_id // .session_id // &quot;main&quot;&#x27; &lt;&lt;&lt;&quot;$input&quot; 2&gt;/dev/null | tr -cd &#x27;A-Za-z0-9_-&#x27;)
+44	counter=&quot;.claude/.stop_attempts_${id:-main}&quot;
+45	mkdir -p .claude
+46	
+47	dt=&quot;&quot;
+48	[ -s .claude/.dt ] &amp;&amp; dt=$(head -n 1 .claude/.dt)
+49	if [ -n &quot;$dt&quot; ] &amp;&amp; python3 &quot;$dt&quot; build escalated &gt;/dev/null 2&gt;&amp;1; then
+50	  rm -f &quot;$counter&quot;
+51	  exit 0
+52	fi
+53	
+54	pkg_args=()
+55	if [ &quot;$mode&quot; != collect ] &amp;&amp; [ -s .claude/.check_pkg ]; then
+56	  pkg_args=(--pkg &quot;$(tr -cd &#x27;A-Za-z0-9_.-&#x27; &lt;.claude/.check_pkg)&quot;)
+57	fi
+58	
+59	out=$(bash scripts/check.sh &quot;$mode&quot; ${pkg_args[@]+&quot;${pkg_args[@]}&quot;} 2&gt;&amp;1)
+60	rc=$?
+61	[ -n &quot;$dt&quot; ] &amp;&amp; python3 &quot;$dt&quot; build verdict --mode &quot;$mode&quot; --rc &quot;$rc&quot; &gt;/dev/null 2&gt;&amp;1
+62	if [ &quot;$rc&quot; -eq 0 ]; then
+63	  rm -f &quot;$counter&quot;
+64	  exit 0
+65	fi
+66	
+67	if [ &quot;$warn&quot; = 1 ]; then
+68	  say_user &quot;Gate &#x27;$mode&#x27; is failing (warn only, not blocking). Run scripts/check.sh $mode to see why.&quot;
+69	fi
+70	
+71	tries=$(cat &quot;$counter&quot; 2&gt;/dev/null || echo 0)
+72	[[ $tries =~ ^[0-9]+$ ]] || tries=0
+73	tries=$((tries + 1))
+74	echo &quot;$tries&quot; &gt;&quot;$counter&quot;
+75	if [ &quot;$tries&quot; -gt &quot;$MAX_TRIES&quot; ]; then
+76	  rm -f &quot;$counter&quot;
+77	  say_user &quot;Gate &#x27;$mode&#x27; still failing after $MAX_TRIES attempts; the agent stopped so a human can look. Run scripts/check.sh $mode.&quot;
+78	fi
+79	
+80	last=&quot;&quot;
+81	if [ &quot;$tries&quot; -eq &quot;$MAX_TRIES&quot; ] &amp;&amp; [ -n &quot;$dt&quot; ]; then
+82	  last=&quot;
+83	This was the last attempt. If you can&#x27;t fix it now, finish anyway with your status line:
+84	the failing verdict is recorded, and dt land rejects the task with it.&quot;
+85	elif [ &quot;$tries&quot; -eq &quot;$MAX_TRIES&quot; ]; then
+86	  last=&quot;
+87	This was the last attempt. If you can&#x27;t fix it now, finish anyway and start your report with
+88	\&quot;GATE FAILED: scripts/check.sh $mode\&quot;, then list what is still failing.&quot;
+89	fi
+90	say_block &quot;Gate &#x27;$mode&#x27; failed (attempt $tries/$MAX_TRIES). Fix these before finishing:
+91	$(echo &quot;$out&quot; | tail -60)$last&quot;
+92	</pre></details></div><div class="step" id="S16"><span class="sid">U02.S16</span><span class="kind">Bash</span>ls -la /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r1/with_skill/project/.claude/worktrees/agent-aa1f567e6413ec498/.claude/<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;ls -la /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r1/with_skill/project/.claude/worktrees/agent-aa1f567e6413ec498/.claude/&quot;,
+  &quot;description&quot;: &quot;List hidden files in .claude&quot;
+}</pre><div class="lbl">output</div><pre>total 120
+drwxr-xr-x@  9 connorott  staff    288 Oct 18 15:15 .
+drwxr-xr-x@ 14 connorott  staff    448 Oct 18 15:15 ..
+-rw-r--r--@  1 connorott  staff      6 Oct 18 15:15 .check_pkg
+-rw-r--r--@  1 connorott  staff    120 Oct 18 15:15 .dt
+-rw-r--r--@  1 connorott  staff    221 Oct 18 15:15 .task_writes
+drwxr-xr-x@  5 connorott  staff    160 Oct 18 15:15 agents
+-rw-r--r--@  1 connorott  staff  42404 Oct 18 15:15 packet.md
+-rw-r--r--@  1 connorott  staff    540 Oct 18 15:15 settings.json
+drwxr-xr-x@  4 connorott  staff    128 Oct 18 15:15 skills</pre></details></div><div class="step" id="S17"><span class="sid">U02.S17</span><span class="kind">Bash</span>scripts/check.sh gate --pkg rllab <span class="err">error</span><details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;scripts/check.sh gate --pkg rllab&quot;,
+  &quot;description&quot;: &quot;Run gate with the package the hook will pass&quot;
+}</pre><div class="lbl">output</div><pre>Exit code 64
+unknown package &#x27;rllab&#x27; (see pkg_scope in scripts/check.sh)</pre></details></div><div class="step" id="S18"><span class="sid">U02.S18</span><span class="kind">Bash</span>python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r1/with_skill/plugin/dev-team/scripts/dt.py escalate --help<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r1/with_skill/plugin/dev-team/scripts/dt.py escalate --help&quot;,
+  &quot;description&quot;: &quot;Show dt escalate usage&quot;
+}</pre><div class="lbl">output</div><pre>usage: dt escalate [-h] [--type SYMBOL]
+                   {TEST-WRONG,CONTRACT-CHANGE,NEEDS-DEP} why
+
+positional arguments:
+  {TEST-WRONG,CONTRACT-CHANGE,NEEDS-DEP}
+  why                   one line: what is wrong and what would fix it
+
+options:
+  -h, --help            show this help message and exit
+  --type SYMBOL         CONTRACT-CHANGE: the contract symbol that can&#x27;t
+                        express what the task needs (risk.Drawdown)</pre></details></div><div class="step" id="S19"><span class="sid">U02.S19</span><span class="kind">Bash</span>grep -n &quot;check_pkg\|pkg_scope\|--pkg&quot; /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r1/with_skill/plugin/dev-team/scripts/dt.py<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;grep -n \&quot;check_pkg\\|pkg_scope\\|--pkg\&quot; /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r1/with_skill/plugin/dev-team/scripts/dt.py&quot;,
+  &quot;description&quot;: &quot;Find how dt sets the check package&quot;
+}</pre><div class="lbl">output</div><pre>(Bash completed with no output)</pre></details></div><div class="step" id="S20"><span class="sid">U02.S20</span><span class="kind">Bash</span>grep -rn &quot;check_pkg&quot; /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r1/with_skill/plugin/dev-team/scripts --include=*.py<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;grep -rn \&quot;check_pkg\&quot; /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r1/with_skill/plugin/dev-team/scripts --include=*.py&quot;,
+  &quot;description&quot;: &quot;Search plugin scripts for check_pkg&quot;
+}</pre><div class="lbl">output</div><pre>(eval):1: no matches found: --include=*.py</pre></details></div><div class="step" id="S21"><span class="sid">U02.S21</span><span class="kind">Bash</span>grep -rln &quot;check_pkg&quot; /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r1/with_skill/plugin/dev-team/scripts<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;grep -rln \&quot;check_pkg\&quot; /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r1/with_skill/plugin/dev-team/scripts&quot;,
+  &quot;description&quot;: &quot;Search plugin scripts for check_pkg&quot;
+}</pre><div class="lbl">output</div><pre>/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r1/with_skill/plugin/dev-team/scripts/devteam/buildstate.py
+/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r1/with_skill/plugin/dev-team/scripts/README.md
+/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r1/with_skill/plugin/dev-team/scripts/devteam/commands/claim.py</pre></details></div><div class="step" id="S22"><span class="sid">U02.S22</span><span class="kind">Bash</span>grep -n -B3 -A12 &quot;check_pkg&quot; /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r1/with_skill/plugin/dev-team/scripts/devteam/commands/claim.py /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r1/with_skill/plugin/dev-team/scripts/devteam/buildstate.py<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;grep -n -B3 -A12 \&quot;check_pkg\&quot; /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r1/with_skill/plugin/dev-team/scripts/devteam/commands/claim.py /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r1/with_skill/plugin/dev-team/scripts/devteam/buildstate.py&quot;,
+  &quot;description&quot;: &quot;Show check_pkg logic in claim and buildstate&quot;
+}</pre><div class="lbl">output</div><pre>/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r1/with_skill/plugin/dev-team/scripts/devteam/commands/claim.py-3-build-phase.md §6.2.
+/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r1/with_skill/plugin/dev-team/scripts/devteam/commands/claim.py-4-Run by the agent as its first action, in its own linked worktree. It turns the reservation into a claim,
+/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r1/with_skill/plugin/dev-team/scripts/devteam/commands/claim.py-5-refuses a stale base (a landing the half needs isn&#x27;t in HEAD&#x27;s todo.md), merges the task&#x27;s tests branch for an
+/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r1/with_skill/plugin/dev-team/scripts/devteam/commands/claim.py:6:implementer, writes `.claude/.task_writes` (the role&#x27;s share of Writes:), `.claude/.check_pkg` (the package),
+/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r1/with_skill/plugin/dev-team/scripts/devteam/commands/claim.py-7-`.claude/.dt` (this dt.py, for the project&#x27;s hook scripts), sets `refs/worktree/checks-base` to HEAD, links the
+/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r1/with_skill/plugin/dev-team/scripts/devteam/commands/claim.py-8-project&#x27;s worktree links, and writes the packet to `.claude/packet.md`.
+/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r1/with_skill/plugin/dev-team/scripts/devteam/commands/claim.py-9-
+/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r1/with_skill/plugin/dev-team/scripts/devteam/commands/claim.py-10-Worktree links: CONSTRAINTS.md may hold one line `**Worktree links:** data/raw, models/cache` naming gitignored
+/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r1/with_skill/plugin/dev-team/scripts/devteam/commands/claim.py-11-inputs (paths relative to the project root, comma-separated, `—` for none). Each that exists in the main checkout
+/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r1/with_skill/plugin/dev-team/scripts/devteam/commands/claim.py-12-and not in the worktree becomes a symlink to the main checkout&#x27;s copy. `.env` files are never linked.
+/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r1/with_skill/plugin/dev-team/scripts/devteam/commands/claim.py-13-&quot;&quot;&quot;
+/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r1/with_skill/plugin/dev-team/scripts/devteam/commands/claim.py-14-from __future__ import annotations
+/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r1/with_skill/plugin/dev-team/scripts/devteam/commands/claim.py-15-
+/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r1/with_skill/plugin/dev-team/scripts/devteam/commands/claim.py-16-import os
+/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r1/with_skill/plugin/dev-team/scripts/devteam/commands/claim.py-17-import re
+/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r1/with_skill/plugin/dev-team/scripts/devteam/commands/claim.py-18-import sys
+--
+/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r1/with_skill/plugin/dev-team/scripts/devteam/commands/claim.py-111-    claude = root / &quot;.claude&quot;
+/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r1/with_skill/plugin/dev-team/scripts/devteam/commands/claim.py-112-    claude.mkdir(exist_ok=True)
+/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r1/with_skill/plugin/dev-team/scripts/devteam/commands/claim.py-113-    (claude / &quot;.task_writes&quot;).write_text(&quot;&quot;.join(f&quot;{w}\n&quot; for w in writes), encoding=&quot;utf-8&quot;)
+/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r1/with_skill/plugin/dev-team/scripts/devteam/commands/claim.py:114:    (claude / &quot;.check_pkg&quot;).write_text(f&quot;{task.package}\n&quot;, encoding=&quot;utf-8&quot;)
+/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r1/with_skill/plugin/dev-team/scripts/devteam/commands/claim.py-115-    (claude / &quot;.dt&quot;).write_text(f&quot;{bs.DT_PY}\n&quot;, encoding=&quot;utf-8&quot;)
+/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r1/with_skill/plugin/dev-team/scripts/devteam/commands/claim.py-116-    links = worktree_links(repo)
+/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r1/with_skill/plugin/dev-team/scripts/devteam/commands/claim.py-117-    state.exclude([&quot;# dt build: files dt claim writes into a worktree&quot;] + [f&quot;/{p}&quot; for p in bs.CLAIM_FILES]
+/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r1/with_skill/plugin/dev-team/scripts/devteam/commands/claim.py-118-                  + [f&quot;/{p}&quot; for p in links])
+/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r1/with_skill/plugin/dev-team/scripts/devteam/commands/claim.py-119-    linked = [link(bs.main_checkout(root), root, p) for p in links]
+/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r1/with_skill/plugin/dev-team/scripts/devteam/commands/claim.py-120-
+/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r1/with_skill/plugin/dev-team/scripts/devteam/commands/claim.py-121-    if claim is None:
+/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r1/with_skill/plugin/dev-team/scripts/devteam/commands/claim.py-122-        bs.git(root, &quot;update-ref&quot;, &quot;refs/worktree/checks-base&quot;, &quot;HEAD&quot;)
+/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r1/with_skill/plugin/dev-team/scripts/devteam/commands/claim.py-123-        claim = {&quot;id&quot;: cid, &quot;task&quot;: task_id, &quot;role&quot;: role, &quot;agent_type&quot;: dispatch.agent_type(role),
+/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r1/with_skill/plugin/dev-team/scripts/devteam/commands/claim.py-124-                 &quot;pkg&quot;: task.package, &quot;worktree&quot;: str(root), &quot;branch&quot;: bs.current_branch(root),
+/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r1/with_skill/plugin/dev-team/scripts/devteam/commands/claim.py-125-                 &quot;base&quot;: bs.head(root), &quot;time&quot;: bs.now(), &quot;finished&quot;: False}
+/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r1/with_skill/plugin/dev-team/scripts/devteam/commands/claim.py-126-        state.write(&quot;claims&quot;, cid, claim)
+/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r1/with_skill/plugin/dev-team/scripts/devteam/buildstate.py-36-ESCALATIONS = (&quot;TEST-WRONG&quot;, &quot;CONTRACT-CHANGE&quot;, &quot;NEEDS-DEP&quot;)
+/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r1/with_skill/plugin/dev-team/scripts/devteam/buildstate.py-37-TRAILER = &quot;Dt-Landed&quot;
+/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r1/with_skill/plugin/dev-team/scripts/devteam/buildstate.py-38-# Files `dt claim` writes into a worktree; kept out of every diff through the shared info/exclude.
+/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r1/with_skill/plugin/dev-team/scripts/devteam/buildstate.py:39:CLAIM_FILES = (&quot;.claude/packet.md&quot;, &quot;.claude/.task_writes&quot;, &quot;.claude/.check_pkg&quot;, &quot;.claude/.dt&quot;,
+/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r1/with_skill/plugin/dev-team/scripts/devteam/buildstate.py-40-               &quot;.claude/.stop_attempts_*&quot;)
+/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r1/with_skill/plugin/dev-team/scripts/devteam/buildstate.py-41-DT_PY = Path(__file__).resolve().parents[1] / &quot;dt.py&quot;
+/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r1/with_skill/plugin/dev-team/scripts/devteam/buildstate.py-42-
+/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r1/with_skill/plugin/dev-team/scripts/devteam/buildstate.py-43-
+/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r1/with_skill/plugin/dev-team/scripts/devteam/buildstate.py-44-class GitError(RuntimeError):
+/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r1/with_skill/plugin/dev-team/scripts/devteam/buildstate.py-45-    pass
+/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r1/with_skill/plugin/dev-team/scripts/devteam/buildstate.py-46-
+/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r1/with_skill/plugin/dev-team/scripts/devteam/buildstate.py-47-
+/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r1/with_skill/plugin/dev-team/scripts/devteam/buildstate.py-48-def git(root: Path | str, *args: str, check: bool = True, env: dict | None = None,
+/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r1/with_skill/plugin/dev-team/scripts/devteam/buildstate.py-49-        input: str | None = None, timeout: float | None = None) -&gt; subprocess.CompletedProcess:
+/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r1/with_skill/plugin/dev-team/scripts/devteam/buildstate.py-50-    &quot;&quot;&quot;Run git in `root`; raise GitError (with stderr) when `check` and it fails.&quot;&quot;&quot;
+/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r1/with_skill/plugin/dev-team/scripts/devteam/buildstate.py-51-    try:</pre></details></div><div class="step" id="S23"><span class="sid">U02.S23</span><span class="kind">Bash</span>git diff main HEAD --stat -- scripts/check.sh<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;git diff main HEAD --stat -- scripts/check.sh&quot;,
+  &quot;description&quot;: &quot;Check if main has a different check.sh&quot;
+}</pre><div class="lbl">output</div><pre>(Bash completed with no output)</pre></details></div><div class="step" id="S24"><span class="sid">U02.S24</span><span class="kind">say</span>I stopped before writing any code. The required gate can&#x27;t pass for this task, whatever code I write. Two runs ago my claim wrote the task&#x27;s package, `rllab`, into `/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r1/with_skill/project/.claude/worktrees/agent-aa1f567e6413ec498/.claude/.check_pkg`, so the Stop hook runs `scripts/check.sh gate --pkg rllab`. The `pkg_scope` list in `/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r1/with_skill/project/.claude/worktrees/agent-aa1f567e6413ec498/scripts/check.sh` only knows the component names ( …[+1167 chars]<details><summary>full text</summary><pre>I stopped before writing any code. The required gate can&#x27;t pass for this task, whatever code I write. Two runs ago my claim wrote the task&#x27;s package, `rllab`, into `/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r1/with_skill/project/.claude/worktrees/agent-aa1f567e6413ec498/.claude/.check_pkg`, so the Stop hook runs `scripts/check.sh gate --pkg rllab`. The `pkg_scope` list in `/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r1/with_skill/project/.claude/worktrees/agent-aa1f567e6413ec498/scripts/check.sh` only knows the component names (`core`, `worlds`, … `cli`), not `rllab`. So the gate exits with code 64 (&quot;unknown package &#x27;rllab&#x27;&quot;) before it checks anything. I ran it myself and got that result.
+
+That same exit code is what rejected the previous attempt (see `/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r1/with_skill/project/.git/dt-build/details/M1-T01.solo-1.txt`). That attempt&#x27;s work was lost when its worktree was removed, so redoing the whole interface now would just be thrown away again.
+
+I can&#x27;t fix this myself: `scripts/` is protected, `.claude/.check_pkg` is written by `dt claim`, and none of the three escalation types (test wrong, contract change, missing dependency) fits a tooling bug. One of two changes would unblock it, and either needs a build-setup Revise or a change to the dev-team plugin:
+- add `rllab` to `pkg_scope` in `check.sh`, covering every component; or
+- have `dt claim` leave `.check_pkg` empty when the project is a single package.
+
+Once that&#x27;s in, M1-T01 can be re-claimed and built.
+
+STOPPED M1-T01 solo: gate fails with exit 64 because check.sh has no package &#x27;rllab&#x27;; no dt escalate type fits, needs a build-setup fix</pre></details></div><div class="step" id="S25"><span class="sid">U02.S25</span><span class="kind">hook</span><span class="hook">⛔ SubagentStop blocked: Gate &#x27;gate&#x27; failed (attempt 1/3). Fix these before finishing:
+unknown package &#x27;rllab&#x27; (see pkg_scope in scripts/check.sh)</span></div><div class="step" id="S26"><span class="sid">U02.S26</span><span class="kind">say</span>Still stopped. This hook failure is the bug I already reported, not a problem in task code. The Stop hook runs `scripts/check.sh gate --pkg rllab`, and `check.sh` has no package named `rllab`, so the gate exits with code 64 before it checks anything. I can&#x27;t change `scripts/check.sh` (it&#x27;s protected) or `.claude/.check_pkg` (dt writes it), and none of the escalation types fits, so I&#x27;ve written no code. Either fix unblocks the task: add `rllab` to `pkg_scope` covering every component, or have `dt claim` leave `.check_pkg` empty for a single package. Both need a build-setup Revise or a change to …[+159 chars]<details><summary>full text</summary><pre>Still stopped. This hook failure is the bug I already reported, not a problem in task code. The Stop hook runs `scripts/check.sh gate --pkg rllab`, and `check.sh` has no package named `rllab`, so the gate exits with code 64 before it checks anything. I can&#x27;t change `scripts/check.sh` (it&#x27;s protected) or `.claude/.check_pkg` (dt writes it), and none of the escalation types fits, so I&#x27;ve written no code. Either fix unblocks the task: add `rllab` to `pkg_scope` covering every component, or have `dt claim` leave `.check_pkg` empty for a single package. Both need a build-setup Revise or a change to the dev-team plugin.
+
+STOPPED M1-T01 solo: gate fails with exit 64 because check.sh has no package &#x27;rllab&#x27;; no dt escalate type fits, needs a build-setup fix</pre></details></div><div class="step" id="S27"><span class="sid">U02.S27</span><span class="kind">hook</span><span class="hook">⛔ SubagentStop blocked: Gate &#x27;gate&#x27; failed (attempt 2/3). Fix these before finishing:
+unknown package &#x27;rllab&#x27; (see pkg_scope in scripts/check.sh)</span></div><div class="step" id="S28"><span class="sid">U02.S28</span><span class="kind">say</span>Still stopped, for the same reason. The gate exits with code 64 because `scripts/check.sh` has no package named `rllab`. I can&#x27;t fix that within this task, and I&#x27;ve written no code. Either fix unblocks it: add `rllab` to `pkg_scope`, or have `dt claim` leave `.check_pkg` empty for a single package. ⏎ STOPPED M1-T01 solo: gate fails with exit 64 because check.sh has no package &#x27;rllab&#x27;; no dt escalate type fits, needs a build-setup fix<details><summary>full text</summary><pre>Still stopped, for the same reason. The gate exits with code 64 because `scripts/check.sh` has no package named `rllab`. I can&#x27;t fix that within this task, and I&#x27;ve written no code. Either fix unblocks it: add `rllab` to `pkg_scope`, or have `dt claim` leave `.check_pkg` empty for a single package.
+
+STOPPED M1-T01 solo: gate fails with exit 64 because check.sh has no package &#x27;rllab&#x27;; no dt escalate type fits, needs a build-setup fix</pre></details></div><div class="step" id="S29"><span class="sid">U02.S29</span><span class="kind">hook</span><span class="hook">⛔ SubagentStop blocked: Gate &#x27;gate&#x27; failed (attempt 3/3). Fix these before finishing:
+unknown package &#x27;rllab&#x27; (see pkg_scope in scripts/check.sh)
+This was the last attempt. If you can&#x27;t fix it now, finish anyway with your status line:
+the failing verdict is recorded, and dt land rejects the task with it.</span></div><div class="step" id="S30"><span class="sid">U02.S30</span><span class="kind">say</span>STOPPED M1-T01 solo: gate exits 64 because check.sh pkg_scope has no &#x27;rllab&#x27; package; no code written, needs a build-setup fix (add &#x27;rllab&#x27; to pkg_scope or leave .check_pkg empty for a single package)<details><summary>full text</summary><pre>STOPPED M1-T01 solo: gate exits 64 because check.sh pkg_scope has no &#x27;rllab&#x27; package; no code written, needs a build-setup fix (add &#x27;rllab&#x27; to pkg_scope or leave .check_pkg empty for a single package)</pre></details></div><div class="step" id="S31"><span class="sid">U02.S31</span><span class="kind">hook</span><span class="hook">SubagentStop said: {
+  &quot;systemMessage&quot;: &quot;Gate &#x27;gate&#x27; still failing after 3 attempts; the agent stopped so a human can look. Run scripts/check.sh gate.&quot;
+}
+</span></div>
+<h2>Commits</h2>
+<p>None.</p>
+<h2>Returned</h2>
+<pre>STOPPED M1-T01 solo: gate exits 64 because check.sh pkg_scope has no &#x27;rllab&#x27; package; no code written, needs a build-setup fix (add &#x27;rllab&#x27; to pkg_scope or leave .check_pkg empty for a single package)</pre>
+</body></html>

@@ -3,10 +3,12 @@
 One stdlib-only CLI that parses every planning doc. Skills, hooks and agents get IDs, statuses, sections, coverage and lint from it instead of reading and counting by hand. Design: [design/planning-stage.md §10, §13](../design/planning-stage.md); the task graph, `dt ready` and `dt plan`: [design/interface-first-design.md §6, §8.3, §13](../design/interface-first-design.md); probes: [design/probes.md §3.4, §4, §5, §11](../design/probes.md).
 
 ```
+<plugin>/scripts/dt [--root DIR] <command> …
 python3 <plugin>/scripts/dt.py [--root DIR] <command> …
 ```
 
-- **Skills** call it as `python3 ../../scripts/dt.py …` relative to the skill's own folder (resolve the skill folder first; the project root is the current directory).
+- **`scripts/dt`** is an executable shim (`#!/usr/bin/env python3`) that runs dt.py: one word, so a shell variable holding its path works in zsh, which doesn't word-split `$DT="python3 …"`.
+- **Skills** call it as `../../scripts/dt …` or `python3 ../../scripts/dt.py …` relative to the skill's own folder (resolve the skill folder first; the project root is the current directory).
 - **Hooks** call `python3 "${CLAUDE_PLUGIN_ROOT}/scripts/dt.py" …`.
 - Stdlib only, Python ≥ 3.9. Tests: `python3 -m unittest discover -s scripts/tests`.
 
@@ -15,6 +17,7 @@ python3 <plugin>/scripts/dt.py [--root DIR] <command> …
 ```
 scripts/
   dt.py                    CLI entry; dispatches to devteam/commands/<command>.py
+  dt                       executable shim: runs dt.py's main without `python3`
   devteam/
     md.py                  markdown primitives: fences, headings, header line, bold-key fields, tables, ID refs
     repo.py                Repo: doc map, doc kinds, ID definitions (incl. retired), lookup, next_id
@@ -129,7 +132,7 @@ With an active plan or not, the plain report (no `--skill`) and `build-planning`
 
 `skills` and `skills_available` list installed skills by name: the project's `.claude/skills/*/SKILL.md` plus `$CLAUDE_PLUGIN_ROOT/skills/*` when that is set, minus dev-team's own planning skills (reference-intake and api-probe included).
 
-`--summary` (SessionStart hook) prints at most 8 lines: active milestone and plan status, progress and next task, blocked tasks, queued plans, docs waiting for approval (Draft), a stale roadmap, `references: N waiting → reference-intake` when any reference file is unindexed, changed or missing, `probes: N waiting → api-probe` when results aren't recorded yet (`probes_results`) or a cited PB has no entry (`probes_unwritten`), `requests: N not honoured → <skills>` when an Approved spec or architecture has open requests, and `dt: python3 <resolved path to dt.py>`. It prints nothing in a project with none of `docs/brief.md`, `docs/spec.md`, `docs/roadmap.md`, `tasks/plan.md`, never fails (an internal error prints one `dt status: error: …` line) and always exits 0.
+`--summary` (SessionStart hook) prints at most 8 lines: active milestone and plan status, progress and next task, blocked tasks, queued plans, docs waiting for approval (Draft), a stale roadmap, `references: N waiting → reference-intake` when any reference file is unindexed, changed or missing, `probes: N waiting → api-probe` when results aren't recorded yet (`probes_results`) or a cited PB has no entry (`probes_unwritten`), `requests: N not honoured → <skills>` when an Approved spec or architecture has open requests, and `dt: <resolved path to scripts/dt>` (`dt: python3 <…/dt.py>` when the shim isn't executable). It prints nothing in a project with none of `docs/brief.md`, `docs/spec.md`, `docs/roadmap.md`, `tasks/plan.md`, never fails (an internal error prints one `dt status: error: …` line) and always exits 0.
 
 Mode rules:
 - **blocked** — idea-refine never; spec-writing: no brief; architecture-design: no spec (as arch-status.py; a Draft spec shows in `docs`); pipeline-design: architecture missing or not Approved; test-planning: no package has an Approved pipelines.md (a package whose pipelines.md isn't Approved is `pkg=blocked`); build-planning: the next milestone to plan has pipelines not all Approved, the next stage has spec IDs on no Approved pipeline, a Revise is open on the active milestone's docs, or (all-at-once) a brief stage is below Designed (below); build-setup: no active plan, or the plan is Draft.

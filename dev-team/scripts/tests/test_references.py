@@ -202,7 +202,7 @@ class StatusTest(Base):
         _, out, _ = self.dt("status", "--summary")
         lines = out.splitlines()
         self.assertEqual(lines[-2], "references: 4 waiting → reference-intake")
-        self.assertTrue(lines[-1].startswith("dt: python3"))
+        self.assertTrue(lines[-1].startswith("dt: "))
 
     def test_new_mode(self):
         (self.root / INDEX).unlink()

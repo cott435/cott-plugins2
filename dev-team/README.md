@@ -51,7 +51,7 @@ Drop reference files (code or markdown) into `references/` whenever you have the
 
 ## Your words
 
-The brief compresses, and each skill may run in a fresh session, so what you said must live in a doc. Every planning skill records each fact, tool, choice and answer you give in `docs/requests.md`, word for word (`UR-NN`). The skill whose doc owns a request honours it and traces it (`UR-02 → AD-04`), or proposes a change that you approve, recorded with your words. Once the spec or architecture is Approved, `dt lint` fails it for any request of its own left open, and `dt next` sends the run back. Design: [design/requests.md](design/requests.md).
+The brief compresses, and each skill may run in a fresh session, so what you said must live in a doc. Every planning skill records each fact, tool, choice and answer you give in `docs/requests.md`, word for word (`UR-NN`). The skill whose doc owns a request honours it and traces it (`UR-02 → AD-04`), or proposes a change that you approve, recorded with your words and the IDs it was written into. Each gate quotes your words beside the text that honours them. Once the spec or architecture is Approved, `dt lint` fails it for any request of its own left open, and `dt next` sends the run back. Design: [design/requests.md](design/requests.md).
 
 ## IDs and section reads
 

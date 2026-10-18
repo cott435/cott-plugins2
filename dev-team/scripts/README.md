@@ -189,7 +189,8 @@ Records a change another skill owns, found at a gate, for the owner's Revise: ap
 Records and traces the user's words in `docs/requests.md` (design/requests.md); the only writer of its lines.
 - `dt request add <owner> "<words>" --skill S [--about "<context>"] [--replaces UR-NN]` — appends the next UR with today's date (creating the doc on first use, titled from the brief) and prints its ID. `--about` says what the words answer when they don't say it themselves ("Go with A" → `--about "price source: A = Sharadar"`). `--replaces` marks the earlier request `superseded by` the new one.
 - `dt request trace UR-NN <ID|§heading>…` — adds IDs or sections that honour it; each must be defined (a section: a heading of the owner's docs) and at least one live in the owner's docs (else exit 2, nothing written). IDs traced earlier that are gone or retired drop out. Refused on a changed or superseded request.
-- `dt request change UR-NN "<what instead>" --approved "<the user's words>" --skill S` — records a change the user approved, with that approval.
+- `dt request change UR-NN "<what instead>" --approved "<the user's words>" --skill S --into ID…` — records a change the user approved, with that approval and the IDs it was written into: each defined and live, at least one in the owner's docs, and every ID that honoured the old words among them (else exit 2, nothing written).
+- `dt request change UR-NN --into ID…` — adds IDs to a recorded change; the approval stays.
 - `dt request [list] [--open] [--owner O] [--json]` — each request with its owner and trace (`· open` when nothing honours it); `--json`: `[{id, owner, words, about, skill, date, state, trace}]`, state `open | traced | changed | superseded`.
 
 Every write rewrites the header's `Last updated` and leaves every other line as it was.
@@ -318,10 +319,13 @@ Checks (code: severity):
   - `roadmap-stage` E — once the roadmap has stages, a milestone row whose Stage cell names no stage row, isn't an `S<n>`, or is empty on a row with no Source of its own
 - Request checks (design/requests.md §5):
   - `request-format` E — a `- **UR-NN**` line that isn't the request form, names an unknown owner, or whose trace is none of the three forms
-  - `request-trace` E — a trace naming an undefined ID, a `§heading` none of the owner's docs has, or a request that doesn't exist, or IDs (none retired) of which none is defined in the owner's docs (a retired one is `retired-ref`)
+  - `request-trace` E — a trace naming an undefined ID, a `§heading` none of the owner's docs has, or a request that doesn't exist, or IDs (none retired) of which none is defined in the owner's docs (a retired one is `retired-ref`), or a change written into an ID that isn't defined
   - `request-open` E — an Approved spec.md or architecture.md with an open request of its owner (`spec`, `architecture`), at that doc's header line
   - `request-edit` E (git) — a request whose words, context, skill or date differ from HEAD, or that is gone: only its trace changes
   - `request-ref` E — a `UR-NN` in any doc that docs/requests.md doesn't define
+  - `request-number` W — a number in a traced request's words (or a change's what) that none of the IDs it names states: digits, number words to twenty, `5%` as 0.05, `2k` as 2000; a time ("1 hour") matches only a time ("60 minutes")
+  - `request-cite` W — a doc citing a superseded request, or a changed one from an ID the change wasn't written into (`--into`)
+  - `request-source` W — a test case whose Source is only requests, with an Expected number none of them states (a superseded request reads as its replacement, a changed one as what was done instead)
 - Probe checks (design/probes.md §4–§5):
   - `probe-fields` E — a PB entry with no Folder, Question or Informs, no checks table, a check with an empty Pass cell, a Status that isn't Draft, Ready, Answered · pass|fail or Waived, or (past Draft) a missing folder
   - `probe-informs` E — an Informs ID (decision, requirement, contract symbol) that isn't defined

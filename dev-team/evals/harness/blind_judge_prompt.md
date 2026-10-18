@@ -36,7 +36,7 @@ Structure: {STRUCTURE_KEYS}
 {EXTRA}
 
 ## Output
-Write ONLY a JSON file to {OUT_PATH} with exactly this shape:
+Reply with ONLY a JSON object, no other text, with exactly this shape:
 {"winner": "A"|"B", "reasoning": "<one paragraph>", "rubric": {"A": {"content": {...}, "structure": {...}, "content_score": x, "structure_score": x, "overall_score": x}, "B": {...}}, "output_quality": {"A": {"score": 1-10, "strengths": [...], "weaknesses": [...]}, "B": {...}}, "unbuildable_tasks": {"A": ["<task id: what the packet is missing>", ...], "B": [...]}, "defects": {"A": ["<file: quoted text — what is wrong>", ...], "B": [...]}}
 
-List defects concretely, with a short quote from the doc. Then reply with one line: the winner and both overall scores.
+List defects concretely, with a short quote from the doc. You have read-only tools; your reply is saved as your verdict.

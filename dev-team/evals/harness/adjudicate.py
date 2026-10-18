@@ -7,8 +7,9 @@ selftest/adjudicated/iteration-<N>.json holds one record per (trajectory, check)
 - `expect`: "pass" or "fail", what a correct grader gives this run;
 - `verdict`: "grader" (a false fail), "false-pass" (a defect the check let through), "real" (a correct fail) or
   "mixed" (a correct fail whose evidence also lists items the analyst ruled false);
-- `must_match` / `must_not_match`: regexes the check's evidence must (not) contain: the real items a mixed fail
-  must keep and the false items it must drop. Evidence is cut to 600 characters, so they name early items only;
+- `must_match` / `must_not_match`: regexes the check's evidence or `metrics` must (not) contain: the real items a
+  mixed fail must keep and the false items it must drop. Evidence is cut to 600 characters; `metrics.items` holds
+  the full lists;
 - `finding`, `reason`; `basis` is "analyst" when the findings name this run and check, "derived" when they name
   the defect and the record applies it to a check the analyst filed under another finding.
 

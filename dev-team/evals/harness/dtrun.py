@@ -231,12 +231,15 @@ def owns(path, owner, packages=()):
 
 def spine_writes_problem(writes, owner, packages=()):
     """Why a spine's Writes is more than its owner module and its unit test, or "". The module may be one folder
-    glob (`viewer/draw/**`); the test may sit under any `tests/`, package-local too, but not intent/, contracts/
+    glob (`viewer/draw/**`) or files inside the owner's folder (`api/client.ts`, `api/validate.ts` for owner `api`):
+    either is the owner itself. The test may sit under any `tests/`, package-local too, but not intent/, contracts/
     or fixtures/."""
     src = [w for w in writes if not is_test_path(w)]
     tests = [w for w in writes if is_test_path(w)]
     why = []
-    if len(src) > 1:
+    op = owner_path(owner, packages)
+    in_folder = bool(op) and all(re.search(rf"(^|/){re.escape(op)}/", w) for w in src)
+    if len(src) > 1 and not in_folder:
         why.append(f"{len(src)} source entries")
     foreign = [w for w in src if owner and not owns(w, owner, packages)]
     if foreign:
@@ -251,9 +254,11 @@ def spine_writes_problem(writes, owner, packages=()):
 
 
 def call_step(pl, s, packages=()):
-    """A step that calls another pipeline (its spine is that pipeline as built) or another package's code (its
-    owner's first segment is another package): faked, never spined in this pipeline."""
-    if any(x != pl["id"] for x in PL_ID.findall(s.get("spine") or "")):
+    """A step that calls another pipeline (its spine cell says that pipeline "as built") or another package's code
+    (its owner's first segment is another package): faked, never spined in this pipeline. "as in PL-NN" reuses that
+    pipeline's function in this pipeline's own module, and a PL-NN named for its output is data: neither is a call."""
+    cell = re.sub(rf"\bas in\s+{PL_ID.pattern}", "", s.get("spine") or "")
+    if re.search(r"\bas built\b", cell) and any(x != pl["id"] for x in PL_ID.findall(cell)):
         return True
     first = (s.get("owner") or "").split(".")[0]
     return bool(pl.get("package")) and first in packages and first != pl["package"]
@@ -378,16 +383,35 @@ def tester_early(t, declared, step_info=None):
     return all(is_declared(s, declared, own) for s in t["read_symbols"])
 
 
+def expand_globs(names, symbol_ids):
+    """Names with each `*` glob (`data.load_*`) replaced by the symbols it matches; a glob matching none stays."""
+    out = []
+    for n in names:
+        hits = [s for s in symbol_ids if fnmatch.fnmatchcase(s, n)] if "*" in n else []
+        out += [x for x in hits or [n] if x not in out]
+    return out
+
+
+def contract_class(s):
+    """A class section (`### corridor.CorridorEnv: Corridor test environment`): a CapWords symbol that is not a
+    boundary type (a heading titled `type`, or `**Kind:** type`) and not a constant (`lab.LADDER`)."""
+    kind = (s.get("fields") or {}).get("Kind", "")
+    boundary = (s.get("title") or "").strip().lower().startswith("type") or kind.strip().lower().startswith("type")
+    return not boundary and bool(re.match(r"[A-Z][a-z]", s["id"].split(".")[-1]))
+
+
 def interface_writes_symbols(iface_tasks, symbols):
-    """Contract functions an interface task declares when its acceptance says it writes every step or contract
-    function with its signature: the non-type symbols of the packages or components its Writes covers."""
+    """Contract symbols an interface task declares when its acceptance says it writes every step or contract
+    function with its signature (the functions), and every contract class too when it names them (the class
+    sections, not the boundary types), of the packages or components its Writes covers."""
     out = set()
     for t in iface_tasks:
         text = " ".join([t.get("title", "")] + list(t.get("acceptance") or []))
         if not re.search(r"\bevery\b[^.;]*\b(signature|function)", text, re.I):
             continue
+        classes = bool(re.search(r"\bevery\b[^.;]*\bclass(es)?\b", text, re.I))
         for s in symbols:
-            if s.get("is_type"):
+            if s.get("is_type") and not (classes and contract_class(s)):
                 continue
             doc = s.get("doc", "")
             names = [x for x in (doc.split("/")[2] if doc.startswith("docs/packages/") else "", s["id"].split(".")[0]) if x]
@@ -444,12 +468,13 @@ def wave_units(m_pls, m_tasks=(), packages=()):
 
 
 def wave_ready(m_tasks, iface_ids, deps, declared, step_info=None):
-    """(spine tasks ready right after the interface task, split tasks whose tester halves start there). Implementer
-    halves and wiring don't count."""
+    """(spine tasks ready right after the interface task, split spine or fold tasks whose tester halves start there).
+    Implementer halves, wiring and a library thicken's tester half don't count: they build no step's module."""
     def is_spine(t):
         return t.get("kind") == "spine" or (not t.get("kind") and t.get("is_spine"))
     spines = [t["id"] for t in m_tasks if iface_ids and t["id"] not in iface_ids and is_spine(t) and set(deps[t["id"]]) <= set(iface_ids)]
-    testers = [t["id"] for t in m_tasks if t["id"] not in iface_ids and t["id"] not in spines and tester_early(t, declared, step_info)]
+    testers = [t["id"] for t in m_tasks if t["id"] not in iface_ids and t["id"] not in spines
+               and (is_spine(t) or is_fold(t, m_tasks)) and tester_early(t, declared, step_info)]
     return spines, testers
 
 
@@ -586,12 +611,46 @@ def field_types(text):
     return [n for n in dict.fromkeys(names) if n not in LIBRARY_TYPES]
 
 
+def top_level_split(s, sep=","):
+    """`s` split at `sep` outside brackets and quotes."""
+    parts, depth, cur, quote = [], 0, "", None
+    for ch in s:
+        if quote:
+            quote = None if ch == quote else quote
+        elif ch in "\"'":
+            quote = ch
+        elif ch in "([{":
+            depth += 1
+        elif ch in ")]}":
+            depth -= 1
+        elif ch == sep and depth == 0:
+            parts.append(cur)
+            cur = ""
+            continue
+        cur += ch
+    return parts + [cur]
+
+
 def defined_in(name, text):
-    """A type defined inline in a contract: `class Name`, `type Name`, `interface Name`, `enum Name`, `Name = …`, or
-    a note giving its typed fields (`# Name: share: float; passed: bool`). A note listing bare field names
-    (`# FlagRow: ticker, date`) defines nothing."""
+    """A type defined inline in a contract: `class Name`, `type Name`, `interface Name`, `enum Name`, `Name = …`, a
+    note giving its typed fields (`# Name: share: float; passed: bool`), a constructor whose every parameter is typed
+    (`FixedEntry(spec: str)`), or a type that mirrors another (`ActionDto` mirrors `qdata.CorporateAction`; `SpellDto`
+    and `ExitDto` mirror their `qdata` types). A note listing bare field names (`# FlagRow: ticker, date`) or a
+    constructor with an untyped parameter (`LearnerEntry(kind: str, settings)`) defines nothing."""
     n = re.escape(name)
-    return bool(re.search(rf"\b(class|type|interface|enum)\s+{n}\b|\b{n}\s*=[^=]|\b{n}\s*:\s*\w+\??\s*:\s*[A-Za-z]", text))
+    if re.search(rf"\b(class|type|interface|enum)\s+{n}\b|\b{n}\s*=[^=]|\b{n}\s*:\s*\w+\??\s*:\s*[A-Za-z]", text):
+        return True
+    if re.search(rf"\b{n}\b[`\w\s,]*?\bmirrors?\s+(`?[a-z]\w*\.[A-Z]\w*|their\s+`?[a-z]\w*`?\s+types?\b)", text):
+        return True
+    for m in re.finditer(rf"\b{n}\(", text):
+        depth, i = 1, m.end()
+        while i < len(text) and depth:
+            depth += {"(": 1, ")": -1}.get(text[i], 0)
+            i += 1
+        params = [p.strip() for p in top_level_split(text[m.end():i - 1]) if p.strip()]
+        if params and all(re.match(r"\w+\s*:\s*\S", p) for p in params):
+            return True
+    return False
 
 
 def stages_uncut(stages):

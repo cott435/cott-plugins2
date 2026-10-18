@@ -177,6 +177,8 @@ def replay(out, name, fixture, layers, summary_extra=None, stream=None):
     proj.mkdir()
     subprocess.run(["git", "init", "-q"], cwd=proj)
     driver.commit(proj, "turn 0")
+    scn = json.loads((HERE / "scenarios.json").read_text())
+    (run / "scenario.json").write_text(json.dumps(driver.scenario_snapshot(scn, "quant", "incremental"), indent=1))
     turns, stage, n, user_run = [], "data", 0, None
     for skill, what in layers:
         if skill == USER_RUN:

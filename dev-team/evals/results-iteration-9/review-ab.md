@@ -399,3 +399,81 @@ Next, either:
 2. Or run test-planning's Extend on the changed cases right after the fixer, before re-judging.
 
 Also define "narrower" in the fixer prompt as "freezes and serializes less", and forbid moving task blocks out of ID order.
+
+## Fixer v4: facts reach the tests, narrower by the plan, no reordering
+
+**What changed.** Only `plan_fix_prompt.md` changed, and the reviewer did not run again.
+- **A changed fact reaches every doc and test case.**
+  - The fixer greps `docs/`, `tasks/` and `tests/fixtures/` for the old value and brings every restatement into line, including the case's title, Source, Expected and Tolerance.
+  - An expected value that *is* the user's fact (a count, a limit, a shape, a direction) is changed in `tests.md` and `expected.json`, with the user's turn listed in `oracle_edits`.
+  - A value that must be computed is deleted, never written. The case is then marked in test-planning's own headless form: `tests.md` Status to Draft, an Open questions bullet, and `dt route test-planning … --from plan-review`.
+  - Before replying, the fixer re-greps each old value and reports what it left in `leftovers`.
+- **Narrower is measured on the plan:** fewer frozen symbols and fewer edges. No edge may join two interface tasks or two spines; move the fake or symbol instead.
+- **No reordering.** New IDs go last in their section, a new edge points only at an earlier task, and a fix that would need either is skipped. v3's milestone exception stays.
+- **`plan_review.py`:** a `prepare` step writes `.review/` without running the reviewer, and `fix` also commits `tests/fixtures/`.
+
+**`dt guard`.** The fixer runs without the plugin (`--setting-sources project,local`, no `--plugin-dir`), so the guard hook that asks the user before every `expected.json` write never fires. In its place, the prompt allows only Edit writes of the user's own value, and `fix.json` lists each one under `oracle_edits` with its turn.
+
+**Method.** Fresh copies of the four iteration-9 projects went to `dev-team-workspace/review-ab-v4/`. Packaged untouched, they matched `iteration-9/bench` byte for byte. Each copy got `plan_review.py <copy> prepare`, with v3's `review.json` put where the fixer reads it, then `fix`. The blind judge then ran as in v3, from scratchpad folders `v4/judge-rl` and `v4/judge-quant`. The rl BA judge first returned malformed JSON and was rerun once. Records are in `review-ab/v4/`.
+
+**Scores (overall, mean of both orders).**
+
+| | Iteration 9 | v1 | v3 | v4 | v4 Δ vs iteration 9 |
+|---|---|---|---|---|---|
+| rl-incremental | 7.65 | 7.4 | 7.7 | 7.4 | −0.25 |
+| rl-all-at-once | 7.45 | 7.35 | 7.35 | **7.9** | **+0.45** |
+| quant-incremental | 7.7 | 7.8 | 7.65 | 7.6 | −0.10 |
+| quant-all-at-once | 7.45 | 7.65 | 7.95 | 7.75 | +0.30 |
+| **mean** | 7.56 | 7.55 | 7.66 | **7.66** | **+0.10** |
+
+- **rl-all-at-once is fixed. It wins both orders**, where iteration 9 split.
+  - internal_consistency 2.0 → 4.0 (v3 → v4), task_buildability 3.5 → 4, dependency_graph_soundness 3 → 4, right_sizing 3 → 4.
+  - The facts' gains from v3 stay: stage_completeness 4, rl_soundness 4.
+- **The mean doesn't move:** rl-incremental gives back what rl-all-at-once gains. quant-all-at-once's 7.95 → 7.75 has the same top complaints as v3, so it's judge noise.
+- **Mean item Δ vs iteration 9, v4 (v3):**
+  - task_buildability +0.38 (+0.38).
+  - right_sizing +0.25 (−0.12).
+  - internal_consistency +0.12 (−0.25).
+  - milestone_quality +0.12 (−0.25).
+  - dependency_graph_soundness −0.25 (−0.50).
+  - pipeline_clarity −0.25 (0).
+
+**Are v3's three failures gone? Yes.**
+- **Spec/test contradictions: gone.**
+  - rl-all-at-once's TC-07/08/09/24 now say survival time, circle reflection, 1 predator and 60 minutes, in `tests.md` and `expected.json`. TC-07's worked score and TC-17's seed bound were deleted and routed.
+  - rl-incremental's TC-46 now matches EVAL-07.
+  - Neither rl judge cites a spec/test contradiction. One cites TC-07's open re-derive as "a stale fixture left open", which is the intended trace.
+- **M1-T03 → M1-T02: gone.** M1-T03 depends on nothing, and quant-incremental's dependency_graph_soundness is back to 4.
+- **Reordering: gone.** Task headings are in ID order in all four plans, and PREY-12 sits after PREY-11. The fixer instead skipped or narrowed five rl-all-at-once fixes whose edges pointed at later tasks (R13, R14, R15, R17, R21), each with its reason.
+
+**New failures.**
+- **rl-incremental: moving work instead of adding an edge broke M1-T26.** R09 offered "M1-T27 depends on M1-T26, or move the CNN selection into M1-T26". The edge rule pushed the fixer to the move. But M1-T26 then builds from `networks.py`, which M1-T27 writes in parallel. Both judges list M1-T26 as unbuildable, and dependency_graph_soundness fell 4 → 3. The edge was real. "Fewer edges" has to mean no edge a task's inputs don't need, not none at all: a move must carry its inputs with it.
+- **quant-incremental: the fixer wrote computed oracles.** It changed TC-19, TC-38, TC-58 and TC-72 from "≤ 1 of 20 seeds" to "≤ 3" in `expected.json`, citing turns 24, 35, 50 and 51. None of those messages says it: "≤ 3" is the reviewer's binomial bound (R22). The rule says to delete such a value and route it, and rl-all-at-once's fixer did exactly that for TC-17. So in one run of four, `oracle_edits` would have needed the user's approval it was standing in for. With `dt guard` off, the turn citation is the only check, and nothing verifies it.
+- **quant-incremental: "keep every heading" blocks a fix.** "M1-T23: mount_runs spine (start, cancel, SSE)" stays. The fixer reported it as a leftover ("Headings must stay exactly as they are"), and both judges still cite it.
+
+**Leftovers reported.** 6, 7, 8 and 5 per run, all with a reason, and each one checked by hand. Most are legitimate:
+- Rejected options in Alternatives lines (SSE, yfinance).
+- Probe history.
+- The same word with another meaning ("square" for the pairing grid, "lower is better" for other scores, pellets that reappear).
+- Re-derive notes that quote the old value on purpose.
+
+Two point at work only test-planning can do: rl-incremental's TC-42 and TC-65 `input.json`, which the fixer may not edit, so both were routed. Routed changes: 2, 2, 2 and 6. Six `tests.md` files went to Draft.
+
+**Fixer cost.**
+
+| | v4 fixer | v3 fixer |
+|---|---|---|
+| rl-incremental | $2.86 (108 turns, 6.8 min) | $2.29 |
+| rl-all-at-once | $3.01 (116, 7.7 min) | $3.15 |
+| quant-incremental | $4.56 (171, 9.1 min) | $4.41 |
+| quant-all-at-once | $6.50 (211, 13.8 min) | $5.50 |
+| **total** | **$16.93** | $15.35 |
+
+Adding v3's reviewer ($15.35), a full v4 pass is $32.28, about $8.07 per run.
+
+**Verdict.** The fixer now does what it was told on the three named failures, and where nothing else broke (rl-all-at-once) the judge rewards it: +0.45 on iteration 9's scale, the first review gain larger than the position effect on a set the review had to fix. The mean is still +0.10, because each version trades one regression for another.
+
+Before another run:
+1. Allow an edge when the moved work's input is written by the other task.
+2. Restrict `oracle_edits` to values whose quoted turn contains the new value: a check `plan_review.py` can make itself.
+3. Let a task title change when only its stale words change.

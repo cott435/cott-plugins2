@@ -1,0 +1,756 @@
+diff --git a/docs/architecture.md b/docs/architecture.md
+index 706deaf..df5547f 100644
+--- a/docs/architecture.md
++++ b/docs/architecture.md
+@@ -42,7 +42,7 @@ flowchart LR
+ | `worlds` | Snake, the three fish-tank variants, predator-prey and the two check worlds, behind `worlds.make` | SNAKE-01–SNAKE-06, FISH-01–FISH-08, PREY-01–PREY-06, TRAIN-06 (check worlds) | `core` |
+ | `baselines` | Random play for any action format, each world's hand-written rule acting on observations only, and their mean scores on the evaluation seeds | EVAL-01, EVAL-02, SNAKE-07, FISH-09, PREY-07 | `core`, `worlds` |
+ | `methods` | Hand-written DQN and PPO learners behind `Learner`; rebuilds a frozen `Policy` from a checkpoint | CHECK-01, TRAIN-07 | `core`, `runlog` |
+-| `train` | One run over the step budget: per-team learners, checkpoints, in-training evaluations, invalid-number stop; batches across cores; the check-world gate | TRAIN-01–TRAIN-07, QR-01–QR-03, TRAIN edge cases | `core`, `worlds`, `baselines`, `methods`, `runlog` |
++| `train` | One run over the step budget: per-team learners, checkpoints, in-training evaluations, invalid-number stop; batches across cores; the check-world gate | TRAIN-01–TRAIN-07, PREY-12, QR-01–QR-03, TRAIN edge cases | `core`, `worlds`, `baselines`, `methods`, `runlog` |
+ | `runlog` | Run folders: record, episode and evaluation logs, checkpoints, live progress, run lookup | LOG-01, LOG-02, LOG-06, TRAIN-03 (storage), TRAIN edge cases (overwrite, incomplete) | `core` |
+ | `charts` | Learning curves with range bands and baseline lines, extra measures, two-team curves, pairing heatmaps; follows the `dataviz` skill | LOG-03–LOG-05, PREY-10, PREY-09 (chart), LOG edge cases | `runlog`, `evaluate` |
+ | `evaluate` | Final evaluation on the final seeds, paired permutation tests run with the `null-hypothesis-testing` skill, verdicts, summaries, fixed-opponent team evaluation, pairing grids, collapse flags | EVAL-03–EVAL-06, SNAKE-08, FISH-10, PREY-08, PREY-09, QR-05, EVAL and PREY edge cases | `core`, `worlds`, `baselines`, `methods`, `runlog` |
+@@ -64,7 +64,7 @@ No external datasets: every world is simulated. Generated data lives under `runs
+ Seeds come from three disjoint ranges (AD-05): training episode seeds drawn by the run's generator from [0, 10⁶), the 20 in-training evaluation seeds 1,000,000–1,000,019, and the 100 final seeds 2,000,000–2,000,099, shared by every run and baseline.
+ 
+ ## Cross-cutting concerns
+-- **Determinism (WORLD-02, TRAIN-02, REPLAY-02, FISH-11, PREY-11):** no global random state. Each episode seed spawns the world's and the policies' generators, and torch runs single-threaded with deterministic algorithms (AD-05). A committed digest of a short snake run's logs and final checkpoint is checked in CI. A later world that changes it fails the build (FISH-11, PREY-11), and so does a fish digest once S2 lands.
++- **Determinism (WORLD-02, TRAIN-02, REPLAY-02, FISH-11, PREY-11):** no global random state. Each episode seed spawns the world's and the policies' generators, and torch runs single-threaded with deterministic algorithms (AD-05). A committed digest of a short snake run's logs and final checkpoint is checked by a local regression test in `scripts/check.sh full`; a later world that changes it fails that check (FISH-11, PREY-11), and so does a fish digest once S2 lands.
+ - **No outside RL code in training (CHECK-01):** import-linter forbids `stable_baselines3` and `gymnasium` outside `refcheck`, and a test asserts neither is in `sys.modules` after a training run (AD-08).
+ - **Speed (QR-01, QR-02, QR-04, QR-05):** world physics is NumPy over all agents at once, learners batch every team's observations into one forward pass, and evaluation spreads seeds over processes. `rllab` logs each run's wall time against the 60-minute budget, and a timing test plays a 1,000-step replay headless.
+ - **GPU (QR-03):** `device` is a run setting, `cpu` by default; a rented GPU run uses the same code, and its cost goes in the write-up by hand.
+@@ -102,7 +102,7 @@ tests/         → folders only; files are planned in pipelines.md
+ ### AD-03: DQN for discrete actions, PPO for continuous ones, one learner per team
+ **Status:** Accepted · **Date:** 2026-10-17 · **Scope:** system
+ - **Context:** Snake has 3 discrete actions (SNAKE-02); fish and predator-prey push with two numbers in [−1, 1] (FISH-02, PREY-02). Many-fish has 8 agents (FISH-06), and predator-prey has two teams learning at once (TRAIN-07). The brief wants each world to teach one idea, and wants checking against a reference implementation (CHECK-02).
+-- **Decision:** `dqn` (replay buffer, target network, ε-greedy, Huber loss) for snake and the discrete check world. `ppo` (Gaussian policy, GAE, clipped objective) for fish, predator-prey and the continuous check world. All agents of a team share one learner (parameter sharing over a batch of agents). Teams have separate learners in the same run. Evaluation and replay act deterministically: greedy for DQN, the mean action for PPO.
++- **Decision:** `dqn` (replay buffer, target network, ε-greedy, Huber loss) for snake and the discrete check world. `ppo` (Gaussian policy, GAE, clipped objective) for fish, predator-prey and the continuous check world. All agents of a team share one learner (parameter sharing over a batch of agents). Teams have separate learners in the same run. In predator-prey, `train` plays each team, in the configured pool share of training episodes, against a frozen opponent loaded from the other team's saved checkpoints, and against the other team's current learner otherwise (PREY-12). Evaluation and replay act deterministically: greedy for DQN, the mean action for PPO.
+ - **Alternatives:** PPO everywhere: one method fewer, but snake would not teach value learning. SAC for fish: strong on continuous control, but a third method and harder to explain for many agents. Tabular Q-learning for snake: SNAKE-06 includes length, an unbounded number, so the table would need discretising.
+ - **Consequences:** Two methods to write, each with a check world (TRAIN-06) and a Stable-Baselines3 equivalent (AD-08). A prey that leaves the episode is masked out of its team's batch.
+ 
+@@ -145,7 +145,7 @@ tests/         → folders only; files are planned in pipelines.md
+ **Status:** Accepted · **Date:** 2026-10-17 · **Scope:** system
+ - **Context:** TRAIN-06 needs every learning method to learn a hand-derived best behaviour before it is used in a world. Bugs in RL are silent (brief), and methods change while a world is built.
+ - **Decision:** `train.run_check` trains each team method in a config on its check world: for DQN a 6-state corridor with two exits, left of state 0 (reward 0.8) and right of state 5 (reward 1.0), γ = 0.9, so the best action is left in states 0–1 and right in 2–5 and a learner biased to one action can't pass; for PPO a 1-D point that is rewarded for reaching a target, where the best push is the sign of the offset. It needs ≥ 95% agreement over every check-world state. `train.run_batch` runs the same check steps with the batch's method settings before starting any run and refuses the batch on failure. `rllab check <config>` runs it alone.
+-- **Alternatives:** A recorded pass per method version: saves seconds but goes stale silently when code changes. A test only: passes in CI but not for the settings actually used.
++- **Alternatives:** A recorded pass per method version: saves seconds but goes stale silently when code changes. A test only: passes in the test suite but not for the settings actually used.
+ - **Consequences:** Each batch spends under a minute on the check. A check-world settings override exists because a world's tuned settings (e.g. buffer size) may be too large for a 6-state world.
+ 
+ ### AD-10: Pipeline entries are the public API; `cli` only dispatches
+@@ -163,7 +163,7 @@ tests/         → folders only; files are planned in pipelines.md
+ - **Consequences:** The Grow triggers stay reported by `dt` and are answered by this decision. A new trigger (a part that runs on its own, a heavy new stack) reopens it.
+ 
+ ## Risks and open questions
+-- **Many-fish and predator-prey speed (QR-01, QR-02).** 8–10 agents, 1,000-step episodes and 21 × 20 evaluation episodes may not fit 60 minutes in Python. Mitigation: NumPy physics over all agents, evaluation in a worker process, and a timing check in the first fish build; QR-03's GPU route doesn't help a CPU-bound world loop.
++- **Many-fish and predator-prey speed (QR-01, QR-02).** 7–8 agents, 1,000-step episodes and 21 × 20 evaluation episodes may not fit 60 minutes in Python. Mitigation: NumPy physics over all agents, evaluation in a worker process, and a timing check in the first fish build; QR-03's GPU route doesn't help a CPU-bound world loop.
+ - **5 parallel runs on mixed cores (QR-02).** Apple Silicon's efficiency cores run slower; 5 runs may not all land on performance cores. Measured in the first snake batch.
+ 
+ ## Changelog
+diff --git a/docs/packages/rllab/contract.md b/docs/packages/rllab/contract.md
+index 37ccc08..3ed3197 100644
+--- a/docs/packages/rllab/contract.md
++++ b/docs/packages/rllab/contract.md
+@@ -2,8 +2,6 @@
+ 
+ **Package:** rllab · **Status:** Approved · **Last updated:** 2026-10-17 · **Architecture:** [../../architecture.md](../../architecture.md)
+ 
+-`Direction = Literal["higher", "lower"]`, `Settings = Mapping[str, int | float | str | bool]` and `Array = np.ndarray` are used throughout.
+-
+ ## core
+ 
+ ### core.ActionSpace: type
+@@ -15,7 +13,7 @@
+ ### core.TeamSpec: type
+ `@dataclass(frozen=True) class TeamSpec: name: str; agents: tuple[int, ...]; score_name: str; direction: Direction`
+ - **Invariants:** `agents` are indices into the world's agent axis; teams of one world are disjoint and cover every agent
+-- **Boundary:** worlds, train, evaluate, charts · **Fixtures:** tests/contracts/core.TeamSpec/ · **Cases:** snake's one team; predator-prey's prey (6) and predator (2) teams
++- **Boundary:** worlds, train, evaluate, charts · **Fixtures:** tests/contracts/core.TeamSpec/ · **Cases:** snake's one team; predator-prey's prey (6) and predator (1) teams
+ - **Used by:** every component reading scores
+ 
+ ### core.WorldSpec: type
+@@ -67,7 +65,7 @@ class World(Protocol):
+ ```
+ - **Invariants:** same seed → same start (WORLD-01); same seed and actions → same steps (WORLD-02); `actions` has one row per agent, rows of inactive agents ignored
+ - **Errors:** `step` raises `ActionError(agent: str, value: object)`, a `ValueError`, for an action outside `spec.action`, never clipping it; `step` after `done` raises `RuntimeError`
+-- **Boundary:** train, evaluate, replay, refcheck · **Fixtures:** tests/contracts/core.World/ · **Cases:** a replay double of a recorded 5-step snake episode from seed 42
++- **Boundary:** train, evaluate, replay, refcheck · **Fixtures:** tests/contracts/core.World/ · **Cases:** a replay double of a recorded 5-step snake episode from seed 42; a scripted fake World with fixed 50-step episodes on any seed
+ - **Used by:** every component that plays episodes; PL-02, PL-08
+ 
+ ### core.Policy: type
+@@ -101,6 +99,11 @@ class World(Protocol):
+ - **Boundary:** charts, replay, notes, cli · **Fixtures:** tests/contracts/core.Output/ · **Cases:** a 5-run snake learning-curve PNG; a seed-7 snake video
+ - **Used by:** charts, replay, notes, cli; PL-05, PL-08, PL-10, PL-12
+ 
++### core.aliases: type
++`Direction = Literal["higher", "lower"]`; `Settings = Mapping[str, int | float | str | bool]`; `Array = np.ndarray`
++- **Invariants:** used throughout the contract; defined once in `core`
++- **Used by:** every component
++
+ ## worlds
+ 
+ ### worlds.make: World factory
+@@ -116,6 +119,23 @@ class World(Protocol):
+ - **Boundary:** train · **Fixtures:** tests/contracts/worlds.CheckWorld/ · **Cases:** a replay double of the 6-state two-exit corridor; one of the 1-D target point
+ - **Used by:** train; PL-01
+ 
++### worlds.SnakeObs: type
++`SNAKE_OBS: tuple[str, ...]`, the snake observation layout, `obs_len` 10:
++
++| Index | Meaning | Encoding |
++|---|---|---|
++| 0 | danger straight ahead | 1.0 if moving straight ends the episode next step, else 0.0 |
++| 1 | danger left | as index 0, for a left turn |
++| 2 | danger right | as index 0, for a right turn |
++| 3–6 | heading | one-hot over up, right, down, left |
++| 7 | food x direction | sign of food x − head x: −1.0, 0.0 or 1.0 |
++| 8 | food y direction | sign of food y − head y (grid y grows downward): −1.0, 0.0 or 1.0 |
++| 9 | length | snake length ÷ 100 |
++
++- **Invariants:** SNAKE-06's contents in this order and encoding; the snake world writes it and the snake rule reads it, nothing else decodes it
++- **Boundary:** worlds, baselines · **Fixtures:** tests/contracts/worlds.SnakeObs/ · **Cases:** the seed-3 start observation (heading up, length 3)
++- **Used by:** worlds, baselines; PL-02, PL-05
++
+ ## baselines
+ 
+ ### baselines.RandomPolicy: Uniform random play
+@@ -194,8 +214,9 @@ class Learner(Protocol):
+ ## train
+ 
+ ### train.RunConfig: type
+-`@dataclass(frozen=True) class RunConfig: name: str; world: str; variant: str; methods: Mapping[str, MethodConfig]; seed: int; budget: int; check_settings: Mapping[str, Settings]; device: str = "cpu"`
+-- **Invariants:** `methods` has one entry per team (TRAIN-07); `budget` counts world steps, not agent steps; `check_settings` overrides settings for the check world only (AD-09)
++`@dataclass(frozen=True) class RunConfig: name: str; world: str; variant: str; methods: Mapping[str, MethodConfig]; seed: int; budget: int; check_settings: Mapping[str, Settings]; device: str = "cpu"; opponent_pool: OpponentPool | None = None`
++`OpponentPool(share: float, after_pct: int, sampling: Literal["uniform"])`
++- **Invariants:** `methods` has one entry per team (TRAIN-07); `budget` counts world steps, not agent steps; `check_settings` overrides settings for the check world only (AD-09); `opponent_pool` is set only for two-team worlds: after the `after_pct` checkpoint, a `share` of each team's training episodes play a frozen opponent drawn by `sampling` from the other team's saved checkpoints, and each such episode's log line names that checkpoint (PREY-12)
+ - **Boundary:** runlog, refcheck, cli · **Fixtures:** tests/contracts/train.RunConfig/ · **Cases:** a snake config from `configs/snake-default.toml`; a predator-prey config with two methods
+ - **Used by:** runlog, refcheck, cli; PL-01, PL-02, PL-03, PL-09
+ 
+@@ -216,7 +237,7 @@ class Learner(Protocol):
+ `def run_train(config: RunConfig, root: Path) -> RunRecord`
+ - **Invariants:** exactly `budget` world steps (TRAIN-01); checkpoints at 0%, 10%, … 100% (TRAIN-03); evaluation of every team on `EVAL_SEEDS` at every 5% (TRAIN-04); same config on the same machine → identical logs and checkpoints (TRAIN-02)
+ - **Errors:** `RunExistsError` before any work if the run folder exists; `NonFiniteError` ends the run as `failed` with step and value, keeping the last good checkpoint; interruption marks it `incomplete`
+-- **Boundary:** PL-03 · **Fixtures:** tests/contracts/train.run_train/ · **Cases:** a fake writing the finished 3-checkpoint snake run folder
++- **Boundary:** PL-03 · **Fixtures:** tests/contracts/train.run_train/ · **Cases:** a fake writing the finished 11-checkpoint (0%–100%) snake run folder
+ - **Used by:** train.run_batch; PL-02, PL-03
+ 
+ ### train.run_batch: Training batch
+@@ -262,7 +283,7 @@ class Run(Protocol):
+     def checkpoints(self) -> list[Checkpoint]: ...
+ ```
+ - **Invariants:** read-only view of one run folder; readable while the run writes (LOG-06)
+-- **Boundary:** charts, evaluate, replay, refcheck, cli · **Fixtures:** tests/contracts/runlog.Run/ · **Cases:** a replay double of a finished 3-checkpoint snake run folder
++- **Boundary:** charts, evaluate, replay, refcheck, cli · **Fixtures:** tests/contracts/runlog.Run/ · **Cases:** a replay double of a finished 11-checkpoint (0%–100%) snake run folder
+ - **Used by:** charts, evaluate, replay, refcheck, cli; PL-05, PL-06, PL-12
+ 
+ ### runlog.RunWriter: Run folder writer
+@@ -275,7 +296,7 @@ class RunWriter:
+     def close(self, status: str, failure: Failure | None = None) -> RunRecord: ...
+ ```
+ - **Errors:** `RunExistsError` naming the path if `runs/<world>/<variant>/<name>` exists (TRAIN edge case)
+-- **Boundary:** train · **Fixtures:** tests/contracts/runlog.RunWriter/ · **Cases:** a replay double of the writes of a 3-checkpoint snake run
++- **Boundary:** train · **Fixtures:** tests/contracts/runlog.RunWriter/ · **Cases:** a replay double of the writes of an 11-checkpoint (0%–100%) snake run
+ - **Used by:** train; PL-02
+ 
+ ### runlog.find_runs: Run lookup
+@@ -288,7 +309,7 @@ class RunWriter:
+ `def open_run(path: Path) -> Run`
+ - **Invariants:** any status, including `running`, `incomplete` and `failed`
+ - **Errors:** `FileNotFoundError` if no `run.json` is at `path`
+-- **Boundary:** replay, cli · **Fixtures:** tests/contracts/runlog.open_run/ · **Cases:** a fake returning the finished 3-checkpoint snake run double
++- **Boundary:** replay, cli · **Fixtures:** tests/contracts/runlog.open_run/ · **Cases:** a fake returning the finished 11-checkpoint (0%–100%) snake run double
+ - **Used by:** replay, cli; PL-12
+ 
+ ### runlog.Progress: type
+diff --git a/docs/packages/rllab/pipelines.md b/docs/packages/rllab/pipelines.md
+index f8e12dd..d182ff7 100644
+--- a/docs/packages/rllab/pipelines.md
++++ b/docs/packages/rllab/pipelines.md
+@@ -26,18 +26,18 @@ def run_check(config_path: Path, seed: int = 0) -> list[CheckResult]:
+ 
+ ## PL-02: Training run
+ **Entry:** `src/rllab/train/pipelines/pl02_train.py::run_train` · **Trigger:** PL-03 `run_parallel`, once per config (`rllab train <config.toml> --seed N` is a one-seed batch)
+-**Covers:** TRAIN-01–TRAIN-04, TRAIN-07, LOG-01, LOG-02, CHECK-01, WORLD-01–WORLD-07, SNAKE-01–SNAKE-06, FISH-01–FISH-08, FISH-11, PREY-01–PREY-06, PREY-11, QR-01, QR-03, QR-06
++**Covers:** TRAIN-01–TRAIN-04, TRAIN-07, LOG-01, LOG-02, CHECK-01, WORLD-01–WORLD-07, SNAKE-01–SNAKE-06, FISH-01–FISH-08, FISH-11, PREY-01–PREY-06, PREY-11, PREY-12, QR-01, QR-03, QR-06
+ 
+ | # | Step | Owner | In → Out | Spine version | Covers |
+ |---|---|---|---|---|---|
+ | 1 | `make` | worlds.make | world, variant, overrides → World | name → class lookup, snake only | WORLD-01–WORLD-07 |
+ | 2 | `Snake` | worlds.snake | overrides → World | 10 × 10 grid, relative turns, food, death, 100-step hunger limit | SNAKE-01–SNAKE-06 |
+-| 3 | `FishTank` | worlds.fish | variant, overrides → World | "one" variant: bouncing ball, smooth pushes, respawn on hit | FISH-01–FISH-08 |
++| 3 | `FishTank` | worlds.fish | variant, overrides → World | "one" variant: ball bouncing in a circular tank, smooth pushes, a hit fish leaves the episode | FISH-01–FISH-08 |
+ | 4 | `PredatorPrey` | worlds.prey | overrides → World | fish movement, catches remove prey, pellets without respawn | PREY-01–PREY-06 |
+ | 5 | `make_learners` | train.setup | RunConfig, WorldSpec → Learner per team | `methods.make_learner` per team, seeded from the run seed | TRAIN-07, CHECK-01 |
+ | 6 | `DQN` | methods.dqn | MethodConfig, WorldSpec → Learner | online one-step Q-learning on an MLP, ε-greedy; no replay buffer or target net | CHECK-01 |
+ | 7 | `PPO` | methods.ppo | MethodConfig, WorldSpec → Learner | REINFORCE with a Gaussian policy and mean-return baseline; no clipping or GAE | CHECK-01 |
+-| 8 | `train_loop` | train.loop | World, Learner per team, RunConfig, root → RunRecord | steps to the budget, writing the run folder through `runlog.RunWriter`; checkpoints at 0–100%; 20-seed evals at every 5% via `core.play_episode`; stops on `NonFiniteError` | TRAIN-01–TRAIN-04, LOG-01, LOG-02, QR-01, QR-03 |
++| 8 | `train_loop` | train.loop | World, Learner per team, RunConfig, root → RunRecord | steps to the budget, writing the run folder through `runlog.RunWriter`; checkpoints at 0–100%; 20-seed evals at every 5% via `core.play_episode`; stops on `NonFiniteError`; with `opponent_pool`, each team plays the pool share of episodes against a frozen opponent from the other team's saved checkpoints | TRAIN-01–TRAIN-04, PREY-12, LOG-01, LOG-02, QR-01, QR-03 |
+ 
+ ### Entry sketch (pre-build — removed by spine task)
+ ```python
+@@ -96,7 +96,7 @@ def run_watch(run_path: Path) -> Progress:
+ | 3 | `RandomPolicy` | baselines.random | ActionSpace → Policy | uniform draws from the passed `rng` | EVAL-01 |
+ | 4 | `SnakeRule` | baselines.snake | none → RulePolicy | toward food on the shorter axis unless fatal next step | SNAKE-07 |
+ | 5 | `FishRule` | baselines.fish | none → RulePolicy | full push away from the seen ball, else random | FISH-09 |
+-| 6 | `PreyRule` | baselines.prey | none → RulePolicy | flee nearest seen predator, else toward nearest seen pellet | PREY-07 |
++| 6 | `PreyRule` | baselines.prey | none → RulePolicy | flee the predator when seen, else toward nearest seen pellet | PREY-07 |
+ | 7 | `PredatorRule` | baselines.prey | none → RulePolicy | chase nearest seen prey, else random wander | PREY-07 |
+ | 8 | `learning_curve` | charts.curve | list[Run], BaselineMeans, out → Output | matplotlib mean line, min–max band, two baseline lines, per team; `dataviz` checks | LOG-03–LOG-05, PREY-10 |
+ 
+@@ -248,7 +248,3 @@ src/rllab/
+               pipelines/pl04_watch.py … pl12_grid.py
+ tests/intent/rllab/  tests/unit/rllab/
+ ```
+-
+-## Open questions
+-- `cli` owns no step: `__main__.py` dispatches each trigger to its entry and prints the returned contract type (routed to architecture-design; assumed: `cli` stays as the dispatcher component)
+-- New contract types and functions these steps need are routed to architecture-design: `core.Output`, `baselines.BaselineMeans`, `replay.Session`, and the entry and loader functions listed at the gate (assumed: as written in each step row)
+diff --git a/docs/packages/rllab/tests.md b/docs/packages/rllab/tests.md
+index 9ee481b..484ec3a 100644
+--- a/docs/packages/rllab/tests.md
++++ b/docs/packages/rllab/tests.md
+@@ -1,6 +1,6 @@
+ # rllab — Tests
+ 
+-**Package:** rllab · **Status:** Approved · **Last updated:** 2026-10-17 · **Pipelines:** [pipelines.md](pipelines.md)
++**Package:** rllab · **Status:** Draft · **Last updated:** 2026-10-17 · **Pipelines:** [pipelines.md](pipelines.md)
+ 
+ ## Strategy
+ | Pipeline | Smoke | Step unit tests | Golden cases | Model eval |
+@@ -50,20 +50,20 @@ Smoke runs use a 2,000-step budget, seeds 1–2 and the snake world unless the p
+ **Source:** spec.md, the user's worked example (SNAKE-02: heading up, turn left → head moves one cell left; SNAKE-05: 12 food → score 12); generator `random_rollouts(world="snake", seeds=0–19)`
+ **Expected:** start length 3 near the centre with food on a free cell; each step the head moves exactly one cell by the relative-turn table (up+left → left, up+right → right, up+straight → up); score = food eaten = final length − 3; the episode ends exactly on a wall or body hit or 100 steps without food; direction `higher` · **Tolerance:** exact, the grid is discrete
+ 
+-### TC-07: Fish score is hits per fish
++### TC-07: Fish score is mean steps survived
+ **Pipeline:** PL-02 · **Covers:** FISH-04, FISH-08 · **Kind:** synthetic known-answer · **Fixture:** tests/fixtures/rllab/TC-07/
+-**Source:** spec.md, the user's worked example (FISH-04: 4 fish, 6 hits → 1.5); generator `random_rollouts(world="fish", variant="many", fish=4, seeds=0–9)`
+-**Expected:** score = total ball hits ÷ 4 on every episode (the spec's instance: 6 hits → 1.5); 1,000 steps per episode; fish overlapping each other never add a hit; direction `lower` · **Tolerance:** 1e-12, float division only
++**Source:** spec.md, the worked example (FISH-04: 4 fish surviving 200, 400, 1,000 and 1,000 steps); generator `random_rollouts(world="fish", variant="many", fish=4, seeds=0–9)`
++**Expected:** score = the mean over the 4 fish of the steps each survived, on every episode; the episode ends at 1,000 steps or at the step the last fish is hit; fish overlapping each other never add a hit; direction `higher` · **Tolerance:** 1e-12, float division only
+ 
+-### TC-08: Ball, push and respawn physics
++### TC-08: Ball, push and hit physics
+ **Pipeline:** PL-02 · **Covers:** FISH-01–FISH-03, PREY-02 · **Kind:** synthetic known-answer · **Fixture:** tests/fixtures/rllab/TC-08/
+-**Source:** spec.md, the user's worked example (FISH-01, FISH-02, FISH-03, PREY-02); generator `constant_push(world="fish", variant="one", push=(1, 0), steps=200, seed=4)`
+-**Expected:** ball speed constant every step and its normal component flips at each wall touch; fish speed rises step by step toward top speed, never above it, and top speed < ball speed; after a hit the fish is ≥ ¼ tank width from the ball; a fish never leaves the tank; predator top speed = 1.2 × prey top speed · **Tolerance:** 1e-9 relative, float physics
++**Source:** spec.md, the user's worked example (FISH-01, FISH-02, FISH-03, PREY-02); generators `constant_push(world="fish", variant="one", push=(1, 0), steps=200, seed=4)` and `constant_push(world="prey", push=(1, 0), steps=200, seed=4)`
++**Expected:** ball speed constant every step and, at each wall touch, its velocity is reflected about the circle's normal at the contact point; fish speed rises step by step toward top speed, never above it, and top speed < ball speed; a hit fish is inactive with zero rows for the rest of the episode; a fish always stays within the circle; predator top speed = 1.2 × prey top speed · **Tolerance:** 1e-9 relative, float physics
+ 
+ ### TC-09: Prey and predator scores
+ **Pipeline:** PL-02 · **Covers:** PREY-01, PREY-03–PREY-05 · **Kind:** synthetic known-answer · **Fixture:** tests/fixtures/rllab/TC-09/
+ **Source:** spec.md, the user's worked example (PREY-05: 18 pellets and 3 prey caught → prey 3, predator 3; PREY-04: all 6 caught at step 600 ends the episode); generator `random_rollouts(world="prey", seeds=0–9)`
+-**Expected:** start with 6 prey, 2 predators, 10 pellets, nothing touching; prey score = pellets eaten ÷ 6 (starting prey, never survivors); predator score = prey caught; a caught prey is inactive with zero rows afterwards; the episode ends at 1,000 steps or when all 6 are caught · **Tolerance:** 1e-12 for the division; exact otherwise
++**Expected:** start with 6 prey, 1 predator, 10 pellets, nothing touching; prey score = pellets eaten ÷ 6 (starting prey, never survivors); predator score = prey caught; a caught prey is inactive with zero rows afterwards; the episode ends at 1,000 steps or when all 6 are caught · **Tolerance:** 1e-12 for the division; exact otherwise
+ 
+ ### TC-10: Out-of-format actions are refused, never clipped
+ **Pipeline:** PL-02 · **Covers:** WORLD-04 · **Kind:** closed form · **Fixture:** tests/fixtures/rllab/TC-10/
+@@ -104,7 +104,7 @@ Smoke runs use a 2,000-step budget, seeds 1–2 and the snake world unless the p
+ ### TC-17: Pure noise keeps both nulls
+ **Pipeline:** PL-06 · **Covers:** EVAL-04 · **Kind:** synthetic known-answer · **Fixture:** tests/fixtures/rllab/TC-17/
+ **Source:** generator `null_scores(runs=5, seeds=100, mean=8, sd=3)` with learned and baseline from one distribution, seeds 12–31; same test as the planted case
+-**Expected:** at most 1 of the 20 seeds rejects either null · **Tolerance:** family-wise α = 0.05 per seed after Holm, so about 1 in 20 seeds may reject by chance
++**Expected:** the number of the 20 seeds that reject either null is at most the bound in Tolerance · **Tolerance:** family-wise α = 0.05 per seed after Holm; bound set at the Binomial(20, 0.05) 99.7th percentile
+ **Skills:** null-hypothesis-testing
+ 
+ ### TC-18: Lower-is-better scores test in the right direction
+@@ -136,21 +136,21 @@ Smoke runs use a 2,000-step budget, seeds 1–2 and the snake world unless the p
+ ### TC-23: Predator-prey teams face fixed opponents; collapse is flagged
+ **Pipeline:** PL-06 · **Covers:** PREY-08, EVAL-06 · **Kind:** synthetic known-answer · **Fixture:** tests/fixtures/rllab/TC-23/
+ **Source:** spec.md, the user's worked example (PREY-08: a separate verdict per team); the collapse rule the learner accepted on 2026-10-17; generator `prey_runs(budget=2000, seeds=1–5)` plus one hand-written `evals.jsonl` whose predator score is 0.0 at the last 5 points (steps 1,600–2,000) against a random-predator mean of 0.4
+-**Expected:** 2 `Summary`s, `prey` and `predator`; learned prey play only against rule-based predators and learned predators only against rule-based prey; the hand-written run's predator `collapse` = 1,600 and its prey `collapse` is `None` · **Tolerance:** exact
++**Expected:** 2 `Summary`s, `prey` and `predator`; learned prey play only against the rule-based predator and the learned predator only against rule-based prey; the hand-written run's predator `collapse` = 1,600 and its prey `collapse` is `None` · **Tolerance:** exact
+ 
+ ### TC-24: Trained snake beats both baselines
+ **Pipeline:** PL-06 · **Covers:** SNAKE-08, EVAL-04, EVAL-05, QR-01, QR-02, QR-05 · **Kind:** model evaluation · **Fixture:** tests/fixtures/rllab/TC-24/
+ **Source:** spec model criteria SNAKE-08, EVAL-04, EVAL-05: metric mean food per episode; held-out seeds 2,000,000–2,000,099; baselines random and the SNAKE-07 rule; 5 runs, seeds 1–5, `configs/snake-default.toml`
+-**Expected:** `verdict.beats_baselines` true; each run ≤ 60 minutes, the batch ≤ 90 minutes, final evaluation ≤ 10 minutes · **Tolerance:** α = 0.05 after Holm (EVAL-04); every run above the rule mean (EVAL-05)
++**Expected:** `verdict.beats_baselines` true; each run ≤ 60 minutes, the batch ≤ 60 minutes, final evaluation ≤ 10 minutes · **Tolerance:** α = 0.05 after Holm (EVAL-04); every run above the rule mean (EVAL-05)
+ **Skills:** null-hypothesis-testing
+ 
+ ### TC-25: Trained fish beat both baselines in every variant
+ **Pipeline:** PL-06 · **Covers:** FISH-10, EVAL-04, EVAL-05 · **Kind:** model evaluation · **Fixture:** tests/fixtures/rllab/TC-25/
+-**Source:** spec model criteria FISH-10: metric hits per fish (lower is better); held-out seeds 2,000,000–2,000,099; baselines random and the FISH-09 rule; 5 runs per variant (one, many, local), seeds 1–5
+-**Expected:** `verdict.beats_baselines` true for each of the 3 variants · **Tolerance:** α = 0.05 after Holm per variant (EVAL-04); every run below the rule mean (EVAL-05)
++**Source:** spec model criteria FISH-10: metric mean steps survived per fish (higher is better); held-out seeds 2,000,000–2,000,099; baselines random and the FISH-09 rule; 5 runs per variant (one, many, local), seeds 1–5
++**Expected:** `verdict.beats_baselines` true for each of the 3 variants · **Tolerance:** α = 0.05 after Holm per variant (EVAL-04); every run above the rule mean (EVAL-05)
+ **Skills:** null-hypothesis-testing
+ 
+-### TC-26: Trained prey and predators each beat their baselines
++### TC-26: Trained prey and predator each beat their baselines
+ **Pipeline:** PL-06 · **Covers:** PREY-08, EVAL-04, EVAL-05 · **Kind:** model evaluation · **Fixture:** tests/fixtures/rllab/TC-26/
+ **Source:** spec model criteria PREY-08: prey score and predator score against rule-based opponents; held-out seeds 2,000,000–2,000,099; baselines random and the PREY-07 rules; 5 runs, seeds 1–5
+ **Expected:** `verdict.beats_baselines` true for the prey team and for the predator team · **Tolerance:** α = 0.05 after Holm per team (EVAL-04); every run above the rule mean (EVAL-05)
+@@ -193,3 +193,5 @@ Smoke runs use a 2,000-step budget, seeds 1–2 and the snake world unless the p
+ 
+ ## Open questions
+ - No regression case yet for FISH-11 and PREY-11: their oracle is a digest of a finished snake run, which exists only after the first snake build. Added through Extend then.
++- TC-07: the worked-instance score in `expected.json` must be re-derived, because FISH-04 now scores mean steps survived (higher is better) instead of hits per fish.
++- TC-17: the maximum number of rejecting seeds must be re-derived from the Binomial(20, 0.05) 99.7th percentile, because the old bound of 1 is broken by a correct test about one time in four.
+diff --git a/docs/roadmap.md b/docs/roadmap.md
+index 933c980..3c01b58 100644
+--- a/docs/roadmap.md
++++ b/docs/roadmap.md
+@@ -12,8 +12,10 @@
+ |---|---|---|---|---|---|---|
+ | M1 | S1 | Train and evaluate a snake | rllab | PL-01–PL-06 | — | Planned |
+ | M2 | S1 | See, check and explain the snake | rllab | PL-02, PL-07–PL-11 | M1 (runlog.Run, runlog.Checkpoint, PL-02 output) | Designed |
+-| M3 | S2 | Fish tank | rllab | PL-01, PL-02, PL-05, PL-07, PL-09 | M1 (core.World, methods.Learner), M2 (refcheck.reference_check, replay.view) | Designed |
+-| M4 | S3 | Predator-prey | rllab | PL-02, PL-05, PL-06, PL-07, PL-12 | M3 (worlds.fish motion, methods.PPO) | Designed |
++| M3 | S2 | One fish | rllab | PL-01, PL-02, PL-05, PL-06, PL-07, PL-08, PL-09 | M1 (core.World, methods.Learner), M2 (refcheck.reference_check, replay.view) | Designed |
++| M4 | S2 | Many fish | rllab | PL-02, PL-05, PL-06, PL-07, PL-09 | M3 (worlds.fish one variant, methods.PPO) | Designed |
++| M5 | S2 | Local sight | rllab | PL-02, PL-05, PL-06, PL-07, PL-08, PL-09, PL-10, PL-11 | M4 (worlds.fish many variant) | Designed |
++| M6 | S3 | Predator-prey | rllab | PL-02, PL-05, PL-06, PL-07, PL-09, PL-10, PL-11, PL-12 | M5 (worlds.fish motion, methods.PPO) | Designed |
+ 
+ *Written by `dt roadmap` from doc statuses and todo checkboxes; never hand-edited.
+ 
+@@ -37,19 +39,31 @@
+ **Plan:** [../tasks/plan.md](../tasks/plan.md)
+ 
+ ## M2: See, check and explain the snake
+-**Outline:** The learner watches any snake checkpoint or baseline in the viewer and as video, runs the reference check, writes the snake write-up, and the trained snake clearly beats both baselines.
++**Outline:** A tuned DQN snake (replay buffer and target network added to the online Q-learning spine) clearly beats both baselines, and I can watch any checkpoint against a baseline side by side and as video. The reference check and the snake write-up close the world here because both need the tuned snake's final results.
+ **Skills:** null-hypothesis-testing
+ **References:** —
+ **Exit:** TC-24 passes (snake beats both baselines within QR-01, QR-02, QR-05); TC-27–TC-32 pass; the snake write-up passes `rllab notes check`.
+ 
+-## M3: Fish tank
+-**Outline:** Fish in all three variants train with PPO, are watched with the sight overlay, and beat both baselines, while snake results reproduce unchanged.
++## M3: One fish
++**Outline:** One fish that sees everything trains with PPO in the circular tank, survives longer than both baselines, and is watched in the viewer, while snake results reproduce unchanged.
+ **Skills:** null-hypothesis-testing, dataviz
+ **References:** —
+-**Exit:** TC-02, TC-07, TC-08 and TC-25 pass; a snake run repeats its M2 results exactly (FISH-11).
++**Exit:** TC-02 passes; TC-07's and TC-08's one-fish parts pass; TC-25 passes for `one`; the one-fish reference check reports pass (CHECK-03); a snake run repeats its M2 results exactly (FISH-11).
+ 
+-## M4: Predator-prey
+-**Outline:** Prey and predators train together, each team is evaluated against fixed opponents, collapses are flagged, and the pairing grid and two-team curves show the back-and-forth.
++## M4: Many fish
++**Outline:** Eight fish that see everything share the tank, train with one shared PPO learner, and survive longer than both baselines.
+ **Skills:** null-hypothesis-testing, dataviz
+ **References:** —
+-**Exit:** TC-09, TC-23, TC-26 and TC-33 pass; snake and fish runs repeat exactly (PREY-11).
++**Exit:** TC-07 and TC-12 pass for `many`; TC-25 passes for `many`; the many-fish reference check reports pass (CHECK-03); a snake run repeats its M2 results exactly (FISH-11).
++
++## M5: Local sight
++**Outline:** Fish that see only within a quarter of the tank's diameter train and survive longer than both baselines, the replay shows each fish's sight radius, and the fish write-up explains the three variants.
++**Skills:** null-hypothesis-testing, dataviz
++**References:** —
++**Exit:** TC-12 passes for `local`; TC-25 passes for `local`; the replay's sight overlay switches on and off (REPLAY-08); the local-sight reference check reports pass (CHECK-03); the fish write-up passes `rllab notes check`; snake and fish runs repeat exactly (FISH-11).
++
++## M6: Predator-prey
++**Outline:** Prey and the predator train together, each team trains partly against the other's past checkpoints and is evaluated against fixed opponents, collapses are flagged, and the pairing grid and two-team curves show the back-and-forth.
++**Skills:** null-hypothesis-testing, dataviz
++**References:** —
++**Exit:** TC-09, TC-23, TC-26 and TC-33 pass; training episodes draw past opponents at the configured pool share (PREY-12); the predator-prey reference check reports pass for each team (CHECK-03); the predator-prey write-up passes `rllab notes check`; snake and fish runs repeat exactly (PREY-11).
+diff --git a/docs/routes.md b/docs/routes.md
+index d42223c..cc359ce 100644
+--- a/docs/routes.md
++++ b/docs/routes.md
+@@ -13,3 +13,5 @@ Changes a skill found that another skill owns, waiting for the owner's Revise. W
+ - [x] spec-writing · TRAIN-03 says 12 checkpoints but its example lists 0%, 10%, … 100% (11); PREY-09's 12 × 12 grid rests on the same count. Proposed: 11 checkpoints at 0%, 10%, … 100% and an 11 × 11 grid (TC-05, TC-33) (from test-planning, 2026-10-17)
+ - [x] architecture-design · AD-09: the DQN check world is a 6-state corridor with two exits (left 0.8, right 1.0, γ = 0.9), so the best action differs by state ([left, left, right, right, right, right]) and a learner biased to one action can't pass (TC-01, TC-03) (from test-planning, 2026-10-17)
+ - [x] pipeline-design · PL-01.CheckDiscrete spine: two-exit corridor (AD-09); PL-12.pairing_grid spine: 121 pairings (11 checkpoints, TRAIN-03) (from architecture-design, 2026-10-17)
++- [ ] test-planning · TC-07: re-derive the worked-instance score (FISH-04 scoring changed to mean steps survived, higher is better) (from plan-review, 2026-10-18)
++- [ ] test-planning · TC-17: re-derive max_rejecting_seeds (bound changed to the Binomial(20, 0.05) 99.7th percentile) (from plan-review, 2026-10-18)
+diff --git a/docs/spec.md b/docs/spec.md
+index f01c8fb..ea4cd8e 100644
+--- a/docs/spec.md
++++ b/docs/spec.md
+@@ -138,7 +138,7 @@ A set of small 2D reinforcement-learning worlds (Snake, Fish tank, Predator-prey
+   - Given any world, when its rule baseline is listed, then its one-sentence description is shown with it.
+ - **EVAL-03** Final evaluation plays every final checkpoint and both baselines on the same 100 seeds, none of which was used in training or in-training evaluation.
+   - Given 5 finished runs, when final evaluation is run, then 700 episodes are played (5 × 100 learned, 100 random, 100 rule-based), all on the same 100 held-out seeds.
+-- **EVAL-04** Whether the learned agent beats each baseline is tested with the `null-hypothesis-testing` skill. It is given: the hypothesis "the trained agent scores better than the baseline"; H0 = the learned agent's mean score is no better than the baseline's, H1 = it is better (in the world's score direction); the statistic = difference in mean episode score, learned (averaged over the runs, per seed) minus baseline; the null built by randomly swapping the learned and baseline labels within each held-out seed (paired permutation, 10,000 permutations); α = 0.05 with Holm correction across all baseline comparisons in that world (2 per variant); the EVAL-03 held-out episodes. The learned agent passes only if both nulls are rejected.
++- **EVAL-04** Whether the learned agent beats each baseline is tested with the `null-hypothesis-testing` skill. It is given: the hypothesis "the trained agent scores better than the baseline"; H0 = the learned agent's mean score is no better than the baseline's, H1 = it is better (in the world's score direction); the statistic = difference in mean episode score, learned (averaged over the runs, per seed) minus baseline; the null built by randomly swapping the learned and baseline labels within each held-out seed (paired permutation, 10,000 permutations); α = 0.05 with Holm correction across the 2 baseline comparisons of each variant and team; the EVAL-03 held-out episodes. The learned agent passes only if both nulls are rejected.
+   - Given final evaluation results for one variant, when tested, then a report shows, for each baseline, the mean scores, the difference, the corrected p-value and reject/keep.
+ - **EVAL-05** "Clearly beats" also needs every single run to beat the rule baseline: each run's final mean score is better than the rule-based baseline's mean score.
+   - Given 5 runs where 4 beat the rule baseline and 1 does not, when the verdict is made, then the world is marked "not yet beating the baselines" and names the failing run.
+@@ -211,22 +211,22 @@ A set of small 2D reinforcement-learning worlds (Snake, Fish tank, Predator-prey
+ ### Fish tank (`FISH`)
+ **Serves:** Goal 1, Goal 2, Goal 3, Goal 4
+ **Stage:** S2
+-**Behavior:** A 2D tank with walls and a ball that bounces around at constant speed. Fish move smoothly by choosing how hard to push in each direction, and lose points when the ball hits them. It is built in three variants: one fish that sees everything, many fish that see everything, and many fish that only see nearby things.
++**Behavior:** A circular 2D tank and a ball that bounces around at constant speed. Fish move smoothly by choosing how hard to push in each direction, and leave the episode when the ball hits them, so they learn to survive as long as possible. It is built in three variants: one fish that sees everything, many fish that see everything, and many fish that only see nearby things.
+ 
+ **Requirements**
+-- **FISH-01** The tank is a square with walls; the ball moves in straight lines at constant speed and bounces off walls.
+-  - Given the ball heading into the right wall, when it touches the wall, then its sideways direction reverses and its speed is unchanged.
++- **FISH-01** The tank is a circle with a wall; the ball moves in straight lines at constant speed and bounces off the wall by reflecting its velocity about the wall's normal at the contact point.
++  - Given the ball reaching the wall, when it touches it, then its velocity is reflected about the normal and its speed is unchanged.
+ - **FISH-02** Each step a fish chooses a push as two numbers between −1 and 1 (left-right and up-down); its speed changes smoothly with the push, up to a top speed below the ball's.
+   - Given a still fish pushing (1, 0) for several steps, when its speed is read, then it rises step by step toward its top speed, never above it.
+-- **FISH-03** When the ball touches a fish, the hit is counted and the fish reappears at a random spot at least one quarter of the tank's width from the ball.
+-  - Given the ball touching a fish, when the step ends, then the hit count is up by 1 and the fish is at least a quarter-width from the ball.
+-- **FISH-04** An episode lasts 1,000 steps; the score is hits per fish per episode (lower is better).
+-  - Given 4 fish and 6 total hits in an episode, when it ends, then the score is 1.5.
++- **FISH-03** When the ball touches a fish, the hit is counted and the fish leaves the episode.
++  - Given the ball touching a fish, when the step ends, then the hit count is up by 1 and the fish is gone for the rest of the episode.
++- **FISH-04** An episode lasts at most 1,000 steps or until every fish is hit; the score is the mean number of steps each fish survived (higher is better).
++  - Given 4 fish surviving 200, 400, 1,000 and 1,000 steps, when the episode ends, then the score is 650.
+ - **FISH-05** Variant "one fish": a single fish observes its own position and velocity and the ball's position and velocity.
+   - Given the one-fish variant, when an observation is taken, then it holds those values for the fish and the ball.
+ - **FISH-06** Variant "many fish": 8 fish share the tank; each observes itself, the ball and the 3 nearest other fish.
+   - Given the many-fish variant, when an observation is taken for any fish, then it holds its own state, the ball's and the 3 nearest fish's.
+-- **FISH-07** Variant "local sight": as "many fish", but a fish sees the ball and other fish only within a radius of one quarter of the tank's width; anything outside is reported as "not seen".
++- **FISH-07** Variant "local sight": as "many fish", but a fish sees the ball and other fish only within a radius of one quarter of the tank's diameter; anything outside is reported as "not seen".
+   - Given the ball beyond the radius, when a fish's observation is taken, then the ball's entries read "not seen".
+ - **FISH-08** Fish pass through each other; only the ball can hit them.
+   - Given two fish moving onto the same spot, when the step ends, then both are there and no hit is counted.
+@@ -238,18 +238,18 @@ A set of small 2D reinforcement-learning worlds (Snake, Fish tank, Predator-prey
+   - Given a snake run repeated with its original settings and seed after fish tank exists, when it finishes, then its results match the original run exactly.
+ 
+ **Edge cases & errors**
+-- A fish pushes into a wall → it stops at the wall and slides along it; it never leaves the tank.
+-- The ball starts touching a fish → the episode's start is re-drawn so that every fish starts at least a quarter-width from the ball.
++- A fish pushes into the wall → it stops at the wall and slides along the curved wall; it never leaves the tank.
++- The ball starts touching a fish → the episode's start is re-drawn so that every fish starts at least a quarter of the tank's diameter from the ball, and no fish is hit at step 0.
+ 
+ ### Predator-prey (`PREY`)
+ **Serves:** Goal 1, Goal 2, Goal 3, Goal 4
+ **Stage:** S3
+-**Behavior:** A 2D arena with food pellets, a team of prey and a team of predators, all moving smoothly as fish do. Prey score by eating food and are removed when caught; predators score by catching prey. Both teams learn at the same time. The learner watches and explains how each side adapts to the other; it may never look "solved", and that is acceptable.
++**Behavior:** A 2D arena with food pellets, a team of prey and one predator, all moving smoothly as fish do. Prey score by eating food and are removed when caught; the predator scores by catching prey. Both sides learn at the same time, each partly against the other's past versions (self-play). The learner watches and explains how each side adapts to the other; it may never look "solved", and that is acceptable.
+ 
+ **Requirements**
+-- **PREY-01** The arena is a square with walls, 6 prey, 2 predators and 10 food pellets; an eaten pellet reappears at a random spot after 50 steps.
+-  - Given seed 5, when an episode starts, then the counts are 6, 2 and 10, with no two objects touching.
+-- **PREY-02** Prey and predators move by smooth pushes as in FISH-02; predators' top speed is 1.2 × the prey's.
++- **PREY-01** The arena is a square with walls, 6 prey, 1 predator and 10 food pellets; an eaten pellet reappears at a random spot after 50 steps.
++  - Given seed 5, when an episode starts, then the counts are 6, 1 and 10, with no two objects touching.
++- **PREY-02** Prey and the predator move by smooth pushes as in FISH-02; the predator's top speed is 1.2 × the prey's.
+   - Given both at full speed, when their speeds are read, then the predator's is 1.2 × the prey's.
+ - **PREY-03** A prey touching a pellet eats it; a predator touching a prey catches it and the prey leaves the episode.
+   - Given a predator touching a prey, when the step ends, then the prey is gone and the predator's catch count is up by 1.
+@@ -257,11 +257,11 @@ A set of small 2D reinforcement-learning worlds (Snake, Fish tank, Predator-prey
+   - Given all 6 prey caught at step 600, when the step ends, then the episode is over.
+ - **PREY-05** Each team has its own score: prey score = pellets eaten per prey (higher is better); predator score = prey caught per episode (higher is better).
+   - Given 18 pellets eaten and 3 prey caught, when the episode ends, then the prey score is 3 and the predator score is 3.
+-- **PREY-06** Every agent observes itself, and the nearest 2 food pellets, nearest 2 prey and nearest 2 predators within a radius of one third of the arena's width; anything outside reads "not seen".
++- **PREY-06** Every agent observes itself, and the nearest 2 food pellets, nearest 2 prey and the predator within a radius of one third of the arena's width; anything outside reads "not seen".
+   - Given a predator beyond the radius, when a prey's observation is taken, then that predator's entries read "not seen".
+-- **PREY-07** Rule-based baselines: prey flee the nearest seen predator, else move toward the nearest seen pellet; predators chase the nearest seen prey, else wander randomly.
+-  - Given a prey that sees a predator to its right, when the rule acts, then it pushes left.
+-- **PREY-08** Each trained team is evaluated against fixed opponents: trained prey against the rule-based predators, compared with random and rule-based prey; trained predators against the rule-based prey, compared with random and rule-based predators. Each passes as in EVAL-04 and EVAL-05.
++- **PREY-07** Rule-based baselines: prey flee the predator when they see it, else move toward the nearest seen pellet; the predator chases the nearest seen prey, else wanders randomly.
++  - Given a prey that sees the predator to its right, when the rule acts, then it pushes left.
++- **PREY-08** Each trained team is evaluated against fixed opponents: trained prey against the rule-based predator, compared with random and rule-based prey; the trained predator against the rule-based prey, compared with the random and rule-based predator. Each passes as in EVAL-04 and EVAL-05.
+   - Given 5 finished runs, when evaluated, then a separate verdict is shown for the prey team and the predator team.
+ - **PREY-09** The learner can play any prey checkpoint against any predator checkpoint from the same run, and see a grid of mean scores for every pairing of the 11 checkpoints of each side.
+   - Given a finished run, when the pairing grid is made, then it shows an 11 × 11 grid of prey scores and of predator scores, each cell the mean of 20 held-out episodes.
+@@ -269,17 +269,19 @@ A set of small 2D reinforcement-learning worlds (Snake, Fish tank, Predator-prey
+   - Given 5 finished runs, when the chart is made, then both teams' mean lines and bands appear against the same environment-steps axis.
+ - **PREY-11** Predator-prey runs through the same training runs, logging, replay viewer and evaluation as snake and fish tank, and their results reproduce unchanged after predator-prey is added.
+   - Given a snake run and a fish run repeated with their original settings and seeds, when they finish, then their results match the originals exactly.
++- **PREY-12** During co-training each team plays, in a stated share of training episodes, against a frozen opponent drawn from the other team's saved checkpoints (an opponent pool), and against the other team's current learner otherwise.
++  - Given a pool share of 0.5 after the 30% checkpoint, when training episodes are listed, then about half name a past opponent checkpoint.
+ 
+ **Edge cases & errors**
+-- One team stops improving or collapses during co-training (e.g. predators catch nothing for the last half of the budget) → the run still finishes and the summary flags the collapse with the step it began; it is a result to explain, not an error.
++- One team stops improving or collapses during co-training (e.g. the predator catches nothing for the last half of the budget) → the run still finishes and the summary flags the collapse with the step it began; it is a result to explain, not an error.
+ - All prey are caught early in most episodes → prey score is still computed per starting prey, so it is never inflated by fewer survivors.
+ 
+ ## Quality requirements
+ - **QR-01** A single training run of any world and variant finishes within 60 minutes on the learner's laptop (Apple Silicon, CPU only).
+   - Checked by the run's logged start and end times.
+-- **QR-02** A batch of 5 runs of one world and variant finishes within 90 minutes on the same laptop, running in parallel.
++- **QR-02** A batch of 5 runs of one world and variant finishes within 60 minutes on the same laptop, running in parallel.
+   - Checked by the batch's first start and last end time.
+-- **QR-03** Rented GPU time, if a world truly needs it, costs at most $10 per world, and is used only after a laptop run is shown to miss QR-01.
++- **QR-03** Rented GPU time, if a world truly needs it, costs at most $5 per world, and is used only after a laptop run is shown to miss QR-01.
+   - Checked against the rental bill, recorded in the world's write-up.
+ - **QR-04** The replay viewer plays at least 30 steps per second at 1× on the laptop, for every world.
+   - Checked by timing a 1,000-step replay.
+@@ -289,7 +291,7 @@ A set of small 2D reinforcement-learning worlds (Snake, Fish tank, Predator-prey
+   - Checked by running a full train, evaluate and replay cycle with networking off.
+ 
+ ## Assumptions
+-- "About an hour of training per world" means one run ≤ 60 minutes, with the 5 runs needed for evaluation running in parallel.
++- "About an hour of training per world" means the 5-run batch ≤ 60 minutes, with the 5 runs needed for evaluation running in parallel.
+ - "Several training runs" means 5 runs with different seeds.
+ - "Clearly beats" means significant at 5% after correction, and every single run beats the rule baseline.
+ - "Write the core learning algorithms myself" means the learner writes the learning algorithms; automatic gradient computation is allowed.
+diff --git a/tasks/plan.md b/tasks/plan.md
+index f7f5621..0e7badc 100644
+--- a/tasks/plan.md
++++ b/tasks/plan.md
+@@ -4,17 +4,17 @@
+ 
+ ## Scope
+ **Exit:** A snake batch of 5 seeds trains behind the method check, `rllab watch`, `chart` and `evaluate` run on it, and every M1 smoke test plus TC-01, TC-03–TC-06, TC-10–TC-22 (snake parts) pass.
+-**Covers:** TRAIN-01–TRAIN-06, LOG-01–LOG-06, EVAL-01–EVAL-06, SNAKE-01–SNAKE-07, WORLD-01–WORLD-06, CHECK-01, QR-03 · **Deferred:** SNAKE-08, QR-01, QR-02, QR-05 (to M2: measured on the tuned DQN's 5-seed batch, TC-24); QR-06 (to M2: the offline cycle includes replay); FISH-01–FISH-11 (to M3: fish tank); PREY-01–PREY-08, PREY-10, PREY-11, WORLD-07 (to M4: predator-prey, the first two-team world)
++**Covers:** TRAIN-01–TRAIN-07, LOG-01–LOG-06, EVAL-01–EVAL-06, SNAKE-01–SNAKE-07, WORLD-01–WORLD-06, CHECK-01 · **Deferred:** SNAKE-08, QR-01, QR-02, QR-05 (to M2: measured on the tuned DQN's 5-seed batch, TC-24); QR-06 (to M2: the offline cycle includes replay); REPLAY-01–REPLAY-08, CHECK-02, CHECK-03, NOTES-01–NOTES-03 (to M2: viewer, reference check, write-up); QR-03 (to M2: recorded in the snake write-up); FISH-01–FISH-11 (to M3–M5: fish tank); PREY-01–PREY-12, WORLD-07 (to M6: predator-prey, the first two-team world)
+ **Skills:** null-hypothesis-testing (permutation test, final evaluation), dataviz (learning-curve chart)
+ ## Phase 0: Interface
+ 
+ ### M1-T01: M1 interface
+-**Package:** rllab · **Step:** contract · **Kind:** interface · **Covers:** — · **Size:** S · **Mode:** solo
++**Package:** rllab · **Step:** contract · **Kind:** interface · **Covers:** — · **Size:** M · **Mode:** solo
+ **Skills:** —
+-**Read:** PL-01, PL-02, PL-03, PL-04, PL-05, PL-06, PL-08, core.ActionSpace, core.TeamSpec, core.WorldSpec, core.Step, core.EpisodeResult, core.DrawState, core.Frame, core.Episode, core.World, core.Policy, core.play_episode, core.EVAL_SEEDS, core.FINAL_SEEDS, core.Output, worlds.make, worlds.CheckWorld, baselines.RandomPolicy, baselines.RulePolicy, baselines.rule_for, baselines.BaselineMeans, baselines.baseline_means, methods.MethodConfig, methods.Transition, methods.Learner, methods.make_learner, methods.load_policy, train.RunConfig, train.load_run_configs, train.run_check, train.run_train, train.run_batch, train.CheckResult, runlog.RunRecord, runlog.EvalPoint, runlog.Checkpoint, runlog.Run, runlog.RunWriter, runlog.find_runs, runlog.open_run, runlog.Progress, runlog.progress, charts.learning_curve, evaluate.Comparison, evaluate.compare, evaluate.Summary, evaluate.final_evaluation, cli.main
++**Read:** PL-01, PL-02, PL-03, PL-04, PL-05, PL-06, PL-08, core.aliases, worlds.SnakeObs, core.ActionSpace, core.TeamSpec, core.WorldSpec, core.Step, core.EpisodeResult, core.DrawState, core.Frame, core.Episode, core.World, core.Policy, core.play_episode, core.EVAL_SEEDS, core.FINAL_SEEDS, core.Output, worlds.make, worlds.CheckWorld, baselines.RandomPolicy, baselines.RulePolicy, baselines.rule_for, baselines.BaselineMeans, baselines.baseline_means, methods.MethodConfig, methods.Transition, methods.Learner, methods.make_learner, methods.load_policy, train.RunConfig, train.load_run_configs, train.run_check, train.run_train, train.run_batch, train.CheckResult, runlog.RunRecord, runlog.EvalPoint, runlog.Checkpoint, runlog.Run, runlog.RunWriter, runlog.find_runs, runlog.open_run, runlog.Progress, runlog.progress, charts.learning_curve, evaluate.Comparison, evaluate.compare, evaluate.Summary, evaluate.final_evaluation, cli.main
+ **Acceptance:**
+ - [ ] Each M1 contract type is code in its component's `types.py` (`core` holds the protocols and seed sets); each `tests/contracts/<id>.<Type>/` sample validates against its schema, and each Protocol's replay double serves its recording
+-- [ ] Every M1 step and entry function imports with its contract signature, body `raise NotImplementedError("<its spine or wiring task>")`; each `__init__.py` exports its contract; `cli/__main__.py` dispatches `check`, `train`, `batch`, `watch`, `chart` and `evaluate`
++- [ ] Every M1 step and entry function imports with its contract signature, body `raise NotImplementedError("<its spine or wiring task>")`; each `__init__.py` exports its contract; `cli/__main__.py` dispatches `check`, `train`, `batch`, `watch`, `chart` and `evaluate`; every subcommand accepts `--smoke`, which runs its entry with the smoke settings (2,000-step budget, seeds 1–2, snake, a temp root, or the TC-14/TC-15 folders for `watch`/`chart`); the thicken stubs the spines call exist in the files their thicken tasks write, each raising `NotImplementedError("<its thicken task>")`: `check_runs` (charts/check.py), `apply_style` (charts/style.py), `holm` (evaluate/final/stats.py), `verdict` (evaluate/final/verdict.py) and `guard` (train/loop/guard.py)
+ - [ ] Every M1 `**Boundary:**` function's fake serves its fixtures; import-linter contracts encode the component directions and forbid `stable_baselines3` and `gymnasium` outside `refcheck` (CHECK-01)
+ **Verify:** `pytest tests/contracts` · `scripts/check.sh gate`
+ **Depends on:** — · **Writes:** src/rllab/__init__.py, src/rllab/core/**, src/rllab/worlds/**, src/rllab/baselines/**, src/rllab/methods/**, src/rllab/train/**, src/rllab/runlog/**, src/rllab/charts/**, src/rllab/evaluate/**, src/rllab/cli/**, tests/contracts/**
+@@ -34,7 +34,7 @@
+ **Package:** rllab · **Step:** PL-01.check_plan · **Kind:** spine · **Covers:** TRAIN-06 · **Size:** XS · **Mode:** solo
+ **Skills:** —
+ **Reason:** one module holds four steps: PL-01.train_checks, PL-01.score_checks and PL-03.require_pass share it
+-**Read:** PL-01, PL-03, train.CheckResult, worlds.CheckWorld, methods.MethodConfig, methods.Learner
++**Read:** PL-01, PL-03, train.CheckResult, worlds.CheckWorld, methods.MethodConfig, methods.Learner, worlds.make, methods.make_learner
+ **Acceptance:**
+ - [ ] On the `methods.Learner` replay double and the `worlds.CheckWorld` double, `check_plan`, `train_checks`, `score_checks` and `require_pass` return schema-valid output; `require_pass` raises `CheckFailedError` on the failing `CheckResult` sample
+ **Verify:** `pytest tests/unit/rllab -k check` · `scripts/check.sh gate`
+@@ -44,7 +44,7 @@
+ **Package:** rllab · **Step:** PL-01.CheckDiscrete · **Kind:** thicken · **Covers:** TRAIN-06 · **Size:** XS · **Mode:** split
+ **Skills:** —
+ **Reason:** fold: spine is the whole behavior
+-**Read:** PL-01, AD-09, TC-03, worlds.CheckWorld, core.World
++**Read:** PL-01, AD-09, TC-03, worlds.CheckWorld, core.World, core.WorldSpec, core.Step, core.ActionSpace
+ **Acceptance:**
+ - [ ] TC-03's `check-discrete` half passes: 6 states, best actions [left, left, right, right, right, right]
+ - [ ] Same seed gives the same start; actions outside `Discrete(2)` raise `ActionError`
+@@ -56,15 +56,15 @@
+ **Skills:** —
+ **Read:** PL-02, worlds.make, core.World, core.WorldSpec
+ **Acceptance:**
+-- [ ] `make("snake")` and `make("check-discrete")` return worlds whose `spec` is readable without a reset; an unknown world, variant or override raises `ValueError` naming it
++- [ ] On the `core.World` double, `make` maps `snake` and `check-discrete` to their classes; an unknown world, variant or override raises `ValueError` naming it
+ **Verify:** `pytest tests/unit/rllab -k make` · `scripts/check.sh gate`
+ **Depends on:** M1-T01 · **Writes:** src/rllab/worlds/make.py, tests/unit/rllab/test_make.py
+ 
+ ### M1-T06: Snake world
+-**Package:** rllab · **Step:** PL-02.Snake · **Kind:** thicken · **Covers:** SNAKE-01–SNAKE-06, WORLD-01–WORLD-06 · **Size:** XS · **Mode:** split
++**Package:** rllab · **Step:** PL-02.Snake · **Kind:** thicken · **Covers:** SNAKE-01–SNAKE-06, WORLD-01–WORLD-06 · **Size:** S · **Mode:** split
+ **Skills:** —
+ **Reason:** fold: spine is the whole behavior
+-**Read:** PL-02, TC-06, TC-10, TC-12, SNAKE-01, SNAKE-02, SNAKE-03, SNAKE-04, SNAKE-05, SNAKE-06, core.World, core.Step, core.DrawState, core.EpisodeResult
++**Read:** PL-02, TC-06, TC-10, TC-12, SNAKE-01, SNAKE-02, SNAKE-03, SNAKE-04, SNAKE-05, SNAKE-06, core.World, core.Step, core.DrawState, core.EpisodeResult, core.WorldSpec, core.TeamSpec, core.ActionSpace, worlds.SnakeObs
+ **Acceptance:**
+ - [ ] TC-06 passes
+ - [ ] TC-10's snake half passes
+@@ -93,12 +93,12 @@
+ **Depends on:** M1-T01 · **Writes:** src/rllab/methods/dqn/**, src/rllab/methods/factory.py, tests/unit/rllab/test_dqn.py
+ 
+ ### M1-T09: train_loop spine (budget, checkpoints, evaluations)
+-**Package:** rllab · **Step:** PL-02.train_loop · **Kind:** spine · **Covers:** TRAIN-01–TRAIN-04, LOG-01, LOG-02, QR-03 · **Size:** S · **Mode:** solo
++**Package:** rllab · **Step:** PL-02.train_loop · **Kind:** spine · **Covers:** TRAIN-01–TRAIN-04, LOG-01, LOG-02 · **Size:** S · **Mode:** solo
+ **Skills:** —
+ **Reason:** also builds `runlog.RunWriter`, the contract class train_loop writes the run folder through
+-**Read:** PL-02, AD-05, AD-06, train.run_train, runlog.RunWriter, runlog.RunRecord, runlog.EvalPoint, core.play_episode, core.EVAL_SEEDS, methods.Learner
++**Read:** PL-02, AD-05, AD-06, train.run_train, runlog.RunWriter, runlog.RunRecord, runlog.EvalPoint, core.play_episode, core.EVAL_SEEDS, methods.Learner, methods.Transition, runlog.Checkpoint, core.Episode, core.World
+ **Acceptance:**
+-- [ ] On the `core.World` and `methods.Learner` doubles with a 2,000-step budget: exactly 2,000 world steps, checkpoints at every 10%, 21 evaluation points on `EVAL_SEEDS`, all written through `RunWriter`
++- [ ] On a scripted fake World (fixed 50-step episodes on any seed) and the `methods.Learner` double with a 2,000-step budget: exactly 2,000 world steps, checkpoints at every 10%, 21 evaluation points on `EVAL_SEEDS`, all written through `RunWriter`; each step passes through the `guard` stub that M1-T27 fills
+ - [ ] `RunWriter` refuses an existing run name with `RunExistsError` before writing; `run.json` is replaced atomically on each status change
+ **Verify:** `pytest tests/unit/rllab -k train_loop` · `scripts/check.sh gate`
+ **Depends on:** M1-T01 · **Writes:** src/rllab/train/loop/**, src/rllab/runlog/writer.py, tests/unit/rllab/test_loop.py
+@@ -116,7 +116,7 @@
+ **Package:** rllab · **Step:** PL-04.progress · **Kind:** thicken · **Covers:** LOG-06 · **Size:** XS · **Mode:** split
+ **Skills:** —
+ **Reason:** fold: spine is the whole behavior
+-**Read:** PL-04, TC-14, runlog.progress, runlog.Progress
++**Read:** PL-04, TC-14, runlog.progress, runlog.Progress, runlog.EvalPoint
+ **Acceptance:**
+ - [ ] TC-14 passes
+ - [ ] A missing run path raises `FileNotFoundError`
+@@ -124,9 +124,9 @@
+ **Depends on:** M1-T01 · **Writes:** src/rllab/runlog/progress.py, tests/intent/rllab/test_progress.py, tests/unit/rllab/test_progress.py
+ 
+ ### M1-T12: find_runs spine (glob finished runs)
+-**Package:** rllab · **Step:** PL-05.find_runs · **Kind:** spine · **Covers:** TRAIN-01 · **Size:** XS · **Mode:** solo
++**Package:** rllab · **Step:** PL-05.find_runs · **Kind:** spine · **Covers:** LOG-03 · **Size:** XS · **Mode:** solo
+ **Skills:** —
+-**Read:** PL-05, PL-12, runlog.find_runs, runlog.open_run, runlog.Run, runlog.RunRecord
++**Read:** PL-05, PL-12, TC-15, runlog.find_runs, runlog.open_run, runlog.Run, runlog.RunRecord, runlog.EvalPoint, runlog.Checkpoint, core.EpisodeResult
+ **Acceptance:**
+ - [ ] On TC-15's hand-built folders, `find_runs` returns finished runs plus those named in `include`, and `open_run` opens any status; a `running` run with no live process reads as `incomplete`
+ **Verify:** `pytest tests/unit/rllab -k find_runs` · `scripts/check.sh gate`
+@@ -135,9 +135,9 @@
+ ### M1-T13: baseline_means spine (20 evaluation seeds)
+ **Package:** rllab · **Step:** PL-05.baseline_means · **Kind:** spine · **Covers:** EVAL-02 · **Size:** XS · **Mode:** solo
+ **Skills:** —
+-**Read:** PL-05, baselines.baseline_means, baselines.BaselineMeans, baselines.rule_for, baselines.RulePolicy, core.play_episode, core.EVAL_SEEDS
++**Read:** PL-05, baselines.baseline_means, baselines.BaselineMeans, baselines.rule_for, baselines.RulePolicy, core.play_episode, core.EVAL_SEEDS, worlds.make, baselines.RandomPolicy, core.WorldSpec, core.TeamSpec
+ **Acceptance:**
+-- [ ] On the `core.World` double, `baseline_means` plays random and rule per team on the 20 `EVAL_SEEDS` and returns a schema-valid `BaselineMeans`; `rule_for` returns the snake rule with its one-sentence `description` and raises `KeyError` for an unknown world
++- [ ] On the `core.World` double, `baseline_means` plays random and rule per team on the 20 `EVAL_SEEDS` and returns a schema-valid `BaselineMeans`; `rule_for` maps `snake` to the snake rule class (checked on the `baselines.RulePolicy` double) and raises `KeyError` for an unknown world
+ **Verify:** `pytest tests/unit/rllab -k baseline_means` · `scripts/check.sh gate`
+ **Depends on:** M1-T01 · **Writes:** src/rllab/baselines/means.py, tests/unit/rllab/test_means.py
+ 
+@@ -153,7 +153,7 @@
+ ### M1-T15: SnakeRule spine (shorter axis toward food)
+ **Package:** rllab · **Step:** PL-05.SnakeRule · **Kind:** spine · **Covers:** SNAKE-07, EVAL-02 · **Size:** XS · **Mode:** solo
+ **Skills:** —
+-**Read:** PL-05, SNAKE-07, SNAKE-06, baselines.RulePolicy, core.Policy
++**Read:** PL-05, SNAKE-07, SNAKE-06, baselines.RulePolicy, core.Policy, worlds.SnakeObs
+ **Acceptance:**
+ - [ ] Given the food to the right and a free cell to the right, when the rule acts, then it moves right; when that move would end the episode next step, it takes a move that doesn't; `description` is one sentence (EVAL-02)
+ **Verify:** `pytest tests/unit/rllab -k snakerule` · `scripts/check.sh gate`
+@@ -164,16 +164,16 @@
+ **Skills:** dataviz
+ **Read:** PL-05, LOG-03, LOG-05, charts.learning_curve, runlog.Run, baselines.BaselineMeans, core.Output
+ **Acceptance:**
+-- [ ] On the `runlog.Run` double ×5 and the `BaselineMeans` sample, `learning_curve` writes a PNG and SVG with one mean line, one min–max band and two baseline lines per team, axes labelled with the score name and "environment steps"; `measure=` draws a declared measure the same way; returns a `core.Output` of kind `chart`
++- [ ] On the `runlog.Run` double ×5 and the `BaselineMeans` sample, `learning_curve` writes a PNG and SVG with one mean line, one min–max band and two baseline lines per team, axes labelled with the score name and "environment steps"; `measure=` draws a declared measure the same way; returns a `core.Output` of kind `chart`; the spine calls the `check_runs` (M1-T28) and `apply_style` (M1-T29) stubs M1-T01 created
+ **Verify:** `pytest tests/unit/rllab -k learning_curve` · `scripts/check.sh gate`
+ **Depends on:** M1-T01 · **Writes:** src/rllab/charts/curve.py, tests/unit/rllab/test_curve.py
+ 
+ ### M1-T17: final_evaluation spine (serial play on the final seeds)
+ **Package:** rllab · **Step:** PL-06.final_evaluation · **Kind:** spine · **Covers:** EVAL-03, EVAL-06 · **Size:** S · **Mode:** solo
+ **Skills:** null-hypothesis-testing
+-**Read:** PL-06, EVAL-03, EVAL-06, evaluate.final_evaluation, evaluate.Summary, runlog.Run, core.play_episode, core.FINAL_SEEDS, methods.load_policy, baselines.RandomPolicy, baselines.rule_for
++**Read:** PL-06, EVAL-03, EVAL-06, evaluate.final_evaluation, evaluate.Summary, runlog.Run, core.play_episode, core.FINAL_SEEDS, methods.load_policy, baselines.RandomPolicy, baselines.rule_for, evaluate.Comparison, runlog.Checkpoint, worlds.make
+ **Acceptance:**
+-- [ ] On the `runlog.Run` double ×5, `final_evaluation` plays each final checkpoint and both baselines on `FINAL_SEEDS` serially and writes `summary.json` with every EVAL-06 field, one schema-valid `Summary` per team; `compare` and `verdict` stay the stubs their thicken tasks name
++- [ ] On the `runlog.Run` double ×5, `final_evaluation` plays each final checkpoint and both baselines on `FINAL_SEEDS` serially and writes `summary.json` with every EVAL-06 field, one schema-valid `Summary` per team; the spine calls the `compare`/`holm` (M1-T25) and `verdict` (M1-T26) stubs M1-T01 created
+ **Verify:** `pytest tests/unit/rllab -k final_evaluation` · `scripts/check.sh gate`
+ **Depends on:** M1-T01 · **Writes:** src/rllab/evaluate/final/play.py, src/rllab/evaluate/final/summary.py, tests/unit/rllab/test_final.py
+ 
+@@ -200,12 +200,12 @@
+ **Depends on:** M1-T02, M1-T03, M1-T04, M1-T08 · **Writes:** src/rllab/train/pipelines/pl01_check.py, tests/unit/rllab/test_pl01_smoke.py
+ 
+ ### M1-T20: Wire PL-02
+-**Package:** rllab · **Step:** PL-02 · **Kind:** wiring · **Covers:** TRAIN-01–TRAIN-04, TRAIN-02 · **Size:** XS · **Mode:** solo
++**Package:** rllab · **Step:** PL-02 · **Kind:** wiring · **Covers:** TRAIN-01–TRAIN-04 · **Size:** XS · **Mode:** solo
+ **Skills:** —
+ **Read:** PL-02, TC-04, TC-05, TC-11, train.run_train
+ **Acceptance:**
+ - [ ] `rllab train --smoke` runs end to end; committed as PL-02's smoke test
+-- [ ] TC-04, TC-05 and TC-11 pass
++- [ ] TC-04, TC-05 and TC-11 pass; `make("snake")` returns the real Snake world, whose `spec` is readable without a reset
+ - [ ] PL-02 pre-build sections replaced by a `dt layout` pointer
+ **Verify:** `rllab train --smoke` · `scripts/check.sh gate`
+ **Depends on:** M1-T05, M1-T06, M1-T07, M1-T08, M1-T09, M1-T18 · **Writes:** src/rllab/train/pipelines/pl02_train.py, tests/unit/rllab/test_pl02_smoke.py
+@@ -223,7 +223,7 @@
+ ### M1-T22: Wire PL-04
+ **Package:** rllab · **Step:** PL-04 · **Kind:** wiring · **Covers:** LOG-06 · **Size:** XS · **Mode:** solo
+ **Skills:** —
+-**Read:** PL-04, runlog.progress, cli.main
++**Read:** PL-04, TC-14, runlog.progress, cli.main
+ **Acceptance:**
+ - [ ] `rllab watch --smoke` prints one snapshot of TC-14's folder; committed as PL-04's smoke test
+ - [ ] PL-04 pre-build sections replaced by a `dt layout` pointer
+@@ -233,9 +233,9 @@
+ ### M1-T23: Wire PL-05
+ **Package:** rllab · **Step:** PL-05 · **Kind:** wiring · **Covers:** LOG-03 · **Size:** XS · **Mode:** solo
+ **Skills:** —
+-**Read:** PL-05, runlog.find_runs, baselines.baseline_means, charts.learning_curve
++**Read:** PL-05, TC-15, runlog.find_runs, baselines.baseline_means, baselines.rule_for, charts.learning_curve
+ **Acceptance:**
+-- [ ] `rllab chart --smoke` draws a chart from TC-15's equal-settings folders; committed as PL-05's smoke test
++- [ ] `rllab chart --smoke` draws a chart from TC-15's equal-settings folders; committed as PL-05's smoke test; `rule_for("snake", "default", "snake")` returns the real snake rule with its one-sentence `description`
+ - [ ] PL-05 pre-build sections replaced by a `dt layout` pointer
+ **Verify:** `rllab chart --smoke` · `scripts/check.sh gate`
+ **Depends on:** M1-T12, M1-T13, M1-T14, M1-T15, M1-T16, M1-T18, M1-T06, M1-T05 · **Writes:** src/rllab/cli/pipelines/pl05_chart.py, tests/unit/rllab/test_pl05_smoke.py
+@@ -248,7 +248,7 @@
+ - [ ] `rllab evaluate --smoke` runs end to end on the `runlog.Run` doubles; committed as PL-06's smoke test
+ - [ ] PL-06 pre-build sections replaced by a `dt layout` pointer
+ **Verify:** `rllab evaluate --smoke` · `scripts/check.sh gate`
+-**Depends on:** M1-T12, M1-T17, M1-T18, M1-T14, M1-T15, M1-T08 · **Writes:** src/rllab/cli/pipelines/pl06_evaluate.py, tests/unit/rllab/test_pl06_smoke.py
++**Depends on:** M1-T05, M1-T06, M1-T08, M1-T12, M1-T14, M1-T15, M1-T17, M1-T18 · **Writes:** src/rllab/cli/pipelines/pl06_evaluate.py, tests/unit/rllab/test_pl06_smoke.py
+ 
+ ### M1-T25: Paired permutation test with Holm correction
+ **Package:** rllab · **Step:** PL-06.final_evaluation · **Kind:** thicken · **Covers:** EVAL-04 · **Size:** XS · **Mode:** split
+@@ -271,7 +271,7 @@
+ **Depends on:** M1-T17 · **Writes:** src/rllab/evaluate/final/verdict.py, tests/intent/rllab/test_verdict.py, tests/unit/rllab/test_verdict.py
+ 
+ ### M1-T27: Invalid-number stop
+-**Package:** rllab · **Step:** PL-02.train_loop · **Kind:** thicken · **Covers:** TRAIN-01 · **Size:** XS · **Mode:** split
++**Package:** rllab · **Step:** PL-02.train_loop · **Kind:** thicken · **Covers:** TRAIN-01 (edge case: invalid number) · **Size:** XS · **Mode:** split
+ **Skills:** —
+ **Read:** PL-02, train.run_train, methods.Learner, runlog.RunRecord
+ **Acceptance:**
+@@ -314,9 +314,9 @@
+ **Read:** PL-02, PL-03, PL-06, train.run_train, TC-01, TC-13, TC-21, TC-22
+ **Acceptance:**
+ - [ ] PL-03 calls the real `run_train`; the fake stays for the contract tests
+-- [ ] Every M1 smoke command passes; TC-13, TC-21 and TC-22 pass on real snake runs
++- [ ] Every M1 smoke command passes; TC-13, TC-21 and TC-22 pass on real snake runs; `make("check-discrete")` returns the real corridor world, whose `spec` is readable without a reset
+ **Verify:** `rllab check --smoke` · `rllab train --smoke` · `rllab batch --smoke` · `rllab watch --smoke` · `rllab chart --smoke` · `rllab evaluate --smoke` · `scripts/check.sh gate`
+-**Depends on:** M1-T19, M1-T20, M1-T21, M1-T22, M1-T23, M1-T24, M1-T25, M1-T26, M1-T27, M1-T28, M1-T29 · **Writes:** src/rllab/train/pipelines/pl03_batch.py
++**Depends on:** M1-T19, M1-T20, M1-T21, M1-T22, M1-T23, M1-T24, M1-T25, M1-T26, M1-T27, M1-T28, M1-T29 · **Writes:** src/rllab/train/pipelines/pl03_batch.py, tests/intent/rllab/test_batch_real.py, tests/intent/rllab/test_final_real.py
+ 
+ ### Checkpoint: milestone exit
+ - [ ] Every pipeline in the milestone runs end to end (smoke commands)
+@@ -361,6 +361,8 @@
+ | M1-T24 Wire PL-06 | M1-T14 RandomPolicy spine (uniform draws) | order | none: integration: the smoke runs it |
+ | M1-T24 Wire PL-06 | M1-T15 SnakeRule spine (shorter axis toward food) | order | none: integration: the smoke runs it |
+ | M1-T24 Wire PL-06 | M1-T08 DQN spine (online one-step Q-learning) | order | none: integration: the smoke runs it |
++| M1-T24 Wire PL-06 | M1-T05 make spine (name lookup) | order | none: integration: the smoke runs it |
++| M1-T24 Wire PL-06 | M1-T06 Snake world | order | none: integration: the smoke runs it |
+ | M1-T25 Paired permutation test with Holm correction | M1-T17 final_evaluation spine (serial play on the final seeds) | code | none: extends the step its spine built |
+ | M1-T26 Baseline verdict rule | M1-T17 final_evaluation spine (serial play on the final seeds) | code | none: extends the step its spine built |
+ | M1-T27 Invalid-number stop | M1-T09 train_loop spine (budget, checkpoints, evaluations) | code | none: extends the step its spine built |
+@@ -393,6 +395,6 @@
+ | Seeding leaks between training and evaluation | TC-04 passes alone but runs differ once evaluations interleave | TC-04 runs with evaluations on; AD-05 keeps every generator spawned per episode |
+ 
+ ## Open questions
+-- `boundaries_unfrozen` lists only symbols no M1 step uses (replay, refcheck, notes, the pairing grid, `evaluate.load_summaries`); each is frozen by the interface task of the milestone that first wires it (M2, or M4 for the grid).
++- `boundaries_unfrozen` lists only symbols no M1 step uses (replay, refcheck, notes, the pairing grid, `evaluate.load_summaries`); each is frozen by the interface task of the milestone that first wires it (M2, or M6 for the grid).
+ 
+ ## Replan notes
+diff --git a/tasks/todo.md b/tasks/todo.md
+index 68f31fe..66d11dc 100644
+--- a/tasks/todo.md
++++ b/tasks/todo.md
+@@ -1,11 +1,11 @@
+ # M1: Train and evaluate a snake — Todo
+ 
+-- [ ] M1-T01 M1 interface (rllab, S, solo)
++- [ ] M1-T01 M1 interface (rllab, M, solo)
+ - [ ] M1-T02 load_run_configs spine (TOML with method defaults) (rllab, XS, solo)
+ - [ ] M1-T03 Check steps spine (plan, train, score, require pass) (rllab, XS, solo)
+ - [ ] M1-T04 CheckDiscrete two-exit corridor (rllab, XS, split)
+ - [ ] M1-T05 make spine (name lookup) (rllab, XS, solo)
+-- [ ] M1-T06 Snake world (rllab, XS, split)
++- [ ] M1-T06 Snake world (rllab, S, split)
+ - [ ] M1-T07 make_learners spine (one learner per team) (rllab, XS, solo)
+ - [ ] M1-T08 DQN spine (online one-step Q-learning) (rllab, S, solo)
+ - [ ] M1-T09 train_loop spine (budget, checkpoints, evaluations) (rllab, S, solo)
+diff --git a/tests/fixtures/rllab/TC-07/expected.json b/tests/fixtures/rllab/TC-07/expected.json
+index 6c781bd..f4244f3 100644
+--- a/tests/fixtures/rllab/TC-07/expected.json
++++ b/tests/fixtures/rllab/TC-07/expected.json
+@@ -1 +1 @@
+-{"property": "score == total_hits / 4 on every episode; episode length 1000; overlapping fish add no hit", "spec_instance": {"fish": 4, "hits": 6, "score": 1.5}, "direction": "lower", "tol": 1e-12}
++{"property": "score == mean over the 4 fish of steps survived on every episode; episode ends at 1000 steps or when the last fish is hit; overlapping fish add no hit", "direction": "higher", "tol": 1e-12}
+diff --git a/tests/fixtures/rllab/TC-08/expected.json b/tests/fixtures/rllab/TC-08/expected.json
+index 2be32e5..50316a4 100644
+--- a/tests/fixtures/rllab/TC-08/expected.json
++++ b/tests/fixtures/rllab/TC-08/expected.json
+@@ -1 +1 @@
+-{"property": "ball speed constant every step and its normal component flips at each wall touch; fish speed non-decreasing toward top speed and never above it; fish top speed < ball speed; after a hit the fish is >= tank_width/4 from the ball; fish position always inside the tank; predator top speed == 1.2 * prey top speed", "tol_rel": 1e-9}
++{"property": "ball speed constant every step and its velocity reflected about the circle's normal at each wall touch; fish speed non-decreasing toward top speed and never above it; fish top speed < ball speed; a hit fish is inactive with zero rows for the rest of the episode; fish position always within the circle; predator top speed == 1.2 * prey top speed", "tol_rel": 1e-9}
+diff --git a/tests/fixtures/rllab/TC-09/expected.json b/tests/fixtures/rllab/TC-09/expected.json
+index ee1f5f9..5c39db8 100644
+--- a/tests/fixtures/rllab/TC-09/expected.json
++++ b/tests/fixtures/rllab/TC-09/expected.json
+@@ -1 +1 @@
+-{"start_counts": {"prey": 6, "predators": 2, "pellets": 10}, "property": "nothing touching at start; prey score == pellets eaten / 6; predator score == prey caught; a caught prey is inactive with zero rows afterwards; episode ends at 1000 steps or when all 6 prey are caught", "spec_instance": {"pellets_eaten": 18, "caught": 3, "prey_score": 3.0, "predator_score": 3}, "tol": 1e-12}
++{"start_counts": {"prey": 6, "predators": 1, "pellets": 10}, "property": "nothing touching at start; prey score == pellets eaten / 6; predator score == prey caught; a caught prey is inactive with zero rows afterwards; episode ends at 1000 steps or when all 6 prey are caught", "spec_instance": {"pellets_eaten": 18, "caught": 3, "prey_score": 3.0, "predator_score": 3}, "tol": 1e-12}
+diff --git a/tests/fixtures/rllab/TC-17/expected.json b/tests/fixtures/rllab/TC-17/expected.json
+index 72a5efb..ae0717f 100644
+--- a/tests/fixtures/rllab/TC-17/expected.json
++++ b/tests/fixtures/rllab/TC-17/expected.json
+@@ -1 +1 @@
+-{"property": "number of generator seeds (of 20) where either comparison is rejected after Holm", "max_rejecting_seeds": 1, "alpha": 0.05, "correction": "holm"}
++{"property": "number of generator seeds (of 20) where either comparison is rejected after Holm", "alpha": 0.05, "correction": "holm"}
+diff --git a/tests/fixtures/rllab/TC-23/expected.json b/tests/fixtures/rllab/TC-23/expected.json
+index ea53970..c050321 100644
+--- a/tests/fixtures/rllab/TC-23/expected.json
++++ b/tests/fixtures/rllab/TC-23/expected.json
+@@ -1 +1 @@
+-{"teams": ["prey", "predator"], "opponents": {"prey": "rule predators", "predator": "rule prey"}, "collapse_run": {"predator": 1600, "prey": null}, "tol": 0}
++{"teams": ["prey", "predator"], "opponents": {"prey": "rule predator", "predator": "rule prey"}, "collapse_run": {"predator": 1600, "prey": null}, "tol": 0}
+diff --git a/tests/fixtures/rllab/TC-24/expected.json b/tests/fixtures/rllab/TC-24/expected.json
+index 276a95a..019a710 100644
+--- a/tests/fixtures/rllab/TC-24/expected.json
++++ b/tests/fixtures/rllab/TC-24/expected.json
+@@ -1 +1 @@
+-{"beats_baselines": true, "max_minutes": {"run": 60, "batch": 90, "final_evaluation": 10}, "alpha": 0.05, "correction": "holm"}
++{"beats_baselines": true, "max_minutes": {"run": 60, "batch": 60, "final_evaluation": 10}, "alpha": 0.05, "correction": "holm"}

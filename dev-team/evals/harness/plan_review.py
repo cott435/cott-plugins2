@@ -2,14 +2,19 @@
 """A final plan-review pass on a copy of a finished run: a read-only reviewer lists defects against the user's own
 messages (plan_review_prompt.md), then a fixer applies them to the copy's docs and plan (plan_fix_prompt.md).
 
-Usage: plan_review.py <run-copy> [review|fix|all]   (default all)
+Usage: plan_review.py <run-copy> [prepare|review|fix|all]   (default all)
   <run-copy> is a with_skill folder laid out like a driver run (project/, plugin/, turns.json), never the original.
   prepare (part of review) writes project/.review/: user_messages.md (each turn's user message from turns.json),
   packets/context__<task>.md (`dt context` for every task) and lint.txt (`dt lint`).
   review runs the reviewer (`claude -p`, REVIEW_MODEL, default claude-opus-5-5, Read/Glob/Grep only) from project/
   and saves its JSON to <run-copy>/review/review.json and project/.review/review.json.
+  prepare alone writes project/.review/ without running the reviewer, so fix can run on a review.json put there
+  by hand (an earlier run's list, to test the fixer alone).
   fix runs the fixer (Read/Edit/Glob/Grep, Bash only for the run's dt) from project/, saves its reply to
-  <run-copy>/review/fix.json, removes project/.review/ and commits the edits in the copy as "plan review fixes".
+  <run-copy>/review/fix.json, removes project/.review/ and commits the edits to docs/, tasks/ and
+  tests/fixtures/ (the expected.json values the fixer may change) in the copy as "plan review fixes".
+  The fixer runs without the plugin, so dt guard's prompt on expected.json writes never fires; fix.json's
+  oracle_edits lists every such write with the developer's turn.
   Each step's cost, turns and seconds go to <run-copy>/review/cost.json.
 """
 import json, os, pathlib, re, shutil, subprocess, sys, time
@@ -83,7 +88,8 @@ def fix(run):
     (run / "review" / "fix.json").write_text(json.dumps(reply, indent=1))
     record(run, "fix", cost)
     shutil.rmtree(proj / ".review", ignore_errors=True)
-    subprocess.run(["git", "add", "-A", "docs", "tasks"], cwd=proj, check=True)
+    subprocess.run(["git", "add", "-A", "docs", "tasks", *(["tests/fixtures"] if (proj / "tests/fixtures").exists() else [])],
+                   cwd=proj, check=True)
     subprocess.run(["git", "commit", "-qm", "plan review fixes"], cwd=proj)
     print(run.parent.name, "fix:", len(reply.get("applied", [])), "applied,", len(reply.get("skipped", [])), "skipped",
           f"${cost['cost_usd']:.2f}")
@@ -94,6 +100,8 @@ if __name__ == "__main__":
     if re.search(r"/iteration-\d+/", str(run)):
         sys.exit(f"plan_review: {run} is an original run; review a copy")
     step = sys.argv[2] if len(sys.argv) > 2 else "all"
+    if step == "prepare":
+        print(run.parent.name, "prepared:", prepare(run), "packets")
     if step in ("review", "all"):
         review(run)
     if step in ("fix", "all"):

@@ -2,6 +2,24 @@
 
 One entry per tagged release, newest first.
 
+## [0.5.0] - 2026-10-18
+
+### Added
+- `/dev-team:plan`: drives planning with one child session per skill run. `dt next` names the next skill run, its mode and why; `dt route` records a change for an upstream skill.
+- `docs/requests.md`: every planning skill records the user's words verbatim (`UR-NN`, `dt request add`) and traces each to the IDs that honour it, or to a change the user approved (`dt request change … --into`, naming every ID the change was written into). Lints `request-format`, `request-trace`, `request-open`, `request-edit`, `request-ref` (errors) and `request-number`, `request-cite`, `request-source` (warnings). Each gate's **Your words** line quotes the words beside the traced text.
+- `dt explain [--write]`: the pipelines in plain words (`docs/explained/<pkg>.md`): what each is for, how it runs, each step's job and the requirements it serves. Pipelines carry a one-sentence `**Purpose:**`. `explain-stale` warns when a written page drifts.
+- `dt context` closes a packet over nested contract types and marks a Writes path an earlier task wrote `(from M1-Txx)`.
+- Plan lints: `milestone-lines`, `milestone-order`, `exit-cases-in-scope`, `kind-title`, `covers-vs-deferred` (errors); `packet-type-closure`, `parallel-step`, `closed-open-question`, `process-narration` (warnings).
+- build-setup: a pylint tool reference; reviewer and implementer agent templates revised for the build phase.
+- Design: `design/build-phase.md` (dev-team owns the build), `design/requests.md`, `design/plan-sequence.html`.
+
+### Changed
+- pipeline-design: one entry module per pipeline, library classes as steps, helper folders, probe stand-ins. build-planning: wiring on spines and folds only, folds are split thickens, `__main__.py` in the interface task, every In → Out type declared by the interface task.
+- architecture-design: a Boundary line and a fake for cross-pipeline functions, field types defined, no contract split for size or direction.
+- test-planning: trusts the user's facts and cites their request as Source; looks up at most three, only when a case rests on one.
+- idea-refine Extend: a new stage never adds a goal. api-probe: every probe run writes evidence.
+- A project that passed `dt lint` under 0.4.0 can now fail it: the new milestone, plan and request lints are errors.
+
 ## [0.4.0] - 2026-10-17
 
 ### Added

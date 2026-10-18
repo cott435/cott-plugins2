@@ -1,0 +1,112 @@
+{
+ "winner": "B",
+ "reasoning": "The two sets share most of their structure: the same 10 milestones, the same 46 M1 tasks, the same pipelines, and the same reference handling (the PCA reference is assigned to the qrisk study milestone, and the TFT files go to M8). B fixes several real problems that A still has. First, A replaced the WebSocket progress channel the user asked for with Server-Sent Events. AD-07 even lists WebSockets as a rejected alternative. B uses a WebSocket throughout: the architecture, contracts, pipelines, plan and packets. Second, A uses yfinance for the cross-check, but the user specified yahooquery. B switches AD-03, PB-03 and the stack to yahooquery and keeps the chart endpoint as a fallback. Third, A gives exit criteria only to M1, while B gives every milestone checkable exit criteria. Fourth, B adds closed-form golden cases for the point-in-time core (split and dividend returns, add-date membership, a late dividend invisible as of K\u22121, a reused ticker, first-known stamping), where A's qdata has no golden cases even though its checkpoint says \"All golden cases pass\". B's packets are also more complete. For example, A's M1-T21 mount_reads packet leaves out query.Company, Actions, Returns, checks.Failure and xcheck.Comparison, and has no Catalog input, even though CompanyPage carries failures; B adds all of these. B also cleans up the plan: M1-T04 no longer claims DATA-01, which the plan defers; it removes A's create_app check, which needed a route list that doesn't exist yet; it handles the deferred mount_studies explicitly in the PL-10 wiring task; and it moves the backtest cost cases into M8, which runs the backtest with costs. Neither set is perfect. Both still use nasdaq-data-link rather than Sharadar's own API, and B's probes still list yfinance docs it read. Even so, B is clearly stronger.",
+ "rubric": {
+  "A": {
+   "content": {
+    "quant_soundness": 4,
+    "null_hypothesis_handoff": 4,
+    "reference_use": 4,
+    "stage_completeness": 4,
+    "internal_consistency": 3,
+    "right_sizing": 4,
+    "milestone_quality": 3,
+    "pipeline_clarity": 4,
+    "interface_quality": 3,
+    "dependency_graph_soundness": 3,
+    "task_buildability": 3
+   },
+   "structure": {
+    "organization": 4,
+    "readability_for_solo_learner": 3,
+    "ease_of_finding_next_build_step": 4,
+    "layout_sensibility": 4
+   },
+   "content_score": 3.5,
+   "structure_score": 3.8,
+   "overall_score": 7.3
+  },
+  "B": {
+   "content": {
+    "quant_soundness": 4,
+    "null_hypothesis_handoff": 4,
+    "reference_use": 4,
+    "stage_completeness": 4,
+    "internal_consistency": 4,
+    "right_sizing": 4,
+    "milestone_quality": 4,
+    "pipeline_clarity": 4,
+    "interface_quality": 4,
+    "dependency_graph_soundness": 4,
+    "task_buildability": 4
+   },
+   "structure": {
+    "organization": 4,
+    "readability_for_solo_learner": 3,
+    "ease_of_finding_next_build_step": 4,
+    "layout_sensibility": 4
+   },
+   "content_score": 4.0,
+   "structure_score": 3.8,
+   "overall_score": 7.8
+  }
+ },
+ "output_quality": {
+  "A": {
+   "score": 6,
+   "strengths": [
+    "Clear vertical-slice milestones with a walking skeleton first and real-data milestones later",
+    "A thorough dependency graph with mitigations",
+    "Point-in-time first-known design (AD-05) and the total-return formula (AD-06) are sound"
+   ],
+   "weaknesses": [
+    "Replaces the user's WebSocket requirement with SSE",
+    "Uses yfinance instead of the yahooquery the user specified",
+    "Only M1 has exit criteria",
+    "No golden cases for the point-in-time core, yet the checkpoint says 'All golden cases pass'",
+    "Packets leave out needed types (M1-T21)"
+   ]
+  },
+  "B": {
+   "score": 7,
+   "strengths": [
+    "Uses a WebSocket progress channel throughout, with seq-based resume",
+    "Uses yahooquery for the cross-check, with the chart endpoint as a fallback",
+    "Every milestone has checkable exit criteria",
+    "Closed-form golden cases (TC-74 to TC-79) for returns, membership and as-of reads",
+    "Richer Read lists in packets; the deferred mount_studies and mark_books are handled explicitly"
+   ],
+   "weaknesses": [
+    "Still uses nasdaq-data-link rather than Sharadar's own API (api.sharadar.com)",
+    "Probes still cite yfinance docs and a yfinance run",
+    "The three interface tasks run in series (T01\u2192T02\u2192T03), which lengthens the critical path",
+    "Golden cases only for PL-04 and PL-08; checks and xcheck have none yet"
+   ]
+  }
+ },
+ "unbuildable_tasks": {
+  "A": [
+   "M1-T21: the packet lacks query.Company, query.Actions, query.Returns, checks.Failure, xcheck.Comparison and store.Catalog, but CompanyPage and CrossCheckView mirror them, and failures need the Catalog that mount_reads does not receive",
+   "M1-T20: the acceptance check 'the route list matches api.create_app exactly' cannot be checked in a split spine before the mount_* tasks exist",
+   "M1-T02: the qserver stubs import qdata types, but the packet does not include them and the task runs in parallel with M1-T01"
+  ],
+  "B": []
+ },
+ "defects": {
+  "A": [
+   "architecture.md AD-07: 'Alternatives: WebSockets \u2014 two-way messaging isn't needed' \u2014 overrides the user's explicit WebSocket requirement",
+   "architecture.md AD-03: 'Yahoo via yfinance as the cross-check source' \u2014 the user specified yahooquery",
+   "roadmap.md M2\u2013M10 have no **Exit:** lines \u2014 later milestones lack checkable exit criteria",
+   "packages/qdata/tests.md: 'No golden cases yet' while plan.md checkpoint says '- [ ] All golden cases pass'",
+   "tasks/plan.md M1-T04: 'Covers: DATA-01' while the Scope says 'Deferred: DATA-01 (to M3\u2026)'",
+   "qserver/pipelines.md PL-10: 'mount_reads | App, VersionedStore \u2192 App' but CompanyPage includes failures from the Catalog",
+   "roadmap.md M2: 'Skills: \u2014' for a milestone that builds explorer check pages (frontend-design)"
+  ],
+  "B": [
+   "qdata/pipelines.md: 'nasdaq-data-link datatable calls' \u2014 the user's Sharadar access is its own API, api.sharadar.com",
+   "probes.md PB-03: 'Docs read: ranaroussi.github.io/yfinance\u2026' \u2014 leftover yfinance material in a yahooquery probe",
+   "architecture.md Risks: 'AD-03 is revised toward yahooquery' \u2014 AD-03 already chooses yahooquery, so this is stale wording",
+   "tasks/plan.md: 'M1-T03 \u2026 Depends on: M1-T02' \u2014 the explorer interface is serialized behind qserver's interface"
+  ]
+ }
+}

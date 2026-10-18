@@ -1,0 +1,252 @@
+{
+ "defects": [
+  {
+   "id": "R01",
+   "class": "milestone",
+   "severity": "high",
+   "file": "docs/roadmap.md",
+   "quote": "| M3 | S2 | Fish tank | rllab | PL-01, PL-02, PL-05, PL-07, PL-09 |",
+   "evidence": "Turn 2: \"Fish tank in small steps (one full-vision fish, then many, then limited vision): fine.\" The roadmap puts the whole S2 stage into one milestone: \"Fish in all three variants train with PPO, are watched with the sight overlay, and beat both baselines\". So the first S2 milestone is the whole stage, not a walking skeleton, and the steps the developer agreed to are gone. The S2 row also says \"Split\" even though it has only one milestone.",
+   "fix": "Split S2 into three milestones, one per step. M3 becomes 'One fish': PPO plus the continuous check world (TC-02), the one-fish variant, its replay, and TC-25 for `one`. Add two milestones with the next free IDs: 'Many fish' (8 fish, parameter sharing, TC-25 for `many`) and 'Local sight' (FISH-07, the REPLAY-08 overlay, TC-25 for `local`, FISH-11). Give each one an Outline, Skills, References and a checkable Exit. Each depends on the one before it, and M4's Depends points at the local-sight milestone (it needs worlds.fish motion and methods.PPO). Don't renumber M4."
+  },
+  {
+   "id": "R02",
+   "class": "user_fact",
+   "severity": "medium",
+   "file": "docs/architecture.md",
+   "quote": "A committed digest of a short snake run's logs and final checkpoint is checked in CI.",
+   "evidence": "Turn 16: \"run dt base. No CI needed.\" The architecture still makes the FISH-11/PREY-11 regression guard depend on CI (\"A later world that changes it fails the build\").",
+   "fix": "Replace with: \"A committed digest of a short snake run's logs and final checkpoint is checked by a test in `scripts/check.sh full`; a later world that changes it fails that check (FISH-11, PREY-11), and so does a fish digest once S2 lands.\" Don't mention CI."
+  },
+  {
+   "id": "R03",
+   "class": "user_fact",
+   "severity": "medium",
+   "file": "docs/spec.md",
+   "quote": "A batch of 5 runs of one world and variant finishes within 90 minutes on the same laptop, running in parallel.",
+   "evidence": "Turn 2: \"MacBook Pro Apple Silicon CPU only, under ~1 hour training per env\". The spec's own Assumption reads that as \"one run \u2264 60 minutes, with the 5 runs needed for evaluation running in parallel\". A 90-minute batch goes past the developer's hour.",
+   "fix": "Change QR-02 to \"finishes within 60 minutes\". Also change TC-24 Expected in docs/packages/rllab/tests.md from \"the batch \u2264 90 minutes\" to \"the batch \u2264 60 minutes\". If 60 can't be met on mixed cores, ask the developer before keeping 90."
+  },
+  {
+   "id": "R04",
+   "class": "user_fact",
+   "severity": "medium",
+   "file": "docs/roadmap.md",
+   "quote": "| M2 | S1 | See, check and explain the snake | rllab | PL-02, PL-07\u2013PL-11 |",
+   "evidence": "Turn 10: \"`rllab watch` as a snapshot first, with `--follow` added later, is fine.\" pipelines.md PL-04 calls `--follow` \"its upgrade\", but no milestone after M1 includes PL-04. The follow mode the developer accepted as 'later' is never scheduled.",
+   "fix": "Add PL-04 to M2's Pipelines cell (\"PL-02, PL-04, PL-07\u2013PL-11\"). Add to the M2 Outline: \"\u2026and follows a live run with `rllab watch --follow`\". Add an Exit item: \"`rllab watch --follow` re-reads at each evaluation point\"."
+  },
+  {
+   "id": "R05",
+   "class": "stale",
+   "severity": "medium",
+   "file": "docs/spec.md",
+   "quote": "\u03b1 = 0.05 with Holm correction across all baseline comparisons in that world (2 per variant)",
+   "evidence": "The spec sets the Holm family per world (6 comparisons for the 3 fish variants, 4 for two prey teams). The contract says \"Holm across the 2 comparisons per team\" (evaluate.final_evaluation). tests.md TC-25 says \"\u03b1 = 0.05 after Holm per variant\" and TC-26 says \"after Holm per team\". A builder of compare/final_evaluation gets two different correction families.",
+   "fix": "Make one rule. Recommended, to match final_evaluation's per-variant call and TC-24\u2013TC-26: change EVAL-04 to \"\u03b1 = 0.05 with Holm correction across the 2 baseline comparisons of each variant and team\". Leave the contract and tests.md as they are. If the per-world family is wanted instead, change contract final_evaluation and TC-25/TC-26 to match."
+  },
+  {
+   "id": "R06",
+   "class": "stale",
+   "severity": "medium",
+   "file": "docs/architecture.md",
+   "quote": "| `runlog` | Run folders: record, episode and evaluation logs, checkpoints, live progress, run lookup | LOG-01, LOG-02, LOG-06, TRAIN-03 (storage), TRAIN edge cases (overwrite, incomplete) | `core` |",
+   "evidence": "The architecture says runlog depends on `core` only. But contract `runlog.RunRecord: ... config: RunConfig` (train), `runlog.Checkpoint: ... methods: Mapping[str, MethodConfig]` (methods), and `RunWriter.__init__(..., config: RunConfig, ...)` make runlog import train and methods. train and methods both depend on runlog (\"`methods` ... `core`, `runlog`\"; \"`train` ... `runlog`\"), so that is an import cycle. The import-linter rules M1-T01 must write can't hold.",
+   "fix": "Move `methods.MethodConfig` and `train.RunConfig` into `core` as shared types (contract sections become core.MethodConfig / core.RunConfig, with a Retired note for the old IDs), or have runlog store them as plain `Settings` mappings. Then update the M1-T01 Read list and every Read line that names them. Leave runlog's Depends as `core`."
+  },
+  {
+   "id": "R07",
+   "class": "stale",
+   "severity": "medium",
+   "file": "docs/architecture.md",
+   "quote": "| `charts` | Learning curves with range bands and baseline lines, extra measures, two-team curves, pairing heatmaps; follows the `dataviz` skill | LOG-03\u2013LOG-05, PREY-10, PREY-09 (chart), LOG edge cases | `runlog`, `evaluate` |",
+   "evidence": "contract charts.learning_curve takes `baselines: BaselineMeans`, a `baselines` type, but charts isn't allowed to depend on baselines. The mermaid also only has `charts --> runlog & evaluate`. M1-T01's import-linter would forbid M1-T16's import.",
+   "fix": "Change charts' Depends on to \"`runlog`, `baselines`, `evaluate`\" and the mermaid line to \"charts --> runlog & baselines & evaluate\"."
+  },
+  {
+   "id": "R08",
+   "class": "packet",
+   "severity": "medium",
+   "file": "tasks/plan.md",
+   "quote": "**Read:** PL-02, AD-05, AD-06, train.run_train, runlog.RunWriter, runlog.RunRecord, runlog.EvalPoint, core.play_episode, core.EVAL_SEEDS, methods.Learner",
+   "evidence": "M1-T09 writes the run folder, but its packet has no file layout. AD-06 says only \"One folder per run (see Data)\", and the names `run.json`, `episodes.jsonl`, `evals.jsonl`, `checkpoints/ckpt_<pct>.pt` exist only in architecture.md ## Data, which isn't in the packet. The packet also lacks types it has to build or call: `methods.Transition` (train_loop builds one for `Learner.observe`), `runlog.Checkpoint` (the return type of `RunWriter.checkpoint`), `core.EpisodeResult` (`RunWriter.episode`), `core.Episode` and `core.Policy` (play_episode), and `core.WorldSpec`/`core.Step`.",
+   "fix": "Add the architecture `## Data` section, methods.Transition, runlog.Checkpoint, core.EpisodeResult, core.Episode, core.Policy, core.Step and core.WorldSpec to M1-T09's Read line."
+  },
+  {
+   "id": "R09",
+   "class": "packet",
+   "severity": "medium",
+   "file": "tasks/plan.md",
+   "quote": "**Read:** PL-05, PL-12, runlog.find_runs, runlog.open_run, runlog.Run, runlog.RunRecord",
+   "evidence": "M1-T12 builds the `Run` reader (read.py) whose methods return `EpisodeResult`, `EvalPoint` and `Checkpoint`, but none of those types is in its packet, and neither is the run-folder file layout (architecture ## Data). M1-T09 writes the folder in parallel, so the two sides can disagree on file names and formats.",
+   "fix": "Add the architecture `## Data` section, AD-06, core.EpisodeResult, runlog.EvalPoint and runlog.Checkpoint to M1-T12's Read line."
+  },
+  {
+   "id": "R10",
+   "class": "packet",
+   "severity": "medium",
+   "file": "tasks/plan.md",
+   "quote": "**Read:** PL-06, EVAL-03, EVAL-06, evaluate.final_evaluation, evaluate.Summary, runlog.Run, core.play_episode, core.FINAL_SEEDS, methods.load_policy, baselines.RandomPolicy, baselines.rule_for",
+   "evidence": "M1-T17 must write a schema-valid `Summary`, whose field `comparisons: tuple[Comparison, ...]` is `evaluate.Comparison`, and that type isn't in the packet. It also has to build a world to play on (worlds.make / core.World), read `Run.checkpoints()` (runlog.Checkpoint), read the team direction (core.TeamSpec/WorldSpec), read `record` (runlog.RunRecord) and the evals for `collapse` (runlog.EvalPoint). None of these is in the packet.",
+   "fix": "Add evaluate.Comparison, worlds.make, core.World, core.WorldSpec, core.TeamSpec, core.Episode, runlog.RunRecord, runlog.EvalPoint and runlog.Checkpoint to M1-T17's Read line."
+  },
+  {
+   "id": "R11",
+   "class": "packet",
+   "severity": "medium",
+   "file": "tasks/plan.md",
+   "quote": "**Read:** PL-05, baselines.baseline_means, baselines.BaselineMeans, baselines.rule_for, baselines.RulePolicy, core.play_episode, core.EVAL_SEEDS",
+   "evidence": "`baseline_means(world: str, variant: str)` gets only names. To play episodes it needs `worlds.make` and `core.World`, plus `baselines.RandomPolicy` (\"plays `RandomPolicy` and `rule_for` per team\"), `core.WorldSpec`/`TeamSpec` for the teams, and `core.Episode` for results. None of these is in M1-T13's packet.",
+   "fix": "Add worlds.make, core.World, core.WorldSpec, core.TeamSpec, core.Episode, core.Policy and baselines.RandomPolicy to M1-T13's Read line."
+  },
+  {
+   "id": "R12",
+   "class": "packet",
+   "severity": "medium",
+   "file": "tasks/plan.md",
+   "quote": "**Read:** PL-01, PL-03, train.CheckResult, worlds.CheckWorld, methods.MethodConfig, methods.Learner",
+   "evidence": "PL-01 `train_checks` must \"make the method's check world and learner\", which needs `worlds.make` and `methods.make_learner`, and `score_checks` calls `policy().act`, which needs `core.Policy` and `core.WorldSpec`. None is in M1-T03's packet. `CheckFailedError` is also defined only in the train.run_batch section, which the packet doesn't include.",
+   "fix": "Add worlds.make, methods.make_learner, core.Policy, core.WorldSpec and train.run_batch to M1-T03's Read line."
+  },
+  {
+   "id": "R13",
+   "class": "packet",
+   "severity": "medium",
+   "file": "tasks/plan.md",
+   "quote": "**Read:** PL-05, LOG-03, LOG-05, charts.learning_curve, runlog.Run, baselines.BaselineMeans, core.Output",
+   "evidence": "learning_curve draws `Run.evals()`, which are `runlog.EvalPoint` values. It labels axes with the score name and direction (`core.TeamSpec`, `core.WorldSpec.measures`/`MeasureSpec`), and it compares run settings from `runlog.RunRecord`. None is in M1-T16's packet. M1-T28 (MixedRunsError on settings) and M1-T29 have the same gap.",
+   "fix": "Add runlog.EvalPoint, runlog.RunRecord, core.WorldSpec and core.TeamSpec to the Read lines of M1-T16, M1-T28 and M1-T29."
+  },
+  {
+   "id": "R14",
+   "class": "packet",
+   "severity": "medium",
+   "file": "tasks/plan.md",
+   "quote": "**Depends on:** M1-T17 \u00b7 **Writes:** src/rllab/evaluate/final/stats.py, tests/intent/rllab/test_compare.py, tests/unit/rllab/test_compare.py",
+   "evidence": "M1-T17's acceptance says \"`compare` and `verdict` stay the stubs their thicken tasks name\". But M1-T17 writes only play.py and summary.py, so it can't create stubs in stats.py/verdict.py. M1-T25 (stats.py) and M1-T26 (verdict.py) can't hook their code into final_evaluation without editing summary.py/play.py, which neither may write. The two run in parallel (both depend only on M1-T17), so giving both summary.py would be a write clash. M1-T28 (charts/check.py) and M1-T29 (charts/style.py) have the same problem: they must change curve.py, which only M1-T16 writes.",
+   "fix": "Add src/rllab/evaluate/final/stats.py and src/rllab/evaluate/final/verdict.py (stubs) to M1-T17's Writes, and src/rllab/charts/check.py and src/rllab/charts/style.py (stubs) to M1-T16's Writes, with the call sites in place. Alternatively, make M1-T26 depend on M1-T25 and M1-T29 on M1-T28, and add summary.py and curve.py respectively to both tasks' Writes."
+  },
+  {
+   "id": "R15",
+   "class": "packet",
+   "severity": "medium",
+   "file": "tasks/plan.md",
+   "quote": "**Depends on:** M1-T19, M1-T20, M1-T21, M1-T22, M1-T23, M1-T24, M1-T25, M1-T26, M1-T27, M1-T28, M1-T29 \u00b7 **Writes:** src/rllab/train/pipelines/pl03_batch.py",
+   "evidence": "M1-T30's acceptance says \"TC-13, TC-21 and TC-22 pass on real snake runs\", but no task's Writes holds a test file for TC-13 or TC-21. M1-T21 writes only test_pl03_smoke.py, M1-T24 only test_pl06_smoke.py, and M1-T30 only pl03_batch.py. The golden cases have nowhere to be written.",
+   "fix": "Add tests/intent/rllab/test_batch.py (TC-13) and tests/intent/rllab/test_final_eval.py (TC-21, TC-22) to M1-T30's Writes."
+  },
+  {
+   "id": "R16",
+   "class": "packet",
+   "severity": "medium",
+   "file": "docs/packages/rllab/contract.md",
+   "quote": "- **Invariants:** acts on observations only; `description` is the world's one sentence (EVAL-02)",
+   "evidence": "The snake rule (M1-T15) must act \"on observations only\". The order and encoding of the snake observation (SNAKE-06: danger ahead/left/right, heading, food direction, length) appear nowhere in the contract. M1-T06 (Snake world) and M1-T15 (SnakeRule) run in parallel and each has to invent the layout, so they will disagree.",
+   "fix": "Add a contract section `worlds.snake observation` (or an Invariant on worlds.make) that gives the exact index layout of the snake obs vector: indices 0\u20132 danger straight/left/right (0/1), 3\u20136 one-hot heading, 7\u20138 food dx, dy sign relative to head, 9 length. Add it to the Read lines of M1-T06 and M1-T15."
+  },
+  {
+   "id": "R17",
+   "class": "milestone",
+   "severity": "medium",
+   "file": "docs/roadmap.md",
+   "quote": "**Exit:** `rllab batch`, `watch`, `chart` and `evaluate` run end to end on snake; every pipeline's smoke test and the snake golden cases (TC-01, TC-03\u2013TC-06, TC-10\u2013TC-22) pass.",
+   "evidence": "M1 can't pass these whole cases. TC-03 also checks `check-continuous` (PPO is M3), and M1-T04 builds only \"TC-03's `check-discrete` half\". TC-10 includes the one-fish push, and M1-T06 passes only \"TC-10's snake half\". TC-12 covers \"every world and variant\", and M1-T06 passes it \"for `snake`\". The plan's Exit says \"(snake parts)\" but the roadmap doesn't, and \"(snake parts)\" doesn't describe TC-03.",
+   "fix": "Roadmap M1 Exit: \"\u2026TC-01, TC-03 (check-discrete half), TC-04\u2013TC-06, TC-10 (snake half), TC-11, TC-12 (snake), TC-13\u2013TC-22 pass.\" Use the same wording in the tasks/plan.md Scope Exit in place of \"TC-10\u2013TC-22 (snake parts)\"."
+  },
+  {
+   "id": "R18",
+   "class": "milestone",
+   "severity": "medium",
+   "file": "docs/roadmap.md",
+   "quote": "**Outline:** The learner watches any snake checkpoint or baseline in the viewer and as video, runs the reference check, writes the snake write-up, and the trained snake clearly beats both baselines.",
+   "evidence": "M2 is the kind of leftover milestone listed as a defect: viewer, video, reference check and write-up carved off M1. It has no single end-to-end capability. It also hides real model work: the plan defers SNAKE-08 \"to M2: measured on the tuned DQN's 5-seed batch\", and plan Risks says \"M2's DQN thicken adds replay and a target net\", but the M2 Outline never mentions finishing DQN.",
+   "fix": "State one capability for M2 and name the DQN work: \"The learner trains the full DQN (replay buffer, target network) on snake, sees it beat both baselines, and watches and explains it in replays, video and the write-up, checked against SB3.\" Alternatively, move the replay viewer (PL-07) into M1 so S1's walking skeleton lets the learner watch a trained snake."
+  },
+  {
+   "id": "R19",
+   "class": "milestone",
+   "severity": "medium",
+   "file": "docs/roadmap.md",
+   "quote": "**Exit:** TC-02, TC-07, TC-08 and TC-25 pass; a snake run repeats its M2 results exactly (FISH-11).",
+   "evidence": "TC-25 is a PL-06 model evaluation (\"**Pipeline:** PL-06\"), and fish training needs the batch (PL-03) and its PPO check gate, yet M3's Pipelines cell is \"PL-01, PL-02, PL-05, PL-07, PL-09\". The same gap is in M2: its Exit needs TC-24 (PL-06, plus QR-02 from PL-03), but its cell is \"PL-02, PL-07\u2013PL-11\".",
+   "fix": "Add PL-03 and PL-06 to the Pipelines cells of M2 and M3 (and of any milestones split out of M3 per R01)."
+  },
+  {
+   "id": "R20",
+   "class": "domain",
+   "severity": "medium",
+   "file": "docs/packages/rllab/tests.md",
+   "quote": "**Expected:** at most 1 of the 20 seeds rejects either null",
+   "evidence": "If the test is correct, each seed rejects with probability at most 0.05 (family-wise). Over 20 seeds the count is Binomial(20, 0.05), so P(\u22652 rejections) = 1 \u2212 0.95\u00b2\u2070 \u2212 20\u00b70.05\u00b70.95\u00b9\u2079 \u2248 1 \u2212 0.358 \u2212 0.377 \u2248 0.26. A correct implementation fails this oracle about a quarter of the time, depending on which fixed seeds were picked.",
+   "fix": "Change to \"at most 4 of the 20 seeds reject either null (P(\u22655) \u2248 0.003 under a correct test)\", or use 200 seeds and require the rejection rate \u2264 0.08. Update the Tolerance to match."
+  },
+  {
+   "id": "R21",
+   "class": "packet",
+   "severity": "medium",
+   "file": "tasks/plan.md",
+   "quote": "**Package:** rllab \u00b7 **Step:** contract \u00b7 **Kind:** interface \u00b7 **Covers:** \u2014 \u00b7 **Size:** S \u00b7 **Mode:** solo",
+   "evidence": "M1-T01 must turn 55 contract sections into code, a schema-validated sample per type, a replay double per Protocol, a fake per Boundary function, stub signatures for every step, `__init__` exports, cli dispatch for six subcommands, and import-linter rules. That is far more than one S task.",
+   "fix": "Set M1-T01's Size to L, or split it by component (core+worlds; baselines+methods+train; runlog+charts+evaluate+cli) while keeping the ID M1-T01 for the first part and the next free IDs for the rest."
+  },
+  {
+   "id": "R22",
+   "class": "packet",
+   "severity": "low",
+   "file": "tasks/plan.md",
+   "quote": "**Read:** PL-04, TC-14, runlog.progress, runlog.Progress",
+   "evidence": "`Progress.latest: EvalPoint | None` uses runlog.EvalPoint, which isn't in M1-T11's packet. M1-T08 (`make_learner` \"rejects a `Box` action space\"; `policy()` returns `Policy`) lacks core.ActionSpace and core.Policy. M1-T18 (`Episode.result: EpisodeResult`, `Frame.draw: DrawState`, `World.step -> Step`) lacks core.EpisodeResult, core.DrawState and core.Step.",
+   "fix": "Add runlog.EvalPoint and the architecture ## Data section to M1-T11's Read. Add core.ActionSpace and core.Policy to M1-T08's Read. Add core.EpisodeResult, core.DrawState and core.Step to M1-T18's Read."
+  },
+  {
+   "id": "R23",
+   "class": "stale",
+   "severity": "low",
+   "file": "docs/packages/rllab/contract.md",
+   "quote": "a fake writing the finished 3-checkpoint snake run folder",
+   "evidence": "TRAIN-03 was changed to always save 11 checkpoints (0%, 10%, \u2026 100%), and architecture Data says \"11 checkpoints, every 10%\". A '3-checkpoint' finished run can't exist. The phrase also appears in runlog.Run (\"a replay double of a finished 3-checkpoint snake run folder\"), runlog.RunWriter (\"the writes of a 3-checkpoint snake run\") and runlog.open_run (\"the finished 3-checkpoint snake run double\").",
+   "fix": "In train.run_train, runlog.Run, runlog.RunWriter and runlog.open_run Cases, replace \"3-checkpoint snake run\" with \"11-checkpoint 2,000-step snake run\"."
+  },
+  {
+   "id": "R24",
+   "class": "stale",
+   "severity": "low",
+   "file": "docs/packages/rllab/pipelines.md",
+   "quote": "- `cli` owns no step: `__main__.py` dispatches each trigger to its entry and prints the returned contract type (routed to architecture-design; assumed: `cli` stays as the dispatcher component)",
+   "evidence": "Both open questions are already settled. AD-10 decides that cli only dispatches. routes.md ticks both routes as done, and contract.md now has core.Output, baselines.BaselineMeans, replay.Session and the entry functions. This is process narration.",
+   "fix": "Delete both bullets under ## Open questions in pipelines.md, and the heading if nothing is left."
+  },
+  {
+   "id": "R25",
+   "class": "stale",
+   "severity": "low",
+   "file": "tasks/plan.md",
+   "quote": "**Covers:** TRAIN-01\u2013TRAIN-06, LOG-01\u2013LOG-06, EVAL-01\u2013EVAL-06, SNAKE-01\u2013SNAKE-07, WORLD-01\u2013WORLD-06, CHECK-01, QR-03 \u00b7 **Deferred:**",
+   "evidence": "M1-T07 covers TRAIN-07, but TRAIN-07 is neither in Covers nor Deferred. The Deferred list also leaves out PREY-09, REPLAY-01\u2013REPLAY-08, QR-04, CHECK-02, CHECK-03 and NOTES-01\u2013NOTES-03, which are all built in later milestones. Also, M1-T12 has \"**Covers:** TRAIN-01\" for find_runs, but PL-05 row 1 covers LOG-03.",
+   "fix": "Add TRAIN-07 (partly; one team) to Covers. Add to Deferred: \"REPLAY-01\u2013REPLAY-08, QR-04, CHECK-02, CHECK-03, NOTES-01\u2013NOTES-03 (to M2); PREY-09 (to M4)\". Change M1-T12's Covers to LOG-03."
+  },
+  {
+   "id": "R26",
+   "class": "user_fact",
+   "severity": "low",
+   "file": "docs/spec.md",
+   "quote": "Rented GPU time, if a world truly needs it, costs at most $10 per world",
+   "evidence": "Turn 2: \"a few dollars of cloud GPU is OK if needed\". The brief says \"A few dollars of rented GPU time is acceptable\". $10 per world is more than 'a few dollars'.",
+   "fix": "Change QR-03 to \"costs at most $5 per world\", or confirm $10 with the developer and also put the figure in the brief's Constraints."
+  },
+  {
+   "id": "R27",
+   "class": "domain",
+   "severity": "low",
+   "file": "docs/architecture.md",
+   "quote": "8\u201310 agents, 1,000-step episodes and 21 \u00d7 20 evaluation episodes may not fit 60 minutes in Python.",
+   "evidence": "Many-fish has 8 agents (FISH-06), and predator-prey has 6 prey + 2 predators = 8 (PREY-01). The 10 pellets aren't agents, so no world has 10 agents.",
+   "fix": "Replace \"8\u201310 agents\" with \"8 agents (plus 10 pellets in predator-prey)\"."
+  }
+ ],
+ "checked": {
+  "user_messages": 16,
+  "docs": 10,
+  "packets": 30
+ }
+}

@@ -1,0 +1,297 @@
+{
+ "defects": [
+  {
+   "id": "R01",
+   "class": "user_fact",
+   "severity": "high",
+   "file": "docs/architecture.md",
+   "quote": "### AD-07: Run records and live events in SQLite, pushed by the server over SSE",
+   "evidence": "The developer asked for WebSocket twice. Turn 1: \"a TypeScript + React browser frontend over a Python backend (HTTP and WebSocket)\". Turn 2: \"It needs live progress of download and validation runs over WebSocket.\" The developer never agreed to replace it. Every doc uses SSE instead: AD-07 (\"streams them over SSE\"), AD-09 (\"Live runs use SSE.\"), the mermaid edge \"HTTP + SSE\", the server row \"Local HTTP + SSE API\", PL-01 step 4 \"SSE of `server.RunEventBody`\", sse-starlette in the tech stack, server/architecture.md (`live`: \"SSE stream per run\"), server/contract.md `server.stream_run` (\"text/event-stream\"), server/pipelines.md PL-34 (`follow` \"over SSE\", `EventSourceResponse`), app/architecture.md (\"follows one live over SSE\", \"an SSE hook\") and app/pipelines.md PL-42 (\"`EventSource` on `server.stream_run`\"). AD-07's Alternatives only rule out a WebSocket from the run process to the server, not from the server to the app.",
+   "fix": "Change the server \u2192 app live channel to a WebSocket and keep the SQLite polling. AD-07: rename it to \"\u2026pushed by the server over a WebSocket\" and make the Decision say \"streams them to the app over a WebSocket (`/api/runs/{id}/events`)\". AD-09: \"Live runs use a WebSocket carrying `RunEventBody` JSON messages.\" Mermaid: \"HTTP + WebSocket\". Packages row: \"Local HTTP + WebSocket API\". PL-01 step 4: \"WebSocket messages of `server.RunEventBody`\". Tech stack: replace sse-starlette with FastAPI's WebSocket support (starlette). server/architecture.md `live`: \"WebSocket per run\". server/contract.md `server.stream_run`: `WS /api/runs/{id}/events \u2192 RunEventBody messages`. server/pipelines.md PL-34: entry returns a WebSocket handler and `follow` sends over the WebSocket. app/architecture.md: \"follows one live over a WebSocket\", \"a WebSocket hook\". app/pipelines.md PL-42 step 1: \"`WebSocket` on `server.stream_run`\". app/tests.md PL-42: a mocked WebSocket replays the stream."
+  },
+  {
+   "id": "R02",
+   "class": "user_fact",
+   "severity": "high",
+   "file": "docs/spec.md",
+   "quote": "- **SIG-02** Each feature's information gain is a registered hypothesis tested with the `null-hypothesis-testing` skill on the walk-forward test periods.",
+   "evidence": "Turn 1: \"Stage 3 \u2014 Features & ML: build candidate features, then test them with ML for information gain over the residual (market-removed) returns.\" SIG-02 replaces the ML test with a per-feature cross-sectional rank correlation, so no ML model is ever fitted in S3. lab PL-20 (`rank_ic`: \"Spearman IC vs `fwd_resid_5d`\") does the same. The roadmap drops \"ML\" from the stage name: \"| S3 | Features & significance | brief | Split |\".",
+   "fix": "Add an ML information-gain test to SIG and keep the rank-IC test as the univariate screen. For example, add SIG-05: \"Each feature's information gain is measured with an ML model (e.g. gradient-boosted trees) fitted per training window on the residual target: the out-of-sample loss with the feature against without it (drop-column), registered and tested with the `null-hypothesis-testing` skill with correction across features.\" Add matching steps to lab/pipelines.md PL-20 (fit per `engine.training_window`, `guard`, paired per-period loss difference into `engine.run_test`), a lab component in lab/architecture.md, and the library in the architecture tech stack (AD for the ML library). Rename S3 in roadmap.md and the brief to \"Features & ML\"."
+  },
+  {
+   "id": "R03",
+   "class": "milestone",
+   "severity": "high",
+   "file": "docs/roadmap.md",
+   "quote": "| M4 | S2 | Covariance ranking | engine, lab | PL-03, PL-14, PL-15, PL-16, PL-17, PL-18 | M1 (data.ReturnsPanel, PL-11 output) | Designed |",
+   "evidence": "Turn 1 says the covariance estimators are \"compared on real data\". M4 depends only on M1, whose only data is the 3-year `SyntheticSource` (about 756 sessions). `engine.schedule` raises \"`ValueError` if coverage is shorter than 756 + 21 + 504 sessions\" (engine/contract.md), so PL-18 cannot run end to end on M1's data. Real Sharadar data arrives in M3.",
+   "fix": "Change M4's Depends cell to \"M1 (data.ReturnsPanel, PL-11 output), M3 (a promoted Sharadar snapshot, PL-09/PL-10 output)\". State in M4's Outline that the ranking runs on a promoted real snapshot. M5\u2013M8 inherit the dependency through M4."
+  },
+  {
+   "id": "R04",
+   "class": "packet",
+   "severity": "high",
+   "file": "tasks/plan.md",
+   "quote": "- [ ] TC-21 and TC-22 pass",
+   "evidence": "M1-T29 (Wire PL-09) depends only on M1-T02\u2013M1-T08. TC-22 needs \"S0 promoted\" and \"`CURRENT` names S0 and `returns_panel(\u2026, snapshot=S0)` reads the same throughout\". That needs PL-10's promotion (M1-T17, M1-T30) and the real PL-11 (M1-T31), neither of which T29 depends on. TC-22 also checks \"the killed run reads `stopped_unexpectedly` once its last heartbeat is 10 s old\". No M1 task implements that derivation: AD-07 names `data.run_record`, which is not in the data contract, and `data.list_runs` is M2 (PL-33). T29 is also sized XS although it adds the shared conftest and two golden cases.",
+   "fix": "Move TC-22 out of M1-T29 into M1-T47 (which depends on T29\u2013T32): replace T29's line with \"- [ ] TC-21 passes\" and add TC-22 to T47's Read and acceptance. Give one task the `stopped_unexpectedly` derivation: add to M1-T02's acceptance \"reading a `running` run whose last heartbeat is \u2265 10 s old on the injected clock returns status `stopped_unexpectedly`\", and add a contract section for the reader AD-07 calls `data.run_record` (or change AD-07 to name `data.list_runs`). Resize T29 to S."
+  },
+  {
+   "id": "R05",
+   "class": "domain",
+   "severity": "medium",
+   "file": "docs/architecture.md",
+   "quote": "FACT-02's 95% property is the parallel-analysis threshold by construction, and is checked on simulated noise in tests.",
+   "evidence": "FACT-02 requires \"0 are kept in at least 95% of 100 simulated trials\". AD-12 keeps eigenvalue i when it beats \"the 95th percentile of the i-th eigenvalue over 100 column-permuted copies\". On pure noise the observed top eigenvalue is exchangeable with the permuted ones, so it beats their 95th percentile about 5% of the time. Testing each i separately pushes the false-keep rate above that. A per-trial success rate of \u2248 95% or less gives \u2265 95 successes out of 100 only about half the time (Binomial(100, 0.95)), so the FACT-02 test is flaky, not true by construction.",
+   "fix": "In AD-12, change the rule to a sequential parallel analysis at a stricter quantile: \"keep eigenvalues in order while each exceeds the 99th percentile of the i-th eigenvalue over 200 column-permuted copies; stop at the first that doesn't\". Replace the Consequences sentence with \"the per-trial false-keep rate is \u2248 1%, so FACT-02's \u2265 95-of-100 bar fails by chance with negligible probability\". Change `lab.fit_factors` `trials: int = 100` in lab/contract.md to match."
+  },
+  {
+   "id": "R06",
+   "class": "packet",
+   "severity": "medium",
+   "file": "docs/packages/data/contract.md",
+   "quote": "`ActionSchema`: `date, kind: Literal[",
+   "evidence": "VALID-03 accepts a gap only with \"a recorded reason (halt, suspension)\". PL-10 `check_gaps` checks \"a bar per member per session or a recorded halt\". TC-05, TC-14, TC-18 and M1-T11/M1-T40 rely on \"HALT's recorded halt\", and plants-s1.json has an event `{\"kind\": \"halt\"\u2026}`. No contract type, table or Source row says where a halt is recorded. ActionSchema's kinds are split, dividend, spinoff, ticker_change and delisting only, so the builders of M1-T04, T11 and T40 can't know where to write or read it.",
+   "fix": "Add \"halt\" (covering suspensions) to ActionSchema's `kind` Literal and to `server.ActionBody.kind`, with `detail` holding the reason, one row per halted session. Say in PL-09 step 6 (`SyntheticSource`) that it emits halt rows in ACTIONS. Say in PL-10 step 6 that `check_gaps` accepts a missing bar when an ACTIONS `halt` row covers that session. Add data.StockHistory (ActionSchema) to M1-T11's and M1-T40's Read lines."
+  },
+  {
+   "id": "R07",
+   "class": "packet",
+   "severity": "medium",
+   "file": "docs/packages/data/pipelines.md",
+   "quote": "| 7 | `check_moves` | validate.moves | ReturnsPanel \u2192 Issue |",
+   "evidence": "check_moves must decide whether a corporate action, a delisting or a researcher override explains a move. Its only input, ReturnsPanel, carries no actions and no overrides. TC-16 (M1-T39) needs \"100200 +50% on 2021-10-13 with a researcher override recorded\". No M1 task implements `data.record_override` or writes `store/overrides.parquet`: it is in no task's Writes. M1-T01 stubs only steps and entries, and its `__main__` acceptance dispatches download and validate but not `override`, which the data layout lists.",
+   "fix": "Change PL-10 step 7's In to \"Snapshot, ReturnsPanel \u2192 Issue\" (actions and `store/overrides.parquet` read from the snapshot) and update the entry sketch to `check_moves(snap, returns)`. In tasks/plan.md, add to M1-T39's acceptance \"`data.record_override` appends to `store/overrides.parquet` and `check_moves` attaches its reason\". Add `packages/data/src/qrp_data/validate/overrides.py` (or the module that owns it) to T39's Writes and data.Snapshot to its Read. Add `override` to M1-T01's `qrp_data.__main__` dispatch."
+  },
+  {
+   "id": "R08",
+   "class": "stale",
+   "severity": "medium",
+   "file": "docs/packages/models/architecture.md",
+   "quote": "`FCST-RET` \u2014 the return forecaster vs zero",
+   "evidence": "FCST-06 says the return forecaster \"passes only if above zero at 5% after correction; its rank correlation must also exceed the best single surviving S3 feature's.\" The second condition is in no design doc. This family, PL-22 step 15 (\"per-period loss vs each baseline \u2026 (`FCST-VOL` or `FCST-RET`)\") and the AD-16 baselines (\"trailing 63-day vol, EWMA vol, zero return\") leave it out. models/tests.md only lists it as uncovered.",
+   "fix": "Change the family to \"`FCST-RET` \u2014 the return forecaster vs zero and vs the best single surviving S3 feature's per-period rank IC\". Add \"best surviving feature's rank IC\" to PL-22 step 14 (`run_baselines`) and to step 15's comparisons. Add it to AD-16's Consequences list of baselines."
+  },
+  {
+   "id": "R09",
+   "class": "domain",
+   "severity": "medium",
+   "file": "docs/packages/models/tests.md",
+   "quote": "The window's 756 sessions hold equal counts of 8 and 12",
+   "evidence": "The first test period starts at session 757 (TC-28) and `engine.Window` puts a gap of max(5, horizon) sessions between `train_end` and `period.start`. So the first period's training window can hold at most 757 \u2212 1 \u2212 gap sessions (\u2264 751), not 756. engine/contract.md `training_window` (length 756) doesn't say what happens when that much history doesn't exist. With 751 sessions, 1..751 holds 376 eights and 375 twelves, so the mean is 9.9973, not 10, and fails TC-60's 1e-9 tolerance. TC-68 relies on the same claim (\"any 756-session window (28 whole periods) has correlation exactly I\"), but a 751- or 735-session window isn't whole Fourier periods, so its correlation isn't exactly I.",
+   "fix": "engine/contract.md `engine.training_window`: add the invariant \"a rolling window is clipped to coverage start when fewer than `length` sessions precede `train_end`\". TC-60: put the test period later (e.g. use `session_calendar(n)` with the test period whose rolling window holds a full 756 sessions, or set `length` explicitly to an even count that fits) and state the window's session range explicitly. TC-68: choose a window length that is a multiple of 27 inside the available history (e.g. `length=729`) and state it."
+  },
+  {
+   "id": "R10",
+   "class": "milestone",
+   "severity": "medium",
+   "file": "docs/roadmap.md",
+   "quote": "**Outline:** Stock search and pages with charts, coverage, validation results, the run list and the live run view; FRED rates in the download.",
+   "evidence": "Only M1 has an **Exit:** line. M2, M3, M4, M5, M6, M7 and M8 are Designed milestones with an Outline but no checkable Exit.",
+   "fix": "Add an Exit line under each Outline. M2: \"**Exit:** with `qrp serve` on a promoted synthetic store, the stock page for 900001 shows its split mark, the coverage and validation pages render, and a running `qrp data download --update` is followed live on `/runs/<id>` with failures shown within 2 s.\" M3: \"**Exit:** `qrp data download --full` then `--update` on SharadarSource, FRED and EDGAR stage and promote real snapshots within QR-03's 6 h and 15 min, timed in the run records, with \u2265 15 years of membership (DATA-01).\" M4: \"**Exit:** `qrp lab rank-covariance` on a promoted real snapshot writes `ranking.md` with all four estimators and their COV ledger outcomes; TC-28\u2013TC-42 and TC-55\u2013TC-57 pass.\" M5: \"**Exit:** `qrp lab classical` records three PORT outcomes, writes `portfolios.md` for all four portfolios, and `lab.benchmark()` returns the stored result; TC-43\u2013TC-48 pass.\" M6: \"**Exit:** `qrp lab features` records one SIG entry per feature (\u2265 10) and `lab.surviving_features()` returns the survivors; TC-49 and TC-50 pass.\" M7: \"**Exit:** `qrp models forecast` trains the LSTM and TFT-lite against their baselines on the laptop and once through `gpu-train` with verified teardown, each with a recorded FCST outcome; TC-58\u2013TC-67 pass.\" M8: \"**Exit:** `qrp models fport` and `qrp models agent` record S4 entries with lockbox scores, and `qrp lab verdict` writes `results/verdict.md` whose first line names the winners or says \\\"none\\\"; TC-51\u2013TC-54 and TC-68\u2013TC-75 pass.\""
+  },
+  {
+   "id": "R11",
+   "class": "milestone",
+   "severity": "medium",
+   "file": "docs/roadmap.md",
+   "quote": "**Outline:** The shared engine (schedule, backtest, ledger test, ledger list) and the S2 covariance study: factors, denoising, four estimators ranked on out-of-sample minimum-variance variance inside ledger entries.",
+   "evidence": "S2 is split into M4 and M5, and S4 into M7 and M8. Only the stage headings carry **Skills:**, and none of the four milestones has a **Skills:** or **References:** line. The work uses reference code: lab PL-18 cites \"RF-01 (characterise_factors)\", and PL-22 cites \"RF-02 (build_bundle), RF-03 (forward_targets)\".",
+   "fix": "Add after each Outline. M4: \"**Skills:** data-analysis, null-hypothesis-testing\" and \"**References:** RF-01\". M5: \"**Skills:** null-hypothesis-testing\" and \"**References:** none\". M7: \"**Skills:** null-hypothesis-testing, data-analysis\" and \"**References:** RF-02, RF-03\". M8: \"**Skills:** null-hypothesis-testing\" and \"**References:** none\". Optionally give M6 \"**References:** RF-01, RF-03\"."
+  },
+  {
+   "id": "R12",
+   "class": "user_fact",
+   "severity": "medium",
+   "file": "docs/spec.md",
+   "quote": "- **PORT-05** The minimum-variance portfolio's after-cost results are stored as the benchmark for S4.",
+   "evidence": "Turn 1: forecast portfolios and PPO agents \"Both must beat the stage-2 classical portfolios out of sample\". Turn 2: \"ML-driven ones must beat them.\" The spec stores and tests against the minimum-variance portfolio only: FPORT-01/02 and AGENT-03 compare \"with PORT-05's stored results\", and VERD-02 declares a winner over \"the classical portfolios\" from that one comparison. On after-cost Sharpe (FPORT-02, AGENT-03), equal weight, risk parity or HRP can beat minimum variance. A method could then be declared a winner while losing to a classical portfolio.",
+   "fix": "Either store all four classical results and test each FPORT/AGENT method against the best classical portfolio on the judged metric, or record the developer's explicit agreement that minimum variance alone is the bar. For the first option: PORT-05 becomes \"All four classical portfolios' after-cost results are stored; the S4 benchmark on each metric is the best of them by walk-forward score\". Update FPORT-01/02, AGENT-03 and VERD-02, `lab.benchmark` (lab/contract.md; return the chosen portfolio's BacktestResult per metric), PL-19 step 10 (`store_benchmark`) and the brief's Not doing line \"they stop if they can't beat minimum variance after costs\"."
+  },
+  {
+   "id": "R13",
+   "class": "packet",
+   "severity": "medium",
+   "file": "tasks/plan.md",
+   "quote": "**Read:** PL-09, data.Source, data.StockId, data.RunRecord, data.RunEvent",
+   "evidence": "M1-T06 must make `store.append_parts` stamp known dates, and TC-21 checks the exact stamping (\"the original with `known_date` 2021-11-10 (`assumed_ref_date`) and the revision with `known_date` 2023-01-06 (`observed`)\"). The rules for `ref_date`, `known_date`, `known_basis` and the part-file layout are only in AD-06 and data/architecture.md \"Known dates\", and neither is in the packet. Other store-touching tasks lack AD-06 too: M1-T05 (appends parts), M1-T08 (manifest layout), M1-T10, T11, T13 and T15 (read snapshot rows; T15's key is bitemporal), M1-T17 (read view and `CURRENT`), M1-T19 (DuckDB over parts, newest version by `known_date`) and M1-T29.",
+   "fix": "Add AD-06 to the **Read:** lines of M1-T05, M1-T06, M1-T08, M1-T10, M1-T11, M1-T13, M1-T15, M1-T17, M1-T19 and M1-T29."
+  },
+  {
+   "id": "R14",
+   "class": "packet",
+   "severity": "medium",
+   "file": "tasks/plan.md",
+   "quote": "- [ ] On the data.Source replay double, returns every permaticker ever in SP500, appended as parts; validates as data.StockId",
+   "evidence": "M1-T05 (fetch_universe) must append SP500 and TICKERS \"as parts\" through `store.append_parts`. That module (`packages/data/src/qrp_data/store/parts.py`) is written by M1-T06, and both tasks depend only on M1-T01. While T05 builds, `append_parts` is still M1-T01's `NotImplementedError` stub, so T05's acceptance can't pass.",
+   "fix": "Add M1-T06 to M1-T05's **Depends on:** (and a dependency-graph row \"M1-T05 fetch_universe | M1-T06 download_stocks spine | code | none: uses store.append_parts\"), or move `store/parts.py` out of M1-T06 into its own spine task that both T05 and T06 depend on."
+  },
+  {
+   "id": "R15",
+   "class": "packet",
+   "severity": "medium",
+   "file": "tasks/plan.md",
+   "quote": "**Read:** PL-01, PL-02, PL-09, PL-10, PL-11, PL-12, PL-27, PL-35, PL-36, PL-43, data.RunRecord, data.Source",
+   "evidence": "The interface task must write every M1 type and stub \"Every M1 step and entry \u2026 with its contract signature\". Its Read omits data.RunEvent, which M1-T02, M1-T06 and M1-T37 build against and which `server.RunEventBody` mirrors. It also omits `data.calendar` (PL-10 step 3, which M1-T09 implements), `data.run_download` and `data.validate_snapshot` (the PL-09 and PL-10 entries), and `data.record_override`. The exceptions every M1 step raises (CoverageError, SnapshotError, CredentialsError, VendorError) have no contract section at all; they are only named in data/architecture.md \"Errors\".",
+   "fix": "Add data.RunEvent, data.calendar, data.run_download, data.validate_snapshot and data.record_override to M1-T01's **Read:** line. In data/contract.md, add a section `data.errors: type` listing `CoverageError(range)`, `SnapshotError`, `CredentialsError`, `VendorError(stock)` with their fields, and add it to M1-T01's Read and to M1-T22's Read (it maps two of them)."
+  },
+  {
+   "id": "R16",
+   "class": "packet",
+   "severity": "medium",
+   "file": "tasks/plan.md",
+   "quote": "**Read:** PL-02, PL-27, data.membership_as_of, server.get_membership, TC-24",
+   "evidence": "M1-T48's TC-24 checks the 200 body field by field, the 422 `ErrorBody` with `code` and `coverage`, validation \"against the exported `schema.json`\", and the app page's rows. The packet has none of server.MembershipBody, server.ErrorBody, server.WireSchema, data.Membership or app.Page. M1-T48 is also labelled **Package:** app although it writes only server and system-test files. Likewise, M1-T35's acceptance renders \"every \u2026 server.ErrorBody sample\", but its Read (\"PL-36, server.get_membership, app.Page\") lacks server.ErrorBody.",
+   "fix": "M1-T48 **Read:** add server.MembershipBody, server.ErrorBody, server.WireSchema, data.Membership and app.Page, and change its **Package:** to server. M1-T35 **Read:** add server.ErrorBody and server.MembershipBody."
+  },
+  {
+   "id": "R17",
+   "class": "milestone",
+   "severity": "medium",
+   "file": "docs/packages/lab/pipelines.md",
+   "quote": "**Trigger:** `qrp lab features` after PL-19",
+   "evidence": "PL-20 (M6) is triggered after PL-19, which belongs to M5, and docs/architecture.md PL-05 says \"`qrp lab features` after PL-04\". The roadmap gives M6 only \"M4 (engine.RunHandle, PL-16 output)\". The spec's scope says S3 starts \"only after S2's covariance ranking is recorded\", which is PL-18 (M4), not the classical portfolios.",
+   "fix": "Change the trigger to \"`qrp lab features` after PL-18's ranking is recorded\" here, and in docs/architecture.md PL-05 to \"after PL-03\". M6's Depends in roadmap.md stays M4. If the PL-19 order is intended instead, add M5 to M6's Depends."
+  },
+  {
+   "id": "R18",
+   "class": "milestone",
+   "severity": "low",
+   "file": "tasks/plan.md",
+   "quote": "QR-08 (to M3: the 1 s and 2 s budgets hold on the full real dataset, per server tests.md)",
+   "evidence": "QR-08 times the stock page (\u2264 2 s, PL-29/PL-38) and the membership page in the browser. The stock page is built in M2. The roadmap's M3 has \"Packages: data\" and \"Pipelines: PL-01, PL-09, PL-10\" and depends only on M1, so it plans no server or app work and no QR-08 measurement. server/tests.md says the same: \"they're measured in M3, when real Sharadar data is loaded\".",
+   "fix": "Add M2 to M3's Depends in roadmap.md (\"M2 (server.get_stock, PL-29 output)\"), add server and app to M3's Packages, and add \"QR-08 timed in the browser on the full real dataset\" to M3's Outline/Exit. Alternatively, move QR-08 to a milestone that has both real data and the pages, and change this Deferred entry and server/tests.md to match."
+  },
+  {
+   "id": "R19",
+   "class": "stale",
+   "severity": "low",
+   "file": "docs/spec.md",
+   "quote": "- **PANEL-02** A returns panel for a date range contains only stocks that were members on each date.",
+   "evidence": "The developer approved \"the PANEL-02 one-cell exception for the delisting return\" (turn 26). AD-08 and data.ReturnsPanel now keep the delisting return on the first session after the last bar, where `member` is False. The spec's PANEL-02 still says only members appear.",
+   "fix": "Append to PANEL-02: \"; the one exception is a delisted member's delisting return, which sits on the first session after its last bar even though it is no longer a member there (AD-08).\""
+  },
+  {
+   "id": "R20",
+   "class": "stale",
+   "severity": "low",
+   "file": "docs/spec.md",
+   "quote": "and does it meet DATA-01's 15 years? Answered by a probe during architecture.",
+   "evidence": "Architecture is finished, and PB-01 and PB-02 were waived unrun (probes.md: \"Status: Waived \u00b7 2026-10-18\"). Neither open question was answered by a probe during architecture, as both open questions claim.",
+   "fix": "Reword both spec open questions to \"\u2026 Open: PB-01 (and PB-02 for sectors) was waived on 2026-10-18 and will be rerun before M3's plan.\""
+  },
+  {
+   "id": "R21",
+   "class": "stale",
+   "severity": "low",
+   "file": "docs/architecture.md",
+   "quote": "`data.run_record` reports a `running` run with no heartbeat for 10 s as `stopped_unexpectedly`.",
+   "evidence": "No `data.run_record` exists in docs/packages/data/contract.md. Run records are read through `data.list_runs`, and data.RunRecord's invariant carries the 10 s rule.",
+   "fix": "Replace `data.run_record` with \"`data.list_runs` (and every reader of `data.RunRecord`)\", or add a `data.run_record(run_id) -> RunRecord` section to the data contract (see R04)."
+  },
+  {
+   "id": "R22",
+   "class": "stale",
+   "severity": "low",
+   "file": "docs/packages/data/pipelines.md",
+   "quote": "- Should the quality report be written for rejected snapshots too? (assumed: yes, it explains the rejection)",
+   "evidence": "The contract already answers it: data.QualityReport is \"written for every validated snapshot, rejected ones included (VALID-07)\". In data/tests.md the open question \"**Flagged moves don't block promotion** (the user, 2026-10-17)\" was likewise answered by the developer in turn 23.",
+   "fix": "Delete this open question. In data/tests.md, move the flagged-moves sentence out of Open questions into the PL-10 strategy text, or delete it."
+  },
+  {
+   "id": "R23",
+   "class": "stale",
+   "severity": "low",
+   "file": "docs/packages/engine/tests.md",
+   "quote": "`engine.BacktestResult`'s conventions are fixed by AD-23 (2026-10-17)",
+   "evidence": "This is process narration in Open questions (\"TC-29's assumption \u2026 holds, TC-30\u2013TC-33's answers are unchanged\"). The next bullet (\"Decided by the user, 2026-10-17: keep the spine's anchoring\") is also already settled. Neither is open.",
+   "fix": "Delete both bullets from Open questions. If wanted, move one sentence to the PL-14 strategy text: \"Blocks are anchored at session 757; sessions between the last whole block and the lockbox belong to no period.\""
+  },
+  {
+   "id": "R24",
+   "class": "stale",
+   "severity": "low",
+   "file": "docs/packages/lab/tests.md",
+   "quote": "TC-41 revised 2026-10-18: the first version assumed `n_signal` sets the kept count",
+   "evidence": "This is revision narration, and the other two Open questions (\"decided by the user, 2026-10-17, and now AD-24 and AD-25\", \"confirmed by the user\") are already settled. None are open.",
+   "fix": "Delete the three Open-question bullets and leave \"- None.\""
+  },
+  {
+   "id": "R25",
+   "class": "stale",
+   "severity": "low",
+   "file": "docs/packages/models/tests.md",
+   "quote": "Confirmed by the user, 2026-10-18.",
+   "evidence": "TC-73's reading was confirmed by the developer in turn 43, so it is no longer an open question.",
+   "fix": "Move the reading into TC-73's Source (\"AGENT-01's 'on or after the training window's end' read as after `Window.train_end`\") and delete the open-question bullet."
+  },
+  {
+   "id": "R26",
+   "class": "stale",
+   "severity": "low",
+   "file": "docs/spec.md",
+   "quote": "It lists every forecaster, forecast-driven portfolio and agent against the benchmark",
+   "evidence": "VERD's Behavior lists forecasters, but VERD-01's acceptance covers only \"every FPORT and AGENT ledger entry\", and PL-21 reads `entries(stage=\"S4\", family=\"S4\")`. That leaves out the FCST-VOL and FCST-RET forecaster entries.",
+   "fix": "Either change the Behavior to \"It lists every forecast-driven portfolio and agent against the benchmark\", or add the FCST-VOL and FCST-RET entries to VERD-01 and to PL-21 step 1 (`entries` by stage S4 without the family filter)."
+  },
+  {
+   "id": "R27",
+   "class": "packet",
+   "severity": "low",
+   "file": "tasks/plan.md",
+   "quote": "**Package:** data \u00b7 **Step:** PL-09.SyntheticSource \u00b7 **Kind:** spine \u00b7 **Covers:** DATA-02\u2013DATA-04, DATA-07 \u00b7 **Size:** XS",
+   "evidence": "M1-T04 must generate a 505-member index over 3 years (~382k rows, AD-22). It has to produce SEP, ACTIONS, TICKERS and SP500 rows with `closeadj` consistent with AD-08, a revision revealed only by the update run, a reclassification, halts, paired index changes, an exposed `truth` and per-case `extra` plants. Every golden case sits on its path (plan Risks). Its packet also lacks the data/tests.md intro that defines `truth` and the `extra` layering.",
+   "fix": "Change Size to M. Add the data/tests.md preamble (the `truth` and `extra` definitions), data.Snapshot and AD-08 to M1-T04's **Read:** line."
+  },
+  {
+   "id": "R28",
+   "class": "packet",
+   "severity": "low",
+   "file": "tasks/plan.md",
+   "quote": "**Read:** PL-09, PL-10, data.RunRecord, data.RunEvent",
+   "evidence": "M1-T02 owns `runs/record.py`, which PL-10 also calls: `open_run(\"validation\", scope=snapshot)` and `close_run(RunRecord, ValidationResult)`. No other task writes that file, but data.ValidationResult isn't in T02's packet, and T02's Step names only PL-09.open_run and PL-09.close_run. The PL-09 sketch `open_run(mode, resume=resume)` and the PL-10 sketch `open_run(\"validation\", scope=snapshot)` also give different signatures.",
+   "fix": "Change M1-T02's Step to \"PL-09.open_run, PL-09.close_run, PL-10.open_run, PL-10.close_run\" and add data.ValidationResult to its Read. Give one `open_run(kind, *, scope, resume=None)` signature in data/pipelines.md and use it in both sketches."
+  },
+  {
+   "id": "R29",
+   "class": "stale",
+   "severity": "low",
+   "file": "docs/packages/lab/pipelines.md",
+   "quote": "residuals = residual_returns(returns, sched, seed=seed)",
+   "evidence": "The contract signature is `residual_returns(returns, as_of: date, *, schedule: Schedule, seed: int)`: the sketch omits `as_of` and passes the schedule positionally. `targets = forward_targets(returns, residuals, cal)` also passes positionally where the contract makes `residuals` and `calendar` keyword-only. models/pipelines.md has `forward_targets(returns, cal, horizons=config.horizons)`.",
+   "fix": "Change the sketches to `residual_returns(returns, sched.lockbox[0], schedule=sched, seed=seed)` (or whichever `as_of` is intended), `forward_targets(returns, residuals=residuals, calendar=cal)`, and in models/pipelines.md `forward_targets(returns, horizons=config.horizons, calendar=cal)`."
+  },
+  {
+   "id": "R30",
+   "class": "domain",
+   "severity": "low",
+   "file": "docs/architecture.md",
+   "quote": "so a high-turnover method's variance moves by a few 10\u207b\u2078",
+   "evidence": "A cost c \u2248 0.001 taken from one of 21 daily returns changes the sample variance by about \u22122c(r\u2081 \u2212 m)/20 + c\u00b2/21. With daily returns of ~1% that is of order 10\u207b\u2076 daily. The reported `variance` is annualised (\u00d7 252), so it moves by up to about 10\u207b\u2074, roughly 1% of a typical 0.02\u20130.04 value, not \"a few 10\u207b\u2078\".",
+   "fix": "Replace with \"so a high-turnover method's annualised variance can move by up to about 10\u207b\u2074 in a period (the cost lands on one session)\"."
+  },
+  {
+   "id": "R31",
+   "class": "domain",
+   "severity": "low",
+   "file": "docs/packages/lab/pipelines.md",
+   "quote": "`fit_factors` on every 12th window",
+   "evidence": "FACT-03's acceptance is \"Given any training window \u2026 the mean absolute pairwise correlation of residuals is at most 50% of that of raw returns\". A check on every 12th window can't show that it holds for every window.",
+   "fix": "Change PL-18 step 5's spine text to \"`fit_factors` on every window; mean \\|corr\\| raw vs residual and k per window, with the `data-analysis` skill (FACT-03 checked on all windows)\", or relax FACT-03 in the spec to \"on every sampled window\"."
+  },
+  {
+   "id": "R32",
+   "class": "stale",
+   "severity": "low",
+   "file": "docs/packages/app/contract.md",
+   "quote": "state linking to `/runs` (EXPL-06)",
+   "evidence": "The \"no dataset yet\" behaviour is the EXPL edge case \"No current dataset yet \u2192 the app says so and points to the run monitor\". EXPL-06 is about charts and layouts following the dataviz and frontend-design skills.",
+   "fix": "Replace \"(EXPL-06)\" with \"(EXPL edge case: no current dataset)\"."
+  }
+ ],
+ "checked": {
+  "user_messages": 50,
+  "docs": 35,
+  "packets": 48
+ }
+}

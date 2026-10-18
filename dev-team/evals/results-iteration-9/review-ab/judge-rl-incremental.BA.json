@@ -1,0 +1,125 @@
+{
+ "winner": "A",
+ "reasoning": "The two sets share the same skeleton: the same three stages and milestones, six pipelines, a 31-task M1 plan and near-identical file layouts. A reads as the cleaned-up, self-consistent version. B keeps stale process text in architecture.md ('adopted before M1 is built', 'a Replan of its interface task', 'five or more pipelines\u2026 All five are commands' when there are six) and a 'Replan notes' section in the plan. B has real contradictions. Its brief says agents beat the scripted player outright while EVAL-03 only requires 'not worse'. Its RunSettings says 'reinforce and ppo only with the tank' while predator-prey needs ppo. viz.Chart has no label, yet TC-70 needs one. TC-42 passes a values array of the same length as rewards, which the gae contract rejects. PL-01's FishTank omits the limited view (FISH-10). Snake/FishTank.reset_to return a bare ndarray against the team-keyed Env. with_seed is used in every entry sketch but has no contract entry. lab.main lacks --vs, --smoke and --label even though tasks verify with --smoke. B also has statistical and RL soundness problems: 'not worse' claims are corrected, which makes them easier to pass. GAE has no per-segment handling at truncation. The PPO reference uses a [-1,1] Box that SB3 clips per axis, unlike the hand-written agent. A fixes all of these explicitly: an uncorrected 'not worse' test, segmented GAE with a truncation golden case, an unbounded Box, Chart.label, with_seed, and full CLI flags. A also gives M2 and M3 checkable Exit criteria, which B lacks. A's task packets are more complete. Its M1-T06 packet includes Transition, StepResult, TeamSpec, SOLO, create_run, GameRecording and OpponentPool; B's omits them all. B's M1-T02 packet omits with_seed even though its acceptance tests it. A's sizes are also more realistic: DQN spine M, Snake S, CNN S, versus all XS in B. A's main weaknesses are a heavy M1 interface that stubs M2/M3 symbols, and very large shared PL-01 tables.",
+ "rubric": {
+  "A": {
+   "content": {
+    "rl_soundness": 5,
+    "stage_completeness": 5,
+    "internal_consistency": 4,
+    "right_sizing": 4,
+    "milestone_quality": 4,
+    "pipeline_clarity": 4,
+    "interface_quality": 4,
+    "dependency_graph_soundness": 4,
+    "task_buildability": 4
+   },
+   "structure": {
+    "organization": 4,
+    "readability_for_solo_learner": 4,
+    "ease_of_finding_next_build_step": 4,
+    "layout_sensibility": 4
+   },
+   "content_score": 4.2,
+   "structure_score": 4.0,
+   "overall_score": 8.2
+  },
+  "B": {
+   "content": {
+    "rl_soundness": 3,
+    "stage_completeness": 4,
+    "internal_consistency": 2,
+    "right_sizing": 3,
+    "milestone_quality": 3,
+    "pipeline_clarity": 4,
+    "interface_quality": 3,
+    "dependency_graph_soundness": 4,
+    "task_buildability": 3
+   },
+   "structure": {
+    "organization": 4,
+    "readability_for_solo_learner": 3,
+    "ease_of_finding_next_build_step": 4,
+    "layout_sensibility": 4
+   },
+   "content_score": 3.2,
+   "structure_score": 3.8,
+   "overall_score": 7.0
+  }
+ },
+ "output_quality": {
+  "A": {
+   "score": 8,
+   "strengths": [
+    "Statistically sound claim handling: 'not worse' tested uncorrected, with TC-23(c) proving a larger family never helps it pass",
+    "GAE contract and TC-42(b) handle truncation segments correctly; the PPO reference action Box is unbounded so it matches the hand-written agent",
+    "Roadmap gives M2 and M3 checkable Exit criteria",
+    "Spine packets carry every type they need (e.g. M1-T06 has Transition, StepResult, create_run, OpponentPool)",
+    "Realistic task sizes (DQN spine M, Snake S, CNN S), and the T26\u2192T27 file conflict is serialized and explained",
+    "No stale process narration; brief open question resolved"
+   ],
+   "weaknesses": [
+    "Brief softens the user's 'beats scripted' bar to 'matches or beats' (consistent with the spec, but a deliberate dilution)",
+    "M1 interface freezes and stubs many M2/M3 symbols (FishTank, PPOAgent, PredatorPrey) that no M1 task uses",
+    "PL-01's step table mixes all three stages' steps, so M1 builders read lots of irrelevant rows",
+    "Tank/predator TCs still say 'one correction over all the report's claims', a small wording mismatch with the greater-only rule"
+   ]
+  },
+  "B": {
+   "score": 6,
+   "strengths": [
+    "Same solid overall architecture, pipelines and golden-case catalogue",
+    "Dependency graph mostly sound, with valid none: reasons",
+    "Brief keeps the user's literal success criterion (beat both baselines)"
+   ],
+   "weaknesses": [
+    "Stale replan and process text in architecture.md and plan.md",
+    "Several contract contradictions (ppo only with tank, reset_to return types, Chart has no label but TC-70 needs one, with_seed missing)",
+    "Multiple-comparison correction applied to 'not worse' claims, which makes them easier to pass",
+    "GAE truncation handling unspecified; the reference Box [-1,1] clips per axis, unlike the hand-written agent",
+    "No Exit criteria for M2 or M3",
+    "Spine packets missing needed types (M1-T06, M1-T02, M1-T13)",
+    "Every implementation task sized XS, including the DQN spine and full Snake rules"
+   ]
+  }
+ },
+ "unbuildable_tasks": {
+  "A": [],
+  "B": [
+   "M1-T06: packet omits core.Transition, core.StepResult, core.TeamSpec, core.SOLO, runs.create_run, runs.GameRecording and selfplay.OpponentPool, yet must build Transitions, open a run folder and save recorded games",
+   "M1-T02: acceptance requires `with_seed swaps only the seed` but no with_seed contract or signature is in the packet (and none exists in contract.md)",
+   "M1-T01: Writes omits src/rllab/selfplay/** while the frozen train.train contract references selfplay.OpponentPool, so the interface can't stub it",
+   "M1-T13: packet lacks core.TeamSpec, core.ActionSpace and core.SOLO, needed for Snake to declare its team; and envs.Snake.reset_to's ndarray return type contradicts the team-keyed core.Env.reset"
+  ]
+ },
+ "defects": {
+  "A": [
+   "final__brief.md: 'each environment's ladder matches or beats a simple scripted player' \u2014 weakens the user's stated success bar of beating the scripted baseline",
+   "final__tasks__plan.md M1-T01 Read: 'envs.FishTank, \u2026 agents.PPOAgent, selfplay.OpponentPool, AD-12, AD-14' \u2014 M1 interface freezes M2/M3 symbols no M1 task consumes",
+   "final__packages__rllab__tests.md TC-46/TC-67/TC-68: '\u03b1 = 0.05 after one correction over all the report's claims' \u2014 conflicts with the greater-only correction rule in compare.run_claims",
+   "final__packages__rllab__pipelines.md PL-01 step 15: 'Env, Agent, RunSettings \u2192 RunRecord' \u2014 but the entry sketch and contract pass a factory and a team\u2192Agent map"
+  ],
+  "B": [
+   "final__architecture.md AD-09: 'adopted before M1 is built \u2026 a Replan of its interface task' \u2014 stale process narration",
+   "final__architecture.md AD-01: 'five or more pipelines \u2026 All five are commands' \u2014 there are six pipelines",
+   "final__tasks__plan.md: '## Replan notes - 2026-10-17: AD-09 adopted before the build\u2026' \u2014 superseded history kept in the plan",
+   "final__brief.md: 'Every trained agent clearly beats both a random player and a simple scripted player' vs spec EVAL-03 'not significantly worse than the scripted player' \u2014 contradiction",
+   "final__spec.md EVAL-03/REF-03: 'not worse \u2026 at 5% after correction' \u2014 correcting a 'worse' test makes 'not worse' easier to pass",
+   "final__spec.md CORE-06: 'behave exactly as before after the core's interface revision' \u2014 refers to a revision of code that was never built",
+   "final__spec.md REPLAY-01: 'Snake's grid, the corridor, or the tank with the ball and every fish' \u2014 omits predator-prey board",
+   "final__spec.md REF-01 example: 'game, view, fish count, rewards, steps and seeds match' \u2014 stale wording; requirement now says agent counts and opponent",
+   "final__packages__rllab__contract.md core.RunSettings: '`reinforce` and `ppo` only with the tank' \u2014 contradicts predprey using ppo in the same invariant",
+   "final__packages__rllab__contract.md envs.Snake.reset_to: '-> tuple[np.ndarray, dict[str, int]]' \u2014 contradicts team-keyed Env.reset",
+   "final__packages__rllab__contract.md viz.Chart: 'path; groups; baselines' \u2014 no label, yet TC-70 and EVAL-11 require labelled cross-play charts",
+   "final__packages__rllab__contract.md lab.main: 'eval \u2026 [--env \u2026] [--team T]' \u2014 no --vs, --smoke or --label, yet tasks verify with `--smoke` and PL-03 uses --vs",
+   "final__packages__rllab__pipelines.md entry sketches call `with_seed(settings, seed)` \u2014 no core.with_seed in contract",
+   "final__packages__rllab__pipelines.md PL-01 step 5: 'full view (AD-12) | FISH-01\u2013FISH-09' \u2014 limited view (FISH-10) dropped",
+   "final__packages__rllab__pipelines.md PL-04 step 4: 'one correction over all claims' \u2014 includes not_worse claims",
+   "final__packages__rllab__tests.md TC-42: 'rewards [1, 1], values [0.5, 0.5]' \u2014 gae contract requires values one longer than rewards",
+   "final__architecture.md AD-10: 'Box action (2,) in [\u22121, 1]' \u2014 SB3 clips per axis, so reference and hand-written PPO see different actions, undermining REF-02",
+   "final__roadmap.md M2/M3: no **Exit:** line \u2014 planned milestones without checkable exit criteria",
+   "final__tasks__plan.md Scope Exit: 'the real 5-seed \u2026 runs pass TC-15' \u2014 TC-15 is a corridor determinism test run in M1-T21, not a real-run check",
+   "final__tasks__todo.md: 'M1-T05 DQNAgent spine \u2026 (rllab, XS, solo)' \u2014 MLP, memory, target copy, Huber and clip in one XS task is undersized"
+  ]
+ }
+}

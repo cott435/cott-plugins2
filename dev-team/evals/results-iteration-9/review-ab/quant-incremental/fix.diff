@@ -1,0 +1,963 @@
+diff --git a/docs/architecture.md b/docs/architecture.md
+index 97087f3..e0debed 100644
+--- a/docs/architecture.md
++++ b/docs/architecture.md
+@@ -3,7 +3,7 @@
+ **Status:** Approved · **Shape:** Multi-package · **Last updated:** 2026-10-18 · **Spec:** [spec.md](spec.md)
+ 
+ ## Overview
+-Six packages in one repo. `qdata` is the Python data library. It downloads Sharadar prices, corporate actions, tickers and S&P 500 membership into an append-only local store where every record carries its first-known date, and each completed run commits a read-only data version. It also runs the validation checks and the Yahoo cross-check, and gives research code a point-in-time reader. `qrisk` is the S2 variance study. It reads windows from `qdata`'s point-in-time reader, builds covariance estimates and long-only portfolios, scores them out of sample, and writes each study run to its own folder. `qfeat` is the S3 feature study. It reuses `qrisk`'s windows and factor counts to build next-month residual targets, computes price and volume features, trains a walk-forward model, tests every feature claim against chance, and allows one holdout run per registered feature list. `qfcst` is the S4 forecasting stage. It trains a compact neural forecaster locally on `qfeat`'s panel and S3's surviving features, builds forecast portfolios beside `qrisk`'s classical ones, and keeps a simulated paper book that every refresh marks. `qserver` is the local backend: it runs `qdata`'s downloads and checks as worker processes, reads study results through `qrisk`, and serves an HTTP + Server-Sent Events API bound to localhost. `explorer` (TypeScript + React) is the browser app. It talks to `qserver` only through that API, with types generated from `qserver`'s OpenAPI schema.
++Six packages in one repo. `qdata` is the Python data library. It downloads Sharadar prices, corporate actions, tickers and S&P 500 membership into an append-only local store where every record carries its first-known date, and each completed run commits a read-only data version. It also runs the validation checks and the Yahoo cross-check, and gives research code a point-in-time reader. `qrisk` is the S2 variance study. It reads windows from `qdata`'s point-in-time reader, builds covariance estimates and long-only portfolios, scores them out of sample, and writes each study run to its own folder. `qfeat` is the S3 feature study. It reuses `qrisk`'s windows and factor counts to build next-month residual targets, computes price and volume features, trains a walk-forward model, tests every feature claim against chance, and allows one holdout run per registered feature list. `qfcst` is the S4 forecasting stage. It trains a compact neural forecaster locally on `qfeat`'s panel and S3's surviving features, builds forecast portfolios beside `qrisk`'s classical ones, and keeps a simulated paper book that every refresh marks. `qserver` is the local backend: it runs `qdata`'s downloads and checks as worker processes, reads study results through `qrisk`, and serves an HTTP + WebSocket API bound to localhost. `explorer` (TypeScript + React) is the browser app. It talks to `qserver` only through that API, with types generated from `qserver`'s OpenAPI schema.
+ 
+ ```mermaid
+ flowchart LR
+@@ -19,7 +19,7 @@ flowchart LR
+   qfcst --> forecasts[(forecasts and paper book)]
+   qserver -->|book.mark_after_refresh| qfcst
+   qrisk --> studies[(study folders)]
+-  explorer -->|HTTP + SSE, generated types| qserver
++  explorer -->|HTTP + WebSocket, generated types| qserver
+   qserver --> qdata
+   qserver -->|study.StudyReader| qrisk
+   qdata --> disk[(local store: Parquet + SQLite)]
+@@ -32,7 +32,7 @@ flowchart LR
+ | `qrisk` | packages/qrisk | Variance study: windows, spectra, covariance estimates, portfolios, holding months, known answers, scorecard and tests, study folders | STRUCT, COV, PORT, SYNTH, EVAL, QR-09 | `qdata` (`query`, `core`, `store`) | [qrisk](packages/qrisk/architecture.md) |
+ | `qfeat` | packages/qfeat | Feature study: residual targets, features, walk-forward model, claim tests, procedure check, registered lists and holdout ledger, reports | RESID, FEAT, FMOD, FTEST, FSYN, HOLD, FREP, QR-10 | `qrisk` (`windows`, `spectrum`), `qdata` (`query`, `core`, `store`) | [qfeat](packages/qfeat/architecture.md) |
+ | `qfcst` | packages/qfcst | Forecasting stage: dataset, baselines, neural forecaster, development evaluation, forecast portfolios, simulation engine, registered setups, paper book, verdict | BASE, FCST, FEVAL, FPORT, FRZ, PAPER, VERD, QR-11, QR-12 | `qfeat` (`panel`, `run`), `qrisk` (`windows`, `spectrum`, `estimators`, `portfolios`), `qdata` (`query`, `core`, `store`) | [qfcst](packages/qfcst/architecture.md) |
+-| `qserver` | packages/qserver | Local backend: run workers and progress, the paper-book phase after a refresh, HTTP + SSE API, study results, serves the app | RUN-01–RUN-06, PAPER-02, RVIEW-01–RVIEW-03, QR-02, QR-04, QR-06, QR-08 | `qdata`, `qrisk`, `qfcst` (`book`) | [qserver](packages/qserver/architecture.md) |
++| `qserver` | packages/qserver | Local backend: run workers and progress, the paper-book phase after a refresh, HTTP + WebSocket API, study results, serves the app | RUN-01–RUN-06, PAPER-02, RVIEW-01–RVIEW-03, QR-02, QR-04, QR-06, QR-08 | `qdata`, `qrisk`, `qfcst` (`book`) | [qserver](packages/qserver/architecture.md) |
+ | `explorer` | packages/explorer | Browser app: search, company, checks, universe, runs, spectrum and comparison pages with live progress | EXPL-01–EXPL-10, RUN-01, RUN-03, RUN-05, RUN-06 (UI), RVIEW-01–RVIEW-03, QR-02, QR-07, QR-08 | `qserver` (HTTP only) | [explorer](packages/explorer/architecture.md) |
+ 
+ ## Dependency rules
+@@ -56,7 +56,7 @@ flowchart LR
+ **Trigger:** the user starts a full download, refresh or check run on the runs page · **Covers:** RUN-01–RUN-06, LOAD-04
+ 1. `explorer` → `qserver`: `POST /runs` through `api.create_app`, answered with `api.RunMessage` (refused with the running run when `RUN-02` applies)
+ 2. `qserver` → `qdata`: the worker calls `load.download`, `checks.run_checks` or `xcheck.run_crosscheck` with a `core.RunContext`
+-3. `qserver` → `explorer`: `api.RunEvent` stream on `GET /runs/{id}/events` until the run ends; on reconnect, the stream resumes from the run's current state
++3. `qserver` → `explorer`: `api.RunEvent` messages on WebSocket `/runs/{id}/ws` until the run ends; on reconnect the client sends its last `seq` and the server resumes after it
+ 4. `explorer` → `qserver`: `POST /runs/{id}/cancel` → `api.RunMessage`; the worker's next `RunContext.check_cancel` raises `core.RunCancelled`
+ 
+ ### PL-02: Explore a company and the universe
+@@ -128,9 +128,9 @@ The local store and the study folders live outside the repo, at `$QDATA_HOME` (d
+ | Backend language | Python 3.12 | AD-01 |
+ | App language | TypeScript 5.6, React 18.3 | AD-10 |
+ | Primary source | Sharadar via Nasdaq Data Link (`SEP`, `ACTIONS`, `TICKERS`, `SP500`) | AD-02 |
+-| Secondary source | Yahoo via `yfinance` | AD-03 |
++| Secondary source | Yahoo via `yahooquery` | AD-03 |
+ | Store | Append-only Parquet with DuckDB reads; SQLite catalog | AD-04 |
+-| Backend API | FastAPI + uvicorn on 127.0.0.1, SSE for progress | AD-07 |
++| Backend API | FastAPI + uvicorn on 127.0.0.1, WebSocket for progress | AD-07 |
+ | Typed messages | Pydantic v2 → OpenAPI → `openapi-typescript` | AD-08 |
+ | Runs | Worker subprocess per run | AD-09 |
+ | Charts | Apache ECharts 5 | AD-10 |
+@@ -141,15 +141,15 @@ The local store and the study folders live outside the repo, at `$QDATA_HOME` (d
+ | Forecast model | PyTorch 2.5, hand-written compact model, CPU deterministic training | AD-23 |
+ | Paper book | Next-open simulation engine; append-only SQLite book per setup | AD-24, AD-25 |
+ | Trading calendar | `exchange_calendars` (XNYS) | — |
+-| Import rules | `import-linter` (qdata, qserver), ESLint `no-restricted-imports` (explorer) | — |
++| Import rules | `import-linter` (qdata, qrisk, qfeat, qfcst, qserver), ESLint `no-restricted-imports` (explorer) | — |
+ | Tests | pytest; Vitest | — |
+ 
+ **Monthly data cost (QR-01):**
+ | Source | Plan | Cost per month |
+ |---|---|---|
+-| Sharadar (Nasdaq Data Link) | the user's existing subscription | $49 placeholder, **unverified**: replace with the plan price shown in the user's Sharadar account |
+-| Yahoo via `yfinance` | free, personal use | $0 |
+-| **Total** | | $49 (unverified) — under the $50 limit only if the placeholder holds |
++| Sharadar (Nasdaq Data Link) | the user's existing subscription | plan price from the user's Sharadar account (placeholder, **unverified**) |
++| Yahoo via `yahooquery` | free, personal use | $0 |
++| **Total** | | that price + $0 (unverified) |
+ 
+ ## Cross-cutting concerns
+ - **Point in time (QUERY-01, CHECK-07, DATA-05):** every stored record has a `first_known` date and the run that added it. Every read filters on both (AD-04, AD-05). Returns and adjusted prices are derived at read time, never stored (AD-06).
+@@ -177,13 +177,13 @@ The local store and the study folders live outside the repo, at `$QDATA_HOME` (d
+ - **Consequences:** Every Sharadar-specific field stays inside `sources` and `load`. A switch touches those two modules.
+ - **Probe:** PB-01 — does the user's Nasdaq Data Link key return `SEP`, `ACTIONS`, `TICKERS` and `SP500` for current and delisted former S&P 500 members since 2000, with `permaticker`, `closeunadj`, and the action types and exit categories above?
+ 
+-### AD-03: Yahoo via yfinance as the cross-check source
++### AD-03: Yahoo via yahooquery as the cross-check source
+ **Status:** Accepted · **Date:** 2026-10-17 · **Scope:** `qdata`
+-- **Context:** PB-03, 2026-10-18: yfinance 1.7.0, 0.2.66 and 0.2.40 all fail against Yahoo; the v8 chart endpoint over plain HTTP returns split-adjusted data from 2000 and `adjclose` within 0.092 points of the total return on dividend days, inside XCHK-02's 0.10 (C6); coverage is unchecked. The user waived PB-03 until M3 ("Waive PB-01 and PB-03 until M3."). The brief names Yahoo through an unofficial free client. Checked against DATA-07 (split- and dividend-adjusted closes fetched independently), XCHK-04 (≥ 95% of current members covered) and QR-05 (≤ 1 request per second). The yfinance docs (ranaroussi.github.io/yfinance, read 2026-10-17) say it is "not affiliated, endorsed, or vetted by Yahoo" and that "the Yahoo! finance API is intended for personal use only". They don't describe `history`'s adjustment parameters, rate limits or delisted coverage.
+-- **Decision:** `sources.YahooSource` calls `Ticker.history` with full adjustment, one ticker per request, behind a 1-per-second limiter and a per-day cache of fetched companies (QR-05). Tickers are mapped by the dates each one belonged to the company (XCHK edge case).
+-- **Alternatives:** Stooq or Tiingo free tier — not what the brief chose; kept as fallbacks behind `SecondarySource` if Yahoo coverage falls short.
++- **Context:** PB-03, 2026-10-18: yfinance 1.7.0, 0.2.66 and 0.2.40 all failed against Yahoo, and yahooquery is not yet probed; the v8 chart endpoint over plain HTTP returns split-adjusted data from 2000 and `adjclose` within 0.092 points of the total return on dividend days, inside XCHK-02's 0.10 (C6); coverage is unchecked. The user waived PB-03 until M3 ("Waive PB-01 and PB-03 until M3."). The brief names Yahoo through yahooquery, an unofficial free client. Checked against DATA-07 (split- and dividend-adjusted closes fetched independently), XCHK-04 (≥ 95% of current members covered) and QR-05 (≤ 1 request per second).
++- **Decision:** `sources.YahooSource` calls yahooquery's `Ticker(...).history(adj_ohlc=True)`, one ticker per request, behind a 1-per-second limiter and a per-day cache of fetched companies (QR-05). Tickers are mapped by the dates each one belonged to the company (XCHK edge case).
++- **Alternatives:** Yahoo's v8 chart endpoint over plain HTTP — the fallback if yahooquery fails PB-03. Stooq or Tiingo free tier — not what the brief chose; kept as fallbacks behind `SecondarySource` if Yahoo coverage falls short.
+ - **Consequences:** The client can break without notice. The cross-check then reports "not run", and the other checks still complete.
+-- **Probe:** PB-03 — for the current S&P 500 members and the user's 10 delisted names, what share does `yfinance` return, are its closes split- and dividend-adjusted, and does it hold up at 1 request per second over 500+ tickers?
++- **Probe:** PB-03 — for the current S&P 500 members and the user's 10 delisted names, what share does `yahooquery` return, are its closes split- and dividend-adjusted, and does it hold up at 1 request per second over 500+ tickers?
+ 
+ ### AD-04: Append-only Parquet records, versions as committed manifests, SQLite catalog
+ **Status:** Accepted · **Date:** 2026-10-17 · **Scope:** `qdata`
+@@ -207,17 +207,17 @@ The local store and the study folders live outside the repo, at `$QDATA_HOME` (d
+ - **Alternatives:** Store adjusted series per version — wrong for any as-of date before a later action is known, and one series per anchor.
+ - **Consequences:** Every read pays for the computation. That costs about 6,500 rows per company and 130,000 per universe-year, well within QR-02 in DuckDB. Checks and the cross-check use the same functions.
+ 
+-### AD-07: FastAPI on localhost with Server-Sent Events
++### AD-07: FastAPI on localhost with a WebSocket for progress
+ **Status:** Accepted · **Date:** 2026-10-17 · **Scope:** `qserver`, `explorer`
+ - **Context:** RUN-03 asks for updates at least every 2 seconds, RUN-06 for runs that survive app reloads, QR-04 for local-only access, and QR-08 for typed messages.
+-- **Decision:** `qserver.api` is a FastAPI app served by uvicorn on 127.0.0.1, with a loopback `Host` check. Progress streams over SSE from the catalog's event table, with `Last-Event-ID` resume. It also serves `explorer`'s production build as static files, so one process is all the user starts.
+-- **Alternatives:** WebSockets — two-way messaging isn't needed, and reconnects are harder. Polling — works, but more requests and less live.
++- **Decision:** `qserver.api` is a FastAPI app served by uvicorn on 127.0.0.1, with a loopback `Host` check. Progress streams over a WebSocket from the catalog's event table; on reconnect the client sends its last `seq` and the server resumes after it. It also serves `explorer`'s production build as static files, so one process is all the user starts.
++- **Alternatives:** Server-Sent Events — one-way and simpler, but the brief asks for a WebSocket. Polling — works, but more requests and less live.
+ - **Consequences:** Pydantic models are the single definition of every message (AD-08).
+ 
+ ### AD-08: Messages defined once in Pydantic, generated into TypeScript
+ **Status:** Accepted · **Date:** 2026-10-17 · **Scope:** `qserver`, `explorer`
+ - **Context:** QR-08 asks that a message-shape change on one side fail the other side's build.
+-- **Decision:** `qserver.api` Pydantic models export to `contracts/openapi.json`, committed. `explorer` generates `src/api/schema.ts` from it with `openapi-typescript`. CI fails if the export or the generated file differs from what is committed, and `tsc` fails where the app uses a changed field. SSE event payloads are schema components too.
++- **Decision:** `qserver.api` Pydantic models export to `contracts/openapi.json`, committed. `explorer` generates `src/api/schema.ts` from it with `openapi-typescript`. CI fails if the export or the generated file differs from what is committed, and `tsc` fails where the app uses a changed field. WebSocket message payloads are schema components too.
+ - **Alternatives:** Hand-written TypeScript types — drift unseen. JSON Schema files as the source — a second definition beside the Pydantic models.
+ - **Consequences:** Every API change is a three-file commit: models, schema, generated types.
+ 
+@@ -258,7 +258,7 @@ The local store and the study folders live outside the repo, at `$QDATA_HOME` (d
+ 
+ ### AD-14: NumPy, SciPy and cvxpy with Clarabel; portfolio methods written by hand
+ **Status:** Accepted · **Date:** 2026-10-17 · **Scope:** `qrisk`
+-- **Context:** PORT-01 asks for the long-only minimum variance over about 500 names, within 1e-6 of the true optimum, about 1,200 times (≈ 295 dates × 3 estimates plus 4 subset portfolios). PORT-02 asks for equal risk contributions within 1%, and PORT-03 for HRP. SYNTH-04 and SYNTH-05 check them against known answers. The idea's purpose is to know exactly what each method does.
++- **Context:** PORT-01 asks for the long-only minimum variance over about 500 names, within 1e-6 of the true optimum, about 2,100 times (≈ 296 dates × 3 full-set estimates plus 4 subset estimates). PORT-02 asks for equal risk contributions within 1%, and PORT-03 for HRP. SYNTH-04 and SYNTH-05 check them against known answers. The idea's purpose is to know exactly what each method does.
+ - **Decision:** Linear algebra and eigendecompositions use NumPy and SciPy. Minimum variance is a QP in cvxpy 1.5, solved by Clarabel (interior point, tolerances 1e-10), with the result's KKT conditions checked before it counts as ok. Equal risk contribution minimises ½ wᵀΣw − (1/N) Σ log wᵢ, which is strictly convex, by Newton's method with a line search, then rescales to sum 1. HRP is written by hand: correlation distance √((1 − ρ)/2), single linkage from `scipy.cluster.hierarchy`, quasi-diagonal ordering, and recursive bisection by inverse cluster variance. Inverse volatility and equal weight are closed forms.
+ - **Alternatives:** PyPortfolioOpt or Riskfolio-Lib — they bundle all three methods but hide the steps the study is meant to expose, and Riskfolio adds a heavy stack. SciPy SLSQP for minimum variance — unreliable with 500 bound constraints, and too loose for PORT-01's 1e-6.
+ - **Consequences:** Two solver dependencies to pin. SYNTH-05's diagonal panel checks equal risk contribution and HRP exactly, and SYNTH-04 checks minimum variance.
+@@ -347,13 +347,12 @@ The local store and the study folders live outside the repo, at `$QDATA_HOME` (d
+ - **Test choice (EVAL-03):** the `null-hypothesis-testing` skill picks the test and the correction while the study is built; until then `DifferenceTest.method` is unset, and the power of about 295 monthly pairs is unknown.
+ - **Holdout power (FREP-02):** about 69 holdout months detect a mean monthly IC of roughly 0.025 or more; smaller real effects will read as "does not pass". The report states the detectable size.
+ - **AD-15 projection:** if many dates need the nearest-correlation projection, the sample estimate's results there are less comparable; the count is reported per date.
+-- **QR-01 (user):** the Sharadar price in the cost table is a $49 placeholder, not checked against the account. It leaves $1 of headroom, so any paid fallback (membership source, secondary source) would breach the limit. The user confirms the price from their Sharadar account.
++- **QR-01 (user):** the Sharadar price in the cost table is a placeholder for the plan price in the user's Sharadar account, not yet checked. The headroom left for any paid fallback (membership source, secondary source) is unknown until PB-01 C1 confirms the price.
+ - **PB-01** (AD-02, waived until M3): membership, the delisted names, the unadjusted rebuild and exit types are unchecked, and the probe's `coverage` step crashes before them. Before M3 is planned, PB-01 is reopened with step-and-line error evidence and re-run; if `SP500` or delisted names are missing, membership needs another source within QR-01.
+ - **PB-02** (AD-05, waived until M3): whether `lastupdated` moves on every revision is unchecked. If it doesn't, refreshes must re-download `SEP` by date window as well (QR-03 at risk). PB-02's `snapshot` and `compare` run before M3 is planned.
+-- **PB-03** (AD-03, waived until M3): yfinance fails against Yahoo today; the chart endpoint works on three tickers. Coverage of current members (XCHK-04) is unchecked. Before M3 builds `YahooSource`, AD-03 is revised toward the chart endpoint and PB-03's coverage re-run.
++- **PB-03** (AD-03, waived until M3): yfinance failed against Yahoo and yahooquery is untested; the chart endpoint works on three tickers. Coverage of current members (XCHK-04) is unchecked. Before M3 builds `YahooSource`, PB-03 is re-run with yahooquery and AD-03 is revised toward yahooquery, with the chart endpoint as the fallback.
+ - History before the first full download can be point-in-time only to the extent Sharadar did not revise it (AD-05). CHECK-07 cannot detect such revisions.
+ - Thresholds in CHECK-03 and CHECK-06 are provisional until the CHECK-12 analysis on the first full version.
+-- Spec PRICE-03's example (prices up to T equal unadjusted) holds only when no dividend falls between those dates and T. The tests should use a split-only case, or the spec should say so.
+ 
+ ## Changelog
+ | Date | Change | Source | IDs |
+diff --git a/docs/brief.md b/docs/brief.md
+index fc97d2d..51c0834 100644
+--- a/docs/brief.md
++++ b/docs/brief.md
+@@ -38,4 +38,4 @@ Me: one researcher on a local machine, moving from data to signal testing and la
+ - Hosting, multiple users or scheduled cloud jobs — it runs locally for one person.
+ 
+ ## Open questions
+-- Does my Sharadar plan include historical S&P 500 membership, or only prices? (To check before the architecture relies on it.)
++- Does my Sharadar plan include historical S&P 500 membership, or only prices? (PB-01, waived until M3.)
+diff --git a/docs/ideas/residual-features.md b/docs/ideas/residual-features.md
+index 90c5a69..ea95553 100644
+--- a/docs/ideas/residual-features.md
++++ b/docs/ideas/residual-features.md
+@@ -56,4 +56,4 @@ Everything comes from the S1 data version, read through as-of reads, with no new
+ - Deep learning or automated feature search.
+ 
+ ## Open questions
+-- Which model family: chosen in the architecture, but it should handle interactions and be trained walk-forward.
++- Model family: resolved in AD-19 (LightGBM).
+diff --git a/docs/packages/explorer/architecture.md b/docs/packages/explorer/architecture.md
+index 58e4cc0..896a294 100644
+--- a/docs/packages/explorer/architecture.md
++++ b/docs/packages/explorer/architecture.md
+@@ -18,7 +18,7 @@ A single-page React app, served by `qserver` in normal use and by the Vite dev s
+ ## Components
+ | Component | Responsibility | Covers | Depends on |
+ |---|---|---|---|
+-| `api` | Generated schema types, typed fetch client, SSE hook with reconnect and resume | QR-08, RUN-03, RUN-06 | — |
++| `api` | Generated schema types, typed fetch client, WebSocket hook with reconnect and resume | QR-08, RUN-03, RUN-06 | — |
+ | `design` | Visual direction, theme tokens and base components for every page, research pages included, set with the `frontend-design` skill | QR-07 | — |
+ | `charts` | Price chart (unadjusted/adjusted, action markers, membership shading), cross-check chart, eigenvalue spectrum with its noise band, realized-variance comparison | EXPL-02, EXPL-03, EXPL-06, RVIEW-01, RVIEW-02, QR-02 | `design` |
+ | `pages` | Search, company, checks, universe and runs pages; the version picker; the spectrum and comparison pages with their study picker | EXPL-01–EXPL-10, RUN-01, RUN-05, RVIEW-01–RVIEW-03 | `api`, `charts`, `design` |
+@@ -27,7 +27,7 @@ A single-page React app, served by `qserver` in normal use and by the Vite dev s
+ See [contract.md](contract.md).
+ 
+ ## Cross-cutting concerns
+-- **Live progress:** the SSE hook shows "reconnecting" while the stream is down and resumes with `Last-Event-ID` (RUN edge case, RUN-06).
++- **Live progress:** the WebSocket hook shows "reconnecting" while the socket is down and resumes after the last `seq` it received (RUN edge case, RUN-06).
+ - **Empty state:** with no version, the app opens on the runs page with a prompt to start a full download. With no study, the research pages say so; a known-answer failure shows the failed checks instead of results (RVIEW edge cases).
+ - **Typed boundary:** `pnpm gen:api` regenerates `src/api/schema.ts`; CI fails on a diff, and `tsc` fails where a page uses a changed field (AD-08).
+ 
+diff --git a/docs/packages/explorer/pipelines.md b/docs/packages/explorer/pipelines.md
+index 37e5063..81fe7d0 100644
+--- a/docs/packages/explorer/pipelines.md
++++ b/docs/packages/explorer/pipelines.md
+@@ -68,7 +68,7 @@ export function FailureRoutes() {
+ |---|---|---|---|---|---|
+ | 1 | `useRuns` | api.queries | — → RunMessage | `GET /runs`, newest first | RUN-05 |
+ | 2 | `useStartRun` | api.mutations | kind → RunMessage | `POST /runs`; a 409 shows the running run | RUN-01, RUN-02 |
+-| 3 | `useRunEvents` | api.events | run id → RunEvent | `EventSource` resuming with `Last-Event-ID`; "reconnecting" while it is down | RUN-03, RUN-06 |
++| 3 | `useRunEvents` | api.events | run id → RunEvent | WebSocket `/runs/{id}/ws` resuming from the last `seq`; "reconnecting" while it is down | RUN-03, RUN-06 |
+ | 4 | `useCancelRun` | api.mutations | run id → RunMessage | `POST /runs/{id}/cancel` | RUN-04 |
+ | 5 | `RunsView` | pages.runs | RunMessage, RunEvent → RouteView | phase, done of total, elapsed, errors; with no version, a prompt to start a full download | RUN-01, RUN-03, RUN-05 |
+ 
+diff --git a/docs/packages/explorer/tests.md b/docs/packages/explorer/tests.md
+index 9dc8f74..8023973 100644
+--- a/docs/packages/explorer/tests.md
++++ b/docs/packages/explorer/tests.md
+@@ -10,6 +10,7 @@
+ | PL-15 | `pnpm --dir packages/explorer gen:api --check` | api.schema | — | — |
+ | PL-01 | `pnpm --dir packages/explorer test pl01_system` | — (system: the app against a real `qserver` and `qdata` on the synthetic source) | — | — |
+ | PL-02 | `pnpm --dir packages/explorer test pl02_system` | — (system: the explore pages against a real `qserver` over a committed synthetic version) | — | — |
++| PL-03 | `pnpm --dir packages/explorer test pl03_system` | — (system: the checks and failure pages against a real `qserver` over a committed synthetic version with a check run) | — | — |
+ | PL-17 | `pnpm --dir packages/explorer test pl17_system` | — (system: the research pages against a real `qserver` over a committed synthetic study) | — | — |
+ ## Open questions
+ - No golden cases yet: every pipeline here has a smoke test and step unit tests only. Golden cases (user-trusted input/output pairs, or synthetic known answers) can be added in an Extend round before the milestone that needs them (assumed: none for M1).
+diff --git a/docs/packages/qdata/architecture.md b/docs/packages/qdata/architecture.md
+index bed0063..592d3ed 100644
+--- a/docs/packages/qdata/architecture.md
++++ b/docs/packages/qdata/architecture.md
+@@ -18,7 +18,7 @@ flowchart LR
+ | Area | Choice | Decision |
+ |---|---|---|
+ | Language | Python 3.12 | AD-01 |
+-| Data clients | `nasdaq-data-link` ≥ 1.0.4; `yfinance` ≥ 0.2.40 | AD-02, AD-03 |
++| Data clients | `nasdaq-data-link` ≥ 1.0.4; `yahooquery` ≥ 2.3 | AD-02, AD-03 |
+ | Store | DuckDB ≥ 1.1, PyArrow ≥ 17; SQLite (stdlib) | AD-04 |
+ | Frames | pandas ≥ 2.2, pandera ≥ 0.20 | — |
+ | Calendar | `exchange_calendars` ≥ 4.5 | — |
+diff --git a/docs/packages/qdata/pipelines.md b/docs/packages/qdata/pipelines.md
+index b16c143..74b84c7 100644
+--- a/docs/packages/qdata/pipelines.md
++++ b/docs/packages/qdata/pipelines.md
+@@ -9,7 +9,7 @@
+ | # | Step | Owner | In → Out | Spine version | Covers |
+ |---|---|---|---|---|---|
+ | 1 | `open_primary` | sources.factory | settings → PrimarySource | the synthetic source unless settings name Sharadar (PB-01 open) | DATA-01 |
+-| 2 | `SharadarSource` | sources.sharadar | api key → PrimarySource | urllib datatables calls with cursor paging, as PB-01's probe; every page archived as a RawPage (AD-02) | DATA-01–DATA-03, QR-01, QR-06 |
++| 2 | `SharadarSource` | sources.sharadar | api key → PrimarySource | `nasdaq-data-link` datatable calls with cursor paging; every page archived as a RawPage (AD-02) | DATA-01–DATA-03, QR-01, QR-06 |
+ | 3 | `SyntheticPrimarySource` | sources.primary_synthetic | seed → PrimarySource | 6 companies over 2000–2003: one delisted (acquired), one 2-for-1 split, one ticker change, one reused ticker | DATA-01 |
+ | 4 | `fetch_universe` | load.universe | PrimarySource, VersionedStore, RunContext → Company | SP500 events to intervals, TICKERS to `permaticker` and ticker spans, ACTIONS exits through one mapping table (AD-02) | LOAD-01, DATA-04, DATA-06, UNIV-02, UNIV-03 |
+ | 5 | `fetch_prices` | load.prices | PrimarySource, Company, VersionedStore, RunContext → Bars | SEP in 10-ticker batches; unadjusted OHLC = value × closeunadj / close; refresh filters on `lastupdated` (PB-02) | LOAD-01, LOAD-02, DATA-02, PRICE-01, QR-03 |
+@@ -61,7 +61,7 @@ def run_checks(reader: PitReader, catalog: Catalog, ctx: RunContext, *, config:
+ | # | Step | Owner | In → Out | Spine version | Covers |
+ |---|---|---|---|---|---|
+ | 1 | `open_secondary` | sources.factory | settings → SecondarySource | the synthetic source unless settings name Yahoo (PB-03 open) | DATA-07 |
+-| 2 | `YahooSource` | sources.yahoo | cache dir → SecondarySource | one ticker per request at 1 per second, cached per day (AD-03); the client PB-03 confirms | DATA-07, QR-05 |
++| 2 | `YahooSource` | sources.yahoo | cache dir → SecondarySource | one ticker per request at 1 per second, cached per day, through yahooquery's `Ticker(...).history(adj_ohlc=True)` (AD-03), or the chart endpoint if PB-03 rules yahooquery out | DATA-07, QR-05 |
+ | 3 | `SyntheticSecondarySource` | sources.secondary_synthetic | seed → SecondarySource | the synthetic primary's companies with returns perturbed by ±0.02 points, one not covered | DATA-07 |
+ | 4 | `match_tickers` | xcheck.match | PitReader → Company | each company's ticker spans; a reused ticker only on its holder's days | XCHK-01 |
+ | 5 | `fetch_secondary` | xcheck.fetch | SecondarySource, Company, RunContext → RawPage | one request per span; `None` → not covered | DATA-07, QR-05 |
+@@ -136,4 +136,4 @@ tests/intent/qdata/  tests/unit/qdata/
+ ```
+ 
+ ## Open questions
+-- Which client `sources.yahoo` uses, yfinance or the chart endpoint, waits on PB-03 (assumed: the synthetic stand-in carries S1 until then).
++- Which client `sources.yahoo` uses, yahooquery or the chart endpoint, waits on PB-03 (assumed: the synthetic stand-in carries S1 until then).
+diff --git a/docs/packages/qdata/tests.md b/docs/packages/qdata/tests.md
+index b567260..ef85688 100644
+--- a/docs/packages/qdata/tests.md
++++ b/docs/packages/qdata/tests.md
+@@ -5,11 +5,41 @@
+ ## Strategy
+ | Pipeline | Smoke | Step unit tests | Golden cases | Model eval |
+ |---|---|---|---|---|
+-| PL-04 | `pytest tests/intent/qdata/test_pl04_smoke.py` | sources.factory, sources.primary_synthetic, load.universe, load.prices, load.actions, load.revisions, load.commit | — | — |
++| PL-04 | `pytest tests/intent/qdata/test_pl04_smoke.py` | sources.factory, sources.primary_synthetic, load.universe, load.prices, load.actions, load.revisions, load.commit | TC-79 (Bars, Actions → stamp_revisions → Bars, Actions) | — |
+ | PL-05 | `pytest tests/intent/qdata/test_pl05_smoke.py` | core.calendar, checks.bars, checks.returns, checks.universe, checks.pit, checks.reference, checks.explanations | — | — |
+ | PL-06 | `pytest tests/intent/qdata/test_pl06_smoke.py` | sources.secondary_synthetic, xcheck.match, xcheck.fetch, xcheck.compare, xcheck.report | — | — |
+ | PL-07 | `python -m qdata calibrate --smoke` | checks.calibrate, checks.config | — | — |
+-| PL-08 | `pytest tests/intent/qdata/test_pl08_smoke.py` | store.versions, query.reader, query.companies, query.universe, query.returns | — | — |
++| PL-08 | `pytest tests/intent/qdata/test_pl08_smoke.py` | store.versions, query.reader, query.companies, query.universe, query.returns | TC-74, TC-75 (PitReader, Company → read_returns → Returns), TC-76 (PitReader → read_universe → Bars), TC-77 (VersionedStore → PitReader), TC-78 (PitReader, ticker → resolve_company → Company) | — |
++
++### TC-74: A split day returns 0%
++**Pipeline:** PL-08 · **Covers:** PRICE-02 · **Kind:** closed form · **Fixture:** —
++**Source:** spec PRICE-02's criterion; AD-06's r_t = (C_t + d_t) · s_t / C_{t−1} − 1; unadjusted close 100 on D−1, a 2-for-1 split (s = 2) with ex-date D, unadjusted close 50 on D
++**Expected:** the return for D is 0, not −0.50 · **Tolerance:** 1e-4 absolute (0.01 percentage points, PRICE-02)
++
++### TC-75: A dividend day returns 0%
++**Pipeline:** PL-08 · **Covers:** PRICE-02 · **Kind:** closed form · **Fixture:** —
++**Source:** spec PRICE-02's criterion; AD-06's formula; unadjusted close 100 on D−1, a $1 cash dividend with ex-date D, unadjusted close 99 on D
++**Expected:** the return for D is (99 + 1) / 100 − 1 = 0 · **Tolerance:** 1e-4 absolute (0.01 percentage points, PRICE-02)
++
++### TC-76: A company added on D is a member from D
++**Pipeline:** PL-08 · **Covers:** UNIV-01 · **Kind:** closed form · **Fixture:** —
++**Source:** spec UNIV-01's criterion and its edge case; a membership interval starting on trading day D; a second company whose addition is effective on a Saturday
++**Expected:** the first is absent from the members on D−1 and present on D; the second is first a member on the following Monday · **Tolerance:** exact, dates are discrete
++
++### TC-77: A late dividend is invisible before it was known
++**Pipeline:** PL-08 · **Covers:** QUERY-01 · **Kind:** closed form · **Fixture:** —
++**Source:** spec QUERY-01's criterion; a $1 dividend with ex-date before K whose record has `first_known` = K (AD-05)
++**Expected:** read as of K−1, the dividend is absent and the ex-date's return omits it; read as of K, it is present · **Tolerance:** exact for presence; returns 1e-12
++
++### TC-78: A reused ticker resolves to its holder on the as-of date
++**Pipeline:** PL-08 · **Covers:** QUERY-04 · **Kind:** closed form · **Fixture:** —
++**Source:** spec QUERY-04's criterion; ticker held by company A until its delisting, then reused by company B from date U
++**Expected:** as of U−1 the ticker resolves to A; as of U it resolves to B; an unknown ticker raises `QueryRefused` · **Tolerance:** exact
++
++### TC-79: First-known stamping on the first full download and a later refresh
++**Pipeline:** PL-04 · **Covers:** DATA-05, LOAD-02 · **Kind:** closed form · **Fixture:** —
++**Source:** AD-05; a first full download on run date F of a bar dated 2001-03-01, a dividend with ex-date 2001-05-15 and a membership change effective 2001-06-01; a refresh on run date G > F in which one bar's unadjusted close changed and a split restated `SEP`'s adjusted history only
++**Expected:** after F, `first_known` is 2001-03-01, 2001-05-15 and 2001-06-01 respectively; after G, only the bar with the changed unadjusted close is a new row, stamped G; the restated adjusted rows are no revision · **Tolerance:** exact
+ 
+ ## Open questions
+-- No golden cases yet: every pipeline here has a smoke test and step unit tests only. Golden cases (user-trusted input/output pairs, or synthetic known answers) can be added in an Extend round before the milestone that needs them (assumed: none for M1).
++- PL-05, PL-06 and PL-07 have no golden cases yet; they can be added in an Extend round before M2 and M3 (assumed: none).
+diff --git a/docs/packages/qfcst/contract.md b/docs/packages/qfcst/contract.md
+index 68ac2c0..4f70fac 100644
+--- a/docs/packages/qfcst/contract.md
++++ b/docs/packages/qfcst/contract.md
+@@ -167,7 +167,7 @@
+ ### engine.backtest: The development backtest
+ `def backtest(store: VersionedStore, version: VersionId, targets: Sequence[TargetWeights]) -> BacktestReport`
+ - **Invariants:** `simulate` over the development dates from 2005, with the paper book's fill rule and costs (FPORT-05)
+-- **Used by:** the development run; PL-34; PL-34
++- **Used by:** the development run; PL-34
+ 
+ ## setup
+ 
+diff --git a/docs/packages/qfcst/pipelines.md b/docs/packages/qfcst/pipelines.md
+index 52b71ad..4dfa07c 100644
+--- a/docs/packages/qfcst/pipelines.md
++++ b/docs/packages/qfcst/pipelines.md
+@@ -183,4 +183,4 @@ tests/intent/qfcst/  tests/unit/qfcst/
+ ```
+ 
+ ## Open questions
+-- Six contract changes are routed to `architecture-design` Revise; the step tables already use them, and `dt lint` reports them until it lands: `dataset.Survivors`; `evaluate.DevEvaluation` (scores and claims, as `evaluate_dev`'s return); `evaluate.ErrorInputs`; `engine.BacktestReport`; `evaluate.DevRun` with `evaluate.write_dev_run` and `evaluate.load_dev_run`, and `SetupRegistry.register` taking a `DevRun`; `book.BookReturns`.
++- None.
+diff --git a/docs/packages/qfcst/tests.md b/docs/packages/qfcst/tests.md
+index 67a9095..d739a44 100644
+--- a/docs/packages/qfcst/tests.md
++++ b/docs/packages/qfcst/tests.md
+@@ -5,7 +5,7 @@
+ ## Strategy
+ | Pipeline | Smoke | Step unit tests | Golden cases | Model eval |
+ |---|---|---|---|---|
+-| PL-34 | `python -m qfcst develop --smoke` | dataset.survivors, dataset.build, baselines.compute, model.net, model.losses, train.fit, train.walk, train.predict, evaluate.scores, evaluate.errors, evaluate.folder, engine.backtest; boundary: `qfeat.run.holdout_claims`, `qfeat.panel.build_panel` and `qdata.query.PitReader` replay doubles | TC-47, TC-48, TC-49 (VersionedStore → compute_baselines → Baselines), TC-50, TC-51, TC-52, TC-56 (VersionedStore, FeaturePanel, Survivors → build_dataset → ForecastSet), TC-53, TC-55 (ForecastSet → walk_forward → Forecasts), TC-54 (ModelConfig → check_model → ModelConfig), TC-57, TC-58 (Forecasts, ForecastSet → evaluate_dev → DevEvaluation) | TC-58 |
++| PL-34 | `python -m qfcst develop --smoke` | dataset.survivors, dataset.build, baselines.compute, model.net, model.losses, train.fit, train.walk, train.predict, evaluate.scores, evaluate.errors, evaluate.folder, engine.backtest; boundary: `qfeat.run.holdout_claims`, `qfeat.panel.build_panel` and `qdata.query.PitReader` replay doubles | TC-47, TC-48, TC-49 (VersionedStore → compute_baselines → Baselines), TC-50, TC-51, TC-52, TC-56 (VersionedStore, FeaturePanel, Survivors → build_dataset → ForecastSet), TC-53, TC-55 (ForecastSet → walk_forward → Forecasts), TC-54 (ModelConfig → check_model → ModelConfig), TC-57, TC-58 (Forecasts, ForecastSet → evaluate_dev → DevEvaluation), TC-61, TC-62, TC-63, TC-64 (TargetWeights → backtest → BacktestReport, through engine.simulate) | TC-58 |
+ | PL-35 | `pytest tests/intent/qfcst/test_pl35_smoke.py` | portfolios.build; boundary: `qrisk.portfolios.build_one` and `qrisk.estimators.estimate_all` replay doubles | TC-59, TC-60 (Window, Spectrum, Forecasts → build_targets → TargetWeights) | — |
+ | PL-36 | `python -m qfcst register --smoke` | setup.registry | TC-69 (DevRun → register → ForecastSetup) | — |
+ | PL-37 | `python -m qfcst book start --smoke` | book.store | TC-68 (ForecastSetup → start_book → BookStatus) | — |
+@@ -73,7 +73,7 @@
+ ### TC-58: A better volatility forecast passes; an equal one does not
+ **Pipeline:** PL-34 · **Covers:** FEVAL-02 · **Kind:** model evaluation · **Fixture:** tests/fixtures/qfcst/TC-58/
+ **Source:** generator `vol_forecasts(dates=191, names=490, seed=402)`: realized volatility from a planted process; a "neural" forecast with half the baseline's log error, and, on seeds 403–422, one with the same error as the baseline; H0, statistic, null and correction from the `null-hypothesis-testing` skill
+-**Expected:** the better forecast's claim passes; across seeds 403–422, at most 1 of the 20 passes · **Tolerance:** α = 0.05 after correction; at most 1 of 20 is the 5% error rate
++**Expected:** the better forecast's claim passes; across seeds 403–422, at most 3 of the 20 seeds reject · **Tolerance:** α = 0.05 after correction; at most 3 of the 20 seeds reject (P(≥ 4) ≈ 1.6% under a correct 5% test)
+ **Skills:** null-hypothesis-testing
+ 
+ ### TC-59: Top-fifth weights
+@@ -143,8 +143,8 @@
+ 
+ ### TC-72: A planted Sharpe difference passes; equal ones do not
+ **Pipeline:** PL-39 · **Covers:** VERD-02 · **Kind:** model evaluation · **Fixture:** tests/fixtures/qfcst/TC-72/
+-**Source:** generator `book_returns(sessions=252, seed=404)`: `topfifth:neural` with annualized Sharpe 3.0 and every other portfolio 0.5, correlated 0.6; and, on seeds 405–424, all eight at Sharpe 0.5; H0, statistic, null and correction from the `null-hypothesis-testing` skill
+-**Expected:** on seed 404, `topfifth:neural`'s 4 claims against the comparisons and its claim against `topfifth:baseline` pass; across seeds 405–424, at most 1 seed has any of the 18 claims pass · **Tolerance:** α = 0.05 after correction; a Sharpe gap of 2.5 over a year is far above the detectable size for 252 days
++**Source:** generator `book_returns(sessions=252, seed=404)`: `topfifth:neural` with annualized Sharpe 3.0 and every other portfolio 0.5, correlated 0.9; and, on seeds 405–424, all eight at Sharpe 0.5; H0, statistic, null and correction from the `null-hypothesis-testing` skill
++**Expected:** on seed 404, `topfifth:neural`'s 4 claims against the comparisons and its claim against `topfifth:baseline` pass; across seeds 405–424, at most 3 of the 20 seeds reject (have any of the 18 claims pass) · **Tolerance:** α = 0.05 after correction; with correlation 0.9 the 2.5 Sharpe gap is about 5 standard errors over 252 days, well above the detectable size at the 18-claim corrected level; at most 3 of the 20 seeds reject (P(≥ 4) ≈ 1.6% under a correct 5% test)
+ **Skills:** null-hypothesis-testing
+ 
+ ### TC-73: The detectable difference behaves
+diff --git a/docs/packages/qfeat/contract.md b/docs/packages/qfeat/contract.md
+index f3e34dd..7fea0ad 100644
+--- a/docs/packages/qfeat/contract.md
++++ b/docs/packages/qfeat/contract.md
+@@ -118,7 +118,7 @@
+ ### claims.BestFeature: type
+ `@dataclass(frozen=True) class BestFeature: name: str; mean_ic: float; dates: int`
+ - **Invariants:** `name` is a candidate feature, never a calibration one; `mean_ic` and `dates` from the development dates it was chosen on (FTEST-03)
+-- **Boundary:** registry, run, synthetic · **Fixtures:** tests/contracts/claims.BestFeature/ · **Cases:** momentum chosen on 191 development dates
++- **Boundary:** registry, run, synthetic · **Fixtures:** tests/contracts/claims.BestFeature/ · **Cases:** momentum chosen on 227 development dates
+ - **Used by:** registry, run, synthetic; PL-25, PL-29, PL-30, PL-31
+ 
+ ### claims.information_coefficients: IC series
+@@ -128,8 +128,8 @@
+ - **Used by:** run, synthetic; PL-25, PL-29, PL-30, PL-31
+ 
+ ### claims.test_claims: The 19-claim family
+-`def test_claims(ic: IcSeries, gains: pd.DataFrame, *, alpha: float = 0.05) -> list[Claim]`
+-- **Invariants:** the test, the null (keeping same-day co-movement and autocorrelation) and the correction are set with the `null-hypothesis-testing` skill, never chosen here (FTEST-04); a passing calibration claim makes every candidate "not reported" (FTEST-05)
++`def test_claims(ic: IcSeries, fit: WalkForward, *, alpha: float = 0.05) -> list[Claim]`
++- **Invariants:** gain claims read `fit.gains`; the test, the null (keeping same-day co-movement and autocorrelation) and the correction are set with the `null-hypothesis-testing` skill, never chosen here (FTEST-04); a passing calibration claim makes every candidate "not reported" (FTEST-05)
+ - **Boundary:** run, synthetic · **Fixtures:** tests/contracts/claims.test_claims/ · **Cases:** a replay of one passing and one failing claim
+ - **Used by:** run, synthetic; PL-25, PL-30, PL-31
+ 
+diff --git a/docs/packages/qfeat/pipelines.md b/docs/packages/qfeat/pipelines.md
+index 1f0754e..d3ec64c 100644
+--- a/docs/packages/qfeat/pipelines.md
++++ b/docs/packages/qfeat/pipelines.md
+@@ -77,7 +77,7 @@ def run_build_date(store: VersionedStore, version: VersionId, rebalance: date, e
+ | # | Step | Owner | In → Out | Spine version | Covers |
+ |---|---|---|---|---|---|
+ | 1 | `build_panel` | panel.build | VersionedStore, VersionId, RebalanceDates → FeaturePanel | PL-26 as built | HOLD-01 |
+-| 2 | `development` | panel.split | FeaturePanel → FeaturePanel | drop every holdout row | HOLD-02 |
++| 2 | `development` | panel.split | FeaturePanel → FeaturePanel | PL-30's, unchanged | HOLD-02 |
+ | 3 | `characterisation_inputs` | explore.inputs | FeaturePanel → CharacterisationInputs | distributions, missing shares, feature correlations, IC by 5-year block | FTEST-06 |
+ | 4 | `write_inputs` | explore.inputs | CharacterisationInputs → CharacterisationInputs | `features/explore/v<N>/*.parquet`, the input to the `data-analysis` skill's analysis | FTEST-06 |
+ 
+@@ -97,11 +97,11 @@ def run_explore(store: VersionedStore, *, version: VersionId | None = None, seed
+ | # | Step | Owner | In → Out | Spine version | Covers |
+ |---|---|---|---|---|---|
+ | 1 | `build_panel` | panel.build | VersionedStore, VersionId, RebalanceDates → FeaturePanel | PL-26 as built | HOLD-01 |
+-| 2 | `development` | panel.split | FeaturePanel → FeaturePanel | PL-28's, unchanged | HOLD-02 |
++| 2 | `development` | panel.split | FeaturePanel → FeaturePanel | PL-30's, unchanged | HOLD-02 |
+ | 3 | `tune_settings` | model.tune | FeaturePanel → ModelSettings | a small grid (leaves, learning rate, rounds) scored by mean rank correlation in an inner walk-forward over development years only | FMOD-03 |
+ | 4 | `walk_forward` | model.fit | FeaturePanel, ModelSettings → WalkForward | PL-30's, unchanged, with the tuned settings | FMOD-03 |
+ | 5 | `information_coefficients` | claims.ic | FeaturePanel, WalkForward → IcSeries | PL-30's, unchanged | FTEST-03 |
+-| 6 | `best_feature` | claims.ic | IcSeries → BestFeature | the candidate (not calibration) with the highest mean development IC | FTEST-03 |
++| 6 | `best_feature` | claims.ic | IcSeries → BestFeature | PL-30's, unchanged | FTEST-03 |
+ | 7 | `register` | registry.store | Registry, ModelSettings, BestFeature, review → FeatureList | write `lists/<sha256>.json` once; refuse to overwrite | HOLD-03 |
+ 
+ ### Entry sketch (pre-build — removed by spine task)
+@@ -123,11 +123,11 @@ def run_register(store: VersionedStore, home: Path, review: str, *, version: Ver
+ | 1 | `run_procedure_check` | synthetic | seed → ProcedureCheck | PL-25 as built | FSYN-04 |
+ | 2 | `open_run` | run.folder | ProcedureCheck, VersionId → FeatureRunManifest | create `runs/<id>/`, write the manifest; on a failed check write `check_failed` and exit non-zero | FSYN-04, FREP-03 |
+ | 3 | `build_panel` | panel.build | VersionedStore, VersionId, RebalanceDates → FeaturePanel | PL-26 as built | HOLD-01 |
+-| 4 | `development` | panel.split | FeaturePanel → FeaturePanel | PL-28's, unchanged | HOLD-02 |
++| 4 | `development` | panel.split | FeaturePanel → FeaturePanel | drop every holdout row (HOLD-02) | HOLD-02 |
+ | 5 | `resolve_settings` | run.settings | Registry, FeatureRunManifest → ModelSettings | the list's settings when one is given, else the defaults | FMOD-03 |
+ | 6 | `walk_forward` | model.fit | FeaturePanel, ModelSettings → WalkForward | yearly LightGBM fits from 2005 on dates ≥ 2 months earlier; skip a year with < 24 dates; gains by permuting each feature within date (AD-19) | FMOD-01, FMOD-02, FMOD-04, FMOD-05 |
+ | 7 | `information_coefficients` | claims.ic | FeaturePanel, WalkForward → IcSeries | Spearman per date for each feature and the model; dates with < 30 values dropped and counted | FTEST-01, FTEST-02 |
+-| 8 | `best_feature` | claims.ic | IcSeries → BestFeature | PL-29's, unchanged | FTEST-03 |
++| 8 | `best_feature` | claims.ic | IcSeries → BestFeature | the candidate (not calibration) with the highest mean development IC | FTEST-03 |
+ | 9 | `model_minus_best` | claims.ic | IcSeries, BestFeature → IcSeries | the model's IC minus the best feature's, per date | FTEST-04 |
+ | 10 | `test_claims` | claims.tests | IcSeries, WalkForward → Claim | the 19 claims with the test, null and correction set by the `null-hypothesis-testing` skill; calibration rule | FTEST-04, FTEST-05 |
+ | 11 | `write_results` | run.folder | FeatureRunManifest, IcSeries, WalkForward, Claim → FeatureRunManifest | `ic.parquet`, `gains.parquet`, `claims.parquet` sorted by key; `succeeded` or `procedure_suspect` | FREP-03, FREP-04 |
+@@ -201,4 +201,4 @@ tests/intent/qfeat/  tests/unit/qfeat/
+ ```
+ 
+ ## Open questions
+-- Five contract changes are routed to `architecture-design` Revise; the step tables already use them, and `dt lint` reports them until it lands: `claims.BestFeature` with `claims.best_feature` and `claims.model_minus_best` (`information_coefficients` loses its `best` argument, and `FeatureList.best` becomes a `BestFeature`); `panel.holdout`; `explore.CharacterisationInputs`; `panel.FeaturePanel` naming its feature columns in `.attrs["features"]`, so the synthetic panel's planted and noise columns use the same type; and `claims.ICSeries` renamed `claims.IcSeries`, since `dt` reads only CamelCase type names.
++- None.
+diff --git a/docs/packages/qfeat/tests.md b/docs/packages/qfeat/tests.md
+index b6ba083..38c26d0 100644
+--- a/docs/packages/qfeat/tests.md
++++ b/docs/packages/qfeat/tests.md
+@@ -9,8 +9,8 @@
+ | PL-26 | `python -m qfeat panel --smoke` | panel.build; boundary: `qrisk.windows` and `qdata.query.PitReader` replay doubles | TC-43 (FeaturePanel → development, holdout → FeaturePanel) | — |
+ | PL-27 | `pytest tests/intent/qfeat/test_pl27_smoke.py` | target.loadings, target.residuals, features.build, features.price, features.volume, features.calibration, panel.join | TC-23, TC-24, TC-27 (Loadings, PitReader → build_targets → Targets), TC-25 (Window, Spectrum → fit_loadings → Loadings), TC-26 (whole pipeline), TC-28–TC-31 (Window, Loadings, PitReader → build_features → Features) | — |
+ | PL-28 | `python -m qfeat explore --smoke` | explore.inputs | — | — |
+-| PL-29 | `python -m qfeat register --smoke` | model.tune, claims.ic, registry.store | TC-35 (IcSeries → best_feature → BestFeature), TC-42 (Registry → register → FeatureList) | — |
+-| PL-30 | `python -m qfeat run --development --smoke` | run.folder, run.settings, run.report, model.fit, model.gain, claims.ic, claims.tests, claims.power | TC-32, TC-33 (FeaturePanel → walk_forward → WalkForward), TC-34 (FeaturePanel, WalkForward → information_coefficients → IcSeries), TC-36 (IcSeries, BestFeature → model_minus_best → IcSeries), TC-39 (IcSeries → test_claims → Claim), TC-44 (claims.detectable_ic), TC-40, TC-45 (whole pipeline), TC-46 (ProcedureCheck → open_run → FeatureRunManifest) | — |
++| PL-29 | `python -m qfeat register --smoke` | model.tune, claims.ic, registry.store | TC-42 (Registry → register → FeatureList) | — |
++| PL-30 | `python -m qfeat run --development --smoke` | run.folder, run.settings, run.report, model.fit, model.gain, claims.ic, claims.tests, claims.power | TC-32, TC-33 (FeaturePanel → walk_forward → WalkForward), TC-34 (FeaturePanel, WalkForward → information_coefficients → IcSeries), TC-35 (IcSeries → best_feature → BestFeature), TC-36 (IcSeries, BestFeature → model_minus_best → IcSeries), TC-39 (IcSeries → test_claims → Claim), TC-44 (claims.detectable_ic), TC-40, TC-45 (whole pipeline), TC-46 (ProcedureCheck → open_run → FeatureRunManifest) | — |
+ | PL-31 | `python -m qfeat run --holdout --smoke` | registry.ledger, panel.split | TC-41 (Registry, FeatureList → open_holdout_run → FeatureRunManifest), TC-43 | — |
+ | PL-24 | `pytest tests/intent/qfeat/test_pl24_system.py` | — (system: PL-30 and PL-31 against real `qrisk` and `qdata` over a committed synthetic version) | TC-40, TC-41 | — |
+ 
+@@ -51,8 +51,8 @@
+ 
+ ### TC-30: Short history leaves nulls
+ **Pipeline:** PL-27 · **Covers:** FEAT-09 · **Kind:** closed form · **Fixture:** tests/fixtures/qfeat/TC-30/
+-**Source:** spec FEAT-09's criterion: a member with 200 trading days of history on R
+-**Expected:** momentum and volume shock null; reversal, volatility, idiosyncratic volatility, maximum return and beta present; no value filled with 0 · **Tolerance:** exact
++**Source:** spec FEAT-09's criterion: an eligible member (STRUCT-02) with no bar on any of the 30 sessions ending 252 sessions before R
++**Expected:** momentum null; reversal, volatility, idiosyncratic volatility, volume shock, maximum return and beta present; no value filled with 0 · **Tolerance:** exact
+ 
+ ### TC-31: Calibration features
+ **Pipeline:** PL-27 · **Covers:** FEAT-10, FEAT-11 · **Kind:** closed form · **Fixture:** tests/fixtures/qfeat/TC-31/
+@@ -75,7 +75,7 @@
+ **Expected:** a feature equal to the target → IC 1; its negative → IC −1; predictions equal to the target → model IC 1 · **Tolerance:** 1e-12
+ 
+ ### TC-35: The best single feature skips calibration features
+-**Pipeline:** PL-29 · **Covers:** FTEST-03 · **Kind:** closed form · **Fixture:** tests/fixtures/qfeat/TC-35/
++**Pipeline:** PL-30 · **Covers:** FTEST-03 · **Kind:** closed form · **Fixture:** tests/fixtures/qfeat/TC-35/
+ **Source:** spec FTEST-03; an IcSeries over 4 dates with mean ICs reversal 0.01, momentum 0.03, volatility 0.02 and shuffled 0.05
+ **Expected:** `BestFeature(name="momentum", mean_ic=0.03, dates=4)` · **Tolerance:** exact for the name and dates; 1e-12 for the mean
+ 
+@@ -93,7 +93,7 @@
+ ### TC-38: Noise is rejected across seeds
+ **Pipeline:** PL-25 · **Covers:** FSYN-03, FTEST-04 · **Kind:** synthetic known-answer · **Fixture:** tests/fixtures/qfeat/TC-38/
+ **Source:** TC-37's generator with `planted_ic=0.0` on seeds 305–324; the same H0, statistic and null
+-**Expected:** at most 1 of the 20 seeds has any claim pass · **Tolerance:** the family-wise error rate α = 0.05
++**Expected:** at most 3 of the 20 seeds reject (have any claim pass) · **Tolerance:** the family-wise error rate α = 0.05; at most 3 of the 20 seeds reject (P(≥ 4) ≈ 1.6% under a correct 5% test)
+ **Skills:** null-hypothesis-testing
+ 
+ ### TC-39: A passing calibration feature makes the run procedure-suspect
+diff --git a/docs/packages/qrisk/pipelines.md b/docs/packages/qrisk/pipelines.md
+index 4bc777b..946cd70 100644
+--- a/docs/packages/qrisk/pipelines.md
++++ b/docs/packages/qrisk/pipelines.md
+@@ -152,4 +152,4 @@ packages/qrisk/src/qrisk/
+ tests/intent/qrisk/  tests/unit/qrisk/
+ ```
+ ## Open questions
+-- Three contract changes are routed to `architecture-design` Revise; the step tables already use them, and `dt lint` reports them until the Revise lands: a `windows.RebalanceDates` type (PL-18 steps 4–6); a `study.StabilityInputs` type (PL-21 steps 2–3); `role` on `backtest.Holding`, with `evaluate.scorecard` and `evaluate.comparison_family` taking holdings alone (PL-18 steps 6–8).
++- None.
+diff --git a/docs/packages/qrisk/tests.md b/docs/packages/qrisk/tests.md
+index b1689e6..d7c0247 100644
+--- a/docs/packages/qrisk/tests.md
++++ b/docs/packages/qrisk/tests.md
+@@ -106,7 +106,7 @@
+ ### TC-19: Equal variances are not significant
+ **Pipeline:** PL-18 · **Covers:** EVAL-03 · **Kind:** synthetic known-answer · **Fixture:** tests/fixtures/qrisk/TC-19/
+ **Source:** TC-18's generator with `ratio=1.0` on seeds 202–221; the same H0, statistic and null as TC-18
+-**Expected:** no seed's difference rejects H0 · **Tolerance:** at most 1 of the 20 seeds may reject, since the error rate is α = 0.05
++**Expected:** at most 3 of the 20 seeds reject (P(≥ 4) ≈ 1.6% under a correct 5% test) · **Tolerance:** at most 3 of the 20 seeds reject (P(≥ 4) ≈ 1.6% under a correct 5% test)
+ **Skills:** null-hypothesis-testing
+ 
+ ### TC-20: A failed known-answer check stops the study
+diff --git a/docs/packages/qserver/architecture.md b/docs/packages/qserver/architecture.md
+index 3693ec8..d8c8da4 100644
+--- a/docs/packages/qserver/architecture.md
++++ b/docs/packages/qserver/architecture.md
+@@ -3,7 +3,7 @@
+ **Package:** qserver · **Status:** Approved · **Last updated:** 2026-10-17 · **System:** [../../architecture.md](../../architecture.md)
+ 
+ ## Overview
+-The local backend the user starts. `api` is a FastAPI app on 127.0.0.1 that answers `explorer`'s reads from `qdata.query`, `qdata.checks` and `qdata.xcheck` and its study reads from `qrisk.study.StudyReader`, records explanations, and serves `explorer`'s built files. `runs` starts each download, refresh or check run as a worker subprocess. The worker calls `qdata.load.download`, `qdata.checks.run_checks` or `qdata.xcheck.run_crosscheck` with a `RunContext` that writes progress to the catalog, and `api` streams that progress over SSE. After a refresh commits, the same worker marks every active paper book through `qfcst.book.mark_after_refresh`, as the run's last phase (AD-25).
++The local backend the user starts. `api` is a FastAPI app on 127.0.0.1 that answers `explorer`'s reads from `qdata.query`, `qdata.checks` and `qdata.xcheck` and its study reads from `qrisk.study.StudyReader`, records explanations, and serves `explorer`'s built files. `runs` starts each download, refresh or check run as a worker subprocess. The worker calls `qdata.load.download`, `qdata.checks.run_checks` or `qdata.xcheck.run_crosscheck` with a `RunContext` that writes progress to the catalog, and `api` streams that progress over a WebSocket. After a refresh commits, the same worker marks every active paper book through `qfcst.book.mark_after_refresh`, as the run's last phase (AD-25).
+ 
+ ## Tech stack
+ | Area | Choice | Decision |
+@@ -16,7 +16,7 @@ The local backend the user starts. `api` is a FastAPI app on 127.0.0.1 that answ
+ | Component | Responsibility | Covers | Depends on |
+ |---|---|---|---|
+ | `runs` | Run lifecycle: start a worker, one-active lock, progress events, cancel, history, interrupted detection; the paper-book phase after a refresh | RUN-01–RUN-06, LOAD-04 (cancel), PAPER-02 | `qdata`, `qfcst.book` |
+-| `api` | HTTP routes and messages, SSE progress, study results, loopback-only guard, OpenAPI export, static app files | RVIEW-01–RVIEW-03, QR-02, QR-04, QR-06, QR-08 | `runs`, `qdata`, `qrisk` |
++| `api` | HTTP routes and messages, WebSocket progress, study results, loopback-only guard, OpenAPI export, static app files | RVIEW-01–RVIEW-03, QR-02, QR-04, QR-06, QR-08 | `runs`, `qdata`, `qrisk` |
+ 
+ ## Interfaces
+ See [contract.md](contract.md).
+diff --git a/docs/packages/qserver/contract.md b/docs/packages/qserver/contract.md
+index 3351bf4..eaef6e1 100644
+--- a/docs/packages/qserver/contract.md
++++ b/docs/packages/qserver/contract.md
+@@ -38,10 +38,10 @@ class RunManager:
+ 
+ ### api.create_app: Local HTTP API
+ ```python
+-def create_app(home: Path) -> FastAPI  # served on 127.0.0.1 only
++def create_app(store: VersionedStore, catalog: Catalog, runs: RunManager) -> FastAPI  # served on 127.0.0.1 only; routes added by the mount_* steps
+ # GET /versions · GET /search?q · GET /companies/{id} · GET /companies/{id}/prices?adjusted · GET /companies/{id}/crosscheck
+ # GET /universe?date · GET /checks/latest · GET /failures?check&company&status&start&end · PUT /failures/{key}/explanation
+-# POST /runs · GET /runs · GET /runs/{id} · POST /runs/{id}/cancel · GET /runs/{id}/events (SSE)   — reads take ?version
++# POST /runs · GET /runs · GET /runs/{id} · POST /runs/{id}/cancel · WS /runs/{id}/ws   — reads take ?version
+ # GET /studies · GET /studies/{id} · GET /studies/{id}/spectrum?date · GET /studies/{id}/scorecard   — from qrisk.study.StudyReader
+ ```
+ - **Invariants:** rejects a non-loopback `Host` (QR-04); no bulk export route (QR-06); its OpenAPI is exported to `contracts/openapi.json` (AD-08)
+@@ -117,7 +117,7 @@ def create_app(home: Path) -> FastAPI  # served on 127.0.0.1 only
+ 
+ ### api.RunEvent: type
+ `class RunEvent(BaseModel): mirrors runs.ProgressEvent, field for field`
+-- **Invariants:** sent at least every 2 seconds while running (RUN-03); `seq` is the SSE event id for resume
++- **Invariants:** sent at least every 2 seconds while running (RUN-03); `seq` is the resume point: on reconnect the client sends its last `seq` and the server resumes after it
+ - **Boundary:** explorer · **Fixtures:** tests/contracts/api.RunEvent/ · **Cases:** a full download's events through completion; a stream resumed after event 5
+ - **Used by:** explorer (PL-01); PL-10, PL-14
+ 
+diff --git a/docs/packages/qserver/pipelines.md b/docs/packages/qserver/pipelines.md
+index a4c1254..c217130 100644
+--- a/docs/packages/qserver/pipelines.md
++++ b/docs/packages/qserver/pipelines.md
+@@ -11,7 +11,7 @@
+ | 1 | `claim_run` | runs.manager | Catalog, run_id → RunInfo | read the run row and record this worker's PID | RUN-02 |
+ | 2 | `open_context` | runs.context | Catalog, RunInfo → RunContext | returns a `CatalogRunContext` for the run | RUN-03 |
+ | 3 | `CatalogRunContext` | runs.context | Catalog, run_id → RunContext | `progress` writes a ProgressEvent row at most once a second; `check_cancel` reads the run's cancel flag | RUN-03, RUN-04 |
+-| 4 | `load_check_config` | runs.config | config dir → CheckConfig | read `config/checks.toml` and `config/reference_delisted.toml` | CHECK-09 |
++| 4 | `load_check_config` | runs.config | config dir → CheckConfig | check runs only: read `config/checks.toml` and `config/reference_delisted.toml`; other kinds pass no config | CHECK-09 |
+ | 5 | `execute_run` | runs.worker | RunInfo, RunContext, CheckConfig → RunInfo | full or refresh: PL-04 as built; check: PL-05 then PL-06 as built; sources from `open_primary` and `open_secondary` | RUN-01, LOAD-04 |
+ | 6 | `mark_books` | runs.worker | RunInfo, RunContext → BookStatus | refresh runs only: `qfcst.book.mark_after_refresh` (PL-38 as built) as the run's last phase; other kinds return no status; a failure is reported on the run and the committed version stands (AD-25) | PAPER-02 |
+ | 7 | `finish_run` | runs.manager | Catalog, RunInfo → RunInfo | succeeded; cancelled on RunCancelled; failed with the SourceError detail | RUN-04, RUN-05 |
+@@ -22,7 +22,7 @@ def run_worker(home: Path, run_id: str) -> RunInfo:
+     catalog = Catalog(home / "catalog.sqlite")
+     run = claim_run(catalog, run_id)
+     ctx = open_context(catalog, run)
+-    config = load_check_config(Path("config"))
++    config = load_check_config(Path("config")) if run.kind == "check" else None
+     run = execute_run(run, ctx, config)
+     mark_books(run, ctx)
+     return finish_run(catalog, run)
+@@ -37,9 +37,9 @@ def run_worker(home: Path, run_id: str) -> RunInfo:
+ | 1 | `open_runs` | runs.manager | Catalog, home → RunManager | mark running runs whose worker PID is gone as failed "interrupted" | RUN-06 |
+ | 2 | `RunManager` | runs.manager | Catalog, home → RunManager | Popen one worker per run; the unique index refuses a second download (RunRefused); cancel sets a flag; `events(after)` reads ProgressEvent rows | RUN-01, RUN-02, RUN-04, RUN-05 |
+ | 3 | `create_app` | api.app | VersionedStore, Catalog, RunManager → App | FastAPI with a loopback `Host` guard; no bulk export route | QR-04, QR-06 |
+-| 4 | `mount_reads` | api.reads | App, VersionedStore → App | versions, search, company, prices, cross-check and universe from a PitReader per request, as VersionMessage, SearchHit, CompanyPage, PriceSeries, CrossCheckView, UniverseDay | EXPL-01–EXPL-06, EXPL-09, EXPL-10, QR-02 |
++| 4 | `mount_reads` | api.reads | App, VersionedStore, Catalog → App | versions, search, company, prices, cross-check and universe from a PitReader per request, as VersionMessage, SearchHit, CompanyPage, PriceSeries, CrossCheckView, UniverseDay | EXPL-01–EXPL-06, EXPL-09, EXPL-10, QR-02 |
+ | 5 | `mount_checks` | api.checks | App, Catalog → App | latest CheckSummaryMessage, filtered FailureMessage lists, the explanation PUT through `checks.explain` | EXPL-07, EXPL-08 |
+-| 6 | `mount_runs` | api.runs | App, RunManager → App | start (409 on RunRefused), cancel, history as RunMessage, SSE of RunEvent resuming from `Last-Event-ID` | RUN-01–RUN-06 |
++| 6 | `mount_runs` | api.runs | App, RunManager → App | start (409 on RunRefused), cancel, history as RunMessage, a WebSocket of RunEvent at `/runs/{id}/ws` resuming after the client's last `seq` | RUN-01–RUN-06 |
+ | 7 | `mount_studies` | api.studies | App, StudyReader → App | study list, spectrum by date and scorecard from `qrisk.study.StudyReader`, as StudyMessage, SpectrumMessage, ScorecardMessage; 404 for an unknown study or date | RVIEW-01–RVIEW-03, QR-02 |
+ | 8 | `mount_static` | api.static | App, dist dir → App | explorer's build served at `/` | QR-04 |
+ | 9 | `serve` | api.serve | App → App | uvicorn on 127.0.0.1:8765 | QR-04 |
+@@ -50,7 +50,7 @@ def run_serve(home: Path) -> App:
+     store, catalog = VersionedStore(home), Catalog(home / "catalog.sqlite")
+     runs = open_runs(catalog, home)
+     app = create_app(store, catalog, runs)
+-    app = mount_reads(app, store)
++    app = mount_reads(app, store, catalog)
+     app = mount_checks(app, catalog)
+     app = mount_runs(app, runs)
+     app = mount_studies(app, StudyReader(home))
+diff --git a/docs/probes.md b/docs/probes.md
+index d7067fa..7ef6355 100644
+--- a/docs/probes.md
++++ b/docs/probes.md
+@@ -3,7 +3,7 @@
+ **Last updated:** 2026-10-17
+ 
+ ### PB-01: My Sharadar subscription serves SEP, ACTIONS, TICKERS and SP500 for current and delisted S&P 500 members since 2000
+-**Folder:** `probes/PB-01-sharadar-coverage/` · **Hash:** 74118cae · **Status:** Waived · 2026-10-17 — Waive PB-01 and PB-03 until M3. · **Milestones:** S1 · **Last run:** 2026-10-18T02:59:30Z
++**Folder:** `probes/PB-01-sharadar-coverage/` · **Hash:** 74118cae · **Status:** Waived · 2026-10-17 — Waive PB-01 and PB-03 until M3. · **Milestones:** M3 · **Last run:** 2026-10-18T02:59:30Z
+ - **Question:** Does my Nasdaq Data Link key return the four Sharadar tables, with the columns AD-02 assumes, the S&P 500 membership history back to 2000, my 10 delisted names with their bars and exits, and split factors that rebuild unadjusted prices? And what does the plan cost?
+ - **Informs:** AD-02 · DATA-01, DATA-02, DATA-03, DATA-04, DATA-06, LOAD-01, UNIV-01, UNIV-03, PRICE-04, QR-01 · sources.PrimarySource, sources.RawPage, query.Bars, query.Actions, query.Company
+ - **Docs read (2026-10-17):** data.nasdaq.com/databases/SFA/documentation and data.nasdaq.com/databases/SEP/documentation (both returned no content, being rendered by JavaScript); docs.data.nasdaq.com/docs/rate-limits-1 (redirects to data.nasdaq.com/accesstools, which returns 404); `api/v3/datatables/SHARADAR/<table>/metadata.json` (needs a key: 403 `missing_api_key`)
+@@ -14,7 +14,7 @@
+ 
+ | Check | What | How | Pass | Runner | Result |
+ |---|---|---|---|---|---|
+-| C1 | Plan and price | data.nasdaq.com → Account settings → Subscriptions | SEP and the tables bundle (ACTIONS, TICKERS, SP500) listed; price ≤ $50 a month, replacing the $49 placeholder (QR-01) | user (manual) | — |
++| C1 | Plan and price | data.nasdaq.com → Account settings → Subscriptions | SEP and the tables bundle (ACTIONS, TICKERS, SP500) listed; price ≤ $50 a month, replacing the placeholder (QR-01) | user (manual) | — |
+ | C2 | Tables and columns | `metadata.json` per table | All four served, with every column AD-02 names, `permaticker` and `closeunadj` among them (DATA-02, DATA-06) | user | pass: all four served, no required column missing |
+ | C3 | Membership history | Rebuild intervals from SP500 added/removed events; count members on 5 dates | 498–505 members on each of 2000-01-03, 2008-06-30, 2008-09-22, 2015-06-30, 2024-06-28, and Lehman Brothers a member on 2008-06-30 (DATA-04, UNIV-01) | user | — |
+ | C4 | The 10 delisted names | TICKERS rows with `isdelisted = Y` for `out/delisted.txt` | 10 of 10 found, each with `permaticker`, `lastpricedate` and SP500 events (DATA-01, DATA-06) | user | — |
+@@ -39,22 +39,22 @@
+ | C3 | Revisions carry a newer `lastupdated` | Download again ≥ 7 days later; compare row hashes | 0 changed or back-filled rows with `lastupdated` ≤ the snapshot day (LOAD-02); restatement-only changes (split-adjusted columns, same `closeunadj`) counted | user | — |
+ | C4 | The refresh filter | `lastupdated.gte = snapshot day`, market-wide, both tables | Every row C3 found changed is returned; the query takes ≤ 5 minutes, half of QR-03's refresh budget (QR-03) | user | — |
+ 
+-### PB-03: yfinance returns split- and dividend-adjusted closes for ≥ 95% of current S&P 500 members at one request per second
+-**Folder:** `probes/PB-03-yahoo-coverage/` · **Hash:** a4297a63 · **Status:** Waived · 2026-10-17 — Waive PB-01 and PB-03 until M3. · **Milestones:** S1 · **Last run:** 2026-10-18T02:59:30Z
+-- **Question:** Does yfinance still work, are its closes adjusted the way the cross-check compares them, how much of today's S&P 500 and of my 10 delisted names does Yahoo cover, and does it hold up at 1 request per second?
++### PB-03: yahooquery returns split- and dividend-adjusted closes for ≥ 95% of current S&P 500 members at one request per second
++**Folder:** `probes/PB-03-yahoo-coverage/` · **Hash:** a4297a63 · **Status:** Waived · 2026-10-17 — Waive PB-01 and PB-03 until M3. · **Milestones:** M3 · **Last run:** 2026-10-18T02:59:30Z
++- **Question:** Does yahooquery work, are its closes adjusted the way the cross-check compares them, how much of today's S&P 500 and of my 10 delisted names does Yahoo cover, and does it hold up at 1 request per second?
+ - **Informs:** AD-03 · DATA-07, XCHK-01, XCHK-02, XCHK-04, QR-05 · sources.SecondarySource, xcheck.Comparison
+ - **Docs read (2026-10-17):** ranaroussi.github.io/yfinance and github.com/ranaroussi/yfinance (unofficial, "intended for personal use only"; silent on adjustment, rate limits and delisted names); ranaroussi.github.io/yfinance/reference/api/yfinance.Ticker.history.html (parameters not documented); the v8 chart endpoint `query1.finance.yahoo.com/v8/finance/chart/<symbol>` has no official docs, its fields read from the response
+-- **Spends:** nothing paid, no key; up to about 620 Yahoo requests at 1 per second (about 11 minutes) from the user's machine: about 510 through yfinance (stopping after 5 failures in a row) and 110 on the chart endpoint. Yahoo may throttle the machine for a while
++- **Spends:** nothing paid, no key; up to about 620 Yahoo requests at 1 per second (about 11 minutes) from the user's machine: about 510 through yahooquery (stopping after 5 failures in a row) and 110 on the chart endpoint. Yahoo may throttle the machine for a while
+ - **Checks:** table below
+ - **Verdict:** —
+-- **Caveats:** yfinance pinned only as ≥ 0.2.40 via inline metadata; the chart endpoint is undocumented and sent a browser User-Agent; C3–C5 read PB-01's member list, so they wait for PB-01; Yahoo samples are masked placeholders
++- **Caveats:** the 2026-10-18 run tried yfinance (pinned only as ≥ 0.2.40 via inline metadata), not yahooquery; C1, C2 and C5 re-run on yahooquery `Ticker(...).history(adj_ohlc=True)`; the chart endpoint is undocumented and sent a browser User-Agent; C3–C5 read PB-01's member list, so they wait for PB-01; Yahoo samples are masked placeholders
+ 
+ | Check | What | How | Pass | Runner | Result |
+ |---|---|---|---|---|---|
+-| C1 | Adjustment | AAPL around the 2020-08-31 4:1 split; KO's 2023 dividend days, adjusted against raw | Split-day return within ±5%; each dividend day's adjusted return within 0.01 points of (C_t + d)/C_{t−1} − 1 (DATA-07, XCHK-02) | agent | not run: yfinance 1.7.0 raised TypeError in its cookie setup; 0.2.66 the same, 0.2.40 KeyError `validRanges` |
+-| C2 | History depth | First month of AAPL, KO, GE with `period="max"` | 2000-01 or earlier for all three (XCHK-01) | agent | not run: same yfinance failure |
++| C1 | Adjustment | yahooquery: AAPL around the 2020-08-31 4:1 split; KO's 2023 dividend days, adjusted against raw | Split-day return within ±5%; each dividend day's adjusted return within 0.01 points of (C_t + d)/C_{t−1} − 1 (DATA-07, XCHK-02) | agent | not run: yfinance 1.7.0 raised TypeError in its cookie setup; 0.2.66 the same, 0.2.40 KeyError `validRanges` |
++| C2 | History depth | yahooquery: first month of AAPL, KO, GE with `period="max"` | 2000-01 or earlier for all three (XCHK-01) | agent | not run: same yfinance failure |
+ | C3 | Current members | Every current member from PB-01 (dots → dashes), since 2000 | ≥ 95% return bars (XCHK-04) | user | — |
+ | C4 | Delisted names | The 10 from PB-01's list | Measured: count covered, against the brief's expectation that most are missing (XCHK-04) | user | — |
+-| C5 | Rate | Errors during C3 and C4 at 1 request per second | No rate-limit error over about 510 requests (QR-05) | user | — |
++| C5 | Rate | yahooquery errors during C3 and C4 at 1 request per second | No rate-limit error over about 510 requests (QR-05) | user | — |
+ | C6 | C1 and C2 on the chart endpoint over plain HTTP | AAPL 2020 split, KO 2023 dividends (`close` against `adjclose`), first month of AAPL, KO, GE | Split-day return within ±5%; each dividend day within 0.01 points of (C_t + d)/C_{t−1} − 1 (DATA-07, XCHK-02); 2000-01 or earlier for all three (XCHK-01) | agent | fail: dividend days differ by up to 0.092 points (4 days); split day −1.87%, 4:1 seen; all three from 2000-01 |
+ | C7 | C3 and C4 on the chart endpoint | 100 sampled current members and the 10 delisted names | ≥ 95% of the sample covered (XCHK-04); no HTTP 429 (QR-05); delisted count measured | user | — |
+diff --git a/docs/roadmap.md b/docs/roadmap.md
+index b5cdf72..37cc01e 100644
+--- a/docs/roadmap.md
++++ b/docs/roadmap.md
+@@ -37,13 +37,15 @@
+ 
+ ## M2: Checks and review
+ **Outline:** A check run with the cross-check runs from the app on the synthetic version; the user filters failures and explains one, and the summary counts follow.
+-**Skills:** —
++**Skills:** frontend-design
+ **References:** —
++**Exit:** From the app, a check run with the cross-check completes on the synthetic version; filtering by one check and "failed" shows only those failures with the count; an explained failure stays explained on the next run and the summary counts update; PL-03, PL-05, PL-06 and PL-13 smoke tests pass.
+ 
+ ## M3: Real sources and calibration
+ **Outline:** The real Sharadar and Yahoo sources replace the stand-ins once their probes are answered; a full download of the real universe is calibrated with the `data-analysis` skill, and the thresholds and timings are met on it.
+ **Skills:** data-analysis
+ **References:** PB-01, PB-02, PB-03
++**Exit:** PB-01, PB-02 and PB-03 are answered; a full Sharadar download commits a real version holding all 10 reference companies (CHECK-09 passes or each failure is explained); the CHECK-12 thresholds are approved by the user; the Yahoo cross-check covers ≥ 95% of current members; QR-01–QR-03 are met on the user's machine.
+ 
+ ## S2: Variance portfolios
+ **Outline:** Eigenvalue spectra and covariance estimators (sample, shrinkage, denoised, factor model) on the point-in-time S&P 500, with long-only minimum-variance, risk-parity and HRP portfolios compared out of sample on realized variance against equal weight, in reports and the explorer.
+@@ -53,11 +55,13 @@
+ **Outline:** On M1's synthetic version, `qrisk known-answers` passes, then `qrisk study run` gates on it, analyses every rebalance date in worker processes, holds each portfolio through its month, and writes the scorecard, the significance tests and the report to a study folder; TC-01 to TC-21 pass.
+ **Skills:** null-hypothesis-testing
+ **References:** RF-01
++**Exit:** `qrisk known-answers` passes; `qrisk study run` on M1's synthetic version writes a study folder with scorecard, tests and report; a forced SYNTH-04 failure stops the run with `known_answer_failed`; TC-01 to TC-21 pass.
+ 
+ ## M5: Research pages and real-data study
+ **Outline:** The spectrum and comparison pages read a study through `qserver`; the stability inputs are exported and the user's review recorded; the study runs on the real full version within 60 minutes, with the stability analysis and the significance results on real data.
+ **Skills:** data-analysis, null-hypothesis-testing, frontend-design
+ **References:** —
++**Exit:** The spectrum and comparison pages show a chosen study through `qserver`; `qrisk study stability` exports the inputs and `qrisk study review` records the review; the study on the real full version finishes within 60 minutes with significance marks; TC-22 and the PL-17 system test pass.
+ 
+ ## S3: Features & ML
+ **Outline:** A fixed set of price and volume features is tested, by rank correlation and by a walk-forward model's feature gain, for information about next-month market-removed returns; each claim passes only a null-hypothesis test corrected across the family, first on synthetic data with a known answer, then once on an untouched holdout.
+@@ -67,27 +71,32 @@
+ **Outline:** On M1's synthetic version, `qfeat check` finds the planted feature and rejects the noise, `qfeat panel` builds the feature panel from `qrisk`'s windows, and `qfeat run --development` trains the walk-forward model and tests the 19 claims end to end; TC-23 to TC-40 and TC-43 to TC-46 pass.
+ **Skills:** null-hypothesis-testing
+ **References:** RF-01
++**Exit:** `qfeat check` passes; `qfeat panel` and `qfeat run --development` complete on M1's synthetic version with all 19 claims reported; TC-23 to TC-40 and TC-43 to TC-46 pass.
+ 
+ ## M7: Registration and holdout on real data
+ **Outline:** On the real full version, the development data is characterised and reviewed, a feature list is registered with tuned settings and its best single feature, and the holdout runs once within 2 hours, with every claim's verdict and the detectable effect in the report; TC-41 and TC-42 pass.
+ **Skills:** data-analysis, null-hypothesis-testing
+ **References:** —
++**Exit:** On the real full version, the FTEST-06 review is recorded, a feature list is registered, `qfeat run --holdout` completes once within 2 hours and a second request is refused; TC-41 and TC-42 pass.
+ 
+ ## S4: Forecasts and forecast portfolios
+-**Outline:** Neural forecasts of next-month return and volatility, trained locally and checked against simple baselines, drive two long-only portfolios that run for 12 months in a simulated paper book beside S2's classical portfolios, judged on Sharpe after 5 basis points of costs.
++**Outline:** Neural forecasts of next-month return and volatility, trained locally and checked against simple baselines, drive two long-only portfolio rules, run on the neural and on the baseline forecasts, that run for 12 months in a simulated paper book beside S2's classical portfolios, judged on Sharpe after 5 basis points of costs.
+ **Skills:** null-hypothesis-testing, data-analysis
+ 
+ ## M8: Forecast skeleton
+-**Outline:** On a synthetic version with a synthetic S3 holdout, `qfcst develop` builds the dataset and baselines, trains the walk-forward model on the CPU, tests the 3 development claims, builds the eight portfolios per date and backtests them with costs, and `qfcst register` freezes a setup; TC-47 to TC-60 and TC-69 pass.
++**Outline:** On a synthetic version with a synthetic S3 holdout, `qfcst develop` builds the dataset and baselines, trains the walk-forward model on the CPU, tests the 3 development claims, builds the eight portfolios per date and backtests them with costs, and `qfcst register` freezes a setup; TC-47 to TC-64 and TC-69 pass.
+ **Skills:** null-hypothesis-testing
+ **References:** RF-02, RF-03
++**Exit:** `qfcst develop` on the synthetic version writes a development run with the 3 claims and an 8-portfolio backtest marked "development, not a verdict"; `qfcst register` writes a setup; TC-47 to TC-64 and TC-69 pass.
+ 
+ ## M9: Paper book
+-**Outline:** On synthetic refreshes, `qfcst book start` opens a book, every refresh run in `qserver` marks it as its last phase with next-open fills, costs, scheduled retraining and an append-only record, and `qfcst verdict` runs the 18 claims once after 12 synthetic months; TC-61 to TC-68 and TC-70 to TC-73 pass.
++**Outline:** On synthetic refreshes, `qfcst book start` opens a book, every refresh run in `qserver` marks it as its last phase with next-open fills, costs, scheduled retraining and an append-only record, and `qfcst verdict` runs the 18 claims once after 12 synthetic months; TC-65 to TC-68 and TC-70 to TC-73 pass.
+ **Skills:** null-hypothesis-testing
+ **References:** —
++**Exit:** After `qfcst book start`, synthetic refreshes in `qserver` mark the book as their last phase; `qfcst verdict` refuses at 11 months and runs once at 12, returning the recorded claims on a second call; TC-65 to TC-68 and TC-70 to TC-73 pass.
+ 
+ ## M10: Real-data development and book start
+ **Outline:** On the real full version, development runs within 2 hours, the forecast errors are characterised and reviewed, a setup is registered and its paper book started; from then on each refresh marks it within 2 minutes, and the verdict waits for 12 months of paper trading.
+ **Skills:** data-analysis, null-hypothesis-testing
+ **References:** —
++**Exit:** On the real full version, `qfcst develop` finishes within 2 hours, the FEVAL-03 review is recorded, a setup is registered and its book started, and the next real refresh marks it within 2 minutes.
+diff --git a/docs/spec.md b/docs/spec.md
+index 89549c5..5f64569 100644
+--- a/docs/spec.md
++++ b/docs/spec.md
+@@ -93,7 +93,7 @@ A local research platform for one researcher. It downloads daily prices, corpora
+   - Given a 2-for-1 split on day D with no price change, when the return for D is computed, then it is 0% (within 0.01 percentage points), not −50%.
+   - Given a $1 cash dividend with ex-date D on a $100 stock that closes at $99 on D, when the return for D is computed, then it is 0% (within 0.01 percentage points).
+ - **PRICE-03** Adjusted prices are derived from the daily total returns, anchored to the unadjusted close on a reference date the caller chooses, defaulting to the latest day in the data version.
+-  - Given a split after date T, when adjusted prices are requested anchored at T, then prices up to T equal the unadjusted prices.
++  - Given a split after date T and no dividend on or before T, when adjusted prices are requested anchored at T, then prices up to T equal the unadjusted prices.
+ - **PRICE-04** The last bar of a company that stopped trading is its last trading date; no prices or returns exist after it.
+   - Given a company with last trading date L, when bars after L are requested, then none are returned, and the exit type is reported with the response.
+ 
+@@ -113,7 +113,7 @@ A local research platform for one researcher. It downloads daily prices, corpora
+ - **CHECK-02** A bar-consistency check fails for each bar where low > min(open, close), high < max(open, close), any price ≤ 0 or volume < 0.
+   - Given a bar with high below close, when checks run, then a failure shows the bar's five values.
+ - **CHECK-03** An extreme-move check fails for each daily total return beyond ±50% on a day with no corporate action.
+-  - Given a −60% return on a day without a split or dividend, when checks run, then a failure is recorded; given the same move on a 1-for-2 reverse-split day explained by the split, then none is.
++  - Given a −60% return on a day without a split or dividend, when checks run, then a failure is recorded; given the same −60% unadjusted move on a 5-for-2 split day explained by the split, then none is.
+ - **CHECK-04** A split-consistency check fails for each split where the ratio of the unadjusted close before and on the ex-date differs from the split ratio by more than 30%.
+   - Given a 3-for-1 split where the unadjusted price did not change, when checks run, then a failure names the split.
+ - **CHECK-05** A member-coverage check fails for each trading day on which an index member has no bar.
+@@ -429,7 +429,7 @@ A local research platform for one researcher. It downloads daily prices, corpora
+ - **FEAT-08** Beta is the member's loading on the first market factor in R's window.
+   - Given a synthetic window where a member's returns are exactly 1.5 times the first factor's, when beta is computed, then it is 1.5 in that factor's units within 1e-10.
+ - **FEAT-09** A member without the history a feature needs on R has no value for that feature on R; no value is filled in.
+-  - Given a member with 200 trading days of history on R, when momentum is computed, then it has no value, and reversal, volatility and maximum return do.
++  - Given an eligible member with no bar on any of the 30 sessions ending 252 sessions before R, when momentum is computed, then it has no value, and reversal, volatility and maximum return do.
+ - **FEAT-10** The noise calibration feature is drawn independently for every member and date from a standard normal distribution, from a fixed seed.
+   - Given two runs with the same seed, when the noise feature is drawn, then the values are identical.
+ - **FEAT-11** The shuffled calibration feature is momentum permuted across members within each rebalance date, from a fixed seed.
+@@ -584,7 +584,7 @@ A local research platform for one researcher. It downloads daily prices, corpora
+ **Behavior:** On the development years, each neural forecast is scored against its baselines and the differences are tested against chance. Forecast errors are characterised before the setup is frozen.
+ 
+ **Requirements**
+-- **FEVAL-01** A return forecast is scored by its mean monthly rank correlation with the return target, and a volatility forecast by its mean QLIKE loss, (realized²/forecast²) − ln(realized²/forecast²) − 1, over the development dates from 2005.
++- **FEVAL-01** A return forecast is scored by its mean monthly rank correlation with the return target, and a volatility forecast by its mean QLIKE loss, (realized²/forecast²) − ln(realized²/forecast²) − 1, over the development dates from 2005 to 2020-11-30 (`HOLD-01`).
+   - Given a volatility forecast equal to the realized volatility on every date, when it is scored, then its QLIKE loss is 0.
+ - **FEVAL-02** Three claims are tested with the `null-hypothesis-testing` skill, given the monthly series of score differences: the neural return forecast against the mean-return baseline, against the momentum baseline, and the neural volatility forecast against the volatility baseline; the three are corrected together, with a null that keeps autocorrelation over time. A claim passes only if it is significant at 5% after correction.
+   - Given a completed development evaluation, when its results are opened, then each of the 3 claims shows its statistic, corrected p-value, the test and the null, and "passes" or "does not pass".
+@@ -606,7 +606,7 @@ A local research platform for one researcher. It downloads daily prices, corpora
+   - Given any rebalance date, when the forecast portfolios are built, then there are four, each naming its rule and its forecast source.
+ - **FPORT-04** Every portfolio in a backtest or the paper book pays 5 basis points of its one-way turnover (as `PORT-09`) at each fill, deducted from that day's return.
+   - Given a fill with turnover 0.4, when the day's return is computed, then 0.0002 is deducted from it.
+-- **FPORT-05** The development backtest runs the four forecast portfolios and the four comparisons (S2's minimum-variance, equal-risk-contribution and hierarchical-risk-parity portfolios on the shrinkage estimate, and equal weight) from 2005, with the paper book's fill rule (`PAPER-04`) and costs, and reports each one's Sharpe ratio after costs. It is reported, never a verdict.
++- **FPORT-05** The development backtest runs the four forecast portfolios and the four comparisons (S2's minimum-variance, equal-risk-contribution and hierarchical-risk-parity portfolios on the shrinkage estimate, and equal weight) over the development dates from 2005 to 2020-11-30 (`HOLD-01`), with the paper book's fill rule (`PAPER-04`) and costs, and reports each one's Sharpe ratio after costs. It is reported, never a verdict.
+   - Given a completed backtest, when its report is opened, then 8 portfolios are listed with annualized return, volatility, Sharpe after costs, turnover and total cost, marked "development, not a verdict".
+ 
+ **Edge cases & errors**
+@@ -731,8 +731,7 @@ A local research platform for one researcher. It downloads daily prices, corpora
+ - Weights drift within the month, and a holding that stops trading is spread across the others rather than held as cash, so realized variance is not understated.
+ 
+ ## Open questions
+-- Does the primary subscription include historical S&P 500 membership by date and delisted companies? Answered by a probe during architecture; if not, membership needs another source within `QR-01`.
+-- Does the primary source provide a first-known date for corporate actions and revisions, or must the system rely on its own download dates (`DATA-05`)? Answered by a probe during architecture.
++- Does the primary subscription include historical S&P 500 membership by date and delisted companies? PB-01, waived until M3, answers it before M3 is planned; if not, membership needs another source within `QR-01`.
+ 
+ ## Changelog
+ | Date | Change | Source | IDs |
+diff --git a/tasks/plan.md b/tasks/plan.md
+index 971672b..fb63ed9 100644
+--- a/tasks/plan.md
++++ b/tasks/plan.md
+@@ -12,7 +12,7 @@
+ ### M1-T01: qdata interface
+ **Package:** qdata · **Step:** contract · **Kind:** interface · **Covers:** — · **Size:** M · **Mode:** solo
+ **Reason:** interface: the component folders and contract folders are frozen together
+-**Read:** PL-04, PL-08, PL-09, core.CompanyId, core.VersionId, core.QueryRefused, core.RunContext, core.RunCancelled, sources.SourceError, sources.RawPage, sources.PrimarySource, store.DataVersion, store.VersionedStore, store.Catalog, load.download, query.Bars, query.Returns, query.Actions, query.Company, query.PitReader, checks.CheckConfig, checks.Failure, checks.CheckSummary, checks.run_checks, checks.explain, xcheck.Comparison, xcheck.CrossCheckReport, xcheck.run_crosscheck
++**Read:** PL-04, PL-08, PL-09, core.CompanyId, core.VersionId, core.QueryRefused, core.RunContext, core.RunCancelled, sources.SourceError, sources.RawPage, sources.PrimarySource, store.DataVersion, store.VersionedStore, store.Catalog, load.download, query.Bars, query.Returns, query.Actions, query.Company, query.PitReader, checks.CheckConfig, checks.Failure, checks.CheckSummary, checks.run_checks, checks.explain, xcheck.Comparison, xcheck.CrossCheckReport, xcheck.run_crosscheck, sources.SecondarySource
+ **Acceptance:**
+ - [ ] Every type above is code in its component's `types.py` (pandera schemas for the frames); each `tests/contracts/<id>.<Type>/` sample validates
+ - [ ] Every PL-04 and PL-08 step and entry imports with its contract signature, body `raise NotImplementedError("<task id>")`; each `__init__.py` exports its contract
+@@ -23,28 +23,28 @@
+ ### M1-T02: qserver interface
+ **Package:** qserver · **Step:** contract · **Kind:** interface · **Covers:** QR-08 · **Size:** M · **Mode:** solo
+ **Reason:** interface: the providing side runs the TypeScript generator (phase0.md)
+-**Read:** PL-09, PL-10, PL-11, runs.RunInfo, runs.ProgressEvent, runs.RunRefused, runs.RunManager, api.create_app, api.App, api.OpenApiDocument, api.VersionMessage, api.SearchHit, api.CompanyPage, api.PriceSeries, api.CrossCheckView, api.UniverseDay, api.FailureMessage, api.CheckSummaryMessage, api.RunMessage, api.RunEvent, api.Schema
++**Read:** PL-09, PL-10, PL-11, runs.RunInfo, runs.ProgressEvent, runs.RunRefused, runs.RunManager, api.create_app, api.App, api.OpenApiDocument, api.VersionMessage, api.SearchHit, api.CompanyPage, api.PriceSeries, api.CrossCheckView, api.UniverseDay, api.FailureMessage, api.CheckSummaryMessage, api.RunMessage, api.RunEvent, api.Schema, core.VersionId, core.QueryRefused, core.RunContext, core.RunCancelled, store.DataVersion, store.VersionedStore, store.Catalog, query.Company, query.Actions, checks.Failure, checks.CheckSummary, checks.CheckConfig, xcheck.Comparison, sources.SourceError
+ **Acceptance:**
+ - [ ] Every `runs` and `api` type is Pydantic or dataclass code; each `tests/contracts/<id>.<Type>/` sample validates against the exported JSON Schema
+ - [ ] Every PL-09, PL-10 and PL-11 step and entry imports with its signature, body `raise NotImplementedError("<task id>")`, except PL-10's `mount_studies` (M5) and PL-09's `mark_books` (M9), which their entries don't call yet; `__main__.py` dispatches `export-openapi`
+ - [ ] `contracts/openapi.json` is exported and `openapi-typescript` has generated `packages/explorer/src/api/schema.ts` from it; the RunManager fake serves its fixtures
+ **Verify:** `pytest tests/contracts` · `scripts/check.sh gate --pkg qserver`
+-**Depends on:** — · **Writes:** packages/qserver/src/qserver/**, contracts/openapi.json, packages/explorer/src/api/schema.ts, tests/contracts/runs.*/**, tests/contracts/api.*/**
++**Depends on:** M1-T01 · **Writes:** packages/qserver/src/qserver/**, contracts/openapi.json, packages/explorer/src/api/schema.ts, tests/contracts/runs.*/**, tests/contracts/api.*/**
+ 
+ ### M1-T03: explorer interface
+ **Package:** explorer · **Step:** contract · **Kind:** interface · **Covers:** — · **Size:** M · **Mode:** solo
+-**Read:** PL-12, PL-14, PL-15, design.Theme, charts.ChartOptions, pages.RouteView, api.Schema
++**Read:** PL-12, PL-14, PL-15, design.Theme, charts.ChartOptions, pages.RouteView, api.Schema, api.VersionMessage, api.SearchHit, api.CompanyPage, api.PriceSeries, api.CrossCheckView, api.UniverseDay, api.RunMessage, api.RunEvent, api.OpenApiDocument
+ **Acceptance:**
+ - [ ] `Theme`, `ChartOptions` and `RouteView` are TypeScript types; each `tests/contracts/<id>.<Type>/` sample type-checks
+ - [ ] Every PL-12, PL-14 and PL-15 step and entry exists with its signature, body `throw new Error("<task id>")`; `main.tsx` mounts the three route modules
+ - [ ] A fixture-backed fake of the qserver API (one recorded response per route) serves the `tests/contracts/api.*` samples
+ **Verify:** `pnpm --dir packages/explorer tsc --noEmit` · `scripts/check.sh gate --pkg explorer`
+-**Depends on:** — · **Writes:** packages/explorer/src/main.tsx, packages/explorer/src/pipelines/**, packages/explorer/src/design/**, packages/explorer/src/charts/**, packages/explorer/src/pages/**, packages/explorer/src/api/client.ts, packages/explorer/src/api/version.ts, packages/explorer/src/api/queries.ts, packages/explorer/src/api/mutations.ts, packages/explorer/src/api/events.ts, packages/explorer/src/api/schema-tools.ts, packages/explorer/scripts/gen-api.ts, tests/contracts/design.*/**, tests/contracts/charts.*/**, tests/contracts/pages.*/**
++**Depends on:** M1-T02 · **Writes:** packages/explorer/src/main.tsx, packages/explorer/tests/fakes/qserver.ts, packages/explorer/src/pipelines/**, packages/explorer/src/design/**, packages/explorer/src/charts/**, packages/explorer/src/pages/**, packages/explorer/src/api/client.ts, packages/explorer/src/api/version.ts, packages/explorer/src/api/queries.ts, packages/explorer/src/api/mutations.ts, packages/explorer/src/api/events.ts, packages/explorer/src/api/schema-tools.ts, packages/explorer/scripts/gen-api.ts, tests/contracts/design.*/**, tests/contracts/charts.*/**, tests/contracts/pages.*/**
+ 
+ ## Phase 1: Step spines
+ 
+ ### M1-T04: open_primary spine (settings choose the source)
+-**Package:** qdata · **Step:** PL-04.open_primary · **Kind:** spine · **Covers:** DATA-01 · **Size:** XS · **Mode:** solo
++**Package:** qdata · **Step:** PL-04.open_primary · **Kind:** spine · **Covers:** — · **Size:** XS · **Mode:** solo
+ **Read:** PL-04, sources.PrimarySource
+ **Acceptance:**
+ - [ ] `open_primary` returns the synthetic source by default and names Sharadar only when settings ask; signature unchanged
+@@ -52,7 +52,7 @@
+ **Depends on:** M1-T01 · **Writes:** packages/qdata/src/qdata/sources/factory.py, tests/unit/qdata/test_factory.py
+ 
+ ### M1-T05: SyntheticPrimarySource spine (6 companies)
+-**Package:** qdata · **Step:** PL-04.SyntheticPrimarySource · **Kind:** spine · **Covers:** DATA-01, DATA-03, DATA-06 · **Size:** S · **Mode:** solo
++**Package:** qdata · **Step:** PL-04.SyntheticPrimarySource · **Kind:** spine · **Covers:** DATA-03, DATA-06 · **Size:** S · **Mode:** solo
+ **Read:** PL-04, sources.PrimarySource, sources.RawPage, PB-01
+ **Acceptance:**
+ - [ ] `SyntheticPrimarySource(seed=0)` satisfies `PrimarySource`: 6 companies over 2000–2003 with a delisting, a 2-for-1 split, a ticker change and a reused ticker, as raw-shaped SEP, ACTIONS, TICKERS and SP500 pages; same seed, same pages
+@@ -123,7 +123,7 @@
+ ### M1-T13: resolve_company spine (holder on the as-of date)
+ **Package:** qdata · **Step:** PL-08.resolve_company · **Kind:** thicken · **Covers:** QUERY-04 · **Size:** XS · **Mode:** split
+ **Reason:** fold: the spine is the whole behavior
+-**Read:** PL-08, query.Company, query.PitReader, QUERY-04
++**Read:** PL-08, query.Company, query.PitReader, core.QueryRefused, QUERY-04
+ **Acceptance:**
+ - [ ] A reused ticker read before the reuse returns the original company; an unknown ticker raises QueryRefused
+ **Verify:** `pytest tests/unit/qdata -k resolve_company` · `scripts/check.sh gate --pkg qdata`
+@@ -166,16 +166,17 @@
+ **Depends on:** M1-T01, M1-T02 · **Writes:** packages/qserver/src/qserver/runs/context.py, tests/unit/qserver/test_context.py
+ 
+ ### M1-T18: load_check_config spine (TOML files)
+-**Package:** qserver · **Step:** PL-09.load_check_config · **Kind:** spine · **Covers:** CHECK-09 · **Size:** XS · **Mode:** solo
++**Package:** qserver · **Step:** PL-09.load_check_config · **Kind:** spine · **Covers:** — · **Size:** S · **Mode:** solo
+ **Read:** PL-09, checks.CheckConfig
+ **Acceptance:**
+-- [ ] Reads `config/checks.toml` and `config/reference_delisted.toml` into a CheckConfig that validates; a missing file raises FileNotFoundError naming it
++- [ ] Reads `config/checks.toml` and `config/reference_delisted.toml` into a CheckConfig that validates; a missing file raises FileNotFoundError naming it; download runs never read config
++- [ ] `config/checks.toml` holds the provisional thresholds 0.50, 498, 505 and 0.30
+ **Verify:** `pytest tests/unit/qserver -k load_check_config` · `scripts/check.sh gate --pkg qserver`
+-**Depends on:** M1-T01, M1-T02 · **Writes:** packages/qserver/src/qserver/runs/config.py, tests/unit/qserver/test_config.py
++**Depends on:** M1-T01, M1-T02 · **Writes:** packages/qserver/src/qserver/runs/config.py, config/checks.toml, tests/unit/qserver/test_config.py
+ 
+ ### M1-T19: execute_run spine (download kinds)
+ **Package:** qserver · **Step:** PL-09.execute_run · **Kind:** spine · **Covers:** RUN-01, LOAD-04 · **Size:** XS · **Mode:** solo
+-**Read:** PL-09, PL-04, load.download, runs.RunInfo, core.RunContext
++**Read:** PL-09, PL-04, load.download, runs.RunInfo, core.RunContext, store.VersionedStore, sources.PrimarySource
+ **Acceptance:**
+ - [ ] Full and refresh runs call `load.download` (its fake) with the synthetic source; a check run raises NotImplementedError naming M2 until then
+ **Verify:** `pytest tests/unit/qserver -k execute_run` · `scripts/check.sh gate --pkg qserver`
+@@ -184,15 +185,15 @@
+ ### M1-T20: create_app spine (loopback guard)
+ **Package:** qserver · **Step:** PL-10.create_app · **Kind:** thicken · **Covers:** QR-04, QR-06 · **Size:** XS · **Mode:** split
+ **Reason:** fold: the spine is the whole behavior
+-**Read:** PL-10, AD-07, api.App, api.create_app, QR-04, QR-06
++**Read:** PL-10, AD-07, api.App, api.create_app, store.VersionedStore, store.Catalog, runs.RunManager, QR-04, QR-06
+ **Acceptance:**
+-- [ ] A request with a non-loopback `Host` gets 403; the route list matches `api.create_app` exactly, with no export route
++- [ ] A request with a non-loopback `Host` gets 403 on an app with no routes mounted; app.py defines no export route
+ **Verify:** `pytest tests/unit/qserver -k create_app` · `scripts/check.sh gate --pkg qserver`
+ **Depends on:** M1-T01, M1-T02 · **Writes:** packages/qserver/src/qserver/api/app.py, tests/unit/qserver/test_app.py
+ 
+ ### M1-T21: mount_reads spine (read routes)
+ **Package:** qserver · **Step:** PL-10.mount_reads · **Kind:** spine · **Covers:** EXPL-01–EXPL-06, EXPL-09, EXPL-10 · **Size:** S · **Mode:** solo
+-**Read:** PL-10, api.VersionMessage, api.SearchHit, api.CompanyPage, api.PriceSeries, api.CrossCheckView, api.UniverseDay, query.PitReader
++**Read:** PL-10, api.VersionMessage, api.SearchHit, api.CompanyPage, api.PriceSeries, api.CrossCheckView, api.UniverseDay, query.PitReader, store.Catalog, store.DataVersion, query.Company, query.Actions, query.Returns, checks.Failure, xcheck.Comparison
+ **Acceptance:**
+ - [ ] On the PitReader double each read route returns its message and its sample validates; every read takes `?version` and names it
+ **Verify:** `pytest tests/unit/qserver -k mount_reads` · `scripts/check.sh gate --pkg qserver`
+@@ -200,18 +201,18 @@
+ 
+ ### M1-T22: mount_checks spine (summary, failures, explanation)
+ **Package:** qserver · **Step:** PL-10.mount_checks · **Kind:** spine · **Covers:** — · **Size:** XS · **Mode:** solo
+-**Read:** PL-10, api.CheckSummaryMessage, api.FailureMessage, checks.explain, store.Catalog
++**Read:** PL-10, api.CheckSummaryMessage, api.FailureMessage, checks.explain, store.Catalog, checks.Failure, checks.CheckSummary
+ **Acceptance:**
+ - [ ] On the Catalog double the three check routes answer with their messages; a catalog with no check run gives 404 on `/checks/latest`
+ **Verify:** `pytest tests/unit/qserver -k mount_checks` · `scripts/check.sh gate --pkg qserver`
+ **Depends on:** M1-T01, M1-T02 · **Writes:** packages/qserver/src/qserver/api/checks.py, tests/unit/qserver/test_checks_routes.py
+ 
+-### M1-T23: mount_runs spine (start, cancel, SSE)
++### M1-T23: mount_runs spine (start, cancel, WebSocket)
+ **Package:** qserver · **Step:** PL-10.mount_runs · **Kind:** thicken · **Covers:** RUN-01–RUN-06 · **Size:** S · **Mode:** split
+ **Reason:** fold: the spine is the whole behavior
+-**Read:** PL-10, api.RunMessage, api.RunEvent, runs.RunManager, RUN-02, RUN-03, RUN-06
++**Read:** PL-10, api.RunMessage, api.RunEvent, runs.RunManager, runs.RunInfo, runs.ProgressEvent, runs.RunRefused, RUN-02, RUN-03, RUN-06
+ **Acceptance:**
+-- [ ] A refused start is 409 with the running run; the SSE stream sends RunEvent with `seq` as event id and resumes after `Last-Event-ID`
++- [ ] A refused start is 409 with the running run; the WebSocket `/runs/{id}/ws` sends RunEvent with ascending `seq` and, on reconnect, resumes after the last `seq` the client sends
+ **Verify:** `pytest tests/unit/qserver -k mount_runs` · `scripts/check.sh gate --pkg qserver`
+ **Depends on:** M1-T01, M1-T02 · **Writes:** packages/qserver/src/qserver/api/runs.py, tests/unit/qserver/test_runs_routes.py
+ 
+@@ -308,7 +309,7 @@
+ **Package:** explorer · **Step:** PL-14.useRunEvents · **Kind:** spine · **Covers:** RUN-03, RUN-06 · **Size:** XS · **Mode:** solo
+ **Read:** PL-14, api.RunEvent, RUN-06
+ **Acceptance:**
+-- [ ] On a recorded stream cut after event 5, the hook shows "reconnecting" and resumes with `Last-Event-ID: 5`
++- [ ] On a recorded WebSocket cut after event 5, the hook shows "reconnecting" and resumes after the last `seq` (5)
+ **Verify:** `pnpm --dir packages/explorer test useRunEvents` · `scripts/check.sh gate --pkg explorer`
+ **Depends on:** M1-T03 · **Writes:** packages/explorer/src/api/events.ts, tests/unit/explorer/events.test.ts
+ 
+@@ -354,7 +355,7 @@
+ **Package:** qserver · **Step:** PL-09 · **Kind:** wiring · **Covers:** RUN-01, RUN-04, LOAD-04 · **Size:** XS · **Mode:** solo
+ **Read:** PL-09, load.download, runs.RunInfo
+ **Acceptance:**
+-- [ ] `run_worker` claims a run, runs the `load.download` fake and finishes it succeeded; a cancel mid-run finishes it cancelled; committed as the smoke test
++- [ ] `run_worker` claims a run, runs the `load.download` fake and finishes it succeeded; a cancel mid-run finishes it cancelled; committed as the smoke test; the entry does not call `mark_books` (M9) and imports nothing from qfcst
+ - [ ] PL-09's pre-build sections replaced by a `dt layout` pointer
+ **Verify:** `pytest tests/intent/qserver/test_pl09_smoke.py` · `scripts/check.sh gate --pkg qserver`
+ **Depends on:** M1-T16, M1-T17, M1-T18, M1-T19 · **Writes:** packages/qserver/src/qserver/runs/pipeline.py, tests/intent/qserver/test_pl09_smoke.py
+@@ -363,7 +364,8 @@
+ **Package:** qserver · **Step:** PL-10 · **Kind:** wiring · **Covers:** QR-04, RUN-06 · **Size:** M · **Mode:** solo
+ **Read:** PL-10, api.create_app, api.App
+ **Acceptance:**
+-- [ ] `run_serve` starts on 127.0.0.1 over the qdata replay doubles; every route in `api.create_app` answers; `mount_static` and `serve` are built here; committed as the smoke test
++- [ ] `run_serve` starts on 127.0.0.1 over the qdata replay doubles; every route in `api.create_app` except the /studies routes answers; the entry does not call `mount_studies` (M5) and imports nothing from qrisk; `mount_static` and `serve` are built here; committed as the smoke test
++- [ ] The mounted route list equals `api.create_app`'s M1 routes (every route except the /studies routes, deferred to M5)
+ - [ ] PL-10's pre-build sections replaced by a `dt layout` pointer
+ **Verify:** `pytest tests/intent/qserver/test_pl10_smoke.py` · `scripts/check.sh gate --pkg qserver`
+ **Depends on:** M1-T16, M1-T20, M1-T21, M1-T22, M1-T23 · **Writes:** packages/qserver/src/qserver/api/pipelines/pl10_serve.py, packages/qserver/src/qserver/api/static.py, packages/qserver/src/qserver/api/serve.py, tests/intent/qserver/test_pl10_smoke.py
+@@ -476,7 +478,7 @@
+ | M1-T40 Wire PL-10 | M1-T20 create_app spine (loopback guard) | order | none: integration: the smoke runs it |
+ | M1-T40 Wire PL-10 | M1-T21 mount_reads spine (read routes) | order | none: integration: the smoke runs it |
+ | M1-T40 Wire PL-10 | M1-T22 mount_checks spine (summary, failures, explanation) | order | none: integration: the smoke runs it |
+-| M1-T40 Wire PL-10 | M1-T23 mount_runs spine (start, cancel, SSE) | order | none: integration: the smoke runs it |
++| M1-T40 Wire PL-10 | M1-T23 mount_runs spine (start, cancel, WebSocket) | order | none: integration: the smoke runs it |
+ | M1-T41 Wire PL-11 | M1-T20 create_app spine (loopback guard) | order | none: integration: the smoke runs it |
+ | M1-T41 Wire PL-11 | M1-T24 export_openapi spine (sorted schema) | order | none: integration: the smoke runs it |
+ | M1-T42 Wire PL-12 | M1-T25 createTheme spine (the approved direction) | order | none: integration: the smoke runs it |
+@@ -508,14 +510,8 @@
+ ## Risks
+ | Risk | Impact | Mitigation |
+ |---|---|---|
+-| The three interface tasks run at once, but qserver's and explorer's stubs import qdata's types and the generated schema | Their import checks fail until the other interface task merges | Each interface task's import check runs at merge; the orchestrator merges M1-T01 first |
+ | The visual direction is not approved in time | Every chart and page task waits on M1-T25 | M1-T25 is scheduled in the first wave; its acceptance is the user's approval |
+ | Synthetic data hides Sharadar quirks (PB-01 unchecked) | M3 re-freezes `PrimarySource` or `Bars` | AD-02 and the PB-01 risk line; PB-01 reopened before M3 is planned |
+ 
+ ## Open questions
+ - None.
+-
+-## Replan notes
+-- 2026-10-17: S2 cut into M4 and M5. PL-10 gained `mount_studies` (RVIEW-01–RVIEW-03); it is Deferred to M5 and left out of M1-T02's stubs, since it needs `qrisk`'s StudyReader from M4. No task added, dropped or reordered.
+-- 2026-10-17: S3 cut into M6 and M7. The `qdata` contract's `core.CompanyId`, `core.VersionId`, `core.QueryRefused`, `query.PitReader` and `store.VersionedStore` sections gained `qfeat` on their Boundary and Used by lines only; no signature, field or case changed, so M1-T01's frozen interface and every task stand. No task added, dropped or reordered.
+-- 2026-10-18: S4 cut into M8–M10. PL-09 gained `mark_books` (PAPER-02); it is Deferred to M9 and left out of M1-T02's stubs, since it needs `qfcst`'s book from M9. No task added, dropped or reordered.
+diff --git a/tasks/todo.md b/tasks/todo.md
+index 38b4ef1..3b67bc4 100644
+--- a/tasks/todo.md
++++ b/tasks/todo.md
+@@ -17,12 +17,12 @@
+ - [ ] M1-T15 read_returns spine (AD-06 total return) (qdata, XS, split)
+ - [ ] M1-T16 runs.manager spine (lifecycle, one-active lock) (qserver, S, split)
+ - [ ] M1-T17 CatalogRunContext spine (progress, cancel) (qserver, XS, split)
+-- [ ] M1-T18 load_check_config spine (TOML files) (qserver, XS, solo)
++- [ ] M1-T18 load_check_config spine (TOML files) (qserver, S, solo)
+ - [ ] M1-T19 execute_run spine (download kinds) (qserver, XS, solo)
+ - [ ] M1-T20 create_app spine (loopback guard) (qserver, XS, split)
+ - [ ] M1-T21 mount_reads spine (read routes) (qserver, S, solo)
+ - [ ] M1-T22 mount_checks spine (summary, failures, explanation) (qserver, XS, solo)
+-- [ ] M1-T23 mount_runs spine (start, cancel, SSE) (qserver, S, split)
++- [ ] M1-T23 mount_runs spine (start, cancel, WebSocket) (qserver, S, split)
+ - [ ] M1-T24 export_openapi spine (sorted schema) (qserver, XS, solo)
+ - [ ] M1-T25 createTheme spine (the approved direction) (explorer, S, solo)
+ - [ ] M1-T26 useVersion spine (latest by default) (explorer, XS, solo)

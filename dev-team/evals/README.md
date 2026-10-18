@@ -335,16 +335,34 @@ The blind judge never reads the packaged `outputs/` folders: `judge_prompt.py` c
 python3 evals/harness/judge_prompt.py quant <bench/eval-1-quant/incremental/run-1/outputs> \
   <bench/eval-1-quant/all_at_once/run-1/outputs> <iteration>/judge-quant.json \
   --both /tmp/judge-quant --labels incremental all_at_once
-python3 evals/harness/judge_prompt.py run /tmp/judge-quant <iteration>/judge-quant.json
+python3 evals/harness/judge_prompt.py run /tmp/judge-quant <iteration>/judge-quant.json --repeats 3
 python3 evals/harness/judge_prompt.py average <iteration>/judge-quant.json
 ```
 
-The first command writes two prompts, `prompt-AB.md` and `prompt-BA.md`, the same pair in both orders, and the key (`judge-quant.key.json`; the labels stay there, never in a prompt). The key's folder must lie outside the prompt folder. `run` is the judge runner: each prompt goes to its own `claude -p` (`JUDGE_MODEL`, default `claude-opus-5-5`) started in the prompt folder with only Read, Glob and Grep, no CLAUDE.md files, no MCP servers and no host settings, and its reply, the verdict JSON, is saved as `judge-quant.AB.json` or `judge-quant.BA.json`. The judge can't write, and a read outside its folder needs a permission a headless run denies, so it can't reach the key. `average` then writes `judge-quant.json`: each run's scores averaged over the two orders and keyed by label, the winner in each order, and any item whose two scores differ by more than 1. Without `--both`, the command prints one prompt in the given order.
+The first command writes two prompts, `prompt-AB.md` and `prompt-BA.md`, the same pair in both orders, and the key (`judge-quant.key.json`; the labels stay there, never in a prompt). The key's folder must lie outside the prompt folder. Without `--both`, the command prints one prompt in the given order.
+
+`run` is the judge runner. It judges the pair `--repeats` times (default 1), each repeat in both orders, `--workers` calls at a time (default min(2 × repeats, 6)). Each call is its own `claude -p` (`JUDGE_MODEL`, default `claude-opus-5-5`) started in the prompt folder with only Read, Glob and Grep, no CLAUDE.md files, no MCP servers and no host settings. Its reply, the verdict JSON, is saved as `judge-quant.AB.json` and `judge-quant.BA.json` for repeat 1, and `judge-quant.AB.<r>.json` and `judge-quant.BA.<r>.json` for repeat r. The judge can't write, and a read outside its folder needs a permission a headless run denies, so it can't reach the key. About 1 reply in 4 has no verdict in the rubric's shape. `run` retries such a reply up to 3 times and logs every attempt to `judge-quant.log`. If an order still fails, `run` exits 1; `--resume` keeps the saved verdicts and judges only the missing ones.
+
+`average` writes `judge-quant.json` from every repeat with both orders saved:
+- `scores`: each set's items, content, structure and overall, averaged over all repeats and orders and keyed by label. `modecmp.py` reads these.
+- `stats`: the same items, each as `mean`, `sd`, `min`, `max` and `n` over the repeats' pair means. With one repeat `sd` is null.
+- `margin`: the first label's overall minus the second's, per repeat. `position_effect`: half the difference between the first label's margin as Set A and as Set B, per repeat (what being Set A is worth).
+- `runs`: each repeat's overall scores and winners. `winner_by_order`: the winner in each order, a list with one per repeat when there are several.
+- `order_disagreements`: items whose two orders differ by more than 1, prefixed `r<n>` with several repeats.
+
+**Iteration 10 uses `--repeats 3`.** One judge pair moves a set's overall by up to 0.55 with its inputs fixed (judge SD about 0.16 per pair, 0.30 on the noisiest set; [results-iteration-9/review-ab.md](results-iteration-9/review-ab.md), Noise). How to read the stats:
+- **`sd` is one pair's noise**, not the mean's. The mean of n repeats is uncertain by about sd/√n: 0.16/√3 ≈ 0.09 at 3 repeats. An SD from 3 draws is itself off by up to half.
+- **Compare two sets by `margin`**, not by their two `mean ± sd` side by side. Within a pair the two sets' scores move against each other, so the margin's sd is larger than either set's.
+- **A margin is a difference** when its mean is at least 0.25 and more than 2.5 × its sd (the 95% bound for 3 repeats). Otherwise call it a tie.
+- **A margin below `position_effect` is a tie as well**, whatever its sign: the order decided it.
+- **An item with `sd` 0 and the same value in every set** is clustering. The prompt's anchors exist to stop that, so report it.
+
+The prompt gives every item one 1–5 scale (5: checked, no defect; 3: one real defect; a real defect the judge names caps its item at 3). `dependency_graph_soundness`, `layout_sensibility`, `organization` and `ease_of_finding_next_build_step` also get a short anchor per score: these scored 4 in 84–96% of iteration 9's 52 verdicts. Scores on the anchored scale aren't comparable to iterations before 10: to compare against iteration 9, re-judge its pairs with the current prompt. `selftest/judge.py` checks the runner with no model calls. It confirms the prompts have the anchors and no mode word, `average` reproduces iteration 9's judge files, and `run --repeats 3` against `selftest/fake_judge.py` retries, resumes and gives the expected stats.
 
 Each packaged run holds `plan_snapshot.json`, the final plan as one graph, with nothing that names the mode. The rubric adds six items:
 - `milestone_quality`: each milestone is one runnable capability with its outcome stated, splits follow dependency lines (no leftover milestones carved off for size), sizes are balanced, Depends are right, and planned milestones have checkable Exit criteria.
 - `pipeline_clarity`: pipelines read as clear call paths.
-- `layout_sensibility`: the layouts make sense.
+- `layout_sensibility`: the layout follows the pipelines: an entry module per package, a module per step owner.
 - `task_buildability`: each task can be built from its `context__<task>.md` packet alone; a spine's packet suffices without its sibling steps' code. The judge reads at least three packets per set, one of them a spine's.
 - `interface_quality`: the boundary types are code shapes, minimal and complete for their boundary; helpers aren't frozen; one sample per boundary; fakes only for calls into another pipeline or package.
 - `dependency_graph_soundness`: edges are real, with no false serialization; `none:` reasons are valid; every spine could start the moment the interface task lands; tasks that can run at once never write the same file.

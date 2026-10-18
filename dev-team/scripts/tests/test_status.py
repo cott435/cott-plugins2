@@ -473,13 +473,15 @@ class BuildPlanningLegacyTest(Base):
                    "- **Boundary:** quant · **Fixtures:** tests/contracts/feed.quotes/ · **Cases:** one day\n\n"
                    "### feed.depth: Depth\n`def depth() -> Depth`\n"
                    "- **Boundary:** web · **Fixtures:** tests/contracts/feed.depth/ · **Cases:** one book\n")
-        self.assertEqual(self.status("build-planning")["boundaries_unfrozen"], ["feed.quotes (quant)"])
+        # The old-style plan has no contract task, so data.load_prices (a Boundary to stats) is unfrozen too.
+        self.assertEqual(self.status("build-planning")["boundaries_unfrozen"],
+                         ["feed.quotes (quant)", "data.load_prices (stats)"])
         self.write("tests/contracts/feed.quotes/schema.json", "{}")        # frozen by an earlier milestone
-        self.assertEqual(self.status("build-planning")["boundaries_unfrozen"], [])
+        self.assertEqual(self.status("build-planning")["boundaries_unfrozen"], ["data.load_prices (stats)"])
         (self.root / "tests/contracts/feed.quotes/schema.json").unlink()
         (self.root / "tests/contracts/feed.quotes").rmdir()
         self.edit("tasks/plan.md", "**Step:** PL-02 · **Covers:** STAT-04", "**Step:** contract · **Covers:** —")
-        self.edit("tasks/plan.md", "**Read:** PL-02, stats.estimate_cov, STAT-04", "**Read:** feed.quotes")
+        self.edit("tasks/plan.md", "**Read:** PL-02, stats.estimate_cov, STAT-04", "**Read:** feed.quotes, data.load_prices")
         self.assertEqual(self.status("build-planning")["boundaries_unfrozen"], [])
 
 

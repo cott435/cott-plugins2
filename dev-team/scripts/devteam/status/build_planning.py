@@ -137,14 +137,16 @@ def milestone_packages(repo: Repo, row: model.Milestone | None, pipelines: list[
 
 def boundaries_unfrozen(repo: Repo, pkgs: list[str], tasks: list[model.Task]) -> list[str]:
     """Boundaries the milestone crosses that no contract task freezes: a contract symbol whose `**Boundary:**`
-    line names a consumer among the milestone's packages (in a single package, its components), in no contract
-    task's `Read:`, with no fixtures folder yet (an earlier milestone froze it). Items read
-    `features.screen (portfolio)`."""
+    line names a consumer among the milestone's packages (in a single package, its components), and, in an
+    interface-first plan, a contract type a milestone step's `In → Out` names (its signature needs it); each in no
+    contract task's `Read:`, with no fixtures folder yet (an earlier milestone froze it). Items read
+    `features.screen (portfolio)` and `profile.Report (PL-02.write_report)`."""
     frozen = {md.strip_md(i).split(" (")[0].strip() for t in tasks if t.is_contract for i in t.read}
+    frozen |= model.frozen_symbols(tasks)
     arch = repo.architecture
     if pkgs and arch is not None and "single" in arch.header.get("Shape", "").lower():
         pkgs = list(pkgs) + [c.id for c in model.components(arch)]
-    out = []
+    out, seen = [], set()
     for doc in repo.docs("contract"):
         for sym in model.symbols(doc):
             fields = md.bullet_fields(doc.lines, sym.start + 1, sym.end)
@@ -152,7 +154,29 @@ def boundaries_unfrozen(repo: Repo, pkgs: list[str], tasks: list[model.Task]) ->
             folder = md.strip_md(fields.get("Fixtures", "")) or f"tests/contracts/{sym.id}/"
             if consumers and sym.id not in frozen and not (repo.root / folder).is_dir():
                 out.append(f"{sym.id} ({', '.join(consumers)})")
+                seen.add(sym.id)
+    if not tasks or not model.is_interface_first(tasks[0].doc):
+        return out
+    types = model.contract_types(repo)
+    by_id = {p.id: p for p in model.all_pipelines(repo)}
+    for pid in _milestone_pipelines(repo, tasks):
+        for s in by_id[pid].steps if pid in by_id else []:
+            for name in s.in_types + s.out_types:
+                ty = model.resolve_type(types, name)
+                if ty is None or ty.id in frozen or ty.id in seen:
+                    continue
+                if not (repo.root / (ty.sample or f"tests/contracts/{ty.id}/")).exists():
+                    out.append(f"{ty.id} ({pid}.{s.name})")
+                    seen.add(ty.id)
     return out
+
+
+def _milestone_pipelines(repo: Repo, tasks: list[model.Task]) -> list[str]:
+    """The plan's milestone's live pipelines (its roadmap row), then any other a task's Step names."""
+    row = milestone_row(repo, model.milestone_of(tasks[0].doc))
+    ids = roadmap_cmd.milestone_pipelines(repo, row)[0] if row else []
+    ids += [m.group(0) for t in tasks if (m := re.match(r"PL-\d{2,}", t.step))]
+    return [p for p in dict.fromkeys(ids) if not repo.is_retired(p)]
 
 
 def _sections(doc: Doc) -> dict[str, str]:
@@ -277,9 +301,9 @@ def build_planning(repo: Repo, r: Report) -> None:
     by_id = {t.id: t for t in tasks}
     nxt = next_task(items, by_id)
     system = model.system_pipeline_ids(repo)
-    spined = {model.spine_pipeline(t, system) for t in tasks}
+    spined = {pl for t in tasks for pl in model.spine_pipelines(t, system)}
     for doc in repo.docs("archived-plan", archive=True):
-        spined |= {model.spine_pipeline(t, system) for t in model.tasks(doc)}
+        spined |= {pl for t in model.tasks(doc) for pl in model.spine_pipelines(t, system)}
     drafts = draft_pipelines(repo, tasks, milestone_pls)
     pkgs = milestone_packages(repo, ms_row, milestone_pls, tasks) if active else []
     open_revise = revising(repo, pkgs, drafts) if active else []

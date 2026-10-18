@@ -401,7 +401,8 @@ class LintTest(ProbeCase):
         self.replace("docs/probes.md", "| ≤ 2006-01-03 (DATA-01) | user |", "|  | user |")
         self.replace("docs/probes.md", "- **Question:** Does FRED", "- Question: Does FRED")
         self.replace("docs/probes.md", "**Status:** Answered · pass · 2026-10-16", "**Status:** Done")
-        self.assertEqual([c[2] for c in self.lint_codes()], ["probe-fields"] * 3)
+        # PB-01's unreadable Status also leaves the Accepted AD-03 citing an open probe.
+        self.assertEqual(sorted(c[2] for c in self.lint_codes()), ["probe-fields"] * 3 + ["probe-open"])
 
     def test_informs(self):
         self.replace("docs/probes.md", "AD-04 · PORT-02 · portfolio.Comparison", "AD-04 · PORT-09 · portfolio.Nope")

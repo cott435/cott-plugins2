@@ -111,7 +111,7 @@ class BudgetChecks(LintCase):
         self._add_symbols(10)       # 139 lines, well past the old fixed 60, at 6 lines a symbol
         self.assertEqual(self.budget_messages(CONTRACT), [])
         self.p.edit(CONTRACT, "- **Used by:** PL-03", "- **Used by:** PL-03\n" + "filler\n" * 57)
-        self.assertEqual(self.budget_messages(CONTRACT), ["195 lines, budget 188 (8 per symbol × 22 + 12)"])
+        self.assertEqual(self.budget_messages(CONTRACT), ["196 lines, budget 188 (8 per symbol × 22 + 12)"])
 
     def test_pipelines_budget_is_per_pipeline(self):
         self.p.edit(PIPES, "**Covers:** PORT-01, PORT-02", "**Covers:** PORT-01, PORT-02\n" + "filler\n" * 70)
@@ -130,7 +130,7 @@ class BudgetChecks(LintCase):
         self._add_symbols(22)
         self.p.edit(CONTRACT, "- **Used by:** PL-03", "- **Used by:** PL-03\nfiller\nfiller")
         self.assertEqual(self.budget_messages(CONTRACT), [
-            "211 lines, over the 200-line ceiling for one package's contract doc: architecture-design should "
+            "212 lines, over the 200-line ceiling for one package's contract doc: architecture-design should "
             "consider a Grow"])
         code, _ = run_main("--root", str(self.p.root), "lint")
         self.assertEqual(code, 0)
@@ -482,8 +482,8 @@ class InterfaceFirstChecks(LintCase):
     def test_shared_file_belongs_to_interface_or_wiring(self):
         self.p.edit(PLAN, "**Writes:** src/quant/stats/rmt.py, tests/unit/quant/test_rmt.py\n\n### M1-T06",
                     "**Writes:** src/quant/stats/rmt.py, src/quant/stats/types.py\n\n### M1-T06")
-        self.assertIn("M1-T05 (spine) writes the shared file src/quant/stats/types.py: only an interface, wiring or "
-                      "system task may", self.messages("writes"))
+        self.assertIn("M1-T05 (spine) writes the shared file src/quant/stats/types.py: only the interface task may",
+                      self.messages("writes"))
 
     def test_entry_module_belongs_to_wiring(self):
         self.p.edit(PLAN, "**Writes:** src/quant/stats/pca.py, tests/intent/quant/test_pca.py",

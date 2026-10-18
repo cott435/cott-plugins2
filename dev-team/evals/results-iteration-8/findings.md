@@ -53,6 +53,22 @@
 - **Judge:** incremental wins both projects in both orders (margins 0.45 and 0.35, above the ~0.3 position bias). In iteration 7 both projects were ties.
 - **Examples off the eval domains:** quality about the same. The iteration-7 leakage (`make_env`, `make_agent`, `EnvSpec`, `CovMethod`) is gone, and there are 0 GridLoad/LeafLab hits in any plan.
 
+## Re-graded with iteration 9's grader
+
+[regraded/](regraded/) holds the four runs graded by the self-tested grader (commit `7fc015d`: fixes 1–6 from [grader-selftest.md](grader-selftest.md)). `../results-iteration-7/regraded/` is refreshed with the same grader, so both are iteration 9's baselines.
+
+| Run | Original | Re-graded | Iteration 7, re-graded |
+|---|---|---|---|
+| rl incremental | 61/67 | 60/67 | 59/67 |
+| rl all-at-once | 59/67 | 61/67 | 64/67 |
+| quant incremental | 69/89 | 78/91 | 71/81 |
+| quant all-at-once | 80/90 | 85/92 | 67/81 |
+
+- **The false positives are gone.** `no_secret_seen`, `runner_split`, `phase0_split` (all four runs), `wave_width`, `tester_starts_early`, `plan_blocked_while_open`, the probe-precision checks, `spec_no_vendors` and `spec_pca_mp` now pass where they were ruled grader faults.
+- **New fails are real.** rl incremental's `unmitigated_reasoned` was a false pass and now fails: wiring waits on library thickens (interface-F3).
+- **Three grader-reason failures remain** (fix 9 in grader-selftest.md): quant inc `no_edge_to_code_when_interface` ("as in PL-06"), rl inc `tester_starts_early` (contract classes) and quant aao `fakes_only_cross_pipeline` (the `data.load_*` glob). With those, iteration 8 still doesn't meet its "no grader-reason failure" bar.
+- **Two quant checks are new and don't apply to the iteration 7 and 8 runs.** `data_sources_suggested` (both iterations) and `crosscheck_facts_reached_design` (iteration 8) fail on runs whose user never named yahooquery or asked for sources. Leave them out when comparing with iteration 9.
+
 ## Iteration 8 against its bar
 
 | Criterion | Result |

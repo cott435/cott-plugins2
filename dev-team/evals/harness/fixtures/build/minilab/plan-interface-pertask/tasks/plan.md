@@ -140,6 +140,7 @@
 **Read:** PL-01, mdata.read_csv, mdata.validate_rows, mdata.align_calendar
 **Acceptance:**
 - [ ] `pytest tests/unit/mdata/test_pl01_smoke.py` runs PL-01 end to end
+- [ ] The smoke test checks that the pipeline runs and its output's shape (type, tickers, lengths), never a value a thicken changes: the golden cases check values
 - [ ] PL-01 entry sketch replaced by a `dt layout` pointer
 **Verify:** `pytest tests/unit/mdata/test_pl01_smoke.py` · `scripts/check.sh gate`
 **Depends on:** M1-T02, M1-T03, M1-T04 · **Writes:** packages/mdata/src/mdata/pipeline.py, tests/unit/mdata/test_pl01_smoke.py
@@ -153,6 +154,7 @@
 **Read:** PL-02, risk.log_returns, risk.rolling_vol, risk.annualize, mdata.load_prices
 **Acceptance:**
 - [ ] `pytest tests/unit/risk/test_pl02_smoke.py` runs PL-02 end to end on the mdata.load_prices fake
+- [ ] The smoke test checks that the pipeline runs and its output's shape (type, tickers, lengths), never a value a thicken changes: the golden cases check values
 - [ ] PL-02 entry sketch replaced by a `dt layout` pointer
 **Verify:** `pytest tests/unit/risk/test_pl02_smoke.py` · `scripts/check.sh gate`
 **Depends on:** M1-T05, M1-T06, M1-T07 · **Writes:** packages/risk/src/risk/vol_pipeline.py, tests/unit/risk/test_pl02_smoke.py
@@ -166,6 +168,7 @@
 **Read:** PL-03, risk.summary_stats, risk.max_drawdown, risk.write_report, risk.vol_series
 **Acceptance:**
 - [ ] `pytest tests/unit/risk/test_pl03_smoke.py` runs PL-03 end to end on the risk.vol_series fake
+- [ ] The smoke test checks that the pipeline runs and its output's shape (type, tickers, lengths), never a value a thicken changes: the golden cases check values
 - [ ] PL-03 entry sketch replaced by a `dt layout` pointer
 **Verify:** `pytest tests/unit/risk/test_pl03_smoke.py` · `scripts/check.sh gate`
 **Depends on:** M1-T08, M1-T09, M1-T10 · **Writes:** packages/risk/src/risk/report_pipeline.py, tests/unit/risk/test_pl03_smoke.py

@@ -4,7 +4,7 @@ an analyst ruled on with the ruling. No model calls.
 
 selftest/adjudicated/iteration-<N>.json holds one record per (trajectory, check) that a findings analysis ruled on
 (results-iteration-<N>/findings-interface.md and findings-flow.md):
-- `expect`: "pass" or "fail", what a correct grader gives this run;
+- `expect`: "pass", "fail" or "na", what a correct grader gives this run;
 - `verdict`: "grader" (a false fail), "false-pass" (a defect the check let through), "real" (a correct fail) or
   "mixed" (a correct fail whose evidence also lists items the analyst ruled false);
 - `must_match` / `must_not_match`: regexes the check's evidence or `metrics` must (not) contain: the real items a
@@ -17,7 +17,8 @@ selftest/adjudicated/iteration-<N>.json holds one record per (trajectory, check)
   `must_not_match` and `reason` replace the record's when comparing; the analyst's own stay in the record.
 
 Each run is copied from the workspace (iteration-<N>/<trajectory>/with_skill) into a scratch dir without its
-virtualenv, node_modules, caches, flow/ and grading.json, and graded there; the workspace is only read.
+virtualenv, node_modules, caches, flow/ and grading.json, and graded there; the workspace is only read. A run whose
+project gained commits after its last turn (AT_COMMIT) is graded with the copy's project reset to that turn's commit.
 
 Usage: adjudicate.py [--workspace DIR] [--out DIR] [--iteration N ...] [--trajectory T ...] [--reuse] [--json FILE]
   --reuse grades only the copies that have no grading.json yet. Exit 1 if any record disagrees with the grader.
@@ -28,6 +29,9 @@ from concurrent.futures import ThreadPoolExecutor
 HERE = pathlib.Path(__file__).resolve().parent
 CORPUS = HERE / "selftest" / "adjudicated"
 WORKSPACE = pathlib.Path("/Users/connorott/plugins/dev-team-workspace")
+# Runs whose project folder gained commits after the run ended: grade the state at the last turn's commit. Iteration
+# 9's quant all-at-once had two build sessions land in its project after `turn 50` (9ece2e6).
+AT_COMMIT = {(9, "quant-all-at-once"): "9ece2e6"}
 SKIP = shutil.ignore_patterns(".venv", "node_modules", "__pycache__", ".mypy_cache", ".ruff_cache", ".pytest_cache",
                               "flow", "grading.json")
 
@@ -42,12 +46,15 @@ def load(iterations=None):
     return recs
 
 
-def regrade(src, dst, reuse=False):
-    """Copy one archived run and grade the copy; return its checks by id."""
+def regrade(src, dst, reuse=False, commit=None):
+    """Copy one archived run and grade the copy (its project reset to `commit` when given); return its checks by id."""
     if not (reuse and (dst / "grading.json").exists()):
         if dst.exists():
             shutil.rmtree(dst)
         shutil.copytree(src, dst, ignore=SKIP, symlinks=True)
+        if commit:
+            for cmd in (["reset", "-q", "--hard", commit], ["clean", "-qfd"]):
+                subprocess.run(["git", *cmd], cwd=dst / "project", check=True)
         r = subprocess.run([sys.executable, str(HERE / "grade.py"), str(dst)], capture_output=True, text=True)
         if r.returncode:
             raise SystemExit(f"adjudicate: grade.py failed on {dst}:\n{r.stderr[-2000:]}")
@@ -59,8 +66,9 @@ def compare(rec, c):
     rec = {**rec, **rec.get("under_rule", {})}
     if c is None:
         return ["check missing from grading.json"]
-    if c.get("na"):
-        return [f"n/a: {c['evidence'][:160]}"]
+    if c.get("na") or rec["expect"] == "na":
+        return [] if c.get("na") and rec["expect"] == "na" else [f"n/a: {c['evidence'][:160]}" if c.get("na") else
+                                                                  f"{'passes' if c['passed'] else 'fails'}, ruled n/a"]
     got = "pass" if c["passed"] else "fail"
     if got != rec["expect"]:
         return [f"{'passes' if c['passed'] else 'fails'}, ruled {rec['expect']}"]
@@ -91,7 +99,8 @@ def main():
 
     def job(key):
         it, t = key
-        return key, regrade(ws / f"iteration-{it}" / t / "with_skill", out / f"iteration-{it}" / t / "with_skill", a.reuse)
+        return key, regrade(ws / f"iteration-{it}" / t / "with_skill", out / f"iteration-{it}" / t / "with_skill", a.reuse,
+                            AT_COMMIT.get(key))
     with ThreadPoolExecutor(max_workers=4) as pool:
         graded = dict(pool.map(job, runs))
 

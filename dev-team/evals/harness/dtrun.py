@@ -188,6 +188,7 @@ LIBRARY_TYPES = NOT_TYPES | {
     "Timestamp", "Timedelta", "Tensor", "Module", "Random", "Record", "Promise", "Array", "Partial", "Readonly",
     "Date", "Map", "Set", "Error", "Response", "Request", "WebSocket", "BaseModel", "Field", "Counter", "Deque",
     "Pattern", "Type", "Never", "NoReturn", "Required", "NotRequired", "Unpack", "Exception", "Event", "Lock",
+    "NaN",  # a value (`float | NaN`), not a type (it9 J4)
 }
 TEST_PATH = re.compile(r"(^|/)tests?/|\.(test|spec)\.(ts|tsx|js|jsx|mjs)$")
 FOLDER_GLOB = re.compile(r"[^*]+/\*\*?")
@@ -274,19 +275,60 @@ def step_unit(s):
     return owner if "." in owner else f"{owner}:{s['name']}"
 
 
+def unit_key(pl, s):
+    """A step's owner module keyed by its pipeline's package too: qserver's `api.schema` and explorer's
+    `api.schema` are two modules (it9 interface F4)."""
+    return f"{pl.get('package') or ''}:{step_unit(s)}"
+
+
 def pipeline_of(task):
     m = PL_ID.match(task.get("step") or "")
     return m.group(0) if m else ""
 
 
-def wired_pipelines(t):
-    """The pipelines a wiring task wires (its own), or a system task wires or swaps (its Step and every PL it reads
-    or names)."""
+def step_ids(cell):
+    """The step IDs a task's Step cell names: `PL-09.open_run, PL-09.close_run` gives both (it9 interface F9)."""
+    return [x.strip() for x in re.split(r"\s*[,;]\s*|\s+and\s+", cell or "") if x.strip()]
+
+
+def entry_pipelines(symbols, pls):
+    """The pipelines whose entry function is one of `symbols` (`data.returns_panel` is PL-11's
+    `…/pl11_returns_panel.py::returns_panel`); a symbol qualified by a package (not a module, `load.download`) must
+    name the pipeline's own package."""
+    packages = {pl.get("package") for pl in pls if pl.get("package")}
+    out = set()
+    for sym in symbols:
+        parts = sym.split(".")
+        for pl in pls:
+            entry = pl.get("entry") or ""
+            func = entry.rsplit("::", 1)[-1] if "::" in entry else ""
+            if func and parts[-1] == func and not (len(parts) > 1 and parts[0] in packages and parts[0] != pl.get("package")):
+                out.add(pl["id"])
+    return out
+
+
+def wired_pipelines(t, pl_by_id=None):
+    """The pipelines a wiring task wires (its own), or a system task wires or swaps (its Step, every PL it reads or
+    names, and with `pl_by_id` every pipeline whose entry function it reads: it9 quant aao T47 reads
+    `data.returns_panel`, PL-11's entry)."""
     ids = set(PL_ID.findall(t.get("step") or ""))
     if t.get("kind") == "system":
-        ids |= set(PL_ID.findall(" ".join([t.get("title", "")] + list(t.get("reads") or t.get("read") or [])
-                                          + list(t.get("acceptance") or []))))
+        reads = list(t.get("reads") or t.get("read") or [])
+        ids |= set(PL_ID.findall(" ".join([t.get("title", "")] + reads + list(t.get("acceptance") or []))))
+        if pl_by_id:
+            ids |= entry_pipelines(set(reads) | set(t.get("read_symbols") or []), list(pl_by_id.values()))
     return ids
+
+
+def swaps_in(a, b, pl_by_id=None):
+    """A system task's row to the wiring of a pipeline it swaps in (its real provider): un-faking it is what a
+    system task does, so no fake can mitigate the row (design §5.1; it9 interface F6). The pipeline is one it
+    wires (wired_pipelines), or one whose smoke test (a test path the wiring task writes) its Verify runs."""
+    if a.get("kind") != "system" or b.get("kind") != "wiring":
+        return False
+    verify = " ".join(a.get("verify") or [])
+    return pipeline_of(b) in wired_pipelines(a, pl_by_id) or any(
+        re.search(rf"(^|[\s/]){re.escape(w.rsplit('/', 1)[-1])}(\s|$|::)", verify) for w in b.get("writes", []) if is_test_path(w))
 
 
 def same_step_unit(a, b, step_info):
@@ -329,7 +371,7 @@ def runs_in(b, wired, step_info, pl_by_id):
     if pipeline_of(b) in wired:
         return True
     if b.get("kind") == "system":
-        return bool(wired_pipelines(b) & wired)
+        return bool(wired_pipelines(b, pl_by_id) & wired)
     sb = step_info.get(b.get("step"))
     return bool(sb) and any(step_unit(s) == step_unit(sb) for p in wired for s in (pl_by_id.get(p) or {}).get("steps", []))
 
@@ -341,7 +383,8 @@ def unmitigated_class(r, by_id, step_info, pl_by_id=None):
     an earlier thicken of that module), contract change, and order with a reason (a real side-effect order; the
     design writes integration rows as `order` with `integration: <why>`). Every class needs a reason. Whatever the
     row's kind, a wiring task never waits on a thicken task that isn't a fold (phase0.md: wiring depends on spines
-    and fold tasks only)."""
+    and fold tasks only), and a thicken task never waits on a wiring or system task (tasks.md: no thicken waits on
+    wiring; it9 quant aao's thickens waited on wire PL-09 for its conftest.py as `order` rows, F1)."""
     reason = (r.get("reason") or "").strip()
     a, b = by_id.get(r.get("from")), by_id.get(r.get("to"))
     if not reason:
@@ -349,6 +392,8 @@ def unmitigated_class(r, by_id, step_info, pl_by_id=None):
     if a is None or b is None:
         return "", "names a task outside the plan"
     kind = r.get("kind")
+    if a.get("kind") == "thicken" and b.get("kind") in ("wiring", "system"):
+        return "", f"a thicken task waits on a {b.get('kind')} task"
     if kind == "contract-change":
         return "contract change", ""
     if a.get("kind") == "wiring" and b.get("kind") == "thicken" and not is_fold(b, by_id.values()):
@@ -359,7 +404,7 @@ def unmitigated_class(r, by_id, step_info, pl_by_id=None):
         return "file", ""
     if a.get("kind") in ("wiring", "system") and b.get("kind") in ("spine", "thicken", "wiring", "system") \
             and (a.get("kind") == "system" or b.get("kind") != "system") \
-            and runs_in(b, wired_pipelines(a), step_info, pl_by_id or {}):
+            and (runs_in(b, wired_pipelines(a, pl_by_id), step_info, pl_by_id or {}) or swaps_in(a, b, pl_by_id)):
         return "integration", ""
     if a.get("kind") == "thicken" and b.get("kind") in STEP_KINDS and same_step_unit(a, b, step_info):
         return "same module", ""
@@ -424,12 +469,12 @@ def interface_writes_symbols(iface_tasks, symbols):
 
 
 def step_units(pls):
-    """Step IDs by owner module (step_unit), call steps included: a call step's module is still built by the
-    spine of its unit (`lab.runs` holds train_seeds, which calls PL-01, and report_runs)."""
+    """Step IDs by owner module (unit_key: package and owner), call steps included: a call step's module is still
+    built by the spine of its unit (`lab.runs` holds train_seeds, which calls PL-01, and report_runs)."""
     units = {}
     for pl in pls:
         for s in pl["steps"]:
-            units.setdefault(step_unit(s), []).append(f"{pl['id']}.{s['name']}")
+            units.setdefault(unit_key(pl, s), []).append(f"{pl['id']}.{s['name']}")
     return units
 
 
@@ -445,8 +490,8 @@ def covering_tasks(pl, s, tasks, units, packages=()):
     else those whose Reason names s (`one module for open_run and close_run`) or whose Writes are s's owner
     module itself. Steps sharing a module share one spine (phase0.md)."""
     builders = [t for t in tasks if t.get("kind") == "spine" or records_fold(t)]
-    ids_ = units.get(step_unit(s), [f"{pl['id']}.{s['name']}"])
-    own = [t for t in builders if t.get("step") in ids_]
+    ids_ = units.get(unit_key(pl, s), [f"{pl['id']}.{s['name']}"])
+    own = [t for t in builders if set(step_ids(t.get("step"))) & set(ids_)]
     if own:
         return own
     named = [t for t in builders if re.search(rf"(?<![\w.]){re.escape(s['name'])}(?!\w)", t.get("reason") or "")]
@@ -454,19 +499,78 @@ def covering_tasks(pl, s, tasks, units, packages=()):
                                                 for w in t.get("writes", []) if not is_test_path(w))]
 
 
-def wave_units(m_pls, m_tasks=(), packages=()):
+def wiring_folds(pl, s, tasks, packages=()):
+    """The pipeline's wiring tasks that build step s themselves (a trivial step folded into the wiring): their
+    title, acceptance or Reason names it (`print_scores` is trivial, so this task builds it (fold)), or their
+    Writes are its owner module (`api/static.py` for `mount_static`)."""
+    out = []
+    for t in tasks:
+        if t.get("kind") != "wiring" or pipeline_of(t) != pl["id"]:
+            continue
+        text = " ".join([t.get("title", ""), t.get("reason") or ""] + list(t.get("acceptance") or []))
+        if re.search(rf"(?<![\w.]){re.escape(s['name'])}(?!\w)", text) or any(
+                owns_module(w, s.get("owner"), packages) for w in t.get("writes", []) if not is_test_path(w)):
+            out.append(t)
+    return out
+
+
+PROBE_WAIT = re.compile(r"\bwaits? on (PB-\d{2,})", re.I)
+
+
+def outside_milestone(m_pls, m_tasks, deferred=(), declared_names=(), packages=()):
+    """{step ID: why} for the steps of a milestone's pipelines that this milestone doesn't build. Library classes
+    are steps, so a pipeline lists every stage's classes while each milestone plans only its own (it9 interface
+    F4). A step no task builds (no spine or recorded fold, no wiring fold; a call step never has one) is outside
+    when:
+    (a) its Covers meet the plan's Deferred, and its other Covers are covered by steps this milestone builds;
+    (b) its spine cell says it waits on a probe (`waits on PB-01`) and a step it builds has the same Out type
+        (a spined stand-in, design §6.2);
+    (c) the interface doesn't declare it, no task names it, and every one of its Covers is covered by a step this
+        milestone builds (it adds no requirement of its own).
+    A step with no Covers is never outside: nothing says it is someone else's."""
+    units = step_units(m_pls)
+    dfr = set(deferred)
+    text = " ".join(json.dumps({k: t.get(k) for k in ("title", "acceptance", "reason", "step", "read_symbols", "read")})
+                    for t in m_tasks)
+    built, unbuilt = [], []
+    for pl in m_pls:
+        for s in pl["steps"]:
+            by = [] if call_step(pl, s, packages) else covering_tasks(pl, s, m_tasks, units, packages) + wiring_folds(pl, s, m_tasks, packages)
+            (built if by else unbuilt).append((pl, s))
+    built_covers = {c for _, s in built for c in s.get("covers") or []}
+    built_out = {x for _, s in built for x in type_names(s.get("out_type"))}
+    out = {}
+    for pl, s in unbuilt:
+        covers = set(s.get("covers") or [])
+        sid = f"{pl['id']}.{s['name']}"
+        if not covers:
+            continue
+        if covers & dfr and covers - dfr <= built_covers:
+            out[sid] = f"Deferred ({', '.join(sorted(covers & dfr))})"
+        elif PROBE_WAIT.search(s.get("spine") or "") and set(type_names(s.get("out_type"))) & built_out:
+            out[sid] = f"waits on {PROBE_WAIT.search(s['spine']).group(1)}; a stand-in with Out {s.get('out_type')} is built"
+        elif s["name"] not in declared_names and not re.search(rf"(?<![\w.]){re.escape(s['name'])}(?!\w)", text) \
+                and covers <= built_covers:
+            out[sid] = "not declared, named by no task, its Covers built by other steps"
+    return out
+
+
+def wave_units(m_pls, m_tasks=(), packages=(), outside=()):
     """The spine units a milestone needs: one per task that builds a non-call step's module (covering_tasks), and
-    per owner module for a step no task builds (a bare owner counts per step)."""
+    per owner module for a step no task builds (a bare owner counts per step). Steps `outside` the milestone
+    (outside_milestone) and steps a wiring task builds itself need none."""
     units = step_units(m_pls)
     keys = set()
     for pl in m_pls:
         for s in pl["steps"]:
-            if call_step(pl, s, packages):
+            if call_step(pl, s, packages) or f"{pl['id']}.{s['name']}" in outside:
                 continue
             cover = covering_tasks(pl, s, m_tasks, units, packages)
             spines = [t for t in cover if t.get("kind") == "spine"]
             pick = spines if spines else cover
-            keys.add(f"task {pick[0]['id']}" if len(pick) == 1 else step_unit(s))
+            if not pick and wiring_folds(pl, s, m_tasks, packages):
+                continue
+            keys.add(f"task {pick[0]['id']}" if len(pick) == 1 else unit_key(pl, s))
     return sorted(keys)
 
 
@@ -481,10 +585,11 @@ def wave_ready(m_tasks, iface_ids, deps, declared, step_info=None):
     return spines, testers
 
 
-def phase0_misses(m_pls, m_tasks, iface_ids, declared_names, packages=()):
-    """What `phase0_split` finds missing in a milestone's pipelines: types the interface lacks; a step unit
-    (owner module) without exactly one spine task, unless a fold applies; a package pipeline without one wiring
-    task writing its entry and a smoke test (any test path); a system pipeline no system task names."""
+def phase0_misses(m_pls, m_tasks, iface_ids, declared_names, packages=(), outside=()):
+    """What `phase0_split` finds missing in a milestone's pipelines: types the interface lacks (of the steps the
+    milestone builds); a step unit (owner module) without exactly one spine task, unless a fold applies; a package
+    pipeline without one wiring task writing its entry and a smoke test (any test path); a system pipeline no
+    system task names. Steps `outside` the milestone (outside_milestone) are left out."""
     units = step_units(m_pls)
     miss = []
     for pl in m_pls:
@@ -493,21 +598,20 @@ def phase0_misses(m_pls, m_tasks, iface_ids, declared_names, packages=()):
             if not any(t.get("kind") == "system" and pid in wired_pipelines(t) for t in m_tasks):
                 miss.append(f"{pid}: system pipeline with no system task naming it")
             continue
-        used = {x for s in pl["steps"] for x in type_names(s.get("in_type")) + type_names(s.get("out_type"))}
+        steps = [s for s in pl["steps"] if f"{pid}.{s['name']}" not in outside]
+        used = {x for s in steps for x in type_names(s.get("in_type")) + type_names(s.get("out_type"))}
         if not iface_ids:
             miss.append(f"{pid}: no interface task")
         elif used - set(declared_names):
             miss.append(f"{pid}: interface lacks {sorted(used - set(declared_names))}")
         wiring = [t for t in m_tasks if t.get("kind") == "wiring" and pipeline_of(t) == pid]
-        for s in pl["steps"]:
+        for s in steps:
             if call_step(pl, s, packages):
                 continue
             cover = covering_tasks(pl, s, m_tasks, units, packages)
             spine = [t for t in cover if t.get("kind") == "spine"]
-            # Folds: a thicken that records one (records_fold), or a trivial step done by the wiring.
-            folded = [t for t in cover if t.get("kind") != "spine"]
-            folded += [t for t in wiring if re.search(rf"\b{re.escape(s['name'])}\b",
-                                                      t.get("title", "") + " " + " ".join(t.get("acceptance") or []))]
+            # Folds: a thicken that records one (records_fold), or a trivial step the wiring builds (wiring_folds).
+            folded = [t for t in cover if t.get("kind") != "spine"] + wiring_folds(pl, s, m_tasks, packages)
             if len(spine) != 1 and not folded:
                 miss.append(f"{pid}.{s['name']}: {len(spine)} spine tasks")
         entry = [t for t in wiring if any(write_overlap(w, pl.get("entry_file") or "") for w in t.get("writes", []))
@@ -540,6 +644,22 @@ def wiring_crosses_frozen(a, b, pl_by_id, step_info, faked, packages=()):
                  and (pipeline_of(b) in PL_ID.findall(s.get("spine") or "") or s.get("owner") == sb.get("owner"))]
     return any(f == s.get("owner") or f.startswith((s.get("owner") or "?") + ".") or f.split(".")[-1] == s["name"]
                for s in reach for f in faked)
+
+
+def boundary_fake_ok(sym, sec, pls, consumer_pl=None, packages=()):
+    """A fake of a cross-pipeline boundary inside one package (design §4.1 fakes any entry or function whose Used by
+    names another pipeline): the symbol's contract section has a Boundary line, its Used by names a pipeline other
+    than the one owning it (a step of that name that isn't a call, or the pipeline whose entry it is), and the
+    consumer's pipeline, when known, is one of the Used by pipelines (it9 rl inc `evaluate.evaluate`, rl aao
+    PL-02's entry `train.run_train`; interface F5)."""
+    fields = bullet_fields((sec or {}).get("fields") or {})
+    if not sec or not (fields.get("Boundary") or "").strip():
+        return False
+    name = sym.split(".")[-1]
+    owners = {pl["id"] for pl in pls for s in pl["steps"] if s["name"] == name and not call_step(pl, s, packages)}
+    owners |= entry_pipelines([sym], pls)
+    users = set(PL_ID.findall(fields.get("Used by") or ""))
+    return bool(users - owners) and (not consumer_pl or consumer_pl in users)
 
 
 def boundaries(pl):
@@ -600,10 +720,14 @@ def sample_written(sid, iface_tasks, on_disk=False):
                           for t in iface_tasks for w in t.get("writes", []))
 
 
-def field_types(text):
+QUALIFIED = re.compile(r"\b([A-Za-z_]\w*)((?:\.\w+)*)\.([A-Z][a-z][A-Za-z0-9]*)\b")
+
+
+def field_types(text, modules=None):
     """CapWords types a contract type section's code (inline `code` spans and fenced blocks) uses in its field
     annotations (`world: WorldSettings`) and return annotations (`-> Returns`); comments, prose and library
-    types left out."""
+    types left out. With `modules` (the contract's packages and symbol prefixes), a type qualified by any other
+    module is a library type too (`JSX.Element`, `duckdb.DuckDBPyConnection`; it9 interface F8)."""
     code, fenced = [], False
     for line in (text or "").splitlines():
         if line.strip().startswith("```"):
@@ -611,13 +735,31 @@ def field_types(text):
             continue
         code += [line] if fenced else re.findall(r"`([^`]+)`", line)
     names = []
+
+    def tokens(s):
+        if modules is not None:
+            s = QUALIFIED.sub(lambda m: m.group(0) if m.group(1) in modules else " ", s)
+        return TYPE_TOKEN.findall(s)
     for c in code:
         c = c.split("#")[0].split("//")[0]
         for ann in re.findall(r"\b\w+\??\s*:\s*([^;=]+)", c):
-            names += TYPE_TOKEN.findall(ann)
+            names += tokens(ann)
         for ret in re.findall(r"->\s*([^;:]+)", c):
-            names += TYPE_TOKEN.findall(ret)
+            names += tokens(ret)
     return [n for n in dict.fromkeys(names) if n not in LIBRARY_TYPES]
+
+
+def contract_text(proj, symbols):
+    """Every contract file the symbols come from, whole (its preamble too: rl aao's `Direction = Literal[…]` sits
+    above the first section, it9 interface F8), then each symbol section's text."""
+    docs = sorted({s["doc"] for s in symbols if s.get("doc")})
+    files = [(pathlib.Path(proj) / rel).read_text() for rel in docs if (pathlib.Path(proj) / rel).is_file()]
+    return "\n".join(files + [s.get("text", "") for s in symbols])
+
+
+def contract_modules(packages, symbols):
+    """The names a contract-qualified type may start with: the packages and every symbol's first segment."""
+    return set(packages) | {s["id"].split(".")[0] for s in symbols}
 
 
 def top_level_split(s, sep=","):
@@ -640,16 +782,25 @@ def top_level_split(s, sep=","):
     return parts + [cur]
 
 
-def defined_in(name, text):
+def defined_in(name, text, known=(), _depth=0):
     """A type defined inline in a contract: `class Name`, `type Name`, `interface Name`, `enum Name`, `Name = …`, a
-    note giving its typed fields (`# Name: share: float; passed: bool`), a constructor whose every parameter is typed
-    (`FixedEntry(spec: str)`), or a type that mirrors another (`ActionDto` mirrors `qdata.CorporateAction`; `SpellDto`
-    and `ExitDto` mirror their `qdata` types). A note listing bare field names (`# FlagRow: ticker, date`) or a
-    constructor with an untyped parameter (`LearnerEntry(kind: str, settings)`) defines nothing."""
+    note giving its typed fields (`# Name: share: float; passed: bool`, or `` - `Name`: index `date`; `close: float64` ``
+    with typed fields anywhere on its line), a constructor whose every parameter is typed (`FixedEntry(spec: str)`),
+    or a type that mirrors another (`ActionDto` mirrors `qdata.CorporateAction`, or a deeper path
+    `qdata.query.Company`; `ActionMsg` mirrors one `qdata.query.Actions` row; `DayDiffMsg` mirroring `DayDiff`, a
+    bare name that is in `known` (has its own section) or is itself defined inline (`DayDiff(day: date, …)`);
+    `SpellDto` and `ExitDto` mirror their `qdata` types). A note
+    listing bare field names (`# FlagRow: ticker, date`) or a constructor with an untyped parameter
+    (`LearnerEntry(kind: str, settings)`) defines nothing."""
     n = re.escape(name)
-    if re.search(rf"\b(class|type|interface|enum)\s+{n}\b|\b{n}\s*=[^=]|\b{n}\s*:\s*\w+\??\s*:\s*[A-Za-z]", text):
+    if re.search(rf"\b(class|type|interface|enum)\s+{n}\b|\b{n}\s*=[^=]|\b{n}\s*:\s*\w+\??\s*:\s*[A-Za-z]"
+                 rf"|`{n}`\s*:[^\n]*?\b\w+\??\s*:\s*`?[A-Za-z]", text):
         return True
-    if re.search(rf"\b{n}\b[`\w\s,]*?\bmirrors?\s+(`?[a-z]\w*\.[A-Z]\w*|their\s+`?[a-z]\w*`?\s+types?\b)", text):
+    mirror = rf"\b{n}\b[`\w\s,]*?\bmirror(?:s|ing)?\s+(?:one\s+)?"
+    if re.search(mirror + r"(`?[a-z]\w*(?:\.\w+)*\.[A-Z]\w*|their\s+`?[a-z]\w*`?\s+types?\b)", text):
+        return True
+    if any(m.group(1) in known or (_depth < 2 and m.group(1) != name and defined_in(m.group(1), text, known, _depth + 1))
+           for m in re.finditer(mirror + r"`?([A-Z]\w*)\b", text)):
         return True
     for m in re.finditer(rf"\b{n}\(", text):
         depth, i = 1, m.end()
@@ -680,23 +831,52 @@ DT_SKILL = re.compile(r"\bstatus\b[^|;&\n]*?--skill[ =]+([a-z][\w-]*)")
 SKILL_READ = re.compile(r"(?:^|/)skills/([a-z][\w-]*)/(?:SKILL\.md|references/)")
 
 
+SLASH = re.compile(r"^\s*/dev-team:([a-z][\w-]*)")
+
+
+def slash_skill(t):
+    """The skill a turn's user message loads with `/dev-team:<skill>` (the driver opens a fresh session that way,
+    and no Skill call follows), or ""; a run whose turns record no user text falls back on the session record
+    (`session.new`, unless it says `slash: false`)."""
+    m = SLASH.match(t.get("user") or "")
+    if m:
+        return m.group(1)
+    s = t.get("session") or {}
+    return s.get("skill") or "" if s.get("new") and s.get("slash") is not False and not t.get("user") else ""
+
+
+def call_skills(c):
+    """The skills one tool call shows at work: a Skill call's skill, `dt status --skill X`, a read of skills/X/."""
+    i = c.get("input") or {}
+    if c.get("name") == "Skill":
+        return [skill_name(i.get("skill") or i.get("name") or "")] if (i.get("skill") or i.get("name")) else []
+    text = " ".join(str(i.get(k) or "") for k in ("command", "file_path", "path", "pattern"))
+    return DT_SKILL.findall(text) + SKILL_READ.findall(text)
+
+
+def turn_skill_seq(turns, calls=()):
+    """Turn → the skills it worked in, in order: a slash-loaded skill first, then each tool call's (call_skills).
+    A turn whose stream has no Skill call (an older stream, or one cut short) adds its recorded `skills` after."""
+    out = {t["turn"]: [slash_skill(t)] if slash_skill(t) else [] for t in turns}
+    seen_skill = set()
+    for c in calls:
+        if c.get("turn") in out:
+            out[c["turn"]] += call_skills(c)
+            if c.get("name") == "Skill":
+                seen_skill.add(c["turn"])
+    for t in turns:
+        if t["turn"] not in seen_skill:
+            out[t["turn"]] += [skill_name(s) for s in t.get("skills", [])]
+    return {n: [s for s in seq if s] for n, seq in out.items()}
+
+
 def turn_skill_map(turns, calls=()):
     """Turn → the skills it worked in: its Skill calls, plus each `dt status --skill X` and skills/X/ read among
     its tool calls (`calls`: probefacts.tool_calls records), so a turn that continues a skill without a Skill
-    call is still attributed to it. A turn that opened a session with `/dev-team:<skill>` (`session.new`) worked in
-    that skill too."""
-    out = {t["turn"]: {skill_name(s) for s in t.get("skills", [])} for t in turns}
-    for t in turns:
-        s = t.get("session") or {}
-        if s.get("new") and s.get("skill"):
-            out[t["turn"]].add(s["skill"])
-    for c in calls:
-        i = c.get("input") or {}
-        text = " ".join(str(i.get(k) or "") for k in ("command", "file_path", "path", "pattern"))
-        hit = DT_SKILL.findall(text) + SKILL_READ.findall(text)
-        if hit and c.get("turn") in out:
-            out[c["turn"]] |= set(hit)
-    return out
+    call is still attributed to it. A turn whose user message opens with `/dev-team:<skill>` (the driver's fresh
+    sessions) worked in that skill too (it9 interface F7)."""
+    seq = turn_skill_seq(turns, calls)
+    return {t["turn"]: {skill_name(s) for s in t.get("skills", [])} | set(seq[t["turn"]]) for t in turns}
 
 
 INTAKE_AGENT = re.compile(r"\b(summari[sz]e|intake)\b.*\.\w{1,5}\b", re.I)
@@ -735,6 +915,22 @@ def routed_revise(layers, prev_turn, changed, prev_layers=()):
     return left_draft and bool(REVISE_ASK.search(text)) and bool(UPSTREAM.search(text))
 
 
+ROUTED_NAMED = re.compile(r"\brout(ed|es?)\b[^.\n]{0,200}\bfix(es)?\b|\bfix(es)?\b[^.\n]{0,200}\brouted\b", re.I)
+MAKE_FIXES = re.compile(r"\b(make|apply|do|run)\b[^.\n]{0,40}\b(routed\s+)?fix(es)?\b", re.I)
+ROUTED_ARCH_LINES = 25
+
+
+def routed_fixes(layers, added, prev_turn, user):
+    """A two-layer turn that applies routed fixes the user approved, then drafts one layer: architecture plus one
+    other layer, the architecture change small (at most ROUTED_ARCH_LINES added lines, `added`: layer → lines),
+    after a turn that named the routed fixes (`prev_turn`'s assistant text) and with a user message telling the
+    agent to make them (it9 rl aao turn 13: the TRAIN-03 count and AD-09's corridor, then the M1 plan; interface F10)."""
+    layers = set(layers)
+    if not prev_turn or len(layers) != 2 or "arch" not in layers or added.get("arch", 0) > ROUTED_ARCH_LINES:
+        return False
+    return bool(ROUTED_NAMED.search(prev_turn.get("assistant") or "")) and bool(MAKE_FIXES.search(user or ""))
+
+
 # data_sources_suggested (grade.py): sources the agent may raise beyond the user's Sharadar prices and yahooquery cross-check,
 # matched by name: {name: (pattern, is a fundamentals source)}. Sharadar counts only as SF1 or "Sharadar
 # Fundamentals"; EODHD counts as fundamentals only where its fundamentals are named.
@@ -759,12 +955,33 @@ DATA_SOURCES = {
 }
 
 
+FUNDAMENTALS = re.compile(r"fundamental|earnings|balance[- ]sheet|income statement|financial statement|cash flow|"
+                          r"\bXBRL\b|company[- ]?facts|\bSF1\b|\b10-[KQ]\b", re.I)
+
+
+def sentences(text):
+    """Sentences, list items and table cells: a source counts for fundamentals only in one about them."""
+    return [s for s in re.split(r"(?<=[.;!?])\s+|\n|\|", text or "") if s.strip()]
+
+
 def data_sources(texts):
-    """({source: [doc, ...]} for every DATA_SOURCES name found in `texts` ({doc: text}), the fundamentals ones)."""
+    """({source: [doc, ...]} for every DATA_SOURCES name found in `texts` ({doc: text}), the fundamentals ones).
+    A fundamentals source counts as one only where a sentence naming it is about fundamentals (earnings, balance
+    sheets, XBRL company facts): it9 quant aao's EDGAR is for SIC sector codes (flow §6)."""
     found = {name: sorted(rel for rel, txt in texts.items() if re.search(pat, txt, re.I))
              for name, (pat, _) in DATA_SOURCES.items()}
     found = {name: rels for name, rels in found.items() if rels}
-    return found, sorted(name for name in found if DATA_SOURCES[name][1])
+    fund = [name for name in found if DATA_SOURCES[name][1] and any(
+        re.search(DATA_SOURCES[name][0], s, re.I) and FUNDAMENTALS.search(s) for txt in texts.values() for s in sentences(txt))]
+    return found, sorted(fund)
+
+
+CROSSCHECK = re.compile(r"\byahoo(query)?\b|\byfinance\b", re.I)
+
+
+def crosscheck_named(user_msgs, docs):
+    """crosscheck_facts_reached_design applies: a user message or a design doc names the Yahoo cross-check."""
+    return any(CROSSCHECK.search(x or "") for x in list(user_msgs) + list(docs))
 
 
 def crosscheck_facts(entries, design, planted):

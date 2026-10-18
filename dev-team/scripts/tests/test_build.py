@@ -62,6 +62,38 @@ class ReadyTest(BuildCase):
         self.assertEqual([(x["id"], x["role"]) for x in r["rows"]], [("M1-T02", "solo"), ("M1-T03", "tester")])
         self.assertEqual(r["held"], [])
 
+    BARRIER = ("### Checkpoint after M1-T01 (barrier)\n"
+               "- [ ] The interface code matches contract.md exactly: types, signatures, stubs, samples, exports\n"
+               "- [ ] M1-T03's tester can write its tests from what is frozen\n\n")
+
+    def test_interface_review_without_a_barrier_in_the_plan(self):
+        """A plan with no barrier after the interface task (rl9): dt adds one, so nothing builds on the frozen
+        interface before its review, and the review's findings write the checkpoint into the plan."""
+        self.edit("tasks/plan.md", self.BARRIER, "")
+        self.commit("plan without the interface barrier")
+        self.fake_land("M1-T01")
+        r = self.ready()
+        self.assertEqual([(x["id"], x["kind"]) for x in r["rows"]], [("M1-T01.mini", "interface")])
+        self.assertEqual({h["why"] for h in r["held"]}, {"barrier: checkpoint after M1-T01 not passed"})
+        found = self.ctl / "M1-T01.mini.md"
+        found.write_text("Important · Interface · tests/contracts/test_x.py the fake drops a field → keep it\n")
+        code, out = self.dt_json("finding", "--from", str(found))
+        self.assertEqual((code, out["outcome"], out["findings"]), (0, "passed", ["M1-R01"]))
+        plan = self.read("tasks/plan.md")
+        self.assertIn("tests/contracts/**\n\n### Checkpoint after M1-T01 (barrier)\n**Findings:**\n- M1-R01 Important", plan)
+        self.assertLess(plan.index("Checkpoint after M1-T01"), plan.index("## Phase 1"))
+        r = self.ready()
+        self.assertEqual(([(x["id"], x["role"]) for x in r["rows"]], r["holds"]),
+                         ([("M1-T02", "solo"), ("M1-T03", "tester")], []))     # the go still holds
+
+    def test_a_checkpoint_straight_after_the_interface_is_a_barrier(self):
+        self.edit("tasks/plan.md", "### Checkpoint after M1-T01 (barrier)", "### Checkpoint after M1-T01")
+        self.commit("plain checkpoint")
+        self.fake_land("M1-T01")
+        r = self.ready()
+        self.assertEqual([(x["id"], x["kind"]) for x in r["rows"]], [("M1-T01.mini", "interface")])
+        self.assertTrue(r["held"] and all(h["why"].startswith("barrier:") for h in r["held"]))
+
     def test_reserve_and_cap(self):
         self.to_phase1()
         self.assertEqual(self.reserve("--cap", "1"), [("M1-T02", "solo")])

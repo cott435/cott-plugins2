@@ -89,7 +89,7 @@ There is no `solo` agent file: a solo half runs as `implementer`.
 |---|---|---|---|
 | Edit | Every Edit/Write | `post_edit.sh` hook | Feeds back |
 | Land | Every task half | `dt land`: `Writes:` diff, protected diff, the role's gate, the gate on the merged tree | Rejects the landing (§6.3) |
-| Interface | Phase 0 landed | Reviewer agent: the interface code is the contract, no more and no less | **Barrier**: `dt ready` releases nothing else until the review is recorded as passed. Critical → stop |
+| Interface | Phase 0 landed | Reviewer agent: the interface code is the contract, no more and no less | **Barrier**: `dt ready` releases nothing else until the review is recorded as passed. Critical → stop. A plan with no checkpoint after the interface task still gets this review: dt adds the barrier (`dispatch.added_barriers`; build eval b1, rl9) |
 | Phase | Each plan phase's tasks all landed | Reviewer agent per package with changes, in parallel, over the phase's landings: interfaces followed, tests (mutation-checked), correctness, simplicity | Not a barrier: dispatch continues. Critical → `dt ready` stops releasing (§9) |
 | Milestone exit | All tasks landed | Reviewer per package over the milestone diff, then the user | User approves the merge |
 

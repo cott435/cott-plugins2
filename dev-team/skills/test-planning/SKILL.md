@@ -9,7 +9,7 @@ A golden case is an oracle: an input and the output the code must produce, recor
 
 **Not for:** test code (the build's), pipeline design (`pipeline-design`), task order (`build-planning`). A change another skill owns (a contract, a pipeline, a spec ID) is recorded for its Revise, never made here: `dt route <owner> "<change>" --from test-planning`, and listed at the gate.
 
-`dt` means `python3 ../../scripts/dt.py`, relative to this skill's folder, run from the project root. `examples.md` here has the `tests.md` template, fixture shapes and a routed case; each mode file names its own examples.
+`dt` means `python3 ../../scripts/dt.py`, relative to this skill's folder, run from the project root; write it out each call, never as a shell variable. `examples.md` here has the `tests.md` template, fixture shapes and a routed case; each mode file names its own examples.
 
 ## Modes
 
@@ -36,7 +36,7 @@ One question at a time, with your guess and a default, and only about what only 
 - Each ID comes from `dt next-id TC`, the section written before the next; never count by hand.
 - Fixtures are kilobytes; large data is a path plus hash. CSV for tables, JSON for structure and parameters.
 - **Every write of an `expected.json` brings a `dt guard` permission prompt**, here and in the build: the user approves every oracle write. Never route around it (no Bash `echo >`, no copying over).
-- `expected.json` changes only through Revise with the user's approval, never by a builder to make a test pass. `build-setup` puts this in the `CONSTRAINTS.md` floor.
+- `expected.json` changes only through Revise with the user's approval, never by a builder to make a test pass.
 - Write only `docs/packages/*/tests.md` and `tests/fixtures/**`. Never create or run anything under `src/`, `tests/intent/`, `tests/unit/` or `tests/contracts/`, nor a generator.
 
 ## Review Gate (CRITICAL)

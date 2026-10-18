@@ -11,7 +11,7 @@ A reference is a file in `references/` showing how something is done (a boosting
 
 **Not for:** example data (`test-planning` fixtures); adding a stage (`idea-refine`'s); PDFs, notebooks and data files (ask for a `.py` export or markdown notes instead).
 
-`dt` means `python3 ../../scripts/dt.py`, relative to this skill's folder, run from the project root. `examples.md` here has the index template, the subagent prompt and a worked example.
+`dt` means `python3 ../../scripts/dt.py`, relative to this skill's folder, run from the project root; write it out each call, never as a shell variable. `examples.md` holds the index template, subagent prompt and a worked example.
 
 ## What's waiting
 

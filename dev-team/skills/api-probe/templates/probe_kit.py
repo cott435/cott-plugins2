@@ -193,7 +193,8 @@ def script_hash(folder: Path = HERE) -> str:
 def run(steps: dict, runner: str = "user", env: str = "", base_url: str = "", keys: list[str] = ()) -> None:
     """`python3 probe.py <step>`: load_env(keys), run that step, then write_evidence() once. A missing or
     unknown step, a missing key or a step that raises still writes evidence, with `error` {kind: usage,
-    missing or exception, step}, then exits 1: a failed run is never invisible to Record."""
+    missing or exception, step}, then exits 1: a failed run is never invisible to Record. An exception
+    adds `frame`: the innermost frame in this folder's code outside the kit (file, line, function)."""
     step = sys.argv[1] if len(sys.argv) > 1 else ""
     error, message = None, ""
     if step not in steps:  # the given text is never recorded: it could be anything the user typed
@@ -209,8 +210,12 @@ def run(steps: dict, runner: str = "user", env: str = "", base_url: str = "", ke
         except Exception as e:  # the class, an HTTP status, a file name: never the message or the request
             error = {"kind": "exception", "step": step, "type": type(e).__name__,
                      **({"status": e.code} if isinstance(getattr(e, "code", None), int) else {}),
-                     **({"file": Path(e.filename).name} if getattr(e, "filename", None) else {})}
-            message = f"{step} stopped: " + ", ".join(str(v) for k, v in error.items() if k not in ("kind", "step"))
+                     **({"file": Path(e.filename).name} if getattr(e, "filename", None) else {}),
+                     **({"frame": f} if (f := _frame(e)) else {})}
+            message = f"{step} stopped: " + ", ".join(str(v) for k, v in error.items() if k not in ("kind", "step", "frame"))
+            if f:
+                message += f" at {f['file']}:{f['line']} in {f['function']}"
+
     write_evidence(runner, env, base_url, error)
     if error:
         sys.exit(f"{message}\nevidence written with error {error['kind']}: say \"ran it\" all the same")
@@ -243,6 +248,19 @@ def write_evidence(runner: str = "user", env: str = "", base_url: str = "", erro
         (EVIDENCE / rel).parent.mkdir(parents=True, exist_ok=True)
         (EVIDENCE / rel).write_text(t)
     print(f"evidence written: {', '.join(text)} ({len(results['checks'])} checks)")
+
+
+def _frame(e: BaseException) -> dict | None:
+    """Where the probe's own code failed: the innermost traceback frame in a file under this folder
+    other than probe_kit.py, as {file, line, function}. Names and numbers only, never a value."""
+    found, tb = None, e.__traceback__
+    while tb:
+        path = Path(tb.tb_frame.f_code.co_filename).resolve()
+        if path.is_relative_to(HERE) and path.name != "probe_kit.py":
+            found = {"file": path.relative_to(HERE).as_posix(), "line": tb.tb_lineno,
+                     "function": tb.tb_frame.f_code.co_name}
+        tb = tb.tb_next
+    return found
 
 
 def _strings(v):
@@ -308,11 +326,18 @@ def _self_test() -> None:
         (probe / "steps.py").write_text("from probe_kit import *\n"
                                         "def ok(): record('C1', {'found': 1}, passed=True)\n"
                                         "def boom(): load_private('x') or open(private('members.json'))\n"
-                                        "run({'ok': ok, 'boom': boom})\n")
-        for args, want in (([], {"kind": "usage", "steps": ["ok", "boom"]}),
-                           (["s3cr3t-typed"], {"kind": "usage", "steps": ["ok", "boom"]}),
+                                        "def typo(): helper.rows('SEP', table='SEP')\n"
+                                        "import helper\n"
+                                        "run({'ok': ok, 'boom': boom, 'typo': typo})\n")
+        (probe / "helper.py").write_text("def rows(table, **filters):\n    return [table, filters]\n")
+        steps = ["ok", "boom", "typo"]
+        for args, want in (([], {"kind": "usage", "steps": steps}),
+                           (["s3cr3t-typed"], {"kind": "usage", "steps": steps}),
                            (["boom"], {"kind": "exception", "step": "boom", "type": "FileNotFoundError",
-                                       "file": "members.json"}),
+                                       "file": "members.json",
+                                       "frame": {"file": "steps.py", "line": 3, "function": "boom"}}),
+                           (["typo"], {"kind": "exception", "step": "typo", "type": "TypeError",
+                                       "frame": {"file": "steps.py", "line": 4, "function": "typo"}}),
                            (["ok"], None)):
             r = subprocess.run([sys.executable, "steps.py", *args], cwd=probe, capture_output=True, text=True,
                                env={"PATH": os.environ["PATH"]})
@@ -324,7 +349,7 @@ def _self_test() -> None:
         sys.exit("self-test FAILED:\n  " + "\n  ".join(failures))
     print("self-test passed: a planted .env secret, card, email, digit run and URL key each stopped the write; "
           "a clean run wrote results.json and a shape-faithful sample; a missing, unknown or failing step "
-          "wrote its error")
+          "wrote its error, a failing one with its frame")
 
 
 if __name__ == "__main__" and sys.argv[1:] == ["--self-test"]:

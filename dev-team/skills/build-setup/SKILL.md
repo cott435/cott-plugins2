@@ -17,7 +17,7 @@ Only `CONSTRAINTS.md`, tool config in `pyproject.toml` (multi-package: the root'
 
 ## Modes
 
-Run `python3 ../../scripts/dt.py status --skill build-setup` first (path relative to this skill's folder, run from the project root). It reports the mode, the gap keys (`config_mismatches`, `protected_gaps`, `agents_missing`, …), `expired_exceptions`, `dependents` and `base`. Revise and Audit run when the user asks for them.
+Run `python3 ../../scripts/dt.py status --skill build-setup` first (path relative to this skill's folder, run from the project root; write it out each call, never as a shell variable). It reports the mode, the gap keys (`config_mismatches`, `protected_gaps`, `agents_missing`, …), `expired_exceptions`, `dependents` and `base`. Revise and Audit run when the user asks for them.
 
 | Mode | When | Do |
 |---|---|---|

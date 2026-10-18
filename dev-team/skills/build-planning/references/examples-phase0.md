@@ -73,6 +73,7 @@ The graph, excerpted (one row per `Depends on` other than on T01, 16, plus the m
 | M1-T11 LS amplitudes | M1-T05 spectrum spine | code | none: thickens the same module |
 | M1-T11 LS amplitudes | M1-T12 Fourier seasonality | data | profile.Profile sample (M1-T01): the spectrum takes any Profile |
 | M1-T14 system | M1-T09 wire PL-02 | file | none: swaps the fake in the entry M1-T09 wrote |
+| M1-T14 system | M1-T08 wire PL-01 | order | none: integration: swaps in the real PL-01 |
 ```
 
 **Multi-package.** The same shape across packages: the interface task freezes each `**Boundary:**` symbol in its `**Fixtures:**` folder (one interface task per provider when one would pass M), spines run in every package at once, a consumer's wiring runs on the provider's fake, and the system task (one per system pipeline, `**Package:**` the owner of its first step, `**Reason:** system task`, `--pkg` on the gate) swaps in the real providers.

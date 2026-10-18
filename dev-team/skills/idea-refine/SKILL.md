@@ -19,7 +19,7 @@ Turns a raw idea into a focused direction and writes it down for the user to acc
 
 **Not for:** a user unsure what they want at all (`interview-me` if available); an accepted brief or idea that needs requirements (`spec-writing`); bug fixes or small changes with obvious requirements.
 
-`dt` means `python3 ../../scripts/dt.py`, relative to this skill's folder, run from the project root.
+`dt` means `python3 ../../scripts/dt.py`, relative to this skill's folder, run from the project root; write it out each call, never as a shell variable.
 
 ## Picking a mode
 
@@ -38,7 +38,7 @@ MODE CHECK ─→ 1 UNDERSTAND & EXPAND ─→ 2 EVALUATE & CONVERGE ─→ 3 WR
 
 ## Asking and tone
 
-Each arrow waits on the user. Everything is written as **Draft** and becomes **Accepted** only when the user says so. Be honest, not supportive: say kindly when an idea is weak and push back on complexity. Sharp while ideating; calm and plain when writing.
+Each arrow waits on the user. Everything is written as **Draft** and becomes **Accepted** only when the user says so. Be honest, not supportive: say kindly when an idea is weak and push back on complexity. Before Not Doing rules out a class of data the user didn't (fundamentals beside prices), ask, with your guess and a default. Sharp while ideating; calm and plain when writing.
 
 ## Review Gate (CRITICAL)
 

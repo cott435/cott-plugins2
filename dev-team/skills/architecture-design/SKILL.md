@@ -11,7 +11,7 @@ The architecture (`docs/architecture.md`) says **how** the spec gets built: comp
 
 It owns `docs/architecture.md`, each package's `contract.md` and, in a multi-package design, each package's `architecture.md`. It mints the `AD-NN` decision IDs, the System pipelines' `PL-NN` IDs, and the contract IDs `<id>.<symbol>`. It writes a decision's `**Probe:**` line, never `docs/probes.md` or `probes/` (`api-probe`'s).
 
-`dt` means `python3 ../../scripts/dt.py`, relative to this skill's folder, run from the project root.
+`dt` means `python3 ../../scripts/dt.py`, relative to this skill's folder, run from the project root; write it out each call, never as a shell variable.
 
 **Preconditions:** an `Approved` spec (else ask). Read the brief's constraints, the spec in full, and in a codebase its structure, dependencies and ADRs. Read the `docs/references.md` entries for the milestone in scope (references waiting: `reference-intake` first), and `docs/requests.md`, the user's own words: `requests_open` lists the ones the architecture must honour. Follow `../idea-refine/references/requests.md` for them and for every answer you get.
 

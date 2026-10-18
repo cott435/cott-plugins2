@@ -8,7 +8,7 @@ Read when writing thicken tasks, the dependency graph and the files. Templates: 
 
 **Split a task** when it needs more than one session, has more than 3 acceptance bullets, touches two packages or two steps, or has "and" in its title. Sizes count `Writes:` entries outside `tests/` (`task-size`; a folder glob counts as one): XS = 1, S = 1–2, M = 3–5. Nothing larger. Spine and thicken tasks are XS or S.
 
-**Acceptance is test-backed.** Each bullet is checkable: a `TC-NN` passes, a Given/When/Then, a model criterion by ID, the smoke command. With no `tests.md`, write the criterion so a tester can encode it. A TC that runs the whole pipeline is the wiring or system task's acceptance (`phase0.md`), never a thicken's, so no thicken waits on wiring.
+**Acceptance is test-backed.** Each bullet is checkable: a `TC-NN` passes, a Given/When/Then, a model criterion by ID, the smoke command. With no `tests.md`, write the criterion so a tester can encode it. A TC that runs the whole pipeline is the wiring or system task's acceptance (`phase0.md`), never a thicken's. A thicken's golden case builds its store from its own fixture (`input.json`) through a shared test helper, never through a wiring task's run, so no thicken waits on wiring.
 
 ## 6. Route skills and references
 
@@ -30,7 +30,7 @@ Read when writing thicken tasks, the dependency graph and the files. Templates: 
 ## 9. Dependencies, Writes, the graph, Verify
 
 - **`Depends on:`** resolves, points only backward (position counts, not ID number), is acyclic, and holds only edges nothing mitigates.
-- **`Writes:`** is exact paths, or a folder glob the task owns, and is an exclusive claim: two tasks with no `Depends on` path between them never write the same path (`writes`). Shared files (`__init__.py`, `types.py`, `__main__.py`) belong to the interface task; each pipeline's entry module to its wiring and system tasks (`phase0.md`). No `Writes:` under `tasks/`: builders never tick `todo.md` or record findings; the orchestrator does after each merge.
+- **`Writes:`** is exact paths, or a folder glob the task owns, and is an exclusive claim: two tasks with no `Depends on` path between them never write the same path (`writes`). Shared files (`__init__.py`, `types.py`, `__main__.py`, and shared test helpers: `conftest.py`, a golden-case store builder) belong to the interface task; each pipeline's entry module to its wiring and system tasks (`phase0.md`). No `Writes:` under `tasks/`: builders never tick `todo.md` or record findings; the orchestrator does after each merge.
 - **`## Dependency graph`**, after the last checkpoint: one row per edge between tasks, `| From | To | Kind | Mitigated by |`. From is the task that needs, To the one it needs; each cell starts with the task ID. Mitigated by names the interface and the task freezing it (`profile.Profile sample (M1-T01)`), or says `none: <reason>`.
 
 | Kind | Meaning | Mitigation |
@@ -40,7 +40,7 @@ Read when writing thicken tasks, the dependency graph and the files. Templates: 
 | `file` | Two tasks must write one file | Move the shared part to the interface task; else serial. Two wiring tasks never share a file: each writes its own entry module. Two steps' thicken tasks on one module: the interface task's layout splits it (each step its own file, the old module re-exporting); never chain them |
 | `code` | A task changes code another task wrote (a thicken after its step's spine or an earlier thicken of that step) | None: serial |
 | `contract-change` | A task changes a frozen interface | None: serial, plus a new interface task |
-| `order` | Integration (a wiring or system task runs the steps it wires: `none: integration: the smoke runs it`), or risk or learning ("do X first to learn Y") | None: reason required |
+| `order` | Integration (a wiring or system task runs the steps it wires: `none: integration: the smoke runs it`), or risk or learning ("do X first to learn Y"; never a human approval: `phase0.md` a) | None: reason required |
 
 A spine never has an edge to another step's task: it builds against the interface's samples and doubles. A mitigated edge documents why two tasks run side by side and never appears in `Depends on`; an unmitigated one must (`edges`). Every `Depends on` has its row, except a dependency on the interface task, which every task has and needs none. The table is the reviewable argument for every serial step.
 - **Width.** `dt status` gives `critical_path`, `waves`, `width` and `parallelism`; on the fresh plan `dt ready` lists only the interface task(s). Mostly width-1 waves mean an edge an interface could mitigate is ordering tasks.

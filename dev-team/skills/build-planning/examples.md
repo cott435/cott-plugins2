@@ -17,7 +17,7 @@ A queued plan (`tasks/queued/M<n>-<slug>.md`) uses the same skeleton and has no 
 
 ## Scope
 **Exit:** <the capability, and the cases that prove it, in one sentence>
-**Covers:** <spec IDs; ranges use an en dash, STAT-01–STAT-04> · **Deferred:** <ID (to M<k>: reason)>, or none
+**Covers:** <spec IDs; ranges use an en dash, STAT-01–STAT-04> · **Deferred:** <ID or PL-NN.<step> (to M<k>: reason)>, or none
 **Skills:** <skill (which steps)>, or none
 
 ## Phase 0: Interface

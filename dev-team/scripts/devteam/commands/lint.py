@@ -41,7 +41,7 @@ SEVERITY = {
     "request-number": "W", "request-cite": "W", "request-source": "W",
     "packet-type-closure": "W", "parallel-step": "W", "milestone-lines": "E", "milestone-order": "E",
     "exit-cases-in-scope": "E", "kind-title": "E", "covers-vs-deferred": "E", "closed-open-question": "W",
-    "process-narration": "W", "explain-stale": "W",
+    "process-narration": "W", "explain-stale": "W", "spine-claim": "W",
 }
 
 # Size budgets (planning-stage.md §3), in lines. Package docs are budgeted per unit (lines per unit × units +
@@ -1344,6 +1344,38 @@ def _step_of(ctx: Context, t: model.Task) -> list[model.Step]:
     return out
 
 
+def _under_owner(path: str, owner: str) -> bool:
+    """A Writes item sits in a step owner's folder or module: owner `train.loop` → `…/train/loop/…`, `…/train/loop.py`."""
+    p, _ = model.norm_write(path)
+    return bool(re.search(rf"(^|/){re.escape(owner.replace('.', '/'))}(/|\.\w+$)", p))
+
+
+def check_spine_claim(ctx: Context):
+    """A spine task whose Reason claims a contract function or class (backticked, `make_learner` or
+    `methods.make_learner`) that no pipeline step or entry is, outside its step's owner, while it writes a source file
+    outside that owner's folder: the symbol needs its own step, or its home in the step's folder owner
+    (interface-F9 of iteration 9). One beside the step's own module is fine."""
+    symbols = [s for s in model.all_symbols(ctx.repo) if not s.is_type]
+    stepped = {s.name for p in ctx.pipelines.values() for s in p.steps} | \
+        {p.entry_function for p in ctx.pipelines.values()}
+    for doc in ctx.plan_docs:
+        for t in model.tasks(doc):
+            reason = t.get("Reason")
+            owners = [s.owner for s in _step_of(ctx, t) if s.owner]
+            if t.kind != "spine" or not owners or not md.strip_md(reason):
+                continue
+            names = set(re.findall(r"`([\w.]+)`", reason))
+            claimed = [sym.id for sym in symbols if (sym.id in names or sym.name in names) and sym.name not in stepped
+                       and not any(sym.id.startswith(o + ".") for o in owners)]
+            stray = [w for w in t.writes if not _is_test(w) and not any(_under_owner(w, o) for o in owners)]
+            if claimed and stray:
+                line = md.field_line(doc.lines, t.start, t.end, "Reason")
+                yield _p(doc, t.start if line is None else line, "spine-claim",
+                         f"{t.id} (spine on {', '.join(dict.fromkeys(owners))}) claims {', '.join(claimed)} in its "
+                         f"Reason, which no pipeline step owns, and writes {', '.join(stray)} outside its step's "
+                         "owner: give each its own step, or put it in the step's folder owner")
+
+
 def _types_between(ctx: Context, types, src: model.Task, dst: model.Task) -> set[str]:
     """Contract types `dst`'s steps produce that `src`'s steps take in (a `data` edge's boundary)."""
     outs = {ty.id for s in _step_of(ctx, dst) for n in s.out_types if (ty := model.resolve_type(types, n))}
@@ -1707,7 +1739,7 @@ CHECKS = [
     check_dup_id, check_missing_ref, check_retired_ref,
     check_budget, check_approved_edit, check_prebuild_left,
     check_task_fields, check_task_size, check_task_acceptance, check_task_title, check_task_step,
-    check_depends, check_milestone_size, check_writes, check_parallel_step, check_edges, check_deprecated, check_verify_smoke,
+    check_depends, check_milestone_size, check_writes, check_parallel_step, check_spine_claim, check_edges, check_deprecated, check_verify_smoke,
     check_step_io_types, check_packet_type_closure, check_type_cases, check_task_ref,
     check_todo_mismatch, check_finding_disposition, check_foreign_plan,
     check_ref_file, check_ref_hash, check_ref_large, check_ref_prefix, check_roadmap_skill, check_roadmap_stage,

@@ -895,6 +895,39 @@ class ParallelStep(LintCase):
         self.assertEqual(self.messages(), [])
 
 
+class SpineClaim(LintCase):
+    """`spine-claim`: a spine's Reason claims a contract function no step owns, and the task writes outside its
+    step's owner (iteration 9's rl all-at-once: M1-T08 built `methods.make_learner` in `methods/factory.py`)."""
+    T02 = "**Depends on:** M1-T01 · **Writes:** src/quant/data/raw.py, tests/unit/quant/test_raw.py"
+
+    def setUp(self):
+        super().setUp()
+        self.p.edit(CONTRACT, "### stats.clean_eigen:", "### stats.shrink: Shrinkage target\n"
+                    "`def shrink(cov: Cov) -> Cov`\n- **Used by:** PL-02\n\n### stats.clean_eigen:")
+        self.p.edit(PLAN, "**Read:** PL-01, data.RawPrices, DATA-01",
+                    "**Reason:** also builds `stats.shrink`, which read_raw's tests need\n"
+                    "**Read:** PL-01, data.RawPrices, DATA-01")
+
+    def messages(self):
+        return [(p.line, p.severity, p.message) for p in self.problems() if p.code == "spine-claim"]
+
+    def test_claimed_function_written_outside_the_owner(self):
+        self.p.edit(PLAN, self.T02, self.T02.replace("raw.py,", "raw.py, src/quant/stats/shrink.py,"))
+        self.assertEqual(self.messages(), [(26, "W", "M1-T02 (spine on data) claims stats.shrink in its Reason, which "
+                                                    "no pipeline step owns, and writes src/quant/stats/shrink.py "
+                                                    "outside its step's owner: give each its own step, or put it in "
+                                                    "the step's folder owner")])
+
+    def test_beside_the_steps_own_module_is_fine(self):
+        self.assertEqual(self.messages(), [])
+
+    def test_a_step_of_its_own_is_fine(self):
+        self.p.edit(PLAN, self.T02, self.T02.replace("raw.py,", "raw.py, src/quant/stats/shrink.py,"))
+        self.p.edit(PIPES, "| 3 | `clean_eigen` |", "| 3 | `shrink` | stats | Cov → Cov | identity | STAT-03 |\n"
+                    "| 4 | `clean_eigen` |")
+        self.assertEqual(self.messages(), [])
+
+
 class MilestoneChecks(LintCase):
     """`milestone-lines` and `milestone-order` on the roadmap."""
     ROADMAP = "docs/roadmap.md"

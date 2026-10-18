@@ -14,7 +14,7 @@ Every arm but A0 runs dev-team's `build` skill (Run mode) in one headless sessio
 | A3 | `plan-interface` | build skill, cap 6 | the proposal |
 | A4 | `plan-interface-solo` (every task solo) | build skill, cap 6 | TDD (vs A3) |
 | A3-RT | `plan-interface-pertask` (a checkpoint after every task) | build skill, cap 6 | per-task vs per-phase review |
-| A3-WF | `plan-interface` | `dt build workflow M1` (not built yet) | a generated workflow vs the main-session driver |
+| A3-WF | `plan-interface` | build skill, cap 6, the loop run by a Workflow script from `dt build workflow M1 --cap 6` (`CLAUDE_CODE_WORKFLOWS=1`, `Workflow` allowed): dispatch, land and status are low-effort agents, builders and reviewers agents of their type in worktrees; the session handles each stop and runs it again ([smoke test](../../design/evidence/2026-10-18-workflow-smoke.md)) | a generated workflow vs the main-session driver |
 
 ## How a run goes (`build_driver.py <target> <arm> <out>`)
 

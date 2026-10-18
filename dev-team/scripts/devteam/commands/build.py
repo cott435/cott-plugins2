@@ -16,6 +16,8 @@ build-phase.md §6.5, §10. The last three are called by the project's hook scri
   every claim no longer live (a rejected half's, for one); Exit runs it after the merge.
 - `release <task> <role>`: drops a reservation or claim the driver gave up on (`<checkpoint>.<pkg> reviewer`
   for a review).
+- `workflow M<n> [--cap N] [--out FILE]`: a Workflow script that drives the build with dt as the decider
+  (devteam/workflow.py; the A3-WF eval arm, build-phase.md §5): printed, or written to FILE.
 - `submit-review <checkpoint>.<pkg> FILE`: run by the reviewer in its worktree; copies its findings file into
   `reviews/<checkpoint>.<pkg>.md`. A worktree agent's Write tool can't reach the git common directory, so the
   reviewer writes inside its worktree and dt moves the file.
@@ -34,7 +36,7 @@ import sys
 from pathlib import Path
 
 from .. import buildstate as bs
-from .. import dispatch, edit, md, model
+from .. import dispatch, edit, md, model, workflow as wf
 from .roadmap import active_plan
 
 
@@ -55,6 +57,10 @@ def add_arguments(parser):
     p = sub.add_parser("release", help="drop a reservation or claim")
     p.add_argument("task", help="task ID, or <checkpoint>.<pkg> for a review")
     p.add_argument("role", choices=bs.ROLES + ("reviewer",))
+    p = sub.add_parser("workflow", help="a Workflow script that runs the build loop, dt deciding (eval arm A3-WF)")
+    p.add_argument("milestone", help="M<n>, the active plan's milestone")
+    p.add_argument("--cap", type=int, default=dispatch.DEFAULT_CAP, help="agents in flight (dt ready --cap)")
+    p.add_argument("--out", help="write the script to this file (relative: to the project root) instead of printing it")
     p = sub.add_parser("verdict", help="(stop_gate.sh) record this worktree's gate verdict")
     p.add_argument("--mode", required=True, choices=("collect", "gate", "full"))
     p.add_argument("--rc", required=True, type=int)
@@ -275,6 +281,31 @@ def submit_review(args, repo) -> int:
     return 0
 
 
+def workflow(args, repo) -> int:
+    mid = args.milestone.upper()
+    if not re.fullmatch(md.MILESTONE_ID, mid):
+        return fail(f"dt build workflow: {args.milestone!r} is not a milestone (M<n>)", 2)
+    if args.cap < 1:
+        return fail("dt build workflow: --cap must be at least 1", 2)
+    root = bs.toplevel(repo.root)
+    if not bs.is_main_checkout(root):
+        return fail("dt build workflow: run it in the main checkout", 2)
+    plan = active_plan(repo)
+    if plan is None or model.milestone_of(plan) != mid:
+        return fail(f"dt build workflow: tasks/plan.md isn't {mid}'s active plan")
+    text = wf.script(root, mid, args.cap)
+    if not args.out:
+        sys.stdout.write(text)
+        return 0
+    out = Path(args.out)
+    out = out if out.is_absolute() else root / out
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(text, encoding="utf-8")
+    emit({"workflow": str(out), "milestone": mid, "cap": args.cap, "dt": str(bs.DT_PY),
+          "build_started": bs.State(root).read("go", "go") is not None})
+    return 0
+
+
 # ---- hook-facing -------------------------------------------------------------------------------
 
 def verdict(args, repo) -> int:
@@ -319,7 +350,8 @@ def mark_finished(args, repo) -> int:
     return 0
 
 
-ACTIONS = {"start": start, "status": status, "go": go, "prune": prune, "resolve": resolve, "release": release, "verdict": verdict,
+ACTIONS = {"start": start, "status": status, "go": go, "prune": prune, "resolve": resolve, "release": release, "workflow": workflow,
+           "verdict": verdict,
            "escalated": escalated, "mark-finished": mark_finished, "submit-review": submit_review}
 
 

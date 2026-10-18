@@ -719,7 +719,8 @@ class Grader:
         m = re.search(r'"session_id":\s*"([0-9a-f-]{36})"', p.read_text(errors="replace")[:20000])
         if not m:
             return []
-        hits = sorted((pathlib.Path.home() / ".claude" / "projects").glob(f"*/{m.group(1)}/subagents/agent-*.jsonl"))
+        # Agent-tool agents sit in subagents/; a Workflow's (arm A3-WF) in subagents/workflows/<run>/.
+        hits = sorted((pathlib.Path.home() / ".claude" / "projects").glob(f"*/{m.group(1)}/subagents/**/agent-*.jsonl"))
         return hits
 
     # -- harness -----------------------------------------------------------------------------------------

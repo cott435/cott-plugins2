@@ -3,6 +3,10 @@ dt claim, dt land, dt escalate, dt build, dt finding --from (build-phase.md §6)
 from __future__ import annotations
 
 import json
+import re
+import shutil
+import subprocess
+import tempfile
 import threading
 import unittest
 from pathlib import Path
@@ -11,6 +15,7 @@ from build_helpers import TC01_TEST, BuildCase, git
 from dt_helpers import HAS_GIT
 
 from devteam import buildstate as bs
+from devteam import dispatch
 
 SPINE = '"""The summarize step."""\n\n\ndef summarize(numbers):\n    return numbers\n'
 UNIT = '"""Unit tests."""\n\n\ndef test_x() -> None:\n    assert True\n'
@@ -612,6 +617,118 @@ class StatusTest(BuildCase):
         self.assertEqual(s["reviews"][0]["review"], "M1-T01.mini")
         events = [json.loads(x)["event"] for x in (self.state() / "log.jsonl").read_text().splitlines()]
         self.assertEqual(events[:1] + events[-3:], ["start", "reserve", "claim", "release"])
+
+
+# Runs an emitted workflow script in node with a scripted agent(): dispatch rows from a queue, builders that finish
+# after a delay (T02's first run without a status line), a land/record/status agent per call. Prints the result and
+# every call, with the most main-checkout agents (dispatch, land, record, status) and builders ever alive at once.
+NODE_SIM = r"""
+const fs = require('fs')
+const src = fs.readFileSync(process.argv[2], 'utf8').replace(/^export const meta/m, 'const meta')
+const AsyncFunction = Object.getPrototypeOf(async function () {}).constructor
+const run = new AsyncFunction('agent', 'log', 'phase', 'parallel', 'pipeline', 'args', 'budget', src)
+const queue = [
+  { rows: [{ id: 'M1-T01', role: 'solo', agent_type: 'implementer', prompt: 'p' },
+           { id: 'M1-T02', role: 'tester', agent_type: 'tester', prompt: 'p' }], holds: [], all_landed: false },
+  { rows: [{ id: 'M1-T02', role: 'tester', agent_type: 'tester', prompt: 'p' }], holds: [], all_landed: false },
+  { rows: [], holds: [], all_landed: false },
+  { rows: [{ id: 'M1-T01.mini', role: 'reviewer', agent_type: 'reviewer', prompt: 'review it', checkpoint: 'M1-T01', pkg: 'mini' }],
+    holds: [], all_landed: false },
+]
+const calls = []
+let main = 0, maxMain = 0, builders = 0, maxBuilders = 0, t02 = 0
+const sleep = ms => new Promise(r => setTimeout(r, ms))
+const MAIN = /^(dispatch|land|record|release|status)/
+async function agent(prompt, opts) {
+  calls.push({ prompt, opts })
+  const label = opts.label
+  if (MAIN.test(label)) {
+    main += 1; maxMain = Math.max(maxMain, main); await sleep(2); main -= 1
+    if (label.startsWith('dispatch')) return queue.shift() || { rows: [], holds: [], all_landed: true }
+    if (label.startsWith('land')) return prompt.includes('--harness') ? { landed: false, reject: 'harness', kind: null, detail_file: '/d/1' }
+                                                                       : { landed: true, reject: null, kind: null, detail_file: '/d/2' }
+    if (label.startsWith('record')) return { outcome: 'passed', findings: ['M1-R01'], critical: [] }
+    return { progress: '2/2', all_landed: true, go_current: true, next_checkpoint: 'exit', holds: [], blocked: [], held: [],
+             escalations: [], critical_open: [], claims: [] }
+  }
+  builders += 1; maxBuilders = Math.max(maxBuilders, builders)
+  const [id, role] = label.split(' ')
+  let text = 'DONE ' + id + ' ' + role
+  if (role === 'reviewer') { await sleep(5); text = 'REVIEW M1-T01 mini: 1 findings, 0 Critical' }
+  else if (id === 'M1-T02') { await sleep(5); t02 += 1; if (t02 === 1) text = 'I ran out of turns' }
+  else await sleep(60)
+  builders -= 1
+  return 'some report\n\n`' + text + '`'
+}
+run(agent, () => {}, () => {}, null, null, undefined, { total: null })
+  .then(result => console.log(JSON.stringify({ result, calls, maxMain, maxBuilders })))
+  .catch(e => { console.error(e && e.stack || e); process.exit(1) })
+"""
+
+
+@unittest.skipUnless(HAS_GIT, "git not installed")
+class WorkflowTest(BuildCase):
+    def emit(self, *extra: str) -> str:
+        code, out, err = self.dt("build", "workflow", "M1", *extra)
+        self.assertEqual(code, 0, out + err)
+        return out
+
+    def test_script(self):
+        text = self.emit("--cap", "4")
+        self.assertTrue(text.startswith("export const meta = {"))
+        self.assertIn(json.dumps(f"python3 {bs.DT_PY} --root {self.root.resolve()}"), text)
+        self.assertIn(str(bs.DT_PY), text)
+        self.assertIn("const CAP = 4\n", text)
+        self.assertIn(" ready --reserve --cap ' + CAP + ' --json", text)
+        self.assertIn(json.dumps(dispatch.builder_prompt("@@TASK@@", "@@ROLE@@")), text)
+        self.assertIn("dt-build/reviews", text)
+        self.assertIsNone(re.search(r"M\d+-T\d+", text), "the script must not hold the plan's tasks")
+        self.assertIn("const CAP = 6\n", self.emit())
+
+    def test_out_and_refusals(self):
+        code, out = self.dt_json("build", "workflow", "M1", "--out", ".dt/build.workflow.js")
+        self.assertEqual((code, out["cap"], out["build_started"]), (0, 6, True))
+        self.assertEqual(Path(out["workflow"]), self.root.resolve() / ".dt/build.workflow.js")
+        self.assertEqual(self.read(".dt/build.workflow.js"), self.emit())
+        self.assertEqual(self.dt_json("build", "workflow", "M2")[0], 1)          # not the active plan's milestone
+        self.assertEqual(self.dt_json("build", "workflow", "M1", "--cap", "0")[0], 2)
+        wt = self.worktree("wf")
+        self.assertEqual(self.dt_json("build", "workflow", "M1", root=wt)[0], 2)  # only in the main checkout
+
+    @unittest.skipUnless(shutil.which("node"), "node not installed")
+    def test_runs_as_dataflow(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "build.workflow.js"
+            path.write_text(self.emit(), encoding="utf-8")
+            sim = Path(tmp) / "sim.js"
+            sim.write_text(NODE_SIM, encoding="utf-8")
+            r = subprocess.run(["node", str(sim), str(path)], capture_output=True, text=True, timeout=60)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        out = json.loads(r.stdout)
+        res, calls = out["result"], out["calls"]
+        self.assertEqual(out["maxMain"], 1)                       # the main checkout: one dt call at a time
+        self.assertEqual(out["maxBuilders"], 2)                   # T01 and T02 built at once
+        self.assertEqual([(x["id"], x["role"], x["status"], x["landed"], x["reject"]) for x in res["landings"]],
+                         [("M1-T02", "tester", "none", False, "harness"), ("M1-T02", "tester", "DONE", True, None),
+                          ("M1-T01", "solo", "DONE", True, None)])
+        self.assertEqual(res["reviews"], [{"review": "M1-T01.mini", "outcome": "passed", "findings": 1, "critical": []}])
+        self.assertEqual((res["all_landed"], res["exit_ready"], res["next_checkpoint"]), (True, False, "exit"))
+        builds = [c for c in calls if c["opts"].get("isolation")]
+        self.assertTrue(all(c["opts"]["isolation"] == "worktree" for c in builds))
+        self.assertEqual([(c["opts"]["label"], c["opts"]["agentType"]) for c in builds],
+                         [("M1-T01 solo", "implementer"), ("M1-T02 tester", "tester"), ("M1-T02 tester", "tester"),
+                          ("M1-T01.mini reviewer", "reviewer")])
+        self.assertEqual(builds[0]["prompt"], dispatch.builder_prompt("M1-T01", "solo"))
+        self.assertEqual(builds[-1]["prompt"], "review it")
+        lands = [c["prompt"] for c in calls if c["opts"]["label"].startswith(("land", "record"))]
+        self.assertIn(f"--root {self.root.resolve()} land M1-T02 --role tester --harness`", lands[0])
+        self.assertIn("land M1-T02 --role tester`", lands[1])
+        self.assertIn("finding --from ", lands[3])
+        self.assertIn("/dt-build/reviews/M1-T01.mini.md --checkpoint M1-T01 --pkg mini`", lands[3])
+        labels = [c["opts"]["label"] for c in calls]
+        self.assertEqual(sum(x.startswith("dispatch") for x in labels), 5)   # once, then after every landing
+        self.assertEqual(labels[-1], "status")
+        self.assertTrue(all(c["opts"].get("effort") == "low" for c in calls if not c["opts"].get("isolation")))
 
 
 if __name__ == "__main__":

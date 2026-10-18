@@ -128,7 +128,7 @@ There is no `solo` agent file: a solo half runs as `implementer`.
 | Context | One short turn per landing (~35 for the rl M1); state on disk survives compaction | Script holds the state |
 | Visibility | Transcript and task list | `/workflows` progress view |
 
-The workflow form is kept as an eval arm: `dt build workflow M1` emits a script with one `pipeline()` per task chain and a low-effort land agent per landing.
+The workflow form is kept as an eval arm (A3-WF): `dt build workflow M1` emits a script that keeps `dt` the decider and holds no task: a low-effort agent runs `dt ready --reserve` and returns the rows, each row runs as an agent of its type in a worktree, each finish gets a low-effort land agent (`dt land`, or `dt finding --from` for a review), one at a time, and every landing is followed by another dispatch. When nothing is ready or running it returns `dt build status`'s stops to the session, which handles them as the build skill says and runs it again (evidence/2026-10-18-workflow-smoke.md).
 
 **Finding `dt` from a subagent.** Agents have no plugin folder and `$CLAUDE_PROJECT_DIR` is empty in their Bash (build-phase-notes evidence, workflow-hooks 3b), so the one-line prompt carries the absolute path the `build` skill resolves from its own folder: *"You are the `<role>` for `<task>`. Run `python3 <abs>/dt.py claim <task> --role <role>`, then read the packet it names."* The reviewer's checklist needs `dt layout` and `dt lint`, so its prompt carries the same path.
 

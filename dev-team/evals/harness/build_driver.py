@@ -207,7 +207,7 @@ def agent_turn(proj, sid, msg, first, out, extra, env):
                                           "nested": bool(d.get("parent_tool_use_id")),
                                           "prompt": (inp.get("prompt") or "")[:400]})
                 if c["name"] == "Workflow":
-                    rec["workflows"].append({"script_head": str(inp.get("script") or inp.get("name") or "")[:3000]})
+                    rec["workflows"].append({"script_head": str(inp.get("script") or inp.get("scriptPath") or inp.get("name") or "")[:3000]})
         if d.get("type") == "user":
             for c in (d.get("message") or {}).get("content", []) or []:
                 if isinstance(c, dict) and c.get("type") == "tool_result" and c.get("is_error"):

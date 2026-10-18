@@ -529,6 +529,12 @@ class Grader:
             tree = pathlib.Path(tmp) / "t"
             tree.mkdir()
             shutil.copytree(self.fixture / "solution" / "packages", tree / "packages", ignore=shutil.ignore_patterns("spine"))
+            # The build's own package exports over the reference modules: the suite is judged on behaviour, not on
+            # which names the interface task chose to re-export.
+            for init in (self.proj / "packages").glob("*/src/*/__init__.py"):
+                dest = tree / init.relative_to(self.proj)
+                if dest.parent.is_dir():
+                    shutil.copy(init, dest)
             shutil.copytree(self.fixture / "project" / "tests" / "fixtures", tree / "tests" / "fixtures")
             shutil.copy(self.proj / "tests" / "conftest.py", tree / "tests" / "conftest.py")
             shutil.copytree(self.fixture / "solution" / "tests" / "contracts", tree / "tests" / "contracts", dirs_exist_ok=True)
@@ -547,14 +553,20 @@ class Grader:
                 (killed if any(res.get(k) != "pass" for k in good) else survived).append(m["id"])
         rate = round(len(killed) / len(muts), 3) if muts else 0
         bad_on_solution = sorted(k for k, v in base.items() if v != "pass")
+        # Intent tests carry the golden cases and the acceptance: one failing on the reference encodes a wrong
+        # belief. Unit and contract tests also pin choices the spec leaves open (an error message, an empty input),
+        # so their disagreements are recorded, not graded.
+        intent_bad = [k for k in bad_on_solution if k.startswith("intent.")]
         self.extra["mutants"] = {"killed": killed, "survived": survived, "suite_tests": len(base),
-                                 "suite_fails_on_solution": bad_on_solution[:20]}
+                                 "suite_fails_on_solution": bad_on_solution[:30]}
         self.check("mutant_kill_rate", "tdd", "The final suite kills ≥ 80% of the one-line mutants of solution/",
                    rate >= 0.8, f"{len(killed)}/{len(muts)} killed; survived {survived}; "
                                 f"{len(bad_on_solution)} suite tests fail on the reference solution", value=rate)
         self.check("suite_agrees_with_solution", "tdd",
-                   "The final suite passes on the reference solution (a failing test there encodes a wrong belief)",
-                   not bad_on_solution, bad_on_solution[:8] or f"{len(base)} tests pass", value=len(bad_on_solution))
+                   "The intent tests pass on the reference solution (a failing one encodes a wrong belief)",
+                   not intent_bad, intent_bad[:8] or f"{sum(k.startswith('intent.') for k in base)} intent tests pass; "
+                   f"{len(bad_on_solution)} unit or contract tests pin choices the reference makes differently",
+                   value=len(intent_bad))
 
     # -- TDD ---------------------------------------------------------------------------------------------
 

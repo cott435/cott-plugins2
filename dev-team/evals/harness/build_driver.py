@@ -383,7 +383,7 @@ def main():
                "cap": arm.get("cap"), "replicate": os.environ.get("REPLICATE"), "turns": len(turns), "stop_reason": stop,
                "finished": stop == "exit", "progress": st.get("progress"),
                "total_seconds": round(time.time() - t_start, 1),
-               "agent_cost_usd": round(sum(costs), 3), "turn_costs_usd": costs,
+               "agent_cost_usd": round(max(costs, default=0), 3), "turn_costs_usd": costs,   # cumulative per session
                "agent_output_tokens": sum(((x["usage"].get("usage") or {}).get("output_tokens") or 0) for x in turns),
                "important_findings": persona.important, "findings": st.get("findings"),
                "agent_model": AGENT_MODEL, "claude_version": version, "pressure": PRESSURE,

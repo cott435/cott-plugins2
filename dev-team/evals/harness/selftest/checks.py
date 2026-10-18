@@ -5,7 +5,7 @@ the bad cases are the defects each check must still catch. No dt, no model calls
 
 Usage: checks.py   prints one line per case; exit 1 if any case comes out wrong
 """
-import json, pathlib, sys, tempfile
+import json, pathlib, re, sys, tempfile
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
 import dtrun as d  # noqa: E402
@@ -403,6 +403,42 @@ case("runner_split", True, "'python3 probe.py' inside a heredoc's string literal
 case("runner_split", True, "a syntax check is no run", not pf.runs_user_script(bash("python3 -m py_compile probes/x/probe.py")))
 case("runner_split", False, "probe.py run in its folder", pf.runs_user_script(bash("cd probes/PB-01 && python3 probe.py bulk")))
 case("runner_split", False, "probe.py run by a shell heredoc", pf.runs_user_script(bash("bash <<EOF\npython3 probe.py\nEOF")))
+
+
+# ---- requests_captured, requests_append_only (design/requests.md): the facts iteration 9 lost at session boundaries
+SCN = json.loads((pathlib.Path(__file__).resolve().parents[1] / "scenarios.json").read_text())
+for pid, p in SCN["projects"].items():
+    said = " ".join(p["facts"] + [s["reveal"] for s in p["stages"]])
+    unmatched = [f["id"] for f in p.get("stated_facts", []) if not re.search(f["pattern"], said, re.I)]
+    case("requests_captured", True, f"{pid}: every stated_facts pattern matches the scenario text it stands for",
+         p.get("stated_facts") and not unmatched)
+RL = SCN["projects"]["rl"]["stated_facts"]
+said = [{"turn": 1, "user": "Environment 2: a circular tank with a ball bouncing around; fish survive as long as possible."},
+        {"turn": 4, "user": "Approved. Environment 3: prey forage while a learning predator hunts them."}]
+st = d.facts_stated(RL, said)
+case("requests_captured", True, "the facts the user said, by turn; an unsaid one isn't counted",
+     st == {"circular_tank": [1], "survive": [1], "one_predator": [4]})
+case("requests_captured", True, "quoted words with the user's casing capture each stated fact",
+     not d.requests_missed(RL, st, ["a circular tank with a ball bouncing around", "fish Survive as long as possible",
+                                    "a learning predator hunts them"]))
+case("requests_captured", False, "the it9 rl losses: a square tank, a hit count, two predators",
+     d.requests_missed(RL, st, ["the tank is a square with walls", "count hits per fish", "2 predators"])
+     == ["circular_tank", "survive", "one_predator"])
+case("requests_captured", False, "a paraphrase (`Web Socket`) is no verbatim capture",
+     d.requests_missed(SCN["projects"]["quant"]["stated_facts"],
+                       {"websocket": [1]}, ["live progress over a Web Socket"]) == ["websocket"])
+w1 = {"UR-01": "live progress over a WebSocket", "UR-02": "I want yahooquery"}
+case("requests_append_only", True, "lines appended, the file first committed at turn 2",
+     not d.requests_rewritten([(1, None, []), (2, w1, []), (3, {**w1, "UR-03": "a circular tank"}, [])]))
+case("requests_append_only", False, "words reworded at turn 3",
+     d.requests_rewritten([(2, w1, []), (3, {**w1, "UR-02": "use a free Yahoo client"}, [])])
+     == ['turn 3: UR-02 "I want yahooquery" became "use a free Yahoo client"'])
+case("requests_append_only", False, "a line deleted, then the whole file: each line reported once",
+     d.requests_rewritten([(2, w1, []), (3, {"UR-01": w1["UR-01"]}, []), (4, None, []), (5, None, [])])
+     == ['turn 3: UR-02 "I want yahooquery" vanished', 'turn 4: UR-01 "live progress over a WebSocket" vanished'])
+case("requests_append_only", False, "a line that stops parsing counts once",
+     d.requests_rewritten([(2, w1, []), (3, {"UR-01": w1["UR-01"]}, ["UR-02"]), (4, {"UR-01": w1["UR-01"]}, ["UR-02"])])
+     == ['turn 3: UR-02 "I want yahooquery" no longer parses'])
 
 
 def run(verbose=True):

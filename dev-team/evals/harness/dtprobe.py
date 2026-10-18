@@ -12,9 +12,12 @@ cross-check: the grader works the graph out itself. Probes (design/probes.md §4
 `decisions` come from the harness's own parse (probefacts.py), and dt's probes parser, once it has one, is
 reported beside them as `dt_probes`.
 
-Usage: dtprobe.py <scripts-dir> <project-dir>
+`requests` is docs/requests.md read through dt's own parser (None for a dt that keeps no record); with
+`--requests-history`, `requests_history` is the same parse at every commit that touched it.
+
+Usage: dtprobe.py <scripts-dir> <project-dir> [--requests-history]
 """
-import json, pathlib, re, sys
+import json, pathlib, re, subprocess, sys
 
 sys.path.insert(0, sys.argv[1])
 sys.path.insert(1, str(pathlib.Path(__file__).resolve().parent))
@@ -222,6 +225,52 @@ def dt_probes(repo):
 
 
 root = pathlib.Path(sys.argv[2])
+try:  # docs/requests.md (design/requests.md); absent before dt kept a record of the user's words.
+    from devteam import requests as dt_requests  # noqa: E402
+    from devteam.repo import Doc  # noqa: E402
+except ImportError:
+    dt_requests = None
+
+
+def requests_at(text):
+    """docs/requests.md as dt's own parser reads it (`devteam.requests.parse`): its UR lines and the ones that don't parse."""
+    reqs, bad = dt_requests.parse(Doc(root, dt_requests.PATH, text))
+    return reqs, [{"id": b.id, "line": b.line + 1, "message": b.message} for b in bad]
+
+
+def requests_facts():
+    """The record now, with dt's open/traced state per line; None when the run's dt keeps no record."""
+    if dt_requests is None:
+        return None
+    path = root / dt_requests.PATH
+    if not path.exists():
+        return {"present": False, "requests": [], "bad": []}
+    try:
+        reqs, bad = requests_at(path.read_text(encoding="utf-8"))
+        return {"present": True, "bad": bad,
+                "requests": [{"id": r.id, "line": r.line + 1, "owner": r.owner, "words": r.words, "about": r.about,
+                              "skill": r.skill, "date": r.date, "trace": r.trace, "state": r.state,
+                              "open": dt_requests.is_open(repo, r)} for r in reqs]}
+    except Exception as ex:  # report, never fail the probe
+        return {"present": True, "_error": repr(ex)[:200], "requests": [], "bad": []}
+
+
+def requests_history():
+    """{sha, present, words: {UR id: words}, bad: [UR id]} at every commit that touched docs/requests.md, oldest first."""
+    if dt_requests is None:
+        return []
+    git = lambda *a: subprocess.run(["git", *a], cwd=root, capture_output=True, text=True)
+    out = []
+    for sha in git("log", "--reverse", "--format=%H", "--", dt_requests.PATH).stdout.split():
+        shown = git("show", f"{sha}:{dt_requests.PATH}")
+        if shown.returncode:
+            out.append({"sha": sha, "present": False, "words": {}, "bad": []})
+            continue
+        reqs, bad = requests_at(shown.stdout)
+        out.append({"sha": sha, "present": True, "words": {r.id: r.words for r in reqs}, "bad": [b["id"] for b in bad]})
+    return out
+
+
 pb_text = (root / "docs" / "probes.md").read_text(errors="ignore") if (root / "docs" / "probes.md").exists() else ""
 probe_doc = probefacts.parse_probes(pb_text)
 decision_list = []
@@ -237,4 +286,5 @@ print(json.dumps({
     "packages": repo.packages(),
     "probes": [{k: v for k, v in e.items() if k != "text"} for e in probe_doc["entries"]],
     "probes_retired": probe_doc["retired"], "decisions": decision_list, "dt_probes": dt_probes(repo),
+    "requests": requests_facts(), "requests_history": requests_history() if "--requests-history" in sys.argv[3:] else [],
 }))

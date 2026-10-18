@@ -39,17 +39,20 @@ def run_json(proj, *args, dt=None):
         return {"_error": f"rc={rc} {err.strip()[-400:]}", "_rc": rc}
 
 
-def probe(proj, dt=None):
-    """dtprobe.py facts (live spec IDs, pipelines, plans and tasks, derived roadmap rows, doc statuses)."""
+def probe(proj, dt=None, requests_history=False):
+    """dtprobe.py facts (live spec IDs, pipelines, plans and tasks, derived roadmap rows, doc statuses);
+    `requests_history` adds docs/requests.md as dt parses it at every commit that touched it."""
     scripts = pathlib.Path(dt or REPO_DT).parent
-    r = subprocess.run([sys.executable, str(HERE / "dtprobe.py"), str(scripts), str(proj)],
+    r = subprocess.run([sys.executable, str(HERE / "dtprobe.py"), str(scripts), str(proj),
+                        *(["--requests-history"] if requests_history else [])],
                        capture_output=True, text=True, timeout=300)
     try:
         return json.loads(r.stdout)
     except Exception:
         return {"_error": r.stderr.strip()[-600:], "live_spec": [], "removed_spec": [], "pipelines": [],
                 "plans": [], "roadmap": [], "stages": [], "references": [], "symbols": [], "tests": [], "docs": {},
-                "packages": [], "probes": [], "probes_retired": [], "decisions": [], "dt_probes": None}
+                "packages": [], "probes": [], "probes_retired": [], "decisions": [], "dt_probes": None,
+                "requests": None, "requests_history": []}
 
 
 def turn_costs(turns):
@@ -782,3 +785,41 @@ def crosscheck_facts(entries, design, planted):
 ML_BEATS_CLASSICAL = re.compile(
     r"(PPO|agent|forecast[- ]driven|ML[- ]driven).{0,600}(min(imum)?[- ]variance|classical|HRP|risk parity|"
     r"S2'?s? (best|named|benchmark)|best (classical|strategy)|benchmark)", re.S | re.I)
+
+
+# ---- the user's words (design/requests.md): requests_captured and requests_append_only over dtprobe's `requests`
+def facts_stated(stated_facts, turns):
+    """{fact id: [turn, ...]} for each checkable scenario fact (scenarios.json `stated_facts`: id and pattern) that a
+    user message in `turns` matches: what the simulated user actually said, not everything it could have."""
+    out = {}
+    for f in stated_facts:
+        hit = [t["turn"] for t in turns if re.search(f["pattern"], t.get("user") or "", re.I)]
+        if hit:
+            out[f["id"]] = hit
+    return out
+
+
+def requests_missed(stated_facts, stated, words):
+    """requests_captured: the stated facts (`facts_stated`) whose pattern no UR line's quoted `words` match."""
+    pat = {f["id"]: f["pattern"] for f in stated_facts}
+    return [fid for fid in stated if not any(re.search(pat[fid], w, re.I) for w in words)]
+
+
+def requests_rewritten(states):
+    """requests_append_only: `states` is [(turn, {UR id: words} or None when there is no docs/requests.md, [UR ids
+    whose lines don't parse])] in turn order; returns each line whose words changed or that vanished since the turn
+    before. A line that stops parsing counts once, and keeps its last words for the turns after."""
+    out, prev, broken = [], None, set()
+    for turn, cur, bad in states:
+        cur = cur or {}
+        for id_, w in (prev or {}).items():
+            if id_ in bad:
+                if id_ not in broken:
+                    out.append(f"turn {turn}: {id_} \"{w}\" no longer parses")
+            elif id_ not in cur:
+                out.append(f"turn {turn}: {id_} \"{w}\" vanished")
+            elif cur[id_] != w:
+                out.append(f"turn {turn}: {id_} \"{w}\" became \"{cur[id_]}\"")
+        broken = {i for i in bad if i in (prev or {})}
+        prev = {**cur, **{i: prev[i] for i in broken}}
+    return out

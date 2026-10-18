@@ -19,7 +19,7 @@
 import json, pathlib, re, shutil
 
 import driver, fakevendor, probe_skill, probefacts as pf
-from dryrun import CONTENT, PLANNING, USER_RUN, copy_layer, replay, task_line, verdict
+from dryrun import CONTENT, PLANNING, REQUESTS_NA, USER_RUN, copy_layer, replay, task_line, verdict
 
 HERE = pathlib.Path(__file__).resolve().parent
 OVERLAY = HERE / "selftest" / "quant-probe"
@@ -183,7 +183,7 @@ def run(out, tmp, good_fixture):
         if not any(r["script"].endswith("probe.py") and r["rc"] == 0 for r in runs):
             bad.append(f"{name}: the user run of probe.py failed: {runs}")
         bad += verdict(name, res, summ, CONTENT | NO_CROSSCHECK | (PROBE_FAIL | PROBEBAD_DT_FAIL if broken else set()),
-                       either=DT_DEPENDENT if broken else ())
+                       either=DT_DEPENDENT if broken else (), na=REQUESTS_NA)
     for name, broken in (("api-probe-good", False), ("api-probe-bad", True)):
         g = probe_skill.replay(out, name, broken)
         res = {c["id"]: c for c in g["expectations"]}

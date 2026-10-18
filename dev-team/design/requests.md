@@ -114,5 +114,5 @@ The full rule (what counts, verbatim, owner, `--about`, replacing, honouring, ch
 ## 6. Limits and next steps
 
 - `dt` can't tell whether an ID really honours a request, only that the owner's doc defines it, nor whether an approved change reached every requirement it touches. The gate's **Your words** line puts each trace in front of the user, and the eval's judge reads them.
-- A skill that doesn't record what it hears loses it as before. The eval can check this directly: each scenario fact the simulated user states should appear as a UR line in the run's `docs/requests.md`.
+- A skill that doesn't record what it hears loses it as before. The eval checks it: each scenario fact the simulated user states must appear in a UR line's words (`requests_captured`), the final lint has no request error (`requests_honoured`), and no line's words change between turns (`requests_append_only`); see [evals/README.md](../evals/README.md).
 - Brief, pipelines, tests, plan and constraints requests aren't linted yet; add them to `DUE_WHEN_APPROVED` once a run shows they're used.

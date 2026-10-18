@@ -75,7 +75,7 @@ later = sorted([*docs.glob("packages/*/pipelines.md"), *docs.glob("packages/*/te
                 *proj.glob("tasks/queued/*.md"), *proj.glob("CONSTRAINTS.md")])
 all_docs = "\n".join([brief, spec, arch_all] + [p.read_text() for p in ideas + later])
 
-facts = dtrun.probe(proj, DT)
+facts = dtrun.probe(proj, DT, requests_history=True)
 st_ir, st_ad = dtj("status", "--skill", "idea-refine"), dtj("status", "--skill", "architecture-design")
 st_pd, st_bp = dtj("status", "--skill", "pipeline-design"), dtj("status", "--skill", "build-planning")
 lint = dtj("lint")
@@ -179,6 +179,55 @@ errs = [p for p in lint_problems if p.get("severity") == "E"]
 check("dt_lint_clean", "`dt lint` is clean (no errors)", "_error" not in lint and not errs,
       lint.get("_error") or f"{len(errs)} errors, {lint.get('warnings')} warnings: " +
       "; ".join(f"{p['path']}:{p['line']} {p['code']}" for p in errs[:8]))
+
+# ---- the user's words (design/requests.md): docs/requests.md, read through the run's own dt parser (dtprobe). Each
+# check is n/a for a dt that keeps no record, so older runs grade as before.
+RQ = facts.get("requests")
+NO_RECORD = "the run's dt keeps no record of the user's words (no devteam.requests)"
+T_CAPTURED = ("Every checkable scenario fact the simulated user stated (scenarios.json stated_facts, matched in its "
+              "messages) appears in some UR line's words in the final docs/requests.md")
+stated_facts = scn["projects"][project].get("stated_facts", [])
+stated = dtrun.facts_stated(stated_facts, turns)
+if RQ is None:
+    graded_or_na("requests_captured", T_CAPTURED, (None, NO_RECORD))
+elif not stated:
+    graded_or_na("requests_captured", T_CAPTURED, (None, "the simulated user stated none of the scenario's checkable facts"))
+else:
+    missed = dtrun.requests_missed(stated_facts, stated, [r["words"] for r in RQ["requests"]])
+    check("requests_captured", T_CAPTURED, RQ["present"] and not missed,
+          f"{len(RQ['requests'])} UR lines{'' if RQ['present'] else ' (no docs/requests.md)'}; stated (fact: turns) "
+          f"{stated}; missed: {missed}", metrics={"stated": len(stated), "missed": len(missed)},
+          items={"missed": [f"{f} (said in turns {stated[f]})" for f in missed]})
+
+T_HONOURED = "`dt lint` has no request-open, request-trace or request-format error at the end of the run"
+REQUEST_LINT = ("request-open", "request-trace", "request-format")
+if RQ is None or not RQ["present"]:
+    graded_or_na("requests_honoured", T_HONOURED, (None, NO_RECORD if RQ is None else
+                 "no docs/requests.md, so nothing to honour (requests_captured grades whether the run needed one)"))
+else:
+    rq_errs = [f"{p['path']}:{p['line']} {p['code']}: {p['message'][:120]}" for p in errs if p.get("code") in REQUEST_LINT]
+    open_ = [f"{r['id']} {r['owner']}" for r in RQ["requests"] if r["open"]]
+    check("requests_honoured", T_HONOURED, "_error" not in lint and not rq_errs,
+          lint.get("_error") or f"{len(RQ['requests'])} UR lines, {len(open_)} open by dt (only spec and architecture "
+          f"ones fail lint, once Approved): {open_[:8]}; errors: {rq_errs[:4]}",
+          metrics={"requests": len(RQ["requests"]), "open": len(open_), "errors": len(rq_errs)},
+          items={"errors": rq_errs, "open": open_})
+
+T_APPEND = "Across the per-turn commits, no UR line's words changed and no line vanished from docs/requests.md"
+rq_hist = facts.get("requests_history") or []
+if RQ is None or not any(h["present"] for h in rq_hist):
+    graded_or_na("requests_append_only", T_APPEND, (None, NO_RECORD if RQ is None else "docs/requests.md was never committed"))
+else:
+    order = {h: i for i, (h, _) in enumerate(commits)}
+    at = sorted((order[h["sha"]], h) for h in rq_hist if h["sha"] in order)
+    states = []
+    for n in sorted(turn_commit):  # the record at each turn: the last commit touching it up to that turn's commit
+        h = next((h for i, h in reversed(at) if i <= order.get(turn_commit[n], -1)), None)
+        states.append((n, h["words"] if h and h["present"] else None, h["bad"] if h else []))
+    rewritten = dtrun.requests_rewritten(states)
+    check("requests_append_only", T_APPEND, not rewritten,
+          f"{sum(1 for _, w, _ in states if w is not None)} turns with a record, {len(states[-1][1] or {})} lines at the "
+          f"last; rewritten: {rewritten[:5]}", metrics={"rewritten": len(rewritten)}, items={"rewritten": rewritten})
 
 on_pipeline = set()
 for p in facts["pipelines"]:

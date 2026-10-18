@@ -61,7 +61,7 @@ On dt's sample, `simulate.py` passes every Replan, Advance, Ready and contract-c
 
 The dry run replays the fixture's `references/` and `docs/references.md` as a reference-intake turn (with one fake Agent launch per file) before the M2 idea. To exercise the driver's reference copying and Agent parsing, run the fake loop on `quant-all-at-once` with `MAX_TURNS=5`: turn 4 is the intake layer and should record one launch per file. The fake loop also writes one plan snapshot per turn to `plans/`.
 
-The dry run is also the grader's self-test. It first runs `selftest/checks.py` (at least one good and one bad case for each check the iteration-7 and iteration-8 fixes changed, and for `data_sources_suggested`), then grades eight replays (each with the current scenario's `scenario.json`), exports each planning replay's `plan.json`, and compares every check with the result pinned in `dryrun.py` and `dryrun_probe.py`, exiting 1 on anything unexpected:
+The dry run is also the grader's self-test. It first runs `selftest/checks.py` (at least one good and one bad case for each check the iteration-7 and iteration-8 fixes changed, and for `data_sources_suggested`, `requests_captured` and `requests_append_only`), then grades ten replays (each with the current scenario's `scenario.json`), exports each planning replay's `plan.json`, and compares every check with the result pinned in `dryrun.py` and `dryrun_probe.py`, exiting 1 on anything unexpected:
 
 | Replay | What it is | Checks passing |
 |---|---|---|
@@ -69,12 +69,14 @@ The dry run is also the grader's self-test. It first runs `selftest/checks.py` (
 | `quant-incremental-ifd` | The sample with the interface-first M1 from `selftest/`; no code | 67 of 81 |
 | `quant-incremental-ifdbad` | That plan broken once per check, plus a `types.py` written in a planning turn and a frozen type revised after the plan | 47 of 81 |
 | `quant-incremental-ifdserial` | The spines chained one after another and the testers solo | 60 of 81 |
+| `quant-incremental-requests` | The ifd replay with the user's words recorded: the user states four scenario facts (Sharadar, delisted names, minimum-variance, WebSocket), and idea-refine, spec-writing and architecture-design append them to `docs/requests.md` untraced, then trace them (DATA-02, PORT-01, `§Tech stack`, an approved change) | 70 of 84 |
+| `quant-incremental-requestsbad` | That record rewritten at turn 2 (UR-01's quote reworded, UR-03 deleted), WebSocket never recorded, a trace to an undefined DATA-99, a malformed line | 65 of 84 |
 | `quant-incremental-probe` | The ifd replay with a Sharadar decision (AD-04, Proposed, citing PB-01), api-probe New (`selftest/quant-probe/`), the user's run of PB-01 against the fake Sharadar, Record, and an architecture Revise that accepts AD-04 with the findings. PB-01 is routed to M1, so M1-T02 also reads `PB-01:samples` | 77 of 92 |
 | `quant-incremental-probebad` | That run broken once per probe check | 66 of 92 |
 | `api-probe-good` | The api-probe fixture with the gold PB-03, its user run against the fake Plaid, and Record | 12 of 12 |
 | `api-probe-bad` | That run broken once per fixture check | 0 of 13 |
 
-Every probe check is n/a in the first four replays, so their counts stand.
+Every probe check is n/a in the first four replays and the two requests replays, so their counts stand. The three request checks are pinned n/a in every quant replay but the requests ones: dt's sample has no `docs/requests.md` and the replayed user says only "Plan my quant lab." and "Approved.", so no scenario fact is stated, nothing is linted and no record is ever committed. The good requests replay passes all three; the broken one fails all three, and dt with it (`dt_lint_clean`: request-open at the Approved spec and architecture, request-trace, request-format; `sim_advance_3`: the archive isn't lint-clean).
 
 Expected failures in every replay, because the sample is a two-milestone project, not a finished four-stage run:
 - The sample is single-package, not multi-package from the data stage (`quant_multi_from_data`).
@@ -231,6 +233,14 @@ The define and design checks from iterations 1–4 are kept, with the same text.
 | `probe_code_in_probe_turns` | Code under `probes/` changes only in api-probe turns (a Skill call, or `dt status --skill api-probe` and its references read): the probe clause of `no_code_during_planning`, kept separate so that check keeps its meaning |
 | `evidence_scan_clean` | Every probe's `evidence/` passes the harness's scan (token shapes, 8+ digit runs, emails, phones, every known secret); dt's `probes --scan` and `evidence_leaks` are reported beside it |
 | `no_needless_probe` | rl (no external source) writes no probe: fails on any PB entry or `probes/` folder, n/a otherwise |
+
+**Request checks** ([design/requests.md](../design/requests.md)). New ids only, each n/a for a run whose dt keeps no record (no `devteam.requests`), so older runs grade as before. `docs/requests.md` is read through the run's own dt parser (`dtprobe.py`: `requests` now, and `requests_history` at every commit that touched it).
+
+| id | Check |
+|---|---|
+| `requests_captured` | Each checkable scenario fact (`scenarios.json` `stated_facts`: an id and a pattern, each matching the fact or stage reveal it stands for) that a user message in `turns.json` matches is matched by some UR line's quoted words in the final record. Misses are listed by fact, with the turns that said it. Fails with no `docs/requests.md`; n/a when the user stated none |
+| `requests_honoured` | The final `dt lint` has no `request-open`, `request-trace` or `request-format` error. Evidence lists the lines dt finds open (brief, pipelines, tests, plan and constraints ones are reported, not linted). n/a with no `docs/requests.md` |
+| `requests_append_only` | At each `turn N` commit (the last commit touching the record by then), no UR line's quoted words differ from the turn before and no line vanished; a line that stops parsing counts once. Traces may change. n/a when the record was never committed |
 
 **The user's "ran it".** The quant persona subscribes to Sharadar, keeps 10 delisted former members to check a source against, and answers a request to run a script with "ran it" (`"ran": true` in its JSON). The driver then, for every Ready probe: writes its `.env` from its `.env.example` as the user would (a variable goes only to the vendor it names, or an alias: key names get the canary `sk-canary-<run id>`, base-URL names the fake vendor), runs `public.py` with no environment but the closed proxy's, then `probe.py` (`uv run` when it has PEP 723 metadata) with the fake's environment, from the probe's folder: once per step the probe's README gives (`probe.py bulk`, then `probe.py checks`; its `## Steps` section, else its Who-runs-what table; `driver.user_steps`), in order, stopping at the first that fails. The quant persona names Sharadar as its subscription and yahooquery as the free cross-check source; `vendor_yahoo.jsonl` logs what the agent's and the user's Yahoo calls asked for, and `proxy.jsonl` every host served, relayed, tunnelled or blocked. A user run never reaches a live vendor. The agent is never told where the fake is.
 

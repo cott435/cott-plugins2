@@ -14,6 +14,11 @@ exports its plan.json. The replays:
   contract, a types.py written during planning, a frozen type revised later, ...). Each of those checks fails.
 - `quant-incremental-ifdserial`: the spines chained one after another and the testers made solo. The parallelism
   and wave-width checks fail.
+- `quant-incremental-requests`: the interface-first sample with the user's words recorded (design/requests.md):
+  the replayed user states scenario facts and each skill appends them to docs/requests.md and traces them. The three
+  requests_* checks pass.
+- `quant-incremental-requestsbad`: the same record rewritten (a quote reworded, a line deleted), a stated fact never
+  recorded, a trace to no ID, a malformed line. The requests_* checks fail, and dt's lint with them.
 - the probe replays (dryrun_probe.py): `quant-incremental-probe` and `-probebad` (design/probes.md §10.1, a user run
   against the fake Sharadar), and the api-probe fixture's `api-probe-good` and `-bad` (§10.2, probe_skill.py).
 Every check is pinned, pass or fail: the checks the sample can't meet (it isn't a finished four-stage quant run)
@@ -60,6 +65,32 @@ BAD_FAIL = {"graph_metrics", "writes_disjoint", "edges_mitigated", "unmitigated_
 # Chained spines also contradict their mitigated rows (dt's `edges` lint agrees), and solo testers break the Mode rule.
 SERIAL_FAIL = {"plan_parallelism", "wave_width", "dt_lint_clean", "sim_ready_2", "tasks_well_formed",
                "no_edge_to_code_when_interface", "edge_table_consistent"}
+# The user's words (design/requests.md). dt's sample has no docs/requests.md and the replayed user says only "Plan my
+# quant lab." and "Approved.", so outside the requests replays each check is n/a: captured (no scenario fact stated),
+# honoured (no record to lint), append-only (no record ever committed).
+REQUESTS_NA = {"requests_captured", "requests_honoured", "requests_append_only"}
+# The broken record: a quote reworded and a line deleted (append-only), WebSocket and minimum-variance said but not on
+# any line (captured), a trace to an undefined DATA-99 and a malformed line (honoured). dt sees the same errors:
+# dt_lint_clean, and sim_advance_3's archive that isn't lint-clean.
+REQUESTS_BAD_FAIL = REQUESTS_NA | {"dt_lint_clean", "sim_advance_3"}
+REQ_USERS = {1: "Plan my quant lab: daily US equities from my Sharadar subscription, delisted names included, and "
+                "minimum-variance portfolios before any ML.",
+             2: "Approved. The viz app gets live progress over a WebSocket."}
+REQ_HEAD = ("# Quant Lab — User requests\n\n**Last updated:** 2026-10-15\n\nThe user's words, verbatim: one line per "
+            "fact, constraint, tool, choice or answer, with the skill that heard it and the date. The words never change; "
+            "only the trace after → does. Written with `dt request`.\n\n")
+UR = {1: 'architecture · "daily US equities from my Sharadar subscription" · idea-refine 2026-10-15',
+      2: 'spec · "delisted names included" · idea-refine 2026-10-15',
+      3: 'spec · "minimum-variance portfolios before any ML" · idea-refine 2026-10-15',
+      4: 'architecture · "The viz app gets live progress over a WebSocket." · spec-writing 2026-10-15'}
+REQ_GOOD = {1: [f"- **UR-0{i}** {UR[i]}" for i in (1, 2, 3)],  # recorded untraced, then traced: only traces change
+            2: [f"- **UR-01** {UR[1]}", f"- **UR-02** {UR[2]} → DATA-02", f"- **UR-03** {UR[3]} → PORT-01",
+                f"- **UR-04** {UR[4]}"],
+            3: [f"- **UR-01** {UR[1]} → §Tech stack", f"- **UR-02** {UR[2]} → DATA-02", f"- **UR-03** {UR[3]} → PORT-01",
+                f'- **UR-04** {UR[4]} → changed: no viz app in M1 (approved "fine, later", architecture-design 2026-10-15)']}
+REQ_BAD = {1: REQ_GOOD[1],
+           2: ['- **UR-01** architecture · "Sharadar data" · idea-refine 2026-10-15', f"- **UR-02** {UR[2]} → DATA-99",
+               "- **UR-04** spec · no quotes · spec-writing 2026-10-15"]}
 
 
 def copy_layer(fixture, proj, paths):
@@ -163,10 +194,26 @@ def revise_frozen_type(proj):
 USER_RUN = "(user run)"  # a layer that is the user's "ran it", committed between turns as driver.py does
 
 
-def replay(out, name, fixture, layers, summary_extra=None, stream=None):
+def with_record(fixture, paths, record):
+    """A planning layer whose skill also left docs/requests.md holding `record` (its UR lines)."""
+    def layer(proj):
+        copy_layer(fixture, proj, paths)
+        (proj / "docs").mkdir(exist_ok=True)
+        (proj / "docs" / "requests.md").write_text(REQ_HEAD + "".join(line + "\n" for line in record))
+    return layer
+
+
+def recorded(fixture, records):
+    """PLANNING with turn N's layer also writing records[N]."""
+    return [(skill, with_record(fixture, paths, records[n]) if n in records else paths)
+            for n, (skill, paths) in enumerate(PLANNING, 1)]
+
+
+def replay(out, name, fixture, layers, summary_extra=None, stream=None, users=None):
     """Fake one trajectory from (skill, paths or function) layers; return the grading.json results by id. A
     USER_RUN layer's function runs the user's checks and is committed as `user run before turn N`; `stream` is
-    written as the run's agent_stream.jsonl (tool calls the probe checks read)."""
+    written as the run's agent_stream.jsonl (tool calls the probe checks read); `users` gives turn N's user message
+    (default "Plan my quant lab." then "Approved.")."""
     run = out / name / "with_skill"
     if run.exists():
         shutil.rmtree(run)
@@ -190,7 +237,7 @@ def replay(out, name, fixture, layers, summary_extra=None, stream=None):
         driver.commit(proj, f"turn {n}")
         _, status = driver.snapshot(proj, dt, keep=run / "plans" / f"T{n:03d}.json")
         stage = "structure_portfolios" if skill == "reference-intake" else stage
-        turns.append({"turn": n, "user": "Approved." if n > 1 else "Plan my quant lab.", "assistant": "(replayed)",
+        turns.append({"turn": n, "user": (users or {}).get(n) or ("Approved." if n > 1 else "Plan my quant lab."), "assistant": "(replayed)",
                       "skills": [f"dev-team:{skill}"] if skill else [], "tools": [], "seconds": 0,
                       "usage": {}, "docs_changed": "", "status": status, "stage": stage,
                       "agents": intake_agents(proj) if skill == "reference-intake" else []})
@@ -215,10 +262,11 @@ def replay(out, name, fixture, layers, summary_extra=None, stream=None):
     return run, {c["id"]: c for c in g["expectations"]}, g["summary"]
 
 
-def verdict(name, res, summary, must_fail, either=()):
+def verdict(name, res, summary, must_fail, either=(), na=()):
     """Compare a replay's checks with the pinned expectations; return the unexpected ones. Checks in `either` may
-    go both ways (a dt-dependent check on a deliberately broken project)."""
-    bad = []
+    go both ways (a dt-dependent check on a deliberately broken project); checks in `na` must be n/a."""
+    bad = [f"{cid} graded, expected n/a: {res[cid]['evidence'][:160]}" for cid in na if cid in res and not res[cid].get("na")]
+    bad += [f"{cid} missing from grading.json" for cid in na if cid not in res]
     for cid, c in res.items():
         if c.get("na") or cid in either:
             continue
@@ -251,11 +299,11 @@ def main():
     bad += [f"selftest/yahoo.py: {w}" for w in yahoo.run()]
     try:
         _, res, summ = replay(out, "quant-incremental", FIXTURE, LAYERS)
-        bad += verdict("quant-incremental", res, summ, CONTENT | {"no_code_during_planning"})  # the M1 code turn
+        bad += verdict("quant-incremental", res, summ, CONTENT | {"no_code_during_planning"}, na=REQUESTS_NA)  # the M1 code turn
 
         good = ifd_fixture(tmp)
         _, res, summ = replay(out, "quant-incremental-ifd", good, PLANNING)
-        bad += verdict("quant-incremental-ifd", res, summ, CONTENT)
+        bad += verdict("quant-incremental-ifd", res, summ, CONTENT, na=REQUESTS_NA)
         churn = res["frozen_interface_churn"].get("metrics", {}).get("churn")
         if churn != 0:
             bad.append(f"ifd: frozen_interface_churn {churn}, expected 0")
@@ -266,7 +314,7 @@ def main():
         layers = PLANNING[:-1] + [("architecture-design", code_in_planning), PLANNING[-1],
                                   ("architecture-design", revise_frozen_type)]
         _, res, summ = replay(out, "quant-incremental-ifdbad", fx, layers)
-        bad += verdict("quant-incremental-ifdbad", res, summ, CONTENT | BAD_FAIL)
+        bad += verdict("quant-incremental-ifdbad", res, summ, CONTENT | BAD_FAIL, na=REQUESTS_NA)
         churn = res["frozen_interface_churn"].get("metrics", {}).get("churn")
         if not churn:
             bad.append(f"ifdbad: frozen_interface_churn {churn}, expected the revised stats.Cov to count")
@@ -275,7 +323,13 @@ def main():
         shutil.copytree(good, fx, ignore=shutil.ignore_patterns("src"))
         break_serial(fx)
         _, res, summ = replay(out, "quant-incremental-ifdserial", fx, PLANNING)
-        bad += verdict("quant-incremental-ifdserial", res, summ, CONTENT | SERIAL_FAIL)
+        bad += verdict("quant-incremental-ifdserial", res, summ, CONTENT | SERIAL_FAIL, na=REQUESTS_NA)
+
+        _, res, summ = replay(out, "quant-incremental-requests", good, recorded(good, REQ_GOOD), users=REQ_USERS)
+        bad += verdict("quant-incremental-requests", res, summ, CONTENT)
+        bad += [f"requests: {cid} n/a, expected graded" for cid in REQUESTS_NA if res.get(cid, {}).get("na")]
+        _, res, summ = replay(out, "quant-incremental-requestsbad", good, recorded(good, REQ_BAD), users=REQ_USERS)
+        bad += verdict("quant-incremental-requestsbad", res, summ, CONTENT | REQUESTS_BAD_FAIL)
 
         import dryrun_probe  # noqa: E402  (imports this module's helpers)
         bad += dryrun_probe.run(out, tmp, good)

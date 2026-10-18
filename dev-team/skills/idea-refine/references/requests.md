@@ -9,6 +9,7 @@ One request (`UR-NN`) per concrete statement you could check a doc against:
 - facts about the domain, the data or the world ("the tank is circular"), numbers, limits, deadlines, budgets
 - tools, libraries, vendors, protocols and data sources the user names ("stream prices over a WebSocket", "use yahooquery")
 - choices: an option picked from yours ("Go with A"), and the answer to any question a skill asked
+- a block acceptance ("assumptions 1–7 are fine"): one request, its `--about` listing what was accepted
 - scope: what must be in, or left out
 
 Not: approval of a whole doc ("approved", "looks good"), wishes with nothing to check ("make it nice"), your own proposals the user hasn't picked, or words already recorded (`dt request` lists them).
@@ -22,8 +23,8 @@ dt request add <owner> "<their words>" --skill <this skill> [--about "<what it a
 ```
 
 - **Verbatim.** Quote the shortest span of their message that carries the fact. Never paraphrase, translate, correct or merge. A message stating three facts is three requests.
-- **`--about`** when the words don't stand alone: "Go with A" → `--about "AD-22 price source: A = Sharadar, B = yfinance"`; "yes, 3" → what was asked.
-- **Owner** is the doc that must honour it: `spec` (behaviour, numbers, scope the user can observe), `architecture` (tools, libraries, vendors, protocols, data sources, an option for a decision), `pipelines`, `tests`, `plan`, or `constraints` (the quality bar, tooling rules).
+- **`--about`** whenever the words don't stand alone: "Go with A" → `--about "AD-22 price source: A = Sharadar, B = yfinance"`; "yes, 3" → what was asked. A bare letter means nothing to the next session, and the same words can pick opposite options in two rounds.
+- **Owner** is the doc that must honour it: `brief` (who the user is, their time, budget or experience: context no later doc carries), `spec` (behaviour, numbers, scope the user can observe), `architecture` (tools, libraries, vendors, protocols, data sources, an option for a decision), `pipelines`, `tests`, `plan`, or `constraints` (the quality bar, tooling rules).
 - **The user changes their mind:** record the new words with `--replaces` the old UR. A line is never edited or deleted.
 - The request that started the run is the user's first message: record it too.
 
@@ -31,8 +32,8 @@ dt request add <owner> "<their words>" --skill <this skill> [--about "<what it a
 
 Before you write your doc, read `docs/requests.md` whole; `requests_open` in `dt status` lists the open requests your doc owns. For each:
 
-- **Honour it:** write the requirement, decision, step, case or rule that does what the words say, then `dt request trace UR-NN <ID>…` with the IDs that do it (spec: requirement IDs; architecture: `AD-NN` or a contract ID; the others: their IDs).
-- **Or change it, with the user's yes:** when it conflicts with another request or can't be met, say so at your gate with your alternative. Only after the user agrees: `dt request change UR-NN "<what instead>" --approved "<their words>" --skill <this skill>`. Never override a request silently, and never record an approval the user didn't give. Headless: leave it open under Open questions and the doc Draft.
+- **Honour it:** write the requirement, decision, step, case or rule that does what the words say, then `dt request trace UR-NN <ID>…` with the IDs that do it (spec: requirement IDs; architecture: `AD-NN` or a contract ID; the others: their IDs). Honoured by a section with no ID (Out of scope, Assumptions, Constraints): trace its heading, `§Out of scope`.
+- **Or change it, with the user's yes:** when it conflicts with another request or can't be met, say so at your gate with your alternative. Only after the user agrees: `dt request change UR-NN "<what instead>" --approved "<their words>" --skill <this skill>`, and write the change into your doc, every requirement or decision it touches. Never override a request silently, and never record an approval the user didn't give. Headless: leave it open under Open questions and the doc Draft.
 - A request another doc owns waits for that doc's skill. Don't copy it into yours (the spec names no tools, even when a request does).
 
 ## At the gate

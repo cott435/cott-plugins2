@@ -13,10 +13,10 @@ from .repo import Doc, Repo
 PATH = "docs/requests.md"
 ID = r"UR-\d{2,}"
 # Owner (the doc that must honour a request) → the skill that writes that doc.
-OWNERS = {"spec": "spec-writing", "architecture": "architecture-design", "pipelines": "pipeline-design",
+OWNERS = {"brief": "idea-refine", "spec": "spec-writing", "architecture": "architecture-design", "pipelines": "pipeline-design",
           "tests": "test-planning", "plan": "build-planning", "constraints": "build-setup"}
-# The doc kinds whose live IDs can honour an owner's request.
-HONOUR_KINDS = {"spec": ("spec",), "architecture": ("architecture", "package-architecture", "contract"),
+# The doc kinds whose live IDs, or sections (`§Out of scope`), can honour an owner's request.
+HONOUR_KINDS = {"brief": ("brief", "idea"), "spec": ("spec",), "architecture": ("architecture", "package-architecture", "contract"),
                 "pipelines": ("pipelines",), "tests": ("tests",), "plan": ("plan", "queued-plan"),
                 "constraints": ("constraints",)}
 # Owners whose open requests fail `dt lint` once their doc is Approved, and send `dt next` back to their skill.
@@ -95,7 +95,8 @@ def parse(doc: Doc | None) -> tuple[list[Request], list[Bad]]:
                 by = s["by"]
             else:
                 items = [md.strip_md(x) for x in md.split_list(trace)]
-                if trace.startswith("changed") or not all(re.fullmatch(md.HEADING_ID, x) for x in items):
+                if trace.startswith("changed") or not all(re.fullmatch(md.HEADING_ID, x) or is_section(x)
+                                                          for x in items):
                     bad.append(Bad(i, m["id"], 'trace is not IDs, `changed: <what> (approved "<words>", <skill> '
                                                '<date>)` or `superseded by UR-NN`'))
                     continue
@@ -105,15 +106,37 @@ def parse(doc: Doc | None) -> tuple[list[Request], list[Bad]]:
     return out, bad
 
 
+def is_section(item: str) -> bool:
+    """A trace item naming a section of the owner's doc by its heading: `§Out of scope`."""
+    return item.startswith("§") and bool(item[1:].strip())
+
+
+def section_docs(repo: Repo, owner: str, item: str) -> list[Doc]:
+    """The owner's docs with a heading whose text is the item's (case and markup ignored)."""
+    want = md.strip_md(item[1:]).strip().lower()
+    return [d for d in repo.docs(*HONOUR_KINDS[owner])
+            if any(md.strip_md(h.text).strip().lower() == want for h in d.headings)]
+
+
+def resolves(repo: Repo, owner: str, item: str) -> bool:
+    if is_section(item):
+        return bool(section_docs(repo, owner, item))
+    return repo.lookup(item, archive=False) is not None
+
+
 def all_requests(repo: Repo) -> list[Request]:
     return parse(repo.doc(PATH))[0]
 
 
 def honouring(repo: Repo, r: Request) -> list[str]:
-    """The IDs in its trace that are live definitions in a doc its owner writes."""
+    """The trace items that are live definitions, or sections, in a doc its owner writes."""
     kinds = HONOUR_KINDS[r.owner]
     out = []
     for id_ in r.honoured_by:
+        if is_section(id_):
+            if section_docs(repo, r.owner, id_):
+                out.append(id_)
+            continue
         d = repo.lookup(id_, archive=False)
         if d is not None and not d.retired and d.doc.kind in kinds:
             out.append(id_)

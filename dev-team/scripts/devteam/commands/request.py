@@ -67,18 +67,19 @@ def _add(args, repo) -> int:
 
 def _trace(args, repo) -> int:
     if len(args.args) < 2:
-        return _fail("trace needs a UR-NN and the IDs that honour it")
+        return _fail("trace needs a UR-NN and the IDs (or §<heading> sections) that honour it")
     r = _find(repo, args.args[0])
     if r is None:
         return _fail(f"{args.args[0]} is not in {rq.PATH}")
     if r.state in ("changed", "superseded"):
         return _fail(f"{r.id} is {r.state} ({r.trace}); its record stays")
     new = [i.strip(",") for i in args.args[1:]]
-    unknown = [i for i in new if repo.lookup(i, archive=False) is None]
+    unknown = [i for i in new if not rq.resolves(repo, r.owner, i)]
     if unknown:
         return _fail(f"not defined: {', '.join(unknown)}")
-    # IDs traced earlier that no longer resolve or are retired drop out; the rest stay.
-    kept = [i for i in r.honoured_by if (d := repo.lookup(i, archive=False)) is not None and not d.retired]
+    # Items traced earlier that no longer resolve or are retired drop out; the rest stay.
+    kept = [i for i in r.honoured_by if rq.is_section(i) and rq.resolves(repo, r.owner, i)
+            or (d := repo.lookup(i, archive=False)) is not None and not d.retired]
     ids = list(dict.fromkeys(kept + new))
     if not rq.honouring(repo, dataclasses.replace(r, honoured_by=ids)):
         kinds = ", ".join(rq.HONOUR_KINDS[r.owner])

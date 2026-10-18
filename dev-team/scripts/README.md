@@ -68,7 +68,7 @@ Commands never glob or open docs themselves; they ask `Repo` (doc map, IDs) and 
 - **Contract types:** a contract section titled `type` (`### <component>.<Type>: type`), or one with a `**Kind:** type` field. Its sample is its `**Sample:**` path, else the `**Fixtures:**` folder on its `- **Boundary:** … · **Fixtures:** tests/contracts/<component>.<Type>/ · **Cases:** …` line. A step table's `In → Out` cell names types by CamelCase name or `pkg.Name`; single capitals (`T`) and all-caps words aren't types.
 - **Findings:** list items `- M<n>-R<nn> <Severity> · <rule> · <text> → <disposition>` under a checkpoint's `**Findings:**`.
 - **Routes** (`docs/routes.md`, written only by `dt route`): checkbox items `- [ ] <owner skill> · <change> (from <skill>, YYYY-MM-DD)`; ticked when the owner's Revise is approved.
-- **Requests** (`docs/requests.md`, design/requests.md §3, written by `dt request`): `- **UR-NN** <owner> · "<the user's words>" [<context>] · <skill> YYYY-MM-DD → <trace>`. Owner is `spec`, `architecture`, `pipelines`, `tests`, `plan` or `constraints`; `[<context>]` and `→ <trace>` are optional. The trace is the IDs that honour it (`TANK-02, TANK-03`), `changed: <what instead> (approved "<the user's words>", <skill> YYYY-MM-DD)` or `superseded by UR-NN`. A request is **open** unless it is changed, superseded, or its trace names a live ID defined in its owner's docs (spec: spec.md; architecture: architecture docs and contracts; pipelines, tests, plan, constraints: theirs). Each line defines its UR ID; the header needs no Status.
+- **Requests** (`docs/requests.md`, design/requests.md §3, written by `dt request`): `- **UR-NN** <owner> · "<the user's words>" [<context>] · <skill> YYYY-MM-DD → <trace>`. Owner is `brief`, `spec`, `architecture`, `pipelines`, `tests`, `plan` or `constraints`; `[<context>]` and `→ <trace>` are optional. The trace is the IDs or sections that honour it (`TANK-02, §Out of scope`: a section is `§` plus a heading's text, case ignored), `changed: <what instead> (approved "<the user's words>", <skill> YYYY-MM-DD)` or `superseded by UR-NN`. A request is **open** unless it is changed, superseded, or its trace names a live ID defined in, or a heading of, its owner's docs (brief: brief.md and ideas; spec: spec.md; architecture: architecture docs and contracts; pipelines, tests, plan, constraints: theirs). Each line defines its UR ID; the header needs no Status.
 - **Ranges:** `STAT-01–STAT-04` and `STAT-01–04` expand to every ID in between.
 - **Pre-build sections:** any heading containing `(pre-build`.
 - **Reference entries** (`docs/references.md`, design/references.md §4): `### RF-NN: <Title>`, then `**File:** \`references/…\` · **Hash:** <8 hex> · **Kind:** code|doc · **Milestones:** S2, M4 | all | —` and bullet fields `- **Purpose:**`, `**Key parts:**`, `**In → Out:**`, `**Use for:**`, `**Caveats:**`. Retired entries are retired lines. "References for M<n>" are derived: entries whose `Milestones` names it (`all` serves every milestone; `—` none), plus the milestone section's `**References:**` line, or, with no such line, the entries assigned to its stage. There is no other list. A `Read:` item `RF-NN:<selector>` names the entry `RF-NN`.
@@ -125,7 +125,7 @@ With an active plan or not, the plain report (no `--skill`) and `build-planning`
 
 `routed_changes` (spec-writing, architecture-design, pipeline-design, test-planning): the skill's open items in `docs/routes.md`, `<change> (from <skill>)`.
 
-`requests_open` (spec-writing, architecture-design, pipeline-design, test-planning, build-planning, build-setup): the open requests the skill's doc owns, `UR-NN "<words>" [<context>]`.
+`requests_open` (idea-refine, spec-writing, architecture-design, pipeline-design, test-planning, build-planning, build-setup): the open requests the skill's doc owns, `UR-NN "<words>" [<context>]`.
 
 `skills` and `skills_available` list installed skills by name: the project's `.claude/skills/*/SKILL.md` plus `$CLAUDE_PLUGIN_ROOT/skills/*` when that is set, minus dev-team's own planning skills (reference-intake and api-probe included).
 
@@ -188,7 +188,7 @@ Records a change another skill owns, found at a gate, for the owner's Revise: ap
 
 Records and traces the user's words in `docs/requests.md` (design/requests.md); the only writer of its lines.
 - `dt request add <owner> "<words>" --skill S [--about "<context>"] [--replaces UR-NN]` — appends the next UR with today's date (creating the doc on first use, titled from the brief) and prints its ID. `--about` says what the words answer when they don't say it themselves ("Go with A" → `--about "price source: A = Sharadar"`). `--replaces` marks the earlier request `superseded by` the new one.
-- `dt request trace UR-NN <ID>…` — adds IDs that honour it; each must be defined and at least one live in the owner's docs (else exit 2, nothing written). IDs traced earlier that are gone or retired drop out. Refused on a changed or superseded request.
+- `dt request trace UR-NN <ID|§heading>…` — adds IDs or sections that honour it; each must be defined (a section: a heading of the owner's docs) and at least one live in the owner's docs (else exit 2, nothing written). IDs traced earlier that are gone or retired drop out. Refused on a changed or superseded request.
 - `dt request change UR-NN "<what instead>" --approved "<the user's words>" --skill S` — records a change the user approved, with that approval.
 - `dt request [list] [--open] [--owner O] [--json]` — each request with its owner and trace (`· open` when nothing honours it); `--json`: `[{id, owner, words, about, skill, date, state, trace}]`, state `open | traced | changed | superseded`.
 
@@ -318,7 +318,7 @@ Checks (code: severity):
   - `roadmap-stage` E — once the roadmap has stages, a milestone row whose Stage cell names no stage row, isn't an `S<n>`, or is empty on a row with no Source of its own
 - Request checks (design/requests.md §5):
   - `request-format` E — a `- **UR-NN**` line that isn't the request form, names an unknown owner, or whose trace is none of the three forms
-  - `request-trace` E — a trace naming an undefined ID or a request that doesn't exist, or IDs (none retired) of which none is defined in the owner's docs (a retired one is `retired-ref`)
+  - `request-trace` E — a trace naming an undefined ID, a `§heading` none of the owner's docs has, or a request that doesn't exist, or IDs (none retired) of which none is defined in the owner's docs (a retired one is `retired-ref`)
   - `request-open` E — an Approved spec.md or architecture.md with an open request of its owner (`spec`, `architecture`), at that doc's header line
   - `request-edit` E (git) — a request whose words, context, skill or date differ from HEAD, or that is gone: only its trace changes
   - `request-ref` E — a `UR-NN` in any doc that docs/requests.md doesn't define

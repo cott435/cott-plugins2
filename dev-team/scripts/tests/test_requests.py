@@ -135,6 +135,17 @@ class CommandTest(Base):
         self.assertEqual(self.dt("request", "trace", "UR-05", "DATA-01")[0], 2)        # superseded
         self.assertEqual(self.read(PATH), DOC)
 
+    def test_trace_to_a_section(self):
+        self.write(PATH, DOC + '- **UR-07** spec · "no live trading" · idea-refine 2026-10-19\n'
+                   '- **UR-08** brief · "evenings and weekends only" · idea-refine 2026-10-19\n')
+        self.assertEqual(self.dt("request", "trace", "UR-07", "§Quality")[1].strip(), "UR-07 → §Quality")
+        self.assertEqual(self.dt("request", "trace", "UR-08", "§constraints")[1].strip(), "UR-08 → §constraints")
+        self.assertEqual(self.dt("request", "trace", "UR-07", "§Nowhere")[0], 2)
+        self.assertEqual(self.dt("request", "trace", "UR-03", "§Quality")[0], 2)      # a spec heading, not architecture
+        reqs = self.requests()
+        self.assertEqual([rq.is_open(Repo(self.root), reqs[i]) for i in ("UR-07", "UR-08")], [False, False])
+        self.assertEqual([p.message.split(" ")[0] for p in self.problems("request-open")], ["UR-03"])
+
     def test_trace_drops_retired_ids(self):
         self.write(PATH, DOC.replace("→ AD-03", "→ AD-02"))
         self.assertEqual(self.dt("request", "trace", "UR-02", "AD-03")[1].strip(), "UR-02 → AD-03")
@@ -191,6 +202,12 @@ class LintTest(Base):
         self.assertEqual([p.line for p in self.problems("retired-ref") if p.path == PATH], [7])  # DATA-03 removed
         self.assertEqual(sorted(p.message.split(" ")[0] for p in self.problems("request-open")),
                          ["UR-01", "UR-02", "UR-03"])
+
+    def test_trace_to_a_missing_section(self):
+        self.write(PATH, DOC.replace("→ DATA-02", "→ §Out of scope"))
+        self.assertEqual([p.message for p in self.problems("request-trace")],
+                         ["UR-01 → §Out of scope: no such heading in spec"])
+        self.assertIn("UR-01", " ".join(p.message for p in self.problems("request-open")))
 
     def test_format(self):
         self.write(PATH, DOC + '- **UR-07** spec · "x" · idea-refine 2026-10-19 → somewhere\n')
@@ -252,7 +269,8 @@ class StatusNextTest(Base):
                          ['UR-03 "Go with A" [storage: A = Parquet, B = SQLite]'])
         self.assertEqual(self.status("pipeline-design")["requests_open"], ['UR-06 "rebalance weekly"'])
         self.assertEqual(self.status("spec-writing")["requests_open"], [])
-        self.assertNotIn("requests_open", self.status("idea-refine"))
+        self.assertEqual(self.status("idea-refine")["requests_open"], [])
+        self.assertNotIn("requests_open", self.status("reference-intake"))
 
     def test_due_architecture_request_revises_and_routes(self):
         self.write(PATH, DOC)

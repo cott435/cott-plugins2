@@ -18,7 +18,7 @@ One milestone can't hold S1: 29 pipelines make well over a hundred tasks, far pa
 | M4 Month comparison | This month vs last, by category | core PL-16–PL-20; app PL-26–PL-28 | M2 (core.Category) |
 | … | | | |
 
-Never one milestone per package: "all of the relay" runs nothing a user can see, and it queues `core` and `app` behind it. M3 and M4 both depend only on M2, so they could share a milestone as parallel tracks; they stay apart here because together their critical path would pass 15.
+Never one milestone per package: "all of the relay" runs nothing a user can see, and it queues `core` and `app` behind it. M3 and M4 both depend only on M2, so they could share a milestone as parallel tracks; they stay apart here because together their critical path would pass 15. M4 builds after M3, but its Depends still says only `M2 (core.Category)`: a build order is never a Depends entry.
 
 M1 then starts with two interface tasks, one per provider, freezing the boundaries M1 uses: `relay.sync_response` (consumed by `core`) and `core.transaction_list` (consumed by `app`), plus each package's step types and signatures. Each boundary gets a JSON Schema (the three runtimes share no types), one JSON fixture per case the contract lists, and a fake: a fake relay endpoint in `core`'s test support, a fake `core` in `app`'s. Then every step spine of all three packages at once; the four wirings, `core` and `app` on the fakes; then PL-40 and PL-41's system tasks, which swap the fakes for the real relay and core. Critical path: interface, spine, the longest thicken chain, system, well under 15.
 

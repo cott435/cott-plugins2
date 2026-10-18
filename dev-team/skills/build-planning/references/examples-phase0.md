@@ -76,3 +76,20 @@ The graph, excerpted (one row per `Depends on` other than on T01, 16, plus the m
 ```
 
 **Multi-package.** The same shape across packages: the interface task freezes each `**Boundary:**` symbol in its `**Fixtures:**` folder (one interface task per provider when one would pass M), spines run in every package at once, a consumer's wiring runs on the provider's fake, and the system task (one per system pipeline, `**Package:**` the owner of its first step, `**Reason:** system task`, `--pkg` on the gate) swaps in the real providers.
+
+**Library classes, a helper folder, a real-collaborator case (LeafLab M1).** PL-01's `SingleCropSet` and `SmallCnn` are step rows behind the `make_dataset` and `make_model` factories (`pipeline-design`'s example), so each gets a spine like any step; `train` owns the folder `core/train/`:
+
+```markdown
+### M1-T03: SingleCropSet spine (200 synthetic leaves)
+**Package:** leaflab · **Step:** PL-01.SingleCropSet · **Kind:** spine · **Covers:** — · **Size:** XS · **Mode:** solo
+**Read:** PL-01, core.Dataset
+**Acceptance:**
+- [ ] `SingleCropSet(seed=0)` satisfies `core.Dataset`: 200 synthetic leaves, a fixed split; same seed, same split
+**Verify:** `pytest tests/unit/leaflab -k singlecrop` · `scripts/check.sh gate`
+**Depends on:** M1-T01 · **Writes:** src/leaflab/singlecrop/dataset.py, tests/unit/leaflab/test_singlecrop.py
+
+### M1-T06: train spine (epoch loop, CSV log)
+… **Depends on:** M1-T01 · **Writes:** src/leaflab/core/train/**, tests/unit/leaflab/test_train.py
+```
+
+`evaluate`'s spine is its whole behavior and has a golden case, so it is one fold task: `**Kind:** thicken`, `**Mode:** split`, `**Reason:** fold: spine is the whole behavior`. Wiring PL-01 depends on the seven spines and that fold, never on the CNN thicken, so the random-guess `SmallCnn` runs the smoke. TC-04 (the CNN beats the logistic baseline on held-out leaves) needs the real CNN, so it is the system task's acceptance; LeafLab has no fake, and that case alone gives M1 a system task.

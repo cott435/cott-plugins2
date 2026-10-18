@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """The fake Yahoo behind the HTTPS proxy, checked over stdlib urllib through the proxy (no yahooquery, no network):
 each planted fact, the cookie and crumb rules, and a tunnel left untouched for other hosts. Then the fake Sharadar on
-its real API hosts (`api.sharadar.com`, `data.nasdaq.com/api/`), the closed proxy user and public runs get (every
+its real API hosts (`api.sharadar.com`, `data.nasdaq.com/api/`), with the SDK's `X-Api-Token` key
+header and Nasdaq Data Link's `quandl_error` codes, the closed proxy user and public runs get (every
 other live host refused), and the shims that send a public.py run to it. Also the driver's vendor_env, which routes
 a variable only to the vendor it names. The dry run runs this too.
 
@@ -78,12 +79,12 @@ def run(verbose=True):
     open_url, open_srv, open_env = proxy.start_proxy(certs, routes, log=plog)
     closed_url, closed_srv, closed_env = proxy.start_proxy(certs, routes, log=plog, closed=True)
 
-    def via(proxy_url, url):
+    def via(proxy_url, url, headers=None):
         ctx = ssl.create_default_context(cafile=open_env["SSL_CERT_FILE"])
         opener = urllib.request.build_opener(urllib.request.ProxyHandler({"https": proxy_url, "http": proxy_url}),
                                              urllib.request.HTTPSHandler(context=ctx))
         try:
-            with opener.open(url, timeout=20) as r:
+            with opener.open(urllib.request.Request(url, headers=headers or {}), timeout=20) as r:
                 return r.status, r.read().decode()
         except urllib.error.HTTPError as e:
             return e.code, e.read().decode()
@@ -97,9 +98,20 @@ def run(verbose=True):
         case("Nasdaq Data Link's datatable API reaches it too, through the closed proxy", code == 200 and "AAPL" in body)
         case("the closed proxy refuses a docs page of a routed host", via(closed_url, "https://data.nasdaq.com/databases/SEP")[0] == 403)
         case("the closed proxy refuses an unfaked vendor (EODHD)", "403" in str(via(closed_url, "https://eodhd.com/api/eod/AAPL.US")[0]))
+        ndl = "https://data.nasdaq.com/api/v3/datatables/SHARADAR/"
+        code, body = via(open_url, ndl + "SEP.json?ticker=AAPL", {"X-Api-Token": "k"})
+        case("the official SDK's X-Api-Token header carries the key (flow-F3)", code == 200 and "AAPL" in body)
+        case("so does a lower-case x-api-token", via(open_url, ndl + "TICKERS.json", {"x-api-token": "k"})[0] == 200)
+        quandl = lambda r: (r[0], (json.loads(r[1] or "{}").get("quandl_error") or {}).get("code"))
+        case("no key: Nasdaq Data Link's QEAx01, 400", quandl(via(open_url, ndl + "SEP.json?ticker=AAPL")) == (400, "QEAx01"))
+        case("a wrong key: QEAx01 too", quandl(via(open_url, ndl + "SEP.json?ticker=AAPL", {"X-Api-Token": "x"})) == (400, "QEAx01"))
+        case("a SHARADAR table outside the plan (SF1): QEPx04, 403",
+             quandl(via(open_url, ndl + "SF1.json?ticker=AAPL", {"X-Api-Token": "k"})) == (403, "QEPx04"))
         log = [json.loads(l) for l in open(plog)]
         case("both refusals are logged as blocked", {e["host"] for e in log if e["kind"] == "blocked"} == {"data.nasdaq.com", "eodhd.com"})
-        case("the fake Sharadar logged both API requests", len(fakevendor.read_log(vlog)) == 2)
+        vreq = fakevendor.read_log(vlog)
+        case("the fake Sharadar logged every API request, the header key as sent and ok",
+             len(vreq) == 7 and [e["key_ok"] for e in vreq] == [True, True, True, True, False, False, True])
         bindir = proxy.shims(os.path.join(tmp2, "bin"), open_env, names=("python3",), public_env=closed_env)
         show = "import os; print(os.environ.get('HTTPS_PROXY'))"
         for name in ("public.py", "other.py"):

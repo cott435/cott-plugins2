@@ -3,9 +3,11 @@
 
 Agent sessions (claude -p) work in a fresh project dir with the whole dev-team plugin loaded via --plugin-dir
 (skills, scripts/dt.py, hooks), staged into <out>/plugin/. As a user opens a new chat per skill, each skill run gets
-its own session: before every message the driver asks the run's own dt for the next run (`dt next --json`). A fresh
-session opens with `/dev-team:<skill> <message>` when that run is another skill, or the same skill again once its
-gate was approved; the session is resumed only while one skill works through its questions and gate (`session_step`).
+its own session (`session_step`): a fresh one, `/dev-team:<skill> <message>` for the run `dt next --json` names, opens
+after the user approves a gate, for a new stage (idea-refine), and when the user reports a probe run (api-probe);
+every other message resumes the session, so answers go back to the session that asked. A fresh session that starts
+right after a question gets the end of that message first ("From the previous session:"). The simulated user's
+approvals carry no "and continue", so the agent stops at each gate.
 Each session's id, skill and turns go into turns.json (`session`) and summary.json (`sessions`). A simulated user (separate
 claude -p, no tools) answers questions, approves drafts, and — in incremental mode — reveals the next stage
 only after the current one is fully planned (pipelines approved and milestone rows on the roadmap; for the first
@@ -33,11 +35,16 @@ client takes no base URL, and Sharadar's `api.sharadar.com`) are served behind a
 whole run gets (`start_vendors`). User runs, and every public.py run the agent starts, go through a second, closed
 proxy that refuses every live host but the package indexes. When the simulated user says it ran the scripts (`ran`),
 the driver runs each Ready probe as the user would: it writes the probe's .env from its .env.example (keys get the
-canary `sk-canary-<run id>`, base URLs the fake vendor), runs public.py with no environment but the closed proxy's,
-then each probe.py step its README gives with the fake vendors' environment, logs them to <out>/user_runs.jsonl and
+canary `sk-canary-<run id>`, base URLs the fake vendor), runs public.py only where the README gives it to the user
+(as given: `uv run public.py <step>`), with no environment but the closed proxy's, then each probe.py step its README
+gives with the fake vendors' environment, logs them to <out>/user_runs.jsonl and
 commits "user run before turn N". The simulated user is then told which steps ran and each one's exit code (no
 output) and rewrites its message to match. When the user would move on while `dt next` says build-planning waits for
 Ready probes it never ran, readiness asks it to run them.
+
+A failed simulated-user call is retried twice and logged to <out>/sim_errors.jsonl. After that the fallback asks the
+agent to repeat its questions when it asked any, and approves only when it didn't; a failed rewrite after a user run
+keeps the message and appends the run report.
 
 Usage: driver.py <trajectory-id> <out-dir>
 
@@ -256,20 +263,47 @@ def dt_next(proj, dt):
         return {}
 
 
-def session_step(nxt, before, sess, action):
-    """Resume the current session or open a fresh one, for which skill: (fresh, skill).
+SKILLS = ("idea-refine", "spec-writing", "architecture-design", "reference-intake", "api-probe", "pipeline-design",
+          "test-planning", "build-planning", "build-setup")
+NAMED_SKILL = re.compile(r"\b(" + "|".join(SKILLS) + r")\b")
+
+
+def named_skill(msg):
+    """The dev-team skill a user's message names ("Yes, start with api-probe on PB-01"), or None."""
+    m = NAMED_SKILL.search(msg or "")
+    return m.group(1) if m else None
+
+
+def asked(reply):
+    """Whether the agent's message ends on a question: a "?" in its last few lines."""
+    return "?" in (reply or "").rstrip()[-500:]
+
+
+def session_step(nxt, before, sess, last=None, now=None, msg=""):
+    """Resume the current session or open a fresh one: (fresh, skill, slash). `slash`: open it with
+    `/dev-team:<skill>`.
 
     `nxt` is `dt next` now, `before` what it said before the current session's last message, `sess` the current
-    session ({skill, seen}: the skills its turns ran) or None, `action` the simulated user's. With nothing left to
-    plan, a new stage goes to idea-refine. A skill the session already ran (its own, or one the agent moved on to)
-    keeps the session through its questions and gate; once that gate is approved, its next run is a fresh session."""
-    skill = nxt.get("skill") or ("idea-refine" if action == "next_stage" else None)
-    if sess is None:
-        return True, skill or "idea-refine"
-    if skill is None:
-        return False, sess["skill"]
-    just_approved = nxt.get("mode") != "gate" and (before or {}).get("mode") == "gate" and before.get("skill") == skill
-    return (False, skill) if skill in sess["seen"] and not just_approved else (True, skill)
+    session ({skill: the one it opened with}) or None, `last` the simulated user's last message ({approves}), `now`
+    the one about to be sent ({action, ran}) and `msg` its text. A session is one skill run, bound by the user's
+    messages, not by the skill dt next names (iteration 9's flow-F5). A fresh one opens
+    - after an approved gate: dt next was at a gate before the last message, and that message approved;
+    - for a new stage (`next_stage`): idea-refine, which owns the new idea until it is written down;
+    - when the user ran probes (`ran`) and the session isn't api-probe's: their Record is.
+    Otherwise the session resumes, whatever dt next names now, so an answer goes back to the session that asked.
+    A fresh session's message names no other skill, or it opens with the message alone, as that skill's run."""
+    last, now = last or {}, now or {}
+    skill = nxt.get("skill")
+    if now.get("action") == "next_stage":
+        skill = "idea-refine"
+    elif sess is None:
+        skill = skill or "idea-refine"
+    elif now.get("ran") and sess["skill"] != "api-probe":
+        skill = "api-probe"
+    elif not (skill and (before or {}).get("mode") == "gate" and last.get("approves")):
+        return False, sess["skill"], False
+    named = named_skill(msg)
+    return (True, named, False) if named and named != skill else (True, skill, True)
 
 
 def agent_turn(proj, sid, msg, first, log_path, plugin_root, extra, turn=None):
@@ -330,7 +364,12 @@ def agent_turn(proj, sid, msg, first, log_path, plugin_root, extra, turn=None):
 PLANNING_CHAIN = """For each stage the assistant takes you through several planning documents, one at a time, each needing your approval: the idea/brief, the spec, the architecture, the pipelines (the workflows you will run and the planned file layout), optionally a test plan with golden test cases, and the build plan (the tasks for that milestone). Before the first build it also sets up the build tooling and quality bar (CONSTRAINTS.md, checks, agent roles); approve that too."""
 
 
-def sim_user(scn, traj, revealed, next_stage, history_tail, agent_msg, status, refs, note=""):
+SIM_TRIES = 3  # one call and two retries before the fallback
+FALLBACK_APPROVE = "Looks good, approved."
+FALLBACK_ASKED = "Sorry, I lost track: could you list your open questions again, briefly and numbered? I'll answer each one."
+
+
+def sim_user(scn, traj, revealed, next_stage, history_tail, agent_msg, status, refs, note="", errlog=None, turn=None):
     proj = scn["projects"][traj["project"]]
     mode = traj["mode"]
     stage_txt = "\n".join(f"- {s['reveal']}" for s in revealed)
@@ -373,17 +412,28 @@ ASSISTANT'S LATEST MESSAGE:
 {agent_msg[-9000:]}
 >>>
 {note_txt}
-Decide your reply. If the assistant asked questions, answer them all briefly and consistently with your facts. If it presented a draft for review, approve it explicitly (or request one specific fix if it contradicts your facts). If it offers golden test cases or a test plan, say yes. If it asks which stage or milestone a reference file serves, or which skills to route to a stage, answer from your facts. If it offers to commit approved documents, say yes. If it asks you to choose options or defaults (for example for tooling), take its recommendation. If it is waiting with nothing to answer, tell it to continue to the next planning step. Never instruct it which skill to use, and never write code, documents or tests yourself. Never ask it to write code or tests or to start building. {build_rule} When you approve something and also introduce the next stage, put the approval first in the same message ("Approved. Next idea: ...").
+Decide your reply. If the assistant asked questions, answer them all briefly and consistently with your facts. If it presented a draft for review, approve it explicitly (or request one specific fix if it contradicts your facts). If it offers golden test cases or a test plan, say yes. If it asks which stage or milestone a reference file serves, or which skills to route to a stage, answer from your facts. If it offers to commit approved documents, say yes. If it asks you to choose options or defaults (for example for tooling), take its recommendation. An approval says only that you approve, plus your answers to any questions: never add "and continue", "then move on to the next step" or what should come next, and never name a step or skill; the assistant stops after each approval, and you tell it to go on in your next message. If it is waiting with nothing to approve or answer, tell it to continue. Never instruct it which skill to use, and never write code, documents or tests yourself. Never ask it to write code or tests or to start building. {build_rule} When you approve something and also introduce the next stage, put the approval first in the same message ("Approved. Next idea: ...").
 Return ONLY a JSON object: {{"action": "reply" | "next_stage" | "finish", "message": "<what you say to the assistant>", "ran": true | false, "approves": true | false}}
 "ran" is true only when your message tells the assistant you ran the scripts it asked you to run (you run them as you send it); saying you will run them later is false. "approves" is true when your message approves what the assistant presented for approval."""
-    r = sh([CLAUDE_BIN, "-p", prompt, "--model", USER_MODEL, "--tools", "", "--output-format", "json",
-            "--no-session-persistence", *ISOLATE], HERE, timeout=600)
-    try:
-        txt = json.loads(r.stdout)["result"]
-        m = re.search(r"\{.*\}", txt, re.S)
-        return json.loads(m.group(0))
-    except Exception:
-        return {"action": "reply", "message": "Looks good, approved. Please continue.", "approves": True}
+    for attempt in range(1, SIM_TRIES + 1):
+        r = sh([CLAUDE_BIN, "-p", prompt, "--model", USER_MODEL, "--tools", "", "--output-format", "json",
+                "--no-session-persistence", *ISOLATE], HERE, timeout=600)
+        try:
+            txt = json.loads(r.stdout)["result"]
+            u = json.loads(re.search(r"\{.*\}", txt, re.S).group(0))
+            if isinstance(u, dict) and isinstance(u.get("message"), str) and u["message"].strip():
+                return u
+            err = "no message in the JSON"
+        except Exception as e:
+            err = repr(e)
+        if errlog:
+            with open(errlog, "a") as f:
+                f.write(json.dumps({"turn": turn, "attempt": attempt, "error": err, "rc": r.returncode,
+                                    "note": note[:300], "stdout": r.stdout[-4000:], "stderr": r.stderr[-2000:]}) + "\n")
+    # Never an approval in place of answers: a question the agent asked is asked again (flow-F7).
+    if asked(agent_msg):
+        return {"action": "reply", "message": FALLBACK_ASKED, "approves": False, "fallback": True}
+    return {"action": "reply", "message": FALLBACK_APPROVE, "approves": True, "fallback": True}
 
 
 def opening(scn, traj):
@@ -501,24 +551,30 @@ def vendor_env(names, vendors):
     return env
 
 
-PROBE_CMD = re.compile(r"(?:uv run|python3?)\s+(?:[^\s`]*/)?probe\.py((?:[ \t]+[^\s`&|;<>]+)*)")
+def script_cmd(script):
+    return re.compile(r"(?:uv run|python3?)\s+(?:[^\s`]*/)?" + re.escape(script) + r"((?:[ \t]+[^\s`&|;<>]+)*)")
 
 
-def user_steps(readme):
-    """The argument lists the probe's README gives `probe.py`, in order: from its `## Steps` section when that names
-    probe.py, else from the whole README (the Who-runs-what table). A probe may split the user's run into steps
-    (`probe.py bulk`, then `probe.py checks`; the api-probe README template does). [[]] when it names none."""
+AGENT_ROW = re.compile(r"^\|[^|\n]*\|\s*agent\b[^\n]*$", re.M | re.I)
+
+
+def user_steps(readme, script="probe.py"):
+    """The argument lists the probe's README gives the user for `script`, in order: from its `## Steps` section
+    when that names the script, else from the whole README but its agent-run rows of the Who-runs-what table. A
+    probe may split the user's run into steps (`probe.py bulk`, then `probe.py checks`; the api-probe README
+    template does). When it names none: [[]] for probe.py (the user runs it as it is), [] for public.py, which
+    is the agent's to run unless the README gives it to the user (flow-F4)."""
     steps = re.search(r"^##\s+Steps\b.*?(?=^##\s|\Z)", readme, re.M | re.S)
-    out = []
-    for text in ([steps.group(0)] if steps else []) + [readme]:
+    cmd, out = script_cmd(script), []
+    for text in ([steps.group(0)] if steps else []) + [AGENT_ROW.sub("", readme)]:
         for span in re.findall(r"`([^`]+)`", text):
-            for m in PROBE_CMD.finditer(span):
+            for m in cmd.finditer(span):
                 args = m.group(1).split()
                 if args not in out:
                     out.append(args)
         if out:
             break
-    return out or [[]]
+    return out or ([[]] if script == "probe.py" else [])
 
 
 def run_user_checks(proj, vendors, log_path, ids=None, timeout=600):
@@ -544,16 +600,21 @@ def run_user_checks(proj, vendors, log_path, ids=None, timeout=600):
         dot.write_text("".join(f"{k}={v}\n" for k, v in env.items() if k in names))
         dot.chmod(0o600)
         readme = (folder / "README.md").read_text(errors="ignore") if (folder / "README.md").exists() else ""
-        user_env = {**{k: ENV[k] for k in ("PATH", "HOME") if k in ENV}, **proxied, **env}
-        for script, script_env, args in [("public.py", dict(proxied), [])] + [("probe.py", user_env, a) for a in user_steps(readme)]:
+        base_env = {k: ENV[k] for k in ("PATH", "HOME") if k in ENV}
+        user_env = {**base_env, **proxied, **env}
+        plan = ([("public.py", dict(proxied), a) for a in user_steps(readme, "public.py")]
+                + [("probe.py", user_env, a) for a in user_steps(readme)])
+        for script, script_env, args in plan:
             if not (folder / script).exists():
                 continue
             if script == "probe.py" and any(r_["probe"] == e["id"] and r_["script"].endswith("probe.py") and r_["rc"] != 0
                                             for r_ in runs):
                 break  # a failed step stops the user's run, as the README's steps say
             head = (folder / script).read_text(errors="ignore")[:2000]
-            cmd = (["uv", "run", script] if "# /// script" in head and shutil.which("uv") and script == "probe.py"
-                   else [sys.executable, "-B", script]) + args
+            uv = shutil.which("uv", path=ENV.get("PATH")) if "# /// script" in head else None
+            if uv:  # as the README gives it: `uv run <script> <step>`; uv itself needs PATH and HOME
+                script_env = {**base_env, **script_env}
+            cmd = ([uv, "run", script] if uv else [sys.executable, "-B", script]) + args
             t0 = time.time()
             try:
                 r = subprocess.run(cmd, cwd=folder, env=script_env, capture_output=True, text=True, timeout=timeout)
@@ -606,7 +667,9 @@ def run_loop(scn, traj, project, stages, out, proj, plugin_root, dt, extra, msg,
     tid = traj["id"]
 
     turns, history, sessions = [], [], []
-    sess, before, action = None, {}, None  # the current session; dt next before its last message; the user's action
+    sess, before = None, {}  # the current session; dt next before its last message
+    last, pending = {}, {}  # the simulated user's last message sent and the one about to be sent ({action, approves, ran})
+    reply = ""  # the agent's last message
     stage_log = [{"turn": 1, "stage": stages[0]["name"] if traj["mode"] == "incremental" else "all"}]
     t_start = time.time()
     closing, stop_reason = 0, "max_turns"  # closing: 1 once the closing approval is sent, 2 after one more
@@ -618,14 +681,16 @@ def run_loop(scn, traj, project, stages, out, proj, plugin_root, dt, extra, msg,
         # not `git show HEAD`, counts the agent's own commits in this turn as changes.
         base = sh(["git", "rev-parse", "HEAD"], proj).stdout.strip()
         nxt = dt_next(proj, dt)
-        fresh, skill = session_step(nxt, before, sess, action)
+        fresh, skill, slash = session_step(nxt, before, sess, last, pending, msg)
+        # A fresh session right after a question gets the question's end, so the answer still has its question.
+        carried = fresh and sess is not None and asked(reply)
         if fresh:
             sess = {"n": len(sessions) + 1, "id": str(uuid.uuid4()), "skill": skill, "seen": [skill], "turns": [],
                     "cost_usd": 0.0, "output_tokens": 0}
             sessions.append(sess)
-        sess["skill"] = skill
-        before = nxt
-        sent = f"/dev-team:{skill} {msg}" if fresh else msg
+        before, last = nxt, pending
+        body = f"From the previous session:\n<<<\n{reply.rstrip()[-1500:]}\n>>>\n\n{msg}" if carried else msg
+        sent = f"/dev-team:{skill} {body}" if slash else body
         reply, usage, tools, skills, dt_s, errors, hooks, init, agents, seen = agent_turn(
             proj, sess["id"], sent, fresh, out / "agent_stream.jsonl", plugin_root, extra, turn=t)
         sess["seen"] = list(dict.fromkeys(sess["seen"] + seen))
@@ -640,7 +705,8 @@ def run_loop(scn, traj, project, stages, out, proj, plugin_root, dt, extra, msg,
         rec = {"turn": t, "user": sent, "assistant": reply, "skills": skills, "tools": tools,
                "seconds": round(dt_s, 1), "usage": usage, "docs_changed": changed, "status": status,
                "stage": stage_log[-1]["stage"], "tool_errors": errors, "hook_events": hooks, "agents": agents,
-               "session": {"n": sess["n"], "id": sess["id"], "skill": skill, "new": fresh, "next": nxt, "seen": seen}}
+               "session": {"n": sess["n"], "id": sess["id"], "skill": skill, "new": fresh, "slash": slash,
+                           "carried": carried, "next": nxt, "seen": seen}}
         if user_run is not None:
             rec["user_run"] = user_run
             user_run = None
@@ -662,8 +728,9 @@ def run_loop(scn, traj, project, stages, out, proj, plugin_root, dt, extra, msg,
                 # The closing message left a doc Draft: one more approval, which asks for nothing else.
                 closing = 2
                 turns[-1]["closing_drafts"] = left
-                msg, action = (f"Approved: {ids(left)}. Please mark {'it' if len(left) == 1 else 'them'} Approved; "
-                               "nothing else, planning is done for now."), "reply"
+                msg = (f"Approved: {ids(left)}. Please mark {'it' if len(left) == 1 else 'them'} Approved; "
+                       "nothing else, planning is done for now.")
+                pending = {"action": "reply", "approves": True}
                 (out / "turns.json").write_text(json.dumps(turns, indent=1))
                 continue
             turns[-1]["sim_user_final"] = "(closing approval delivered)"
@@ -675,7 +742,8 @@ def run_loop(scn, traj, project, stages, out, proj, plugin_root, dt, extra, msg,
             break
         revealed = stages[:n_revealed]
         nxt = stages[n_revealed] if traj["mode"] == "incremental" and n_revealed < len(stages) else None
-        ask = lambda note="": sim_user(scn, traj, revealed, nxt, "\n\n".join(history[-4:-1]), reply, status, refs, note)
+        ask = lambda note="": sim_user(scn, traj, revealed, nxt, "\n\n".join(history[-4:-1]), reply, status, refs, note,
+                                       errlog=out / "sim_errors.jsonl", turn=t)
         u = ask()
         dnext = dt_next(proj, dt)  # what dt says after this turn
         changed_docs = sh(["git", "diff", "--name-only", base, "HEAD"], proj).stdout.split()
@@ -691,15 +759,23 @@ def run_loop(scn, traj, project, stages, out, proj, plugin_root, dt, extra, msg,
                 break
             asks = [a for _, a in blocked]
             rec["readiness_asks"] = asks
-            u = ask(f"The current stage is not fully planned yet ({'; '.join(why)}). Set action to \"reply\": approve "
-                    f"anything pending, then {'; '.join(asks)}. Ask for this even if the assistant recommended against "
-                    "it or said it can wait. Do not introduce the next stage or finish.")
-            if u.get("action") != "reply":
-                unrun = probes_to_run(facts, dnext, probes_run)
-                wants = "; and ".join(re.sub(r"^ask for ", "", a) for a in asks if not unrun or a != ask_runs(unrun))
-                u = {"action": "reply", "approves": True, "ran": bool(unrun),
-                     "message": "Approved." + (f" I ran {ids(unrun)} as their READMEs say." if unrun else "")
-                     + (f" Before we move on, I'd like {wants}." if wants else "")}
+            if dnext.get("mode") == "gate":
+                # Something waits for approval: the approval goes alone, and what is missing is asked for after it.
+                u = ask(f"The current stage is not fully planned yet ({'; '.join(why)}), but first the assistant needs "
+                        "your approval. Set action to \"reply\": approve what it presented, answering any questions, "
+                        "and ask for nothing else in this message. Do not introduce the next stage or finish.")
+                if u.get("action") != "reply":
+                    u = {"action": "reply", "approves": True, "message": "Approved."}
+            else:
+                u = ask(f"The current stage is not fully planned yet ({'; '.join(why)}). Set action to \"reply\": "
+                        f"{'; '.join(asks)}. Ask for this even if the assistant recommended against it or said it can "
+                        "wait. Do not introduce the next stage or finish.")
+                if u.get("action") != "reply":
+                    unrun = probes_to_run(facts, dnext, probes_run)
+                    wants = "; and ".join(re.sub(r"^ask for ", "", a) for a in asks if not unrun or a != ask_runs(unrun))
+                    u = {"action": "reply", "approves": False, "ran": bool(unrun),
+                         "message": (f"I ran {ids(unrun)} as their READMEs say." if unrun else "")
+                         + (f" Before we move on, I'd like {wants}." if wants else "")}
         else:
             stalled = 0
         if u.get("action") == "finish" and nxt and not why:
@@ -727,9 +803,11 @@ def run_loop(scn, traj, project, stages, out, proj, plugin_root, dt, extra, msg,
             stage_log.append({"turn": t + 1, "stage": nxt["name"]})
             new_refs = add_references(proj, project, [nxt["name"]])
             refs += new_refs
-        msg = (u.get("message") or "Approved. Continue.") + refs_note(new_refs)
-        action = u.get("action")
+        msg = (u.get("message") or "Please continue.").strip() + refs_note(new_refs)
+        pending = {k: u.get(k) for k in ("action", "approves", "ran")}
         rec["sim_ran"], rec["sim_approves"] = bool(u.get("ran")), bool(u.get("approves"))
+        if u.get("fallback"):
+            rec["sim_fallback"] = u["message"]
         if vendors and u.get("ran"):
             user_run = run_user_checks(proj, vendors, out / "user_runs.jsonl")
             probes_run |= {r_["probe"] for r_ in user_run}
@@ -741,7 +819,10 @@ def run_loop(scn, traj, project, stages, out, proj, plugin_root, dt, extra, msg,
                        f"(keep its action, \"{u.get('action')}\"): say you ran them, name only these steps, and for a "
                        "step that failed give its exit code, never any output. If nothing ran, say so. Keep the rest "
                        f"of your message.\nYOUR MESSAGE: {u.get('message')}")
-            if told.get("message"):
+            if told.get("fallback"):  # keep the message and its answers, and still report the run (flow-F7)
+                rec["sim_fallback_rewrite"] = True
+                msg = f"{u.get('message', '').strip()} I ran them as the READMEs say: {report}." + refs_note(new_refs)
+            else:
                 msg = told["message"] + refs_note(new_refs)
         (out / "turns.json").write_text(json.dumps(turns, indent=1))
     summary = {"trajectory": tid, "turns": len(turns), "stages_reached": n_revealed, "stage_log": stage_log,

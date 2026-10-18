@@ -54,6 +54,8 @@ TURNS_REF = "refs/eval/turns"
 ORACLE_ASK = re.compile(r"(expected\.json|golden (case|fixture)|fixture|oracle)[^.?\n]*(change|update|edit|regenerat|fix)"
                         r"|(change|update|edit|regenerat|fix)[^.?\n]*(expected\.json|golden (case|fixture)|fixture|oracle)", re.I)
 COMMIT_ASK = re.compile(r"\bcommit", re.I)
+APPROVE_ASK = re.compile(r"\bapprov", re.I)
+PICK_ASK = re.compile(r"recommend|decision needed|pick one|which do you want", re.I)
 SYMBOL = re.compile(r"\b[a-z][a-z0-9_]*\.[A-Z]\w*\b")    # a contract type, e.g. risk.Drawdown
 CONTRACT_TEST = re.compile(r"tests/contracts/\S*test_\w+\.py")   # an escalation blaming a frozen contract test
 CONTRACT_ASK = re.compile(r"contract[- ]change|CONTRACT-CHANGE|architecture-design|frozen (type|interface)", re.I)
@@ -339,11 +341,6 @@ class Persona:
         crit = [f for r in st.get("reviews") or [] for f in r.get("critical_open") or []]
         if crit:
             return "critical", p["critical"].format(finding=crit[0])
-        blocked = [b for b in st.get("blocked") or [] if b["id"] not in self.retried]
-        if blocked:
-            self.retried.add(blocked[0]["id"])
-            return "retry", (f"Retry {blocked[0]['id']} once: record `dt build resolve {blocked[0]['id']} --note "
-                             f"\"retry once\"` and continue.")
         # The exit: every task landed and reviewed, or the exit review recorded and the driver now asking about
         # fix tasks (the persona wants none). A session arm (A0) has no reviews: every task ticked.
         exit_reviewed = any(str(r.get("review", "")).startswith("exit.") for r in st.get("reviews") or [])
@@ -355,6 +352,15 @@ class Persona:
             return "finish", p["exit"]
         if self.arm.get("dispatch") != "session" and st.get("go_current") is False:
             return "go", p["go"]
+        if APPROVE_ASK.search(reply[-1500:]) and asks:      # a drafted fix the session shows for approval
+            return "approve", p["approve"]
+        if PICK_ASK.search(reply[-1500:]) and asks:         # options with a recommendation: take it
+            return "recommended", p["recommended"]
+        blocked = [b for b in st.get("blocked") or [] if b["id"] not in self.retried]
+        if blocked:
+            self.retried.add(blocked[0]["id"])
+            return "retry", (f"Retry {blocked[0]['id']} once: record `dt build resolve {blocked[0]['id']} --note "
+                             f"\"retry once\"` and continue.")
         if COMMIT_ASK.search(reply[-1500:]) and asks:
             return "commit", p["commit"]
         due = [x for x in self.pressure if x["after_checkpoint"] <= len(st.get("reviews") or [])]

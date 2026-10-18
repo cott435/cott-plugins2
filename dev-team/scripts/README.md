@@ -257,6 +257,10 @@ Without `--stamp`: one line per entry, `RF-NN: <file> · ok|changed (now <hash>)
 
 Without a flag: one line per entry, `PB-NN: <folder> · <Status> · hash ok|unstamped|hash changed (now <hash>)|folder missing · results <run_at> (current|for other code; n/m checks)|no results|results invalid: … · <milestones>`. `--stamp` (mechanical, below) writes each entry's Hash. `--scan` runs the redaction scan over every `probes/*/evidence/` (or the named probes'): token shapes (`access-production-…`, `public-sandbox-…`), `sk-…` keys, credentials in URLs (`?api_key=…`), emails, card-like (13–19 digits, spaces or dashes allowed) and other 8+ digit runs, phone numbers, hex runs of 24+, mixed-case base64 runs of 32+, and every secret-looking value (8+ characters, not a URL, with a digit or 16+ long) in the probe's `.env`/`.env.*` (not `.env.example`) and the project's `.env`. It prints `path:line (pattern)` per hit and never the matched text, then `scan: N hits` (exit 1) or `scan: clean`.
 
+### `dt explain [PL-NN|<pkg>…] [--write]`
+
+The pipelines in plain words, for a person reading the plan: per pipeline, its **Purpose** line (or, without one, the requirements it serves), how it runs (trigger; the system pipeline it is a segment of), then each step in order with what it does (its Spine version), what it takes and gives, and the requirements it serves, quoted from the spec. Library classes are listed under the factory step that builds them; a system pipeline shows its hops between packages and names its segments. Prints the chosen pipelines (default all); `--write` writes one page per package to `docs/explained/<pkg>.md` (`system.md` for system pipelines), outside the doc map. `explain-stale` warns when a written page no longer matches.
+
 ### `dt layout <pkg> [--json]`
 
 ```
@@ -334,6 +338,7 @@ Checks (code: severity):
   - `request-number` W — a number in a traced request's words (or a change's what) that none of the IDs it names states: digits, number words to twenty, `5%` as 0.05, `2k` as 2000; a time ("1 hour") matches only a time ("60 minutes")
   - `request-cite` W — a doc citing a superseded request, or a changed one from an ID the change wasn't written into (`--into`)
   - `request-source` W — a test case whose Source is only requests, with an Expected number none of them states (a superseded request reads as its replacement, a changed one as what was done instead)
+- `explain-stale` W — a page under `docs/explained/` that differs from what `dt explain --write` writes now, or whose package has no pipelines left
 - Probe checks (design/probes.md §4–§5):
   - `probe-fields` E — a PB entry with no Folder, Question or Informs, no checks table, a check with an empty Pass cell, a Status that isn't Draft, Ready, Answered · pass|fail or Waived, or (past Draft) a missing folder
   - `probe-informs` E — an Informs ID (decision, requirement, contract symbol) that isn't defined

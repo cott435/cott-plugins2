@@ -38,7 +38,7 @@ A pipeline exists because someone runs it, so never derive workflows from the co
 ## Review Gate (CRITICAL)
 
 Rerun `dt status --skill pipeline-design`. `retired_refs` must be empty; `uncovered_ids` and `components_unowned` too, or each gap under Open questions with a reason (up front, every stage's IDs land on a pipeline). Up front, every stage's workflows have pipelines in every package: no package is left `new`. Present:
-1. **What was written:** one line per pipeline (ID, title, trigger, steps); the planned layout.
+1. **What was written:** one line per pipeline (ID, title, trigger, steps); the planned layout; the readable pages `dt explain --write` wrote to `docs/explained/`.
 2. **ASSUMPTIONS:** every name, trigger, type, step order and module split you chose.
 3. **Open questions.**
 4. **Uncovered:** spec IDs or components on no step, and why.

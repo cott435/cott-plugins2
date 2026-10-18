@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
 """The fake Yahoo behind the HTTPS proxy, checked over stdlib urllib through the proxy (no yahooquery, no network):
-each planted fact, the cookie and crumb rules, and a tunnel left untouched for other hosts. Also the driver's
-vendor_env, which routes a variable only to the vendor it names. The dry run runs this too.
+each planted fact, the cookie and crumb rules, and a tunnel left untouched for other hosts. Then the fake Sharadar on
+its real API hosts (`api.sharadar.com`, `data.nasdaq.com/api/`), the closed proxy user and public runs get (every
+other live host refused), and the shims that send a public.py run to it. Also the driver's vendor_env, which routes
+a variable only to the vendor it names. The dry run runs this too.
 
 Usage: yahoo.py   prints one line per case; exit 1 if any case comes out wrong
 """
-import json, os, pathlib, sys, tempfile, urllib.error, urllib.request
+import json, os, pathlib, ssl, subprocess, sys, tempfile, urllib.error, urllib.request
 
 HERE = pathlib.Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(HERE))
@@ -68,6 +70,49 @@ def run(verbose=True):
         server.shutdown()
         for k, v in saved.items():
             os.environ.pop(k) if v is None else os.environ.__setitem__(k, v)
+
+    tmp2 = tempfile.mkdtemp(prefix="fake-sharadar-")
+    certs, plog, vlog = os.path.join(tmp2, "certs"), os.path.join(tmp2, "proxy.jsonl"), os.path.join(tmp2, "vendor.jsonl")
+    sharadar = fakevendor.handler_class("sharadar", vlog, expect_key="k")
+    routes = {"api.sharadar.com": sharadar, "data.nasdaq.com/api/": sharadar}
+    open_url, open_srv, open_env = proxy.start_proxy(certs, routes, log=plog)
+    closed_url, closed_srv, closed_env = proxy.start_proxy(certs, routes, log=plog, closed=True)
+
+    def via(proxy_url, url):
+        ctx = ssl.create_default_context(cafile=open_env["SSL_CERT_FILE"])
+        opener = urllib.request.build_opener(urllib.request.ProxyHandler({"https": proxy_url, "http": proxy_url}),
+                                             urllib.request.HTTPSHandler(context=ctx))
+        try:
+            with opener.open(url, timeout=20) as r:
+                return r.status, r.read().decode()
+        except urllib.error.HTTPError as e:
+            return e.code, e.read().decode()
+        except urllib.error.URLError as e:
+            return str(e.reason), ""
+
+    try:
+        code, body = via(open_url, "https://api.sharadar.com/v1.0/sep?ticker=AAPL&api_key=k")
+        case("public.py's api.sharadar.com reaches the fake Sharadar", code == 200 and "AAPL" in body)
+        code, body = via(closed_url, "https://data.nasdaq.com/api/v3/datatables/SHARADAR/SEP.json?ticker=AAPL&api_key=k")
+        case("Nasdaq Data Link's datatable API reaches it too, through the closed proxy", code == 200 and "AAPL" in body)
+        case("the closed proxy refuses a docs page of a routed host", via(closed_url, "https://data.nasdaq.com/databases/SEP")[0] == 403)
+        case("the closed proxy refuses an unfaked vendor (EODHD)", "403" in str(via(closed_url, "https://eodhd.com/api/eod/AAPL.US")[0]))
+        log = [json.loads(l) for l in open(plog)]
+        case("both refusals are logged as blocked", {e["host"] for e in log if e["kind"] == "blocked"} == {"data.nasdaq.com", "eodhd.com"})
+        case("the fake Sharadar logged both API requests", len(fakevendor.read_log(vlog)) == 2)
+        bindir = proxy.shims(os.path.join(tmp2, "bin"), open_env, names=("python3",), public_env=closed_env)
+        show = "import os; print(os.environ.get('HTTPS_PROXY'))"
+        for name in ("public.py", "other.py"):
+            pathlib.Path(tmp2, name).write_text(show)
+        shim = lambda script, env: subprocess.run([os.path.join(bindir, "python3"), script], cwd=tmp2, env=env,
+                                                   capture_output=True, text=True).stdout.strip()
+        base = {"PATH": os.environ.get("PATH", "")}
+        case("the shim sends public.py through the closed proxy, whatever it was given",
+             shim("public.py", {**base, "HTTPS_PROXY": open_url}) == closed_url == shim("public.py", base))
+        case("other scripts keep the open proxy", shim("other.py", base) == open_url)
+    finally:
+        open_srv.shutdown()
+        closed_srv.shutdown()
 
     vendors = {"sharadar": {"url": "http://127.0.0.1:1/v1.0/data", "key": "sk-canary-x",
                             "cfg": {"aliases": ["NASDAQ"], "base_env": ["SHARADAR_BASE_URL"], "key_env": ["SHARADAR_API_KEY"]}},

@@ -203,11 +203,12 @@ def env_values(folder):
 
 def tool_calls(stream_path, turns=None):
     """Every tool call in a stream-json transcript: {turn, name, input, parent, id}. The driver appends each
-    turn's stream to one file and records that turn's tool names in turns.json (`turns`; read beside the stream
-    when not given), so the calls split by those counts. One `claude -p` call can print several `system/init`
-    lines (each background agent that finishes resumes it), so an init starts a turn only when there are no
-    counts or they don't add up to the stream's calls (the dry run's synthetic streams)."""
-    out, turn = [], 0
+    turn's stream to one file, after a `{"type": "driver_turn", "turn": N}` line that numbers it. A stream with
+    no markers (runs before them) splits by the tool names turns.json records per turn (`turns`; read beside the
+    stream when not given): one `claude -p` call can print several `system/init` lines (each background agent that
+    finishes resumes it), so an init starts a turn only when there are no counts or they don't add up to the
+    stream's calls (the dry run's synthetic streams)."""
+    out, turn, marked = [], 0, False
     p = pathlib.Path(stream_path)
     if not p.exists():
         return out
@@ -219,7 +220,9 @@ def tool_calls(stream_path, turns=None):
             d = json.loads(line)
         except ValueError:
             continue
-        if d.get("type") == "system" and d.get("subtype") == "init":
+        if d.get("type") == "driver_turn":
+            turn, marked = int(d.get("turn") or 0), True
+        if d.get("type") == "system" and d.get("subtype") == "init" and not marked:
             turn += 1
         if d.get("type") == "assistant":
             for c in (d.get("message") or {}).get("content", []) or []:
@@ -227,7 +230,7 @@ def tool_calls(stream_path, turns=None):
                     out.append({"turn": max(turn, 1), "name": c.get("name"), "input": c.get("input") or {},
                                 "parent": d.get("parent_tool_use_id"), "id": c.get("id")})
     counts = [(t["turn"], len(t.get("tools") or [])) for t in turns]
-    if counts and sum(n for _, n in counts) == len(out):
+    if not marked and counts and sum(n for _, n in counts) == len(out):
         i = 0
         for n_turn, n in counts:
             for c in out[i:i + n]:

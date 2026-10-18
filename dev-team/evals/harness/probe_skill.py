@@ -125,7 +125,7 @@ def run_paid(out):
                 continue
             t += 1
             reply, usage, tools, skills, secs, errors, hooks, init, agents, _ = driver.agent_turn(
-                proj, sid, msg, t == 1, out / "agent_stream.jsonl", root, extra)
+                proj, sid, msg, t == 1, out / "agent_stream.jsonl", root, extra, turn=t)
             driver.commit(proj, f"turn {t}")
             rec = {"turn": t, "user": msg, "assistant": reply, "skills": skills, "tools": tools, "seconds": round(secs, 1),
                    "usage": usage, "tool_errors": errors, "hook_events": hooks, "agents": agents}

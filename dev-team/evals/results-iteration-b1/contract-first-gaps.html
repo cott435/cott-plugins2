@@ -1,0 +1,319 @@
+<title>Contract-First Gap Review</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Serif:wght@500;600&display=swap">
+<style>
+/* Layout: one reading column; three summary columns that stack on phones; charts as to-scale HTML bars. */
+:root {
+  --bg: #f7f8fa;
+  --surface: #fcfcfb;
+  --ink: #14171c;
+  --ink-2: #4a505a;
+  --ink-3: #6e7480;
+  --rule: #dfe3ea;
+  --series-1: #2a78d6;
+  --track: #eceff4;
+  --good: #0ca30c;
+  --warn: #fab219;
+  --crit: #d03b3b;
+  --chip-good: #e5f4e5;
+  --chip-warn: #fdf1d6;
+  --chip-crit: #f9e3e3;
+  --chip-ink-good: #0b5c0b;
+  --chip-ink-warn: #7a5400;
+  --chip-ink-crit: #8f2323;
+  --f-display: "IBM Plex Serif", Georgia, serif;
+  --f-body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --f-mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #121418; --surface: #1a1a19; --ink: #eceef2; --ink-2: #b9bec8; --ink-3: #8d93a0; --rule: #2c3038;
+    --series-1: #3987e5; --track: #262a31;
+    --chip-good: #13301a; --chip-warn: #3a2f12; --chip-crit: #3a1818;
+    --chip-ink-good: #8fe08f; --chip-ink-warn: #ffd27a; --chip-ink-crit: #ff9c9c;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #121418; --surface: #1a1a19; --ink: #eceef2; --ink-2: #b9bec8; --ink-3: #8d93a0; --rule: #2c3038;
+  --series-1: #3987e5; --track: #262a31;
+  --chip-good: #13301a; --chip-warn: #3a2f12; --chip-crit: #3a1818;
+  --chip-ink-good: #8fe08f; --chip-ink-warn: #ffd27a; --chip-ink-crit: #ff9c9c;
+  color-scheme: dark;
+}
+body { background: var(--bg); color: var(--ink); font-family: var(--f-body); font-size: 15px; line-height: 1.55; }
+.wrap { max-width: 980px; margin: 0 auto; padding-block: 40px 64px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  display: grid; gap: 48px; }
+h1, h2 { font-family: var(--f-display); font-weight: 600; text-wrap: balance; margin: 0; }
+h1 { font-size: clamp(28px, 4.5vw, 40px); line-height: 1.15; }
+h2 { font-size: 22px; line-height: 1.25; }
+p { margin: 0; max-width: 68ch; }
+.eyebrow { font-family: var(--f-mono); font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-3); }
+.lede { color: var(--ink-2); font-size: 17px; }
+header { display: grid; gap: 12px; }
+section { display: grid; gap: 16px; }
+.sub { color: var(--ink-2); }
+.note { color: var(--ink-3); font-size: 13px; }
+
+/* three-column summary */
+.cols { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+.col { background: var(--surface); border: 1px solid var(--rule); border-radius: 6px; padding: 18px; display: grid; gap: 10px; align-content: start; min-width: 0; }
+.col h3 { margin: 0; font-size: 15px; font-weight: 600; }
+.col ul { margin: 0; padding-left: 18px; display: grid; gap: 6px; color: var(--ink-2); }
+@media (max-width: 760px) { .cols { grid-template-columns: 1fr; } }
+
+/* charts */
+.chart { background: var(--surface); border: 1px solid var(--rule); border-radius: 6px; padding: 20px; display: grid; gap: 14px; min-width: 0; }
+.chart-title { font-weight: 600; }
+.legend { display: flex; flex-wrap: wrap; gap: 8px 18px; font-size: 13px; color: var(--ink-2); }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.sw { width: 12px; height: 12px; border-radius: 3px; display: inline-block; }
+.sw.good { background: var(--good); } .sw.warn { background: var(--warn); } .sw.crit { background: var(--crit); }
+.rows { display: grid; gap: 12px; }
+.row { display: grid; grid-template-columns: minmax(120px, 210px) minmax(0, 1fr); gap: 12px; align-items: center; }
+.row-label { font-size: 14px; color: var(--ink); }
+.row-label small { display: block; color: var(--ink-3); font-size: 12px; }
+@media (max-width: 560px) { .row { grid-template-columns: 1fr; gap: 6px; } }
+.stack { display: flex; gap: 2px; height: 30px; }
+.seg { border-radius: 4px; display: flex; align-items: center; justify-content: center; font-family: var(--f-mono); font-size: 12px; font-weight: 500; color: #fff; min-width: 26px; cursor: default; }
+.seg.good { background: var(--good); } .seg.warn { background: var(--warn); color: #1d1600; } .seg.crit { background: var(--crit); }
+.seg:focus-visible, .bar:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+.barline { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.bar { height: 22px; background: var(--series-1); border-radius: 0 4px 4px 0; min-width: 3px; cursor: default; }
+.val { font-family: var(--f-mono); font-size: 13px; color: var(--ink); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.val small { color: var(--ink-3); }
+.axis { display: grid; grid-template-columns: minmax(120px, 210px) minmax(0, 1fr); gap: 12px; font-family: var(--f-mono); font-size: 11px; color: var(--ink-3); }
+.axis .ticks { position: relative; height: 14px; border-top: 1px solid var(--rule); }
+.axis .ticks span { position: absolute; top: 2px; transform: translateX(-50%); }
+.axis .ticks span:first-child { transform: none; }
+@media (max-width: 560px) { .axis { grid-template-columns: 1fr; } .axis > :first-child { display: none; } }
+
+/* matrix table */
+.table-wrap { overflow-x: auto; background: var(--surface); border: 1px solid var(--rule); border-radius: 6px; }
+table { border-collapse: collapse; width: 100%; min-width: 760px; font-size: 14px; }
+th, td { text-align: left; vertical-align: top; padding: 10px 12px; border-bottom: 1px solid var(--rule); }
+th { font-size: 12px; font-weight: 600; color: var(--ink-3); letter-spacing: .04em; text-transform: uppercase; background: var(--surface); }
+tr:last-child td { border-bottom: 0; }
+td.n { font-family: var(--f-mono); color: var(--ink-3); width: 28px; }
+td.gap { font-weight: 500; }
+td.gap small, td.fill small { display: block; font-weight: 400; color: var(--ink-3); font-size: 12px; margin-top: 2px; }
+.chip { display: inline-flex; align-items: center; gap: 5px; padding: 2px 8px; border-radius: 999px; font-size: 12px; font-weight: 500; white-space: nowrap; }
+.chip.good { background: var(--chip-good); color: var(--chip-ink-good); }
+.chip.warn { background: var(--chip-warn); color: var(--chip-ink-warn); }
+.chip.crit { background: var(--chip-crit); color: var(--chip-ink-crit); }
+.group td { background: var(--track); font-family: var(--f-mono); font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--ink-2); padding-block: 6px; }
+
+#tip { position: fixed; z-index: 10; max-width: 300px; background: var(--ink); color: var(--bg); padding: 8px 10px; border-radius: 6px; font-size: 13px; line-height: 1.4; pointer-events: none; }
+@media (prefers-reduced-motion: no-preference) { .seg, .bar { transition: filter .15s; } .seg:hover, .bar:hover { filter: brightness(1.08); } }
+</style>
+
+<div class="wrap">
+  <header>
+    <div class="eyebrow">dev-team · build eval b1 · stock-data brief</div>
+    <h1>Contract-first pipelines: what's covered, what your brief adds, what's still open</h1>
+    <p class="lede">dev-team already builds in the order your brief proposes: contracts, then a spine, then wiring, then thickening. Measured on minilab, a small prices-to-risk-report project, that order was not faster at this size. Its real weak point is gaps that only show up once real code runs. Your brief fixes most of the design gaps. Two of the most expensive failures in the eval are missing from both.</p>
+  </header>
+
+  <section aria-labelledby="s-summary">
+    <h2 id="s-summary">In plain terms</h2>
+    <div class="cols">
+      <div class="col">
+        <div class="eyebrow">Done today</div>
+        <h3>What dev-team does now</h3>
+        <ul>
+          <li>Writes every shared type as code, with a schema and a sample file, before any parallel work.</li>
+          <li>Builds fakes for each boundary with the contracts, so each step is tested alone.</li>
+          <li>Runs a spine, then wiring, then thickens, with agents in parallel and a review at phase ends.</li>
+          <li>Catches a missing field while the contracts are written, in about 2 minutes.</li>
+        </ul>
+      </div>
+      <div class="col">
+        <div class="eyebrow">Your brief</div>
+        <h3>What you suggested</h3>
+        <ul>
+          <li>Build one real source end to end before the rest.</li>
+          <li>One canonical record (<code>Bar</code>) that every source converts into.</li>
+          <li>Failures isolated per source and symbol, logged, with reruns that are safe to repeat.</li>
+          <li>Logging, stage counts and a <code>FakeSource</code> in the spine from day one.</li>
+          <li>Sources, symbols, dates and stages in config. Retries and rate limits as wrappers.</li>
+        </ul>
+      </div>
+      <div class="col">
+        <div class="eyebrow">Proposed fixes</div>
+        <h3>What fills the rest</h3>
+        <ul>
+          <li>Build the real slice <em>before</em> freezing the contracts. The brief's order freezes first.</li>
+          <li>One shared test suite that every source <em>and its fake</em> must pass.</li>
+          <li>Contract tests check shape only, never "this is still a stub". Review before the parallel wave starts.</li>
+          <li>Spell out the record's timezone, price adjustment, currency and version.</li>
+          <li>Rules for overlapping sources, shared rate limits, batch failure and daily backfill.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section aria-labelledby="s-cover">
+    <h2 id="s-cover">How the 12 weak points get covered</h2>
+    <p class="sub">The 5 weak points your brief found, plus 7 more from the eval runs and from reading the brief. Hover a segment to see which ones.</p>
+    <div class="chart" id="cover-chart">
+      <div class="legend" aria-hidden="true">
+        <span><i class="sw good"></i>✓ Covered</span>
+        <span><i class="sw warn"></i>◐ Partly</span>
+        <span><i class="sw crit"></i>✕ Not covered</span>
+      </div>
+      <div class="rows" id="cover-rows"></div>
+      <p class="note">"Brief + proposed fixes" is on paper only. None of the fixes is built or tested yet.</p>
+    </div>
+  </section>
+
+  <section aria-labelledby="s-cost">
+    <h2 id="s-cost">A gap found late costs much more</h2>
+    <p class="sub">Time lost to a contract problem, by when it surfaced. This is why building a real slice early and reviewing before the parallel wave matter most.</p>
+    <div class="chart">
+      <div class="chart-title">Minutes lost per problem</div>
+      <div class="rows" id="cost-rows"></div>
+      <div class="axis" aria-hidden="true"><div></div><div class="ticks" id="cost-axis"></div></div>
+    </div>
+  </section>
+
+  <section aria-labelledby="s-speed">
+    <h2 id="s-speed">Build time on minilab</h2>
+    <p class="sub">Median of 3 runs per setup, 21 tasks. One session working alone was fastest. The parallel contract-first build (A3) loses its parallel gain to fixed costs: the contract task, reviews and agent start-up.</p>
+    <div class="chart">
+      <div class="chart-title">Minutes to build milestone M1</div>
+      <div class="rows" id="speed-rows"></div>
+      <div class="axis" aria-hidden="true"><div></div><div class="ticks" id="speed-axis"></div></div>
+    </div>
+  </section>
+
+  <section aria-labelledby="s-table">
+    <h2 id="s-table">Every weak point, one row each</h2>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>#</th><th>Weak point</th><th>dev-team today</th><th>Your brief</th><th>How it gets filled</th></tr></thead>
+        <tbody id="matrix"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section aria-labelledby="s-protocol">
+    <h2 id="s-protocol">Protocol or ABC</h2>
+    <p>Use <code>typing.Protocol</code>. Adapters don't need to import or inherit anything, mypy checks them, and third-party classes fit as they are. <code>@runtime_checkable</code> only checks that names exist, so the real runtime check is the shared test suite above: it checks behavior on every registered source. An ABC is only worth it if you want sources found automatically through subclassing, which your config-driven registry doesn't need.</p>
+  </section>
+</div>
+<div id="tip" role="tooltip" hidden></div>
+
+<script>
+const S = { good: ["✓", "Covered"], warn: ["◐", "Partly"], crit: ["✕", "Not covered"] };
+const GAPS = [
+  { g: "brief", t: "Interfaces designed before real data is seen", today: "warn", todayWhy: "Probes check external APIs, but minilab still froze a fake that filtered tickers when the real code didn't.", brief: "warn", briefWhy: "Has the real slice, but after the contracts freeze.", fill: "Build one real source end to end, then freeze the contracts." },
+  { g: "brief", t: "No shared data shape", today: "good", todayWhy: "Every type has a schema and a sample file.", brief: "good", briefWhy: "One canonical Bar record.", fill: "Already covered." },
+  { g: "brief", t: "Failure behavior undefined", today: "warn", todayWhy: "Each function's errors are in its contract. Nothing per source.", brief: "good", briefWhy: "Per source and symbol, logged, safe reruns.", fill: "Covered by the brief." },
+  { g: "brief", t: "Logging and test seams added late", today: "warn", todayWhy: "Fakes come with the contracts. Logging isn't required.", brief: "good", briefWhy: "Logging, counts and FakeSource in the spine.", fill: "Covered by the brief." },
+  { g: "brief", t: "Settings hard-coded", today: "crit", todayWhy: "Left to each project's design.", brief: "good", briefWhy: "Sources, symbols, dates and stages in config.", fill: "Covered by the brief." },
+  { g: "new", t: "Fakes drift from the real sources", today: "crit", todayWhy: "minilab: the fake filtered tickers, the real code didn't. Found at the last task, 6–8 min lost.", brief: "crit", briefWhy: "Not mentioned.", fill: "One shared test suite run on every source and its fake." },
+  { g: "new", t: "Contract tests pin a temporary state", today: "crit", todayWhy: "rl9: a frozen test required every step to stay a stub. The run stalled at 1 of 30 tasks.", brief: "crit", briefWhy: "Not mentioned. Building stubs first makes it more likely.", fill: "Contract tests check shape only. Review before the parallel wave." },
+  { g: "new", t: "Record meaning: timezone, price adjustment, currency", today: "warn", todayWhy: "A contract can state it. Nothing requires it.", brief: "warn", briefWhy: "Bar has fields, not their meaning.", fill: "Bar names its timezone, adjustment, currency and schema version." },
+  { g: "new", t: "Two sources disagree on the same day", today: "crit", todayWhy: "Not covered.", brief: "crit", briefWhy: "The sink keeps both, but nothing says which wins.", fill: "A precedence rule per field." },
+  { g: "new", t: "Rate limits shared across symbols", today: "crit", todayWhy: "Not covered.", brief: "warn", briefWhy: "RateLimited wraps one adapter instance.", fill: "One limiter per provider, shared by every symbol and process." },
+  { g: "new", t: "When to fail a whole batch", today: "crit", todayWhy: "Not covered.", brief: "warn", briefWhy: "Per-rule severity is left open.", fill: "Fail the run when the rejected share passes a threshold." },
+  { g: "new", t: "Daily incremental runs", today: "crit", todayWhy: "Not covered.", brief: "warn", briefWhy: "Reruns are safe, but there is no 'since last run'.", fill: "A watermark and backfill window per source." },
+];
+
+const tip = document.getElementById("tip");
+function showTip(e, html) {
+  tip.innerHTML = html; tip.hidden = false;
+  const r = (e.currentTarget || e.target).getBoundingClientRect();
+  const w = tip.offsetWidth, h = tip.offsetHeight;
+  let x = (e.clientX ?? r.left + r.width / 2) + 12, y = (e.clientY ?? r.top) + 14;
+  if (x + w > innerWidth - 8) x = innerWidth - w - 8;
+  if (y + h > innerHeight - 8) y = r.top - h - 8;
+  tip.style.left = Math.max(8, x) + "px"; tip.style.top = Math.max(8, y) + "px";
+}
+function hideTip() { tip.hidden = true; }
+function hover(el, html) {
+  el.tabIndex = 0;
+  el.addEventListener("mousemove", e => showTip(e, html));
+  el.addEventListener("mouseleave", hideTip);
+  el.addEventListener("focus", e => showTip(e, html));
+  el.addEventListener("blur", hideTip);
+}
+const esc = s => s.replace(/&/g, "&amp;").replace(/</g, "&lt;");
+
+// Coverage chart
+const views = [
+  { label: "dev-team today", sub: "as built", key: "today" },
+  { label: "With your brief", sub: "design only", key: "brief" },
+  { label: "Brief + proposed fixes", sub: "on paper", key: "all" },
+];
+const coverRows = document.getElementById("cover-rows");
+for (const v of views) {
+  const status = g => v.key === "all" ? "good" : g[v.key];
+  const row = document.createElement("div"); row.className = "row";
+  row.innerHTML = `<div class="row-label">${v.label}<small>${v.sub}</small></div><div class="stack" role="img"></div>`;
+  const stack = row.querySelector(".stack");
+  const counts = [];
+  for (const s of ["good", "warn", "crit"]) {
+    const items = GAPS.filter(g => status(g) === s);
+    if (!items.length) continue;
+    counts.push(`${items.length} ${S[s][1].toLowerCase()}`);
+    const seg = document.createElement("div");
+    seg.className = "seg " + s; seg.style.flex = items.length;
+    seg.textContent = `${S[s][0]} ${items.length}`;
+    seg.setAttribute("aria-label", `${v.label}: ${items.length} ${S[s][1]}`);
+    hover(seg, `<b>${v.label} · ${S[s][1]} (${items.length})</b><br>` + items.map(g => "· " + esc(g.t)).join("<br>"));
+    stack.appendChild(seg);
+  }
+  stack.setAttribute("aria-label", `${v.label}: ${counts.join(", ")} of 12`);
+  coverRows.appendChild(row);
+}
+
+// Bar charts, drawn to one linear scale each
+function bars(rowsId, axisId, data, max, step, unit) {
+  const rows = document.getElementById(rowsId);
+  for (const d of data) {
+    const row = document.createElement("div"); row.className = "row";
+    row.innerHTML = `<div class="row-label">${d.label}<small>${d.sub}</small></div><div class="barline"><div class="bar"></div><span class="val">${d.text}</span></div>`;
+    const bar = row.querySelector(".bar");
+    bar.style.width = `calc((100% - 92px) * ${d.v / max})`;
+    bar.setAttribute("role", "img"); bar.setAttribute("aria-label", `${d.label}: ${d.text}`);
+    hover(bar, `<b>${d.label}</b><br>${d.tip}`);
+    rows.appendChild(row);
+  }
+  const axis = document.getElementById(axisId);
+  for (let t = 0; t <= max; t += step) {
+    const s = document.createElement("span");
+    s.textContent = t + (t === 0 ? "" : unit);
+    s.style.left = `calc((100% - 92px) * ${t / max})`;
+    axis.appendChild(s);
+  }
+}
+bars("cost-rows", "cost-axis", [
+  { label: "Missing field", sub: "caught while writing contracts", v: 2.0, text: "≈2 min", tip: "minilab: Drawdown lacked trough_date. Every contract-first run caught it at the contract task. Contract change 98–123 s." },
+  { label: "Fake ≠ real code", sub: "caught at the last task", v: 7.4, text: "6–8 min", tip: "minilab: the fakes filtered tickers, the real code didn't. Re-freeze and fix task: 388 s and 496 s in two runs." },
+  { label: "Missing field", sub: "caught after the freeze", v: 12.6, text: "≈13 min", tip: "minilab A2-r1, older plan: found by a tester after the contracts froze. Revise, Replan, re-freeze: 755 s." },
+  { label: "Stub-pinning contract test", sub: "no review before the parallel wave", v: 73.5, text: "73 min <small>· stalled at 1/30</small>", tip: "rl9: the contract task froze a test requiring every step to stay a stub. Every builder was blocked. The run stalled after 4,409 s, $36." },
+], 80, 20, " min");
+bars("speed-rows", "speed-axis", [
+  { label: "One session (A0)", sub: "no subagents, plan order", v: 14.9, text: "14.9", tip: "Median 894 s, range 848–1,040 s." },
+  { label: "Workflow-run (A3-WF)", sub: "contract-first, parallel", v: 19.2, text: "19.2", tip: "Median 1,152 s, range 1,076–2,039 s. The slowest run includes an 8-min Replan." },
+  { label: "Older spine plan (A2)", sub: "parallel, 12 tasks", v: 21.4, text: "21.4", tip: "Median 1,283 s, range 1,233–1,327 s." },
+  { label: "No separate testers (A4)", sub: "contract-first, parallel", v: 22.6, text: "22.6", tip: "Median 1,353 s, range 1,227–1,435 s." },
+  { label: "Contract-first (A3)", sub: "parallel, cap 6", v: 23.8, text: "23.8", tip: "Median 1,428 s, range 1,248–1,791 s. Parallel phase 360 s, fixed costs about 1,000 s." },
+  { label: "Review after each task (A3-RT)", sub: "contract-first, parallel", v: 30.3, text: "30.3", tip: "Median 1,815 s, range 1,706–2,132 s. Reviewers took 2–3 of the 6 agent slots." },
+  { label: "One agent at a time (A1)", sub: "contract-first, serial", v: 51.7, text: "51.7", tip: "Median 3,099 s, range 3,028–3,115 s." },
+], 60, 15, "");
+
+// Matrix
+const chip = s => `<span class="chip ${s}"><span aria-hidden="true">${S[s][0]}</span>${S[s][1]}</span>`;
+const m = document.getElementById("matrix");
+let last = "";
+GAPS.forEach((g, i) => {
+  if (g.g !== last) {
+    last = g.g;
+    m.insertAdjacentHTML("beforeend", `<tr class="group"><td colspan="5">${g.g === "brief" ? "Weak points your brief found" : "Gaps the brief misses"}</td></tr>`);
+  }
+  m.insertAdjacentHTML("beforeend", `<tr><td class="n">${i + 1}</td><td class="gap">${esc(g.t)}</td><td>${chip(g.today)}<small class="note" style="display:block;margin-top:4px">${esc(g.todayWhy)}</small></td><td>${chip(g.brief)}<small class="note" style="display:block;margin-top:4px">${esc(g.briefWhy)}</small></td><td class="fill">${esc(g.fill)}</td></tr>`);
+});
+</script>

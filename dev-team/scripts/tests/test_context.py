@@ -22,7 +22,8 @@ class ContextFixtureTest(unittest.TestCase):
         positions = [out.index(s) for s in order]
         self.assertEqual(positions, sorted(positions))
         self.assertIn("Sample: tests/contracts/data.RawPrices/ (exists)\n", out)
-        self.assertIn("- src/quant/data/universe.py (new)\n- tests/unit/quant/test_universe.py (new)\n", out)
+        self.assertIn("- src/quant/data/universe.py (from M1-T03)\n- tests/unit/quant/test_universe.py (from M1-T03)\n",
+                      out)          # its spine task wrote them first: extend, don't start over
         self.assertIn("    pipeline.py — PL-01 entry: load prices.\n", out)
         self.assertEqual(out.count("### data.Prices:"), 1)          # read already: not repeated as an interface
         self.assertNotIn("## Files likely", out)
@@ -36,9 +37,10 @@ class ContextFixtureTest(unittest.TestCase):
                          ["data.Prices", "stats.Returns", "stats.Cov", "stats.Factors", "stats.estimate_cov",
                           "stats.clean_eigen"])
         self.assertEqual(data["kind"], "wiring")
-        self.assertEqual(data["writes"], [{"path": "src/quant/stats/pipeline.py", "exists": False, "folder": False},
+        self.assertEqual(data["writes"], [{"path": "src/quant/stats/pipeline.py", "exists": False, "folder": False,
+                                           "from": []},           # M1-T01's src/quant/stats/** folder doesn't count
                                           {"path": "tests/unit/quant/test_pl02_smoke.py", "exists": False,
-                                           "folder": False}])
+                                           "folder": False, "from": []}])
 
     def test_deterministic(self):
         self.assertEqual(run_dt(QUANT, "context", "M1-T11"), run_dt(QUANT, "context", "M1-T11"))
@@ -50,7 +52,8 @@ class ContextFixtureTest(unittest.TestCase):
         self.assertEqual([r["ref"] for r in data["read"]], ["PL-02", "TC-02", "STAT-03", "stats.Cov", "stats.clean_eigen"])
         self.assertEqual(data["lines"], data["text"].count("\n"))
         self.assertEqual(data["interfaces"], [])
-        self.assertEqual(data["writes"][0], {"path": "src/quant/stats/rmt.py", "exists": False, "folder": False})
+        self.assertEqual(data["writes"][0], {"path": "src/quant/stats/rmt.py", "exists": False, "folder": False,
+                                             "from": ["M1-T05"]})
         self.assertEqual(data["files_likely"], [])
 
     def test_missing_task(self):
@@ -100,6 +103,34 @@ class ContextCopyTest(FixtureCopy):
         self.assertIn("### notes/data.md\n````markdown\n# Notes\n```python\nx = 1\n```\n````\n", out)
         self.assertIn("### src/quant/data/steps.py\n```python\n\"\"\"PL-01 steps", out)
         self.assertIn("### missing/file.py\n(missing: not in the repo yet)\n", out)
+
+    def test_nested_types_are_pulled_until_closed(self):
+        # Read names stats.CovReport; its signature names Factors, whose signature (edited) names Returns.
+        self.set_read("PL-01, stats.CovReport")
+        self.replace("docs/packages/quant/contract.md", "class Factors: loadings: np.ndarray;",
+                     "class Factors: loadings: np.ndarray; source: Returns;")
+        code, out, _ = self.dt("context", "M1-T10", "--json")
+        data = json.loads(out)
+        self.assertEqual(code, 0)
+        self.assertEqual([(i["id"], i["named_by"]) for i in data["interfaces"]],
+                         [("data.RawPrices", None), ("data.Prices", None), ("stats.Factors", "stats.CovReport"),
+                          ("stats.Returns", "stats.Factors")])
+        self.assertIn("<!-- docs/packages/quant/contract.md:40 · named by stats.CovReport -->\n### stats.Factors: type",
+                      data["text"])
+
+    def test_a_name_defined_inline_pulls_its_section(self):
+        self.set_read("PL-01, stats.clean_eigen")
+        self.replace("docs/packages/quant/contract.md", "`def clean_eigen(cov: Cov, *, n_obs: int) -> Cov`",
+                     "`def clean_eigen(cov: Cov, *, n_obs: int, edge: Edge) -> Cov`")
+        self.replace("docs/packages/quant/contract.md", "class Weights: values: np.ndarray; tickers: tuple[str, ...]`",
+                     "class Weights: values: np.ndarray; tickers: tuple[str, ...]` and `Edge = float`")
+        data = json.loads(self.dt("context", "M1-T10", "--json")[1])
+        self.assertIn(("portfolio.Weights", "stats.clean_eigen"), [(i["id"], i["named_by"]) for i in data["interfaces"]])
+
+    def test_writes_from_an_ancestor(self):
+        code, out, _ = self.dt("context", "M1-T14")
+        self.assertEqual(code, 0)
+        self.assertIn("- src/quant/stats/pipeline.py (from M1-T09)\n", out)
 
     def test_budget_warning(self):
         self.write("big.txt", "line\n" * 2100)

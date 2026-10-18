@@ -3,6 +3,7 @@ contract symbols and components. Each is read from a `Doc` by the shared markdow
 """
 from __future__ import annotations
 
+import fnmatch
 import re
 from dataclasses import dataclass, field
 
@@ -116,6 +117,25 @@ class Task:
     @property
     def text(self) -> str:
         return "\n".join(self.doc.lines[self.start:self.end]).rstrip() + "\n"
+
+
+def norm_write(path: str) -> tuple[str, bool]:
+    """A Writes item → (path or folder prefix, is a folder). `dir/**`, `dir/*` and `dir/` claim the folder."""
+    p = path.strip().removeprefix("./")
+    for suffix in ("/**", "/*", "/"):
+        if p.endswith(suffix):
+            return p[: -len(suffix)] + "/", True
+    return p, False
+
+
+def writes_overlap(a: str, b: str) -> bool:
+    """Two Writes items claim a file in common: the same path, one inside the other's folder, or a glob match."""
+    (pa, da), (pb, db) = norm_write(a), norm_write(b)
+    if pa == pb:
+        return True
+    if da and pb.startswith(pa) or db and pa.startswith(pb):
+        return True
+    return fnmatch.fnmatch(pa, pb) or fnmatch.fnmatch(pb, pa)
 
 
 @dataclass

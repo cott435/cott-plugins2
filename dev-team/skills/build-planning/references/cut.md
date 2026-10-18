@@ -8,7 +8,6 @@ Read only `dt status`, the roadmap, the packages' `pipelines.md`, `contract.md` 
 
 Before planning, check the Grow triggers. `grow_triggers` lists the measurable ones (> 3 pipelines, > 12 modules, package docs > 2,000 lines). Check the others yourself:
 - The milestone brings a dependency stack the rest shouldn't carry (torch, CUDA).
-- A one-way dependency is worth enforcing (data must never import models).
 - A part runs or deploys on its own (a paper-trading service).
 
 If one fires and no `AD-NN` already records the decision to stay single, **stop** and route to `architecture-design` Grow. Plan after Grow, pipeline-design Grow and build-setup Extend have caught up.

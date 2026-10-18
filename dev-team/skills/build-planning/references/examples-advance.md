@@ -1,6 +1,6 @@
 # Example: Advance — M1 done, M2 kickoff
 
-**State:** all fourteen M1 todo items ticked, both checkpoints ticked. Assume `test-planning` Extend added a PL-03 Strategy row (smoke `python -m gridload.reserve evaluate --smoke`) and TC-04 (the optimized reserve allocation for a two-region closed form).
+**State:** all fourteen M1 todo items ticked, all four checkpoints ticked. Assume `test-planning` Extend added a PL-03 Strategy row (smoke `python -m gridload.reserve evaluate --smoke`) and TC-04 (the optimized reserve allocation for a two-region closed form).
 
 **Turn 1 — exit checkpoint.**
 ```
@@ -55,9 +55,15 @@ One scope question:
 **Verify:** `pytest tests/contracts` · `scripts/check.sh gate`
 **Depends on:** — · **Writes:** src/gridload/reserve/**, tests/contracts/reserve.Allocation/, tests/contracts/reserve.Comparison/
 
+### Checkpoint after M2-T01 (barrier)
+…
+
 ## Phase 1: Step spines
 
 M2-T02 `allocate` spine (equal split) as in `../examples.md`; M2-T03 `compare` spine (realized shortfall only), the same shape.
+
+### Checkpoint after M2-T03
+…
 
 ## Phase 2: Wiring and thicken
 
@@ -68,22 +74,18 @@ M2-T02 `allocate` spine (equal split) as in `../examples.md`; M2-T03 `compare` s
 - [ ] `python -m gridload.reserve evaluate --smoke` runs end to end on synthetic load, every step at its spine version; committed as PL-03's smoke test
 - [ ] PL-03 pre-build sections replaced by a `dt layout` pointer
 **Verify:** `python -m gridload.reserve evaluate --smoke` · `scripts/check.sh gate`
-**Depends on:** M2-T02, M2-T03 · **Writes:** src/gridload/reserve/pipeline.py, src/gridload/reserve/__main__.py, tests/unit/gridload/test_pl03_smoke.py
+**Depends on:** M2-T02, M2-T03 · **Writes:** src/gridload/reserve/pipeline.py, tests/unit/gridload/test_pl03_smoke.py
 
 M2-T05 Out-of-sample comparison (`compare`, split, RES-02, on M2-T03): Given a walk-forward split, each allocation uses only load before its week; realized held-out shortfall is reported next to the equal split. M2-T06 Optimized reserve allocation as in `../examples.md`.
 
-### Checkpoint after M2-T06
-…
-
 ### M2-T07: Fourier profile as the allocation default
 **Package:** gridload · **Step:** PL-03.fit_seasonality · **Kind:** thicken · **Covers:** STAT-02 · **Size:** XS · **Mode:** solo
-**Reason:** wiring only; the Fourier fit's behavior is already tested by M1-T12
 **Read:** PL-03, profile.fit_seasonality
 **Acceptance:**
 - [ ] The allocation uses the Fourier profile by default; `--profile means` still selects the baseline
 - [ ] PL-03 smoke test still passes
 **Verify:** `python -m gridload.reserve evaluate --smoke` · `scripts/check.sh gate`
-**Depends on:** M2-T04 · **Writes:** src/gridload/reserve/pipeline.py
+**Depends on:** M2-T04 · **Writes:** src/gridload/reserve/pipeline.py, tests/unit/gridload/test_pl03_default.py
 
 ### Checkpoint: milestone exit
 …
@@ -108,7 +110,7 @@ M2-T05 Out-of-sample comparison (`compare`, split, RES-02, on M2-T03): Given a w
 ## Replan notes
 ````
 
-Why this shape: `fit_seasonality` is M1's, built and real, so PL-03 needs no fake and M2 no system task. M2-T03 doesn't wait for M2-T02: it builds on the `Allocation` sample. The comparison is the evaluation and the riskiest step, but nothing needs to wait for it, so risk adds no edge; its tester starts in wave 1 like M2-T06's. Critical path 4 (M2-T01 → M2-T02 → M2-T04 → M2-T07), widest wave 4 (two spines, two testers). M2-T07 changes a default, which is behavior, so `solo` needs the `Reason` line.
+Why this shape: `fit_seasonality` is M1's, built and real, so PL-03 needs no fake and M2 no system task. M2-T03 doesn't wait for M2-T02: it builds on the `Allocation` sample. The comparison is the evaluation and the riskiest step, but nothing needs to wait for it, so risk adds no edge; its tester starts in wave 1 like M2-T06's. Critical path 4 (M2-T01 → M2-T02 → M2-T04 → M2-T07), widest wave 4 (two spines, two testers). M2-T07 changes a default but names no TC case, Given/When/Then or criterion, so it is solo by the rule; its unit test pins the default. Checkpoints after M2-T01 (barrier) and M2-T03, then the milestone exit, since Phase 2 is the last.
 
 Write M2's row (Depends `M1 (profile.fit_seasonality)`) and section (Packages, Pipelines, Outline, Exit, Plan link) and run `dt roadmap` (M2 → Planned, S2 → Planned). Run the Review Gate and present it with ASSUMPTIONS (the shape above, the unmitigated edges, the M2-T07 override, data-science routed to M2-T06 only). *(Turn ends.)*
 

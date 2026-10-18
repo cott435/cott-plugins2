@@ -46,13 +46,15 @@ The standing quality bar. `pyproject.toml` and `scripts/check.sh` enforce it; ev
 | Role | May edit | May not edit | Stop gate |
 |---|---|---|---|
 | tester | `tests/intent/**`, within the task's `Writes:` | everything else; reads no source | `check.sh collect` (lint, collect, red for the right reason) |
-| implementer / solo | `src/**`, `tests/unit/**`, within the task's `Writes:`; the interface task also its new `tests/contracts/<id>.<symbol>/` | the protected list; `tasks/` | `check.sh gate` + protected-path diff against `refs/checks/base` |
-| reviewer | its own worktree only, for the mutation check; nothing lands (the orchestrator records findings with `dt finding`) | everything else | runs `check.sh full` by hand |
+| implementer / solo | `src/**`, `tests/unit/**`, within the task's `Writes:`; an interface task also the `tests/contracts/<id>.<symbol>/` its `Writes:` names | the protected list; `tasks/` | `check.sh gate` + protected-path diff against the worktree's base |
+| reviewer | its worktree, for the mutation check, and its findings file; nothing lands (the orchestrator records findings with `dt finding`) | everything else | runs `check.sh full` by hand |
 
-**Protected list** (`PROTECTED` in `scripts/check.sh`; `path_guard.sh deny --protected` reads the same list): {{protected_globs_md}}. `tests/contracts/**` covers the contract folders that exist at the task's base (CR-09). **`Writes:`**: the orchestrator puts a task's `Writes:` in `.claude/.task_writes` in the builder's worktree, and `path_guard.sh writes` blocks every edit outside it. Only the orchestrator writes `tasks/` (`dt tick`, `dt finding`), after each merge.
+**Protected list** (`PROTECTED` in `scripts/check.sh`; `path_guard.sh deny --protected` reads the same list): {{protected_globs_md}}. `tests/contracts/**` covers the contract folders that exist at the task's base (CR-09). **`Writes:`**: `dt claim`, in the builder's worktree, writes the role's share of the task's `Writes:` to `.claude/.task_writes` and sets the worktree's base (`refs/worktree/checks-base`); `path_guard.sh writes` blocks edits outside the list, and a tester's or implementer's edits before the claim. Only the orchestrator writes `tasks/` (`dt land`, `dt finding`).
+
+**Worktree links:** {{worktree_links}}
 
 ## Review
-Run by the reviewer agent over what it is given (base, package, tasks, paths): the interface review after Phase 0, a phase review per package at each checkpoint, and the milestone exit. `dt land` already checks each task's `Writes:`, protected paths, gate and red tests; review judges what tools can't.
+Run by the reviewer agent over what it is given (base, package, tasks, paths): the interface review after Phase 0, a phase review per package at each checkpoint, and the milestone exit. `dt land` has already checked each landing's `Writes:`, protected paths and role gate, and the gate on the merged tree; review judges what tools can't.
 
 **Interface** (after Phase 0): the code is the contract, no more and no less.
 1. Types match `contract.md`: fields, types, invariants. Nothing a step's In → Out needs is missing; no helper is frozen.

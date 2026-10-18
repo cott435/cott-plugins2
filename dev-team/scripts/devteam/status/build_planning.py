@@ -15,22 +15,59 @@ from .common import (OWN_SKILLS, Report, add_common, add_graph, advance_ready, a
 from .packages import drift, grow_triggers, known_packages, stale_contracts
 
 
-def expected_mode(task: model.Task) -> str:
-    """The build-mode rule: solo for skeleton tasks (interface, spine, wiring, system; with no Kind, Phase 0),
-    split for behaviour with a checkable outcome, else solo."""
-    if task.kind in ("interface", "spine", "wiring", "system") or (not task.kind and task.is_spine):
-        return "solo"
-    return "split" if task.covers or any(i.startswith("TC-") for i in task.read) else "solo"
+GIVEN_WHEN_THEN = re.compile(r"\bgiven\b.+\bwhen\b.+\bthen\b", re.IGNORECASE)
 
 
-def mode_violations(tasks: list[model.Task]) -> list[str]:
+def model_criteria(repo: Repo) -> set[str]:
+    """Spec requirement IDs that are model criteria: those a `model evaluation` test case cites, and those under a
+    spec heading that says model."""
+    out: set[str] = set()
+    for doc in repo.docs("tests"):
+        for tc in model.test_cases(doc):
+            if "model" in md.strip_md(tc.fields.get("Kind", "")).lower():
+                cited = md.expand_refs("\n".join(doc.lines[tc.start:tc.end]))
+                out |= {i for i in cited if not i.startswith(("TC-", "PL-", "AD-", "CR-", "RF-", "PB-"))}
+    if repo.spec:
+        _, reqs = model.spec_features(repo.spec)
+        out |= {r.id for r in reqs if "model" in r.section.lower()}
+    return out
+
+
+def split_reason(task: model.Task, criteria: set[str] | frozenset[str] = frozenset()) -> str:
+    """Why the task must be split (build-phase.md §3.2: the oracle, not the Kind), or "" for solo: its acceptance
+    names a TC case, a Given/When/Then or a model criterion, or its Writes include tests/intent/."""
+    text = " ".join(cb.text for cb in task.acceptance)
+    tcs = [i for i in md.expand_refs(text) if i.startswith("TC-")]
+    if tcs:
+        return f"acceptance names {', '.join(tcs)}"
+    if GIVEN_WHEN_THEN.search(md.strip_md(text)):
+        return "acceptance has a Given/When/Then"
+    named = [i for i in md.expand_refs(text) if i in criteria]
+    if named:
+        return f"acceptance names model criterion {', '.join(named)}"
+    intent = [w for w in task.writes if w.startswith("tests/intent/")]
+    if intent:
+        return f"writes {intent[0]}, which only a tester may"
+    return ""
+
+
+def expected_mode(task: model.Task, criteria: set[str] | frozenset[str] = frozenset()) -> str:
+    return "split" if split_reason(task, criteria) else "solo"
+
+
+def mode_override(task: model.Task) -> str:
+    """The task's `**Reason:** mode: <why>`, or "": a Reason about anything else doesn't override the rule."""
+    m = re.match(r"mode\s*:\s*(.*)", md.strip_md(task.get("Reason")), re.IGNORECASE)
+    return m.group(1).strip() or "mode" if m else ""
+
+
+def mode_violations(tasks: list[model.Task], criteria: set[str] | frozenset[str] = frozenset()) -> list[str]:
     out = []
     for t in tasks:
-        want = expected_mode(t)
-        if t.mode in ("split", "solo") and t.mode != want and not md.strip_md(t.get("Reason")):
-            skeleton = t.kind if t.kind and t.kind != "thicken" else "spine" if not t.kind and t.is_spine else ""
-            why = skeleton or ("covers behaviour" if want == "split" else "no checkable outcome")
-            out.append(f"{t.id}: {t.mode}, expected {want} ({why})")
+        why = split_reason(t, criteria)
+        want = "split" if why else "solo"
+        if t.mode in ("split", "solo") and t.mode != want and not mode_override(t):
+            out.append(f"{t.id}: {t.mode}, expected {want} ({why or 'no TC, Given/When/Then or model criterion in its acceptance'})")
     return out
 
 
@@ -363,7 +400,7 @@ def build_planning(repo: Repo, r: Report) -> None:
     r.add("blocked_tasks", blocked_tasks)
     r.add("uncovered", uncovered(repo, active, tasks, milestone_pls) if active else [])
     r.add("no_spine", [p for p in milestone_pls if p not in spined])
-    r.add("mode_violations", mode_violations(tasks))
+    r.add("mode_violations", mode_violations(tasks, model_criteria(repo)))
     r.add("boundaries_unfrozen", boundaries_unfrozen(repo, pkgs, tasks) if active else [])
     r.add("draft_pipelines", drafts)
     r.add("changed_since_plan", changed)

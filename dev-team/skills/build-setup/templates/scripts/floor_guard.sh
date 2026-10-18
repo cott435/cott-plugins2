@@ -4,7 +4,7 @@
 # imports from references/ or probes/, or either folder put on an import path.
 # Diff-scoped, so code that was already there is not judged again.
 #
-#   scripts/floor_guard.sh                default base: refs/checks/base, else HEAD
+#   scripts/floor_guard.sh                default base: refs/worktree/checks-base, else HEAD
 #   scripts/floor_guard.sh --base REF     e.g. the milestone's Base sha, or origin/main in CI
 #   scripts/floor_guard.sh --exit         the milestone exit: also fail on any interface stub left
 #
@@ -36,7 +36,7 @@ if [ -n "$base_ref" ]; then
     exit 2
   }
 else
-  base=$(git rev-parse -q --verify refs/checks/base || git rev-parse -q --verify HEAD) || {
+  base=$(git rev-parse -q --verify refs/worktree/checks-base || git rev-parse -q --verify HEAD) || {
     echo "floor_guard: no commit to compare against: commit first" >&2
     exit 2
   }

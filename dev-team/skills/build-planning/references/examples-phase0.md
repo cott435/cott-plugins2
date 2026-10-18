@@ -5,12 +5,12 @@ PL-01 Load meter readings (`read_raw` → `apply_registry`, owner `data`) and PL
 ```
 wave 0  T01  interface
 wave 1  spines T02 read_raw · T03 apply_registry · T04 fit_seasonality · T05 spectrum · T06 deseason · T07 write_report
-        testers of T10 registry · T11 LS amplitudes · T12 Fourier seasonality · T13 seasonal removal
+        testers of T10 registry · T11 LS amplitudes · T12 Fourier seasonality · T13 seasonal removal · T14 system
 wave 2  wiring T08 PL-01 · T09 PL-02 (on the load_readings fake); implementers of T10 ← T03 · T11 ← T05 · T12 ← T04 · T13 ← T06
 wave 3  T14  system: PL-02 on the real PL-01
 ```
 
-14 tasks, critical path 4 (T01 → T05 → T11 → T14, or any other four-task chain), 10 agents in wave 1, every spine and thicken XS or S. No fold: each step's spine is a real baseline worth testing alone.
+14 tasks, critical path 4 (T01 → T05 → T11 → T14, or any other four-task chain), 11 agents in wave 1, every spine and thicken XS or S. Checkpoints after T01 (barrier), T07 and T13, and the milestone exit after T14. No fold: each step's spine is a real baseline worth testing alone. The system task names TC cases, so it is split like the thicken tasks.
 
 ```markdown
 ### M1-T01: M1 interface
@@ -18,7 +18,7 @@ wave 3  T14  system: PL-02 on the real PL-01
 **Read:** PL-01, PL-02, data.RawReadings, data.Readings, profile.Load, profile.Profile, profile.Spectrum, profile.SeasonalityReport, data.load_readings
 **Acceptance:**
 - [ ] Each type is code in `data/types.py` or `profile/types.py`; each `tests/contracts/<id>.<Type>/` sample validates against its schema
-- [ ] Every step imports with its contract signature, body `raise NotImplementedError("<its spine task>")`; each `__init__.py` exports its contract
+- [ ] Every step and entry function imports with its contract signature, body `raise NotImplementedError("<its spine or wiring task>")`; each `__init__.py` exports its contract; `__main__.py` dispatches each trigger
 - [ ] The `data.load_readings` fake serves its fixtures
 **Verify:** `pytest tests/contracts` · `scripts/check.sh gate`
 **Depends on:** — · **Writes:** src/gridload/data/**, src/gridload/profile/**, tests/contracts/**
@@ -38,7 +38,7 @@ wave 3  T14  system: PL-02 on the real PL-01
 - [ ] `python -m gridload.profile seasonality-report --smoke` runs end to end on the `data.load_readings` fake; committed as PL-02's smoke test
 - [ ] PL-02 pre-build sections replaced by a `dt layout` pointer
 **Verify:** `python -m gridload.profile seasonality-report --smoke` · `scripts/check.sh gate`
-**Depends on:** M1-T04, M1-T05, M1-T06, M1-T07 · **Writes:** src/gridload/profile/pipeline.py, src/gridload/profile/__main__.py, tests/unit/gridload/test_pl02_smoke.py
+**Depends on:** M1-T04, M1-T05, M1-T06, M1-T07 · **Writes:** src/gridload/profile/pipeline.py, tests/unit/gridload/test_pl02_smoke.py
 
 ### M1-T11: Least-squares amplitudes
 **Package:** gridload · **Step:** PL-02.spectrum · **Kind:** thicken · **Covers:** STAT-03 · **Size:** XS · **Mode:** split
@@ -50,13 +50,13 @@ wave 3  T14  system: PL-02 on the real PL-01
 **Depends on:** M1-T05 · **Writes:** src/gridload/profile/spectrum.py, tests/intent/gridload/test_spectrum.py, tests/unit/gridload/test_spectrum.py
 
 ### M1-T14: PL-02 on the real PL-01
-**Package:** gridload · **Step:** PL-02 · **Kind:** system · **Covers:** — · **Size:** XS · **Mode:** solo
+**Package:** gridload · **Step:** PL-02 · **Kind:** system · **Covers:** — · **Size:** XS · **Mode:** split
 **Read:** PL-01, PL-02, data.load_readings, TC-01, TC-02, TC-03
 **Acceptance:**
 - [ ] PL-02 calls the real `load_readings`; the fake stays for the contract tests
 - [ ] Both smoke commands pass; TC-01–TC-03 pass on the real chain
 **Verify:** `python -m gridload.data load --smoke` · `python -m gridload.profile seasonality-report --smoke` · `scripts/check.sh gate`
-**Depends on:** M1-T08, M1-T09, M1-T10, M1-T11, M1-T12, M1-T13 · **Writes:** src/gridload/profile/pipeline.py
+**Depends on:** M1-T08, M1-T09, M1-T10, M1-T11, M1-T12, M1-T13 · **Writes:** src/gridload/profile/pipeline.py, tests/intent/gridload/test_pl02_system.py, tests/unit/gridload/test_pl02_system.py
 ```
 
 T11's tester starts in wave 1: it tests `spectrum` as T01 declares it and fails on `NotImplementedError("M1-T05")`. Its implementer follows its tester and T05, nothing else. Wiring T09 waits on PL-02's spines because its smoke runs them, but not on PL-01: the fake stands in.

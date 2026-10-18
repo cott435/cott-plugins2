@@ -49,16 +49,16 @@ With no plan yet, `uncovered`, `no_spine` and the unrouted lists have nothing to
 **User:** "All of it."
 
 **Written:**
-- `tasks/plan.md`, the 14 tasks of `examples-phase0.md`: M1-T01 interface; six step spines M1-T02–M1-T07; wiring M1-T08 (PL-01) and M1-T09 (PL-02, on the `load_readings` fake); thicken M1-T10 registry-aware load, M1-T11 least-squares amplitudes, M1-T12 Fourier seasonality, M1-T13 seasonal removal; checkpoint after M1-T13; M1-T14 system; exit checkpoint; the dependency graph.
+- `tasks/plan.md`, the 14 tasks of `examples-phase0.md`: M1-T01 interface; six step spines M1-T02–M1-T07; wiring M1-T08 (PL-01) and M1-T09 (PL-02, on the `load_readings` fake); thicken M1-T10 registry-aware load, M1-T11 least-squares amplitudes, M1-T12 Fourier seasonality, M1-T13 seasonal removal; M1-T14 system; checkpoints after M1-T01 (barrier), M1-T07 and M1-T13, and the exit checkpoint; the dependency graph.
 - `tasks/todo.md`: fourteen unchecked lines.
 - Roadmap: the milestone table with row `| M1 | S1 | Ingest & clean | gridload | PL-01, PL-02 | — | |`, and `## M1: Ingest & clean` with Outline, Exit and Plan link. S2 keeps its stage row only. Then `dt roadmap` (M1 → Planned, S1 → Planned).
 - `AGENTS.md`: the doc map, with `data-science — profile steps`.
 
 **Review gate message:**
 
-> Cut S1 into one milestone, M1 Ingest & clean (both pipelines). Wrote the M1 plan (14 tasks: interface, 6 spines, 2 wiring, 4 thicken, system; critical path 4, 10 agents in wave 1; checkpoints after M1-T13 and at exit), its todo, the M1 roadmap row and the AGENTS.md doc map. `dt lint` is clean; `uncovered`, `no_spine` and `mode_violations` are empty; `dt ready` lists only M1-T01; every `dt context` packet is under 2,000 lines.
+> Cut S1 into one milestone, M1 Ingest & clean (both pipelines). Wrote the M1 plan (14 tasks: interface, 6 spines, 2 wiring, 4 thicken, system; critical path 4, 11 agents in wave 1; checkpoints after M1-T01 (barrier), M1-T07, M1-T13 and at exit), its todo, the M1 roadmap row and the AGENTS.md doc map. `dt lint` is clean; `uncovered`, `no_spine` and `mode_violations` are empty; `dt ready` lists only M1-T01; every `dt context` packet is under 2,000 lines.
 >
-> **ASSUMPTIONS:** M1-T01 freezes six types, every step signature and the `load_readings` fake; the only unmitigated edges are stubs, spines under their thicken tasks and wiring, and the system task; no folds; interface, spines, wiring and system solo, the four thicken tasks split; data-science routed to the three profile thicken tasks.
+> **ASSUMPTIONS:** M1-T01 freezes six types, every step signature and the `load_readings` fake; the only unmitigated edges are stubs, spines under their thicken tasks and wiring, and the system task; no folds; interface, spines and wiring solo; the four thicken tasks and the system task split, since each names a TC case; data-science routed to the three profile thicken tasks.
 >
 > **Open questions:** none. **Uncovered:** none deferred.
 >

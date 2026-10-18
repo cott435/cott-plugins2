@@ -18,19 +18,22 @@ Read when writing thicken tasks, the dependency graph and the files. Templates: 
 
 ## 7. Build mode
 
-- `split` (tester, then implementer) when the task adds or changes behavior with a checkable outcome: anything a TC case, Given/When/Then or model criterion covers.
-- `solo` for interface, spine, wiring, system, refactor, glue and doc-sync tasks.
+The mode follows the oracle, whatever the Kind:
+- `split` (tester, then implementer) when the acceptance names a TC case, a Given/When/Then or a model criterion, or `Writes:` includes a path under `tests/intent/` (only a tester writes intent tests).
+- `solo` otherwise: an interface task, a spine with no TC, a refactor or glue task with no oracle.
 
-`mode_violations` flags a task that breaks the rule. An override needs `**Reason:** <one line>` on the task. **A split task tests symbols a frozen interface declares** (the interface task's types and signatures), so the tester never writes against a guess and starts right after the interface, beside the implementers. Its `Depends on` is the implementer half's; the tester half waits only on the interface.
+`mode_violations` flags a task that breaks the rule. An override needs `**Reason:** mode: <one line>` on the task; a Reason not starting `mode:` doesn't count. **A split task tests symbols a frozen interface declares** (the interface task's types and signatures), so the tester never writes against a guess and starts right after the interface, beside the implementers. Its `Depends on` is the implementer half's; the tester half waits only on the interface.
+
+**Risk.** A task that needs credentials, writes to a network service or acts outside the repo carries `**Risk:** external`: the build releases it only after the user's own yes, recorded when it comes up. A task that runs on fakes never needs it.
 
 ## 8. Checkpoints
 
-`### Checkpoint after M<n>-T<nn>` at the end of a wave, naming the wave's last task in plan order: usually once after the wiring and thicken wave, when every pipeline runs end to end. `### Checkpoint: milestone exit` last. Use the blocks in `../examples.md`. A separate read-only reviewer runs each one; the orchestrator records its findings with `dt finding`, not this skill.
+A `### Checkpoint after M<n>-T<nn>` closes each phase but the last, naming the phase's last task in plan order; Phase 0's is written `### Checkpoint after M<n>-T<nn> (barrier)`. `### Checkpoint: milestone exit` closes the last phase. Use the blocks in `../examples.md`. Reviewer agents run each one over that phase's landings; behind the barrier nothing else starts until the interface review passes. The orchestrator records findings with `dt finding`, not this skill.
 
 ## 9. Dependencies, Writes, the graph, Verify
 
 - **`Depends on:`** resolves, points only backward (position counts, not ID number), is acyclic, and holds only edges nothing mitigates.
-- **`Writes:`** is exact paths, or a folder glob the task owns, and is an exclusive claim: two tasks with no `Depends on` path between them never write the same path (`writes`). Shared files (`__init__.py`, `types.py`, `pipeline.py`, `__main__.py`) belong to the interface, wiring or system task. No `Writes:` under `tasks/`: builders never tick `todo.md` or record findings; the orchestrator does after each merge.
+- **`Writes:`** is exact paths, or a folder glob the task owns, and is an exclusive claim: two tasks with no `Depends on` path between them never write the same path (`writes`). Shared files (`__init__.py`, `types.py`, `__main__.py`) belong to the interface task; each pipeline's entry module to its wiring and system tasks (`phase0.md`). Every task but an interface task names its unit test file under `tests/unit/<pkg>/` (`writes-unit`): the implementer and solo halves write unit tests. No `Writes:` under `tasks/`: builders never tick `todo.md` or record findings; the orchestrator does after each merge.
 - **`## Dependency graph`**, after the last checkpoint: one row per edge between tasks, `| From | To | Kind | Mitigated by |`. From is the task that needs, To the one it needs; each cell starts with the task ID. Mitigated by names the interface and the task freezing it (`profile.Profile sample (M1-T01)`), or says `none: <reason>`.
 
 | Kind | Meaning | Mitigation |

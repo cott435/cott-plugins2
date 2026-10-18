@@ -3,9 +3,10 @@
 #   path_guard.sh deny  GLOB...        block files matching any GLOB
 #   path_guard.sh deny  --protected    block the protected list (scripts/check.sh protected)
 #   path_guard.sh allow GLOB...        block files NOT matching any GLOB
-#   path_guard.sh writes               block files outside the task's Writes: list, which the
-#                                      orchestrator puts in .claude/.task_writes (one path or glob a
-#                                      line; a trailing / means the folder). No file: no limit
+#   path_guard.sh writes               block files outside the task's Writes: list, which
+#                                      `dt claim` puts in .claude/.task_writes (one path or glob a
+#                                      line; a trailing / means the folder). No file: blocked for the
+#                                      tester and implementer agent types, no limit for any other
 # GLOBs are relative to the project root; * also matches across /.
 # Reads the hook JSON on stdin. Exit 2 = block the tool call; stderr goes to the agent.
 # Fails closed: if the input or the protected list can't be read, the call is blocked.
@@ -29,7 +30,15 @@ fi
 globs=()
 scope="this agent"
 if [ "$mode" = writes ]; then
-  [ -s "$root/.claude/.task_writes" ] || exit 0
+  if [ ! -s "$root/.claude/.task_writes" ]; then
+    agent=$(jq -r '.agent_type // empty' <<<"$input" 2>/dev/null)
+    case "${agent##*:}" in
+      tester|implementer)
+        echo "BLOCKED: no .claude/.task_writes in this worktree: run the dt claim command in your prompt first" >&2
+        exit 2 ;;
+    esac
+    exit 0
+  fi
   while IFS= read -r line; do
     line="${line%%[[:space:]]}"
     [ -z "$line" ] && continue
@@ -73,7 +82,7 @@ done
 
 if [ "$mode" = deny ] && [ $match = 1 ]; then
   if [[ $rel == tests/contracts/* ]]; then
-    echo "BLOCKED: $rel is a frozen boundary contract (CR-09). It changes only through architecture-design Revise; stop and report it." >&2
+    echo "BLOCKED: $rel is a frozen boundary contract (CR-09). It changes only through architecture-design Revise: if your task needs it changed, run dt escalate CONTRACT-CHANGE." >&2
   else
     echo "BLOCKED: $rel is protected from this agent (CONSTRAINTS.md, Roles and protected paths)." >&2
   fi

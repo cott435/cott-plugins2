@@ -235,12 +235,19 @@ def _writes(repo, task: model.Task) -> list[dict]:
     return out
 
 
-def run(args, repo) -> int:
-    task = _find_task(repo, args.task)
-    if task is None:
-        print(f"dt context: task {args.task} not found in tasks/plan.md or tasks/queued/", file=sys.stderr)
-        return 1
+SOURCE_PREFIXES = ("src/",)
 
+
+def is_source(rel: str) -> bool:
+    """A path under a source folder (`src/`, `packages/<pkg>/src/`): never shown to a tester."""
+    rel = rel.removeprefix("./")
+    return rel.startswith(SOURCE_PREFIXES) or bool(re.match(r"packages/[^/]+/src/", rel))
+
+
+def packet(repo, task, writes: list[str] | None = None, tester: bool = False) -> dict:
+    """The task's packet: `{text, lines, reads, interfaces, writes, files_likely, problems}`. `writes` narrows the
+    Writes block to a half's share; `tester` leaves out source files and the package layout (build-phase.md
+    §3.4: a tester never sees `src/`)."""
     blocks: list[str] = []
     reads: list[dict] = []
     problems: list[str] = []
@@ -268,17 +275,16 @@ def run(args, repo) -> int:
             reads.append({"ref": ref, "kind": "id", "where": d.where, "retired": d.retired})
             blocks.append(f"<!-- {d.where} -->\n{d.text}")
         elif _looks_like_path(repo, ref):
+            if tester and is_source(ref):
+                reads.append({"ref": ref, "kind": "file", "exists": (repo.root / ref).exists(), "shown": "withheld"})
+                continue
             block, exists = _file_block(repo, ref)
             reads.append({"ref": ref, "kind": "file", "exists": exists})
             blocks.append(block)
         else:
             problems.append(f"Read: {ref} is not defined in any doc")
-    if problems:
-        for p in problems:
-            print(f"dt context: {task.id}: {p}", file=sys.stderr)
-        return 1
 
-    layout = _layout_block(repo, task.package)
+    layout = "" if tester else _layout_block(repo, task.package)
     if layout:
         blocks.append(layout)
     shown_ids = {r["ref"] for r in reads if r["kind"] == "id"}
@@ -286,10 +292,12 @@ def run(args, repo) -> int:
     if syms:
         blocks.append(_interfaces_block(repo, syms))
     files = [{"path": f, "exists": (repo.root / f).exists()} for f in task.files_likely]
-    writes = _writes(repo, task) if "Writes" in task.fields else []
-    if writes:
+    out_writes = _writes(repo, task) if "Writes" in task.fields else []
+    if writes is not None:
+        out_writes = [w for w in out_writes if w["path"] in writes]
+    if out_writes:
         blocks.append("## Writes (edit only these files; the plan gives every other file to another task)\n" + "".join(
-            f"- {w['path']} ({'folder' if w['folder'] else 'exists' if w['exists'] else 'new'})\n" for w in writes))
+            f"- {w['path']} ({'folder' if w['folder'] else 'exists' if w['exists'] else 'new'})\n" for w in out_writes))
     elif files:
         blocks.append("## Files likely\n" + "".join(
             f"- {f['path']} ({'exists' if f['exists'] else 'new'})\n" for f in files))
@@ -300,17 +308,31 @@ def run(args, repo) -> int:
                 "Read only what is below, plus CONSTRAINTS.md and the files you edit. "
                 "Your task is the last section.\n")
     text = "\n".join([preamble] + blocks)
-    lines = text.count("\n")
+    return {"text": text, "lines": text.count("\n"), "reads": reads, "interfaces": syms, "writes": out_writes,
+            "files_likely": files, "problems": problems}
+
+
+def run(args, repo) -> int:
+    task = _find_task(repo, args.task)
+    if task is None:
+        print(f"dt context: task {args.task} not found in tasks/plan.md or tasks/queued/", file=sys.stderr)
+        return 1
+    p = packet(repo, task)
+    if p["problems"]:
+        for problem in p["problems"]:
+            print(f"dt context: {task.id}: {problem}", file=sys.stderr)
+        return 1
+    text, lines, syms = p["text"], p["lines"], p["interfaces"]
     if lines > BUDGET:
         print(f"dt context: {task.id} packet is {lines} lines (budget {BUDGET}); split the task or trim its Read:",
               file=sys.stderr)
 
     if args.json:
         print(json.dumps({"task": task.id, "package": task.package, "mode": task.mode, "kind": task.kind,
-                          "lines": lines, "read": reads,
+                          "lines": lines, "read": p["reads"],
                           "interfaces": [{"id": s.id, "where": f"{s.doc.rel}:{s.start + 1}", "type": s.is_type,
                                           "sample": s.sample} for s in syms],
-                          "writes": writes, "files_likely": files, "text": text}, indent=2))
+                          "writes": p["writes"], "files_likely": p["files_likely"], "text": text}, indent=2))
     else:
         print(text, end="")
     return 0

@@ -26,7 +26,7 @@ SEVERITY = {
     "dup-id": "E", "missing-ref": "E", "retired-ref": "E", "budget": "W", "grow-size": "W", "approved-edit": "W",
     "prebuild-left": "E", "task-size": "E", "task-acceptance": "E", "task-title": "E", "task-fields": "E",
     "task-step": "W", "depends": "E", "milestone-size": "E", "writes": "E", "edges": "E", "deprecated": "W",
-    "step-io-types": "E", "verify-smoke": "E", "todo-mismatch": "E",
+    "step-io-types": "E", "verify-smoke": "E", "todo-mismatch": "E", "writes-unit": "E", "call-fake": "E",
     "finding-disposition": "E", "foreign-plan": "W", "broken-fence": "E", "header": "E",
     "unreadable": "E", "internal": "W", "pipeline-fields": "E", "spine-mock": "W", "contract-heading": "E",
     "fixture-size": "W",                # missing fixture files are reported as E
@@ -988,6 +988,51 @@ def check_edges(ctx: Context):
                     yield _p(doc, line, "edges", f"{t.id} depends on {dep} with {where} saying why (kind, `none: <reason>`)")
 
 
+def check_writes_unit(ctx: Context):
+    """Every implementer and solo half writes unit tests (implementer.md), so a task's `Writes:` outside
+    `tests/intent/` name a `tests/unit/` path. An interface task is exempt."""
+    for doc in ctx.plan_docs:
+        if not model.is_interface_first(doc):
+            continue
+        for t in model.tasks(doc):
+            if t.kind == "interface" or "Writes" not in t.fields:
+                continue
+            share = [w for w in t.writes if not w.startswith("tests/intent/")]
+            if not any(w.startswith("tests/unit/") for w in share):
+                line = md.field_line(doc.lines, t.start, t.end, "Writes")
+                half = "implementer" if t.mode == "split" else "solo"
+                yield _p(doc, t.start if line is None else line, "writes-unit",
+                         f"{t.id} Writes name no tests/unit/ path: its {half} half writes unit tests "
+                         f"(tests/unit/{t.package or '<pkg>'}/)")
+
+
+def check_call_fake(ctx: Context):
+    """A `call` edge marked `none` whose callee is a contract symbol no interface task freezes: freeze its fake in
+    the interface task and mitigate the edge, so both sides start at once, or give the reason
+    `none: integration: <what runs the real chain>`. (A callee the interface already freezes is `edges`'.)"""
+    symbols = {s.id for s in model.all_symbols(ctx.repo)}
+    for doc in ctx.plan_docs:
+        if not model.is_interface_first(doc):
+            continue
+        tasks = model.tasks(doc)
+        by_id = {t.id: t for t in tasks}
+        produced = model.frozen_symbols(tasks)
+        for e in model.graph_edges(doc):
+            if e.kind != "call" or e.mitigated or not e.src or not e.dst:
+                continue
+            if re.match(r"integration\s*:", e.reason, re.IGNORECASE):
+                continue
+            callees = set(re.findall(rf"(?<![\w.]){md.SYMBOL_ID}", md.strip_md(e.reason)))
+            if e.src in by_id and e.dst in by_id:
+                callees |= _callees(ctx, by_id[e.src], by_id[e.dst])
+            hit = sorted((callees & symbols) - produced)
+            if hit:
+                yield _p(doc, e.line, "call-fake",
+                         f"{e.src} waits on {e.dst} to call {', '.join(hit)}, a contract symbol with no fake: have the "
+                         "interface task freeze its fake and mitigate the edge, or give `none: integration: <what "
+                         "runs the real chain>`")
+
+
 def check_step_io_types(ctx: Context):
     """Every type a package step's `In → Out` cell names is a contract type section, and every step's Out names
     one: the boundaries an interface task freezes (entry arguments on the In side may stay plain). A project with
@@ -1181,7 +1226,8 @@ CHECKS = [
     check_dup_id, check_missing_ref, check_retired_ref,
     check_budget, check_approved_edit, check_prebuild_left,
     check_task_fields, check_task_size, check_task_acceptance, check_task_title, check_task_step,
-    check_depends, check_milestone_size, check_writes, check_edges, check_deprecated, check_verify_smoke,
+    check_depends, check_milestone_size, check_writes, check_edges, check_writes_unit, check_call_fake,
+    check_deprecated, check_verify_smoke,
     check_step_io_types, check_type_cases, check_task_ref,
     check_todo_mismatch, check_finding_disposition, check_foreign_plan,
     check_ref_file, check_ref_hash, check_ref_large, check_ref_prefix, check_roadmap_skill, check_roadmap_stage,

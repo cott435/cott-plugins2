@@ -149,6 +149,55 @@ class SingleProject(unittest.TestCase):
                 self.assertEqual(result.returncode, 1, name)
                 self.assertIn("FAILED: protected files changed", result.stderr)
 
+    def test_base_is_per_worktree(self) -> None:
+        """The base is refs/worktree/checks-base, else HEAD; the shared refs/checks/base is never read."""
+        r = self.root
+        skeleton = sh(r, "git", "rev-parse", "HEAD").stdout.strip()
+        write(r, "tests/contracts/feed.quotes/schema.json", "{}\n")
+        commit(r, "interface task")
+        frozen = "tests/contracts/feed.quotes/**"
+        self.assertIn(frozen, check(r, "protected").stdout.split())
+        sh(r, "git", "update-ref", project.BASE_REF, skeleton)
+        self.assertNotIn(frozen, check(r, "protected").stdout.split(), "judged at the worktree's base")
+        sh(r, "git", "update-ref", "-d", project.BASE_REF)
+        sh(r, "git", "update-ref", "refs/checks/base", skeleton)
+        self.assertIn(frozen, check(r, "protected").stdout.split(), "no worktree base: HEAD, not the shared ref")
+        sh(r, "git", "update-ref", "-d", "refs/checks/base")
+        sh(r, "git", "update-ref", project.BASE_REF, "HEAD")
+        wt = Path(self.tmp.name) / "wt"
+        sh(r, "git", "worktree", "add", "-q", "--detach", str(wt), "HEAD")
+        try:
+            sh(wt, "git", "update-ref", project.BASE_REF, skeleton)
+            self.assertNotIn(frozen, check(wt, "protected").stdout.split())
+            self.assertIn(frozen, check(r, "protected").stdout.split(), "one base per worktree")
+        finally:
+            sh(r, "git", "worktree", "remove", "--force", str(wt))
+
+    def test_a_refreeze_task_may_write_the_frozen_folder_its_writes_name(self) -> None:
+        r = self.root
+        schema = "tests/contracts/feed.quotes/schema.json"
+        write(r, schema, "{}\n")
+        commit(r, "interface task")
+        self.assertEqual(hook(r, "path_guard.sh", edit_input(r, schema), "deny", "--protected").returncode, 2)
+        write(r, ".claude/.task_writes", "src/tinyq/data/**\ntests/contracts/feed.quotes/\n")
+        self.assertNotIn("tests/contracts/feed.quotes/**", check(r, "protected").stdout.split())
+        self.assertEqual(hook(r, "path_guard.sh", edit_input(r, schema), "deny", "--protected").returncode, 0)
+        write(r, ".claude/.task_writes", "tests/contracts/feed.depth/\n")
+        self.assertIn("tests/contracts/feed.quotes/**", check(r, "protected").stdout.split(), "only the folder named")
+
+    def test_gate_runs_the_contract_tests(self) -> None:
+        r = self.root
+        test = ('"""Contract: the prices sample."""\n\nfrom tinyq.data.prices import load_prices\n\n\n'
+                "def test_sample_loads() -> None:\n    assert load_prices([2.0]) == [{want}]\n")
+        write(r, "tests/contracts/data.Prices/test_sample.py", test.format(want="2.0"))
+        result = check(r, "gate", "--pkg", "stats")
+        self.assertEqual(result.returncode, 0, result.stderr[-2000:])
+        self.assertIn("-> pytest tests/intent/stats tests/unit/stats tests/contracts ", result.stderr)
+        write(r, "tests/contracts/data.Prices/test_sample.py", test.format(want="3.0"))
+        result = check(r, "gate", "--pkg", "stats")
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("FAILED: pytest tests/intent/stats tests/unit/stats tests/contracts", result.stderr)
+
     def test_tester_may_not_write_a_contract(self) -> None:
         write(self.root, "tests/contracts/feed.quotes/schema.json", "{}\n")
         result = check(self.root, "collect")
@@ -265,6 +314,17 @@ class SingleProject(unittest.TestCase):
                 result = hook(r, "path_guard.sh", edit_input(r, rel), "writes")
                 self.assertEqual(result.returncode, want, result.stderr)
         self.assertIn("this task's Writes:", result.stderr)
+
+    def test_path_guard_writes_fails_closed_for_builders(self) -> None:
+        r = self.root
+        for agent, want in [("tester", 2), ("implementer", 2), ("dev-team:implementer", 2),
+                            ("reviewer", 0), ("", 0)]:
+            with self.subTest(agent=agent):
+                payload = edit_input(r, "src/tinyq/x.py") | ({"agent_type": agent} if agent else {})
+                result = hook(r, "path_guard.sh", payload, "writes")
+                self.assertEqual(result.returncode, want, result.stderr)
+                if want:
+                    self.assertIn("dt claim", result.stderr)
 
     # ------------------------------------------------------------------- floor_guard.sh
     def floor(self, *args: str) -> subprocess.CompletedProcess[str]:
@@ -386,6 +446,11 @@ class SingleProject(unittest.TestCase):
         append(self.root, "src/tinyq/data/prices.py", "\n\nX = 1  # type: ignore\n")
         commit(self.root, "sneaky")
         self.assertEqual(self.floor().returncode, 0, "the base moved past it")
+        sh(self.root, "git", "update-ref", "refs/checks/base", "HEAD~1")
+        self.assertEqual(self.floor().returncode, 0, "the shared ref is never read")
+        sh(self.root, "git", "update-ref", "-d", "refs/checks/base")
+        sh(self.root, "git", "update-ref", project.BASE_REF, "HEAD~1")
+        self.assertEqual(self.floor().returncode, 1, "the worktree's base")
         self.assertEqual(self.floor("--base", "HEAD~1").returncode, 1)
         self.assertEqual(self.floor("--base", "no-such-ref").returncode, 2)
 
@@ -591,6 +656,50 @@ class SingleProject(unittest.TestCase):
         answer = json.loads(hook(r, "stop_gate.sh", {"cwd": str(r)}, "gate").stdout)
         self.assertIn("unknown package 'nope'", answer["reason"], "the task's package became --pkg")
 
+    def fake_dt(self, escalated: bool = False) -> Path:
+        """A stand-in for dt.py at .claude/.dt: logs its arguments, answers `build escalated`."""
+        tmp = Path(tempfile.mkdtemp())
+        log, flag = tmp / "calls.jsonl", tmp / "escalated"
+        if escalated:
+            flag.touch()
+        script = tmp / "dt.py"
+        script.write_text(
+            "import json, pathlib, sys\n"
+            f"with open({str(log)!r}, 'a') as f:\n    f.write(json.dumps(sys.argv[1:]) + '\\n')\n"
+            "if sys.argv[1:3] == ['build', 'escalated']:\n"
+            f"    sys.exit(0 if pathlib.Path({str(flag)!r}).exists() else 1)\n")
+        write(self.root, ".claude/.dt", f"{script}\n")
+        return log
+
+    @staticmethod
+    def calls(log: Path) -> list[list[str]]:
+        return [json.loads(line) for line in log.read_text().splitlines()] if log.exists() else []
+
+    def test_stop_gate_records_each_verdict_with_dt(self) -> None:
+        r = self.root
+        payload = {"cwd": str(r), "agent_id": "t"}
+        log = self.fake_dt()
+        result = hook(r, "stop_gate.sh", payload, "collect")
+        self.assertEqual((result.returncode, result.stdout), (0, ""), result.stderr)
+        self.assertEqual(self.calls(log), [["build", "escalated"],
+                                           ["build", "verdict", "--mode", "collect", "--rc", "0"]])
+        append(r, "tests/intent/stats/test_mean.py", "\nimport tinyq.nothing_here\n")
+        (r / ".claude/.stop_attempts_t").write_text("2")
+        answer = json.loads(hook(r, "stop_gate.sh", payload, "collect").stdout)
+        self.assertEqual(answer["decision"], "block")
+        self.assertEqual(self.calls(log)[-1], ["build", "verdict", "--mode", "collect", "--rc", "1"])
+        self.assertIn("attempt 3/3", answer["reason"])
+        self.assertIn("status line", answer["reason"], "in a dt build the last try ends on the status line")
+        self.assertNotIn("GATE FAILED", answer["reason"])
+
+    def test_stop_gate_lets_an_escalated_agent_stop(self) -> None:
+        r = self.root
+        append(r, "tests/intent/stats/test_mean.py", "\nimport tinyq.nothing_here\n")
+        log = self.fake_dt(escalated=True)
+        result = hook(r, "stop_gate.sh", {"cwd": str(r), "agent_id": "t"}, "collect")
+        self.assertEqual((result.returncode, result.stdout), (0, ""), result.stderr)
+        self.assertEqual(self.calls(log), [["build", "escalated"]], "no gate, so no verdict")
+
     def test_stop_gate_collect_for_tester(self) -> None:
         r = self.root
         result = hook(r, "stop_gate.sh", {"cwd": str(r), "agent_id": "t"}, "collect")
@@ -651,6 +760,18 @@ class Templates(unittest.TestCase):
         documented = (skill / "references" / "derive.md").read_text(encoding="utf-8")
         missing = sorted(name for name in used if f"`{name}`" not in documented)
         self.assertEqual(missing, [])
+
+    def test_settings_let_background_agents_work(self) -> None:
+        settings = json.loads((project.TEMPLATES / ".claude/settings.json").read_text(encoding="utf-8"))
+        perms = settings["permissions"]
+        self.assertEqual(perms["defaultMode"], "acceptEdits")
+        for rule in ("Bash(uv run:*)", "Bash(bash scripts/check.sh:*)", "Bash(python3 */scripts/dt.py *)",
+                     "Bash(git diff:*)"):
+            self.assertIn(rule, perms["allow"])
+        ignored = (project.TEMPLATES / "gitignore.additions").read_text(encoding="utf-8").split()
+        for name in (".claude/packet.md", ".claude/.task_writes", ".claude/.check_pkg", ".claude/.dt",
+                     ".dt/"):
+            self.assertIn(name, ignored)
 
     def test_scripts_are_executable(self) -> None:
         for rel in project.SCRIPTS:

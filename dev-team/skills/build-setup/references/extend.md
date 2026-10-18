@@ -12,6 +12,7 @@ Read when `dt status --skill build-setup` reports `extend`: kickoff, after the n
 - **New stack:** stubs and rule families.
 - **Grow:** rewrite component contracts as package contracts; the rules don't change.
 - Remove parentheses from optional layers whose module now exists.
+- **Parallel build**, on a bar written before it (no `.claude/settings.json`): the template's `.claude/settings.json`; `check.sh`'s `base_commit`, `claimed_contract` and `frozen_contracts` and the `tests/contracts` line in `test_dirs`; `path_guard.sh` and `stop_gate.sh`; the three agent files; the `.gitignore` lines; CONSTRAINTS.md's Roles text and `**Worktree links:**`. A tightening, except the re-freeze opening (a frozen contract folder a task's `Writes:` names is open to it), which loosens CR-09: list it under Loosenings.
 - **References and probes**, on a bar written before them: the `references/` and `probes/` excludes, `references/**` and `probes/**` in both protected lists, the template's `floor_guard.py`, CR-08, Review item 7 and the `.gitignore` lines. A tightening; the floor guard doesn't count those excludes as loosening.
 
 After approval and the commit, `dt base` runs as the Review Gate says.

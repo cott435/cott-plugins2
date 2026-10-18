@@ -17,7 +17,7 @@ PRECHECK → DETECT → 4 QUESTIONS → GENERATE → [commit yes] → PROVE → 
 
 **4. Generate.** Derive every value per `derive.md` and fill the templates; `grep -rn '{{[a-z_]*}}'` over the written files must print nothing. `chmod +x scripts/*.sh scripts/hooks/*.sh`; append the `.gitignore` lines. `uv lock && uv sync`, then write the vulture whitelist: the template header plus `uv run --frozen vulture --make-whitelist`, and count `duplicates_today` with `check.sh`'s pylint line (`tools/pylint.md`). Never edit `check.sh` steps or hook commands by hand.
 
-**5. Prove.** Ask to commit the bar skeleton (default yes): the protected-path diff needs a commit. On a yes, commit and `git update-ref refs/checks/base HEAD`. Run `uv run --frozen ruff check --show-settings >/dev/null` and `time bash scripts/check.sh gate`; fix the config, never the check, until it passes within budget. Headless: don't commit; run the gate, report the protected-path step as expected to fail, leave Draft.
+**5. Prove.** Ask to commit the bar skeleton (default yes): the protected-path diff needs a commit. On a yes, commit and `git update-ref refs/worktree/checks-base HEAD`. Run `uv run --frozen ruff check --show-settings >/dev/null` and `time bash scripts/check.sh gate`; fix the config, never the check, until it passes within budget. Headless: don't commit; run the gate, report the protected-path step as expected to fail, leave Draft.
 
 ## Example: GridLoad, single package
 
@@ -65,7 +65,7 @@ DEFAULT if unsure: mypy strict as the gate; pyright runs in check.sh full.
 ```
 Wrote: CONSTRAINTS.md (Draft), pyproject.toml tool config, scripts/check.sh, check_size.py,
 floor_guard.sh/.py, red_check.py, vulture_whitelist.py, scripts/hooks/*.sh, .claude/agents/{tester,implementer,
-reviewer}.md, tests/conftest.py (didn't exist), .gitignore (+12 lines). No CI (not requested).
+reviewer}.md, .claude/settings.json, tests/conftest.py (didn't exist), .gitignore (+12 lines). No CI (not requested).
 Proof run, after the skeleton commit: ruff --show-settings ok; check.sh gate passed in 14 s
 (fresh venv; budget 90 s).
 

@@ -135,7 +135,9 @@ def protected_lists(repo: Repo) -> dict[str, list[str]]:
     if repo.constraints:
         line = next((x for x in repo.constraints.lines if "**Protected list**" in x), None)
         if line:
-            out["CONSTRAINTS.md"] = [g for g in re.findall(r"`([^`]+)`", line.split(":", 1)[-1]) if "/" in g or "." in g]
+            # The list runs from the label's colon to its sentence's end; later sentences name other paths.
+            body = re.split(r"(?<=`)\.(?:\s|$)", line.split(":", 1)[-1], maxsplit=1)[0]
+            out["CONSTRAINTS.md"] = [g for g in re.findall(r"`([^`]+)`", body) if "/" in g or "." in g]
     return out
 
 

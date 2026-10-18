@@ -77,7 +77,7 @@ In a serial build a separate tester adds a step to every split task. In an inter
 | tester (`tester`) | Task, acceptance, TC cases and fixture paths, the interface's types, signatures and sample paths, contract sections. No `src/` | The task's `Writes:` under `tests/intent/` | `check.sh collect` (lint, collect, red for the right reason, every marker) |
 | implementer (`implementer`) | Full `dt context` packet; its worktree already holds the tester's tests, merged by `dt claim` | The task's `Writes:` outside `tests/intent/` | `check.sh gate --pkg`, the task's own intent tests with every marker, protected diff |
 | solo (`implementer`) | Full packet | The task's `Writes:` | `check.sh gate --pkg` (an interface task also `tests/contracts`), protected diff |
-| reviewer (`reviewer`) | Prompt only: review kind, package, task IDs, base and end commits, paths, lead or not. It reads the diff, the tasks' acceptance, CONSTRAINTS.md's Review section, contract and step tables itself. Never builders' reports | Nothing that lands: mutations in its own worktree, restored after each; its findings file under `.git/dt-build/reviews/` | Runs `check.sh full` itself |
+| reviewer (`reviewer`) | Prompt only: review kind, package, task IDs, base and end commits, paths, lead or not. It reads the diff, the tasks' acceptance, CONSTRAINTS.md's Review section, contract and step tables itself. Never builders' reports | Nothing that lands: mutations in its own worktree, restored after each; its findings in a gitignored `.dt/review.md`, handed in with `dt build submit-review` | Runs `check.sh full` itself |
 
 There is no `solo` agent file: a solo half runs as `implementer`.
 
@@ -109,7 +109,7 @@ There is no `solo` agent file: a solo half runs as `implementer`.
 
 **Mutation check.** The reviewer proves tests can fail by breaking the behaviour on purpose, in its own linked worktree (it checks `git rev-parse --git-dir` differs from `--git-common-dir`, else it skips the check and says so): per acceptance bullet or TC case, the smallest change that should break it (flip a comparison or boundary, drop a formula term, return the baseline, remove a guard, skip a side effect, unseed a generator, swap same-typed arguments), the covering tests run with every marker (`-m ""`, so a slow-marked test isn't silently deselected), the file restored. If no test ran, the finding is "untested", never "survived". At most 10 per review. Severity: Critical only when an intent test misses a mutation that changes its TC's expected output; any other survivor, including a possibly equivalent mutant, is Important with the mutant shown. Breadth comes later from `mutmut` on the changed lines at milestone exit, as a measured metric (§15).
 
-**Findings.** The reviewer writes its finding lines to `.git/dt-build/reviews/<checkpoint>.<pkg>.md` and ends with one status line (`REVIEW <checkpoint> <pkg>: <n> findings, <c> Critical`). The driver runs `dt finding --from <file>`, which records each line under the checkpoint block in `plan.md`, commits that change on the build branch (the main checkout stays clean), and writes the review's outcome (`passed`, `critical`) to `.git/dt-build/reviews/<checkpoint>.<pkg>.json`. `dt ready` reads those outcomes: it holds everything behind an unpassed barrier and stops releasing while a Critical is unresolved; `dt build resolve <finding>` records the user's decision. Important findings get fix tasks through build-planning Replan at the next user gate (a stop or milestone exit), committed on the build branch before dispatch, and run before exit; Suggestions and Nits get one only if the user asks. After exit fix tasks land, the exit review runs again over their landings plus the Milestone exit list.
+**Findings.** A worktree agent's Write tool can't reach outside its worktree or into `.claude/` (verified, §12), so the reviewer writes its finding lines to a gitignored `.dt/review.md` in its worktree, runs `dt build submit-review <checkpoint>.<pkg> .dt/review.md` (dt copies it to `.git/dt-build/reviews/<checkpoint>.<pkg>.md`), and ends with one status line (`REVIEW <checkpoint> <pkg>: <n> findings, <c> Critical`). The driver runs `dt finding --from <file>`, which records each line under the checkpoint block in `plan.md`, commits that change on the build branch (the main checkout stays clean), and writes the review's outcome (`passed`, `critical`) to `.git/dt-build/reviews/<checkpoint>.<pkg>.json`. `dt ready` reads those outcomes: it holds everything behind an unpassed barrier and stops releasing while a Critical is unresolved; `dt build resolve <finding>` records the user's decision. Important findings get fix tasks through build-planning Replan at the next user gate (a stop or milestone exit), committed on the build branch before dispatch, and run before exit; Suggestions and Nits get one only if the user asks. After exit fix tasks land, the exit review runs again over their landings plus the Milestone exit list.
 
 **Checkpoint placement (changes tasks.md §8).** `### Checkpoint after M<n>-T<nn>` closes each plan phase: after Phase 0, after Phase 1, after Phase 2, and the milestone exit. The Phase 0 block is written `### Checkpoint after M<n>-T<nn> (barrier)`. Each block names the phase's last task in plan order, as now.
 
@@ -186,6 +186,7 @@ Run by an agent that can't finish: `TEST-WRONG` (implementer: an intent test is 
 - `status`: the run's state from `dt-build/` and the trailers: landed, reserved, claimed (with whether its agent finished, §10), ready, blocked (with why), reviews and findings by severity, the next checkpoint.
 - `resolve <finding|task>`: records the user's decision on a Critical or a blocked task.
 - `release <task> <role>`: drops a reservation or claim the driver has given up on.
+- `submit-review <checkpoint>.<pkg> FILE`: run by a reviewer in its worktree; copies its findings file into `reviews/`, which the reviewer's Write tool can't reach.
 
 ---
 
@@ -225,7 +226,8 @@ Reviewers are spawned with `isolation: worktree` like builders, so a mutation ne
 | Chained git in one Bash call refused in worktrees (build-phase-notes §4) | Agent files say: one git command per call |
 | Slow and perf tests deselected by `addopts` (rl: `-m 'not slow and not perf'`) | `red_check.py` and the reviewer's mutation runs pass `-m ""`; `dt land` runs the task's own intent tests with every marker; the exit review runs `-m slow` and `-m perf` |
 | `tests/contracts` never runs (`check.sh` `test_dirs` covers `tests/intent` and `tests/unit` only) | `gate` and `full` run `tests/contracts` too, so samples, fakes and doubles are checked when the interface lands and after |
-| Background agents' un-allowed commands are denied, and every worktree agent reads the main checkout's `.claude/settings.json` (verified, §12) | build-setup writes allow rules there for `uv run`, `git`, `scripts/check.sh` and the `dt` path; the build runs in `acceptEdits`. The main checkout's copy is the one that must stay protected |
+| Background agents' un-allowed commands are denied, and every worktree agent reads the main checkout's `.claude/settings.json` (verified, §12) | build-setup writes allow rules there for `uv run`, `git`, `scripts/check.sh` and the `dt` path; the build runs in `acceptEdits`. The main checkout's copy is the one that must stay protected. The rules apply only in a trusted folder: headless runs and evals pass them with `--allowedTools` |
+| A worktree agent's Write tool can't write outside its worktree, nor into `.claude/` (verified, §12) | Anything an agent hands to `dt` sits in a gitignored `.dt/` in its worktree; `dt`, a process, moves it (`submit-review`) |
 | Worktree base | Agent-tool worktrees branch from the main checkout's HEAD (verified, §12). `dt claim` still checks the base |
 
 ---
@@ -285,10 +287,9 @@ On restart (Resume mode, a new session, so no agent of the old one is running), 
 - A per-worktree venv takes 0.35–0.9 s from a warm uv cache, torch included; the first torch import ~6 s.
 - `claude -p` waits for background agents and resumes the main agent on each completion, with one `result` event per main turn.
 
-**Still to verify**, once `dt claim` and `dt land` exist:
-1. A full split task end to end: tester claims, writes red tests, lands on its tests branch; implementer claims (tests merged in), passes, lands; the merged gate passes and the build branch was never red.
-2. Two worktree agents in parallel, landing one after the other under the lock.
-3. In the interactive app: how a background agent's permission prompt, or a guard's `ask`, surfaces.
+**Verified by a live build** ([evidence/2026-10-17-live-build.md](evidence/2026-10-17-live-build.md), buildmini M1, five runs, $2.85): a split task end to end with the build branch never red (the tester's tests reach `build/M1` only in the implementer's landing); two worktree agents in parallel, landed one after the other under the lock; the merged-tree gate catching a real integration error; retries on `writes` and `integration` rejects; the Stop gate's verdict reused at land; the interface and exit reviews recorded through `submit-review`. The runs also showed that project allow rules apply only in a trusted folder, and that worktree agents can't Write outside their worktree or into `.claude/`.
+
+**Still to verify:** in the interactive app, how a background agent's permission prompt, or a guard's `ask`, surfaces.
 
 ---
 

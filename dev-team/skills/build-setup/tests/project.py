@@ -15,6 +15,7 @@ from pathlib import Path
 
 TEMPLATES = Path(__file__).resolve().parents[1] / "templates"
 PLACEHOLDER = re.compile(r"\{\{([a-z_]+)\}\}")
+BASE_REF = "refs/worktree/checks-base"  # what dt claim sets in a builder's worktree
 SCRIPTS = [
     "scripts/check.sh",
     "scripts/check_size.py",
@@ -92,6 +93,7 @@ def base_values() -> dict[str, str]:
         "exception_rows": "",
         "source_globs": '"src/**"',
         "default_branch": "main",
+        "worktree_links": "`data/raw/`",
     }
 
 
@@ -99,7 +101,8 @@ def common(root: Path, values: dict[str, str]) -> None:
     for rel in SCRIPTS:
         copy_template(root, rel, values)
     for rel in [".claude/agents/tester.md", ".claude/agents/implementer.md",
-                ".claude/agents/reviewer.md", "CONSTRAINTS.md", "tests/conftest.py"]:
+                ".claude/agents/reviewer.md", ".claude/settings.json", "CONSTRAINTS.md",
+                "tests/conftest.py"]:
         copy_template(root, rel, values)
     shutil.copy(TEMPLATES / "gitignore.additions", root / ".gitignore")
     write(root, ".python-version", "3.11\n")
@@ -251,15 +254,15 @@ def finish(root: Path) -> None:
 def commit(root: Path, message: str) -> None:
     sh(root, "git", "add", "-A")
     sh(root, "git", "commit", "-q", "-m", message)
-    sh(root, "git", "update-ref", "refs/checks/base", "HEAD")
+    sh(root, "git", "update-ref", BASE_REF, "HEAD")
 
 
 def reset(root: Path) -> None:
     """Back to the committed skeleton; the venv and caches are ignored files and stay."""
     sh(root, "git", "reset", "-q", "--hard", "refs/checks/skeleton")
-    sh(root, "git", "update-ref", "refs/checks/base", "HEAD")
+    sh(root, "git", "update-ref", BASE_REF, "HEAD")
     sh(root, "git", "clean", "-q", "-fd")
     for counter in (root / ".claude").glob(".stop_attempts_*"):
         counter.unlink()
-    (root / ".claude" / ".check_pkg").unlink(missing_ok=True)
-    (root / ".claude" / ".task_writes").unlink(missing_ok=True)
+    for name in (".check_pkg", ".task_writes", ".dt", "packet.md"):
+        (root / ".claude" / name).unlink(missing_ok=True)

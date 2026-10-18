@@ -34,6 +34,10 @@ COMMANDS = {
     "finding": "finding",
     "tick": "tick",
     "base": "base",
+    "claim": "claim",
+    "land": "land",
+    "escalate": "escalate",
+    "build": "build",
 }
 
 
@@ -48,6 +52,9 @@ def main(argv: list[str] | None = None) -> int:
         module.add_arguments(p)
         modules[name] = module
     args = parser.parse_args(argv)
+    if args.command == "build" and args.action == "mark-finished":
+        # A SubagentStop hook: never fails, whatever the current directory holds.
+        return modules["build"].run(args, None)
     if args.command == "guard":
         # Hooks must never fail closed on a parse error; guard reads hook JSON and decides itself.
         return modules["guard"].run(args, None)

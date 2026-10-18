@@ -1,0 +1,527 @@
+"""The build commands on a git repo of fixtures/buildmini with a stub check.sh: dt ready --halves/--reserve,
+dt claim, dt land, dt escalate, dt build, dt finding --from (build-phase.md §6)."""
+from __future__ import annotations
+
+import json
+import threading
+import unittest
+from pathlib import Path
+
+from build_helpers import TC01_TEST, BuildCase, git
+from dt_helpers import HAS_GIT
+
+from devteam import buildstate as bs
+
+SPINE = '"""The summarize step."""\n\n\ndef summarize(numbers):\n    return numbers\n'
+UNIT = '"""Unit tests."""\n\n\ndef test_x() -> None:\n    assert True\n'
+
+
+@unittest.skipUnless(HAS_GIT, "git not installed")
+class StartTest(BuildCase):
+    start = False
+
+    def test_start(self):
+        self.write("scratch.txt", "x")
+        code, out = self.dt_json("build", "start", "M1")
+        self.assertEqual((code, "isn't clean" in out["error"]), (1, True))
+        (self.root / "scratch.txt").unlink()
+        code, out = self.dt_json("build", "start", "M1")
+        self.assertEqual((code, out["branch"]), (0, "build/M1"))
+        self.assertEqual(git(self.root, "branch", "--show-current"), "build/M1")
+        self.assertIn("**Build:** build/M1 started ", self.read("tasks/plan.md").splitlines()[2])
+        self.assertEqual(self.status(), "")
+        self.assertEqual(self.dt_json("build", "start", "M1")[0], 1)            # already started
+        self.assertEqual(self.dt_json("build", "start", "M2")[0], 1)            # not the plan's milestone
+
+
+@unittest.skipUnless(HAS_GIT, "git not installed")
+class ReadyTest(BuildCase):
+    def test_interface_first_then_barrier(self):
+        r = self.ready()
+        self.assertEqual([(x["id"], x["role"], x["agent_type"]) for x in r["rows"]], [("M1-T01", "solo", "implementer")])
+        row = r["rows"][0]
+        self.assertEqual(row["prompt"], f"You are the solo for M1-T01. Run `python3 {bs.DT_PY} claim M1-T01 --role solo`, "
+                                        "then read the packet it names.")
+        self.assertEqual((row["pkg"], row["kind"], row["remaining_cp"]), ("mini", "interface", 6))
+        self.fake_land("M1-T01")
+        r = self.ready()
+        self.assertEqual([(x["id"], x["role"]) for x in r["rows"]], [("M1-T01.mini", "reviewer")])
+        review = r["rows"][0]
+        self.assertEqual((review["kind"], review["tasks"], review["lead"]), ("interface", ["M1-T01"], True))
+        self.assertTrue(review["findings_file"].endswith("dt-build/reviews/M1-T01.mini.md"))
+        self.assertIn("REVIEW M1-T01 mini: <n> findings, <c> Critical", review["prompt"])
+        self.assertEqual({(h["id"], h["role"]) for h in r["held"]}, {("M1-T02", "solo"), ("M1-T03", "tester")})
+        self.assertTrue(all(h["why"].startswith("barrier:") for h in r["held"]))
+        self.pass_barrier()
+        r = self.ready()
+        self.assertEqual([(x["id"], x["role"]) for x in r["rows"]], [("M1-T02", "solo"), ("M1-T03", "tester")])
+        self.assertEqual(r["held"], [])
+
+    def test_reserve_and_cap(self):
+        self.to_phase1()
+        self.assertEqual(self.reserve("--cap", "1"), [("M1-T02", "solo")])
+        out = self.ready("--cap", "1")
+        self.assertEqual((out["rows"], out["over_cap"], out["in_flight"]), ([], 1, ["M1-T02.solo"]))
+        self.assertEqual(self.reserve(), [("M1-T03", "tester")])                  # never listed twice
+        self.assertEqual(self.reserve(), [])
+        log = [json.loads(x)["event"] for x in (self.state() / "log.jsonl").read_text().splitlines()]
+        self.assertEqual(log.count("reserve"), 2)
+
+    def test_implementer_waits_for_its_tests_and_dependencies(self):
+        self.to_phase1()
+        git(self.root, "branch", "dt/M1-T03-tests")                               # the tester half landed
+        self.assertEqual([(x["id"], x["role"]) for x in self.ready()["rows"]], [("M1-T02", "solo")])
+        self.fake_land("M1-T02")
+        self.assertEqual([(x["id"], x["role"]) for x in self.ready()["rows"]],
+                         [("M1-T03", "implementer"), ("M1-T04", "solo")])
+
+    def test_risk_external_needs_a_yes(self):
+        self.edit("tasks/plan.md", "**Package:** mini · **Step:** PL-01 · **Kind:** wiring",
+                  "**Risk:** external (writes to a server)\n**Package:** mini · **Step:** PL-01 · **Kind:** wiring")
+        self.commit("risk")
+        self.to_phase1()
+        self.fake_land("M1-T02")
+        held = {h["id"]: h["why"] for h in self.ready()["held"]}
+        self.assertTrue(held["M1-T04"].startswith("Risk: external"))
+        self.assertEqual(self.dt_json("build", "resolve", "M1-T04", "--note", "yes, go")[0], 0)
+        self.assertIn(("M1-T04", "solo"), [(x["id"], x["role"]) for x in self.ready()["rows"]])
+
+    def test_no_git(self):
+        import shutil
+        shutil.rmtree(self.root / ".git")
+        code, out, err = self.dt("ready", "--halves")
+        self.assertEqual(code, 1)
+        self.assertIn("needs git", err)
+
+
+@unittest.skipUnless(HAS_GIT, "git not installed")
+class ClaimTest(BuildCase):
+    def test_refuses_without_reservation_or_in_main(self):
+        wt = self.worktree("a")
+        code, _, err = self.claim("M1-T01", "solo", wt)
+        self.assertEqual(code, 1)
+        self.assertIn("not reserved", err)
+        self.reserve()
+        code, _, err = self.claim("M1-T01", "solo", self.root)
+        self.assertIn("not the main checkout", err)
+        code, _, err = self.claim("M1-T01", "tester", wt)
+        self.assertIn("its halves are solo", err)
+
+    def test_claim_writes_the_boundary_and_packet(self):
+        self.reserve()
+        wt = self.worktree("a")
+        code, out, err = self.claim("M1-T01", "solo", wt)
+        self.assertEqual(code, 0, err)
+        self.assertRegex(out.splitlines()[0], r"^packet: /.*/wts/a/\.claude/packet\.md \(\d+ lines; read it in full\)$")
+        self.assertIn("done: Done when `scripts/check.sh gate` passes", out)
+        self.assertEqual(self.read(".claude/.task_writes", wt).splitlines(),
+                         ["src/mini/__init__.py", "src/mini/__main__.py", "src/mini/types.py", "src/mini/summary.py",
+                          "src/mini/pipeline.py", "tests/contracts/**"])
+        self.assertEqual(self.read(".claude/.check_pkg", wt), "mini\n")
+        self.assertEqual(self.read(".claude/.dt", wt), f"{bs.DT_PY}\n")
+        self.assertEqual(git(wt, "rev-parse", "refs/worktree/checks-base"), self.head(wt))
+        self.assertTrue(self.read(".claude/packet.md", wt).startswith("# Packet: M1-T01 solo\n"))
+        self.assertEqual(git(wt, "status", "--porcelain"), "")                     # dt's files are excluded
+        self.assertEqual((self.records("reserved"), self.records("claims")), ([], ["M1-T01.solo"]))
+        claim = json.loads((self.state() / "claims/M1-T01.solo.json").read_text())
+        self.assertEqual((claim["role"], claim["base"], claim["finished"], claim["branch"]),
+                         ("solo", self.head(wt), False, "wt-a"))
+        self.assertEqual(self.claim("M1-T01", "solo", wt)[0], 0)                   # idempotent in its own worktree
+        other = self.worktree("b")
+        self.assertIn("already claimed", self.claim("M1-T01", "solo", other)[2])
+
+    def test_stale_base(self):
+        old = self.worktree("old")                                               # before M1-T01 landed
+        self.to_phase1()
+        self.reserve()
+        code, _, err = self.claim("M1-T02", "solo", old)
+        self.assertEqual(code, 1)
+        self.assertIn("stale base", err)
+        self.assertIn("M1-T01", err)
+
+    def test_tester_packet_has_no_source(self):
+        self.edit("tasks/plan.md", "**Read:** PL-01, TC-01, SUM-02, core.Summary, core.summarize",
+                  "**Read:** PL-01, TC-01, SUM-02, core.Summary, core.summarize, src/mini/__init__.py")
+        self.commit("read a source file")
+        self.to_phase1()
+        wt = self.run_half("M1-T03", "tester", {})
+        packet = self.read(".claude/packet.md", wt)
+        self.assertNotIn("### src/mini/__init__.py", packet)
+        self.assertNotIn("## Layout", packet)
+        self.assertIn("### TC-01: Mean of four numbers", packet)
+        self.assertIn("- tests/intent/mini/test_tc01.py (new)", packet)
+        self.assertNotIn("- src/mini/summary.py", packet)
+        self.assertEqual(self.read(".claude/.task_writes", wt), "tests/intent/mini/test_tc01.py\n")
+
+    def test_worktree_links(self):
+        self.write("CONSTRAINTS.md", "# Constraints\n\n**Status:** Approved\n\n**Worktree links:** `data/raw/`, .env\n")
+        self.commit("constraints")
+        (self.root / "data/raw").mkdir(parents=True)
+        (self.root / "data/raw/prices.csv").write_text("x\n")
+        git(self.root, "update-index", "--refresh")
+        self.write(".git/info/exclude", "/data/\n")
+        self.reserve()
+        wt = self.worktree("a")
+        code, out, err = self.claim("M1-T01", "solo", wt)
+        self.assertIn("links: data/raw: linked; .env: never linked", out)
+        self.assertTrue((wt / "data/raw").is_symlink())
+        self.assertEqual((wt / "data/raw/prices.csv").read_text(), "x\n")
+
+
+@unittest.skipUnless(HAS_GIT, "git not installed")
+class LandTest(BuildCase):
+    def test_solo_squash_with_trailer_tick_and_release(self):
+        self.to_phase1()
+        pre = self.head()
+        wt = self.run_half("M1-T02", "solo", {"src/mini/summary.py": SPINE, "tests/unit/mini/test_summary.py": UNIT})
+        git(wt, "add", "-A")
+        git(wt, "commit", "-q", "-m", "one")                                     # committed and uncommitted both land
+        self.write("tests/unit/mini/test_summary.py", UNIT + "\n# more\n", root=wt)
+        out = self.land("M1-T02", "solo")
+        self.assertEqual((out["landed"], out["reject"], out["flaky"]), (True, None, False))
+        self.assertEqual(git(self.root, "rev-parse", "HEAD^"), pre)                # one commit, not a merge
+        self.assertEqual(git(self.root, "log", "-1", "--format=%P").count(" "), 0)
+        msg = git(self.root, "log", "-1", "--format=%B")
+        self.assertEqual(msg.splitlines()[0], "M1-T02: summarize spine (count, total)")
+        self.assertIn("Dt-Landed: M1-T02 solo", msg)
+        self.assertEqual(sorted(git(self.root, "show", "--name-only", "--format=", "HEAD").splitlines()),
+                         ["src/mini/summary.py", "tasks/todo.md", "tests/unit/mini/test_summary.py"])
+        self.assertIn("- [x] M1-T02", self.read("tasks/todo.md"))
+        self.assertEqual(self.read("tests/unit/mini/test_summary.py"), UNIT + "\n# more\n")
+        self.assertEqual(self.status(), "")
+        self.assertEqual(self.records("claims"), [])
+        self.assertFalse(wt.exists())
+        self.assertNotIn("wt-M1-T02-solo", git(self.root, "branch"))
+        self.assertEqual(git(self.root, "rev-parse", "refs/worktree/checks-base"), self.head())
+        gates = [c for c in self.calls() if c.endswith(" gate --pkg mini")]
+        self.assertEqual(len(gates), 2)                                          # worktree, then merged tree
+        self.assertTrue(gates[1].startswith(str(self.root.resolve())))
+        self.assertEqual(bs.landings(self.root)["M1-T02"]["role"], "solo")
+
+    def test_split_task_end_to_end(self):
+        self.to_phase1()
+        before = self.head()
+        wt = self.run_half("M1-T03", "tester", {"tests/intent/mini/test_tc01.py": TC01_TEST})
+        out = self.land("M1-T03", "tester")
+        self.assertTrue(out["landed"])
+        self.assertEqual(self.head(), before)                                     # the build branch isn't touched
+        self.assertFalse((self.root / "tests/intent").exists())
+        tests = git(self.root, "rev-parse", "dt/M1-T03-tests")
+        self.assertEqual(git(self.root, "rev-parse", "dt/M1-T03-tests^"), before)
+        self.assertIn("Dt-Landed: M1-T03 tester", git(self.root, "log", "-1", "--format=%B", tests))
+        self.assertEqual(git(self.root, "show", "--name-only", "--format=", tests), "tests/intent/mini/test_tc01.py")
+        self.assertTrue(any(c.endswith(" collect") for c in self.calls()))
+        self.assertFalse(wt.exists())
+        self.assertEqual(self.dt_json("build", "status")[1]["tests_landed"], ["M1-T03"])
+
+        self.fake_land("M1-T02")
+        wt = self.run_half("M1-T03", "implementer", {"src/mini/summary.py": SPINE + "# mean\n"})
+        self.assertEqual(self.read("tests/intent/mini/test_tc01.py", wt), TC01_TEST)   # merged in by dt claim
+        self.assertEqual(self.read(".claude/.task_writes", wt),
+                         "src/mini/summary.py\ntests/unit/mini/test_summary.py\n")
+        out = self.land("M1-T03", "implementer")
+        self.assertTrue(out["landed"], out)
+        files = sorted(git(self.root, "show", "--name-only", "--format=", "HEAD").splitlines())
+        self.assertEqual(files, ["src/mini/summary.py", "tasks/todo.md", "tests/intent/mini/test_tc01.py"])
+        self.assertIn("Dt-Landed: M1-T03 implementer", git(self.root, "log", "-1", "--format=%B"))
+        # The merged tree's gate ran against a base holding the tests, so they weren't the implementer's change.
+        base_line = [c for c in self.calls() if c.startswith(str(self.root.resolve()) + " gate")]
+        self.assertEqual(len(base_line), 1)
+
+    def test_writes_reject_then_redispatch(self):
+        self.to_phase1()
+        wt = self.run_half("M1-T02", "solo", {"src/mini/summary.py": SPINE, "src/mini/extra.py": "x = 1\n"})
+        out = self.land("M1-T02", "solo")
+        self.assertEqual((out["landed"], out["reject"], out["rejects"]), (False, "writes", 1))
+        detail = open(out["detail_file"]).read()
+        self.assertIn("- src/mini/extra.py", detail)
+        self.assertNotIn("- src/mini/summary.py", detail.split("reject: writes")[1])
+        self.assertFalse(wt.exists())
+        self.assertIn("wt-M1-T02-solo", git(self.root, "branch"))                # kept after a reject
+        self.assertEqual((self.records("claims"), self.records("reserved")), ([], ["M1-T03.tester"]))
+        self.assertEqual(self.status(), "")
+        self.assertIn(("M1-T02", "solo"), self.reserve())                          # re-dispatched once
+        wt2 = self.worktree("again")
+        code, msg, _ = self.claim("M1-T02", "solo", wt2)
+        self.assertIn("previous rejection: writes, details in", msg)
+        self.write("src/mini/extra.py", "x = 1\n", root=wt2)
+        self.assertEqual(self.land("M1-T02", "solo")["reject"], "writes")
+        held = {h["id"]: h["why"] for h in self.ready()["held"]}
+        self.assertEqual(held["M1-T02"], "rejected 2 times (last: writes)")         # second time: blocked
+        self.assertEqual(self.dt_json("build", "resolve", "M1-T02")[0], 0)
+        self.assertIn(("M1-T02", "solo"), [(r["id"], r["role"]) for r in self.ready()["rows"]])
+
+    def test_protected_reject_and_tester_allowance(self):
+        self.edit("tasks/plan.md", "**Depends on:** M1-T01 · **Writes:** src/mini/summary.py, tests/unit/mini/test_summary.py",
+                  "**Depends on:** M1-T01 · **Writes:** src/mini/summary.py, tests/unit/mini/test_summary.py, pyproject.toml")
+        self.commit("a protected path in Writes")
+        self.to_phase1()
+        self.run_half("M1-T02", "solo", {"src/mini/summary.py": SPINE, "pyproject.toml": "[project]\n"})
+        out = self.land("M1-T02", "solo")
+        self.assertEqual(out["reject"], "writes")
+        self.assertIn("on the protected list:\n- pyproject.toml", open(out["detail_file"]).read())
+        # tests/intent/** is protected, but it is the tester's own allowance.
+        self.run_half("M1-T03", "tester", {"tests/intent/mini/test_tc01.py": TC01_TEST})
+        self.assertTrue(self.land("M1-T03", "tester")["landed"])
+
+    def test_gate_reject_and_verdict_reuse(self):
+        self.to_phase1()
+        wt = self.run_half("M1-T02", "solo", {"src/mini/summary.py": SPINE})
+        self.assertEqual(self.hook("--root", str(wt), "build", "verdict", "--mode", "gate", "--rc", "1")[0], 0)
+        gate = json.loads((self.state() / "gates/M1-T02.solo.json").read_text())
+        self.assertEqual((gate["passed"], gate["tree"]), (False, bs.tree_hash(wt)))
+        before = len(self.calls())
+        out = self.land("M1-T02", "solo")
+        self.assertEqual(out["reject"], "gate")
+        self.assertIn("reused the Stop gate's verdict", open(out["detail_file"]).read())
+        self.assertFalse(any(" gate" in c for c in self.calls()[before:]))          # the stub never ran the gate
+        self.assertEqual(self.records("gates"), [])
+
+        wt = self.run_half("M1-T02", "solo", {"src/mini/summary.py": SPINE}, name="second")
+        self.hook("--root", str(wt), "build", "verdict", "--mode", "gate", "--rc", "0")
+        self.write("src/mini/summary.py", SPINE + "# changed after the verdict\n", root=wt)
+        self.stub("gate", 1)
+        out = self.land("M1-T02", "solo")
+        self.assertEqual(out["reject"], "gate")                                    # the tree changed: gate re-ran
+        self.assertIn("stub gate: exit 1", open(out["detail_file"]).read())
+
+    def test_escalated(self):
+        self.to_phase1()
+        git(self.root, "branch", "dt/M1-T03-tests")
+        self.fake_land("M1-T02")
+        wt = self.run_half("M1-T03", "implementer", {})
+        self.assertEqual(self.hook("--root", str(wt), "build", "escalated")[0], 1)
+        code, out, _ = self.dt("escalate", "test-wrong", "TC-01's `mean` uses the wrong count", root=wt)
+        self.assertEqual(code, 0)
+        self.assertIn("STOPPED M1-T03 implementer: see dt escalate", out)
+        self.assertEqual(self.hook("--root", str(wt), "build", "escalated")[0], 0)
+        self.assertEqual(self.hook("--root", str(wt / "src"), "build", "escalated")[0], 0)   # from a subfolder
+        out = self.land("M1-T03", "implementer")
+        self.assertEqual((out["reject"], out["kind"]), ("escalated", "TEST-WRONG"))
+        held = {(h["id"], h["role"]): h["why"] for h in self.ready()["held"]}
+        self.assertTrue(held[("M1-T03", "implementer")].startswith("escalated TEST-WRONG"))
+        code, res = self.dt_json("build", "resolve", "M1-T03", "--note", "the test is wrong")
+        self.assertEqual((res["reopened_tester"], res["escalations_cleared"]), (True, ["M1-T03.implementer"]))
+        self.assertIn(("M1-T03", "tester"), [(r["id"], r["role"]) for r in self.ready()["rows"]])
+
+    def test_escalate_needs_a_claim_and_the_right_role(self):
+        self.to_phase1()
+        wt = self.worktree("loose")
+        self.assertEqual(self.dt("escalate", "NEEDS-DEP", "numpy", root=wt)[0], 1)
+        wt = self.run_half("M1-T03", "tester", {})
+        self.assertEqual(self.dt("escalate", "TEST-WRONG", "x", root=wt)[0], 2)
+        self.assertEqual(self.dt("escalate", "NEEDS-DEP", "needs numpy", root=wt)[0], 0)
+        self.assertEqual(self.land("M1-T03", "tester")["kind"], "NEEDS-DEP")
+        ready = self.ready()
+        self.assertEqual(ready["rows"], [])                                        # NEEDS-DEP drains everything
+        self.assertTrue(ready["holds"][0].startswith("escalation: M1-T03.tester NEEDS-DEP"))
+
+    def test_integration_reject_resets(self):
+        self.to_phase1()
+        pre = self.head()
+        self.run_half("M1-T02", "solo", {"src/mini/summary.py": SPINE, "tests/unit/mini/test_summary.py": UNIT})
+        self.stub("gate", 0, 1, 1)                                                 # worktree passes; merged fails twice
+        out = self.land("M1-T02", "solo")
+        self.assertEqual(out["reject"], "integration")
+        self.assertEqual((self.head(), self.status()), (pre, ""))
+        self.assertNotIn("- [x] M1-T02", self.read("tasks/todo.md"))
+        self.assertIn("dependents: M1-T03, M1-T04", open(out["detail_file"]).read())
+        self.assertEqual(git(self.root, "rev-parse", "refs/worktree/checks-base"), pre)
+
+    def test_flaky_rerun_lands_with_a_finding(self):
+        self.to_phase1()
+        self.run_half("M1-T02", "solo", {"src/mini/summary.py": SPINE, "tests/unit/mini/test_summary.py": UNIT})
+        self.stub("gate", 0, 1, 0)
+        out = self.land("M1-T02", "solo")
+        self.assertEqual((out["landed"], out["flaky"]), (True, True))
+        plan = self.read("tasks/plan.md")
+        self.assertIn("- M1-R01 Important · flaky · M1-T02 the integration gate failed, then passed on its rerun", plan)
+        self.assertLess(plan.index("Checkpoint: milestone exit"), plan.index("M1-R01"))
+        self.assertIn("tasks/plan.md", git(self.root, "show", "--name-only", "--format=", "HEAD"))
+
+    def test_conflict_resets(self):
+        self.to_phase1()
+        self.run_half("M1-T02", "solo", {"src/mini/summary.py": SPINE})
+        self.write("src/mini/summary.py", "something else\n")
+        pre = self.commit("another task wrote the same file")
+        out = self.land("M1-T02", "solo")
+        self.assertEqual(out["reject"], "conflict")
+        self.assertEqual((self.head(), self.status()), (pre, ""))
+
+    def test_harness(self):
+        self.to_phase1()
+        self.assertEqual(self.reserve(), [("M1-T02", "solo"), ("M1-T03", "tester")])
+        out = self.land("M1-T02", "solo")                                          # reserved, never claimed
+        self.assertEqual((out["reject"], out["harness_failures"], out["rejects"]), ("harness", 1, 0))
+        self.assertNotIn("M1-T02.solo", self.records("reserved"))
+        wt = self.run_half("M1-T02", "solo", {})
+        self.assertEqual(self.land("M1-T02", "solo")["reject"], "harness")         # unfinished, no changes
+        self.assertFalse(wt.exists())
+        self.run_half("M1-T02", "solo", {"src/mini/summary.py": SPINE}, name="third")
+        self.assertEqual(self.land("M1-T02", "solo", "--harness")["harness_failures"], 3)
+        held = {h["id"]: h["why"] for h in self.ready()["held"]}
+        self.assertEqual(held["M1-T02"], "3 harness failures in a row")
+
+    def test_preconditions(self):
+        self.to_phase1()
+        self.write("dirty.txt", "x")
+        code, out = self.dt_json("land", "M1-T02", "--role", "solo")
+        self.assertEqual(code, 1)
+        self.assertIn("isn't clean", out["error"])
+        (self.root / "dirty.txt").unlink()
+        self.assertEqual(self.dt_json("land", "M1-T09", "--role", "solo")[0], 2)
+        self.assertEqual(self.dt_json("land", "M1-T02", "--role", "tester")[0], 2)
+        wt = self.worktree("x")
+        self.assertEqual(self.dt_json("land", "M1-T02", "--role", "solo", root=wt)[0], 2)
+
+    def test_lock(self):
+        self.to_phase1()
+        self.run_half("M1-T02", "solo", {"src/mini/summary.py": SPINE})
+        state = bs.State(self.root)
+        held, release = threading.Event(), threading.Event()
+
+        def hold():
+            with state.lock(5):
+                held.set()
+                release.wait(5)
+
+        t = threading.Thread(target=hold)
+        t.start()
+        held.wait(5)
+        try:
+            code, out = self.dt_json("land", "M1-T02", "--role", "solo", "--lock-timeout", "0.3")
+            self.assertEqual(code, 3)
+            self.assertIn("land.lock", out["error"])
+            self.assertEqual(self.records("claims"), ["M1-T02.solo"])               # nothing happened
+        finally:
+            release.set()
+            t.join()
+        self.assertTrue(self.land("M1-T02", "solo")["landed"])
+
+    def test_wiring_runs_prebuild_clear(self):
+        self.to_phase1()
+        self.fake_land("M1-T02")
+        self.run_half("M1-T04", "solo", {"src/mini/pipeline.py": "x = 1\n", "tests/unit/mini/test_pipeline.py": UNIT})
+        self.assertTrue(self.land("M1-T04", "solo")["landed"])
+        pipelines = self.read("docs/packages/mini/pipelines.md")
+        self.assertNotIn("Entry sketch (pre-build", pipelines)
+        self.assertIn("Layout: `dt layout mini`", pipelines)
+        self.assertIn("docs/packages/mini/pipelines.md", git(self.root, "show", "--name-only", "--format=", "HEAD"))
+
+
+@unittest.skipUnless(HAS_GIT, "git not installed")
+class HookTest(BuildCase):
+    def test_mark_finished_by_cwd(self):
+        self.to_phase1()
+        wt = self.run_half("M1-T02", "solo", {})
+        self.assertEqual(self.hook("build", "mark-finished", stdin="not json"), (0, ""))
+        self.assertEqual(self.hook("build", "mark-finished", stdin=json.dumps({"cwd": str(self.root)})), (0, ""))
+        self.assertFalse(json.loads((self.state() / "claims/M1-T02.solo.json").read_text())["finished"])
+        code, out = self.hook("build", "mark-finished",
+                              stdin=json.dumps({"cwd": str(wt / "src"), "agent_type": "implementer"}))
+        self.assertEqual((code, out), (0, ""))
+        claim = json.loads((self.state() / "claims/M1-T02.solo.json").read_text())
+        self.assertEqual((claim["finished"], claim["stop_agent_type"]), (True, "implementer"))
+        status = self.dt_json("build", "status")[1]
+        self.assertEqual([(c["id"], c["finished"]) for c in status["claims"]], [("M1-T02.solo", True)])
+        self.assertEqual(self.ready()["in_flight"], ["M1-T03.tester"])           # a finished claim isn't in flight
+        # A finished claim with no changes goes to the gate, not to harness.
+        self.assertEqual(self.land("M1-T02", "solo")["reject"], None)
+
+    def test_submit_review_copies_into_the_common_dir(self):
+        wt = self.worktree("rev")
+        self.write(".dt/review.md", "Nit · readability · `src/mini/x.py:1::f` name → rename\n", root=wt)
+        code, out, _ = self.dt("build", "submit-review", "M1-T01.mini", ".dt/review.md", root=wt)
+        self.assertEqual(code, 0, out)
+        dest = Path(json.loads(out)["file"])
+        self.assertEqual(dest.parent.name, "reviews")
+        self.assertIn("`src/mini/x.py:1::f`", dest.read_text())
+        self.assertEqual(self.dt("build", "submit-review", "bogus", ".dt/review.md", root=wt)[0], 2)
+
+    def test_verdict_and_escalated_outside_a_claim(self):
+        wt = self.worktree("loose")
+        self.assertEqual(self.hook("--root", str(wt), "build", "verdict", "--mode", "gate", "--rc", "0"), (0, ""))
+        self.assertEqual(self.records("gates"), [])
+        self.assertEqual(self.hook("--root", str(wt), "build", "escalated")[0], 1)
+
+
+@unittest.skipUnless(HAS_GIT, "git not installed")
+class FindingFromTest(BuildCase):
+    LINES = ("# Review M1-T01 mini\n\n"
+             "Critical · CR-09 · `src/mini/types.py:3::Summary` has no `mean` field → add `mean: float | None`\n"
+             "- Important · tests · `tests/contracts/core.Summary/sample.json` holds no mean → add one\n"
+             "Checklist: [x] types\n")
+
+    def test_records_commits_and_holds(self):
+        self.fake_land("M1-T01")
+        self.reserve()
+        path = self.state() / "reviews" / "M1-T01.mini.md"
+        path.write_text(self.LINES, encoding="utf-8")
+        code, out = self.dt_json("finding", "--from", str(path))
+        self.assertEqual(code, 0, out)
+        self.assertEqual((out["outcome"], out["findings"], out["critical"], out["tasks"]),
+                         ("critical", ["M1-R01", "M1-R02"], ["M1-R01"], ["M1-T01"]))
+        plan = self.read("tasks/plan.md")
+        self.assertIn("**Findings:**\n- M1-R01 Critical · CR-09 · `src/mini/types.py:3::Summary` has no `mean` field "
+                      "→ add `mean: float | None`\n- M1-R02 Important · tests · "
+                      "`tests/contracts/core.Summary/sample.json` holds no mean → add one\n", plan)
+        self.assertLess(plan.index("M1-R02"), plan.index("## Phase 1"))
+        self.assertEqual(self.status(), "")
+        self.assertEqual(git(self.root, "log", "-1", "--format=%s"), "M1-T01 review, mini: 2 findings, 1 Critical")
+        self.assertEqual(self.records("reserved"), [])
+        self.assertEqual(json.loads((self.state() / "reviews/M1-T01.mini.json").read_text())["outcome"], "critical")
+        ready = self.ready()
+        self.assertEqual(ready["rows"], [])
+        self.assertTrue(ready["holds"][0].startswith("critical: M1-R01"))
+        self.assertEqual(self.dt_json("finding", "--from", str(path))[1]["already_recorded"], True)
+        self.assertEqual(self.read("tasks/plan.md"), plan)
+        self.assertEqual(self.dt_json("build", "resolve", "m1-r01", "--note", "fixed by a re-freeze")[0], 0)
+        self.assertEqual([(r["id"], r["role"]) for r in self.ready()["rows"]], [("M1-T02", "solo"), ("M1-T03", "tester")])
+        status = self.dt_json("build", "status")[1]
+        self.assertEqual(status["findings"], {"Critical": 1, "Important": 1})
+        self.assertEqual(status["reviews"][0]["critical_open"], [])
+
+    def test_explicit_checkpoint_and_errors(self):
+        self.fake_land("M1-T01")
+        path = self.ctl / "findings.md"
+        path.write_text("Nit · naming · `a` → b\n", encoding="utf-8")
+        self.assertEqual(self.dt_json("finding", "--from", str(path))[0], 2)          # no checkpoint in the name
+        code, out = self.dt_json("finding", "--from", str(path), "--checkpoint", "exit", "--pkg", "mini")
+        self.assertEqual((code, out["checkpoint"], out["outcome"]), (0, "exit", "passed"))
+        self.assertEqual(self.dt_json("finding", "--from", str(self.ctl / "missing.md"))[0], 1)
+
+    def test_exit_review_after_all_landed(self):
+        for t in ("M1-T01", "M1-T02", "M1-T03", "M1-T04"):
+            self.fake_land(t, "implementer" if t == "M1-T03" else "solo")
+        self.pass_barrier()
+        rows = self.ready()["rows"]
+        self.assertEqual([(r["id"], r["kind"], r["tasks"]) for r in rows],
+                         [("exit.mini", "exit", ["M1-T01", "M1-T02", "M1-T03", "M1-T04"])])
+        self.assertEqual(len(rows[0]["commits"]), 4)
+        self.assertEqual(rows[0]["end"], self.head())
+
+
+@unittest.skipUnless(HAS_GIT, "git not installed")
+class StatusTest(BuildCase):
+    def test_resume_view(self):
+        self.to_phase1()
+        self.reserve()
+        wt = self.worktree("t03")
+        self.claim("M1-T03", "tester", wt)
+        self.assertEqual(self.dt_json("build", "release", "M1-T02", "solo")[1]["dropped"], ["reserved"])
+        code, s = self.dt_json("build", "status")
+        self.assertEqual(code, 0)
+        self.assertEqual((s["milestone"], s["branch"], s["progress"]), ("M1", "build/M1", "1/4"))
+        self.assertTrue(s["go"].startswith("build/M1 started"))
+        self.assertEqual(s["landed"][0]["task"], "M1-T01")
+        self.assertEqual(s["reserved"], [])
+        self.assertEqual([(c["id"], c["finished"]) for c in s["claims"]], [("M1-T03.tester", False)])
+        self.assertEqual(s["ready"], [{"id": "M1-T02", "role": "solo"}])
+        self.assertEqual(s["next_checkpoint"]["checkpoint"], "exit")
+        self.assertEqual(s["reviews"][0]["review"], "M1-T01.mini")
+        events = [json.loads(x)["event"] for x in (self.state() / "log.jsonl").read_text().splitlines()]
+        self.assertEqual(events[:1] + events[-3:], ["start", "reserve", "claim", "release"])
+
+
+if __name__ == "__main__":
+    unittest.main()

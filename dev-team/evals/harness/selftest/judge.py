@@ -127,7 +127,14 @@ def check_repeats(pdir, out, root):
     r = cli("run", pdir, bad, env={**env, "FAKE_JUDGE_FAIL": "1"})
     log = bad.with_suffix(".log").read_text()
     case("run: gives up after three malformed replies per order, exit 1",
-         r.returncode == 1 and log.count("malformed") == 6 and "rerun with --resume" in r.stderr, r.stderr[-300:])
+         r.returncode == 1 and log.count(" malformed attempt ") == 6 and "rerun with --resume" in r.stderr, r.stderr[-300:])
+    raw = bad.with_name("judge-bad.AB.malformed.txt")
+    case("run: the last malformed reply is saved for reading", raw.exists() and "Set A is better" in raw.read_text())
+    case("parse: the verdict object found among prose, fences and stray braces",
+         jp.first_json_object('Read {both}. ```json\n{"winner": "B", "rubric": {"A": {}}}\n``` see {"x": }')
+         == {"winner": "B", "rubric": {"A": {}}})
+    case("parse: an object that doesn't decode is no verdict",
+         jp.first_json_object('{"winner": "A", "rubric": {"A": "a "quoted" word"}}') is None)
 
 
 def main():

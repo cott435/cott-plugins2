@@ -14,7 +14,8 @@ Usage:
       own `claude -p` (JUDGE_MODEL, default claude-opus-5-5) from <prompt-dir> with only Read, Glob and Grep, no
       CLAUDE.md files, no MCP servers and no host settings. Repeat 1's verdicts are <out>.AB.json and <out>.BA.json,
       repeat r's <out>.AB.r.json and <out>.BA.r.json. A reply with no valid verdict (no JSON, or not the rubric's
-      shape) is retried, up to 3 attempts, each logged to <out>.log and stderr. Saved verdicts are removed first;
+      shape) is retried, up to 3 attempts, each logged to <out>.log and stderr, the latest bad reply kept
+      as <out>.<order>.malformed.txt. Saved verdicts are removed first;
       --resume keeps those of repeats 1..N and runs only the missing ones. A judge can't write, and a read
       outside <prompt-dir> asks for a permission that a headless run in the default permission mode denies, so the
       key stays out of reach.
@@ -208,17 +209,33 @@ def judge(prompt_dir, order, out, rep=1):
            "--tools", "Read,Glob,Grep", "--allowedTools", "Read,Glob,Grep", "--strict-mcp-config",
            "--output-format", "json", "--no-session-persistence", *driver.ISOLATE]
     r = subprocess.run(cmd, cwd=prompt_dir, env=driver.ENV, capture_output=True, text=True, timeout=7200)
+    tag = verdict_tag(order, rep)
     try:
         reply = json.loads(r.stdout)["result"]
-        verdict = json.loads(re.search(r"\{.*\}", reply, re.S).group(0))
-    except (ValueError, KeyError, TypeError, AttributeError):
-        raise SystemExit(f"judge_prompt: no JSON verdict from the {order} judge (rc {r.returncode}): "
-                         f"{(r.stdout or r.stderr)[-800:]}")
-    problem = verdict_problem(verdict)
+    except (ValueError, KeyError, TypeError):
+        reply = None
+    verdict = first_json_object(reply) if isinstance(reply, str) else None
+    problem = "no JSON object in the reply" if verdict is None else verdict_problem(verdict)
     if problem:
-        raise SystemExit(f"judge_prompt: the {order} judge's verdict is malformed: {problem}")
-    sibling(out, verdict_tag(order, rep)).write_text(json.dumps(verdict, indent=1))
+        raw = pathlib.Path(out).with_name(f"{pathlib.Path(out).stem}.{tag}.malformed.txt")
+        raw.write_text(reply if isinstance(reply, str) else (r.stdout or r.stderr))
+        raise SystemExit(f"judge_prompt: the {order} judge gave no valid verdict (rc {r.returncode}): {problem}; "
+                         f"reply saved to {raw.name}")
+    sibling(out, tag).write_text(json.dumps(verdict, indent=1))
     return order, verdict.get("winner")
+
+
+def first_json_object(text):
+    """The first JSON object in a reply that decodes whole, wherever it starts; prose or fences around it are fine."""
+    dec = json.JSONDecoder()
+    for m in re.finditer(r"\{", text):
+        try:
+            obj = dec.raw_decode(text, m.start())[0]
+        except ValueError:
+            continue
+        if isinstance(obj, dict) and "rubric" in obj:
+            return obj
+    return None
 
 
 def log_line(out, *parts):

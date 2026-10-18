@@ -41,7 +41,7 @@ SEVERITY = {
     "request-number": "W", "request-cite": "W", "request-source": "W",
     "packet-type-closure": "W", "parallel-step": "W", "milestone-lines": "E", "milestone-order": "E",
     "exit-cases-in-scope": "E", "kind-title": "E", "covers-vs-deferred": "E", "closed-open-question": "W",
-    "process-narration": "W",
+    "process-narration": "W", "explain-stale": "W",
 }
 
 # Size budgets (planning-stage.md §3), in lines. Package docs are budgeted per unit (lines per unit × units +
@@ -901,6 +901,20 @@ def check_request_source(ctx: Context):
                          "was derived, or route it to the user")
 
 
+def check_explain_stale(ctx: Context):
+    """A page under docs/explained/ that no longer matches what `dt explain --write` would write now."""
+    from . import explain
+    folder = ctx.repo.root / explain.DIR
+    if not folder.is_dir():
+        return
+    want = explain.pages(ctx.repo)
+    for path in sorted(folder.glob("*.md")):
+        rel = path.relative_to(ctx.repo.root).as_posix()
+        if want.get(rel) != path.read_text(encoding="utf-8"):
+            yield Problem(rel, 1, "explain-stale", "out of date with the pipelines docs: `dt explain --write`"
+                          + ("" if rel in want else " (no pipelines left for it: delete it)"))
+
+
 # ---- probe checks (design/probes.md §4, §5) --------------------------------------------------------
 
 PROBE_FIELDS = ("Folder", "Question", "Informs")
@@ -1703,7 +1717,7 @@ CHECKS = [
     check_probe_sample, check_probe_results, check_probe_stale, check_probe_large,
     check_boundaries, check_probe_open, check_milestone_depends,
     check_request_format, check_request_trace, check_request_open, check_request_edit, check_request_ref,
-    check_request_number, check_request_cite, check_request_source,
+    check_request_number, check_request_cite, check_request_source, check_explain_stale,
 ]
 
 

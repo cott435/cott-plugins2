@@ -9,6 +9,7 @@ The file format every mode writes. `dt` parses it: keep the header line, the `##
 
 ## PL-NN: <Workflow name>
 **Entry:** `src/<path>/<entry module>::run_<workflow>` · **Trigger:** `python -m <module> <command>`
+**Purpose:** <one sentence: what the user gets from running it, in their words>
 **Covers:** <spec IDs, ranges with an en dash>
 **References:** <optional: RF-NN (step) for each reference that informs a step>
 

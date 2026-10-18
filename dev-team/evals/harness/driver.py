@@ -265,11 +265,13 @@ def dt_next(proj, dt):
 
 SKILLS = ("idea-refine", "spec-writing", "architecture-design", "reference-intake", "api-probe", "pipeline-design",
           "test-planning", "build-planning", "build-setup")
-NAMED_SKILL = re.compile(r"\b(" + "|".join(SKILLS) + r")\b")
+# A skill named as the next step ("Yes, start with api-probe on PB-01"), not one mentioned in passing.
+NAMED_SKILL = re.compile(r"\b(?:start|begin|go|move|switch|run|use|do|continue|proceed|open|first)\b[^.?!\n]{0,40}?"
+                         r"\b(" + "|".join(SKILLS) + r")\b", re.I)
 
 
 def named_skill(msg):
-    """The dev-team skill a user's message names ("Yes, start with api-probe on PB-01"), or None."""
+    """The dev-team skill a user's message names as the next step, or None."""
     m = NAMED_SKILL.search(msg or "")
     return m.group(1) if m else None
 

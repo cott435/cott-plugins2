@@ -573,7 +573,7 @@ def grade(run: pathlib.Path) -> dict:
 
 
 def failed(g: dict) -> list[str]:
-    return [r["id"] for r in g["expectations"] if not r["passed"] and r["category"] != "harness"]
+    return [r["id"] for r in g["expectations"] if not r.get("na") and not r["passed"] and r["category"] != "harness"]
 
 
 def good(out: pathlib.Path, arm: str) -> bool:

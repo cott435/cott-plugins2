@@ -8,7 +8,8 @@ itself). Each expectation carries a `category`: efficiency, integration, correct
 `harness` checks are summarised apart in `harness_summary` and never count in `summary`.
 
 What the run is read from (build_driver.py writes it; dryrun_build.py replays it):
-- <run>/project: the git repo. `main` is the state before the build; `build/M1` the build branch, whose first
+- <run>/project: the git repo. The base (the state before the build) is the commit `dt build start` branched from
+  (its `start` log event's parent), else build/M1's merge-base with `main` or `master`; `build/M1` the build branch, whose first
   parent holds every landing: a commit with the trailer `Dt-Landed: <task> <role>` (implementer, solo; and, in A0,
   tester), and `dt/<task>-tests` each split task's tester landing. Tasks and roles come only from those trailers,
   never from commit subjects or branch names. A0 writes its own trailers: weaker evidence, marked in `extra`.
@@ -17,6 +18,12 @@ What the run is read from (build_driver.py writes it; dryrun_build.py replays it
 - <run>/agent_stream.jsonl: the main session's stream-json (result events: cost, usage, permission_denials);
   the session's subagent transcripts beside its transcript under ~/.claude/projects/; <run>/flow/index.json
   (workflow-analyzer units: each agent's time and tokens); turns.json, summary.json.
+
+A target with a fixture (minilab) is graded against its oracle, holdout, mutants and planted.json. A project target
+(`"project"` in scenarios.json, a planning run's project) has none of them: those checks are `na` (kept for lining up
+with fixture runs, never counted), and correctness is the project's own golden cases instead: the build's
+tests/intent run on build/M1's tree in the project's venv with every marker, `oracle_unchanged` over tests/fixtures,
+and `interface_changes` counted with no planted flaw. Everything keyed on dt is the same for both.
 
 Usage: grade_build.py <run-dir> [--fixture DIR] [--quiet]
 """
@@ -40,10 +47,12 @@ FIXTURES = HERE / "fixtures" / "build"
 TASK = re.compile(r"\bM\d+-T\d+\b")
 SIZE_W = {"XS": 1, "S": 2, "M": 4}
 TRAILER = re.compile(r"^Dt-Landed:\s*(M\d+-T\d+)\s+(tester|implementer|solo)\b", re.M)
-INTERFACE_PATHS = ["packages/*/src/*/types.py", "tests/contracts/*"]
+INTERFACE_PATHS = ["packages/*/src/*/types.py", "packages/*/src/*/protocols.py", "src/*/types.py", "src/*/protocols.py",
+                   "tests/contracts/*"]
 PROTECTED = ["tests/intent/*", "tests/fixtures/*", "tests/conftest.py", "pyproject.toml", "uv.lock", "CONSTRAINTS.md",
              "scripts/*", ".claude/agents/*", ".claude/settings.json", "references/*", "packages/*/pyproject.toml"]
 WRONG_RED = ("ImportError", "ModuleNotFoundError", "AttributeError", "NameError")
+GOLDEN_TIMEOUT = int(os.environ.get("GOLDEN_TIMEOUT", "1800"))   # a project's intent tests may train for real
 
 
 # ---- the plan -------------------------------------------------------------------------------------------
@@ -231,6 +240,33 @@ def landings(repo: Repo, build: str, base: str | None) -> list[dict]:
     return sorted(out, key=lambda c: c["time"])
 
 
+def build_base(repo: Repo, build: str | None, log: list[dict] | None = None) -> str | None:
+    """The commit the build started from, never assuming a branch name: the parent of the commit `dt build start`
+    made (its `start` log event), else build's merge-base with `main` or `master`, else the parent of the first
+    `M<n>: build started` commit on build's first parent."""
+    if not build:
+        return None
+    for e in log or []:
+        if e.get("event") == "start" and e.get("commit"):
+            parent = repo.ref(f"{e['commit']}^")
+            if parent:
+                return parent
+    for name in ("main", "master"):
+        if repo.ref(f"refs/heads/{name}"):
+            mb = repo.git("merge-base", build, f"refs/heads/{name}").strip()
+            if mb:
+                return mb
+    for sha in repo.first_parent(build):
+        if re.match(r"M\d+: build started", repo.git("show", "-s", "--format=%s", sha).strip()):
+            return repo.ref(f"{sha}^")
+    return None
+
+
+def src_dirs(tree: pathlib.Path) -> list[pathlib.Path]:
+    """A tree's source roots: `src` (single package) and every `packages/*/src` (a workspace)."""
+    return [d for d in [tree / "src", *sorted(tree.glob("packages/*/src"))] if d.is_dir()]
+
+
 # ---- the grader -----------------------------------------------------------------------------------------
 
 class Grader:
@@ -245,16 +281,23 @@ class Grader:
         self.arm = dict((scn.get("arms") or {}).get(self.arm_id, {}), id=self.arm_id)
         target = self.summary.get("target", "minilab")
         tcfg = (scn.get("build_targets") or {}).get(target, {})
-        self.fixture = fixture or (HERE / tcfg["fixture"] if tcfg.get("fixture") else FIXTURES / "minilab")
-        self.planted = json.loads((self.fixture / "planted.json").read_text())
+        if fixture:
+            self.fixture = fixture
+        elif tcfg.get("fixture"):
+            self.fixture = HERE / tcfg["fixture"]
+        elif tcfg.get("project"):
+            self.fixture = None            # a planning run's project: its own golden cases, no oracle/holdout/mutants
+        else:
+            self.fixture = FIXTURES / "minilab"
+        self.planted = json.loads((self.fixture / "planted.json").read_text()) if self.fixture else None
         self.R, self.extra = [], {}
         self.build = self.repo.ref("build/M1") or self.repo.ref("HEAD")
-        self.base = self.repo.ref("main")
+        self.log = self.read_log()
+        self.base = build_base(self.repo, self.build, self.log) or self.repo.ref("main")
         self.plan0 = parse_plan(self.repo.show(self.base, "tasks/plan.md") or "") if self.base else {"tasks": []}
         final = self.repo.show(self.build, "tasks/plan.md") if self.build else None
         self.plan = parse_plan(final) if final else self.plan0
         self.lands = landings(self.repo, self.build, self.base) if self.build else []
-        self.log = self.read_log()
         self.python = self.venv_python()
 
     def load(self, name):
@@ -292,6 +335,10 @@ class Grader:
         if value is not None:
             r["value"] = value
         self.R.append(r)
+
+    def na(self, id_, category, text, why):
+        """A check this target can't run (no fixture oracle): kept so ids line up across targets, never counted."""
+        self.R.append({"id": id_, "category": category, "text": text, "passed": None, "na": True, "evidence": why})
 
     # -- efficiency --------------------------------------------------------------------------------------
 
@@ -420,6 +467,14 @@ class Grader:
 
         changes = self.interface_changes()
         self.extra["interface_changes"] = changes
+        if not self.planted:
+            self.check("interface_changes", "integration",
+                       "Mid-build interface changes ≤ 1 (a re-freeze interface task, or a landing outside the interface "
+                       "task touching types.py, protocols.py or tests/contracts/; no planted flaw in this project)",
+                       len(changes) <= 1, changes or "none", value=len(changes))
+            self.na("planted_flaw_contract_change", "integration", "The planted flaw ends as a contract change",
+                    "n/a: a project target has no planted flaw")
+            return
         flaw = self.planted["interface_flaw"]
         self.check("interface_changes", "integration",
                    f"Mid-build interface changes ≤ 1 (the planted {flaw['type']}.{flaw['field']})",
@@ -485,7 +540,44 @@ class Grader:
 
     # -- correctness -------------------------------------------------------------------------------------
 
+    def project_correctness(self):
+        """A project target's own golden cases: the build's tests/intent, run on build/M1's tree (git archive) in the
+        project's venv with every marker; the fixture-only checks are n/a."""
+        res, files, cases, named = [], [], [], []
+        if self.build:
+            with tempfile.TemporaryDirectory(prefix="golden-") as tmp:
+                tree = pathlib.Path(tmp) / "t"
+                archive(self.repo, self.build, tree)
+                intent = tree / "tests" / "intent"
+                files = sorted(str(p.relative_to(tree)) for p in intent.rglob("test_*.py")) if intent.is_dir() else []
+                if files:
+                    res = pytest_junit(["tests/intent"], src_dirs(tree), tree, cwd=tree, python=self.python,
+                                       markers_all=True, timeout=GOLDEN_TIMEOUT)
+                cases = sorted({p.name for p in (tree / "tests" / "fixtures").glob("*/TC-*") if p.is_dir()})
+                text = "\n".join((tree / f).read_text(errors="replace") for f in files)
+                named = [c for c in cases if re.search(rf"\b{re.escape(c)}\b", text)]
+        n, ok = len(res), sum(r["outcome"] == "pass" for r in res)
+        bad = [f"{r['name']}: {r['outcome']} {r.get('exc') or ''}".strip() for r in res if r["outcome"] != "pass"]
+        self.extra["golden"] = {"intent_files": len(files), "tests": n, "passed": ok, "failing": bad[:40],
+                                "cases": len(cases), "cases_named_by_intent_tests": named,
+                                "cases_not_named": [c for c in cases if c not in named]}
+        self.check("golden_visible_pass_rate", "correctness",
+                   "The build's own intent tests (the project's golden cases) pass on build/M1's tree, every marker, "
+                   "in the project's venv", n and ok == n,
+                   f"{ok}/{n} pass in {len(files)} files; failing: {bad[:6]}; {len(named)}/{len(cases)} golden cases "
+                   f"named by an intent test", value=round(ok / n, 3) if n else 0)
+        changed = self.oracle_changes()
+        self.check("oracle_unchanged", "correctness", "No golden fixture (tests/fixtures/**) changed on build/M1",
+                   not changed, changed[:10] or "unchanged", value=len(changed))
+        why = "n/a: a project target has no fixture oracle, holdout, mutants or planted beliefs"
+        self.na("holdout_pass_rate", "correctness", "Grader's own run of the holdout cases against the built code", why)
+        self.na("planted_beliefs_caught", "correctness", "All planted wrong beliefs caught", why)
+        self.na("mutant_kill_rate", "tdd", "The final suite kills ≥ 80% of the one-line mutants of solution/", why)
+        self.na("suite_agrees_with_solution", "tdd", "The intent tests pass on the reference solution", why)
+
     def correctness(self):
+        if not self.fixture:
+            return self.project_correctness()
         src = [self.proj / "packages" / p / "src" for p in ("mdata", "risk")]
         visible = pytest_junit([self.fixture / "oracle" / "test_visible.py"], src, self.fixture, python=self.python)
         holdout = pytest_junit([self.fixture / "holdout" / "test_holdout.py"], src, self.fixture, python=self.python)
@@ -596,8 +688,7 @@ class Grader:
             with tempfile.TemporaryDirectory(prefix="red-") as tmp:
                 tree = pathlib.Path(tmp) / "t"
                 archive(self.repo, c["sha"], tree)
-                res = pytest_junit(files, [tree / "packages" / p / "src" for p in ("mdata", "risk")], tree, cwd=tree,
-                                   python=self.python, markers_all=True)
+                res = pytest_junit(files, src_dirs(tree), tree, cwd=tree, python=self.python, markers_all=True)
             for r in res:
                 ok = r["outcome"] == "fail" and r["exc"] in ("AssertionError", "NotImplementedError", "Failed")
                 right += ok
@@ -669,7 +760,7 @@ class Grader:
         self.check("gates_pass", "process", "No half ended blocked (a gate, integration, writes or conflict reject as "
                    "its last outcome)", not blocked, blocked[:10] or "none", value=len(blocked))
         stubs = []
-        for f in (self.proj / "packages").rglob("*.py") if (self.proj / "packages").is_dir() else []:
+        for f in (f for d in src_dirs(self.proj) for f in d.rglob("*.py")):
             stubs += [f"{f.relative_to(self.proj)}: {m}" for m in re.findall(r'NotImplementedError\("(M\d+-T\d+)', f.read_text())]
         self.check("no_stub_left", "process", "No interface stub is left at the end (CR-02 carve-out closed)", not stubs,
                    stubs[:8] or "none", value=len(stubs))
@@ -744,12 +835,13 @@ class Grader:
                 part()
             except Exception as e:  # a grader crash is a harness failure, not a design result
                 self.check(f"grader_{part.__name__}", "harness", f"grade_build {part.__name__} ran", False, repr(e))
-        design = [r for r in self.R if r["category"] != "harness"]
+        design = [r for r in self.R if r["category"] != "harness" and not r.get("na")]
         harness = [r for r in self.R if r["category"] == "harness"]
         passed = sum(r["passed"] for r in design)
         out = {"expectations": self.R,
                "summary": {"passed": passed, "failed": len(design) - passed, "total": len(design),
-                           "pass_rate": round(passed / len(design), 3) if design else 0},
+                           "pass_rate": round(passed / len(design), 3) if design else 0,
+                           "not_applicable": [r["id"] for r in self.R if r.get("na")]},
                "harness_summary": {"passed": sum(r["passed"] for r in harness), "total": len(harness),
                                    "failures": [r["id"] for r in harness if not r["passed"]]},
                "execution_metrics": {"total_steps": len(self.turns), "landings": len(self.lands),
@@ -757,12 +849,14 @@ class Grader:
                "timing": {"executor_duration_seconds": self.summary.get("total_seconds"),
                           "total_duration_seconds": self.summary.get("total_seconds")},
                "extra": dict(self.extra, arm=self.arm_id, target=self.summary.get("target", "minilab"),
+                             base=self.base, fixture=str(self.fixture) if self.fixture else None,
                              cost_usd=self.summary.get("agent_cost_usd"), turns=len(self.turns))}
         (self.run / "grading.json").write_text(json.dumps(out, indent=1))
         if not self.quiet:
             print(f"{self.arm_id}: {passed}/{len(design)} design checks; harness {out['harness_summary']['passed']}/{len(harness)}")
             for r in self.R:
-                print(("PASS " if r["passed"] else "FAIL ") + f"[{r['category']}/{r['id']}] {r['text']}  — {r['evidence'][:150]}")
+                print(("N/A  " if r.get("na") else "PASS " if r["passed"] else "FAIL ")
+                      + f"[{r['category']}/{r['id']}] {r['text']}  — {r['evidence'][:150]}")
         return out
 
 
@@ -816,9 +910,9 @@ def archive(repo: Repo, rev: str, dest: pathlib.Path):
     subprocess.run(["tar", "-x", "-C", str(dest)], input=tar.stdout, check=True)
 
 
-def pytest_junit(targets, src_dirs, rootdir, cwd=None, python=None, markers_all=False) -> list[dict]:
+def pytest_junit(targets, src_dirs, rootdir, cwd=None, python=None, markers_all=False, timeout=900) -> list[dict]:
     """Run pytest on targets with src_dirs first on sys.path (the project's interpreter by default); one dict per
-    test: name, outcome pass|fail|error, exc."""
+    test: name, outcome pass|fail|error, exc. A run past `timeout` is one error result."""
     with tempfile.TemporaryDirectory(prefix="junit-") as tmp:
         xml = pathlib.Path(tmp) / "j.xml"
         env = dict(os.environ, PYTHONPATH=os.pathsep.join(str(s) for s in src_dirs), PYTHONDONTWRITEBYTECODE="1")
@@ -826,7 +920,10 @@ def pytest_junit(targets, src_dirs, rootdir, cwd=None, python=None, markers_all=
         cmd = [python or sys.executable, "-m", "pytest", "-q", "-p", "no:cacheprovider", "--continue-on-collection-errors",
                f"--junitxml={xml}", "--import-mode=importlib", "--rootdir", str(rootdir), "-c", os.devnull,
                *(["-m", ""] if markers_all else []), *[str(t) for t in targets]]
-        subprocess.run(cmd, cwd=cwd or rootdir, env=env, capture_output=True, text=True, timeout=900)
+        try:
+            subprocess.run(cmd, cwd=cwd or rootdir, env=env, capture_output=True, text=True, timeout=timeout)
+        except subprocess.TimeoutExpired:
+            return [{"name": f"(pytest timed out after {timeout}s)", "outcome": "error", "exc": "Timeout"}]
         if not xml.exists():
             return []
         out = []

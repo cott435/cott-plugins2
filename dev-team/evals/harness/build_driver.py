@@ -4,7 +4,9 @@
 The live-build method (design/evidence/2026-10-17-live-build.md). The dev-team plugin is staged into <out>/plugin/
 and the project made from the target fixture with the staged plugin's build-setup templates (minilab's
 scripts/make_live.py: the real bar, the arm's plan variant, `dt base`), so the plugin under test supplies the bar,
-the agents and dt. One headless session, resumed at each stop:
+the agents and dt. A target with `"project": <abs path>` instead of `fixture` is a planning run's project: port_bar.py
+clones it and re-renders the staged plugin's bar over it (its own plan, whatever the arm's). One headless session,
+resumed at each stop:
 `claude -p --plugin-dir <plugin> --add-dir <plugin> --agents <the rendered .claude/agents/*.md as JSON, hooks
 included, every model pinned to AGENT_MODEL> --allowedTools <the rendered .claude/settings.json allow rules>
 --permission-mode acceptEdits --output-format stream-json`. A turn's outcome is its LAST result event (the CLI
@@ -143,6 +145,9 @@ def allow_rules(proj: pathlib.Path, arm: dict) -> list[str]:
 # ---- setup ----------------------------------------------------------------------------------------------
 
 def setup(out: pathlib.Path, cfg: dict, arm: dict) -> tuple[pathlib.Path, pathlib.Path, pathlib.Path]:
+    """A fixture target is made by its make_live.py with the arm's plan; a project target (`"project": <abs path>`,
+    `"port_bar": true`) is a planning run's project, cloned and given the staged plugin's bar by port_bar.py, its
+    own plan whatever the arm's (report in <out>/port_bar.json)."""
     proj = out / "project"
     if proj.exists():
         shutil.rmtree(proj)
@@ -150,7 +155,16 @@ def setup(out: pathlib.Path, cfg: dict, arm: dict) -> tuple[pathlib.Path, pathli
     probs = plugin.check(root)
     if probs:
         sys.exit("plugin staging failed:\n" + "\n".join(probs))
-    dt = load_make_live(cfg).make(proj, arm["plan"], root)
+    if cfg.get("project"):
+        import port_bar  # noqa: E402
+        if not cfg.get("port_bar", True):
+            sys.exit("build_driver: a project target needs port_bar (its bar predates the build phase otherwise)")
+        report = port_bar.port(pathlib.Path(cfg["project"]), proj, root)
+        (out / "port_bar.json").write_text(json.dumps(report, indent=1))
+        print(port_bar.summary(report), flush=True)
+        dt = root / "scripts" / "dt.py"
+    else:
+        dt = load_make_live(cfg).make(proj, arm["plan"], root)
     turn_commit(proj, 0)
     return proj, root, dt
 
@@ -251,7 +265,7 @@ class Persona:
         return sh(["git", *a], self.proj).stdout
 
     def contract_revised(self) -> bool:
-        diff = self.git("diff", "main", "--", "docs/packages")       # committed on build/M1 or not
+        diff = self.git("diff", self.base(), "--", "docs/packages")       # committed on build/M1 or not
         return bool(re.search(r"^\+.*\S", diff, re.M)) and "contract.md" in diff
 
     def frozen(self, symbol: str) -> bool:
@@ -261,7 +275,15 @@ class Persona:
     def replanned(self) -> bool:
         ids = lambda text: set(re.findall(r"^### (M\d+-T\d+):", text, re.M))  # noqa: E731
         now = (self.proj / "tasks" / "plan.md").read_text()
-        return bool(ids(now) - ids(self.git("show", "main:tasks/plan.md")))
+        return bool(ids(now) - ids(self.git("show", f"{self.base()}:tasks/plan.md")))
+
+    def base(self) -> str:
+        """The state before the build: `main` (make_live and port_bar both name the default branch so), else the
+        commit `dt build start` branched from."""
+        if sh(["git", "rev-parse", "-q", "--verify", "refs/heads/main"], self.proj).returncode == 0:
+            return "main"
+        import grade_build  # noqa: E402
+        return grade_build.build_base(grade_build.Repo(self.proj), "build/M1") or "HEAD"
 
     def answer(self, reply: str, st: dict) -> tuple[str, str]:
         """(kind, message), or ("finish", …) when the run ends with this answer."""
@@ -328,7 +350,7 @@ def main():
     scn = json.loads((HERE / "scenarios.json").read_text())
     cfg, arm = scn["build_targets"][target], dict(scn["arms"][arm_id], id=arm_id)
     out.mkdir(parents=True, exist_ok=True)
-    for stale in ("agent_stream.jsonl", "turns.json", "summary.json", "grading.json"):
+    for stale in ("agent_stream.jsonl", "turns.json", "summary.json", "grading.json", "port_bar.json"):
         (out / stale).unlink(missing_ok=True)
     proj, plugin_root, dt = setup(out, cfg, arm)
     agents = agents_json(proj)
@@ -340,7 +362,8 @@ def main():
         extra += ["--agents", json.dumps(agents)]
     extra += ["--allowedTools", *allowed]
     env = dict(driver.ENV, BUILD_ARM=arm_id, BUILD_TARGET=target, **arm.get("env", {}))
-    pressure = json.loads((HERE / cfg["fixture"] / "pressure.json").read_text())["turns"] if PRESSURE else []
+    pfile = HERE / cfg["fixture"] / "pressure.json" if cfg.get("fixture") else None
+    pressure = json.loads(pfile.read_text())["turns"] if PRESSURE and pfile and pfile.exists() else []
     version = sh([CLAUDE_BIN, "--version"], HERE, env=env).stdout.strip()
     persona = Persona(proj, dt, scn, arm, pressure)
 
@@ -382,7 +405,8 @@ def main():
         (out / "turns.json").write_text(json.dumps(turns, indent=1))
     st = persona.status()
     costs = [(x["usage"].get("cost_usd") or 0) for x in turns]
-    summary = {"target": target, "arm": arm_id, "plan": arm["plan"], "dispatch": arm["dispatch"], "tdd": arm["tdd"],
+    summary = {"target": target, "arm": arm_id, "plan": "project's own" if cfg.get("project") else arm["plan"],
+               "dispatch": arm["dispatch"], "tdd": arm["tdd"],
                "cap": arm.get("cap"), "replicate": os.environ.get("REPLICATE"), "turns": len(turns), "stop_reason": stop,
                "finished": stop == "exit", "progress": st.get("progress"),
                "total_seconds": round(time.time() - t_start, 1),

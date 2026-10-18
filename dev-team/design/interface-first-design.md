@@ -60,6 +60,8 @@ Files, pipelines, steps or tasks? Each has a job, and only one is the split unit
 
 So a milestone's graph is built from steps, and each task names the step(s) it touches (`**Step:**` already exists). A task touching two steps is two tasks (`tasks.md:9`), except wiring.
 
+**Library classes are steps.** A class that a factory or lookup step returns, and that the pipeline then drives through a Protocol (`make_env` returning `SnakeEnv`, `make_agent` returning `TableAgent`), is a step of its own: its owner module, its Protocol as In → Out, and a spine that is a minimal real class (a Snake that moves and never eats, an agent that acts at random). Wiring then waits on its spine like any other, never on its thicken. Two library classes behind one factory are two steps.
+
 ---
 
 ## 4. Interfaces: what is frozen, in what form, and when
@@ -73,8 +75,9 @@ Every boundary the milestone builds across, where the two sides belong to differ
 | Step → next step in a pipeline (data) | The `Out` type as code + one sample payload | The downstream step's spine and tests run on the sample, not on the upstream code |
 | Step → step passing an object with behavior (a `typing.Protocol` or class, such as `core.Env` or `runstore.RunWriter`), or a call into another component's function (`load_agent` calling `make_env`) | The Protocol or signature as code + a fixture-backed replay double in `tests/contracts/<id>.<Type>/`, replaying a recorded interaction. The double is the type's sample, not a mock of a step | The consuming step's spine and tests run on the double, not on the provider's code |
 | Step signature | The function signature in its owner module (body: see 4.3) | Wiring and testers import it |
-| Pipeline → another pipeline or package (call) | Schema + fixtures + a fixture-backed fake (today's contract folder) | The calling pipeline's wiring and smoke test |
-| Shared modules (`types.py`, `__init__.py` exports) | Written whole by the interface task | No builder touches them |
+| Pipeline → another pipeline or package (call), including a pipeline entry another pipeline runs | Schema + fixtures + a fixture-backed fake (today's contract folder). An entry or function whose `Used by` names another pipeline or package has a `**Boundary:**` line, so it gets a fake | The calling pipeline's wiring and smoke test |
+| Shared modules (`types.py`, `__init__.py` exports, `__main__.py`, a package's re-exporting `pipeline.py`) | Written whole by the interface task. `__main__.py` routes every milestone trigger to its entry's stub | No builder touches them |
+| Pipeline entries | One entry module per pipeline (`pipelines/pl01_train.py`), its signature and stub written by the interface task | Each wiring task writes only its own entry module and smoke test, so wiring tasks never share a file |
 
 Not frozen: helpers inside a step, private functions, anything one task owns end to end.
 
@@ -91,9 +94,7 @@ Not frozen: helpers inside a step, private functions, anything one task owns end
 
 Testers need importable names so RED fails for the right reason (build-phase-notes Q4), but CR-02 and agent-skills' floor forbid `NotImplementedError` stubs (`constraint-driven-development/SKILL.md:105`).
 
-**Decision:** the interface task writes each step's signature with the body `raise NotImplementedError("<task id>")`, naming the spine task that replaces it. CR-02 gains one carve-out: such a stub is allowed while the task it names is open; `check.sh gate` fails on any stub naming a done task, and the milestone exit fails on any stub at all. RED in a spine test fails on `NotImplementedError`; RED in a thicken test fails on the baseline's wrong answer.
-
-Alternative kept open (§11): the interface task writes the spine version itself for trivial steps (identity, print), skipping the stub.
+**Decision:** the interface task writes each step's signature with the body `raise NotImplementedError("<task id>")`, naming the spine task that replaces it. CR-02 gains one carve-out: such a stub is allowed while the task it names is open; `check.sh gate` fails on any stub naming a done task, and the milestone exit fails on any stub at all. RED in a spine test fails on `NotImplementedError`; RED in a thicken test fails on the baseline's wrong answer. The interface task writes no real behaviour: a trivial step is a spine task or a `trivial into wiring` fold (§5.3), and a library class is a step with its own spine (§3).
 
 ### 4.4 Who and when
 
@@ -110,12 +111,12 @@ Phase 0  interface (solo)               types, signatures, samples, fakes, expor
 Phase 1  spine ∥  one per step           each writes its owner module only
          tester ∥ every split task's     tests against signatures + golden fixtures
                   tester half
-Phase 2  wiring ∥ one per pipeline       entry + smoke; cross-pipeline calls use the fake
+Phase 2  wiring ∥ one per pipeline       its own entry module + smoke; cross-pipeline calls use the fake
          thicken ∥ implementer halves    each after its step's spine
 Phase 3  system (solo)                   fakes swapped for real providers; full smoke
 ```
 
-A task's kind is a field (`**Kind:** interface | spine | wiring | thicken | system`). A split task keeps its two halves in one task, but they start at different times: **the tester half depends only on the interface task**, and the implementer half on the task's `Depends on`. Phase labels describe the usual waves; the graph decides what may start.
+A task's kind is a field (`**Kind:** interface | spine | wiring | thicken | system`). A wiring task depends only on its pipeline's spines and fold tasks; a golden case that needs real collaborators belongs to the system task. A split task keeps its two halves in one task, but they start at different times: **the tester half depends only on the interface task**, and the implementer half on the task's `Depends on`. Phase labels describe the usual waves; the graph decides what may start.
 
 ### 5.2 Worked example: quant M1 today
 
@@ -148,7 +149,7 @@ Two folds keep the task count down, both build-planning rules. A fold is allowed
 
 ### 5.4 Milestone level
 
-The same rules apply one level up. A milestone row's `Depends` names what it needs from the earlier one (an interface ID or a pipeline output), so build-planning cuts only where a later slice needs an earlier one's outputs (iteration-6 S8). With interfaces frozen, two milestones could be active at once; that stays out of scope (§11.4).
+The same rules apply one level up. A milestone row's `Depends` names what it needs from the earlier one (an interface ID or a pipeline output), so build-planning cuts only where a later slice needs an earlier one's outputs (iteration-6 S8). With interfaces frozen, two milestones could be active at once; that stays out of scope (§11.3).
 
 ---
 
@@ -173,7 +174,7 @@ Edge kinds:
 |---|---|---|
 | `data` | One step's output feeds another's input | Type + sample payload |
 | `call` | A pipeline calls another pipeline or package | Fake backed by fixtures |
-| `file` | Two tasks must write one file | Move the shared part to the interface or wiring task; else serial |
+| `file` | Two tasks must write one file | Move the shared part to the interface task; else serial. Two wiring tasks never share a file: each writes its own entry module (§4.1) |
 | `code` | A task *changes* code another task wrote: a thicken after its step's spine, two thickens of one module. Running or calling that code is not a `code` edge | None: serial. A spine never has a `code` edge to another step's task; it runs on that boundary's sample or replay double |
 | `contract-change` | A task changes a frozen interface | None: serial, plus a new interface task |
 | `order` | Risk or learning ("do X first to learn Y"), or integration: a wiring or system task runs the steps it wires | None: reason required. A wiring or system task's edge to a step of a pipeline it wires or swaps in gives the reason `integration: <what runs it>` |
@@ -194,11 +195,14 @@ A mitigated edge is documentation: it doesn't order the tasks and doesn't appear
 
 `**Parallel:** G<n>` goes away (derived). Within a split task the implementer always follows its tester; that order is implied, not an edge. `**Writes:**` is exact paths or one directory glob owned by the task. A step's owner may be a folder that holds its private helpers (`train/loop/**`): the step's spine and thicken tasks write that glob, and no other task writes inside it.
 
+A step whose provider waits on an open probe gets a stand-in behind the same Protocol in the milestone: a synthetic source the spine writes in a sibling owner folder (`sources/synthetic/**`), selected by settings. The real provider's spine is planned for the milestone the probe's Answer unblocks.
+
 ### 6.3 `dt` changes
 
 | Command | Change |
 |---|---|
-| `dt lint` `writes` (new) | Error: two tasks with no `Depends on` path write the same path, across the whole plan. Error: a shared file (`__init__.py`, `types.py`, an entry module) written by a task that isn't interface or wiring |
+| `dt lint` `writes` (new) | Error: two tasks with no `Depends on` path write the same path, across the whole plan. Error: a shared file (`__init__.py`, `types.py`, `__main__.py`, a re-exporting `pipeline.py`) written by a task that isn't the interface task. Error: two wiring tasks writing one file |
+| `dt lint` `boundaries` (new) | Error: a contract function or pipeline entry whose `Used by` names another package or pipeline has no `**Boundary:**` line |
 | `dt lint` `edges` (new) | Error: a `Depends on` whose graph row says it is mitigated (mitigated edges don't order); a `Depends on` with no graph row; a row with `none` and no reason; a mitigation naming an interface the interface task doesn't produce |
 | `dt lint` `milestone-size` | Unchanged rule (critical path ≤ ~15), now reading the derived graph |
 | `dt lint` `parallel` | Replaced by `writes` and `edges` |
@@ -307,7 +311,7 @@ New checks (planned scope):
 | `graph_metrics` | N tasks, critical path (CP, unweighted and size-weighted XS=1 S=2 M=4), waves, width per wave, N/CP; grader vs dt | Agree exactly (informational) |
 | `plan_parallelism` | N/CP for M1 | ≥ 2.5 when N ≥ 10 |
 | `wave_width` | Ready set right after the interface task (spines + tester halves) | ≥ 0.8 × the milestone's step count |
-| `writes_disjoint` | No two tasks without a `Depends on` path share a `Writes:` path; a spine writes only its owner module and its unit test | 0 conflicts |
+| `writes_disjoint` | No two tasks without a `Depends on` path share a `Writes:` path; a spine writes only its owner module (or owner folder) and its unit test; no two wiring tasks share a file, even in order | 0 conflicts |
 | `edges_mitigated` | Cross-owner `data`/`call` edges whose mitigation names an interface the interface task produces | ≥ 0.9 |
 | `unmitigated_reasoned` | Every `none:` row has a reason of an allowed kind (same module, unsplittable shared file, real side-effect order, integration: wiring and system tasks run the steps they wire) | 100% |
 | `no_edge_to_code_when_interface` | No `Depends on` to a code task across a boundary an interface covers | 0 |
@@ -323,7 +327,7 @@ New checks (designed scope):
 | id | Check | Threshold |
 |---|---|---|
 | `interface_coverage` | Every cross-owner step boundary has its type as a contract section that names its cases; in M1 also an interface task whose `Writes:` covers each type's sample path `tests/contracts/<id>.<Type>/`. Samples are build output, so the check never asks for the file on disk | 100% |
-| `types_in_contract` | Every type named in a step table resolves to a contract section (iteration-6's top buildability defect, `findings.md:143`) | 100% |
+| `types_in_contract` | Every type named in a step table, and every type a field annotation uses, resolves to a contract section, a typed inline definition (`FixedEntry(spec: str)`), or a section that mirrors another (`mirrors qdata.Security`) (iteration-6's top buildability defect, `findings.md:143`) | 100% |
 | `frozen_interface_churn` | Times a type or contract folder M1 froze is revised by a later stage, walked over turn commits (`grade.py:127-129`) | Reported; expect all-at-once ≤ incremental |
 
 `frozen_interface_churn` is the incremental mode's real risk: freezing types before later stages are known.
@@ -454,11 +458,10 @@ Every skill change is held to plugin-dev's word limits; detail goes to `referenc
 ## 11. Open questions
 
 1. **Fold spine into thicken?** Fewer tasks and less merge cost, but the baseline is no longer built and tested on its own. The build eval can settle it with one extra arm.
-2. **Stub bodies or real trivial spines** in the interface task (§4.3)?
-3. **How fine is too fine?** At what task count does merge cost beat width? The build eval's wall-clock curve answers it; until then, the fold rules and the critical-path cap bound it.
-4. **Two active milestones** once the next milestone's interfaces are frozen?
-5. **Where `Writes:` is enforced:** the plugin's `hooks.json` guard keyed by `agent_type` (build-phase-notes §4 rec. 1) needs the task's paths passed in; how the orchestrator hands them over.
-6. **Orchestrator form:** a deterministic `dt ready` loop in the main session vs a workflow per checkpoint segment. agent-skills warns against paraphrasing orchestrators (`orchestration-patterns.md:316-326`); passing `dt context` verbatim avoids that.
+2. **How fine is too fine?** At what task count does merge cost beat width? The build eval's wall-clock curve answers it; until then, the fold rules and the critical-path cap bound it.
+3. **Two active milestones** once the next milestone's interfaces are frozen?
+4. **Where `Writes:` is enforced:** the plugin's `hooks.json` guard keyed by `agent_type` (build-phase-notes §4 rec. 1) needs the task's paths passed in; how the orchestrator hands them over.
+5. **Orchestrator form:** a deterministic `dt ready` loop in the main session vs a workflow per checkpoint segment. agent-skills warns against paraphrasing orchestrators (`orchestration-patterns.md:316-326`); passing `dt context` verbatim avoids that.
 
 ---
 

@@ -37,7 +37,7 @@ Pages, all static HTML and inline SVG with no scripts, written into `<out>/plan/
   M<n>.html   one milestone's build: columns are waves, lanes are task kinds; interface tasks
               are diamonds whose "unblocks" edges are dashed; a split task is two segments,
               tester then implementer, and the tester waits only on interface tasks; every
-              tied critical path is thick; an edge between two wiring tasks that write one entry
+              tied critical path of whole tasks is thick; an edge between two wiring tasks that write one entry
               module is orange. Waves are the longest path to each segment; a barycenter
               pass orders each cell. Metrics (waves of segments and of whole tasks; data and
               call edges mitigated; unmitigated rows by why they stay), the producer's own
@@ -366,8 +366,8 @@ class Graph:
         self.cycles: list[tuple[str, str]] = []
         self._segments()
         self._layers()
-        self._critical_path()
         self._task_waves()
+        self._critical_path()
 
     def last(self, t: str) -> tuple[str, str]:
         return (t, "impl") if self.split[t] else (t, "")
@@ -437,70 +437,97 @@ class Graph:
         self.n_waves = max(layer.values(), default=-1) + 1
         self.waves = [sorted((k for k in layer if layer[k] == w), key=lambda k: natural(k[0])) for w in range(self.n_waves)]
 
+    def _task_waves(self) -> None:
+        """Waves of whole tasks, the way a producer counts them, to set beside its numbers. `tdeps` is
+        `deps` with any edge that closes a cycle left out."""
+        lvl: dict[str, int] = {}
+        state: dict[str, int] = {}
+        self.tdeps: dict[str, list[str]] = {t: [] for t in self.ids}
+
+        def visit(t) -> int:
+            if t in lvl:
+                return lvl[t]
+            state[t] = 1
+            best = 0
+            for d in self.deps[t]:
+                if state.get(d) != 1:  # a cycle edge, named by _layers
+                    self.tdeps[t].append(d)
+                    best = max(best, visit(d) + 1)
+            state[t] = 2
+            lvl[t] = best
+            return best
+
+        for t in sorted(self.ids, key=natural):
+            visit(t)
+        self.tlevel = lvl
+        self.task_waves = [sorted((t for t in lvl if lvl[t] == w), key=natural) for w in range(max(lvl.values(), default=-1) + 1)]
+
     def _critical_path(self) -> None:
-        """Every longest path, drawn: `cp_segments` and `cp_pairs` are the segments and edges on
-        any of them, `cp_lanes` the paths as task chains, tied ones merged where they differ in one
-        task. `cp` is one of them, named in the metrics. Ties for it go to the producer's own
-        critical path, then to an edge between two tasks over one inside a split task, then to the
-        heavier size, then to the id."""
+        """Every longest path of whole tasks through `depends`, the way a producer counts it: a split
+        task's two boxes are one step. `cp_tasks` and `cp_tpairs` are the tasks and edges on any of
+        them; `cp_segments` and `cp_pairs` the boxes and box edges drawn thick for them (both halves of
+        a split task, and each box edge between two such tasks). `cp_lanes` lists the paths, tied ones
+        merged where they differ in one task. `cp` is one of them, named in the metrics. Ties for it
+        go to the producer's own critical path, then to the heavier size, then to the id."""
+        self.cp_tasks: set[str] = set()
+        self.cp_tpairs: set[tuple[str, str]] = set()
         self.cp_segments: set[tuple[str, str]] = set()
         self.cp_pairs: set = set()
         self.cp_lanes: list[list[list[str]]] = []
         self.cp_paths = 0
         self.cp: list[str] = []
-        if not self.layer:
+        if not self.tlevel:
             return
         theirs = set((self.snap.builds.get(self.mid) or {}).get("critical_path") or [])
         size = {t["id"]: SIZE_W.get(str(t["attrs"].get("size") or "").upper(), 1) for t in self.tasks}
 
-        def key(k, nxt=None):
-            return (k[0] in theirs, nxt is None or k[0] != nxt[0], size.get(k[0], 1))
+        def key(t):
+            return (t in theirs, size.get(t, 1))
 
-        def by_id(ks):  # max() keeps the first of equals, so the lowest id wins what is left
-            return sorted(ks, key=lambda k: natural(k[0]))
+        def by_id(ts):  # max() keeps the first of equals, so the lowest id wins what is left
+            return sorted(ts, key=natural)
 
-        top = self.n_waves - 1
-        cur = max(by_id(k for k in self.layer if self.layer[k] == top), key=key)
+        lvl = self.tlevel
+        top = max(lvl.values())
+        cur = max(by_id(t for t in lvl if lvl[t] == top), key=key)
         path = [cur]
-        while self.layer[cur] > 0:
-            cands = by_id(p for p in self.preds[cur] if self.layer[p] == self.layer[cur] - 1)
-            cur = max(cands, key=lambda p, c=cur: key(p, c))
+        while lvl[cur] > 0:
+            cur = max(by_id(d for d in self.tdeps[cur] if lvl[d] == lvl[cur] - 1), key=key)
             path.append(cur)
-        path.reverse()
-        self.cp = list(dict.fromkeys(k[0] for k in path))
-        # height: the longest run of segments after k; k is on a longest path when layer + height = top
-        height: dict = {}
-        for k in sorted(self.layer, key=lambda k: -self.layer[k]):
-            height[k] = max((height[s] + 1 for s in self.succs[k]), default=0)
-        self.cp_segments = {k for k in self.layer if self.layer[k] + height[k] == top}
-        self.cp_pairs = {(p, k) for k in self.cp_segments for p in self.preds[k]
-                         if p in self.cp_segments and self.layer[p] + 1 + height[k] == top}
-        self._cp_lanes(path)
+        self.cp = path[::-1]
+        # height: the longest run of tasks after t; t is on a longest path when level + height = top
+        tsuccs: dict[str, list[str]] = {t: [] for t in lvl}
+        for t, ds in self.tdeps.items():
+            for d in ds:
+                tsuccs[d].append(t)
+        height: dict[str, int] = {}
+        for t in sorted(lvl, key=lambda t: -lvl[t]):
+            height[t] = max((height[s] + 1 for s in tsuccs[t]), default=0)
+        self.cp_tasks = {t for t in lvl if lvl[t] + height[t] == top}
+        self.cp_tpairs = {(d, t) for t in self.cp_tasks for d in self.tdeps[t]
+                          if d in self.cp_tasks and lvl[d] + 1 + height[t] == top}
+        self.cp_segments = {k for k in self.layer if k[0] in self.cp_tasks}
+        self.cp_pairs = {(p, k) for k, ps in self.preds.items() for p in ps
+                         if (p[0], k[0]) in self.cp_tpairs or (p[0] == k[0] and k[0] in self.cp_tasks)}
+        self._cp_lanes(tsuccs)
 
-    def _cp_lanes(self, primary: list[tuple[str, str]], cap: int = 200) -> None:
-        """The longest paths as task chains, the primary first. Chains of one length that differ in
-        a single task merge into one lane with alternatives there. Past `cap` paths only the
-        primary is listed; `cp_paths` still counts them all."""
-        into: dict = {}
-        for p, k in self.cp_pairs:
-            into.setdefault(k, []).append(p)
-        count: dict = {}
-        for k in sorted(self.cp_segments, key=lambda k: self.layer[k]):
-            count[k] = sum(count[p] for p in into.get(k, [])) or 1
-        ends = [k for k in self.cp_segments if self.layer[k] == self.n_waves - 1]
-        self.cp_paths = sum(count[k] for k in ends)
-
-        def tasks(path) -> tuple[str, ...]:
-            return tuple(dict.fromkeys(k[0] for k in path))
-
-        first = tasks(primary)
+    def _cp_lanes(self, tsuccs: dict[str, list[str]], cap: int = 200) -> None:
+        """The longest task paths as lanes, `cp` first. Paths that differ in a single task merge into
+        one lane with alternatives there. Past `cap` paths only `cp` is listed; `cp_paths` still
+        counts them all."""
+        count: dict[str, int] = {}
+        for t in sorted(self.cp_tasks, key=lambda t: self.tlevel[t]):
+            count[t] = sum(count[d] for d in self.tdeps[t] if (d, t) in self.cp_tpairs) or 1
+        top = len(self.cp) - 1
+        self.cp_paths = sum(count[t] for t in self.cp_tasks if self.tlevel[t] == top)
+        first = tuple(self.cp)
         if self.cp_paths > cap:
             self.cp_lanes = [[[t] for t in first]]
             return
-        paths: list[list] = [[k] for k in self.cp_segments if self.layer[k] == 0]
-        for _ in range(self.n_waves - 1):
-            paths = [p + [k] for p in paths for k in self.succs[p[-1]] if (p[-1], k) in self.cp_pairs]
-        chains = sorted({tasks(p) for p in paths}, key=lambda c: (c != first, [natural(t) for t in c]))
+        paths: list[tuple[str, ...]] = [(t,) for t in self.cp_tasks if self.tlevel[t] == 0]
+        for _ in range(top):
+            paths = [p + (t,) for p in paths for t in tsuccs[p[-1]] if (p[-1], t) in self.cp_tpairs]
+        chains = sorted(paths, key=lambda c: (c != first, [natural(t) for t in c]))
         lanes = [[{t} for t in c] for c in chains]
         merged = True
         while merged:
@@ -508,7 +535,7 @@ class Graph:
             for i in range(len(lanes)):
                 for j in range(i + 1, len(lanes)):
                     a, b = lanes[i], lanes[j]
-                    diff = [x for x in range(len(a)) if a[x] != b[x]] if len(a) == len(b) else []
+                    diff = [x for x in range(len(a)) if a[x] != b[x]]
                     if len(diff) == 1:
                         a[diff[0]] |= b[diff[0]]
                         del lanes[j]
@@ -517,20 +544,6 @@ class Graph:
                 if merged:
                     break
         self.cp_lanes = [[sorted(s, key=natural) for s in lane] for lane in lanes]
-
-    def _task_waves(self) -> None:
-        """Waves of whole tasks, the way a producer counts them, to set beside its numbers."""
-        lvl: dict[str, int] = {}
-
-        def visit(t, seen=()) -> int:
-            if t not in lvl:
-                lvl[t] = 0
-                lvl[t] = 1 + max((visit(d, seen + (t,)) for d in self.deps[t] if d not in seen), default=-1)
-            return lvl[t]
-
-        for t in self.ids:
-            visit(t)
-        self.task_waves = [sorted((t for t in lvl if lvl[t] == w), key=natural) for w in range(max(lvl.values(), default=-1) + 1)]
 
     def lanes(self) -> list[str]:
         present = list(dict.fromkeys(self.kind[t["id"]] for t in self.tasks))
@@ -589,7 +602,8 @@ class Graph:
         """Why an unmitigated dependency-graph row stays, read from its structure (the kinds of
         its two tasks, their steps and Writes), not its wording. "" for a mitigated row. A file
         row and integration are tested before a generic order, in step with dev-team's
-        `dtrun.unmitigated_class`: the design writes integration rows as `order`."""
+        `dtrun.unmitigated_class`: the design writes integration rows as `order`. An order row between
+        two tasks the design never chains (`SERIAL_PAIRS`) is a serializer whatever its reason."""
         if e["mitigated_by"]:
             return ""
         a, b, kind = e["from"], e["to"], e["kind"]
@@ -600,6 +614,8 @@ class Graph:
             return "contract change"
         if kind == "order" and not e["reason"]:
             return "order, no reason"
+        if kind == "order" and (ka, kb) in SERIAL_PAIRS:
+            return "serializer"
         if kind == "file":
             return "shared file"
         if ka in ("wiring", "system"):
@@ -631,16 +647,20 @@ class Graph:
                 "unmitigated": dict(sorted(why.items(), key=lambda kv: (REASON_ORDER.index(kv[0]), kv[0])))}
 
 
-# Unmitigated-row classes, in the order they are listed; the last three are worth a look.
+# Unmitigated-row classes, in the order they are listed; those in REASON_FLAG are worth a look.
 REASON_ORDER = ["integration", "same module", "shared file", "side-effect order", "contract change",
-                "across steps", "data or call, not mitigated", "order, no reason", "other"]
-REASON_FLAG = {"across steps", "data or call, not mitigated", "order, no reason", "other"}
+                "serializer", "across steps", "data or call, not mitigated", "order, no reason", "other"]
+REASON_FLAG = {"serializer", "across steps", "data or call, not mitigated", "order, no reason", "other"}
+# (waits, on): kinds the design never chains, so an order row between them only adds a step
+SERIAL_PAIRS = {("thicken", "wiring"), ("thicken", "system"), ("spine", "spine"), ("system", "system")}
 REASON_TIP = {
     "integration": "a wiring or system task waits on what it wires or runs",
     "same module": "a code edge between spine or thicken tasks of the same step, or whose Writes overlap",
     "shared file": "a file edge: the two tasks write the same file",
-    "side-effect order": "an order edge with a reason that is neither shared file nor integration",
+    "side-effect order": "an order edge with a reason, between tasks no other class covers",
     "contract change": "a contract-change edge",
+    "serializer": "an order edge from a thicken to a wiring or system task, from a spine to a spine, or from a "
+                  "system task to a system task: the design never chains these, so it adds a step",
     "across steps": "a code edge between spine or thicken tasks of different steps: it serializes them",
     "data or call, not mitigated": "an interface could have frozen this boundary",
     "order, no reason": "an order edge that gives no reason",
@@ -1692,7 +1712,8 @@ def write_milestone(plan: Plan, mid: str, d: Path) -> Path:
     theirs = s.builds.get(mid) or {}
     tiles = [(str(m["tasks"]), "tasks", ""),
              (str(m["cp"]), "critical path (tasks)", f'<i class="{"bad" if m["cp"] > CP_CAP else "ok"}">cap {CP_CAP}</i>'
-              + (f" <i>· {len(g.cp_lanes)} lanes tie</i>" if len(g.cp_lanes) > 1 else "")),
+              + (f" <i>· {g.cp_paths} paths tie in {len(g.cp_lanes)} lane{'' if len(g.cp_lanes) == 1 else 's'}</i>"
+                 if g.cp_paths > 1 else "")),
              (str(m["waves"]), "waves of boxes (tester and implementer apart)",
               f"<i>whole tasks: {m['task_waves']}</i>"),
              (f"{m['widest']} boxes", "agents in the widest wave", f"<i>({m['widest_tasks']} whole tasks)</i>"),
@@ -1704,8 +1725,8 @@ def write_milestone(plan: Plan, mid: str, d: Path) -> Path:
         parts = [f'<span class="{"warnp" if c in REASON_FLAG else ""}" title="{esc(REASON_TIP.get(c, ""))}">'
                  f'{esc(c)} {n}</span>' for c, n in m["unmitigated"].items()]
         notes.append(f'<p>Unmitigated dependency-graph rows, {sum(m["unmitigated"].values())} of {m["edges"]}, '
-                     f'by why they stay: {" · ".join(parts)}. Integration, same-module, shared-file, order and '
-                     f'contract-change rows can never be mitigated; the rest are worth a look. Hover a class for '
+                     f'by why they stay: {" · ".join(parts)}. Integration, same-module, shared-file, side-effect '
+                     f'order and contract-change rows can never be mitigated; the rest are worth a look. Hover a class for '
                      f'what it means.</p>')
     if theirs:
         tw = [list(w) for w in theirs.get("waves") or []]
@@ -1722,7 +1743,7 @@ def write_milestone(plan: Plan, mid: str, d: Path) -> Path:
         by_files: dict[tuple, list[str]] = {}
         for (t, dep), f in g.entry_pairs.items():
             by_files.setdefault(tuple(f), []).append(f"{short(dep, mid)} → {short(t, mid)}")
-        on_cp = sum(1 for t, dep in g.entry_pairs if any(p[0] == dep and k[0] == t for p, k in g.cp_pairs))
+        on_cp = sum(1 for t, dep in g.entry_pairs if (dep, t) in g.cp_tpairs)
         groups = "; ".join(f'{esc(", ".join(f))}: {esc(", ".join(e))}' for f, e in by_files.items())
         notes.append(f'<p class="warnp">{len(g.entry_pairs)} wiring → wiring edge{"" if len(g.entry_pairs) == 1 else "s"} '
                      f'through a shared entry module, {on_cp} on the critical path. Both tasks write {groups}. '
@@ -1771,8 +1792,9 @@ def write_milestone(plan: Plan, mid: str, d: Path) -> Path:
 on. Rows are task kinds. <span class="c6 sw" style="transform:rotate(45deg)"></span>An interface task is a diamond;
 dashed edges are what it unblocks. Solid edges are other <code>depends</code>; a split task is two boxes, the tester
 (dashed border) then the implementer. A tester waits only on the interface: the interface tasks among its task's
-ancestors, else all of the milestone's. Waves count boxes, so a split task can take two. The critical path is the thick
-line and the bold boxes, every tied one drawn (in the line above, a lane's alternatives are in brackets); ✓ is done. An
+ancestors, else all of the milestone's. Waves count boxes, so a split task can take two. The critical path counts whole
+tasks through <code>depends</code>, as the tile does: it is the thick line and the bold boxes (both halves of a split task),
+every tied one drawn (in the line above, a lane's alternatives are in brackets); ✓ is done. An
 orange edge marked "entry" joins two wiring tasks that write the same entry module (<code>__main__.py</code> or <code>pipeline.py</code>). Edges
 an interface mitigates do not order the tasks and are listed below, not drawn. Hover a box for its dependencies and
 writes; click it for the task on the turn's page.</p>

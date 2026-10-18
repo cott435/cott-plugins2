@@ -358,6 +358,55 @@ class TiedLanes(unittest.TestCase):
         self.assertIn("shared file · shared entry module", self.page)
 
 
+def serializers() -> dict:
+    """Iteration 9's R6 and R9 in one milestone. T03 is a split fold, so the box path T01 → T03 (tester,
+    implementer) → T05 → T07 is five long while the spine T02 ties it in whole tasks; the producer names
+    T02. The order rows T04 → T02 (spine → spine, an approval), T06 → T05 (thicken → wiring, a shared
+    conftest.py) and T08 → T07 (system → system) are serializers; T03 → T02 is a thicken's side effect."""
+    tasks = [("T01", "interface", "", []), ("T02", "spine", "", ["T01"]), ("T03", "thicken", "split", ["T01"]),
+             ("T04", "spine", "", ["T02"]), ("T05", "wiring", "", ["T02", "T03"]), ("T06", "thicken", "", ["T05"]),
+             ("T07", "system", "", ["T05"]), ("T08", "system", "", ["T07"])]
+    nodes = [n("M1", "milestone", None, "Serial")]
+    edges = []
+    for tid, kind, mode, deps in tasks:
+        nodes.append(n(f"M1-{tid}", "task", "M1", f"task {tid}", {"kind": kind, "mode": mode or "solo"}))
+        edges += [{"from": f"M1-{tid}", "to": f"M1-{d}", "kind": "depends"} for d in deps]
+    edges += [{"from": f"M1-{a}", "to": f"M1-{b}", "kind": "order", "reason": r} for a, b, r in [
+        ("T04", "T02", "learning: QR-07 sets the direction"), ("T06", "T05", "its store is built by conftest.py"),
+        ("T08", "T07", "serves a store PL-01 promoted"), ("T03", "T02", "the fixture T02 writes")]]
+    return {"schema": "plan-map/2", "producer": "test", "snapshots": [
+        {"turn": 1, "skill": "build-planning", "nodes": nodes, "edges": edges,
+         "builds": [{"milestone": "M1", "critical_path": ["M1-T01", "M1-T02", "M1-T05", "M1-T07", "M1-T08"],
+                     "waves": [[f"M1-{t}" for t in w] for w in
+                               [["T01"], ["T02", "T03"], ["T04", "T05"], ["T06", "T07"], ["T08"]]]}]}]}
+
+
+class Serializers(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.out, _ = render(serializers())
+        cls.g = planmap.Graph(planmap.load(cls.out).final, "M1")
+        cls.page = (cls.out / "plan" / "M1.html").read_text(encoding="utf-8")
+
+    def test_order_rows_the_design_never_chains_are_worth_a_look(self):
+        self.assertEqual(self.g.metrics()["unmitigated"], {"side-effect order": 1, "serializer": 3})
+        self.assertIn("serializer", planmap.REASON_FLAG)
+        self.assertIn('<span class="warnp" title="an order edge from a thicken', self.page)
+
+    def test_the_critical_path_counts_whole_tasks(self):
+        self.assertEqual(self.g.n_waves, 6)  # boxes: T03 takes two waves
+        self.assertEqual(self.g.cp, ["M1-T01", "M1-T02", "M1-T05", "M1-T07", "M1-T08"])
+        self.assertEqual(self.g.cp_paths, 2)
+        self.assertEqual(self.g.cp_lanes, [[["M1-T01"], ["M1-T02", "M1-T03"], ["M1-T05"], ["M1-T07"], ["M1-T08"]]])
+        self.assertEqual(self.g.cp_segments, {("M1-T01", ""), ("M1-T02", ""), ("M1-T03", "test"), ("M1-T03", "impl"),
+                                              ("M1-T05", ""), ("M1-T07", ""), ("M1-T08", "")})
+        self.assertEqual((self.g.metrics()["cp"], self.g.metrics()["task_waves"]), (5, 5))
+        self.assertIn("<b>5<i class=\"ok\">cap 15</i> <i>· 2 paths tie in 1 lane</i></b>", self.page)
+        self.assertIn("critical path T01 → (T02 | T03) → T05 → T07 → T08", self.page)
+        self.assertIn("Recomputed here from <code>depends</code> edges: the same.", self.page)
+        self.assertEqual(len(re.findall(r'<path [^>]*class="e cp', self.page)), len(self.g.cp_pairs))
+
+
 class WithARun(unittest.TestCase):
     def test_axis_and_skills_come_from_the_run(self):
         index = {"title": "a run", "project": "/p", "turns": [

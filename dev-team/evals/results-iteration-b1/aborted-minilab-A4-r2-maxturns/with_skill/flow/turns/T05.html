@@ -1,0 +1,985 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1"><title>T05 turn</title>
+<style>
+:root{--bg:#fbfbfa;--fg:#1d1d1f;--muted:#6b6b70;--line:#d9d9de;--box:#fff;--rowp:#eef3fb;--band:#fff4d6;
+--ok:#2e7d32;--bad:#c62828;--warn:#b26a00;--idle:#6b6b70}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#17171a;--fg:#ececf0;--muted:#9a9aa3;
+--line:#34343a;--box:#222227;--rowp:#1d2433;--band:#3a3015;--ok:#6fcf73;--bad:#ff6b6b;--warn:#f0b35a;--idle:#9a9aa3}}
+:root[data-theme="dark"]{--bg:#17171a;--fg:#ececf0;--muted:#9a9aa3;--line:#34343a;--box:#222227;--rowp:#1d2433;
+--band:#3a3015;--ok:#6fcf73;--bad:#ff6b6b;--warn:#f0b35a;--idle:#9a9aa3}
+body{margin:0;padding:16px;background:var(--bg);color:var(--fg);font:14px/1.45 -apple-system,system-ui,sans-serif}
+h1{font-size:18px;margin:0 0 4px}h2{font-size:15px;margin:22px 0 8px}.sub{color:var(--muted)}
+table{border-collapse:collapse;margin:4px 0 8px}td,th{border-bottom:1px solid var(--line);padding:4px 10px;text-align:left;
+vertical-align:top}th{color:var(--muted);font-weight:600}.chips span{display:inline-block;margin:0 4px 2px 0}
+.legend span{margin-right:14px;white-space:nowrap}.sw{display:inline-block;width:10px;height:10px;border-radius:2px;
+margin-right:4px;vertical-align:-1px}.scroll{overflow:auto;max-height:88vh;border:1px solid var(--line);border-radius:8px}
+.chart{display:grid;width:max-content}.chart>div{line-height:0}.corner{position:sticky;top:0;left:0;z-index:3}
+.colhead{position:sticky;top:0;z-index:2}.rowhead{position:sticky;left:0;z-index:2}
+svg.bg{background:var(--bg)}.colhead svg{border-bottom:1px solid var(--line)}.rowhead svg{border-right:1px solid var(--line)}
+.ok{color:var(--ok);fill:var(--ok)}.bad{color:var(--bad);fill:var(--bad)}.warn{color:var(--warn);fill:var(--warn)}
+.idle{color:var(--idle);fill:var(--idle)}
+svg text{fill:var(--fg);font-family:-apple-system,system-ui,sans-serif}
+.box{fill:var(--box);stroke:var(--line)}.unit:hover .box{stroke:var(--fg)}
+.role{font-size:12px;font-weight:600}.uid,.wmeta,.lmeta,.meta{font-size:10px;fill:var(--muted)}
+.sub{font-size:10.5px;fill:var(--muted)}.badge{font-size:11px;font-weight:600}
+.meta.bad{fill:var(--bad);font-weight:600}.lane{font-size:13px;font-weight:700}.wave{font-size:13px;font-weight:700}
+.par{fill:#4e79a7}.ser{fill:var(--muted)}.rowp{fill:var(--rowp)}.rows{fill:transparent}.band{fill:var(--band)}
+.bandt{font-size:11.5px}.grid{stroke:var(--line)}.link{stroke:var(--muted);stroke-width:1.2;opacity:.55}
+.arrowhead{fill:var(--muted)}.marks{font-size:10.5px}.audit{stroke:var(--box);stroke-width:2}.auditn{font-size:10px;font-weight:700;fill:#fff}
+a{color:inherit}svg a .box{cursor:pointer}
+
+:root{--c0:#2a78d6;--c1:#eb6834;--c2:#1baf7a;--c3:#eda100;--c4:#e87ba4;--c5:#008300;--c6:#6250d6;--c7:#e34948;
+--cx:#8a8985;--main:#52514e;--read:#dcdbd5;--readfg:#1d1d1f}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--c0:#3987e5;--c1:#d95926;--c2:#199e70;
+--c3:#c98500;--c4:#d55181;--c5:#008300;--c6:#9085e9;--c7:#e66767;--cx:#77766f;--main:#c3c2b7;--read:#3b3b40;
+--readfg:#ececf0}}
+:root[data-theme="dark"]{--c0:#3987e5;--c1:#d95926;--c2:#199e70;--c3:#c98500;--c4:#d55181;--c5:#008300;
+--c6:#9085e9;--c7:#e66767;--cx:#77766f;--main:#c3c2b7;--read:#3b3b40;--readfg:#ececf0}
+.c0{fill:var(--c0);background:var(--c0)}.c1{fill:var(--c1);background:var(--c1)}.c2{fill:var(--c2);background:var(--c2)}
+.c3{fill:var(--c3);background:var(--c3)}.c4{fill:var(--c4);background:var(--c4)}.c5{fill:var(--c5);background:var(--c5)}
+.c6{fill:var(--c6);background:var(--c6)}.c7{fill:var(--c7);background:var(--c7)}.cx{fill:var(--cx);background:var(--cx)}
+.cmain{fill:var(--main)}.sc0{stroke:var(--c0)}.sc1{stroke:var(--c1)}.sc2{stroke:var(--c2)}
+.tl text,.sm text,.lc text{font-size:10.5px;fill:var(--muted)}.tl .lbl-in,.sm .lbl-in{fill:#fff;font-size:10.5px;font-weight:600}
+.tl .rowl,.sm .rowl,.lc .rowl{fill:var(--fg);font-size:11.5px;font-weight:600}.tl .band{fill:var(--rowp)}
+.tl .brk{stroke:var(--muted);stroke-dasharray:2 3}.tl a:hover rect,.sm a:hover rect{stroke:var(--fg);stroke-width:1.5}
+.axis{stroke:var(--line)}.sm .val{fill:var(--fg);font-weight:600}.lc path.ln{fill:none;stroke-width:2}
+.lc circle{stroke:var(--bg);stroke-width:2}.lc .end{font-weight:600;fill:var(--fg)}
+.tiles{display:flex;flex-wrap:wrap;gap:10px;margin:12px 0}.tile{border:1px solid var(--line);border-radius:8px;
+padding:8px 12px;min-width:110px;background:var(--box)}.tile b{display:block;font-size:20px;line-height:1.2}
+.tile span{font-size:12px;color:var(--muted)}.tile i{font-style:normal;font-size:12px;margin-left:6px}
+.fm{border-collapse:separate;border-spacing:2px}.fm td,.fm th{border:0;padding:0;text-align:center;font-size:11px}
+.fm th{padding:0 2px;font-weight:600}.fm td.f,.fm th.f{text-align:left;padding-right:10px;white-space:nowrap;
+position:sticky;left:0;background:var(--bg);font:11.5px ui-monospace,Menlo,monospace;
+max-width:380px;overflow:hidden;text-overflow:ellipsis}
+.fm td.cell{min-width:22px;height:20px;border-radius:3px}.fm td.fw{background:var(--c0);color:#fff;font-weight:700}
+.fm td.fe{background:var(--c1);color:#fff;font-weight:700}.fm td.fr{background:var(--read);color:var(--readfg)}
+.fm td.n{color:var(--muted);padding:0 6px}.fm tr.grp td{text-align:left;padding-top:8px;color:var(--muted);
+font-weight:600}
+.key{display:inline-block;min-width:18px;text-align:center;border-radius:3px;font-size:11px;margin-right:4px}
+.bar{display:inline-block;height:9px;border-radius:2px;vertical-align:0}
+
+pre{white-space:pre-wrap;word-break:break-word;background:var(--box);border:1px solid var(--line);border-radius:6px;
+padding:8px 10px;margin:4px 0;font:12px/1.45 ui-monospace,SFMono-Regular,Menlo,monospace;max-width:100%;overflow:auto}
+.step{border-top:1px solid var(--line);padding:6px 0}.step:target{background:var(--rowp)}
+.sid{font:12px ui-monospace,Menlo,monospace;color:var(--muted);margin-right:8px}.kind{font-weight:600;margin-right:8px}
+.err{color:var(--bad);font-weight:600}.hook{color:var(--bad);margin:4px 0 0 16px}.lbl{font-size:12px;color:var(--muted);margin-top:6px}
+details summary{cursor:pointer;color:var(--muted);font-size:12px}.head td:first-child{color:var(--muted)}
+.top{font-size:13px}.narr{list-style:none;padding-left:0}.narr li{margin:3px 0}
+</style></head>
+<body>
+<p class="top"><a href="../flow.html">← the run's flow chart</a></p>
+<p class="top"><a href="../plan/T01.html">The plan as of T05</a>: unchanged since T01 · <a href="../plan/index.html">plan map</a></p>
+<h1>T05 · turn · Override it: record `dt build resolve M1-R24 --note &quot;accepted for this eval&quot;` and continue.</h1>
+<table class="head"><tr><td>Type</td><td>turn</td></tr><tr><td>Description</td><td>Override it: record `dt build resolve M1-R24 --note &quot;accepted for this eval&quot;` and continue.</td></tr><tr><td>Spawned by</td><td>user</td></tr><tr><td>Model</td><td>claude-opus-5-5</td></tr><tr><td>Start</td><td>2026-10-18 09:47:20 UTC</td></tr><tr><td>Duration</td><td>2 min</td></tr><tr><td>Tool calls</td><td>36</td></tr><tr><td>Errors</td><td>1</td></tr><tr><td>Hook blocks</td><td>9</td></tr><tr><td>Tokens</td><td>16.6k out · 51.8k new in · 2.3M cached in · peak context 192k</td></tr><tr><td>Skills invoked</td><td>dev-team:build-planning</td></tr><tr><td>Files written or edited</td><td>docs/packages/risk/contract.md, docs/architecture.md, tasks/plan.md, tasks/todo.md</td></tr><tr><td>Definition</td><td>none</td></tr><tr><td>Steps</td><td>44</td></tr><tr><td>Finished</td><td>yes</td></tr></table>
+
+
+<h2>Prompt</h2>
+<pre>Override it: record `dt build resolve M1-R24 --note &quot;accepted for this eval&quot;` and continue.</pre>
+<h2>Files</h2>
+<table><tr><th>Op</th><th>File</th><th>Calls</th><th>By</th><th>Via</th><th>Steps</th></tr><tr><td>edit</td><td><code>docs/architecture.md</code></td><td>2</td><td>main</td><td>Edit</td><td><a href="#D165">D165</a> <a href="#D167">D167</a></td></tr><tr><td>edit</td><td><code>docs/packages/risk/contract.md</code></td><td>3</td><td>main</td><td>Edit</td><td><a href="#D162">D162</a> <a href="#D163">D163</a> <a href="#D164">D164</a></td></tr><tr><td>edit</td><td><code>tasks/plan.md</code></td><td>11</td><td>main</td><td>Edit</td><td><a href="#D169">D169</a> <a href="#D170">D170</a> <a href="#D171">D171</a> <a href="#D172">D172</a> <a href="#D175">D175</a> <a href="#D176">D176</a> <a href="#D177">D177</a> <a href="#D178">D178</a> <a href="#D179">D179</a> <a href="#D180">D180</a> <a href="#D181">D181</a></td></tr><tr><td>edit</td><td><code>tasks/todo.md</code></td><td>2</td><td>main</td><td>Bash, Edit</td><td><a href="#D173">D173</a> <a href="#D183">D183</a></td></tr><tr><td>read</td><td><code>../plugin/dev-team/skills/build-planning/references/examples-replan.md</code></td><td>1</td><td>main</td><td>Bash</td><td><a href="#D158">D158</a></td></tr><tr><td>read</td><td><code>../plugin/dev-team/skills/build-planning/references/replan.md</code></td><td>1</td><td>main</td><td>Read</td><td><a href="#D157">D157</a></td></tr><tr><td>read</td><td><code>../plugin/dev-team/skills/build-planning/references/tasks.md</code></td><td>1</td><td>main</td><td>Bash</td><td><a href="#D158">D158</a></td></tr><tr><td>read</td><td><code>docs/architecture.md</code></td><td>1</td><td>main</td><td>Read</td><td><a href="#D166">D166</a></td></tr><tr><td>read</td><td><code>tasks/plan.md</code></td><td>1</td><td>main</td><td>Read</td><td><a href="#D159">D159</a></td></tr><tr><td>read</td><td><code>tasks/todo.md</code></td><td>2</td><td>main</td><td>Bash, Read</td><td><a href="#D160">D160</a> <a href="#D182">D182</a></td></tr></table>
+<h2>Steps</h2>
+<div class="step" id="SD149"><span class="sid">D149</span><span class="kind">user</span>Override it: record `dt build resolve M1-R24 --note &quot;accepted for this eval&quot;` and continue.<details><summary>full text</summary><pre>Override it: record `dt build resolve M1-R24 --note &quot;accepted for this eval&quot;` and continue.</pre></details></div><div class="step" id="SD150"><span class="sid">D150</span><span class="kind">Bash</span>python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A4-r2/with_skill/plugin/dev-team/scripts/dt.py build resolve M1-R24 --note &quot;accepted for this eval&quot;<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A4-r2/with_skill/plugin/dev-team/scripts/dt.py build resolve M1-R24 --note \&quot;accepted for this eval\&quot;&quot;
+}</pre><div class="lbl">output</div><pre>{
+  &quot;resolved&quot;: &quot;M1-R24&quot;,
+  &quot;kind&quot;: &quot;finding&quot;
+}</pre></details></div><div class="step" id="SD151"><span class="sid">D151</span><span class="kind">Bash</span>python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A4-r2/with_skill/plugin/dev-team/scripts/dt.py ready --reserve --cap 6 --json<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A4-r2/with_skill/plugin/dev-team/scripts/dt.py ready --reserve --cap 6 --json&quot;
+}</pre><div class="lbl">output</div><pre>{
+  &quot;rows&quot;: [],
+  &quot;over_cap&quot;: 0,
+  &quot;in_flight&quot;: [],
+  &quot;cap&quot;: 6,
+  &quot;holds&quot;: [],
+  &quot;held&quot;: [],
+  &quot;all_landed&quot;: true
+}</pre></details></div><div class="step" id="SD152"><span class="sid">D152</span><span class="kind">Bash</span>grep -n &quot;Important ·&quot; tasks/plan.md<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;grep -n \&quot;Important ·\&quot; tasks/plan.md&quot;
+}</pre><div class="lbl">output</div><pre>26:- M1-R01 Important · interface · tests/contracts/risk.TickerSummary/sample.json:4::ann_vol The RISK-04 numbers in the TickerSummary and Report samples are not what the contract&#x27;s own prices.csv/Returns sample give. BOLT ann_return is -2.869562 but should be 252*mean = 50.4*ln(18.9/20) = -2.851143. ann_vol should be about 0.39873 for ACME and 0.38005 for BOLT (sqrt(252)*sample stdev of the 5 returns), not 0.412567 and 0.411349. So both sharpe values are wrong too (ACME about 7.3652, not 7.118247). The samples feed M1-T10/M1-T13 and the exit check that a real provider and its double agree on the same sample → recompute ann_return, ann_vol and sharpe from the risk.Returns sample in risk.TickerSummary/sample.json and risk.Report/sample.json now, while the folders can still change without an architecture-design Revise
+27:- M1-R02 Important · interface · tests/contracts/risk.VolSeries/sample.json:14::values The ACME window-2 annualized vols do not match RISK-02/RISK-03 on the risk.Returns sample: |r_i - r_j|*sqrt(126) gives 0.332876, 0.439151 and 0.546527, but the sample has 0.332878, 0.439145 and 0.546519 (BOLT agrees to 1e-6). The vol_series fake&#x27;s docstring says it serves exactly the window-2 volatility of prices.csv, so the exit check that the real provider and its double agree will fail at 6 decimal places → recompute the ACME row (and last_vol 0.546519 in the TickerSummary and Report samples) from the exact log returns
+115:- M1-R08 Important · mutation · packages/mdata/src/mdata/calendar.py:23::align_calendar mutant `dates = tuple(d for d in closes_by_ticker[tickers[0]] if d in common) if tickers else ()` (first ticker&#x27;s file order instead of sorted) passes all of tests/unit/mdata/test_calendar.py, so the Prices invariant &quot;dates ascending&quot; is untested when the first ticker&#x27;s rows are out of order → in test_unsorted_rows_give_ascending_dates_and_sorted_tickers put ABC&#x27;s 2024-01-03 row before its 2024-01-02 row
+116:- M1-R09 Important · scope · packages/mdata/src/mdata/validate.py:16::validate_rows the M1-T03 spine (&quot;keep rows with a close, sorted&quot;) already implements all of DATA-02 and TC-01 (positive closes only, later duplicate wins, ticker filter, KeyError), which is M1-T14&#x27;s thicken work, so M1-T14 has nothing left to change and its TC-01 intent test cannot fail first → keep the code but record M1-T14 as satisfied once its TC-01 intent test passes against this code; future spine tasks stay to their stated baseline
+227:- M1-R12 Important · mutation · packages/mdata/src/mdata/calendar.py:45::_fill deleting the `missing = 0` reset (so missing dates add up across separate gaps instead of counting &quot;in a row&quot; per DATA-04) passes every test in test_calendar.py and test_calendar_golden.py; no case has two short gaps adding up to more than max_gap → add a unit test in tests/unit/mdata/test_calendar.py where one ticker misses 2 dates, trades, then misses 2 more with max_gap=3 and must fill, not raise
+228:- M1-R13 Important · mutation · packages/mdata/src/mdata/pipeline.py:22::load_prices changing `align_calendar(rows)` to `align_calendar(rows, max_gap=6)` passes every test in tests/unit/mdata and tests/contracts, so the contract&#x27;s &quot;GapError for a gap over 5 dates&quot; from load_prices is untested (the smoke test checks shape only, by design) → M1-T21&#x27;s system test should run TC-03 through load_prices on a CSV and expect GapError naming B
+249:- M1-R17 Important · mutation · packages/mdata/src/mdata/calendar.py:45::_fill mutant: delete `missing = 0`, so the counter adds up every missing date instead of only consecutive ones. All 123 tests under `pytest tests -m &quot;&quot;` still pass. DATA-04&#x27;s &quot;more than 5 calendar dates in a row&quot; is untested whenever a ticker has two separate gaps that add up to more than max_gap. TC-02 and TC-03 each have a single gap, so no golden output changes → add a test to tests/unit/mdata/test_calendar.py: ZED has two gaps of 2 split by a traded date, max_gap=2, and fills without a GapError
+250:- M1-R18 Important · exit · tests/system/test_e2e.py:18::SAMPLE_TOLERANCE The real-vs-double check for risk.vol_series uses abs=1e-5 and says the sample is &quot;rounded to six places&quot;. Six-place rounding allows at most 5e-7, but the real ACME vols differ from tests/contracts/risk.VolSeries/sample.json by -2.3e-6, 6.0e-6 and 7.7e-6. That is M1-R02&#x27;s sample error, and the wide tolerance hides it instead of showing that the two agree → recompute the ACME VolSeries values through an architecture-design Revise (tests/contracts is frozen), then set the tolerance to 5e-7
+251:- M1-R19 Important · exit · tests/contracts/risk.Report/sample.json:4::rows M1-R01 is still open at exit. The real risk_report on tests/contracts/mdata.load_prices/prices.csv with window=2 gives ACME ann_vol 0.398734 and sharpe 7.365195, and BOLT ann_return -2.851146, ann_vol 0.380052 and sharpe -7.501995. The Report and TickerSummary samples hold 0.412567, 7.118247, -2.869562, 0.411349 and -6.97598, and last_vol is also off by up to 7.7e-6. The frozen samples carry wrong answers that consumers will copy → recompute ann_return, ann_vol, sharpe and last_vol in risk.TickerSummary/sample.json and risk.Report/sample.json through an architecture-design Revise, and add an exit test that compares real risk_report rows with the Report sample at 5e-7
+252:- M1-R20 Important · exit · tests/system/test_e2e.py:39::test_real_vol_series_agrees_with_its_double No test runs the real mdata.load_prices and its double on the same sample. Only risk.vol_series is compared with its double. The real load_prices(prices.csv) does equal the mdata.Prices sample today, but nothing protects that → add `test_real_load_prices_agrees_with_its_double` to tests/system/test_e2e.py: assert load_prices(PRICES_CSV) == contract_fake(&quot;mdata.load_prices&quot;).load_prices(PRICES_CSV), and do the same for tickers=[&quot;BOLT&quot;]</pre></details></div><div class="step" id="SD153"><span class="sid">D153</span><span class="kind">say</span>Recorded. The build continues to the exit&#x27;s next step: the 10 Important findings need fix tasks, which come from `build-planning` Replan.<details><summary>full text</summary><pre>Recorded. The build continues to the exit&#x27;s next step: the 10 Important findings need fix tasks, which come from `build-planning` Replan.</pre></details></div><div class="step" id="SD154"><span class="sid">D154</span><span class="kind">Skill</span>dev-team:build-planning Replan M1 at exit: fix tasks for the 10 Important exit/checkpoint findings (M1-R01, R02, R08, R09, R12, R13, R17, R18, R19, R20). M1-R24 Critical was overridden by the user (&quot;accepted for this eval&quot;). On build branch build/M1.<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;skill&quot;: &quot;dev-team:build-planning&quot;,
+  &quot;args&quot;: &quot;Replan M1 at exit: fix tasks for the 10 Important exit/checkpoint findings (M1-R01, R02, R08, R09, R12, R13, R17, R18, R19, R20). M1-R24 Critical was overridden by the user (\&quot;accepted for this eval\&quot;). On build branch build/M1.&quot;
+}</pre><div class="lbl">output</div><pre>Launching skill: dev-team:build-planning</pre></details></div><div class="step" id="SD155"><span class="sid">D155</span><span class="kind">skill-body</span>skill loaded from `/Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A4-r2/with_skill/plugin/dev-team/skills/build-planning`</div><div class="step" id="SD156"><span class="sid">D156</span><span class="kind">Bash</span>python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A4-r2/with_skill/plugin/dev-team/scripts/dt.py status --skill build-planning<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A4-r2/with_skill/plugin/dev-team/scripts/dt.py status --skill build-planning&quot;
+}</pre><div class="lbl">output</div><pre>skill: build-planning
+mode: replan
+docs: brief Accepted · spec Approved · architecture Approved (Multi-package) · roadmap stale (run dt roadmap) · plan M1 Approved · constraints Approved
+next ids: AD-03 PL-04 TC-09 M2 M1-T22
+references_unindexed: none
+references_changed: none
+references_missing: none
+milestone: M1 Approved
+progress: 21/21
+next_task: none
+blocked_tasks: none
+uncovered: QR-01
+no_spine: none
+mode_violations: M1-T21: solo, expected split (acceptance names TC-01, TC-02, TC-03, TC-04, TC-05, TC-06, TC-07, TC-08)
+boundaries_unfrozen: none
+draft_pipelines: none
+changed_since_plan: docs/packages/risk/contract.md
+interfaces_changed: none
+probes_blocking: none
+stage_to_cut: none
+pipelines_inferred: none
+milestone_references: RF-01
+milestone_skills: none
+references_unrouted: none
+skills_unrouted: none
+stage_unrouted: none
+skills_missing: none
+skills_available: none
+grow_triggers: none
+drift: none
+stale_contracts: none
+queued: none
+base: b6a1ae8
+critical_path: M1-T01 → M1-T02 → M1-T11 → M1-T21
+waves: M1-T01 | M1-T02, M1-T03, M1-T04, M1-T05, M1-T06, M1-T07, M1-T08, M1-T09, M1-T10 | M1-T11, M1-T12, M1-T13, M1-T14, M1-T15, M1-T16, M1-T17, M1-T18, M1-T19, M1-T20 | M1-T21
+width: 10
+parallelism: 5.25
+graph_warning: none
+critical_path_halves: M1-T01.solo → M1-T02.solo → M1-T11.solo → M1-T21.solo
+file_edges_on_path: none</pre></details></div><div class="step" id="SD157"><span class="sid">D157</span><span class="kind">Read</span>/Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A4-r2/with_skill/plugin/dev-team/skills/build-planning/references/replan.md<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A4-r2/with_skill/plugin/dev-team/skills/build-planning/references/replan.md&quot;
+}</pre><div class="lbl">output</div><pre>1	# Replan
+2	
+3	`dt status` says `replan`: something learned during the build, or a major bug (after `pipeline-design` or `architecture-design` Revise, if a step or decision changed). Example: `examples-replan.md`.
+4	
+5	1. Take `blocked_tasks`, the docs under `changed_since_plan` and their revised sections (`dt section &lt;ID&gt;`). Until those docs are re-approved, `dt status` says `blocked`: wait. Reorder, split or add; new IDs from `dt next-id M&lt;n&gt;-T`. Never renumber or reuse an ID. A new or split task meets `tasks.md`. Each changed `Depends on` changes its `## Dependency graph` row; a frozen interface that must change is a `contract-change`: a new interface task before every task that needs it (`phase0.md`, Frozen means frozen).
+6	2. **Never drop an unchecked task silently.** List each drop with its reason for approval. On approval, remove it from plan, graph and todo and keep a retired line under Replan notes: `- ~~M2-T05: Title~~ Retired YYYY-MM-DD: reason`.
+7	3. Remove a `**Blocked:**` line only when the change resolves it. A major bug&#x27;s regression case becomes an acceptance bullet.
+8	4. Add one dated line to `## Replan notes`, set Status to Draft and update `Last updated` (the plan is then newer than the revised docs, which clears `changed_since_plan`), run the Review Gate. Never touch a checked task.
+9	</pre></details></div><div class="step" id="SD158"><span class="sid">D158</span><span class="kind">Bash</span>cd /Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A4-r2/with_skill/plugin/dev-team/skills/build-planning/references &amp;&amp; ls &amp;&amp; cat tasks.md examples-replan.md &amp;&amp; grep -n &quot;Frozen means frozen&quot; -A12 phase0.md<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;cd /Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A4-r2/with_skill/plugin/dev-team/skills/build-planning/references &amp;&amp; ls &amp;&amp; cat tasks.md examples-replan.md &amp;&amp; grep -n \&quot;Frozen means frozen\&quot; -A12 phase0.md&quot;
+}</pre><div class="lbl">output</div><pre>advance.md
+cut.md
+examples-advance.md
+examples-cut.md
+examples-foreign.md
+examples-new.md
+examples-phase0.md
+examples-replan.md
+examples-routing.md
+extend.md
+new.md
+phase0.md
+replan.md
+tasks.md
+# Thickening, routing, modes, checkpoints, the graph, writing
+
+Read when writing thicken tasks, the dependency graph and the files. Templates: `../examples.md`; graph example: `examples-phase0.md`; routing example: `examples-routing.md`.
+
+## 5. Thicken
+
+`**Kind:** thicken`, under Phase 2: one task per step upgrade, depending on its step&#x27;s spine. Order in the file sets nothing: every thicken task can start once its spine lands. Risk orders tasks only when a later one must learn from an earlier one, as an `order` edge with its reason (step 9). In data and ML work, data loading, leak checks and the evaluation get thicken tasks of their own, never left until after the model.
+
+**Split a task** when it needs more than one session, has more than 3 acceptance bullets, touches two packages or two steps, or has &quot;and&quot; in its title. Sizes count `Writes:` entries outside `tests/` (`task-size`; a folder glob counts as one): XS = 1, S = 1–2, M = 3–5. Nothing larger. Spine and thicken tasks are XS or S.
+
+**Acceptance is test-backed.** Each bullet is checkable: a `TC-NN` passes, a Given/When/Then, a model criterion by ID, the smoke command. With no `tests.md`, write the criterion so a tester can encode it. A TC that runs the whole pipeline is the wiring or system task&#x27;s acceptance, never a thicken&#x27;s, so no thicken waits on wiring.
+
+## 6. Route skills and references
+
+**Skills.** Start from `milestone_skills` (the milestone&#x27;s `**Skills:**` line, else its stage&#x27;s): each goes on the `**Skills:**` of every task it fits, and at least one. Then add others whose descriptions fit a task (project `.claude/skills/*/SKILL.md`, `skills_available`). The plan&#x27;s Scope lists the milestone&#x27;s skills. A task that needs a skill that isn&#x27;t installed names it anyway (`dt status` reports it under `skills_missing`) and goes under Open questions. Never quietly plan the step without it.
+
+**References.** Each `RF-NN` or `PB-NN` in `milestone_references` goes in the `Read:` of the tasks whose step it informs; an RF entry&#x27;s *Use for* and *Key parts* say which, a PB entry&#x27;s *Informs* and *Caveats*. Cite the ID, never the `references/` or `probes/` path. A probe&#x27;s code goes to the step that calls the same API (`PB-01:probe.py:sync_all`); its redacted samples (`PB-01:samples`) go to the interface task (`phase0.md`) and, as raw-shaped test input, to that step&#x27;s spine and thicken tasks. Over 300 lines, add a selector so the packet stays small: `RF-01:deseasonalize` (one function or class), `RF-01:outline`, or `RF-03:&lt;heading&gt;` for a doc. With no selector a long file prints as its outline and `dt lint` warns `ref-large`. Whether to reuse the code is the builder&#x27;s call; don&#x27;t write it into Acceptance. A decision whose Consequences adopt what a probe spent (Plaid Items it linked) gets its own task in the milestone that builds that step.
+
+## 7. Build mode
+
+The mode follows the oracle, whatever the Kind:
+- `split` (tester, then implementer) when the acceptance names a TC case, a Given/When/Then or a model criterion, or `Writes:` includes a path under `tests/intent/` (only a tester writes intent tests).
+- `solo` otherwise: an interface task, a spine with no TC, a refactor or glue task with no oracle.
+
+`mode_violations` flags a task that breaks the rule. An override needs `**Reason:** mode: &lt;one line&gt;` on the task; a Reason not starting `mode:` doesn&#x27;t count. **A split task tests symbols a frozen interface declares** (the interface task&#x27;s types and signatures), so the tester never writes against a guess and starts right after the interface, beside the implementers. Its `Depends on` is the implementer half&#x27;s; the tester half waits only on the interface.
+
+**Risk.** A task that needs credentials, writes to a network service or acts outside the repo carries `**Risk:** external`: the build releases it only after the user&#x27;s own yes, recorded when it comes up. A task that runs on fakes never needs it.
+
+## 8. Checkpoints
+
+A `### Checkpoint after M&lt;n&gt;-T&lt;nn&gt;` closes each phase but the last, naming the phase&#x27;s last task in plan order; Phase 0&#x27;s is written `### Checkpoint after M&lt;n&gt;-T&lt;nn&gt; (barrier)`. `### Checkpoint: milestone exit` closes the last phase. Use the blocks in `../examples.md`. Reviewer agents run each one over that phase&#x27;s landings; behind the barrier nothing else starts until the interface review passes. The orchestrator records findings with `dt finding`, not this skill.
+
+## 9. Dependencies, Writes, the graph, Verify
+
+- **`Depends on:`** resolves, points only backward (position counts, not ID number), is acyclic, and holds only edges nothing mitigates.
+- **`Writes:`** is exact paths, or a folder glob the task owns, and is an exclusive claim: two tasks with no `Depends on` path between them never write the same path (`writes`). Shared files (`__init__.py`, `types.py`, `__main__.py`) belong to the interface task; each pipeline&#x27;s entry module to its wiring and system tasks (`phase0.md`). Every task but an interface task names its unit test file under `tests/unit/&lt;pkg&gt;/` (`writes-unit`): the implementer and solo halves write unit tests. No `Writes:` under `tasks/`: builders never tick `todo.md` or record findings; the orchestrator does after each merge.
+- **`## Dependency graph`**, after the last checkpoint: one row per edge between tasks, `| From | To | Kind | Mitigated by |`. From is the task that needs, To the one it needs; each cell starts with the task ID. Mitigated by names the interface and the task freezing it (`profile.Profile sample (M1-T01)`), or says `none: &lt;reason&gt;`.
+
+| Kind | Meaning | Mitigation |
+|---|---|---|
+| `data` | One step&#x27;s output feeds another&#x27;s input | The type and its sample |
+| `call` | A pipeline calls another pipeline or package | The fixture-backed fake |
+| `file` | Two tasks must write one file | Move the shared part to the interface or wiring task; else serial. Two steps&#x27; thicken tasks on one module: the interface task&#x27;s layout splits it (each step its own file, the old module re-exporting); never chain them |
+| `code` | A task changes code another task wrote (a thicken after its step&#x27;s spine or an earlier thicken of that step) | None: serial |
+| `contract-change` | A task changes a frozen interface | None: serial, plus a new interface task |
+| `order` | Integration (a wiring or system task runs the steps it wires: `none: integration: the smoke runs it`), or risk or learning (&quot;do X first to learn Y&quot;) | None: reason required |
+
+A spine never has an edge to another step&#x27;s task: it builds against the interface&#x27;s samples and doubles. A mitigated edge documents why two tasks run side by side and never appears in `Depends on`; an unmitigated one must (`edges`). Every `Depends on` has its row, except a dependency on the interface task, which every task has and needs none. The table is the reviewable argument for every serial step.
+- **Width.** `dt status` gives `critical_path`, `waves`, `width` and `parallelism`; on the fresh plan `dt ready` lists only the interface task(s). Mostly width-1 waves mean an edge an interface could mitigate is ordering tasks.
+- **`Verify:`** The interface task&#x27;s runs the schema check over every sample; every other task&#x27;s runs its focused tests and `scripts/check.sh gate` (`--pkg &lt;pkg&gt;` in multi-package), plus its pipeline&#x27;s smoke command (tests.md Strategy, else the Trigger plus ` --smoke`) once its `Depends on` path reaches that pipeline&#x27;s wiring task: wiring and system tasks always. A thicken task running beside the wiring is smoke-tested by the gate after each merge. Only the modes `fast`, `gate` and `full` exist.
+- **`Read:`** lists the IDs (references as `RF-NN[:selector]`, probes as `PB-NN:&lt;file&gt;[:&lt;symbol&gt;]`, `PB-NN:outline` or `PB-NN:samples`) and paths a builder needs, and nothing else. A split task&#x27;s names its step&#x27;s function, so the tester knows the signature it tests. Check each packet with `dt context &lt;task&gt;`: it must resolve and stay under 2,000 lines.
+
+## 10. Write
+
+Task IDs start at `dt next-id M&lt;n&gt;-T` and count up, in phase order.
+- **Next milestone only.** Later milestones stay as roadmap outlines. Write `tasks/queued/M&lt;n&gt;-&lt;slug&gt;.md` only when the user asks.
+- `tasks/plan.md` with Status `Draft` and `**Base:** —` (pending). Never record a sha yourself: `build-setup` runs `dt base` after its bar is approved and committed.
+- `tasks/todo.md`: one unchecked line per task, IDs matching the plan.
+- Milestone rows and sections (`cut.md` step 2), the planned milestone&#x27;s `**Exit:**` and `**Plan:**`, then `dt roadmap`.
+# Example: Replan — the spectrum needs the Fourier fit first
+
+**State:** mid-M1 (the plan of `examples-phase0.md`). The build paused M1-T11:
+```markdown
+**Blocked:** TC-02 fails on the hour-of-week means profile when T &lt; 5 weeks; the spectrum needs the Fourier profile as input
+```
+```
+mode: replan
+blocked_tasks: M1-T11
+```
+
+No step changed (PL-02 already runs `fit_seasonality` before `spectrum`), so no `pipeline-design` Revise is needed; only the graph changes. Had a step changed, `pipeline-design` Revise would run first: while `pipelines.md` is Draft, `dt status` says `blocked` (`waiting for docs/packages/gridload/pipelines.md approval`); once it&#x27;s re-approved with a later `Last updated` than the plan, it says `replan` with `changed_since_plan: docs/packages/gridload/pipelines.md`.
+
+**Edits:**
+- Move the M1-T12 section above M1-T11. IDs stay; plan position sets the order, and `dt lint` checks `Depends on` by position.
+- M1-T11: `**Depends on:** M1-T05, M1-T12`; remove the `Blocked` line. Its `Writes:` and M1-T12&#x27;s stay disjoint.
+- The graph row that let them run side by side, `| M1-T11 LS amplitudes | M1-T12 Fourier seasonality | data | profile.Profile sample (M1-T01): … |`, becomes `| M1-T11 LS amplitudes | M1-T12 Fourier seasonality | order | none: TC-02 needs the Fourier profile as the spectrum&#x27;s input |`. The critical path grows from 4 to 5 (M1-T01 → M1-T04 → M1-T12 → M1-T11 → M1-T14).
+- M1-T11 gains no new bullet: TC-02 already covers it.
+- Reorder `todo.md` to match.
+- `## Replan notes`: `- 2026-10-28: M1-T11 now waits on M1-T12 (the spectrum needs the Fourier profile; TC-02 failed on hour-of-week means); dropped none`
+- Status → Draft.
+
+**Gate message:** what moved and why, the new edge and the longer critical path, &quot;dropped none&quot;. *(Turn ends.)*
+
+**A drop looks like this.** It&#x27;s listed for approval first (&quot;Drop M1-T13? Seasonal removal is already checked by TC-02 and TC-03 in M1-T14&#x27;s run. Default: keep&quot;). Only after an unambiguous yes, remove the section, its graph rows and todo line, and add under Replan notes:
+```markdown
+- ~~M1-T13: Seasonal removal check~~ Retired 2026-10-28: TC-02 and TC-03 now run in M1-T14
+```
+`dt next-id` counts the retired ID, so it&#x27;s never reused, and `dt lint` flags any `Depends on` still pointing at it.
+38:**Frozen means frozen.** Changing a frozen type, sample, signature or fake is a `contract-change`: `architecture-design` Revise, then a new interface task naming the symbol in `Read:`, never an edit to make a test pass. The bar enforces it (CR-09): once a contract folder exists at a task&#x27;s base the implementer can&#x27;t write it, and `dt guard` asks before any edit no open interface task covers. The re-freeze is that interface task, run by an implementer agent, never the main session: its `Writes:` names the frozen folders it changes, which opens them to it alone.</pre></details></div><div class="step" id="SD159"><span class="sid">D159</span><span class="kind">Read</span>/Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A4-r2/with_skill/project/tasks/plan.md<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A4-r2/with_skill/project/tasks/plan.md&quot;
+}</pre><div class="lbl">output</div><pre>1	# M1: Risk report — Plan
+2	
+3	**Milestone:** M1 · **Status:** Approved · **Base:** b6a1ae8 · **Last updated:** 2026-10-17 · **Roadmap:** [../docs/roadmap.md](../docs/roadmap.md) · **Build:** build/M1 started 2026-10-18
+4	
+5	## Scope
+6	**Exit:** `risk.risk_report` writes the report for a prices CSV; TC-01–TC-08 pass.
+7	**Covers:** DATA-01–DATA-04, RISK-01–RISK-05, REP-01, QR-01 · **Deferred:** none
+8	
+9	## Phase 0: Interface
+10	
+11	### M1-T01: Freeze the M1 interfaces
+12	**Package:** mdata · **Step:** contract · **Kind:** interface · **Size:** M · **Mode:** solo
+13	**Read:** PL-01, PL-02, PL-03, mdata.RawRow, mdata.Prices, mdata.GapError, risk.Returns, risk.VolSeries, risk.TickerSummary, risk.Drawdown, risk.Report, mdata.load_prices, risk.vol_series
+14	**Acceptance:**
+15	- [ ] Boundary types in `mdata/types.py` and `risk/types.py`, one sample each under `tests/contracts/&lt;pkg&gt;.&lt;Type&gt;/`
+16	- [ ] Every M1 step and entry signature in its owner module, body `raise NotImplementedError(&quot;&lt;task&gt;&quot;)` naming the task that replaces it
+17	- [ ] `mdata.load_prices` and `risk.vol_series` fakes backed by the samples; `__init__` exports
+18	**Verify:** `pytest tests/contracts` · `scripts/check.sh gate`
+19	**Depends on:** — · **Writes:** packages/mdata/src/mdata/__init__.py, packages/mdata/src/mdata/types.py, packages/mdata/src/mdata/io.py, packages/mdata/src/mdata/validate.py, packages/mdata/src/mdata/calendar.py, packages/mdata/src/mdata/pipeline.py, packages/risk/src/risk/__init__.py, packages/risk/src/risk/types.py, packages/risk/src/risk/returns.py, packages/risk/src/risk/vol.py, packages/risk/src/risk/annualize.py, packages/risk/src/risk/summary.py, packages/risk/src/risk/drawdown.py, packages/risk/src/risk/report.py, packages/risk/src/risk/vol_pipeline.py, packages/risk/src/risk/report_pipeline.py, tests/contracts/**
+20	
+21	### Checkpoint after M1-T01 (barrier)
+22	- [ ] The interface code is the contract: types, signatures, stubs, samples, fakes and exports match contract.md, no more and no less
+23	- [ ] Every split task&#x27;s tester can write its tests from what is frozen
+24	- [ ] `scripts/check.sh full` passes; Review checklist done; every finding has a disposition
+25	**Findings:**
+26	- M1-R01 Important · interface · tests/contracts/risk.TickerSummary/sample.json:4::ann_vol The RISK-04 numbers in the TickerSummary and Report samples are not what the contract&#x27;s own prices.csv/Returns sample give. BOLT ann_return is -2.869562 but should be 252*mean = 50.4*ln(18.9/20) = -2.851143. ann_vol should be about 0.39873 for ACME and 0.38005 for BOLT (sqrt(252)*sample stdev of the 5 returns), not 0.412567 and 0.411349. So both sharpe values are wrong too (ACME about 7.3652, not 7.118247). The samples feed M1-T10/M1-T13 and the exit check that a real provider and its double agree on the same sample → recompute ann_return, ann_vol and sharpe from the risk.Returns sample in risk.TickerSummary/sample.json and risk.Report/sample.json now, while the folders can still change without an architecture-design Revise
+27	- M1-R02 Important · interface · tests/contracts/risk.VolSeries/sample.json:14::values The ACME window-2 annualized vols do not match RISK-02/RISK-03 on the risk.Returns sample: |r_i - r_j|*sqrt(126) gives 0.332876, 0.439151 and 0.546527, but the sample has 0.332878, 0.439145 and 0.546519 (BOLT agrees to 1e-6). The vol_series fake&#x27;s docstring says it serves exactly the window-2 volatility of prices.csv, so the exit check that the real provider and its double agree will fail at 6 decimal places → recompute the ACME row (and last_vol 0.546519 in the TickerSummary and Report samples) from the exact log returns
+28	- M1-R03 Suggestion · interface · tests/contracts/risk.Drawdown/sample.json:4::drawdowns The Drawdown sample covers ACME and CALM, but the TickerSummary sample covers only ACME. M1-T10&#x27;s tester, told to run write_report on the samples, gets the ValueError for mismatched tickers unless they pick the ACME drawdown by hand → say in M1-T10&#x27;s acceptance to pair the ACME TickerSummary with the ACME Drawdown, or leave it, since a tester can filter
+29	- M1-R04 Suggestion · interface · tests/contracts/mdata.RawRow/sample.json:6::rows M1-T04 (align_calendar spine) is mitigated by the RawRow sample, but that sample has a None close (ACME 2024-03-05). align_calendar&#x27;s input is validated rows, so the None close would reach Prices, which requires positive closes → M1-T04&#x27;s tester should drop the None row before calling align_calendar; no change to the frozen sample needed
+30	
+31	## Phase 1: Step spines
+32	
+33	### M1-T02: read_csv spine (read every row)
+34	**Package:** mdata · **Step:** PL-01.read_csv · **Kind:** spine · **Covers:** DATA-01 · **Size:** XS · **Mode:** solo
+35	**Read:** PL-01, mdata.read_csv, mdata.RawRow, DATA-01
+36	**Acceptance:**
+37	- [ ] `read_csv` returns valid output on a synthetic input (its spine version: read every row); signature unchanged
+38	**Verify:** `pytest tests/unit/mdata/test_io.py` · `scripts/check.sh gate`
+39	**Depends on:** M1-T01 · **Writes:** packages/mdata/src/mdata/io.py, tests/unit/mdata/test_io.py
+40	
+41	### M1-T03: validate_rows spine (keep rows with a close, sorted)
+42	**Package:** mdata · **Step:** PL-01.validate_rows · **Kind:** spine · **Size:** XS · **Mode:** solo
+43	**Read:** PL-01, mdata.validate_rows, mdata.RawRow
+44	**Acceptance:**
+45	- [ ] `validate_rows` turns the mdata.RawRow sample into a valid output (its spine version: keep rows with a close, sorted); signature unchanged
+46	**Verify:** `pytest tests/unit/mdata/test_validate.py` · `scripts/check.sh gate`
+47	**Depends on:** M1-T01 · **Writes:** packages/mdata/src/mdata/validate.py, tests/unit/mdata/test_validate.py
+48	
+49	### M1-T04: align_calendar spine (dates every ticker has, no fill)
+50	**Package:** mdata · **Step:** PL-01.align_calendar · **Kind:** spine · **Size:** XS · **Mode:** solo
+51	**Read:** PL-01, mdata.align_calendar, mdata.RawRow, mdata.Prices
+52	**Acceptance:**
+53	- [ ] `align_calendar` turns the mdata.RawRow sample into a valid output (its spine version: dates every ticker has, no fill); signature unchanged
+54	**Verify:** `pytest tests/unit/mdata/test_calendar.py` · `scripts/check.sh gate`
+55	**Depends on:** M1-T01 · **Writes:** packages/mdata/src/mdata/calendar.py, tests/unit/mdata/test_calendar.py
+56	
+57	### M1-T05: log_returns spine (simple returns)
+58	**Package:** risk · **Step:** PL-02.log_returns · **Kind:** spine · **Size:** XS · **Mode:** solo
+59	**Read:** PL-02, risk.log_returns, mdata.Prices, risk.Returns
+60	**Acceptance:**
+61	- [ ] `log_returns` turns the mdata.Prices sample into a valid output (its spine version: simple returns); signature unchanged
+62	**Verify:** `pytest tests/unit/risk/test_returns.py` · `scripts/check.sh gate`
+63	**Depends on:** M1-T01 · **Writes:** packages/risk/src/risk/returns.py, tests/unit/risk/test_returns.py
+64	
+65	### M1-T06: rolling_vol spine (expanding stdev of earlier returns)
+66	**Package:** risk · **Step:** PL-02.rolling_vol · **Kind:** spine · **Size:** XS · **Mode:** solo
+67	**Read:** PL-02, risk.rolling_vol, risk.Returns, risk.VolSeries
+68	**Acceptance:**
+69	- [ ] `rolling_vol` turns the risk.Returns sample into a valid output (its spine version: expanding stdev of earlier returns); signature unchanged
+70	**Verify:** `pytest tests/unit/risk/test_vol.py` · `scripts/check.sh gate`
+71	**Depends on:** M1-T01 · **Writes:** packages/risk/src/risk/vol.py, tests/unit/risk/test_vol.py
+72	
+73	### M1-T07: annualize spine (daily values pass through)
+74	**Package:** risk · **Step:** PL-02.annualize · **Kind:** spine · **Size:** XS · **Mode:** solo
+75	**Read:** PL-02, risk.annualize, risk.VolSeries
+76	**Acceptance:**
+77	- [ ] `annualize` turns the risk.VolSeries sample into a valid output (its spine version: daily values pass through); signature unchanged
+78	**Verify:** `pytest tests/unit/risk/test_annualize.py` · `scripts/check.sh gate`
+79	**Depends on:** M1-T01 · **Writes:** packages/risk/src/risk/annualize.py, tests/unit/risk/test_annualize.py
+80	
+81	### M1-T08: summary_stats spine (daily mean, stdev)
+82	**Package:** risk · **Step:** PL-03.summary_stats · **Kind:** spine · **Size:** XS · **Mode:** solo
+83	**Read:** PL-03, risk.summary_stats, risk.VolSeries, risk.TickerSummary
+84	**Acceptance:**
+85	- [ ] `summary_stats` turns the risk.VolSeries sample into a valid output (its spine version: daily mean, stdev); signature unchanged
+86	**Verify:** `pytest tests/unit/risk/test_summary.py` · `scripts/check.sh gate`
+87	**Depends on:** M1-T01 · **Writes:** packages/risk/src/risk/summary.py, tests/unit/risk/test_summary.py
+88	
+89	### M1-T09: max_drawdown spine (depth only)
+90	**Package:** risk · **Step:** PL-03.max_drawdown · **Kind:** spine · **Size:** XS · **Mode:** solo
+91	**Read:** PL-03, risk.max_drawdown, risk.Returns, risk.Drawdown
+92	**Acceptance:**
+93	- [ ] `max_drawdown` turns the risk.Returns sample into a valid output (its spine version: depth only); signature unchanged
+94	**Verify:** `pytest tests/unit/risk/test_drawdown.py` · `scripts/check.sh gate`
+95	**Depends on:** M1-T01 · **Writes:** packages/risk/src/risk/drawdown.py, tests/unit/risk/test_drawdown.py
+96	
+97	### M1-T10: write_report spine (JSON rows)
+98	**Package:** risk · **Step:** PL-03.write_report · **Kind:** spine · **Covers:** REP-01 · **Size:** XS · **Mode:** solo
+99	**Read:** PL-03, risk.write_report, risk.TickerSummary, risk.Drawdown, risk.Report, REP-01
+100	**Acceptance:**
+101	- [ ] `write_report` turns the risk.TickerSummary sample into a valid output (its spine version: JSON rows); signature unchanged
+102	**Verify:** `pytest tests/unit/risk/test_report.py` · `scripts/check.sh gate`
+103	**Depends on:** M1-T01 · **Writes:** packages/risk/src/risk/report.py, tests/unit/risk/test_report.py
+104	
+105	### Checkpoint after M1-T10
+106	- [ ] Every pipeline in the milestone runs end to end (smoke commands)
+107	- [ ] Every stub names an open task (`scripts/check.sh gate`)
+108	- [ ] Entry functions still read top to bottom as the step table says (Sync if not)
+109	- [ ] contract.md matches the contract code (`dt status` freshness check)
+110	- [ ] `scripts/check.sh full` passes; Review checklist done; every finding has a disposition
+111	**Findings:**
+112	- M1-R05 Suggestion · CR-10 · packages/risk/src/risk/vol_pipeline.py::PL-02 `dt layout risk` reports drift for PL-02 and PL-03 (calls [NotImplementedError] vs their step tables), so the checkpoint item &quot;every pipeline in the milestone runs end to end&quot; can&#x27;t hold after M1-T10. Wiring is M1-T12/M1-T13 in Phase 2, so this is expected → no fix in this phase; check the item at the M1-T20 checkpoint, or reword the M1-T10 checkpoint template to skip pipelines that aren&#x27;t wired yet
+113	- M1-R06 Nit · CR-11 · packages/risk/src/risk/summary.py:36::_summarize `last_vol=vols[-1] if vols else None` guards an empty vol series that can&#x27;t happen once summary_stats has raised for fewer than two returns, because VolSeries values align to returns.dates → write `last_vol=vols[-1]`
+114	- M1-R07 Nit · tests · tests/unit/risk/test_returns.py:13::SAMPLE test_returns.py and test_vol.py build their own `Path(__file__).parents[2] / &quot;contracts&quot; / ...` paths to the samples, while the other four test files in this phase use the `contract_sample` fixture → load the samples with `contract_sample(&quot;mdata.Prices&quot;)` and `contract_sample(&quot;risk.Returns&quot;)`
+115	- M1-R08 Important · mutation · packages/mdata/src/mdata/calendar.py:23::align_calendar mutant `dates = tuple(d for d in closes_by_ticker[tickers[0]] if d in common) if tickers else ()` (first ticker&#x27;s file order instead of sorted) passes all of tests/unit/mdata/test_calendar.py, so the Prices invariant &quot;dates ascending&quot; is untested when the first ticker&#x27;s rows are out of order → in test_unsorted_rows_give_ascending_dates_and_sorted_tickers put ABC&#x27;s 2024-01-03 row before its 2024-01-02 row
+116	- M1-R09 Important · scope · packages/mdata/src/mdata/validate.py:16::validate_rows the M1-T03 spine (&quot;keep rows with a close, sorted&quot;) already implements all of DATA-02 and TC-01 (positive closes only, later duplicate wins, ticker filter, KeyError), which is M1-T14&#x27;s thicken work, so M1-T14 has nothing left to change and its TC-01 intent test cannot fail first → keep the code but record M1-T14 as satisfied once its TC-01 intent test passes against this code; future spine tasks stay to their stated baseline
+117	- M1-R10 Nit · tests · tests/unit/mdata/test_validate.py:13::SAMPLE the SAMPLE path and _sample_rows re-implement the conftest `contract_sample` fixture → use `contract_sample(&quot;mdata.RawRow&quot;)[&quot;rows&quot;]` as test_calendar.py does and drop SAMPLE, _sample_rows and the json/Path imports
+118	- M1-R11 Nit · tests · tests/unit/mdata/test_calendar.py:1::module test_calendar.py and test_validate.py carry no `pytestmark = pytest.mark.unit`, unlike test_io.py, so `-m unit` skips them → add the module-level unit marker to both
+119	
+120	## Phase 2: Wiring
+121	
+122	### M1-T11: Wire PL-01
+123	**Package:** mdata · **Step:** PL-01 · **Kind:** wiring · **Size:** S · **Mode:** solo
+124	**Read:** PL-01, mdata.read_csv, mdata.validate_rows, mdata.align_calendar
+125	**Acceptance:**
+126	- [ ] `pytest tests/unit/mdata/test_pl01_smoke.py` runs PL-01 end to end
+127	- [ ] The smoke test checks that the pipeline runs and its output&#x27;s shape (type, tickers, lengths), never a value a thicken changes: the golden cases check values
+128	- [ ] PL-01 entry sketch replaced by a `dt layout` pointer
+129	**Verify:** `pytest tests/unit/mdata/test_pl01_smoke.py` · `scripts/check.sh gate`
+130	**Depends on:** M1-T02, M1-T03, M1-T04 · **Writes:** packages/mdata/src/mdata/pipeline.py, tests/unit/mdata/test_pl01_smoke.py
+131	
+132	### M1-T12: Wire PL-02 on the mdata.load_prices fake
+133	**Package:** risk · **Step:** PL-02 · **Kind:** wiring · **Size:** S · **Mode:** solo
+134	**Read:** PL-02, risk.log_returns, risk.rolling_vol, risk.annualize, mdata.load_prices
+135	**Acceptance:**
+136	- [ ] `pytest tests/unit/risk/test_pl02_smoke.py` runs PL-02 end to end on the mdata.load_prices fake
+137	- [ ] The smoke test checks that the pipeline runs and its output&#x27;s shape (type, tickers, lengths), never a value a thicken changes: the golden cases check values
+138	- [ ] PL-02 entry sketch replaced by a `dt layout` pointer
+139	**Verify:** `pytest tests/unit/risk/test_pl02_smoke.py` · `scripts/check.sh gate`
+140	**Depends on:** M1-T05, M1-T06, M1-T07 · **Writes:** packages/risk/src/risk/vol_pipeline.py, tests/unit/risk/test_pl02_smoke.py
+141	
+142	### M1-T13: Wire PL-03 on the risk.vol_series fake
+143	**Package:** risk · **Step:** PL-03 · **Kind:** wiring · **Size:** S · **Mode:** solo
+144	**Read:** PL-03, risk.summary_stats, risk.max_drawdown, risk.write_report, risk.vol_series
+145	**Acceptance:**
+146	- [ ] `pytest tests/unit/risk/test_pl03_smoke.py` runs PL-03 end to end on the risk.vol_series fake
+147	- [ ] The smoke test checks that the pipeline runs and its output&#x27;s shape (type, tickers, lengths), never a value a thicken changes: the golden cases check values
+148	- [ ] PL-03 entry sketch replaced by a `dt layout` pointer
+149	**Verify:** `pytest tests/unit/risk/test_pl03_smoke.py` · `scripts/check.sh gate`
+150	**Depends on:** M1-T08, M1-T09, M1-T10 · **Writes:** packages/risk/src/risk/report_pipeline.py, tests/unit/risk/test_pl03_smoke.py
+151	
+152	## Phase 2: Thicken
+153	
+154	### M1-T14: Drop unusable rows, resolve duplicates
+155	**Package:** mdata · **Step:** PL-01.validate_rows · **Kind:** thicken · **Covers:** DATA-02 · **Size:** S · **Mode:** solo
+156	**Reason:** mode: arm A4, one builder writes the golden-case tests and the code
+157	**Read:** PL-01, mdata.validate_rows, mdata.RawRow, TC-01, DATA-02
+158	**Acceptance:**
+159	- [ ] TC-01 passes
+160	- [ ] A requested ticker with no usable row is a `KeyError` naming it
+161	**Verify:** `pytest tests/unit/mdata/test_validate_golden.py tests/unit/mdata/test_validate.py` · `scripts/check.sh gate`
+162	**Depends on:** M1-T03 · **Writes:** packages/mdata/src/mdata/validate.py, tests/unit/mdata/test_validate_golden.py, tests/unit/mdata/test_validate.py
+163	
+164	### M1-T15: Forward fill with a gap limit
+165	**Package:** mdata · **Step:** PL-01.align_calendar · **Kind:** thicken · **Covers:** DATA-03, DATA-04 · **Size:** S · **Mode:** solo
+166	**Reason:** mode: arm A4, one builder writes the golden-case tests and the code
+167	**Read:** PL-01, mdata.align_calendar, mdata.RawRow, mdata.Prices, TC-02, TC-03, DATA-03, DATA-04
+168	**Acceptance:**
+169	- [ ] TC-02 and TC-03 pass
+170	**Verify:** `pytest tests/unit/mdata/test_calendar_golden.py tests/unit/mdata/test_calendar.py` · `scripts/check.sh gate`
+171	**Depends on:** M1-T04 · **Writes:** packages/mdata/src/mdata/calendar.py, tests/unit/mdata/test_calendar_golden.py, tests/unit/mdata/test_calendar.py
+172	
+173	### M1-T16: Log returns
+174	**Package:** risk · **Step:** PL-02.log_returns · **Kind:** thicken · **Covers:** RISK-01 · **Size:** S · **Mode:** solo
+175	**Reason:** mode: arm A4, one builder writes the golden-case tests and the code
+176	**Read:** PL-02, risk.log_returns, mdata.Prices, risk.Returns, TC-04, RISK-01
+177	**Acceptance:**
+178	- [ ] TC-04 passes within 1e-12
+179	**Verify:** `pytest tests/unit/risk/test_returns_golden.py tests/unit/risk/test_returns.py` · `scripts/check.sh gate`
+180	**Depends on:** M1-T05 · **Writes:** packages/risk/src/risk/returns.py, tests/unit/risk/test_returns_golden.py, tests/unit/risk/test_returns.py
+181	
+182	### M1-T17: Rolling volatility from earlier returns
+183	**Package:** risk · **Step:** PL-02.rolling_vol · **Kind:** thicken · **Covers:** RISK-02 · **Size:** S · **Mode:** solo
+184	**Reason:** mode: arm A4, one builder writes the golden-case tests and the code
+185	**Read:** PL-02, risk.rolling_vol, risk.Returns, risk.VolSeries, TC-05, RISK-02, RF-01
+186	**Acceptance:**
+187	- [ ] TC-05 passes within 1e-12
+188	- [ ] A window below 2 is a `ValueError`
+189	**Verify:** `pytest tests/unit/risk/test_vol_golden.py tests/unit/risk/test_vol.py` · `scripts/check.sh gate`
+190	**Depends on:** M1-T06 · **Writes:** packages/risk/src/risk/vol.py, tests/unit/risk/test_vol_golden.py, tests/unit/risk/test_vol.py
+191	
+192	### M1-T18: Annualize over trading days
+193	**Package:** risk · **Step:** PL-02.annualize · **Kind:** thicken · **Covers:** RISK-03 · **Size:** S · **Mode:** solo
+194	**Reason:** mode: arm A4, one builder writes the golden-case tests and the code
+195	**Read:** PL-02, risk.annualize, risk.VolSeries, TC-06, RISK-03, RF-01
+196	**Acceptance:**
+197	- [ ] TC-06 passes within 1e-12
+198	- [ ] Annualizing an annualized series is a `ValueError`
+199	**Verify:** `pytest tests/unit/risk/test_annualize_golden.py tests/unit/risk/test_annualize.py` · `scripts/check.sh gate`
+200	**Depends on:** M1-T07 · **Writes:** packages/risk/src/risk/annualize.py, tests/unit/risk/test_annualize_golden.py, tests/unit/risk/test_annualize.py
+201	
+202	### M1-T19: Annualized summary with Sharpe
+203	**Package:** risk · **Step:** PL-03.summary_stats · **Kind:** thicken · **Covers:** RISK-04 · **Size:** S · **Mode:** solo
+204	**Reason:** mode: arm A4, one builder writes the golden-case tests and the code
+205	**Read:** PL-03, risk.summary_stats, risk.VolSeries, risk.TickerSummary, TC-07, RISK-04, RF-01
+206	**Acceptance:**
+207	- [ ] TC-07 passes within 1e-9
+208	**Verify:** `pytest tests/unit/risk/test_summary_golden.py tests/unit/risk/test_summary.py` · `scripts/check.sh gate`
+209	**Depends on:** M1-T08 · **Writes:** packages/risk/src/risk/summary.py, tests/unit/risk/test_summary_golden.py, tests/unit/risk/test_summary.py
+210	
+211	### M1-T20: Drawdown with its dates
+212	**Package:** risk · **Step:** PL-03.max_drawdown · **Kind:** thicken · **Covers:** RISK-05 · **Size:** S · **Mode:** solo
+213	**Reason:** mode: arm A4, one builder writes the golden-case tests and the code
+214	**Read:** PL-03, risk.max_drawdown, risk.Returns, risk.Drawdown, TC-08, RISK-05, RF-01
+215	**Acceptance:**
+216	- [ ] TC-08 passes: depth within 1e-12, both dates exact
+217	**Verify:** `pytest tests/unit/risk/test_drawdown_golden.py tests/unit/risk/test_drawdown.py` · `scripts/check.sh gate`
+218	**Depends on:** M1-T09 · **Writes:** packages/risk/src/risk/drawdown.py, tests/unit/risk/test_drawdown_golden.py, tests/unit/risk/test_drawdown.py
+219	
+220	### Checkpoint after M1-T20
+221	- [ ] Every pipeline in the milestone runs end to end (smoke commands)
+222	- [ ] Every stub names an open task (`scripts/check.sh gate`)
+223	- [ ] Entry functions still read top to bottom as the step table says (Sync if not)
+224	- [ ] contract.md matches the contract code (`dt status` freshness check)
+225	- [ ] `scripts/check.sh full` passes; Review checklist done; every finding has a disposition
+226	**Findings:**
+227	- M1-R12 Important · mutation · packages/mdata/src/mdata/calendar.py:45::_fill deleting the `missing = 0` reset (so missing dates add up across separate gaps instead of counting &quot;in a row&quot; per DATA-04) passes every test in test_calendar.py and test_calendar_golden.py; no case has two short gaps adding up to more than max_gap → add a unit test in tests/unit/mdata/test_calendar.py where one ticker misses 2 dates, trades, then misses 2 more with max_gap=3 and must fill, not raise
+228	- M1-R13 Important · mutation · packages/mdata/src/mdata/pipeline.py:22::load_prices changing `align_calendar(rows)` to `align_calendar(rows, max_gap=6)` passes every test in tests/unit/mdata and tests/contracts, so the contract&#x27;s &quot;GapError for a gap over 5 dates&quot; from load_prices is untested (the smoke test checks shape only, by design) → M1-T21&#x27;s system test should run TC-03 through load_prices on a CSV and expect GapError naming B
+229	- M1-R14 Nit · consistency · tests/unit/mdata/test_validate_golden.py:15::TC01 builds the fixture path and parses JSON by hand while test_calendar_golden.py uses the shared `golden` fixture; its two KeyError tests also repeat test_validate.py::test_requested_ticker_without_usable_row_raises → load TC-01 with `golden(&quot;mdata&quot;, &quot;TC-01&quot;)` and keep the KeyError cases in one file
+230	- M1-R15 Suggestion · tests · tests/unit/risk/test_returns_golden.py:1::module The golden-case (intent) files for TC-04 to TC-08 have no `intent` marker. Unit markers are uneven too: test_pl03_smoke.py sets `pytestmark = pytest.mark.unit` but test_pl02_smoke.py and the other risk unit files don&#x27;t, so `-m intent` or `-m unit` picks a misleading subset → add `pytestmark = pytest.mark.intent` to the five *_golden.py files and `pytestmark = pytest.mark.unit` to the risk unit and smoke files, as the mdata files already do
+231	- M1-R16 Nit · tests · tests/unit/risk/test_vol_golden.py:13::FIXTURE The TC-05 test opens tests/fixtures/risk/TC-05 through its own `Path(__file__).parents[2]` and json.loads. The other four golden tests use the shared `golden` fixture → use `given, expected = golden(&quot;risk&quot;, &quot;TC-05&quot;)` and drop FIXTURE and the json/Path imports
+232	
+233	## Phase 3: System
+234	
+235	### M1-T21: Risk report on the real pipelines
+236	**Package:** mdata · **Step:** PL-03 · **Kind:** system · **Size:** S · **Mode:** solo
+237	**Read:** PL-01, PL-02, PL-03, TC-01, TC-02, TC-03, TC-04, TC-05, TC-06, TC-07, TC-08, mdata.load_prices, risk.vol_series, risk.risk_report
+238	**Acceptance:**
+239	- [ ] `risk.risk_report` runs PL-03 → PL-02 → PL-01 on a CSV with no fakes; the fakes are used only by smoke and contract tests
+240	- [ ] All smoke tests and TC-01–TC-08 pass
+241	**Verify:** `pytest tests/unit/mdata/test_pl01_smoke.py` · `pytest tests/unit/risk/test_pl02_smoke.py` · `pytest tests/unit/risk/test_pl03_smoke.py` · `pytest tests` · `scripts/check.sh full --exit`
+242	**Depends on:** M1-T11, M1-T12, M1-T13, M1-T14, M1-T15, M1-T16, M1-T17, M1-T18, M1-T19, M1-T20 · **Writes:** packages/risk/src/risk/report_pipeline.py, tests/system/test_e2e.py, tests/unit/risk/test_risk_report.py
+243	
+244	### Checkpoint: milestone exit
+245	- [ ] Every pipeline in the milestone runs end to end (smoke commands)
+246	- [ ] All golden cases pass; no `NotImplementedError` stub is left (`scripts/check.sh full --exit`)
+247	- [ ] `scripts/check.sh full` passes; Review checklist done; every finding has a disposition
+248	**Findings:**
+249	- M1-R17 Important · mutation · packages/mdata/src/mdata/calendar.py:45::_fill mutant: delete `missing = 0`, so the counter adds up every missing date instead of only consecutive ones. All 123 tests under `pytest tests -m &quot;&quot;` still pass. DATA-04&#x27;s &quot;more than 5 calendar dates in a row&quot; is untested whenever a ticker has two separate gaps that add up to more than max_gap. TC-02 and TC-03 each have a single gap, so no golden output changes → add a test to tests/unit/mdata/test_calendar.py: ZED has two gaps of 2 split by a traded date, max_gap=2, and fills without a GapError
+250	- M1-R18 Important · exit · tests/system/test_e2e.py:18::SAMPLE_TOLERANCE The real-vs-double check for risk.vol_series uses abs=1e-5 and says the sample is &quot;rounded to six places&quot;. Six-place rounding allows at most 5e-7, but the real ACME vols differ from tests/contracts/risk.VolSeries/sample.json by -2.3e-6, 6.0e-6 and 7.7e-6. That is M1-R02&#x27;s sample error, and the wide tolerance hides it instead of showing that the two agree → recompute the ACME VolSeries values through an architecture-design Revise (tests/contracts is frozen), then set the tolerance to 5e-7
+251	- M1-R19 Important · exit · tests/contracts/risk.Report/sample.json:4::rows M1-R01 is still open at exit. The real risk_report on tests/contracts/mdata.load_prices/prices.csv with window=2 gives ACME ann_vol 0.398734 and sharpe 7.365195, and BOLT ann_return -2.851146, ann_vol 0.380052 and sharpe -7.501995. The Report and TickerSummary samples hold 0.412567, 7.118247, -2.869562, 0.411349 and -6.97598, and last_vol is also off by up to 7.7e-6. The frozen samples carry wrong answers that consumers will copy → recompute ann_return, ann_vol, sharpe and last_vol in risk.TickerSummary/sample.json and risk.Report/sample.json through an architecture-design Revise, and add an exit test that compares real risk_report rows with the Report sample at 5e-7
+252	- M1-R20 Important · exit · tests/system/test_e2e.py:39::test_real_vol_series_agrees_with_its_double No test runs the real mdata.load_prices and its double on the same sample. Only risk.vol_series is compared with its double. The real load_prices(prices.csv) does equal the mdata.Prices sample today, but nothing protects that → add `test_real_load_prices_agrees_with_its_double` to tests/system/test_e2e.py: assert load_prices(PRICES_CSV) == contract_fake(&quot;mdata.load_prices&quot;).load_prices(PRICES_CSV), and do the same for tickers=[&quot;BOLT&quot;]
+253	- M1-R21 Suggestion · exit · scripts/check.sh::full `check.sh full --exit --pkg mdata` runs pytest only on tests/unit/mdata, tests/unit/risk and tests/contracts. The exit gate never runs tests/system/test_e2e.py, which the exit item &quot;system tests use real providers&quot; relies on. The reviewer ran `pytest tests -m &quot;&quot;` by hand and all 123 tests passed → have build-setup add tests/system to the `--exit` pytest run (scripts/ is protected, so it can&#x27;t change here)
+254	- M1-R22 Suggestion · correctness · packages/mdata/src/mdata/validate.py:17::validate_rows `row.close &gt; 0` keeps a close read as &quot;inf&quot;, because read_csv accepts any text that float() parses. An infinite close then reaches Prices and gives inf or nan log returns. (&quot;nan&quot; is already dropped, since nan &gt; 0 is False) → use `row.close is not None and math.isfinite(row.close) and row.close &gt; 0`, and add a test with an &quot;inf&quot; close
+255	- M1-R23 Nit · tests · tests/unit/mdata/test_calendar_golden.py:1::module M1-R11 is still open, and the new golden file repeats it: test_calendar_golden.py, test_calendar.py and test_validate.py have no `pytestmark = pytest.mark.unit`, so `-m unit` skips them, including TC-02 and TC-03. test_validate.py also still builds its own SAMPLE path (M1-R10) → add the module marker to all three, and use the `contract_sample(&quot;mdata.RawRow&quot;)` fixture in test_validate.py
+256	- M1-R24 Critical · RISK-05 · packages/risk/src/risk/drawdown.py:26::_drawdown The &quot;first if tied&quot; rule is checked on cumulative log levels from accumulate(), so floating-point rounding breaks real price ties. Closes 100, 101, 94.93, 101, 47.465 run through log_returns then max_drawdown give peak_date 2024-01-04 (the second 101) where RISK-05 wants 2024-01-02. A probe found 34 of 600 such return-to-the-same-close series get the later peak. The tie tests pass only because they use exact binary sums (0.1, -0.1, 0.1), and TC-08 has no tie → treat levels within an absolute 1e-12 in log space as equal (`if level &gt; peak + 1e-12:` and `elif level - peak &lt; worst - 1e-12:`), and add a unit test that builds these closes with log_returns and expects peak 2024-01-02
+257	- M1-R25 Nit · tests · tests/unit/risk/test_vol_golden.py:13::FIXTURE The TC-05 test builds its own `Path(__file__).parents[2] / &quot;fixtures&quot; / &quot;risk&quot; / &quot;TC-05&quot;` path and reads the JSON itself, while the other four golden tests use the conftest `golden` fixture (the same drift as M1-R07) → `given, expected = golden(&quot;risk&quot;, &quot;TC-05&quot;)`
+258	
+259	## Dependency graph
+260	| From | To | Kind | Mitigated by |
+261	|---|---|---|---|
+262	| M1-T03 validate_rows spine | M1-T02 read_csv spine | data | mdata.RawRow sample (M1-T01) |
+263	| M1-T04 align_calendar spine | M1-T03 validate_rows spine | data | mdata.RawRow sample (M1-T01) |
+264	| M1-T05 log_returns spine | M1-T04 align_calendar spine | data | mdata.Prices sample (M1-T01) |
+265	| M1-T06 rolling_vol spine | M1-T05 log_returns spine | data | risk.Returns sample (M1-T01) |
+266	| M1-T07 annualize spine | M1-T06 rolling_vol spine | data | risk.VolSeries sample (M1-T01) |
+267	| M1-T08 summary_stats spine | M1-T07 annualize spine | data | risk.VolSeries sample (M1-T01) |
+268	| M1-T09 max_drawdown spine | M1-T05 log_returns spine | data | risk.Returns sample (M1-T01) |
+269	| M1-T10 write_report spine | M1-T08 summary_stats spine | data | risk.TickerSummary sample (M1-T01) |
+270	| M1-T10 write_report spine | M1-T09 max_drawdown spine | data | risk.Drawdown sample (M1-T01) |
+271	| M1-T11 wire PL-01 | M1-T02 read_csv spine | code | none: the smoke test runs the real read_csv |
+272	| M1-T11 wire PL-01 | M1-T03 validate_rows spine | code | none: the smoke test runs the real validate_rows |
+273	| M1-T11 wire PL-01 | M1-T04 align_calendar spine | code | none: the smoke test runs the real align_calendar |
+274	| M1-T12 wire PL-02 | M1-T11 wire PL-01 | call | mdata.load_prices fake (M1-T01) |
+275	| M1-T12 wire PL-02 | M1-T05 log_returns spine | code | none: the smoke test runs the real log_returns |
+276	| M1-T12 wire PL-02 | M1-T06 rolling_vol spine | code | none: the smoke test runs the real rolling_vol |
+277	| M1-T12 wire PL-02 | M1-T07 annualize spine | code | none: the smoke test runs the real annualize |
+278	| M1-T13 wire PL-03 | M1-T12 wire PL-02 | call | risk.vol_series fake (M1-T01) |
+279	| M1-T13 wire PL-03 | M1-T08 summary_stats spine | code | none: the smoke test runs the real summary_stats |
+280	| M1-T13 wire PL-03 | M1-T09 max_drawdown spine | code | none: the smoke test runs the real max_drawdown |
+281	| M1-T13 wire PL-03 | M1-T10 write_report spine | code | none: the smoke test runs the real write_report |
+282	| M1-T14 drop unusable rows, resolve duplicates | M1-T03 validate_rows spine | code | none: thickens the same module |
+283	| M1-T15 forward fill with a gap limit | M1-T04 align_calendar spine | code | none: thickens the same module |
+284	| M1-T16 log returns | M1-T05 log_returns spine | code | none: thickens the same module |
+285	| M1-T17 rolling volatility from earlier returns | M1-T06 rolling_vol spine | code | none: thickens the same module |
+286	| M1-T18 annualize over trading days | M1-T07 annualize spine | code | none: thickens the same module |
+287	| M1-T19 annualized summary with sharpe | M1-T08 summary_stats spine | code | none: thickens the same module |
+288	| M1-T20 drawdown with its dates | M1-T09 max_drawdown spine | code | none: thickens the same module |
+289	| M1-T21 system | M1-T11 wire PL-01 | code | none: runs the real pipeline end to end, no fakes |
+290	| M1-T21 system | M1-T12 wire PL-02 | code | none: runs the real pipeline end to end, no fakes |
+291	| M1-T21 system | M1-T13 wire PL-03 | code | none: runs the real pipeline end to end, no fakes |
+292	| M1-T21 system | M1-T14 drop unusable rows, resolve duplicates | order | none: the golden cases run on the finished steps |
+293	| M1-T21 system | M1-T15 forward fill with a gap limit | order | none: the golden cases run on the finished steps |
+294	| M1-T21 system | M1-T16 log returns | order | none: the golden cases run on the finished steps |
+295	| M1-T21 system | M1-T17 rolling volatility from earlier returns | order | none: the golden cases run on the finished steps |
+296	| M1-T21 system | M1-T18 annualize over trading days | order | none: the golden cases run on the finished steps |
+297	| M1-T21 system | M1-T19 annualized summary with sharpe | order | none: the golden cases run on the finished steps |
+298	| M1-T21 system | M1-T20 drawdown with its dates | order | none: the golden cases run on the finished steps |
+299	
+300	## Risks
+301	| Risk | Impact | Mitigation |
+302	|---|---|---|
+303	| A frozen type misses a field a later step needs | a contract change mid-milestone | testers start on the interface and escalate as `contract-change` |
+304	
+305	## Open questions
+306	
+307	## Replan notes
+308	</pre></details></div><div class="step" id="SD160"><span class="sid">D160</span><span class="kind">Bash</span>cd /Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A4-r2/with_skill/project &amp;&amp; tail -5 tasks/todo.md &amp;&amp; grep -n &quot;intent\|protected\|tests/system\|tests/contracts&quot; CONSTRAINTS.md | head -30<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;cd /Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A4-r2/with_skill/project &amp;&amp; tail -5 tasks/todo.md &amp;&amp; grep -n \&quot;intent\\|protected\\|tests/system\\|tests/contracts\&quot; CONSTRAINTS.md | head -30&quot;
+}</pre><div class="lbl">output</div><pre>- [x] M1-T17 Rolling volatility from earlier returns (risk, S, solo)
+- [x] M1-T18 Annualize over trading days (risk, S, solo)
+- [x] M1-T19 Annualized summary with Sharpe (risk, S, solo)
+- [x] M1-T20 Drawdown with its dates (risk, S, solo)
+- [x] M1-T21 Risk report on the real pipelines (mdata, S, solo)
+7:- **CR-01** No new suppressions. Ruff runs with `--ignore-noqa` in gate and full, so a Ruff exception is a `per-file-ignores` entry in protected config with a row in Exceptions. `# type: ignore`, `pyright:` comments and `pragma: no cover` are caught by `floor_guard.sh` on the diff
+12:- **CR-06** The implementer never changes `tests/intent/**`
+15:- **CR-09** A frozen interface (`tests/contracts/&lt;id&gt;.&lt;symbol&gt;/`: schema, samples, fake; and the types, signatures and exports the interface task wrote) is frozen once it exists at the task&#x27;s base. Only the interface task freezing it (`**Kind:** interface`) writes a new folder, and no other task&#x27;s `Writes:` names its `types.py` or `__init__.py`; a frozen interface changes only through `architecture-design` Revise, never to make a test pass
+45:## Roles and protected paths
+48:| tester | `tests/intent/**`, within the task&#x27;s `Writes:` | everything else; reads no source | `check.sh collect` (lint, collect, red for the right reason) |
+49:| implementer / solo | `src/**`, `tests/unit/**`, within the task&#x27;s `Writes:`; an interface task also the `tests/contracts/&lt;id&gt;.&lt;symbol&gt;/` its `Writes:` names | the protected list; `tasks/` | `check.sh gate` + protected-path diff against the worktree&#x27;s base |
+52:**Protected list** (`PROTECTED` in `scripts/check.sh`; `path_guard.sh deny --protected` reads the same list): `tests/intent/**`, `tests/fixtures/**`, `tests/conftest.py`, `pyproject.toml`, `uv.lock`, `CONSTRAINTS.md`, `scripts/**`, `.claude/agents/**`, `.claude/settings.json`, `references/**`, `probes/**`, `tests/contracts/**`, `packages/*/pyproject.toml`. `tests/contracts/**` covers the contract folders that exist at the task&#x27;s base (CR-09). **`Writes:`**: `dt claim`, in the builder&#x27;s worktree, writes the role&#x27;s share of the task&#x27;s `Writes:` to `.claude/.task_writes` and sets the worktree&#x27;s base (`refs/worktree/checks-base`); `path_guard.sh writes` blocks edits outside the list, and a tester&#x27;s or implementer&#x27;s edits before the claim. Only the orchestrator writes `tasks/` (`dt land`, `dt finding`).
+57:Run by the reviewer agent over what it is given (base, package, tasks, paths): the interface review after Phase 0, a phase review per package at each checkpoint, and the milestone exit. `dt land` already checked each landing&#x27;s `Writes:`, protected paths and gates; review judges what tools can&#x27;t.
+67:2. **Tests prove something:** each intent test asserts its TC case or acceptance bullet, loading expected values and tolerances from fixtures; none is assertion-free or weakened; Hypothesis runs the `ci` profile. Unit tests are specific, never computing the expected value with the code under test or testing only a mock. **Mutation check** (`.claude/agents/reviewer.md`): per acceptance bullet, the smallest change that should break it; a mutation no test catches is a finding.
+77:**Severity:** Critical: a frozen interface changed, a weakened test, an intent test that misses a mutation changing its TC&#x27;s expected output, a wrong answer, a loosened bar, a security hole, lost data; it stops the build. Important: a consumer bypassing a type, any other surviving mutation, an unneeded abstraction, a duplicate across tasks. Suggestion and Nit: local. Findings go under the checkpoint block in `tasks/plan.md` (`dt finding`), each with a fix task or a reason.</pre></details></div><div class="step" id="SD161"><span class="sid">D161</span><span class="kind">think</span>Since CR-09 requires an `architecture-design` Revise to change a frozen sample, and findings R01, R02, R18, and R19 need the risk samples re-frozen, I&#x27;ll draft a minimal Revise alongside the Replan.<details><summary>full text</summary><pre>Since CR-09 requires an `architecture-design` Revise to change a frozen sample, and findings R01, R02, R18, and R19 need the risk samples re-frozen, I&#x27;ll draft a minimal Revise alongside the Replan.
+
+</pre></details></div><div class="step" id="SD162"><span class="sid">D162</span><span class="kind">Edit</span>/Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A4-r2/with_skill/project/docs/packages/risk/contract.md | old: &#x27;Status: Approved · Last updated: 2026-10-18&#x27; | new: &#x27;Status: Draft · Last updated: 2026-10-18&#x27;<div class="lbl">edited /Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A4-r2/with_skill/project/docs/packages/risk/contract.md · old</div><pre>**Status:** Approved · **Last updated:** 2026-10-18</pre><div class="lbl">new</div><pre>**Status:** Draft · **Last updated:** 2026-10-18</pre><details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;replace_all&quot;: false,
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A4-r2/with_skill/project/docs/packages/risk/contract.md&quot;,
+  &quot;old_string&quot;: &quot;**Status:** Approved · **Last updated:** 2026-10-18&quot;,
+  &quot;new_string&quot;: &quot;**Status:** Draft · **Last updated:** 2026-10-18&quot;
+}</pre><div class="lbl">output</div><pre>The file /Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A4-r2/with_skill/project/docs/packages/risk/contract.md has been updated successfully.</pre></details></div><div class="step" id="SD163"><span class="sid">D163</span><span class="kind">Edit</span>/Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A4-r2/with_skill/project/docs/packages/risk/contract.md | old: &#x27;`@dataclass(frozen=True) class VolSeries: returns: Returns; window: int; annuali&#x27; | new: &#x27;`@dataclass(frozen=True) class VolSeries: returns: Returns; window: int; annuali&#x27;<div class="lbl">edited /Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A4-r2/with_skill/project/docs/packages/risk/contract.md · old</div><pre>`@dataclass(frozen=True) class VolSeries: returns: Returns; window: int; annualized: bool; values: Mapping[str, tuple[float | None, ...]]`
+- **Invariants:** aligned to `returns.dates`; None until `window` earlier returns exist</pre><div class="lbl">new</div><pre>`@dataclass(frozen=True) class VolSeries: returns: Returns; window: int; annualized: bool; values: Mapping[str, tuple[float | None, ...]]`
+- **Invariants:** aligned to `returns.dates`; None until `window` earlier returns exist; the sample&#x27;s values are RISK-02/RISK-03 on the risk.Returns sample, rounded to six places</pre><details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;replace_all&quot;: false,
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A4-r2/with_skill/project/docs/packages/risk/contract.md&quot;,
+  &quot;old_string&quot;: &quot;`@dataclass(frozen=True) class VolSeries: returns: Returns; window: int; annualized: bool; values: Mapping[str, tuple[float | None, ...]]`\n- **Invariants:** aligned to `returns.dates`; None until `window` earlier returns exist&quot;,
+  &quot;new_string&quot;: &quot;`@dataclass(frozen=True) class VolSeries: returns: Returns; window: int; annualized: bool; values: Mapping[str, tuple[float | None, ...]]`\n- **Invariants:** aligned to `returns.dates`; None until `window` earlier returns exist; the sample&#x27;s values are RISK-02/RISK-03 on the risk.Returns sample, rounded to six places&quot;
+}</pre><div class="lbl">output</div><pre>The file /Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A4-r2/with_skill/project/docs/packages/risk/contract.md has been updated successfully.</pre></details></div><div class="step" id="SD164"><span class="sid">D164</span><span class="kind">Edit</span>/Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A4-r2/with_skill/project/docs/packages/risk/contract.md | old: &#x27;`@dataclass(frozen=True) class TickerSummary: ticker: str; ann_return: float; an&#x27; | new: &#x27;`@dataclass(frozen=True) class TickerSummary: ticker: str; ann_return: float; an&#x27;<div class="lbl">edited /Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A4-r2/with_skill/project/docs/packages/risk/contract.md · old</div><pre>`@dataclass(frozen=True) class TickerSummary: ticker: str; ann_return: float; ann_vol: float; sharpe: float; last_vol: float | None`
+- **Used by:** PL-03</pre><div class="lbl">new</div><pre>`@dataclass(frozen=True) class TickerSummary: ticker: str; ann_return: float; ann_vol: float; sharpe: float; last_vol: float | None`
+- **Invariants:** the sample&#x27;s values are RISK-04 on the risk.Returns and risk.VolSeries samples, rounded to six places; the risk.Report sample&#x27;s rows carry the same values
+- **Used by:** PL-03</pre><details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;replace_all&quot;: false,
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A4-r2/with_skill/project/docs/packages/risk/contract.md&quot;,
+  &quot;old_string&quot;: &quot;`@dataclass(frozen=True) class TickerSummary: ticker: str; ann_return: float; ann_vol: float; sharpe: float; last_vol: float | None`\n- **Used by:** PL-03&quot;,
+  &quot;new_string&quot;: &quot;`@dataclass(frozen=True) class TickerSummary: ticker: str; ann_return: float; ann_vol: float; sharpe: float; last_vol: float | None`\n- **Invariants:** the sample&#x27;s values are RISK-04 on the risk.Returns and risk.VolSeries samples, rounded to six places; the risk.Report sample&#x27;s rows carry the same values\n- **Used by:** PL-03&quot;
+}</pre><div class="lbl">output</div><pre>The file /Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A4-r2/with_skill/project/docs/packages/risk/contract.md has been updated successfully.</pre></details></div><div class="step" id="SD165"><span class="sid">D165</span><span class="kind">Edit</span>/Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A4-r2/with_skill/project/docs/architecture.md | old: &#x27;| 2026-10-18 | risk.Drawdown carries trough_date (RISK-05) | — | risk.Drawdown (&#x27; | new: &#x27;| 2026-10-18 | risk.Drawdown carries trough_date (RISK-05) | — | risk.Drawdown (&#x27;<div class="lbl">edited /Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A4-r2/with_skill/project/docs/architecture.md · old</div><pre>| 2026-10-18 | risk.Drawdown carries trough_date (RISK-05) | — | risk.Drawdown (changed) |</pre><div class="lbl">new</div><pre>| 2026-10-18 | risk.Drawdown carries trough_date (RISK-05) | — | risk.Drawdown (changed) |
+| 2026-10-18 | risk samples hold the values RISK-02–RISK-04 give (M1-R01, M1-R02) | — | risk.VolSeries, risk.TickerSummary (changed) |</pre><div class="hook">hook PostToolUse:Edit said: {&quot;hookSpecificOutput&quot;: {&quot;hookEventName&quot;: &quot;PostToolUse&quot;, &quot;additionalContext&quot;: &quot;dt lint:\ndocs/architecture.md:3: approved-edit Approved doc changed since HEAD without going back to Draft (or the approval isn&#x27;t committed)\n0 errors, 1 warning&quot;}}
+</div><details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;replace_all&quot;: false,
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A4-r2/with_skill/project/docs/architecture.md&quot;,
+  &quot;old_string&quot;: &quot;| 2026-10-18 | risk.Drawdown carries trough_date (RISK-05) | — | risk.Drawdown (changed) |&quot;,
+  &quot;new_string&quot;: &quot;| 2026-10-18 | risk.Drawdown carries trough_date (RISK-05) | — | risk.Drawdown (changed) |\n| 2026-10-18 | risk samples hold the values RISK-02–RISK-04 give (M1-R01, M1-R02) | — | risk.VolSeries, risk.TickerSummary (changed) |&quot;
+}</pre><div class="lbl">output</div><pre>The file /Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A4-r2/with_skill/project/docs/architecture.md has been updated successfully.</pre></details></div><div class="step" id="SD166"><span class="sid">D166</span><span class="kind">Read</span>/Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A4-r2/with_skill/project/docs/architecture.md limit=4<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A4-r2/with_skill/project/docs/architecture.md&quot;,
+  &quot;limit&quot;: 4
+}</pre><div class="lbl">output</div><pre>1	# Minilab — Architecture
+2	
+3	**Status:** Approved · **Shape:** Multi-package · **Last updated:** 2026-10-17 · **Spec:** [spec.md](spec.md)
+4	</pre></details></div><div class="step" id="SD167"><span class="sid">D167</span><span class="kind">Edit</span>/Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A4-r2/with_skill/project/docs/architecture.md | old: &#x27;Status: Approved · Shape: Multi-package · Last updated: 2026-10-17&#x27; | new: &#x27;Status: Draft · Shape: Multi-package · Last updated: 2026-10-18&#x27;<div class="lbl">edited /Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A4-r2/with_skill/project/docs/architecture.md · old</div><pre>**Status:** Approved · **Shape:** Multi-package · **Last updated:** 2026-10-17</pre><div class="lbl">new</div><pre>**Status:** Draft · **Shape:** Multi-package · **Last updated:** 2026-10-18</pre><details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;replace_all&quot;: false,
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A4-r2/with_skill/project/docs/architecture.md&quot;,
+  &quot;old_string&quot;: &quot;**Status:** Approved · **Shape:** Multi-package · **Last updated:** 2026-10-17&quot;,
+  &quot;new_string&quot;: &quot;**Status:** Draft · **Shape:** Multi-package · **Last updated:** 2026-10-18&quot;
+}</pre><div class="lbl">output</div><pre>The file /Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A4-r2/with_skill/project/docs/architecture.md has been updated successfully.</pre></details></div><div class="step" id="SD168"><span class="sid">D168</span><span class="kind">say</span>Now the plan: three fix tasks, plus a fourth because the exit tests for each package have more than 3 acceptance bullets between them.<details><summary>full text</summary><pre>Now the plan: three fix tasks, plus a fourth because the exit tests for each package have more than 3 acceptance bullets between them.</pre></details></div><div class="step" id="SD169"><span class="sid">D169</span><span class="kind">Edit</span>/Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A4-r2/with_skill/project/tasks/plan.md | old: &#x27;Depends on: M1-T11, M1-T12, M1-T13, M1-T14, M1-T15, M1-T16, M1-T17, M1-T18, &#x27; | new: &#x27;Depends on: M1-T11, M1-T12, M1-T13, M1-T14, M1-T15, M1-T16, M1-T17, M1-T18, &#x27;<div class="lbl">edited /Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A4-r2/with_skill/project/tasks/plan.md · old</div><pre>**Depends on:** M1-T11, M1-T12, M1-T13, M1-T14, M1-T15, M1-T16, M1-T17, M1-T18, M1-T19, M1-T20 · **Writes:** packages/risk/src/risk/report_pipeline.py, tests/system/test_e2e.py, tests/unit/risk/test_risk_report.py
+</pre><div class="lbl">new</div><pre>**Depends on:** M1-T11, M1-T12, M1-T13, M1-T14, M1-T15, M1-T16, M1-T17, M1-T18, M1-T19, M1-T20 · **Writes:** packages/risk/src/risk/report_pipeline.py, tests/system/test_e2e.py, tests/unit/risk/test_risk_report.py
+
+### M1-T22: Re-freeze the risk VolSeries, TickerSummary and Report samples
+**Package:** risk · **Step:** contract · **Kind:** interface · **Size:** XS · **Mode:** solo
+**Read:** risk.Returns, risk.VolSeries, risk.TickerSummary, risk.Report, risk.vol_series, RISK-02, RISK-03, RISK-04
+**Acceptance:**
+- [ ] The ACME values in the risk.VolSeries sample are RISK-02/RISK-03 on the risk.Returns sample&#x27;s exact log returns, rounded to six places (M1-R02)
+- [ ] `ann_return`, `ann_vol`, `sharpe` and `last_vol` in the risk.TickerSummary and risk.Report samples are RISK-04 on those samples, rounded to six places (M1-R01)
+- [ ] The risk.vol_series fake serves the corrected sample; `pytest tests/contracts` passes
+**Verify:** `pytest tests/contracts` · `scripts/check.sh gate`
+**Depends on:** — · **Writes:** tests/contracts/risk.VolSeries/**, tests/contracts/risk.TickerSummary/**, tests/contracts/risk.Report/**
+
+### M1-T23: Calendar tests for unsorted rows and separate gaps
+**Package:** mdata · **Step:** PL-01.align_calendar · **Kind:** thicken · **Covers:** DATA-03, DATA-04 · **Size:** XS · **Mode:** solo
+**Reason:** mode: unit tests for surviving mutants, no TC case changes
+**Read:** PL-01, mdata.align_calendar, mdata.Prices, DATA-03, DATA-04
+**Acceptance:**
+- [ ] When the first ticker&#x27;s rows are out of date order, `dates` still come out ascending (M1-R08)
+- [ ] A ticker with two gaps of 2 dates, split by a traded date, fills with `max_gap=2` and raises no `GapError` (M1-R12, M1-R17)
+**Verify:** `pytest tests/unit/mdata/test_calendar.py` · `scripts/check.sh gate`
+**Depends on:** M1-T15 · **Writes:** packages/mdata/src/mdata/calendar.py, tests/unit/mdata/test_calendar.py
+
+### M1-T24: Real risk providers agree with the re-frozen samples
+**Package:** risk · **Step:** PL-03 · **Kind:** system · **Size:** XS · **Mode:** solo
+**Reason:** mode: compares real providers with frozen samples, no TC case
+**Read:** PL-02, PL-03, risk.vol_series, risk.risk_report, risk.VolSeries, risk.Report
+**Acceptance:**
+- [ ] The real `risk.vol_series` matches its sample within 5e-7 (M1-R18)
+- [ ] The real `risk_report` rows on the contract prices.csv with window 2 match the risk.Report sample within 5e-7 (M1-R19)
+**Verify:** `pytest tests/system/test_e2e.py` · `scripts/check.sh full --exit`
+**Depends on:** M1-T21, M1-T22 · **Writes:** packages/risk/src/risk/report_pipeline.py, tests/system/test_e2e.py, tests/unit/risk/test_risk_report.py
+
+### M1-T25: Real load_prices agrees with its double and enforces the gap limit
+**Package:** mdata · **Step:** PL-01 · **Kind:** system · **Size:** XS · **Mode:** solo
+**Reason:** mode: arm A4, one builder writes the golden-case tests and the code
+**Read:** PL-01, mdata.load_prices, mdata.Prices, mdata.GapError, TC-03
+**Acceptance:**
+- [ ] The real `mdata.load_prices` equals its fake on the contract prices.csv, with and without `tickers=[&quot;BOLT&quot;]` (M1-R20)
+- [ ] TC-03 run through `load_prices` on a CSV raises `GapError` naming B (M1-R13)
+**Verify:** `pytest tests/system/test_load_prices.py tests/unit/mdata/test_pipeline.py` · `scripts/check.sh full --exit`
+**Depends on:** M1-T11 · **Writes:** packages/mdata/src/mdata/pipeline.py, tests/system/test_load_prices.py, tests/unit/mdata/test_pipeline.py
+</pre><div class="hook">⛔ hook PostToolUse:Edit blocked: dt lint found problems in tasks/plan.md:
+tasks/plan.md:244: task-title M1-T22 title has &quot;and&quot; (split it)
+tasks/plan.md:244: todo-mismatch M1-T22 is in plan.md but not in todo.md
+tasks/plan.md:244: writes M1-T22 and M1-T01 both write tests/contracts/risk.VolSeries/**, tests/contracts/risk.TickerSummary/**, tests/contracts/risk.Report/** with no Depends on path between them: move the shared part to the interface or wiring task, or order them (and give the edge a graph row)
+tasks/plan.md:254: task-title M1-T23 title has &quot;and&quot; (split it)
+tasks/plan.md:254: todo-mismatch M1-T23 is in plan.md but not in todo.md
+tasks/plan.md:262: edges M1-T23 depends on M1-T15 with no graph row saying why (kind, `none: &lt;reason&gt;`)
+tasks/plan.md:264: todo-mismatch M1-T24 is in plan.md but not in todo.md
+tasks/plan.md:264: verify-smoke M1-T24 Verify lacks PL-03&#x27;s smoke command `pytest tests/unit/risk/test_pl03_smoke.py`
+tasks/plan.md:272: edges M1-T24 depends on M1-T21 with no graph row saying why (kind, `none: &lt;reason&gt;`)
+tasks/plan.md:274: task-title M1-T25 title has &quot;and&quot; (split it)
+tasks/plan.md:274: todo-mismatch M1-T25 is in plan.md but not in todo.md
+tasks/plan.md:274: verify-smoke M1-T25 Verify lacks PL-01&#x27;s smoke command `pytest tests/unit/mdata/test_pl01_smoke.py`
+tasks/plan.md:282: edges M1-T25 depends on M1-T11 with no graph row saying why (kind, `none: &lt;reason&gt;`)
+13 errors, 0 warnings</div><details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;replace_all&quot;: false,
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A4-r2/with_skill/project/tasks/plan.md&quot;,
+  &quot;old_string&quot;: &quot;**Depends on:** M1-T11, M1-T12, M1-T13, M1-T14, M1-T15, M1-T16, M1-T17, M1-T18, M1-T19, M1-T20 · **Writes:** packages/risk/src/risk/report_pipeline.py, tests/system/test_e2e.py, tests/unit/risk/test_risk_report.py\n&quot;,
+  &quot;new_string&quot;: &quot;**Depends on:** M1-T11, M1-T12, M1-T13, M1-T14, M1-T15, M1-T16, M1-T17, M1-T18, M1-T19, M1-T20 · **Writes:** packages/risk/src/risk/report_pipeline.py, tests/system/test_e2e.py, tests/unit/risk/test_risk_report.py\n\n### M1-T22: Re-freeze the risk VolSeries, TickerSummary and Report samples\n**Package:** risk · **Step:** contract · **Kind:** interface · **Size:** XS · **Mode:** solo\n**Read:** risk.Returns, risk.VolSeries, risk.TickerSummary, risk.Report, risk.vol_series, RISK-02, RISK-03, RISK-04\n**Acceptance:**\n- [ ] The ACME values in the risk.VolSeries sample are RISK-02/RISK-03 on the risk.Returns sample&#x27;s exact log returns, rounded to six places (M1-R02)\n- [ ] `ann_return`, `ann_vol`, `sharpe` and `last_vol` in the risk.TickerSummary and risk.Report samples are RISK-04 on those samples, rounded to six places (M1-R01)\n- [ ] The risk.vol_series fake serves the corrected sample; `pytest tests/contracts` passes\n**Verify:** `pytest tests/contracts` · `scripts/check.sh gate`\n**Depends on:** — · **Writes:** tests/contracts/risk.VolSeries/**, tests/contracts/risk.TickerSummary/**, tests/contracts/risk.Report/**\n\n### M1-T23: Calendar tests for unsorted rows and separate gaps\n**Package:** mdata · **Step:** PL-01.align_calendar · **Kind:** thicken · **Covers:** DATA-03, DATA-04 · **Size:** XS · **Mode:** solo\n**Reason:** mode: unit tests for surviving mutants, no TC case changes\n**Read:** PL-01, mdata.align_calendar, mdata.Prices, DATA-03, DATA-04\n**Acceptance:**\n- [ ] When the first ticker&#x27;s rows are out of date order, `dates` still come out ascending (M1-R08)\n- [ ] A ticker with two gaps of 2 dates, split by a traded date, fills with `max_gap=2` and raises no `GapError` (M1-R12, M1-R17)\n**Verify:** `pytest tests/unit/mdata/test_calendar.py` · `scripts/check.sh gate`\n**Depends on:** M1-T15 · **Writes:** packages/mdata/src/mdata/calendar.py, tests/unit/mdata/test_calendar.py\n\n### M1-T24: Real risk providers agree with the re-frozen samples\n**Package:** risk · **Step:** PL-03 · **Kind:** system · **Size:** XS · **Mode:** solo\n**Reason:** mode: compares real providers with frozen samples, no TC case\n**Read:** PL-02, PL-03, risk.vol_series, risk.risk_report, risk.VolSeries, risk.Report\n**Acceptance:**\n- [ ] The real `risk.vol_series` matches its sample within 5e-7 (M1-R18)\n- [ ] The real `risk_report` rows on the contract prices.csv with window 2 match the risk.Report sample within 5e-7 (M1-R19)\n**Verify:** `pytest tests/system/test_e2e.py` · `scripts/check.sh full --exit`\n**Depends on:** M1-T21, M1-T22 · **Writes:** packages/risk/src/risk/report_pipeline.py, tests/system/test_e2e.py, tests/unit/risk/test_risk_report.py\n\n### M1-T25: Real load_prices agrees with its double and enforces the gap limit\n**Package:** mdata · **Step:** PL-01 · **Kind:** system · **Size:** XS · **Mode:** solo\n**Reason:** mode: arm A4, one builder writes the golden-case tests and the code\n**Read:** PL-01, mdata.load_prices, mdata.Prices, mdata.GapError, TC-03\n**Acceptance:**\n- [ ] The real `mdata.load_prices` equals its fake on the contract prices.csv, with and without `tickers=[\&quot;BOLT\&quot;]` (M1-R20)\n- [ ] TC-03 run through `load_prices` on a CSV raises `GapError` naming B (M1-R13)\n**Verify:** `pytest tests/system/test_load_prices.py tests/unit/mdata/test_pipeline.py` · `scripts/check.sh full --exit`\n**Depends on:** M1-T11 · **Writes:** packages/mdata/src/mdata/pipeline.py, tests/system/test_load_prices.py, tests/unit/mdata/test_pipeline.py\n&quot;
+}</pre><div class="lbl">output</div><pre>The file /Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A4-r2/with_skill/project/tasks/plan.md has been updated successfully. (file state is current in your context — no need to Read it back)</pre></details></div><div class="step" id="SD170"><span class="sid">D170</span><span class="kind">Edit</span>/Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A4-r2/with_skill/project/tasks/plan.md | old: &#x27;| M1-T21 system | M1-T20 drawdown with its dates | order | none: the golden case&#x27; | new: &#x27;| M1-T21 system | M1-T20 drawdown with its dates | order | none: the golden case&#x27;<div class="lbl">edited /Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A4-r2/with_skill/project/tasks/plan.md · old</div><pre>| M1-T21 system | M1-T20 drawdown with its dates | order | none: the golden cases run on the finished steps |
+</pre><div class="lbl">new</div><pre>| M1-T21 system | M1-T20 drawdown with its dates | order | none: the golden cases run on the finished steps |
+| M1-T23 calendar tests | M1-T15 forward fill with a gap limit | code | none: tests, and may fix, the same module |
+| M1-T24 risk providers agree with samples | M1-T21 system | code | none: extends test_e2e.py and report_pipeline.py |
+| M1-T24 risk providers agree with samples | M1-T22 re-freeze risk samples | contract-change | none: compares the real providers with the re-frozen samples |
+| M1-T25 load_prices agrees with its double | M1-T11 wire PL-01 | code | none: tests, and may fix, the real load_prices |
+</pre><div class="hook">⛔ hook PostToolUse:Edit blocked: dt lint found problems in tasks/plan.md:
+tasks/plan.md:244: task-title M1-T22 title has &quot;and&quot; (split it)
+tasks/plan.md:244: todo-mismatch M1-T22 is in plan.md but not in todo.md
+tasks/plan.md:244: writes M1-T22 and M1-T01 both write tests/contracts/risk.VolSeries/**, tests/contracts/risk.TickerSummary/**, tests/contracts/risk.Report/** with no Depends on path between them: move the shared part to the interface or wiring task, or order them (and give the edge a graph row)
+tasks/plan.md:254: task-title M1-T23 title has &quot;and&quot; (split it)
+tasks/plan.md:254: todo-mismatch M1-T23 is in plan.md but not in todo.md
+tasks/plan.md:264: todo-mismatch M1-T24 is in plan.md but not in todo.md
+tasks/plan.md:264: verify-smoke M1-T24 Verify lacks PL-03&#x27;s smoke command `pytest tests/unit/risk/test_pl03_smoke.py`
+tasks/plan.md:274: task-title M1-T25 title has &quot;and&quot; (split it)
+tasks/plan.md:274: todo-mismatch M1-T25 is in plan.md but not in todo.md
+tasks/plan.md:274: verify-smoke M1-T25 Verify lacks PL-01&#x27;s smoke command `pytest tests/unit/mdata/test_pl01_smoke.py`
+10 errors, 0 warnings</div><details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;replace_all&quot;: false,
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A4-r2/with_skill/project/tasks/plan.md&quot;,
+  &quot;old_string&quot;: &quot;| M1-T21 system | M1-T20 drawdown with its dates | order | none: the golden cases run on the finished steps |\n&quot;,
+  &quot;new_string&quot;: &quot;| M1-T21 system | M1-T20 drawdown with its dates | order | none: the golden cases run on the finished steps |\n| M1-T23 calendar tests | M1-T15 forward fill with a gap limit | code | none: tests, and may fix, the same module |\n| M1-T24 risk providers agree with samples | M1-T21 system | code | none: extends test_e2e.py and report_pipeline.py |\n| M1-T24 risk providers agree with samples | M1-T22 re-freeze risk samples | contract-change | none: compares the real providers with the re-frozen samples |\n| M1-T25 load_prices agrees with its double | M1-T11 wire PL-01 | code | none: tests, and may fix, the real load_prices |\n&quot;
+}</pre><div class="lbl">output</div><pre>The file /Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A4-r2/with_skill/project/tasks/plan.md has been updated successfully. (file state is current in your context — no need to Read it back)</pre></details></div><div class="step" id="SD171"><span class="sid">D171</span><span class="kind">Edit</span>/Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A4-r2/with_skill/project/tasks/plan.md | old: &#x27;## Replan notes&#x27; | new: &#x27;## Replan notes ⏎ - 2026-10-18: exit fixes for the Important findings: M1-T22 re&#x27;<div class="lbl">edited /Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A4-r2/with_skill/project/tasks/plan.md · old</div><pre>## Replan notes
+</pre><div class="lbl">new</div><pre>## Replan notes
+- 2026-10-18: exit fixes for the Important findings: M1-T22 re-freezes the risk samples (M1-R01, M1-R02), M1-T23 adds calendar tests (M1-R08, M1-R12, M1-R17), M1-T24 checks the risk providers against the samples (M1-R18, M1-R19), M1-T25 checks load_prices (M1-R13, M1-R20); M1-R09 needs no task (M1-T14 landed and TC-01 passes on the M1-T03 code); M1-R24 Critical overridden by the user; dropped none
+</pre><div class="hook">⛔ hook PostToolUse:Edit blocked: dt lint found problems in tasks/plan.md:
+tasks/plan.md:244: task-title M1-T22 title has &quot;and&quot; (split it)
+tasks/plan.md:244: todo-mismatch M1-T22 is in plan.md but not in todo.md
+tasks/plan.md:244: writes M1-T22 and M1-T01 both write tests/contracts/risk.VolSeries/**, tests/contracts/risk.TickerSummary/**, tests/contracts/risk.Report/** with no Depends on path between them: move the shared part to the interface or wiring task, or order them (and give the edge a graph row)
+tasks/plan.md:254: task-title M1-T23 title has &quot;and&quot; (split it)
+tasks/plan.md:254: todo-mismatch M1-T23 is in plan.md but not in todo.md
+tasks/plan.md:264: todo-mismatch M1-T24 is in plan.md but not in todo.md
+tasks/plan.md:264: verify-smoke M1-T24 Verify lacks PL-03&#x27;s smoke command `pytest tests/unit/risk/test_pl03_smoke.py`
+tasks/plan.md:274: task-title M1-T25 title has &quot;and&quot; (split it)
+tasks/plan.md:274: todo-mismatch M1-T25 is in plan.md but not in todo.md
+tasks/plan.md:274: verify-smoke M1-T25 Verify lacks PL-01&#x27;s smoke command `pytest tests/unit/mdata/test_pl01_smoke.py`
+10 errors, 0 warnings</div><details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;replace_all&quot;: false,
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A4-r2/with_skill/project/tasks/plan.md&quot;,
+  &quot;old_string&quot;: &quot;## Replan notes\n&quot;,
+  &quot;new_string&quot;: &quot;## Replan notes\n- 2026-10-18: exit fixes for the Important findings: M1-T22 re-freezes the risk samples (M1-R01, M1-R02), M1-T23 adds calendar tests (M1-R08, M1-R12, M1-R17), M1-T24 checks the risk providers against the samples (M1-R18, M1-R19), M1-T25 checks load_prices (M1-R13, M1-R20); M1-R09 needs no task (M1-T14 landed and TC-01 passes on the M1-T03 code); M1-R24 Critical overridden by the user; dropped none\n&quot;
+}</pre><div class="lbl">output</div><pre>The file /Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A4-r2/with_skill/project/tasks/plan.md has been updated successfully. (file state is current in your context — no need to Read it back)</pre></details></div><div class="step" id="SD172"><span class="sid">D172</span><span class="kind">Edit</span>/Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A4-r2/with_skill/project/tasks/plan.md | old: &#x27;Milestone: M1 · Status: Approved · Base: b6a1ae8 · Last updated:&#x27; | new: &#x27;Milestone: M1 · Status: Draft · Base: b6a1ae8 · Last updated: 20&#x27;<div class="lbl">edited /Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A4-r2/with_skill/project/tasks/plan.md · old</div><pre>**Milestone:** M1 · **Status:** Approved · **Base:** b6a1ae8 · **Last updated:** 2026-10-17</pre><div class="lbl">new</div><pre>**Milestone:** M1 · **Status:** Draft · **Base:** b6a1ae8 · **Last updated:** 2026-10-18</pre><div class="hook">⛔ hook PostToolUse:Edit blocked: dt lint found problems in tasks/plan.md:
+tasks/plan.md:244: task-title M1-T22 title has &quot;and&quot; (split it)
+tasks/plan.md:244: todo-mismatch M1-T22 is in plan.md but not in todo.md
+tasks/plan.md:244: writes M1-T22 and M1-T01 both write tests/contracts/risk.VolSeries/**, tests/contracts/risk.TickerSummary/**, tests/contracts/risk.Report/** with no Depends on path between them: move the shared part to the interface or wiring task, or order them (and give the edge a graph row)
+tasks/plan.md:254: task-title M1-T23 title has &quot;and&quot; (split it)
+tasks/plan.md:254: todo-mismatch M1-T23 is in plan.md but not in todo.md
+tasks/plan.md:264: todo-mismatch M1-T24 is in plan.md but not in todo.md
+tasks/plan.md:264: verify-smoke M1-T24 Verify lacks PL-03&#x27;s smoke command `pytest tests/unit/risk/test_pl03_smoke.py`
+tasks/plan.md:274: task-title M1-T25 title has &quot;and&quot; (split it)
+tasks/plan.md:274: todo-mismatch M1-T25 is in plan.md but not in todo.md
+tasks/plan.md:274: verify-smoke M1-T25 Verify lacks PL-01&#x27;s smoke command `pytest tests/unit/mdata/test_pl01_smoke.py`
+10 errors, 0 warnings</div><details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;replace_all&quot;: false,
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A4-r2/with_skill/project/tasks/plan.md&quot;,
+  &quot;old_string&quot;: &quot;**Milestone:** M1 · **Status:** Approved · **Base:** b6a1ae8 · **Last updated:** 2026-10-17&quot;,
+  &quot;new_string&quot;: &quot;**Milestone:** M1 · **Status:** Draft · **Base:** b6a1ae8 · **Last updated:** 2026-10-18&quot;
+}</pre><div class="lbl">output</div><pre>The file /Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A4-r2/with_skill/project/tasks/plan.md has been updated successfully. (file state is current in your context — no need to Read it back)</pre></details></div><div class="step" id="SD173"><span class="sid">D173</span><span class="kind">Bash</span>cat &gt;&gt; tasks/todo.md &lt;&lt;&#x27;EOF&#x27;
+- [ ] M1-T22 Re-freeze the risk VolSeries, TickerSummary and Report samples (risk, XS, solo)
+- [ ] M1-T23 Calendar tests for unsorted rows and separate gaps (mdata, XS, solo)
+- [ ] M1-T24 Real risk providers agree with the re-frozen samples (risk, XS, solo)
+- [ ] M1-T25 Real load_prices agrees with its double and enforces the gap limit (mdata, XS, solo)
+EOF<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;cat &gt;&gt; tasks/todo.md &lt;&lt;&#x27;EOF&#x27;\n- [ ] M1-T22 Re-freeze the risk VolSeries, TickerSummary and Report samples (risk, XS, solo)\n- [ ] M1-T23 Calendar tests for unsorted rows and separate gaps (mdata, XS, solo)\n- [ ] M1-T24 Real risk providers agree with the re-frozen samples (risk, XS, solo)\n- [ ] M1-T25 Real load_prices agrees with its double and enforces the gap limit (mdata, XS, solo)\nEOF&quot;
+}</pre><div class="lbl">output</div><pre>(Bash completed with no output)</pre></details></div><div class="step" id="SD174"><span class="sid">D174</span><span class="kind">say</span>Fixing the lint errors: titles without &quot;and&quot;, the T22 → T01 edge, and the smoke commands.<details><summary>full text</summary><pre>Fixing the lint errors: titles without &quot;and&quot;, the T22 → T01 edge, and the smoke commands.</pre></details></div><div class="step" id="SD175"><span class="sid">D175</span><span class="kind">Edit</span>/Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A4-r2/with_skill/project/tasks/plan.md | old: &#x27;### M1-T22: Re-freeze the risk VolSeries, TickerSummary and Report samples&#x27; | new: &#x27;### M1-T22: Re-freeze the risk samples&#x27;<div class="lbl">edited /Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A4-r2/with_skill/project/tasks/plan.md · old</div><pre>### M1-T22: Re-freeze the risk VolSeries, TickerSummary and Report samples</pre><div class="lbl">new</div><pre>### M1-T22: Re-freeze the risk samples</pre><div class="hook">⛔ hook PostToolUse:Edit blocked: dt lint found problems in tasks/plan.md:
+tasks/plan.md:244: writes M1-T22 and M1-T01 both write tests/contracts/risk.VolSeries/**, tests/contracts/risk.TickerSummary/**, tests/contracts/risk.Report/** with no Depends on path between them: move the shared part to the interface or wiring task, or order them (and give the edge a graph row)
+tasks/plan.md:254: task-title M1-T23 title has &quot;and&quot; (split it)
+tasks/plan.md:264: verify-smoke M1-T24 Verify lacks PL-03&#x27;s smoke command `pytest tests/unit/risk/test_pl03_smoke.py`
+tasks/plan.md:274: task-title M1-T25 title has &quot;and&quot; (split it)
+tasks/plan.md:274: verify-smoke M1-T25 Verify lacks PL-01&#x27;s smoke command `pytest tests/unit/mdata/test_pl01_smoke.py`
+5 errors, 0 warnings</div><details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;replace_all&quot;: false,
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A4-r2/with_skill/project/tasks/plan.md&quot;,
+  &quot;old_string&quot;: &quot;### M1-T22: Re-freeze the risk VolSeries, TickerSummary and Report samples&quot;,
+  &quot;new_string&quot;: &quot;### M1-T22: Re-freeze the risk samples&quot;
+}</pre><div class="lbl">output</div><pre>The file /Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A4-r2/with_skill/project/tasks/plan.md has been updated successfully. (file state is current in your context — no need to Read it back)</pre></details></div><div class="step" id="SD176"><span class="sid">D176</span><span class="kind">Edit</span>/Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A4-r2/with_skill/project/tasks/plan.md | old: &#x27;Depends on: — · Writes: tests/contracts/risk.VolSeries/&#x27; | new: &#x27;Depends on: M1-T01 · Writes: tests/contracts/risk.VolSeries/&#x27;<div class="lbl">edited /Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A4-r2/with_skill/project/tasks/plan.md · old</div><pre>**Depends on:** — · **Writes:** tests/contracts/risk.VolSeries/**</pre><div class="lbl">new</div><pre>**Depends on:** M1-T01 · **Writes:** tests/contracts/risk.VolSeries/**</pre><div class="hook">⛔ hook PostToolUse:Edit blocked: dt lint found problems in tasks/plan.md:
+tasks/plan.md:254: task-title M1-T23 title has &quot;and&quot; (split it)
+tasks/plan.md:264: verify-smoke M1-T24 Verify lacks PL-03&#x27;s smoke command `pytest tests/unit/risk/test_pl03_smoke.py`
+tasks/plan.md:274: task-title M1-T25 title has &quot;and&quot; (split it)
+tasks/plan.md:274: verify-smoke M1-T25 Verify lacks PL-01&#x27;s smoke command `pytest tests/unit/mdata/test_pl01_smoke.py`
+4 errors, 0 warnings</div><details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;replace_all&quot;: false,
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A4-r2/with_skill/project/tasks/plan.md&quot;,
+  &quot;old_string&quot;: &quot;**Depends on:** — · **Writes:** tests/contracts/risk.VolSeries/**&quot;,
+  &quot;new_string&quot;: &quot;**Depends on:** M1-T01 · **Writes:** tests/contracts/risk.VolSeries/**&quot;
+}</pre><div class="lbl">output</div><pre>The file /Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A4-r2/with_skill/project/tasks/plan.md has been updated successfully. (file state is current in your context — no need to Read it back)</pre></details></div><div class="step" id="SD177"><span class="sid">D177</span><span class="kind">Edit</span>/Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A4-r2/with_skill/project/tasks/plan.md | old: &#x27;### M1-T23: Calendar tests for unsorted rows and separate gaps&#x27; | new: &#x27;### M1-T23: Calendar tests for unsorted rows, separate gaps&#x27;<div class="lbl">edited /Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A4-r2/with_skill/project/tasks/plan.md · old</div><pre>### M1-T23: Calendar tests for unsorted rows and separate gaps</pre><div class="lbl">new</div><pre>### M1-T23: Calendar tests for unsorted rows, separate gaps</pre><div class="hook">⛔ hook PostToolUse:Edit blocked: dt lint found problems in tasks/plan.md:
+tasks/plan.md:264: verify-smoke M1-T24 Verify lacks PL-03&#x27;s smoke command `pytest tests/unit/risk/test_pl03_smoke.py`
+tasks/plan.md:274: task-title M1-T25 title has &quot;and&quot; (split it)
+tasks/plan.md:274: verify-smoke M1-T25 Verify lacks PL-01&#x27;s smoke command `pytest tests/unit/mdata/test_pl01_smoke.py`
+3 errors, 0 warnings</div><details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;replace_all&quot;: false,
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A4-r2/with_skill/project/tasks/plan.md&quot;,
+  &quot;old_string&quot;: &quot;### M1-T23: Calendar tests for unsorted rows and separate gaps&quot;,
+  &quot;new_string&quot;: &quot;### M1-T23: Calendar tests for unsorted rows, separate gaps&quot;
+}</pre><div class="lbl">output</div><pre>The file /Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A4-r2/with_skill/project/tasks/plan.md has been updated successfully. (file state is current in your context — no need to Read it back)</pre></details></div><div class="step" id="SD178"><span class="sid">D178</span><span class="kind">Edit</span>/Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A4-r2/with_skill/project/tasks/plan.md | old: &#x27;Verify: `pytest tests/system/test_e2e.py` · `scripts/check.sh full --exit`&#x27; | new: &#x27;Verify: `pytest tests/system/test_e2e.py` · `pytest tests/unit/risk/test_pl0&#x27;<div class="lbl">edited /Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A4-r2/with_skill/project/tasks/plan.md · old</div><pre>**Verify:** `pytest tests/system/test_e2e.py` · `scripts/check.sh full --exit`</pre><div class="lbl">new</div><pre>**Verify:** `pytest tests/system/test_e2e.py` · `pytest tests/unit/risk/test_pl03_smoke.py` · `scripts/check.sh full --exit`</pre><div class="hook">⛔ hook PostToolUse:Edit blocked: dt lint found problems in tasks/plan.md:
+tasks/plan.md:274: task-title M1-T25 title has &quot;and&quot; (split it)
+tasks/plan.md:274: verify-smoke M1-T25 Verify lacks PL-01&#x27;s smoke command `pytest tests/unit/mdata/test_pl01_smoke.py`
+2 errors, 0 warnings</div><details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;replace_all&quot;: false,
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A4-r2/with_skill/project/tasks/plan.md&quot;,
+  &quot;old_string&quot;: &quot;**Verify:** `pytest tests/system/test_e2e.py` · `scripts/check.sh full --exit`&quot;,
+  &quot;new_string&quot;: &quot;**Verify:** `pytest tests/system/test_e2e.py` · `pytest tests/unit/risk/test_pl03_smoke.py` · `scripts/check.sh full --exit`&quot;
+}</pre><div class="lbl">output</div><pre>The file /Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A4-r2/with_skill/project/tasks/plan.md has been updated successfully. (file state is current in your context — no need to Read it back)</pre></details></div><div class="step" id="SD179"><span class="sid">D179</span><span class="kind">Edit</span>/Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A4-r2/with_skill/project/tasks/plan.md | old: &#x27;### M1-T25: Real load_prices agrees with its double and enforces the gap limit&#x27; | new: &#x27;### M1-T25: Real load_prices matches its double, enforces the gap limit&#x27;<div class="lbl">edited /Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A4-r2/with_skill/project/tasks/plan.md · old</div><pre>### M1-T25: Real load_prices agrees with its double and enforces the gap limit</pre><div class="lbl">new</div><pre>### M1-T25: Real load_prices matches its double, enforces the gap limit</pre><div class="hook">⛔ hook PostToolUse:Edit blocked: dt lint found problems in tasks/plan.md:
+tasks/plan.md:274: verify-smoke M1-T25 Verify lacks PL-01&#x27;s smoke command `pytest tests/unit/mdata/test_pl01_smoke.py`
+1 error, 0 warnings</div><details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;replace_all&quot;: false,
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A4-r2/with_skill/project/tasks/plan.md&quot;,
+  &quot;old_string&quot;: &quot;### M1-T25: Real load_prices agrees with its double and enforces the gap limit&quot;,
+  &quot;new_string&quot;: &quot;### M1-T25: Real load_prices matches its double, enforces the gap limit&quot;
+}</pre><div class="lbl">output</div><pre>The file /Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A4-r2/with_skill/project/tasks/plan.md has been updated successfully. (file state is current in your context — no need to Read it back)</pre></details></div><div class="step" id="SD180"><span class="sid">D180</span><span class="kind">Edit</span>/Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A4-r2/with_skill/project/tasks/plan.md | old: &#x27;Verify: `pytest tests/system/test_load_prices.py tests/unit/mdata/test_pipel&#x27; | new: &#x27;Verify: `pytest tests/system/test_load_prices.py tests/unit/mdata/test_pipel&#x27;<div class="lbl">edited /Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A4-r2/with_skill/project/tasks/plan.md · old</div><pre>**Verify:** `pytest tests/system/test_load_prices.py tests/unit/mdata/test_pipeline.py` · `scripts/check.sh full --exit`</pre><div class="lbl">new</div><pre>**Verify:** `pytest tests/system/test_load_prices.py tests/unit/mdata/test_pipeline.py` · `pytest tests/unit/mdata/test_pl01_smoke.py` · `scripts/check.sh full --exit`</pre><details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;replace_all&quot;: false,
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A4-r2/with_skill/project/tasks/plan.md&quot;,
+  &quot;old_string&quot;: &quot;**Verify:** `pytest tests/system/test_load_prices.py tests/unit/mdata/test_pipeline.py` · `scripts/check.sh full --exit`&quot;,
+  &quot;new_string&quot;: &quot;**Verify:** `pytest tests/system/test_load_prices.py tests/unit/mdata/test_pipeline.py` · `pytest tests/unit/mdata/test_pl01_smoke.py` · `scripts/check.sh full --exit`&quot;
+}</pre><div class="lbl">output</div><pre>The file /Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A4-r2/with_skill/project/tasks/plan.md has been updated successfully. (file state is current in your context — no need to Read it back)</pre></details></div><div class="step" id="SD181"><span class="sid">D181</span><span class="kind">Edit</span>/Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A4-r2/with_skill/project/tasks/plan.md | old: &#x27;| M1-T23 calendar tests | M1-T15&#x27; | new: &#x27;| M1-T22 re-freeze risk samples | M1-T01 freeze the M1 interfaces | contract-cha&#x27;<div class="lbl">edited /Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A4-r2/with_skill/project/tasks/plan.md · old</div><pre>| M1-T23 calendar tests | M1-T15</pre><div class="lbl">new</div><pre>| M1-T22 re-freeze risk samples | M1-T01 freeze the M1 interfaces | contract-change | none: re-freezes samples M1-T01 froze (M1-R01, M1-R02) |
+| M1-T23 calendar tests | M1-T15</pre><details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;replace_all&quot;: false,
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A4-r2/with_skill/project/tasks/plan.md&quot;,
+  &quot;old_string&quot;: &quot;| M1-T23 calendar tests | M1-T15&quot;,
+  &quot;new_string&quot;: &quot;| M1-T22 re-freeze risk samples | M1-T01 freeze the M1 interfaces | contract-change | none: re-freezes samples M1-T01 froze (M1-R01, M1-R02) |\n| M1-T23 calendar tests | M1-T15&quot;
+}</pre><div class="lbl">output</div><pre>The file /Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A4-r2/with_skill/project/tasks/plan.md has been updated successfully. (file state is current in your context — no need to Read it back)</pre></details></div><div class="step" id="SD182"><span class="sid">D182</span><span class="kind">Read</span>/Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A4-r2/with_skill/project/tasks/todo.md<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A4-r2/with_skill/project/tasks/todo.md&quot;
+}</pre><div class="lbl">output</div><pre>1	# M1: Risk report — Todo
+2	
+3	- [x] M1-T01 Freeze the M1 interfaces (mdata, M, solo)
+4	- [x] M1-T02 read_csv spine (read every row) (mdata, XS, solo)
+5	- [x] M1-T03 validate_rows spine (keep rows with a close, sorted) (mdata, XS, solo)
+6	- [x] M1-T04 align_calendar spine (dates every ticker has, no fill) (mdata, XS, solo)
+7	- [x] M1-T05 log_returns spine (simple returns) (risk, XS, solo)
+8	- [x] M1-T06 rolling_vol spine (expanding stdev of earlier returns) (risk, XS, solo)
+9	- [x] M1-T07 annualize spine (daily values pass through) (risk, XS, solo)
+10	- [x] M1-T08 summary_stats spine (daily mean, stdev) (risk, XS, solo)
+11	- [x] M1-T09 max_drawdown spine (depth only) (risk, XS, solo)
+12	- [x] M1-T10 write_report spine (JSON rows) (risk, XS, solo)
+13	- [x] M1-T11 Wire PL-01 (mdata, S, solo)
+14	- [x] M1-T12 Wire PL-02 on the mdata.load_prices fake (risk, S, solo)
+15	- [x] M1-T13 Wire PL-03 on the risk.vol_series fake (risk, S, solo)
+16	- [x] M1-T14 Drop unusable rows, resolve duplicates (mdata, S, solo)
+17	- [x] M1-T15 Forward fill with a gap limit (mdata, S, solo)
+18	- [x] M1-T16 Log returns (risk, S, solo)
+19	- [x] M1-T17 Rolling volatility from earlier returns (risk, S, solo)
+20	- [x] M1-T18 Annualize over trading days (risk, S, solo)
+21	- [x] M1-T19 Annualized summary with Sharpe (risk, S, solo)
+22	- [x] M1-T20 Drawdown with its dates (risk, S, solo)
+23	- [x] M1-T21 Risk report on the real pipelines (mdata, S, solo)
+24	- [ ] M1-T22 Re-freeze the risk VolSeries, TickerSummary and Report samples (risk, XS, solo)
+25	- [ ] M1-T23 Calendar tests for unsorted rows and separate gaps (mdata, XS, solo)
+26	- [ ] M1-T24 Real risk providers agree with the re-frozen samples (risk, XS, solo)
+27	- [ ] M1-T25 Real load_prices agrees with its double and enforces the gap limit (mdata, XS, solo)
+28	</pre></details></div><div class="step" id="SD183"><span class="sid">D183</span><span class="kind">Edit</span>/Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A4-r2/with_skill/project/tasks/todo.md | old: &#x27;- [ ] M1-T22 Re-freeze the risk VolSeries, TickerSummary and Report samples (ris&#x27; | new: &#x27;- [ ] M1-T22 Re-freeze the risk samples (risk, XS, solo) ⏎ - [ ] M1-T23 Calendar&#x27;<div class="lbl">edited /Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A4-r2/with_skill/project/tasks/todo.md · old</div><pre>- [ ] M1-T22 Re-freeze the risk VolSeries, TickerSummary and Report samples (risk, XS, solo)
+- [ ] M1-T23 Calendar tests for unsorted rows and separate gaps (mdata, XS, solo)
+- [ ] M1-T24 Real risk providers agree with the re-frozen samples (risk, XS, solo)
+- [ ] M1-T25 Real load_prices agrees with its double and enforces the gap limit (mdata, XS, solo)</pre><div class="lbl">new</div><pre>- [ ] M1-T22 Re-freeze the risk samples (risk, XS, solo)
+- [ ] M1-T23 Calendar tests for unsorted rows, separate gaps (mdata, XS, solo)
+- [ ] M1-T24 Real risk providers agree with the re-frozen samples (risk, XS, solo)
+- [ ] M1-T25 Real load_prices matches its double, enforces the gap limit (mdata, XS, solo)</pre><details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;replace_all&quot;: false,
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A4-r2/with_skill/project/tasks/todo.md&quot;,
+  &quot;old_string&quot;: &quot;- [ ] M1-T22 Re-freeze the risk VolSeries, TickerSummary and Report samples (risk, XS, solo)\n- [ ] M1-T23 Calendar tests for unsorted rows and separate gaps (mdata, XS, solo)\n- [ ] M1-T24 Real risk providers agree with the re-frozen samples (risk, XS, solo)\n- [ ] M1-T25 Real load_prices agrees with its double and enforces the gap limit (mdata, XS, solo)&quot;,
+  &quot;new_string&quot;: &quot;- [ ] M1-T22 Re-freeze the risk samples (risk, XS, solo)\n- [ ] M1-T23 Calendar tests for unsorted rows, separate gaps (mdata, XS, solo)\n- [ ] M1-T24 Real risk providers agree with the re-frozen samples (risk, XS, solo)\n- [ ] M1-T25 Real load_prices matches its double, enforces the gap limit (mdata, XS, solo)&quot;
+}</pre><div class="lbl">output</div><pre>The file /Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A4-r2/with_skill/project/tasks/todo.md has been updated successfully. (file state is current in your context — no need to Read it back)</pre></details></div><div class="step" id="SD184"><span class="sid">D184</span><span class="kind">Bash</span>python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A4-r2/with_skill/plugin/dev-team/scripts/dt.py lint tasks/ docs/roadmap.md AGENTS.md docs/<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A4-r2/with_skill/plugin/dev-team/scripts/dt.py lint tasks/ docs/roadmap.md AGENTS.md docs/&quot;
+}</pre><div class="lbl">output</div><pre>0 errors, 0 warnings</pre></details></div><div class="step" id="SD185"><span class="sid">D185</span><span class="kind">Bash</span>python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A4-r2/with_skill/plugin/dev-team/scripts/dt.py status --skill build-planning<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A4-r2/with_skill/plugin/dev-team/scripts/dt.py status --skill build-planning&quot;
+}</pre><div class="lbl">output</div><pre>skill: build-planning
+mode: replan
+docs: brief Accepted · spec Approved · architecture Draft (Multi-package) · roadmap stale (run dt roadmap) · plan M1 Draft · constraints Approved
+next ids: AD-03 PL-04 TC-09 M2 M1-T26
+references_unindexed: none
+references_changed: none
+references_missing: none
+milestone: M1 Draft
+progress: 21/25
+next_task: M1-T22 Re-freeze the risk samples
+blocked_tasks: none
+uncovered: QR-01
+no_spine: none
+mode_violations: M1-T21: solo, expected split (acceptance names TC-01, TC-02, TC-03, TC-04, TC-05, TC-06, TC-07, TC-08)
+boundaries_unfrozen: none
+draft_pipelines: none
+changed_since_plan: none
+interfaces_changed: risk.TickerSummary (M1-T08, M1-T10, M1-T13, M1-T19, M1-T21, M1-T24), risk.VolSeries (M1-T06, M1-T07, M1-T08, M1-T12, M1-T13, M1-T17, M1-T18, M1-T19, M1-T21, M1-T24)
+probes_blocking: none
+stage_to_cut: none
+pipelines_inferred: none
+milestone_references: RF-01
+milestone_skills: none
+references_unrouted: none
+skills_unrouted: none
+stage_unrouted: none
+skills_missing: none
+skills_available: none
+grow_triggers: none
+drift: none
+stale_contracts: none
+queued: none
+base: b6a1ae8
+critical_path: M1-T01 → M1-T02 → M1-T11 → M1-T21 → M1-T24
+waves: M1-T01 | M1-T02, M1-T03, M1-T04, M1-T05, M1-T06, M1-T07, M1-T08, M1-T09, M1-T10, M1-T22 | M1-T11, M1-T12, M1-T13, M1-T14, M1-T15, M1-T16, M1-T17, M1-T18, M1-T19, M1-T20 | M1-T21, M1-T23, M1-T25 | M1-T24
+width: 10
+parallelism: 5.0
+graph_warning: none
+critical_path_halves: M1-T01.solo → M1-T02.solo → M1-T11.solo → M1-T21.solo → M1-T24.solo
+file_edges_on_path: none</pre></details></div><div class="step" id="SD186"><span class="sid">D186</span><span class="kind">Bash</span>for t in M1-T22 M1-T23 M1-T24 M1-T25; do python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A4-r2/with_skill/plugin/dev-team/scripts/dt.py context $t | wc -l; done <span class="err">error</span><details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;for t in M1-T22 M1-T23 M1-T24 M1-T25; do python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A4-r2/with_skill/plugin/dev-team/scripts/dt.py context $t | wc -l; done&quot;
+}</pre><div class="lbl">output</div><pre>A variable in this command can&#x27;t be checked before it runs</pre></details></div><div class="step" id="SD187"><span class="sid">D187</span><span class="kind">Bash</span>python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A4-r2/with_skill/plugin/dev-team/scripts/dt.py context M1-T22 | wc -l<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A4-r2/with_skill/plugin/dev-team/scripts/dt.py context M1-T22 | wc -l&quot;
+}</pre><div class="lbl">output</div><pre>      79</pre></details></div><div class="step" id="SD188"><span class="sid">D188</span><span class="kind">Bash</span>python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A4-r2/with_skill/plugin/dev-team/scripts/dt.py context M1-T23 | wc -l<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A4-r2/with_skill/plugin/dev-team/scripts/dt.py context M1-T23 | wc -l&quot;
+}</pre><div class="lbl">output</div><pre>      70</pre></details></div><div class="step" id="SD189"><span class="sid">D189</span><span class="kind">Bash</span>python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A4-r2/with_skill/plugin/dev-team/scripts/dt.py context M1-T24 | wc -l<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A4-r2/with_skill/plugin/dev-team/scripts/dt.py context M1-T24 | wc -l&quot;
+}</pre><div class="lbl">output</div><pre>     129</pre></details></div><div class="step" id="SD190"><span class="sid">D190</span><span class="kind">Bash</span>python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A4-r2/with_skill/plugin/dev-team/scripts/dt.py context M1-T25 | wc -l<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A4-r2/with_skill/plugin/dev-team/scripts/dt.py context M1-T25 | wc -l&quot;
+}</pre><div class="lbl">output</div><pre>      96</pre></details></div><div class="step" id="SD191"><span class="sid">D191</span><span class="kind">say</span>Both drafts are ready for your approval, and nothing runs until you approve them and give a new go. I recorded your M1-R24 override. Merging still needs the 10 Important findings handled first: each one gets a fix task or a reason it doesn&#x27;t need one. ⏎ 1. Contract revision (Draft): `docs/packages/risk/contract.md` and `docs/architecture.md` ⏎ The bar&#x27;s rule CR-09 says a frozen sample can only change through an `architecture-design` revision. Four findings (M1-R01, R02, R18, R19) report wrong numbers in the risk samples, so this revision comes first. ⏎ - `risk.VolSeries`: a new rule th …[+2418 chars]<details><summary>full text</summary><pre>Both drafts are ready for your approval, and nothing runs until you approve them and give a new go. I recorded your M1-R24 override. Merging still needs the 10 Important findings handled first: each one gets a fix task or a reason it doesn&#x27;t need one.
+
+**1. Contract revision (Draft): `docs/packages/risk/contract.md` and `docs/architecture.md`**
+
+The bar&#x27;s rule CR-09 says a frozen sample can only change through an `architecture-design` revision. Four findings (M1-R01, R02, R18, R19) report wrong numbers in the risk samples, so this revision comes first.
+- **`risk.VolSeries`:** a new rule that its sample&#x27;s values are what RISK-02 and RISK-03 give on the `risk.Returns` sample, rounded to six places.
+- **`risk.TickerSummary`:** a new rule that its sample&#x27;s values are what RISK-04 gives on those samples, rounded to six places, and that the `risk.Report` sample&#x27;s rows carry the same values.
+- **Changelog:** one new row.
+- **Not changed:** the types and signatures.
+
+**2. M1 re-plan (Draft): `tasks/plan.md` and `tasks/todo.md`**
+
+The plan gets 4 fix tasks, all extra-small and each run by a single agent. Lint is clean, and every task packet is under 130 lines.
+
+| Task | What it does | Fixes |
+|---|---|---|
+| M1-T22 | Re-freezes the `risk.VolSeries`, `risk.TickerSummary` and `risk.Report` samples with the correct values | R01, R02 |
+| M1-T23 | Adds calendar tests: unsorted first ticker, and two separate gaps that each stay within the limit | R08, R12, R17 |
+| M1-T24 | Checks the real `vol_series` and `risk_report` against the re-frozen samples within 5e-7 | R18, R19 |
+| M1-T25 | Checks the real `load_prices` against its double, and that TC-03 run through `load_prices` raises `GapError` | R13, R20 |
+
+- **Order:** T22, T23 and T25 can run together; T24 waits for T22. Critical path: T22 → T24, then the exit review runs again.
+- **M1-R09:** no task. M1-T14 has already landed and TC-01 passes on the code M1-T03 wrote.
+- **Dropped tasks:** none.
+
+**Assumptions:**
+- The contract revision needs no new decision record, because it only pins sample values to requirements that are already approved.
+- T23 and T25 may also edit their source modules, in case a new test exposes a real bug.
+- T22 changes only values. The planning status lists T08, T10, T13 and others as reading the changed types. If any of their unit tests hard-code the old sample numbers, T22&#x27;s checks will fail and the build will stop on it.
+
+**Open questions, from before this re-plan:**
+- QR-01 is reported as uncovered by any task.
+- M1-T21 ran as a single agent when the rules expected a tester/implementer split, and it has no recorded reason. It has already landed, so the re-plan doesn&#x27;t change it.
+- The Suggestions and Nits get no tasks unless you ask.
+
+**To continue:** approve the contract revision, approve the re-plan, and give the go for these 4 tasks. I&#x27;ll then commit both on `build/M1`, record the go, run the tasks, and run the exit review again. Or tell me what to change.</pre></details></div><div class="step" id="SD192"><span class="sid">D192</span><span class="kind">hook</span><span class="hook">SessionStart:resume said: milestone: M1 Risk report · plan Draft
+progress: 21/25 · next: M1-T22 Re-freeze the risk samples
+blocked: none
+draft (waiting for approval): docs/architecture.md, docs/packages/risk/contract.md, tasks/plan.md
+roadmap: Status* column stale (run dt roadmap)
+dt: python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A4-r2/with_skill/plugin/dev-team/scripts/dt.py
+</span></div>
+<h2>Commits</h2>
+<p>None.</p>
+<h2>Returned</h2>
+<pre>Both drafts are ready for your approval, and nothing runs until you approve them and give a new go. I recorded your M1-R24 override. Merging still needs the 10 Important findings handled first: each one gets a fix task or a reason it doesn&#x27;t need one.
+
+**1. Contract revision (Draft): `docs/packages/risk/contract.md` and `docs/architecture.md`**
+
+The bar&#x27;s rule CR-09 says a frozen sample can only change through an `architecture-design` revision. Four findings (M1-R01, R02, R18, R19) report wrong numbers in the risk samples, so this revision comes first.
+- **`risk.VolSeries`:** a new rule that its sample&#x27;s values are what RISK-02 and RISK-03 give on the `risk.Returns` sample, rounded to six places.
+- **`risk.TickerSummary`:** a new rule that its sample&#x27;s values are what RISK-04 gives on those samples, rounded to six places, and that the `risk.Report` sample&#x27;s rows carry the same values.
+- **Changelog:** one new row.
+- **Not changed:** the types and signatures.
+
+**2. M1 re-plan (Draft): `tasks/plan.md` and `tasks/todo.md`**
+
+The plan gets 4 fix tasks, all extra-small and each run by a single agent. Lint is clean, and every task packet is under 130 lines.
+
+| Task | What it does | Fixes |
+|---|---|---|
+| M1-T22 | Re-freezes the `risk.VolSeries`, `risk.TickerSummary` and `risk.Report` samples with the correct values | R01, R02 |
+| M1-T23 | Adds calendar tests: unsorted first ticker, and two separate gaps that each stay within the limit | R08, R12, R17 |
+| M1-T24 | Checks the real `vol_series` and `risk_report` against the re-frozen samples within 5e-7 | R18, R19 |
+| M1-T25 | Checks the real `load_prices` against its double, and that TC-03 run through `load_prices` raises `GapError` | R13, R20 |
+
+- **Order:** T22, T23 and T25 can run together; T24 waits for T22. Critical path: T22 → T24, then the exit review runs again.
+- **M1-R09:** no task. M1-T14 has already landed and TC-01 passes on the code M1-T03 wrote.
+- **Dropped tasks:** none.
+
+**Assumptions:**
+- The contract revision needs no new decision record, because it only pins sample values to requirements that are already approved.
+- T23 and T25 may also edit their source modules, in case a new test exposes a real bug.
+- T22 changes only values. The planning status lists T08, T10, T13 and others as reading the changed types. If any of their unit tests hard-code the old sample numbers, T22&#x27;s checks will fail and the build will stop on it.
+
+**Open questions, from before this re-plan:**
+- QR-01 is reported as uncovered by any task.
+- M1-T21 ran as a single agent when the rules expected a tester/implementer split, and it has no recorded reason. It has already landed, so the re-plan doesn&#x27;t change it.
+- The Suggestions and Nits get no tasks unless you ask.
+
+**To continue:** approve the contract revision, approve the re-plan, and give the go for these 4 tasks. I&#x27;ll then commit both on `build/M1`, record the go, run the tasks, and run the exit review again. Or tell me what to change.</pre>
+</body></html>

@@ -256,14 +256,14 @@ class Persona:
         self.cc_done = False
         self.cc_task = ""
         self.cc_claim = None
-        self.cc_from: tuple[str, set[str]] = ("", set())
+        self.cc_from: tuple[str, str] = ("", "")
         self.retried: set[str] = set()
         self.resolved: set[str] = set()
         self.important = 0
 
     def start_cc(self, symbol: str, task: str, claim) -> None:
         self.cc_type, self.cc_task, self.cc_claim, self.cc_done = symbol, task, claim, False
-        self.cc_from = (self.contracts(), self.task_ids())
+        self.cc_from = (self.contracts(), self.plan())
 
     def status(self) -> dict:
         r = sh([sys.executable, str(self.dt), "--root", str(self.proj), "build", "status"], self.proj)
@@ -279,8 +279,8 @@ class Persona:
         """The contract docs as they are on disk now, committed or not."""
         return "".join(f.read_text() for f in sorted((self.proj / "docs" / "packages").glob("*/contract.md")))
 
-    def task_ids(self) -> set[str]:
-        return set(re.findall(r"^### (M\d+-T\d+):", (self.proj / "tasks" / "plan.md").read_text(), re.M))
+    def plan(self) -> str:
+        return (self.proj / "tasks" / "plan.md").read_text()
 
     def contract_revised(self) -> bool:
         """The contract docs changed since this contract change began."""
@@ -291,8 +291,9 @@ class Persona:
         return sh(["git", "cat-file", "-e", f"HEAD:tests/contracts/{symbol}"], self.proj).returncode == 0
 
     def replanned(self) -> bool:
-        """A task was added since this contract change began."""
-        return bool(self.task_ids() - self.cc_from[1])
+        """The plan changed since this contract change began (a Replan may add the re-freeze task or rewrite a
+        pending one into it; `dt tick` writes todo.md, not plan.md)."""
+        return self.plan() != self.cc_from[1]
 
     def answer(self, reply: str, st: dict) -> tuple[str, str]:
         """(kind, message), or ("finish", …) when the run ends with this answer."""

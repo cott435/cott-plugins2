@@ -19,7 +19,7 @@ exports its plan.json. The replays:
 Every check is pinned, pass or fail: the checks the sample can't meet (it isn't a finished four-stage quant run)
 fail in every replay, and in the broken replays dt itself (lint, `dt ready`, `dt archive`) catches the planted
 defects alongside the grader. Before the replays it runs selftest/checks.py: a good and a bad case for each
-structural rule (dtrun.py) that the iteration-7 findings changed; selftest/sessions.py: when the driver opens a
+structural rule (dtrun.py, probefacts.py) that the iteration-7 and -8 findings changed; selftest/sessions.py: when the driver opens a
 fresh agent session; and selftest/yahoo.py: the fake Yahoo's planted facts through the HTTPS proxy.
 
 Usage: dryrun.py [out-dir]   (default: a fresh temp dir; printed at the end). Exit 1 on any unexpected result.

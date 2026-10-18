@@ -118,3 +118,41 @@ Ranked by harm: a false pass hides a defect that costs width. Ties are broken by
 - `dt roadmap --check` errors on a Depends cycle.
 - A lint for a decision Accepted while its probe is open.
 - `boundaries_unfrozen` reports a type in a milestone step's In → Out that the interface leaves out.
+
+## 4. After fixes 1–6
+
+**adjudicate.py: 30 wrong before, 8 after.** Every ruling that fixes 1–6 target now passes, and none of the 62 that passed before regressed. Count after each fix:
+
+| Fix | Wrong rulings | What changed |
+|---|---|---|
+| none (baseline) | 30 | |
+| 1. Edge rules | 28 | A wiring task waiting on a thicken that isn't a fold now fails, whatever the row's kind. `same_step_unit` needs a spine of the same Step or owner, so two library thickens of one Step aren't one module. Fixes the 2 iteration-8 false passes. |
+| 2. Spine units | 22 | A step with no spine of its own is built by the spine or fold whose Reason names it, or whose Writes is its owner module. Call steps stay in their unit. A fold counts when its Reason records it anywhere. `wave_units` uses the same matching (rl aao: 20 → 11 units). |
+| 3. Probe-check precision | 17 | The data-source decision is the one whose heading names the vendor. Each probe is checked against its own vendor's docs domain. Only the raw-price requirement on what the source delivers counts. api-probe turns come from `turn_skill_map`. The probe simulation sets queued plans aside and answers every probe on the milestone. |
+| 4. Command text | 13 | `probefacts.bash_reads` and `script_runs` read shell commands with `shlex`. Here-document bodies are data unless an interpreter runs them. Only reading verbs, input redirects and Python opening the file count as reads. |
+| 5. Rows to interface tasks | 11 | Rows from a task to an interface task are skipped in `edges_mitigated` and `unmitigated_reasoned`. Interface→interface rows stay graded (it7 quant inc T04→T03 is real). |
+| 6. Spec regexes | 8 | `spec_no_vendors` exempts the vendors the persona's facts name. `spec_pca_mp` accepts "eigenvalue", "components above the edge" and "factor model". |
+
+**Still wrong (8), all outside fixes 1–6:**
+- **False fails (3):**
+  - it8 quant inc `no_edge_to_code_when_interface`: "as in PL-06" is still read as a call (fix 9).
+  - it8 rl inc `tester_starts_early`: contract classes are not declared (fix 9).
+  - it8 quant aao `fakes_only_cross_pipeline`: the `data.load_*` glob (fix 9).
+- **False passes (2):**
+  - it7 rl inc `wave_width`: tester halves of library thickens are still counted (fix 7).
+  - it7 quant aao `sim_ready_1`: the order is implied by Read but missing from Depends on, and no check sees it (fix 8, a new check and the user's call).
+- **Mixed (3):**
+  - it8 quant inc `writes_disjoint`: T27's folder owner (fix 9).
+  - it8 rl aao and quant inc `types_in_contract`: the constructor and mirror forms (fix 9).
+
+**Fix 1's wiring→wiring part needs the skill fix first.** Counting `serial_on_shared_file` between two wiring tasks as a violation would fail `no_edge_to_code_when_interface` in all four iteration-8 runs, because each chains wiring tasks on a shared `pipeline.py` or `__main__.py`.
+- Those plans follow today's `build-planning/references/tasks.md:33`, which lets wiring tasks share those files.
+- The analyst ruled the check a pass in quant inc, and filed the chains under F1 as a skill and design gap.
+- So the mutation stays a pinned gap. The rule belongs with the skill change to one entry module per pipeline, with the interface task writing `__main__.py`.
+
+**Dry run:** as pinned, with no re-pins. `selftest/checks.py` grows from 95 to 117 cases over 18 checks: new cases for the edge rules, spine units, recorded folds, secret reads and script runs.
+
+**mutate.py:** as pinned, and unchanged from section 2:
+- **Gap:** wiring-shared-entry.
+- **dt only:** boundary-removed.
+- **Caught exactly by the owning check:** the other five.

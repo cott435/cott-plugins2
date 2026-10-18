@@ -249,7 +249,7 @@ def simulate_probes(src, dt=None):
     """One record for plan_blocked_while_open: {text, passed, evidence}, or {text, na: True, evidence: why}."""
     dt = dt or dtrun.REPO_DT
     src = pathlib.Path(src).resolve()
-    text = "Probe simulation: with the plan set aside, a probe on its milestone Ready → build-planning blocked on it; Answered → not"
+    text = "Probe simulation: with the plan set aside, the probes on its milestone Ready → build-planning blocked on them; Answered → not"
     pb = src / "docs" / "probes.md"
     entries = probefacts.parse_probes(pb.read_text(errors="ignore"))["entries"] if pb.exists() else []
     if not entries:
@@ -261,23 +261,27 @@ def simulate_probes(src, dt=None):
         plan = next((p for p in facts["plans"] if p["kind"] == "plan" and p["dev_team"] and p["milestone"]), None)
         ms = plan["milestone"] if plan else (facts["roadmap"][0]["id"] if facts["roadmap"] else "")
         stage = next((r.get("stage") for r in facts["roadmap"] if r["id"] == ms), "")
-        e = next((e for e in entries if ms in e["milestones"] or (stage and stage in e["milestones"])), entries[0])
+        es = [e for e in entries if ms in e["milestones"] or (stage and stage in e["milestones"])] or entries[:1]
+        ids = [e["id"] for e in es]
         for rel in ("tasks/plan.md", "tasks/todo.md"):
             if (proj / rel).exists():
                 (proj / rel).unlink()
+        shutil.rmtree(proj / "tasks" / "queued", ignore_errors=True)  # a queued plan would put dt in extend, not New
         pb = proj / "docs" / "probes.md"
-        set_probe_status(pb, e["id"], "Ready")
+        for pid in ids:
+            set_probe_status(pb, pid, "Ready")
         open_ = bp(proj, dt)
         if "probes_blocking" not in open_:
             return {"text": text, "na": True, "evidence": f"dt has no probes_blocking yet (build-planning mode={open_.get('mode')} "
                                                            f"{open_.get('_error', '')})"}
-        set_probe_status(pb, e["id"], "Answered · pass · 2099-01-01")
+        for pid in ids:
+            set_probe_status(pb, pid, "Answered · pass · 2099-01-01")
         done = bp(proj, dt)
-        blocked = open_.get("mode") == "blocked" and e["id"] in json.dumps(open_.get("probes_blocking"))
-        freed = done.get("mode") != "blocked" and e["id"] not in json.dumps(done.get("probes_blocking"))
-        return {"text": text.replace("a probe", e["id"]).replace("its milestone", ms or "the first milestone"),
+        blocked = open_.get("mode") == "blocked" and all(pid in json.dumps(open_.get("probes_blocking")) for pid in ids)
+        freed = done.get("mode") != "blocked" and not any(pid in json.dumps(done.get("probes_blocking")) for pid in ids)
+        return {"text": text.replace("the probes", ", ".join(ids)).replace("its milestone", ms or "the first milestone"),
                 "passed": blocked and freed,
-                "evidence": f"{ms} plan set aside; {e['id']} Ready → mode={open_.get('mode')} probes_blocking={open_.get('probes_blocking')}; "
+                "evidence": f"{ms} plan set aside; {', '.join(ids)} Ready → mode={open_.get('mode')} probes_blocking={open_.get('probes_blocking')}; "
                             f"Answered → mode={done.get('mode')} probes_blocking={done.get('probes_blocking')}"}
     finally:
         shutil.rmtree(tmp, ignore_errors=True)

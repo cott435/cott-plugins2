@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-"""Good and bad cases for the grader's structural rules (dtrun.py), one pair or more per check that iteration 7's
-findings changed. The good cases are the forms the iteration-7 plans used that the old grader flagged by mistake;
+"""Good and bad cases for the grader's structural rules (dtrun.py, probefacts.py), one pair or more per check that
+iteration 7's and 8's findings changed. The good cases are the forms those plans used that the old grader flagged by mistake;
 the bad cases are the defects each check must still catch. No dt, no model calls; the dry run runs this too.
 
 Usage: checks.py   prints one line per case; exit 1 if any case comes out wrong
@@ -83,6 +83,17 @@ case("unmitigated_reasoned", False, "an interface task waiting on another interf
      not d.unmitigated_class(row("T04", "T03", "code", "generates its types from T03's schema"),
                              {"T04": task("T04", "interface", "contract", ["web/src/api/types.ts"]), "T03": task("T03", "interface", "contract", ["server/**"])}, {})[0])
 case("unmitigated_reasoned", True, "a mitigated row stays mitigated", d.integration_row(row("T09", "T08", "call", mitigated="data.load_prices fake"))["mitigated_by"])
+# Iteration 8's F3: wiring waits on spines and folds only; two thickens of one Step aren't one module by that alone.
+T8 = {**T, "T11": task("T11", "thicken", "PL-01.read_raw", ["src/quant/data/views.py"], mode="split", reason="library module behind read_raw"),
+      "T13": task("T13", "thicken", "PL-01.read_raw", ["src/quant/data/rules.py"], mode="split"),
+      "T15": task("T15", "thicken", "PL-02.pca", ["src/quant/stats/pca.py"], mode="split", reason="spine folded into the thicken: TC-03 checks it")}
+case("unmitigated_reasoned", True, "wiring waits on a step whose only task is a recorded fold: integration",
+     d.unmitigated_class(row("T09", "T15", "order", "integration: the smoke runs it"), T8, info | {"PL-02.pca": step("pca", "stats.pca")})[0] == "order")
+for r_, why in [(row("T08", "T11", "order", "integration: the smoke builds the views"), "wiring waits on a thicken task that isn't a fold"),
+                (row("T08", "T10", "code", "the smoke runs it"), "wiring waits on a thicken task that isn't a fold"),
+                (row("T13", "T11", "data", "the rules need real views"), "no allowed structure")]:
+    got, w = d.unmitigated_class(r_, T8, info)
+    case("unmitigated_reasoned", False, f"{r_['from']}→{r_['to']} {r_['kind']} '{r_['reason']}' flagged ({why})", not got and w == why)
 
 # ---- writes_disjoint (interface F6): owner → path, package-local tests, one folder glob
 for writes, owner, pkgs in [(["src/gridlab/experiments/build.py", "tests/unit/test_build.py"], "experiments.build", ()),
@@ -120,6 +131,25 @@ miss = d.phase0_misses([two], [task("T01", "interface"), task("T02", "spine", "P
                                 task("T03", "wiring", "PL-06", ["packages/data/src/data/p6.py", "packages/data/tests/test_p6.py"])],
                        {"T01"}, {"X", "Y", "Z"}, ("data",))
 case("phase0_split", False, "two owner modules, one spine task", miss == ["PL-06.b: 0 spine tasks"])
+# Iteration 8's F4: bare owners name modules; a spine's Reason or Writes says which steps it builds; call steps stay.
+cli = pipe("PL-16", [step("read_settings", "cli", "argv → Settings"), step("judge", "cli", "Settings → Verdicts"),
+                     step("train_seeds", "lab.runs", "Settings → Runs", "PL-01 as built"), step("report_runs", "lab.runs", "Runs → Report"),
+                     step("fetch", "api", "Route → Dto")], package="lab", entry="packages/lab/src/lab/pl16.py")
+wire16 = task("T09", "wiring", "PL-16", ["packages/lab/src/lab/pl16.py", "packages/lab/tests/test_pl16.py"])
+t16 = [task("T01", "interface"), task("T02", "spine", "PL-16.read_settings", reason="`read_settings` and `judge` share cli.py"),
+       task("T03", "spine", "PL-16.train_seeds"), task("T04", "spine", "PL-01.other", ["packages/lab/src/lab/api.ts"]), wire16]
+names16 = {"Settings", "Verdicts", "Runs", "Report", "Dto", "Route"}
+case("phase0_split", True, "a step named in a spine's Reason, a call step's unit, a spine writing the owner module",
+     not d.phase0_misses([cli], t16, {"T01"}, names16, ("lab",)))
+case("wave_width", True, "a Reason-shared bare owner is one unit; a call step's module counts once",
+     len(d.wave_units([cli], t16, ("lab",))) == 3)
+miss = d.phase0_misses([cli], [x for x in t16 if x["id"] != "T02"] + [task("T02", "spine", "PL-16.read_settings")], {"T01"}, names16, ("lab",))
+case("phase0_split", False, "a bare-owner step no spine names or owns", miss == ["PL-16.judge: 0 spine tasks"])
+case("phase0_split", True, "a fold recorded anywhere in the Reason",
+     not d.phase0_misses([two], [task("T01", "interface"), task("T02", "spine", "PL-06.a"),
+                                 task("T04", "thicken", "PL-06.b", mode="split", reason="spine folded into the thicken: TC-28 checks it"),
+                                 task("T03", "wiring", "PL-06", ["packages/data/src/data/p6.py", "packages/data/tests/test_p6.py"])],
+                         {"T01"}, {"X", "Y", "Z"}, ("data",)))
 
 # ---- interface_coverage (interface F8): Out → In boundaries; a named case the interface task writes
 rl = pipe("PL-02", [step("make_agent", "core.agents", "AgentSpec → Agent"), step("create_run", "runstore.writer", "RunConfig → RunWriter"),
@@ -311,6 +341,27 @@ case("crosscheck_facts_reached_design", False, "names missing from the Verdict, 
      not ok and "BSC" in m["missing_not_named"] and not m["adjusted_only"])
 ok, _ = d.crosscheck_facts([y_entry("ready", lost + " DNA is Ginkgo now.")], "Yahoo has no raw close.", Y)
 case("crosscheck_facts_reached_design", False, "the facts guessed before the probe is Answered", not ok)
+
+
+# ---- no_secret_seen, runner_split (iteration-8 flow F5, F6): reading verbs on .env and out/, not text that names them
+def bash(cmd):
+    return {"name": "Bash", "input": {"command": cmd}}
+
+
+for cmd, why in [("cat > probes/PB-01/.env.example <<'EOF'\n# Copy to .env in this folder\nKEY=\nEOF", "a heredoc writing .env.example"),
+                 ("printf '.env\\n!.env.example\\nprobes/*/out/\\n' >> .gitignore", "ignore patterns into .gitignore"),
+                 ("git check-ignore probes/$d/.env probes/$d/out/", "git check-ignore"),
+                 ('test -e probes/x/.env && echo "env file present"', "an existence test"), ("grep -n .env .gitignore", "a grep pattern")]:
+    case("no_secret_seen", True, f"{why} reads no secret", not pf.secret_reads([bash(cmd)]))
+for cmd, why in [("grep -n KEY probes/x/.env", "grep on .env"), (". ./.env", "sourcing .env"), ("done < .env", "an input redirect"),
+                 ("python3 - <<'EOF'\nprint(open('.env').read())\nEOF", "python run on a heredoc that opens .env"),
+                 ("head -5 probes/PB-01/out/members.json", "head on out/")]:
+    case("no_secret_seen", False, f"{why} is a read", pf.secret_reads([bash(cmd)]))
+case("runner_split", True, "'python3 probe.py' inside a heredoc's string literal is no run",
+     not pf.runs_user_script(bash("python3 - <<'EOF'\nsys.exit(\"usage: python3 probe.py bulk|checks\")\nEOF")))
+case("runner_split", True, "a syntax check is no run", not pf.runs_user_script(bash("python3 -m py_compile probes/x/probe.py")))
+case("runner_split", False, "probe.py run in its folder", pf.runs_user_script(bash("cd probes/PB-01 && python3 probe.py bulk")))
+case("runner_split", False, "probe.py run by a shell heredoc", pf.runs_user_script(bash("bash <<EOF\npython3 probe.py\nEOF")))
 
 
 def run(verbose=True):

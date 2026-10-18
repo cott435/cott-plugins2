@@ -122,8 +122,11 @@ dups = sorted({r for r in reqs if reqs.count(r) > 1})
 check("spec_ids_unique", "Spec requirement IDs are unique", reqs and not dups, f"duplicates: {dups}")
 vendors = r"\b(yfinance|yahoo|polygon|alpaca|quandl|nasdaq data link|sharadar|tiingo|crsp|wrds|pytorch|torch|numpy|pandas|scikit|sklearn|gymnasium|gym\b|pygame|stable[- ]baselines|sb3|tensorflow|jax|lightgbm|xgboost|parquet|duckdb|sqlite|postgres)"
 spec_body = re.split(r"## Changelog", spec)[0]
-hits = sorted({h.lower() for h in re.findall(vendors, spec_body, re.I)})
-check("spec_no_vendors", "Spec names no vendors, libraries, or storage tech", not hits, f"found: {hits}")
+# A vendor the persona already uses (quant: its Sharadar subscription, yahooquery) is the user's constraint, not a choice.
+persona_named = {h.lower() for h in re.findall(vendors, " ".join(scn["projects"][project].get("facts", [])), re.I)}
+hits = sorted({h.lower() for h in re.findall(vendors, spec_body, re.I)} - persona_named)
+check("spec_no_vendors", "Spec names no vendors, libraries, or storage tech beyond those the user already uses", not hits,
+      f"found: {hits}; the user's own: {sorted(persona_named)}")
 if project == "quant":
     check("spec_data_reqs", "Spec has DATA- requirements", bool(re.search(r"\*\*DATA-\d{2}\*\*", spec)), "")
 check("spec_baselines", "Learning/model criteria name a baseline to beat", bool(re.search(r"baseline|random (agent|policy)|scripted|equal[- ]weight|beats?", spec, re.I)),
@@ -333,7 +336,7 @@ check("plan_parallelism", f"{ms_id} parallelism (tasks ÷ critical path) is at l
 
 # Counted in spine units: steps sharing an owner module share one spine task, so the denominator is the distinct
 # owner modules; the numerator is spine tasks and tester halves only (implementer halves and wiring don't count).
-units = dtrun.wave_units(m_pls, PKGS)
+units = dtrun.wave_units(m_pls, m_tasks, PKGS)
 after_iface, early = dtrun.wave_ready(m_tasks, iface_ids, deps, declared, step_of)
 ready_n = len(after_iface) + len(early)
 check("wave_width", "Right after the interface task, the ready set (spines plus split tasks' tester halves) is at least "
@@ -376,7 +379,10 @@ def mitigation_ok(r):
     return bool(names) and all(n in declared for n in names)
 
 
-dc_rows = [r for r in g_rows if r["kind"] in ("data", "call")]
+# A row from a task to an interface task needs none (tasks.md): every task waits on the interface, so it is no edge
+# to mitigate. Interface tasks waiting on each other stay graded (they never depend on each other, phase0.md).
+dep_rows = [r for r in g_rows if r["to"] not in iface_ids or r["from"] in iface_ids]
+dc_rows = [r for r in dep_rows if r["kind"] in ("data", "call")]
 dc_ok = [r for r in dc_rows if r["mitigated_by"] and mitigation_ok(r)]
 mit_share = round(len(dc_ok) / len(dc_rows), 3) if dc_rows else None
 check("edges_mitigated", "At least 90% of data/call edges name a mitigation the interface task produces",
@@ -386,7 +392,7 @@ check("edges_mitigated", "At least 90% of data/call edges name a mitigation the 
       + ("" if g_rows else "; the plan has no Dependency graph table"),
       metrics={"edges_mitigated": mit_share, "data_call_edges": len(dc_rows)})
 
-unmit = [r for r in g_rows if not r["mitigated_by"]]
+unmit = [r for r in dep_rows if not r["mitigated_by"]]
 # Judged by structure, not wording (see dtrun.unmitigated_class): integration, file, same module, contract change,
 # order with a reason. Code edges between two steps' spine and thicken tasks are listed on their own.
 classes, unreasoned, cross_step = {}, [], []
@@ -452,7 +458,7 @@ check("edge_table_consistent", "Every Depends on (beyond the interface task) has
       metrics={"rows": len(g_rows), "missing": len(missing_rows) + len(bad_rows) + len(unordered)})
 
 # Steps grouped by owner module (one spine per module), system pipelines met by a system task, package-local
-# smoke tests, and `Reason: fold: <rule>` accepted (dtrun.phase0_misses).
+# smoke tests, a step named in a spine's Reason, and recorded folds accepted (dtrun.phase0_misses).
 split_miss = dtrun.phase0_misses(m_pls, m_tasks, iface_ids, declared_names, PKGS)
 check("phase0_split", f"Every pipeline of {ms_id}: its types declared by an interface task, one spine task per step (or a fold "
       "rule applied), one wiring task writing the entry and its smoke test",
@@ -850,7 +856,7 @@ if project == "quant":
     check("spec_bias_guards", "Spec guards look-ahead and survivorship bias as testable requirements",
           bool(re.search(r"look[- ]ahead|published after|known (on|as of)|point[- ]in[- ]time", spec, re.I)) and bool(re.search(r"delist|survivorship", spec, re.I)), "")
     check("spec_pca_mp", "Spec covers PCA market-mode removal and Marchenko–Pastur denoising",
-          bool(re.search(r"\bPCA\b|principal component|eigenvector|top factors|market (factor|mode)", spec, re.I)) and bool(re.search(r"Marchenko|random[- ]matrix|noise band|pure noise", spec, re.I)), "")
+          bool(re.search(r"\bPCA\b|principal component|eigenvector|eigenvalue|components above the edge|factor model|top factors|market (factor|mode)", spec, re.I)) and bool(re.search(r"Marchenko|random[- ]matrix|noise band|pure noise", spec, re.I)), "")
     check("spec_classical", "Classical portfolios (min-variance / risk parity / HRP) are specified",
           bool(re.search(r"min(imum)?[- ]variance", spec, re.I)) and bool(re.search(r"risk parity", spec, re.I)), "")
     m = dtrun.ML_BEATS_CLASSICAL.search(spec)  # the classical portfolios, or S2's named benchmark strategy
@@ -1010,8 +1016,16 @@ if probing and vendor_cfg:
         a = arch_at(turn_commit[n])
         hist[n] = {"main": PR.show(turn_commit[n], "docs/architecture.md"), "arch": a, "decisions": pf.decisions(a),
                    "probes": pf.parse_probes(PR.show(turn_commit[n], "docs/probes.md"))["entries"]}
+
+
+def source_decisions(decs):
+    """The decisions that choose a data source: their heading names the vendor (a decision that only mentions it,
+    such as credentials or security identity, isn't one); by their text when no heading does."""
+    return [d for d in decs if src_rx.search(d["title"])] or [d for d in decs if src_rx.search(d["text"])]
+
+
 final_decs = pf.decisions(arch_all)
-src_final = [d for d in final_decs if src_rx.search(d["text"])]
+src_final = source_decisions(final_decs)
 src_ids = {d["id"] for d in src_final}
 ventries = [e for e in PR.probes if set(e["informs"]) & src_ids] or PR.probes
 first_user_turn = min((n for _, n in PR.user_runs), default=None)
@@ -1022,8 +1036,8 @@ if not probing or not vendor_cfg:
     graded_or_na("probe_not_guess", T_GUESS, (None, NOT_PROBING if not probing else "the project has no external source"))
 else:
     first_ok = next((n for n in sorted(hist) if status(hist[n]["main"]) == "Approved"), None)
-    src0 = [d for d in (hist[first_ok]["decisions"] if first_ok is not None else [])
-            if src_rx.search(d["text"]) and not d["status"].lower().startswith("superseded")]
+    src0 = [d for d in source_decisions(hist[first_ok]["decisions"] if first_ok is not None else [])
+            if not d["status"].lower().startswith("superseded")]
     no_line = [d["id"] for d in src0 if not d["probe_ids"]]
     early = {}
     for n in sorted(hist):
@@ -1046,7 +1060,9 @@ if not probing or not vendor_cfg:
 else:
     req_text = {m.group(1): m.group(2) for m in re.finditer(r"^\s*- \*\*([A-Z][A-Z0-9]*-\d{2,})\*\*\s*(.*)$", spec, re.M)}
     live = set(facts["live_spec"])
-    raw_reqs = [i for i, t in req_text.items() if i in live and i.startswith("PRICE-") and re.search(r"\braw\b", t, re.I)]
+    # The raw-price requirement on what the source delivers, not the ones that store or compute from raw prices.
+    raw_reqs = [i for i, t in req_text.items() if i in live and i.startswith("PRICE-") and re.search(r"\braw\b", t, re.I)
+                and re.search(r"\b(source|vendor|deliver\w*|provide\w*|feed)\b", t, re.I)]
     need = ({"DATA-01", "DATA-02"} & live) | set(raw_reqs)
     informed = set()
     for e in ventries:
@@ -1065,7 +1081,14 @@ if not probing or not vendor_cfg:
     graded_or_na("docs_before_probe", T_DOCS, (None, NOT_PROBING if not probing else "the project has no external source"))
 else:
     doms = [d for c in vendor_cfg.values() for d in c.get("docs_domains", [])]
-    no_docs = [e["id"] for e in ventries if not any(d in e["docs_read"].lower() for d in doms)]
+
+    def own_domains(e):
+        """The docs domains of the vendor a probe is about (named in its title, question or folder); every
+        configured vendor's when it names none of them."""
+        about = " ".join([e.get("title", ""), e["question"], e["folder"]]).lower()
+        own = [c for n, c in vendor_cfg.items() if any(a.lower() in about for a in [n, c.get("decision", n), *c.get("aliases", [])])]
+        return [d for c in own for d in c.get("docs_domains", [])] or doms
+    no_docs = [e["id"] for e in ventries if not any(d in e["docs_read"].lower() for d in own_domains(e))]
     contra = re.compile(planted.get("contradiction", r"(?!)"), re.I)
     contra_turn = next((n for n in sorted(hist) if any(contra.search(d["text"]) for d in hist[n]["decisions"] if src_rx.search(d["text"]))
                         or contra.search(pf.risks(hist[n]["arch"]))), None)

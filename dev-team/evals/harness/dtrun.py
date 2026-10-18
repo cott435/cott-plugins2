@@ -282,11 +282,28 @@ def wired_pipelines(t):
 
 
 def same_step_unit(a, b, step_info):
-    """Two step tasks build one module: the same Step, or two steps with the same dotted owner."""
+    """A thicken task `a` extends the module spine task `b` built: b's Step is a's, or a step with the same dotted
+    owner. Two thicken tasks of one Step build one module only when their Writes overlap (the `file` class), so
+    library modules behind one factory step are not one unit."""
+    if b.get("kind") != "spine":
+        return False
     if a.get("step") and a.get("step") == b.get("step"):
         return True
     sa, sb = step_info.get(a.get("step")), step_info.get(b.get("step"))
     return bool(sa and sb) and "." in (sa.get("owner") or "") and sa.get("owner") == sb.get("owner")
+
+
+def records_fold(t):
+    """A thicken task that records a fold (phase0.md): its Reason names the fold (`fold: …`, `spine folded into the
+    thicken`), or it is a split task that keeps the baseline selectable."""
+    return t.get("kind") == "thicken" and bool(
+        re.search(r"\bfold", t.get("reason") or "", re.I)
+        or (t.get("mode") == "split" and re.search(r"baseline", " ".join(t.get("acceptance") or []), re.I)))
+
+
+def is_fold(t, tasks):
+    """A thicken task that stands in for its step's spine: it records the fold and no spine task has its Step."""
+    return records_fold(t) and not any(x.get("kind") == "spine" and x.get("step") == t.get("step") for x in tasks)
 
 
 def integration_row(r):
@@ -314,7 +331,9 @@ def unmitigated_class(r, by_id, step_info, pl_by_id=None):
     Allowed: integration (a wiring or system task waits on a step task, wiring or system task of a pipeline it
     wires or swaps), file (the two tasks' Writes overlap), same module (a thicken waits on its own step's spine or
     an earlier thicken of that module), contract change, and order with a reason (a real side-effect order; the
-    design writes integration rows as `order` with `integration: <why>`). Every class needs a reason."""
+    design writes integration rows as `order` with `integration: <why>`). Every class needs a reason. Whatever the
+    row's kind, a wiring task never waits on a thicken task that isn't a fold (phase0.md: wiring depends on spines
+    and fold tasks only)."""
     reason = (r.get("reason") or "").strip()
     a, b = by_id.get(r.get("from")), by_id.get(r.get("to"))
     if not reason:
@@ -324,6 +343,8 @@ def unmitigated_class(r, by_id, step_info, pl_by_id=None):
     kind = r.get("kind")
     if kind == "contract-change":
         return "contract change", ""
+    if a.get("kind") == "wiring" and b.get("kind") == "thicken" and not is_fold(b, by_id.values()):
+        return "", "wiring waits on a thicken task that isn't a fold"
     if kind == "order":
         return "order", ""
     if writes_overlap(a, b):
@@ -375,9 +396,51 @@ def interface_writes_symbols(iface_tasks, symbols):
     return out
 
 
-def wave_units(m_pls, packages=()):
-    """The spine units a milestone needs: its distinct non-call step owner modules (a bare owner counts per step)."""
-    return sorted({step_unit(s) for pl in m_pls for s in pl["steps"] if not call_step(pl, s, packages)})
+def step_units(pls):
+    """Step IDs by owner module (step_unit), call steps included: a call step's module is still built by the
+    spine of its unit (`lab.runs` holds train_seeds, which calls PL-01, and report_runs)."""
+    units = {}
+    for pl in pls:
+        for s in pl["steps"]:
+            units.setdefault(step_unit(s), []).append(f"{pl['id']}.{s['name']}")
+    return units
+
+
+def owns_module(path, owner, packages=()):
+    """`path` is the owner's module file itself or its folder glob (`…/api/client.ts`, `…/viewer/draw/**`), not just
+    a file somewhere under the owner's folder."""
+    op = owner_path(owner, packages)
+    return bool(op) and bool(re.search(rf"(^|/){re.escape(op)}(\.(py|pyi|ts|tsx|js|jsx)|/\*\*?)$", path))
+
+
+def covering_tasks(pl, s, tasks, units, packages=()):
+    """The spine tasks and recorded folds that build step s: those whose Step is s or shares its owner module;
+    else those whose Reason names s (`one module for open_run and close_run`) or whose Writes are s's owner
+    module itself. Steps sharing a module share one spine (phase0.md)."""
+    builders = [t for t in tasks if t.get("kind") == "spine" or records_fold(t)]
+    ids_ = units.get(step_unit(s), [f"{pl['id']}.{s['name']}"])
+    own = [t for t in builders if t.get("step") in ids_]
+    if own:
+        return own
+    named = [t for t in builders if re.search(rf"(?<![\w.]){re.escape(s['name'])}(?!\w)", t.get("reason") or "")]
+    return named or [t for t in builders if any(owns_module(w, s.get("owner"), packages)
+                                                for w in t.get("writes", []) if not is_test_path(w))]
+
+
+def wave_units(m_pls, m_tasks=(), packages=()):
+    """The spine units a milestone needs: one per task that builds a non-call step's module (covering_tasks), and
+    per owner module for a step no task builds (a bare owner counts per step)."""
+    units = step_units(m_pls)
+    keys = set()
+    for pl in m_pls:
+        for s in pl["steps"]:
+            if call_step(pl, s, packages):
+                continue
+            cover = covering_tasks(pl, s, m_tasks, units, packages)
+            spines = [t for t in cover if t.get("kind") == "spine"]
+            pick = spines if spines else cover
+            keys.add(f"task {pick[0]['id']}" if len(pick) == 1 else step_unit(s))
+    return sorted(keys)
 
 
 def wave_ready(m_tasks, iface_ids, deps, declared, step_info=None):
@@ -394,11 +457,7 @@ def phase0_misses(m_pls, m_tasks, iface_ids, declared_names, packages=()):
     """What `phase0_split` finds missing in a milestone's pipelines: types the interface lacks; a step unit
     (owner module) without exactly one spine task, unless a fold applies; a package pipeline without one wiring
     task writing its entry and a smoke test (any test path); a system pipeline no system task names."""
-    units = {}
-    for pl in m_pls:
-        for s in pl["steps"]:
-            if not call_step(pl, s, packages):
-                units.setdefault(step_unit(s), []).append(f"{pl['id']}.{s['name']}")
+    units = step_units(m_pls)
     miss = []
     for pl in m_pls:
         pid = pl["id"]
@@ -415,13 +474,10 @@ def phase0_misses(m_pls, m_tasks, iface_ids, declared_names, packages=()):
         for s in pl["steps"]:
             if call_step(pl, s, packages):
                 continue
-            ids_ = units.get(step_unit(s), [f"{pid}.{s['name']}"])
-            spine = [t for t in m_tasks if t.get("kind") == "spine" and t.get("step") in ids_]
-            # Folds: a split thicken that keeps the baseline selectable, a thicken whose Reason records the fold
-            # (`fold: <rule>`), or a trivial step done by the wiring.
-            folded = [t for t in m_tasks if t.get("kind") == "thicken" and t.get("step") in ids_ and (
-                (t.get("mode") == "split" and re.search(r"baseline", " ".join(t.get("acceptance") or []), re.I))
-                or re.match(r"\s*fold\b", t.get("reason") or "", re.I))]
+            cover = covering_tasks(pl, s, m_tasks, units, packages)
+            spine = [t for t in cover if t.get("kind") == "spine"]
+            # Folds: a thicken that records one (records_fold), or a trivial step done by the wiring.
+            folded = [t for t in cover if t.get("kind") != "spine"]
             folded += [t for t in wiring if re.search(rf"\b{re.escape(s['name'])}\b",
                                                       t.get("title", "") + " " + " ".join(t.get("acceptance") or []))]
             if len(spine) != 1 and not folded:

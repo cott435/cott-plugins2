@@ -27,7 +27,8 @@ class Run:
         self.turn_commit = {int(s.split()[1]): h for h, s in self.commits if re.fullmatch(r"turn \d+", s)}
         self.user_runs = [(h, int(s.rsplit(" ", 1)[1])) for h, s in self.commits if re.fullmatch(r"user run before turn \d+", s)]
         self.calls = pf.tool_calls(self.run / "agent_stream.jsonl")
-        self.probe_turns = {t["turn"] for t in self.turns if "api-probe" in [dtrun.skill_name(x) for x in t.get("skills", [])]}
+        # api-probe turns: Skill calls, plus turns that continue it (dt status --skill api-probe, its references read).
+        self.probe_turns = {n for n, ks in dtrun.turn_skill_map(self.turns, self.calls).items() if "api-probe" in ks}
         pb = self.proj / "docs" / "probes.md"
         self.probes = pf.parse_probes(pb.read_text(errors="ignore") if pb.exists() else "")["entries"]
         self.dirs = sorted(p for p in (self.proj / "probes").iterdir() if p.is_dir()) if (self.proj / "probes").is_dir() else []

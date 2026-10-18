@@ -149,23 +149,42 @@ def probe_small_isolated(r):
             f"api-probe turns changing pyproject.toml: {pyproj}")
 
 
+def written_before_switch(calls, rel):
+    """In one turn's tool calls (in order), the last call naming the file `rel` (its path or file name) comes before
+    the first call that shows another skill than api-probe at work (dtrun.call_skills: a Skill call, `dt status
+    --skill X`, a skills/X/ read): the write belongs to the skill the session was already in."""
+    switch = next((i for i, c in enumerate(calls) if set(dtrun.call_skills(c)) - {"api-probe"}), len(calls))
+    name = rel.rsplit("/", 1)[-1]
+    naming = [i for i, c in enumerate(calls) if rel in pf.call_text(c) or re.search(rf"(?<![\w.-]){re.escape(name)}\b", pf.call_text(c))]
+    return bool(naming) and naming[-1] < switch
+
+
 def probe_code_in_probe_turns(r):
-    """Code under probes/ is added or changed only in api-probe turns."""
+    """Code under probes/ is added or changed only in api-probe turns. A turn that opens by finishing the api-probe
+    work of the turn before in the same session, then moves on to another skill, keeps the probe writes made
+    before the switch (it9 quant inc turn 8: the approved PB-03 Revise, then pipeline-design; flow §6)."""
     if not r.has_probes:
         return None, "no probes"
-    bad, seen = [], []
+    bad, seen, carried = [], [], []
+    session = {t["turn"]: (t.get("session") or {}).get("id", "") for t in r.turns}
     for n in sorted(r.turn_commit):
         prev = r.before(n)
         if not n or not prev:
             continue
+        calls = [c for c in r.calls if c.get("turn") == n]
         for line in r.git("diff", "--name-status", prev, r.turn_commit[n], "--", "probes").splitlines():
             parts = line.split("\t")
             if len(parts) < 2 or parts[0].startswith("D") or not re.match(r"probes/.+\.py$", parts[-1]):
                 continue
             seen.append(n)
-            if n not in r.probe_turns:
+            if n in r.probe_turns:
+                continue
+            if n - 1 in r.probe_turns and session.get(n) == session.get(n - 1) and written_before_switch(calls, parts[-1]):
+                carried.append(f"turn {n}: {parts[-1]}")
+            else:
                 bad.append(f"turn {n}: {parts[-1]}")
-    return not bad, f"api-probe turns {sorted(r.probe_turns)}; turns writing probe code {sorted(set(seen))}; outside api-probe: {bad[:6]}"
+    return not bad, (f"api-probe turns {sorted(r.probe_turns)}; turns writing probe code {sorted(set(seen))}; outside api-probe: "
+                     f"{bad[:6]}" + (f"; written before the turn left api-probe (kept with it): {carried[:6]}" if carried else ""))
 
 
 def evidence_scan_clean(r, extra=()):

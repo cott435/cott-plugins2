@@ -399,14 +399,19 @@ check("plan_parallelism", f"{ms_id} parallelism (tasks ÷ critical path) is at l
 # Counted in spine units: steps sharing an owner module share one spine task, so the denominator is the distinct
 # owner modules; the numerator is spine tasks and the tester halves of split spines and folds only (implementer
 # halves, wiring and library thickens don't count).
-units = dtrun.wave_units(m_pls, m_tasks, PKGS)
+# Steps of the milestone's pipelines that another milestone builds (Deferred, probe-blocked with a built stand-in,
+# or undeclared and unnamed with nothing of their own): left out of wave_width and phase0_split, and listed.
+outside = dtrun.outside_milestone(m_pls, m_tasks, active["deferred"] if active else [], declared_names, PKGS)
+outside_ev = f"; outside the milestone: {len(outside)} {sorted(outside)}" if outside else ""
+units = dtrun.wave_units(m_pls, m_tasks, PKGS, outside)
 after_iface, early = dtrun.wave_ready(m_tasks, iface_ids, deps, declared, step_of)
 ready_n = len(after_iface) + len(early)
 check("wave_width", "Right after the interface task, the ready set (spines plus split spines' and folds' tester halves) is at least "
       "0.8 × the milestone's step count", iface_ids and units and ready_n >= 0.8 * len(units),
       f"interface: {sorted(iface_ids)}; spines ready after it: {after_iface} + tester halves {early} = {ready_n}; "
-      f"spine units (owner modules): {len(units)} ({units}); steps: {len(m_steps)}",
-      metrics={"ready_after_interface": ready_n, "steps": len(units), "step_count": len(m_steps)})
+      f"spine units (owner modules): {len(units)} ({units}); steps: {len(m_steps)}{outside_ev}",
+      metrics={"ready_after_interface": ready_n, "steps": len(units), "step_count": len(m_steps)},
+      items={"outside_milestone": [f"{k}: {v}" for k, v in sorted(outside.items())]} if outside else None)
 
 conflicts = []
 for i, a in enumerate(m_tasks):
@@ -425,7 +430,9 @@ for t in m_tasks:
             shared_bad.append(f"{t['id']} ({t.get('kind') or 'no kind'}): {', '.join(hit)}")
     if t.get("kind") == "spine":
         # The owner maps to a path (`experiments.build` → …/experiments/build.py); tests anywhere under tests/.
-        owner = step_info.get(t["step"], (None, {}))[1].get("owner", "")
+        # A Step cell naming several steps (`PL-09.open_run, PL-09.close_run`) takes their owner when they share one.
+        owners = list(dict.fromkeys(step_info[x][1].get("owner", "") for x in dtrun.step_ids(t["step"]) if x in step_info))
+        owner = owners[0] if len(owners) == 1 else ""
         why = dtrun.spine_writes_problem(t["writes"], owner, PKGS)
         if why:
             spine_bad.append(f"{t['id']} (owner {owner or '?'}): {why}")
@@ -446,13 +453,16 @@ def mitigation_ok(r):
 # A row from a task to an interface task needs none (tasks.md): every task waits on the interface, so it is no edge
 # to mitigate. Interface tasks waiting on each other stay graded (they never depend on each other, phase0.md).
 dep_rows = [r for r in g_rows if r["to"] not in iface_ids or r["from"] in iface_ids]
-dc_rows = [r for r in dep_rows if r["kind"] in ("data", "call")]
+# A system task's row to the wiring of a pipeline it swaps in is the un-faking itself: no fake can mitigate it.
+swap_rows = [r for r in dep_rows if r["from"] in by_id and r["to"] in by_id and dtrun.swaps_in(by_id[r["from"]], by_id[r["to"]], pl_by_id)]
+dc_rows = [r for r in dep_rows if r["kind"] in ("data", "call") and r not in swap_rows]
 dc_ok = [r for r in dc_rows if r["mitigated_by"] and mitigation_ok(r)]
 mit_share = round(len(dc_ok) / len(dc_rows), 3) if dc_rows else None
 check("edges_mitigated", "At least 90% of data/call edges name a mitigation the interface task produces",
       g_rows and (mit_share is None or mit_share >= 0.9),
       f"{len(dc_ok)}/{len(dc_rows)} mitigated by a declared interface; not: "
       f"{[(r['from'], r['to'], r['mitigated_by'] or 'none') for r in dc_rows if r not in dc_ok][:5]}"
+      + (f"; system rows to the wiring they swap in (not counted): {[(r['from'], r['to']) for r in swap_rows][:6]}" if swap_rows else "")
       + ("" if g_rows else "; the plan has no Dependency graph table"),
       metrics={"edges_mitigated": mit_share, "data_call_edges": len(dc_rows)},
       items={"not_mitigated": [f"{r['from']}→{r['to']}: {r['mitigated_by'] or 'none'}" for r in dc_rows if r not in dc_ok]})
@@ -529,11 +539,12 @@ check("edge_table_consistent", "Every Depends on (beyond the interface task) has
 
 # Steps grouped by owner module (one spine per module), system pipelines met by a system task, package-local
 # smoke tests, a step named in a spine's Reason, and recorded folds accepted (dtrun.phase0_misses).
-split_miss = dtrun.phase0_misses(m_pls, m_tasks, iface_ids, declared_names, PKGS)
-check("phase0_split", f"Every pipeline of {ms_id}: its types declared by an interface task, one spine task per step (or a fold "
-      "rule applied), one wiring task writing the entry and its smoke test",
-      m_pls and not split_miss, f"pipelines {[p['id'] for p in m_pls]}; missing: {split_miss[:6]}; "
-      f"dt no_spine: {st_bp.get('no_spine')}", metrics={"missing": len(split_miss)}, items={"missing": split_miss})
+split_miss = dtrun.phase0_misses(m_pls, m_tasks, iface_ids, declared_names, PKGS, outside)
+check("phase0_split", f"Every pipeline of {ms_id}: its types declared by an interface task (for the steps it builds), one spine "
+      "task per step (or a fold rule applied), one wiring task writing the entry and its smoke test; steps another milestone "
+      "builds left out", m_pls and not split_miss, f"pipelines {[p['id'] for p in m_pls]}; missing: {split_miss[:6]}; "
+      f"dt no_spine: {st_bp.get('no_spine')}{outside_ev}", metrics={"missing": len(split_miss), "outside": len(outside)},
+      items={"missing": split_miss, "outside_milestone": [f"{k}: {v}" for k, v in sorted(outside.items())]})
 
 big_steps = [f"{t['id']} {t['kind']}={t['size']}" for t in m_tasks if t.get("kind") in ("spine", "thicken") and t["size"] not in ("XS", "S")]
 n_step_tasks = sum(1 for t in m_tasks if t.get("kind") in ("spine", "thicken"))
@@ -553,8 +564,12 @@ check("tester_starts_early", "At least 80% of split tasks read only symbols the 
 
 
 def fake_ok(sym, consumer_pl=None):
-    """A fake is fine only where a pipeline calls another pipeline or package."""
+    """A fake is fine only where a pipeline calls another pipeline or package: a call step, another package's
+    user, or a Boundary line whose Used by names another pipeline than the owner's (dtrun.boundary_fake_ok)."""
     name = sym.split(".")[-1]
+    sec = next((s_ for s_ in facts.get("symbols", []) if s_["id"] == sym), None)
+    if dtrun.boundary_fake_ok(sym, sec, facts["pipelines"], consumer_pl, PKGS):
+        return True
     if consumer_pl:
         pl = pl_by_id.get(consumer_pl)
         own = [s_ for s_ in (pl or {}).get("steps", []) if s_["name"] == name]
@@ -562,7 +577,6 @@ def fake_ok(sym, consumer_pl=None):
             return all(call_step(pl, s_) for s_ in own)
     if any(call_step(pl, s_) for pl in facts["pipelines"] for s_ in pl["steps"] if s_["name"] == name):
         return True
-    sec = next((s_ for s_ in facts.get("symbols", []) if s_["id"] == sym), None)
     pkg = sec["doc"].split("/")[2] if sec and sec["doc"].startswith("docs/packages/") else None
     users = re.findall(r"PL-\d{2,}", (sec or {}).get("fields", {}).get("Used by", ""))
     return bool(pkg) and any(pl_by_id.get(u, {}).get("package") not in (None, pkg) for u in users)
@@ -669,10 +683,13 @@ check("interface_coverage", "Every cross-owner step boundary has its type as a c
 named_types = {(pl["id"], s_["name"], nm) for pl in facts["pipelines"] for s_ in pl["steps"]
                for nm in type_names(s_["in_type"]) + type_names(s_["out_type"])}
 unresolved_types = sorted({nm for _, _, nm in named_types if nm not in type_by_name})
-# The types a type section's own fields use resolve too (a section, an inline definition, or a library type).
-contract_text = "\n".join(s_["text"] for s_ in facts.get("symbols", []))
-unresolved_fields = sorted({f"{sid}: {nm}" for sid, s_ in type_secs.items() for nm in dtrun.field_types(s_.get("text", ""))
-                            if nm not in type_by_name and not dtrun.defined_in(nm, contract_text)})
+# The types a type section's own fields use resolve too (a section, an inline definition anywhere in a contract file,
+# its preamble included, or a library type: one qualified by a module that is no contract package or symbol prefix).
+contract_text = dtrun.contract_text(proj, facts.get("symbols", []))
+contract_modules = dtrun.contract_modules(PKGS, facts.get("symbols", []))
+unresolved_fields = sorted({f"{sid}: {nm}" for sid, s_ in type_secs.items()
+                            for nm in dtrun.field_types(s_.get("text", ""), contract_modules)
+                            if nm not in type_by_name and not dtrun.defined_in(nm, contract_text, set(type_by_name))})
 check("types_in_contract", "Every type named in a step table resolves to a contract type section",
       named_types and not unresolved_types and not unresolved_fields,
       f"{len({nm for _, _, nm in named_types})} types named in step tables, {len(type_secs)} type sections; unresolved: {unresolved_types[:10]}; "
@@ -871,20 +888,26 @@ def layers_changed(n):
                           if l.startswith("+") and not l.startswith("+++") and "**Used by:**" not in l)
         if k:
             added[k] = added.get(k, 0) + n_added
+    layer_added[n] = added
     return {k for k, v in added.items() if v >= 12}  # status flips and small fixes don't count
 
+layer_added = {}  # turn → {layer: lines added}
 layer_sets = {n: layers_changed(n) for n in sorted(turn_commit) if n}
 multi_all = [(n, sorted(ks)) for n, ks in layer_sets.items() if len(ks) > 1]
 # A routed Revise round trip passes: the turn before stopped at its gate, left the pipelines (or tests) doc Draft
 # and asked to run the architecture revision; this turn ran it and re-synced that doc. The single-turn case fails.
+# So does a turn that makes the routed fixes the turn before named and the user told it to make (a small architecture
+# change), then drafts one layer.
 turn_rec = {t["turn"]: t for t in turns}
 routed = [(n, ks) for n, ks in multi_all
-          if dtrun.routed_revise(set(ks), turn_rec.get(n - 1), changed_paths.get(n, []), layer_sets.get(n - 1, set()))]
+          if dtrun.routed_revise(set(ks), turn_rec.get(n - 1), changed_paths.get(n, []), layer_sets.get(n - 1, set()))
+          or dtrun.routed_fixes(set(ks), layer_added.get(n, {}), turn_rec.get(n - 1), (turn_rec.get(n) or {}).get("user"))]
 multi = [x for x in multi_all if x not in routed]
-# Skills are attributed to turns by Skill calls, `dt status --skill X` calls and skills/X/ reads, so a turn that
-# continues a skill without invoking it again still counts as that skill's.
+# Skills are attributed to turns by Skill calls, `dt status --skill X` calls, skills/X/ reads and a slash-command
+# opening (`/dev-team:<skill>`), so a turn that continues a skill without invoking it again still counts as that skill's.
 stream_calls = pf.tool_calls(run / "agent_stream.jsonl")
 turn_skills = dtrun.turn_skill_map(turns, stream_calls)
+skill_seq = dtrun.turn_skill_seq(turns, stream_calls)
 # Watched, not graded: pipeline-design finding missing types and adding them to the contract in its own turn.
 pd_turns = {n for n, ks in turn_skills.items() if "pipeline-design" in ks}
 pd_types = [(n, sorted(set(types_at[n]) - set(types_at.get(max([k for k in types_at if k < n], default=n), {}))))
@@ -906,9 +929,12 @@ for t in turns:
     prev = cur
 check("approval_after_user", "Docs only flip to Accepted/Approved in a turn where the user approved", not bad, f"violations: {bad[:10]}",
       items={"violations": [list(b) for b in bad]})
-skills_used = sorted({dtrun.skill_name(s) for t in turns for s in t["skills"]})
+# A skill counts as invoked when a turn worked in it (turn_skill_map): a Skill call, or the driver's `/dev-team:<skill>`
+# opening of a fresh session, which makes no Skill call (it9 interface F7).
+skills_used = sorted(set().union(*turn_skills.values())) if turn_skills else []
 missing = [s for s in PLANNING_SKILLS if s not in skills_used]
-check("skills_invoked", "All six required planning skills were invoked (idea → build-setup)", not missing, f"used: {skills_used}; missing: {missing}")
+check("skills_invoked", "All six required planning skills were invoked (idea → build-setup), by a Skill call or a "
+      "`/dev-team:<skill>` session opening", not missing, f"used: {skills_used}; missing: {missing}")
 check("test_planning_invoked", "test-planning ran (optional skill; the persona asks for golden cases)", "test-planning" in skills_used, f"used: {skills_used}")
 
 # ---- Replan and Advance simulation on a copy of the final project (no model calls)
@@ -1049,7 +1075,7 @@ if ref_stage:
                  "The structure & classical-portfolios milestones route data-analysis and null-hypothesis-testing "
                  "(their roadmap **Skills:** lines, and a task of each planned milestone that names one)")
 
-    intake = [t for t in turns if "reference-intake" in [dtrun.skill_name(x) for x in t["skills"]]]
+    intake = [t for t in turns if "reference-intake" in turn_skills.get(t["turn"], set())]
     check("reference_intake_invoked", "reference-intake ran", bool(intake), f"turns: {[t['turn'] for t in intake]}")
     names = sorted({pathlib.PurePath(f).name for f in present})
     # Intake turns by attribution (a Skill call, `dt status --skill reference-intake`, its reference reads), a
@@ -1204,6 +1230,11 @@ if not probing or yahoo is None:
 elif not re.search(r"yahooquery", run_facts, re.I):
     graded_or_na("crosscheck_facts_reached_design", T_CROSS, (None, "the run's scenario snapshot names no yahooquery "
                  "cross-check" if run_scn else "the run recorded no scenario snapshot"))
+elif not y_entries and not dtrun.crosscheck_named([t.get("user") or "" for t in turns], [brief, spec, arch_all]):
+    # The persona reveals yahooquery only when asked; when no user message and no doc names the cross-check, there
+    # was no cross-check to probe (it9 quant aao, flow §6).
+    graded_or_na("crosscheck_facts_reached_design", T_CROSS, (None, "nobody named a Yahoo cross-check: no user message "
+                 "and no brief, spec or architecture names Yahoo or yahooquery, and no probe of it"))
 elif not y_entries:
     check("crosscheck_facts_reached_design", T_CROSS, False, "no probe of the Yahoo cross-check")
 else:
@@ -1257,7 +1288,7 @@ out = {"expectations": R,
                  "output_tokens": sum(((t["usage"].get("usage") or {}).get("output_tokens") or 0) for t in turns),
                  "agent_seconds": round(sum(t["seconds"] for t in turns)),
                  "final_words": {k: len(v.split()) for k, v in [("brief", brief), ("spec", spec), ("architecture", arch_all)]}, "skills_used": skills_used,
-                 "skill_sequence": [s for t in turns for s in t["skills"]],
+                 "skill_sequence": [s for t in turns for s in dict.fromkeys(skill_seq.get(t["turn"], []))],
                  "ideas": [p.name for p in ideas], "package_docs": [str(p.relative_to(docs)) for p in pkg_docs],
                  "spec_reqs": len(reqs), "decisions": len(ads), "brief_words": bw,
                  "shape_by_turn": shapes, "packages": facts["packages"], "pipelines": len(facts["pipelines"]),

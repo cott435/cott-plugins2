@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-"""Good and bad cases for the grader's structural rules (dtrun.py, probefacts.py), one pair or more per check that
-iteration 7's and 8's findings changed. The good cases are the forms those plans used that the old grader flagged by mistake;
+"""Good and bad cases for the grader's structural rules (dtrun.py, probefacts.py, probegrade.py, planexport.py), one
+pair or more per check that iteration 7's, 8's and 9's findings changed. The good cases are the forms those plans used that the old grader flagged by mistake;
 the bad cases are the defects each check must still catch. No dt, no model calls; the dry run runs this too.
 
 Usage: checks.py   prints one line per case; exit 1 if any case comes out wrong
@@ -17,9 +17,9 @@ def task(id_, kind, step="", writes=(), mode="solo", reads=(), read_symbols=(), 
             "read_symbols": list(read_symbols), "acceptance": list(acceptance), "reason": reason, "title": title or id_}
 
 
-def step(name, owner, io="", spine=""):
+def step(name, owner, io="", spine="", covers=()):
     i, _, o = io.partition("→")
-    return {"name": name, "owner": owner, "in_type": i.strip(), "out_type": o.strip(), "spine": spine}
+    return {"name": name, "owner": owner, "in_type": i.strip(), "out_type": o.strip(), "spine": spine, "covers": list(covers)}
 
 
 def pipe(id_, steps, package="quant", entry="", system=False):
@@ -439,6 +439,238 @@ case("requests_append_only", False, "a line deleted, then the whole file: each l
 case("requests_append_only", False, "a line that stops parsing counts once",
      d.requests_rewritten([(2, w1, []), (3, {"UR-01": w1["UR-01"]}, ["UR-02"]), (4, {"UR-01": w1["UR-01"]}, ["UR-02"])])
      == ['turn 3: UR-02 "I want yahooquery" no longer parses'])
+
+
+# ==== iteration 9 (results-iteration-9/findings.md, "Harness: grader") ===========================================
+
+# ---- phase0_split, wave_width (it9 interface F4): only the steps this milestone builds
+lab = pipe("PL-01", [step("make_env", "lab.build", "Settings → Env", covers=["CORE-01"]),
+                     step("Snake", "envs.snake", "Rewards → Env", covers=["SNAKE-01"]),
+                     step("FishTank", "envs.tank", "Rewards → Env", covers=["FISH-01", "FISH-02"]),       # Deferred to M2
+                     step("PPOAgent", "agents.ppo", "Params → Agent", covers=["PG-01", "AGENT-06"]),       # PG-01 Deferred
+                     step("OpponentPool", "selfplay.pool", "Agent → Pool", covers=["SELF-03"]),            # Deferred: its type too
+                     step("DQNAgent", "agents.dqn", "Params → Agent", covers=["AGENT-06"])],
+           package="rllab", entry="src/rllab/lab/pipelines/pl01_train.py")
+ev = pipe("PL-03", [step("evaluate", "evaluate.protocol", "Agent → ScoreSet", covers=["EVAL-02"]),
+                    step("print_scores", "lab.printing", "ScoreSet → ScoreSet", covers=["EVAL-01"])],
+          package="rllab", entry="src/rllab/lab/pipelines/pl03_eval.py")
+t9 = [task("T01", "interface"), task("T02", "spine", "PL-01.make_env"), task("T03", "spine", "PL-01.Snake"),
+      task("T05", "spine", "PL-01.DQNAgent"), task("T06", "spine", "PL-03.evaluate"),
+      task("T21", "wiring", "PL-01", ["src/rllab/lab/pipelines/pl01_train.py", "tests/unit/test_pl01.py"]),
+      task("T23", "wiring", "PL-03", ["src/rllab/lab/pipelines/pl03_eval.py", "tests/unit/test_pl03.py"],
+           reason="`print_scores` is trivial, so this task builds it (fold)")]
+names9 = {"Settings", "Env", "Rewards", "Params", "Agent", "ScoreSet"}  # no Pool: OpponentPool is M3's
+DEFER = ["FISH-01", "FISH-02", "PG-01", "SELF-03"]
+out9 = d.outside_milestone([lab, ev], t9, DEFER, names9, ("rllab",))
+case("phase0_split", True, "it9 rl inc: FishTank, PPOAgent and OpponentPool are Deferred (PPO's AGENT-06 is DQN's too)",
+     sorted(out9) == ["PL-01.FishTank", "PL-01.OpponentPool", "PL-01.PPOAgent"])
+miss = d.phase0_misses([lab, ev], t9, {"T01"}, names9, ("rllab",), out9)
+case("phase0_split", True, "...so neither their spines nor OpponentPool's type are missing; a fold named in the wiring's Reason",
+     not miss)
+case("wave_width", True, "deferred steps and a step the wiring builds are no spine units (it9 rl inc 28 → 18)",
+     d.wave_units([lab, ev], t9, ("rllab",), out9) == ["task T02", "task T03", "task T05", "task T06"])
+case("phase0_split", False, "with nothing Deferred, the same steps miss their spines and the interface lacks Pool",
+     {"PL-01.FishTank: 0 spine tasks", "PL-01: interface lacks ['Pool']"}
+     <= set(d.phase0_misses([lab, ev], t9, {"T01"}, names9, ("rllab",), d.outside_milestone([lab, ev], t9, [], names9 | {"FishTank", "PPOAgent", "OpponentPool"}, ("rllab",)))))
+own_req = pipe("PL-04", [step("load", "data.load", "Path → Frame", covers=["DATA-01"]),
+                         step("clean", "data.clean", "Frame → Frame", covers=["DATA-02", "DATA-09"])], package="data", entry="data/p4.py")
+t4 = [task("T01", "interface"), task("T02", "spine", "PL-04.load"), task("T03", "wiring", "PL-04", ["data/p4.py", "tests/test_p4.py"])]
+case("phase0_split", False, "a step one of whose Covers is Deferred, but with a requirement only it covers, is still missing",
+     d.phase0_misses([own_req], t4, {"T01"}, {"Path", "Frame"}, ("data",), d.outside_milestone([own_req], t4, ["DATA-09"], set(), ("data",)))
+     == ["PL-04.clean: 0 spine tasks"])
+src9 = pipe("PL-09", [step("SyntheticSource", "vendors_synthetic", "seed → Source", covers=["DATA-01", "DATA-07"]),
+                      step("EdgarSicSource", "vendors.edgar", "user agent → Source", "SIC from each header (waits on PB-02)", covers=["DATA-07"]),
+                      step("SharadarBars", "vendors.sharadar", "api key → Bars", "get_table per table (waits on PB-01)", covers=["DATA-08"])],
+            package="data", entry="data/p9.py")
+ts9 = [task("T01", "interface"), task("T04", "spine", "PL-09.SyntheticSource"), task("T05", "wiring", "PL-09", ["data/p9.py", "tests/test_p9.py"])]
+o9 = d.outside_milestone([src9], ts9, [], {"Source", "Bars"} | {"EdgarSicSource", "SharadarBars"}, ("data",))
+case("phase0_split", True, "it9 quant aao: EdgarSicSource waits on PB-02 and a built stand-in has its Out type", "PL-09.EdgarSicSource" in o9)
+case("phase0_split", False, "a probe-blocked step whose Out type no built step has is still missing", "PL-09.SharadarBars" not in o9)
+rl2 = pipe("PL-02", [step("DQN", "methods.dqn", "Config → Learner", covers=["CHECK-01", "TRAIN-01"]),
+                     step("PPO", "methods.ppo", "Config → Learner", covers=["CHECK-01"])], package="rllab", entry="p2.py")
+t2 = [task("T01", "interface"), task("T08", "spine", "PL-02.DQN"), task("T20", "wiring", "PL-02", ["p2.py", "tests/test_p2.py"])]
+case("phase0_split", True, "it9 rl aao's PPO: undeclared, named by no task, its one Cover built by DQN",
+     "PL-02.PPO" in d.outside_milestone([rl2], t2, [], {"Config", "Learner"}, ("rllab",)))
+case("phase0_split", False, "...but declared by the interface it is this milestone's, and missing",
+     d.phase0_misses([rl2], t2, {"T01"}, {"Config", "Learner", "PPO"}, ("rllab",),
+                     d.outside_milestone([rl2], t2, [], {"Config", "Learner", "PPO"}, ("rllab",))) == ["PL-02.PPO: 0 spine tasks"])
+case("phase0_split", False, "a step with no Covers is never outside (the it8 bare-owner case stays a miss)",
+     not d.outside_milestone([cli], [x for x in t16 if x["id"] != "T02"] + [task("T02", "spine", "PL-16.read_settings")], [], names16, ("lab",)))
+api_s = pipe("PL-11", [step("export_openapi", "api.schema", "App → Doc"), step("write_schema", "api.schema", "Doc → Doc")], package="qserver", entry="s/p11.py")
+api_e = pipe("PL-15", [step("readSchema", "api.schema", "path → Doc"), step("generateTypes", "api.schema", "Doc → Schema")], package="explorer", entry="e/p15.ts")
+ta = [task("T01", "interface"), task("T24", "spine", "PL-11.export_openapi", reason="also builds write_schema, same module"),
+      task("T36", "spine", "PL-15.generateTypes", reason="also builds readSchema: one module"),
+      task("T41", "wiring", "PL-11", ["s/p11.py", "tests/test_p11.py"]), task("T44", "wiring", "PL-15", ["e/p15.ts", "tests/p15.test.ts"])]
+case("phase0_split", True, "it9 quant inc: qserver's api.schema and explorer's api.schema are two modules, one spine each",
+     not d.phase0_misses([api_s, api_e], ta, {"T01"}, {"App", "Doc", "Schema"}, ("qserver", "explorer")))
+case("phase0_split", False, "two spines for one package's module are still two",
+     d.phase0_misses([api_s], ta + [task("T25", "spine", "PL-11.write_schema")], {"T01"}, {"App", "Doc"}, ("qserver",))
+     == ["PL-11.export_openapi: 2 spine tasks", "PL-11.write_schema: 2 spine tasks"])
+case("phase0_split", False, "a wiring task that names nothing builds no step",
+     d.phase0_misses([ev], [x for x in t9 if x["id"] != "T23"] + [task("T23", "wiring", "PL-03", ["src/rllab/lab/pipelines/pl03_eval.py", "tests/unit/test_pl03.py"])],
+                     {"T01"}, names9, ("rllab",)) == ["PL-03.print_scores: 0 spine tasks"])
+sv = pipe("PL-10", [step("create_app", "api.app", "Store → App"), step("mount_static", "api.static", "App → App")], package="qserver", entry="s/pl10.py")
+tw = [task("T01", "interface"), task("T20", "spine", "PL-10.create_app"),
+      task("T40", "wiring", "PL-10", ["s/pl10.py", "s/api/static.py", "tests/test_pl10.py"])]
+case("wave_width", True, "it9 quant inc: a step the wiring writes the module of is no spine unit", d.wave_units([sv], tw, ("qserver",)) == ["task T20"])
+case("wave_width", False, "...but a step nothing builds still is", d.wave_units([sv], tw[:2], ("qserver",)) == ["qserver:api.static", "task T20"])
+
+# ---- fakes_only_cross_pipeline (it9 interface F5): an in-package fake across pipelines, by its Boundary line
+ev_sec = {"id": "evaluate.evaluate", "fields": {"Boundary": "train, reference, lab", "Used by": "train, reference, lab; PL-01, PL-02, PL-03"}}
+pls5 = [pipe("PL-01", [step("train", "train.loop")], package="rllab"), pipe("PL-03", [step("evaluate", "evaluate.protocol")], package="rllab")]
+case("fakes_only_cross_pipeline", True, "it9 rl inc: evaluate.evaluate has a Boundary line and PL-01 uses PL-03's step",
+     d.boundary_fake_ok("evaluate.evaluate", ev_sec, pls5, "PL-01", ("rllab",)))
+rt_sec = {"id": "train.run_train", "fields": {"Boundary": "PL-03", "Used by": "train.run_batch; PL-02, PL-03"}}
+pls5e = [{"id": "PL-02", "package": "rllab", "entry": "src/rllab/train/pipelines/pl02_train.py::run_train", "steps": []},
+         {"id": "PL-03", "package": "rllab", "entry": "src/rllab/train/pipelines/pl03_batch.py::run_batch", "steps": [step("run_parallel", "train.batch")]}]
+case("fakes_only_cross_pipeline", True, "it9 rl aao: PL-02's entry train.run_train, faked for PL-03",
+     d.boundary_fake_ok("train.run_train", rt_sec, pls5e, "PL-03", ("rllab",)))
+case("fakes_only_cross_pipeline", False, "...but not for a consumer its Used by doesn't name",
+     not d.boundary_fake_ok("train.run_train", rt_sec, pls5e, "PL-07", ("rllab",)))
+case("fakes_only_cross_pipeline", False, "no Boundary line: a within-package helper stays a type and a sample",
+     not d.boundary_fake_ok("evaluate.evaluate", {"id": "evaluate.evaluate", "fields": {"Used by": "PL-01, PL-03"}}, pls5, "PL-01", ("rllab",)))
+case("fakes_only_cross_pipeline", False, "a Used by naming only the owner's pipeline is no cross-pipeline call",
+     not d.boundary_fake_ok("evaluate.evaluate", {"id": "evaluate.evaluate", "fields": {"Boundary": "lab", "Used by": "PL-03"}}, pls5, "PL-03", ("rllab",)))
+
+# ---- edges_mitigated, unmitigated_reasoned (it9 interface F6): a system task swaps in the real provider
+pls6 = {"PL-11": {"id": "PL-11", "package": "data", "entry": "packages/data/src/qrp_data/pipelines/pl11_returns_panel.py::returns_panel", "steps": []},
+        "PL-12": {"id": "PL-12", "package": "data", "entry": "packages/data/src/qrp_data/pipelines/pl12_membership.py::membership_as_of", "steps": []},
+        "PL-13": {"id": "PL-13", "package": "data", "entry": "packages/data/src/qrp_data/pipelines/pl13_x.py::other", "steps": []}}
+s47 = dict(task("T47", "system", "PL-01", reads=["PL-01", "PL-10", "data.returns_panel"], read_symbols=["data.returns_panel"]),
+           verify=["uv run pytest tests/intent/data/test_pl12_smoke.py -q"])
+w31 = task("T31", "wiring", "PL-11", ["packages/data/src/qrp_data/pipelines/pl11_returns_panel.py", "tests/intent/data/test_pl11_smoke.py"])
+w32 = task("T32", "wiring", "PL-12", ["packages/data/src/qrp_data/pipelines/pl12_membership.py", "tests/intent/data/test_pl12_smoke.py"])
+w33 = task("T33", "wiring", "PL-13", ["packages/data/src/qrp_data/pipelines/pl13_x.py", "tests/intent/data/test_pl13_smoke.py"])
+case("edges_mitigated", True, "it9 quant aao: T47 reads data.returns_panel, PL-11's entry, so its row to wire PL-11 swaps it in",
+     d.swaps_in(s47, w31, pls6) and "PL-11" in d.wired_pipelines(s47, pls6))
+case("edges_mitigated", True, "...and its Verify runs PL-12's smoke test", d.swaps_in(s47, w32, pls6))
+case("edges_mitigated", False, "a pipeline it neither reads nor runs is no swap", not d.swaps_in(s47, w33, pls6))
+case("edges_mitigated", False, "wiring → wiring is never a swap", not d.swaps_in(w31, w32, pls6))
+T6 = {"T47": s47, "T31": w31, "T33": w33}
+case("unmitigated_reasoned", True, "the swap row `call · none: system task swaps in the real provider` is integration",
+     d.unmitigated_class(row("T47", "T31", "call", "system task swaps in the real provider"), T6, {}, pls6)[0] == "integration")
+case("unmitigated_reasoned", False, "...a call row to a pipeline it doesn't run has no allowed structure",
+     d.unmitigated_class(row("T47", "T33", "call", "system task swaps in the real provider"), T6, {}, pls6) == ("", "no allowed structure"))
+
+# ---- unmitigated_reasoned (it9 interface F1): no thicken waits on wiring or system, whatever the row's kind
+T1 = {**T, "T29": task("T29", "wiring", "PL-01", ["src/quant/data/pipeline.py", "tests/intent/conftest.py"]),
+      "T37": task("T37", "thicken", "PL-01.apply_universe", ["src/quant/data/universe_rules.py"], mode="split")}
+for r_, k in [(row("T37", "T29", "order", "TC-23's store is built by the real download (conftest.py)"), "wiring"),
+              (row("T37", "T14", "order", "golden cases need the real chain"), "system"),
+              (row("T37", "T29", "file", "both write conftest.py"), "wiring")]:
+    case("unmitigated_reasoned", False, f"it9 quant aao F1: thicken → {k} `{r_['kind']}` '{r_['reason']}'",
+         d.unmitigated_class(r_, T1, info) == ("", f"a thicken task waits on a {k} task"))
+case("unmitigated_reasoned", True, "a thicken waiting on its own step's spine is still same module",
+     d.unmitigated_class(row("T37", "T03", "code", "extends it"), T1, info)[0] == "same module")
+
+# ---- skills_invoked, test_planning_invoked (it9 interface F7): the driver's `/dev-team:<skill>` sessions
+st9 = [{"turn": 1, "user": "/dev-team:idea-refine I want an RL lab", "skills": [], "session": {"new": True, "skill": "idea-refine"}},
+       {"turn": 2, "user": "Approved.", "skills": [], "session": {"new": False, "skill": "idea-refine"}},
+       {"turn": 3, "user": "/dev-team:spec-writing From the previous session: …", "skills": [], "session": {"new": True, "skill": "spec-writing"}},
+       {"turn": 4, "user": "Approved.", "skills": [], "session": {"new": True, "skill": "test-planning", "slash": False}}]
+sm = d.turn_skill_map(st9)
+case("skills_invoked", True, "a session opened with /dev-team:<skill> worked in that skill, with no Skill call",
+     sm[1] == {"idea-refine"} and sm[3] == {"spec-writing"})
+case("skills_invoked", False, "a turn with no slash opening, Skill call, dt status or skill read is no skill's", sm[2] == set())
+case("skills_invoked", False, "a new session the driver opened without the slash prefix loads nothing by itself", sm[4] == set())
+seq = d.turn_skill_seq([{"turn": 5, "user": "/dev-team:api-probe go", "skills": ["dev-team:pipeline-design"]}],
+                       [{"turn": 5, "name": "Bash", "input": {"command": "python3 dt.py status --skill api-probe"}},
+                        {"turn": 5, "name": "Skill", "input": {"skill": "dev-team:pipeline-design"}}])
+case("skills_invoked", True, "the per-turn order: the slash skill, then each call's", seq[5] == ["api-probe", "api-probe", "pipeline-design"])
+
+# ---- types_in_contract (it9 interface F8, J4): whole contract text, mirror forms, qualified library types, notes
+with tempfile.TemporaryDirectory() as tmp:
+    (pathlib.Path(tmp) / "docs").mkdir()
+    (pathlib.Path(tmp) / "docs" / "contract.md").write_text('# Contract\n\n`Direction = Literal["higher", "lower"]`, `Settings = Mapping[str, float]` are used throughout.\n\n## core\n')
+    ctext = d.contract_text(tmp, [{"id": "core.TeamSpec", "doc": "docs/contract.md", "text": "`class TeamSpec: direction: Direction`"}])
+case("types_in_contract", True, "it9 rl aao: an alias in the contract's preamble resolves", d.defined_in("Direction", ctext) and d.defined_in("Settings", ctext))
+case("types_in_contract", False, "...a type the preamble doesn't define doesn't", not d.defined_in("Budget", ctext))
+mq = ("- **Invariants:** `CompanyMsg` mirrors `qdata.query.Company`; `ActionMsg` mirrors one `qdata.query.Actions` row\n"
+      "- **Invariants:** mirrors `qdata.xcheck.Comparison`, `DayDiffMsg` mirroring `DayDiff` (EXPL-06)\n"
+      "- `CheckCountsMsg` mirrors `CheckCounts` plus `check: str`; `ScoreMsg` mirrors `Scorecard`\n"
+      "- **Invariants:** `DayDiff(day: date, primary: float, action: str | None)` per day")
+case("types_in_contract", True, "it9 quant inc: deep mirror paths, 'mirrors one … row', 'mirroring', a bare name with a section or inline",
+     all(d.defined_in(n, mq, {"CheckCounts"}) for n in ("CompanyMsg", "ActionMsg", "DayDiffMsg", "CheckCountsMsg")))
+case("types_in_contract", False, "a bare mirror target with no section and no inline definition defines nothing",
+     not d.defined_in("ScoreMsg", mq, {"CheckCounts"}))
+mods = d.contract_modules(("qdata", "explorer"), [{"id": "pages.RouteView"}, {"id": "store.VersionedStore"}])
+ft = d.field_types("`type RouteView = { title: string; element: JSX.Element }`\n"
+                   "`def open(self, version: VersionId | None) -> duckdb.DuckDBPyConnection`\n"
+                   "`def company(self) -> qdata.query.Company`\n`class Bar: value: float | NaN; staged: StagedRun`", mods)
+case("types_in_contract", True, "it9 quant inc/aao: JSX.Element, duckdb.DuckDBPyConnection and NaN aren't contract types",
+     not {"Element", "DuckDBPyConnection", "NaN"} & set(ft))
+case("types_in_contract", False, "...but a contract-qualified type and an undefined one stay to resolve (StagedRun is real)",
+     {"Company", "StagedRun", "VersionId"} <= set(ft))
+note = ("- `BarSchema`: index `date`; `open, high, close, ret: float64` (NaN where missing). `ActionSchema`: `date, kind: Literal[\"split\"], value: float`\n"
+        "- `VendorRowSchema`: `table: str; key: str; values: str  # JSON`\n- `FlagRow`: `ticker, date`")
+case("types_in_contract", True, "it9 quant aao: a backticked note with typed fields defines its type",
+     all(d.defined_in(n, note) for n in ("BarSchema", "ActionSchema", "VendorRowSchema")))
+case("types_in_contract", False, "a backticked note listing bare field names defines nothing", not d.defined_in("FlagRow", note))
+
+# ---- gate_discipline (it9 interface F10): routed fixes the user approved, then one drafted layer
+p12 = {"assistant": "The two routed fixes would then come before build-planning: the TRAIN-03 count in the spec, and AD-09's corridor in the architecture."}
+u13 = "Approved. Set the plan to Approved. Then make the two routed fixes (the TRAIN-03 count and AD-09's corridor) and continue."
+case("gate_discipline", True, "it9 rl aao turn 13: 16 architecture lines of approved routed fixes, then the M1 plan",
+     d.routed_fixes({"arch", "plan"}, {"arch": 16, "plan": 432}, p12, u13))
+case("gate_discipline", False, "an architecture change over 25 lines is a redesign, not a routed fix",
+     not d.routed_fixes({"arch", "plan"}, {"arch": 60, "plan": 432}, p12, u13))
+case("gate_discipline", False, "no user message telling the agent to make them",
+     not d.routed_fixes({"arch", "plan"}, {"arch": 16, "plan": 432}, p12, "Approved. Continue to the next planning step."))
+case("gate_discipline", False, "the turn before named no routed fix",
+     not d.routed_fixes({"arch", "plan"}, {"arch": 16, "plan": 432}, {"assistant": "Plan drafted."}, u13))
+case("gate_discipline", False, "three layers are never one routed fix",
+     not d.routed_fixes({"arch", "spec", "plan"}, {"arch": 16, "spec": 14, "plan": 432}, p12, u13))
+
+# ---- writes_disjoint (it9 interface F9 nit): a Step cell naming two steps
+case("writes_disjoint", True, "it9 quant aao T02: `PL-09.open_run, PL-09.close_run` names both steps",
+     d.step_ids("PL-09.open_run, PL-09.close_run") == ["PL-09.open_run", "PL-09.close_run"])
+case("writes_disjoint", False, "...and its owner's spine writing runs/events.py beside runs/record.py is still flagged",
+     d.spine_writes_problem(["packages/data/src/qrp_data/runs/record.py", "packages/data/src/qrp_data/runs/events.py",
+                             "tests/unit/data/test_runs.py"], "runs.record", ("data",)))
+
+# ---- probe_code_in_probe_turns (it9 flow §6): writes before the turn leaves api-probe stay api-probe's
+import probegrade  # noqa: E402
+t8 = [{"name": "Write", "input": {"file_path": "/w/project/probes/PB-03-yahoo/yahoo_http.py"}},
+      {"name": "Bash", "input": {"command": "cd probes/PB-03-yahoo && python3 - <<'EOF'\np=pathlib.Path(\"public.py\")\nEOF"}},
+      {"name": "Skill", "input": {"skill": "dev-team:pipeline-design"}},
+      {"name": "Bash", "input": {"command": "python3 dt.py status --skill pipeline-design"}}]
+case("probe_code_in_probe_turns", True, "it9 quant inc turn 8: the approved PB-03 Revise, then pipeline-design",
+     probegrade.written_before_switch(t8, "probes/PB-03-yahoo/yahoo_http.py") and probegrade.written_before_switch(t8, "probes/PB-03-yahoo/public.py"))
+case("probe_code_in_probe_turns", False, "a probe file written after the turn moved to pipeline-design",
+     not probegrade.written_before_switch(t8 + [{"name": "Edit", "input": {"file_path": "/w/project/probes/PB-03-yahoo/probe.py"}}],
+                                          "probes/PB-03-yahoo/probe.py"))
+case("probe_code_in_probe_turns", False, "a probe file no call names can't be placed", not probegrade.written_before_switch(t8, "probes/PB-03-yahoo/other.py"))
+
+# ---- crosscheck_facts_reached_design (it9 flow §6): n/a when nobody named the cross-check
+case("crosscheck_facts_reached_design", True, "it9 quant aao: no user message or doc names Yahoo (EXCH calendar 'cross-checked' is no source)",
+     not d.crosscheck_named(["Plan my quant lab on Sharadar."], ["| Trading calendar | exchange_calendars, cross-checked with SEP dates |"]))
+case("crosscheck_facts_reached_design", False, "a user who names yahooquery makes the check apply",
+     d.crosscheck_named(["I cross-check against Yahoo with yahooquery."], []))
+
+# ---- data_sources_suggested (it9 flow §6): a fundamentals source only in a sentence about fundamentals
+f, fund = d.data_sources({"docs/architecture.md": "AD-05: sector history from SEC EDGAR annual-report headers (SIC codes). "
+                          "Fundamentals stay out of scope (spec.md Out of scope)."})
+case("data_sources_suggested", False, "it9 quant aao: EDGAR for SIC codes is no fundamentals source", "SEC EDGAR / XBRL" in f and not fund)
+f, fund = d.data_sources({"docs/architecture.md": "| Fundamentals | SEC EDGAR company facts, later | AD-09 |"})
+case("data_sources_suggested", True, "EDGAR in a table row about fundamentals counts", fund == ["SEC EDGAR / XBRL"])
+
+# ---- planexport.turn_skills (it9 R10): the skill at the end of each turn, not the last Skill call carried forward
+import planexport  # noqa: E402
+with tempfile.TemporaryDirectory() as tmp:
+    rdir = pathlib.Path(tmp)
+    tt = [{"turn": 1, "user": "/dev-team:idea-refine go", "skills": [], "tools": [], "session": {"id": "s1", "new": True, "skill": "idea-refine"}},
+          {"turn": 2, "user": "Approved.", "skills": [], "tools": ["Bash"], "session": {"id": "s1"}},
+          {"turn": 3, "user": "Approved.", "skills": [], "tools": [], "session": {"id": "s1"}},
+          {"turn": 4, "user": "Approved.", "skills": [], "tools": [], "session": {"id": "s2", "new": True, "skill": "build-planning", "slash": False}}]
+    (rdir / "turns.json").write_text(json.dumps(tt))
+    (rdir / "agent_stream.jsonl").write_text("\n".join(json.dumps(x) for x in [
+        {"type": "driver_turn", "turn": 1}, {"type": "driver_turn", "turn": 2},
+        {"type": "assistant", "message": {"content": [{"type": "tool_use", "name": "Bash", "input": {"command": "python3 dt.py status --skill build-planning"}}]}},
+        {"type": "driver_turn", "turn": 3}, {"type": "driver_turn", "turn": 4}]) + "\n")
+    ps = planexport.turn_skills(rdir)
+case("planexport_turn_skills", True, "it9 R10: a long session's turn running `dt status --skill build-planning` is build-planning's",
+     ps[1] == "idea-refine" and ps[2] == "build-planning" and ps[3] == "build-planning")
+case("planexport_turn_skills", False, "a new session that shows no skill doesn't inherit the last session's", ps[4] == "")
 
 
 def run(verbose=True):

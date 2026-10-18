@@ -10,8 +10,8 @@ comes from, in order:
    project is never checked out): `dt plan --json` when that dt has it, else built here from dtprobe facts
    with the same node levels, edge kinds and builds.
 `--dt` runs another dt (the repo's, to redraw an old run with what a newer `dt plan` reports) and skips the kept
-snapshots. A snapshot identical to the last one is also recorded as `same_as`. Each snapshot's `skill` is the last skill invoked
-by that turn (from `turns.json`), carried forward over turns that invoke none.
+snapshots. A snapshot identical to the last one is also recorded as `same_as`. Each snapshot's `skill` is the skill at work at the
+end of that turn (turn_skills), carried forward only over turns that show none.
 
 Usage: planexport.py <run-dir> [--out <dir>] [--dt <dt.py>]   (default out: <run-dir>/flow; prints the plan.json path)
 """
@@ -19,7 +19,7 @@ import argparse, hashlib, io, json, pathlib, re, shutil, subprocess, sys, tarfil
 
 HERE = pathlib.Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
-import dtrun  # noqa: E402
+import dtrun, probefacts as pf  # noqa: E402
 
 SCHEMA = "plan-map/2"
 LEVELS = ["goal", "stage", "feature", "requirement", "milestone", "task", "pipeline", "step", "test", "type", "symbol"]
@@ -152,20 +152,24 @@ def body_at(proj, sha, dt):
 
 
 def turn_skills(run):
-    """{turn: the skill at work}. A skill runs on over later turns without a new `Skill` call, so a turn with
-    none carries the last invoked skill forward until another one is invoked. A session the driver opened with
-    `/dev-team:<skill>` (`session.new`) starts with that skill."""
+    """{turn: the skill at work at the end of the turn}, from dtrun.turn_skill_seq: the last of its `/dev-team:<skill>`
+    opening, Skill calls, `dt status --skill X` calls and skills/X/ reads (dev-team skills before others). Only a turn
+    with none of those carries the previous turn's skill forward, within its session: carrying the last Skill call
+    forward labelled rl inc's T35 idea-refine, 34 turns after it (it9 R10)."""
     try:
         turns = json.loads((run / "turns.json").read_text())
     except (OSError, json.JSONDecodeError):
         return {}
-    out, last = {}, ""
+    seq = dtrun.turn_skill_seq(turns, pf.tool_calls(run / "agent_stream.jsonl", turns))
+    plugin = {p.name for p in [*(run / "plugin").glob("*/skills/*"), *(dtrun.REPO_DT.parents[1] / "skills").glob("*")] if p.is_dir()}
+    out, last, last_sess = {}, "", None
     for t in sorted(turns, key=lambda t: int(t["turn"])):
-        sess = t.get("session") or {}
-        opened = [sess["skill"]] if sess.get("new") and sess.get("skill") else []
-        own = opened + ([dtrun.skill_name(s) for s in t.get("skills", []) if str(s).startswith("dev-team")] or
-                        [dtrun.skill_name(s) for s in t.get("skills", [])])
+        sess = (t.get("session") or {}).get("id")
+        if sess != last_sess and (t.get("session") or {}).get("new"):
+            last = ""
+        own = [s for s in seq.get(t["turn"], []) if s in plugin] or seq.get(t["turn"], [])
         last = own[-1] if own else last
+        last_sess = sess
         out[int(t["turn"])] = last
     return out
 

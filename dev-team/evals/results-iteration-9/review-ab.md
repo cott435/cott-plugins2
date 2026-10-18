@@ -326,3 +326,76 @@ Only the reviewer was run (`plan_review.py <copy> review`), on fresh copies of t
 2. Check each named concept for its mechanism, not its label.
 
 The missing-Exit and other mechanical defects should move to the dt lints above, so breadth matters less. One calibration rerun after a v2 review plus fix would show whether the facts close the gap the calibration found.
+
+## Reviewer and fixer v3: on iteration 9's scale
+
+**What changed.**
+- **Reviewer** (`plan_review_prompt.md`), on top of v2's facts checklist:
+  - A hard packet floor: read every packet. Only with more than 40 may it read fewer, and never fewer than every spine and interface packet plus ten others. It reports `checked.packets` against `checked.packets_total`.
+  - A named concept is `kept` only if the docs carry its mechanism, not its label. The prompt gives self-play and walk-forward as examples, so the self-play catch below is partly taught.
+- **Fixer** (`plan_fix_prompt.md`), with the four rules from §Verdict:
+  - A new milestone may renumber milestones that have no tasks.
+  - Of two offered fixes, take the narrower.
+  - When brief and spec disagree, keep the user's words.
+  - Expected outputs (golden numbers, tolerances, fixture values, a case's expected result) are skipped as "route to test-planning".
+
+**Method.** Fresh copies of the four iteration-9 projects went to `dev-team-workspace/review-ab-v3/<traj>/with_skill/`. Packaged untouched, they matched `iteration-9/bench` byte for byte. Each copy then got `plan_review.py <copy> all` and was packaged with `package.py review-ab-v3`. The blind judge ran reviewed incremental against reviewed all-at-once per project, in both orders, as §Calibration did, from scratchpad folders `judge-rl` and `judge-quant`. The quant AB judge first returned malformed JSON and was rerun once through `judge_prompt.judge`. There is one run per project, so any single item could flip on a rerun. Records, keys and verdicts are in `review-ab/v3/`.
+
+**Scores (overall, mean of both orders).**
+
+| | Iteration 9 | v1 reviewed (§Calibration) | v3 reviewed | v3 Δ vs iteration 9 |
+|---|---|---|---|---|
+| rl-incremental | 7.65 | 7.4 | 7.7 | +0.05 |
+| rl-all-at-once | 7.45 | 7.35 | 7.35 | −0.10 |
+| quant-incremental | 7.7 | 7.8 | 7.65 | −0.05 |
+| quant-all-at-once | 7.45 | 7.65 | 7.95 | +0.50 |
+| **mean** | 7.56 | 7.55 | **7.66** | **+0.10** |
+
+- **Still inside the noise.** The mean moves +0.10, against v1's −0.01. Only quant-all-at-once's +0.50 clears iteration 9's 0.4–0.45 position effect.
+- **Winners.**
+  - rl: incremental now wins both orders (iteration 9 and v1 split by order).
+  - quant: split by order, as in iteration 9.
+- **v1's regression is gone.** rl-incremental's interface_quality is back to 4, from v1's 3. No judge cites M2/M3 symbols frozen in M1.
+
+**Packets read and facts caught.**
+
+| | Packets read | user_fact defects | Facts listed (changed) | Defects | Applied / skipped or partial |
+|---|---|---|---|---|---|
+| rl-incremental | 31 / 31 | 2 | 78 (2) | 40 | 37 / 6 |
+| rl-all-at-once | 30 / 30 | 7 | 42 (8) | 27 | 25 / 13 |
+| quant-incremental | 46 / 46 (v2: 14) | 3 | 90 (4) | 35 | 34 / 5 |
+| quant-all-at-once | 48 / 48 | 4 | 72 (6) | 31 | 31 / 5 |
+
+- **The floor held:** every packet, on every run. quant-incremental's list is 35 defects against v2's 31, but still short of v1's 47. It still misses qdata's "No golden cases yet", M1-T06's spine/thicken title and M1-T23's "SSE" title. iteration 9's judge cited all three, and the v3 judges cite two of them.
+- **rl-all-at-once: all four turn-1 facts caught:** the circular tank, survival scoring, one predator and, for the first time, self-play. R04 was flagged on the mechanism: "Self-play needs each side to train against its opponent's past versions." The fixer added PREY-12, an `OpponentPool` in `RunConfig` and the pool in M6's Outline. Both rl judges now credit rl-all-at-once's spec, and stage_completeness went 3 → 4 and rl_soundness 3.5 → 4.
+- **quant-all-at-once:** four user facts. Three are new against v1: covariance compared on real data, ML information gain over residual returns, and ML portfolios beating every classical one. It gained most, +0.50. The yahooquery and 10-names complaints remain; they are out of reach, because that run's user never gave them.
+- **quant-incremental:** PPO deferred and local-only training were again correctly left alone (the user's own cuts), and both judges still cite them.
+- **The renumbering rule worked.** rl-all-at-once's fish split now reads M3 One fish → M4 Many fish → M5 Local sight → M6 Predator-prey, not v1's M3 → M5 → M6 → M4.
+
+**Why rl-all-at-once didn't move: the test-planning rule left the tests behind.** The fixer changed the spec's facts but skipped their test cases as expected outputs. So `tests.md` still has TC-07 and TC-25 "hits per fish (lower)", TC-08 respawn, TC-09 "2 predators" and TC-24 "≤ 90 minutes". Both rl judges list all five as spec/test contradictions. internal_consistency fell 3.5 → 2.0, cancelling the facts' gain. rl-incremental shows the same pattern once: EVAL-07 now keeps the user's "every rung beats the scripted fish", but TC-46 still says rungs 2 and 3, and both judges cite it. The rule is right that golden numbers belong to test-planning, but nothing in this harness runs test-planning after the fixer. So "route it" became "leave it contradicting".
+
+**Fixer regressions this time.**
+- **rl-all-at-once, plan order.** To satisfy lint's dependency order, the fixer moved task blocks so M1-T13 sits after M1-T15 and M1-T24 after M1-T26. It also inserted PREY-12 between PREY-09 and PREY-10. Both judges call the order confusing. One also calls M1-T13's new dependency false serialization.
+- **quant-incremental, M1-T03 depends on M1-T02 again** (v1's R07 regression). R09 offered "add Depends on M1-T02, or move the fake to a task depending on both". The fixer took the first as the narrower edit, which serialized two interface tasks: dependency_graph_soundness 4 → 3. "Narrower" has to mean less frozen and less serialized, not fewer words changed.
+
+**Cost.**
+
+| | Reviewer | Fixer | Total | Minutes | v1 total |
+|---|---|---|---|---|---|
+| rl-incremental | $2.86 (25 turns) | $2.29 (95) | $5.15 | 13.3 | $6.13 |
+| rl-all-at-once | $3.08 (52) | $3.15 (118) | $6.23 | 14.2 | $3.92 |
+| quant-incremental | $5.24 (83) | $4.41 (179) | $9.65 | 19.1 | $8.91 |
+| quant-all-at-once | $4.17 (55) | $5.50 (175) | $9.68 | 20.4 | $9.40 |
+| **total** | $15.35 | $15.35 | **$30.71** | | $28.36 |
+
+Mean $7.68 per run, against v1's $7.09. The four judge calls aren't counted.
+
+**Verdict.** Still not ready for the skills, but the reason has narrowed.
+- The reviewer now catches the user's facts and reads every packet, at about v1's cost.
+- What holds the score flat is propagation: a corrected fact must reach its test cases in the same pass.
+
+Next, either:
+1. Let the fixer rewrite a case's wording when it only restates a changed spec fact (score direction, a count, a shape, a time limit), and list the fixtures to regenerate. Golden numbers still go to test-planning.
+2. Or run test-planning's Extend on the changed cases right after the fixer, before re-judging.
+
+Also define "narrower" in the fixer prompt as "freezes and serializes less", and forbid moving task blocks out of ID order.

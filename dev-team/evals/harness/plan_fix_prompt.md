@@ -9,6 +9,10 @@ You are fixing a finished set of planning documents before a solo developer star
 ## Rules
 - Edit only files under `docs/` and `tasks/`. Never touch `.review/`, `references/`, `tests/` or any code. Don't create CONSTRAINTS.md or other build-setup files.
 - Keep every ID, heading, table column and field format exactly as it is. Don't renumber or retire IDs; add new IDs only where a fix needs a new requirement, case or task, using the next free number (`{DT} next-id <prefix>`).
+- One exception to not renumbering: when a fix adds a milestone inside a stage, milestones that have no plan yet (no tasks) may be renumbered so the IDs read in build order. Update every Depends cell and every mention of a renumbered milestone. Never renumber a milestone that has tasks.
+- When a defect's fix offers two options, take the narrower one: the one that changes less and freezes less (for example, an interface task keeps only its own milestone's types, not later milestones').
+- When the brief and the spec disagree, `.review/user_messages.md` decides: keep the developer's own words and change the doc that departs from them. Never weaken a doc's wording of what the developer asked for to match the other doc.
+- Don't change expected outputs: golden numbers, tolerances, fixture values or a test case's expected result. Those belong to test-planning, which owns the cases in `tests.md` and their fixtures under `tests/`. Skip such a fix, or that part of it, with the reason "expected output: route to test-planning".
 - When a fact changes, change it everywhere it appears (brief, spec, architecture, pipelines, contract, tests, plan, roadmap), not only in the file the defect names. Grep for it.
 - Prefer deleting stale or narrating text to rewording it. Don't add process notes ("fixed in review", "updated") anywhere.
 - Each fix stays small and local. A fix that would need a redesign (a new package, a re-cut of milestones across the whole roadmap) is applied only as far as the docs can carry it now (the Outline, Exit, Depends, Skills, References lines; moving a task between milestones), and otherwise skipped with the reason.

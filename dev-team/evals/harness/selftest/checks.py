@@ -99,7 +99,10 @@ for r_, why in [(row("T08", "T11", "order", "integration: the smoke builds the v
 for writes, owner, pkgs in [(["src/gridlab/experiments/build.py", "tests/unit/test_build.py"], "experiments.build", ()),
                             (["packages/web/src/views/stock.tsx", "packages/web/tests/stock.test.tsx"], "web.views.stock", ("web", "server")),
                             (["src/gridlab/viewer/draw/**", "tests/unit/test_draw.py"], "viewer.draw", ()),
-                            (["src/quant/data/read.py", "tests/unit/quant/test_read.py"], "data", ())]:
+                            (["src/quant/data/read.py", "tests/unit/quant/test_read.py"], "data", ()),
+                            # it8 quant inc F11: two files inside the owner's folder are the owner
+                            (["packages/cockpit/src/api/client.ts", "packages/cockpit/src/api/validate.ts",
+                              "tests/unit/cockpit/client.test.ts"], "api", ("cockpit",))]:
     case("writes_disjoint", True, f"spine of {owner} writing {writes}", not d.spine_writes_problem(writes, owner, pkgs))
 for writes, owner, why in [(["src/gridlab/train/loop.py", "src/gridlab/train/checkpoints.py"], "train.loop", "a helper module beside the owner"),
                            (["src/gridlab/experiments/build.py", "tests/intent/test_build.py"], "experiments.build", "an intent test"),
@@ -184,6 +187,17 @@ iface = [task("T01", "interface", "contract", ["src/gridlab/**", "tests/contract
               acceptance=["Every M1 step and contract function exists with its signature"])]
 got = d.interface_writes_symbols(iface, syms)
 case("tester_starts_early", True, "an interface writing every contract function declares its package's functions", got == {"baselines.make_baseline"})
+iface_cls = [task("T01", "interface", "contract", ["src/gridlab/**", "tests/contracts/**"],
+                  acceptance=["Every M1 step and contract class imports with its contract signature"])]
+cls_syms = syms + [{"id": "core.Corridor", "is_type": True, "title": "Corridor test environment", "doc": "docs/packages/gridlab/contract.md"},
+                   {"id": "core.LADDER", "is_type": True, "title": "The ladder rungs", "doc": "docs/packages/gridlab/contract.md"}]
+cls_syms[2] = dict(cls_syms[2], title="type")
+case("tester_starts_early", True, "an interface writing every contract class declares the class sections too (it8 rl inc F5)",
+     d.interface_writes_symbols(iface_cls, cls_syms) == {"baselines.make_baseline", "core.Corridor"})
+case("tester_starts_early", False, "...but not the boundary types or constants, which its Read declares (it8 rl inc F12: CrossPlay)",
+     not {"core.Env", "core.LADDER"} & d.interface_writes_symbols(iface_cls, cls_syms))
+case("tester_starts_early", False, "an interface writing every step signature declares no class",
+     "core.Corridor" not in d.interface_writes_symbols(iface, cls_syms))
 case("tester_starts_early", False, "an undeclared symbol", not d.tester_early(task("T22", "thicken", mode="split", read_symbols=["stats.shrink_target"]), decl))
 case("tester_starts_early", False, "a split task reading no symbol", not d.tester_early(task("T31", "thicken", "PL-02.clean_eigen", mode="split"), decl, inf))
 case("tester_starts_early", False, "an interface that writes only types declares no function",
@@ -195,6 +209,17 @@ pl4 = pipe("PL-04", [step("trading_days", "data.calendar", "dates → Days", "da
                      step("build", "builder.build", "Days → Tables")], package="builder")
 case("fakes_only_cross_pipeline", True, "a step owned by another package is a call", d.call_step(pl4, pl4["steps"][0], ("data", "builder")))
 case("fakes_only_cross_pipeline", True, "a step whose spine names another pipeline is a call", d.call_step(pl2, step("load", "data", "", "PL-01 as built")))
+case("fakes_only_cross_pipeline", True, "'PL-19's estimator step for the name, as built' is a call",
+     d.call_step(pl2, step("estimate", "stats", "", "the PL-19 estimator step for the requested name, as built")))
+case("fakes_only_cross_pipeline", False, "'as in PL-06' reuses that function in its own module, no call (it8 quant inc F7)",
+     not d.call_step(pl2, step("read_tables", "snapshots.read", "", "as in PL-06")))
+case("fakes_only_cross_pipeline", False, "a PL-NN named for its output is data, no call",
+     not d.call_step(pl2, step("load_windows", "data", "", "PL-36's saved windows")))
+case("fakes_only_cross_pipeline", True, "a fake glob stands for the contract symbols it matches (it8 quant aao F8)",
+     d.expand_globs(["data.load_*", "data.security_info"], ["data.load_prices", "data.load_universe", "data.security_info", "stats.load_x"])
+     == ["data.load_prices", "data.load_universe", "data.security_info"])
+case("fakes_only_cross_pipeline", False, "a glob matching no contract symbol stays, to be reported",
+     d.expand_globs(["data.fetch_*"], ["data.load_prices"]) == ["data.fetch_*"])
 case("fakes_only_cross_pipeline", True, "Cases naming a replay double", d.is_double({"Cases": "a fixture-backed fake replaying a recorded 5-step episode"}))
 case("fakes_only_cross_pipeline", False, "a step of the pipeline's own package is no call", not d.call_step(pl4, pl4["steps"][1], ("data", "builder")))
 case("fakes_only_cross_pipeline", False, "a sample payload is no double", not d.is_double({"Sample": "tests/contracts/stats.Cov/sample.json"}))
@@ -204,12 +229,14 @@ m = [pipe("PL-09", [step("a", "data.validate", "X → Y"), step("b", "data.valid
                     step("d", "core", "Z → W"), step("e", "core", "W → V")])]
 case("wave_width", True, "steps sharing data.validate are one unit; a bare owner counts per step", len(d.wave_units(m)) == 4)
 ts = [task("T01", "interface"), task("T02", "spine", "PL-09.a"), task("T03", "spine", "PL-09.c"),
-      task("T04", "thicken", "PL-09.b", mode="split", read_symbols=["data.Y"]),
-      task("T05", "thicken", "PL-09.d"), task("T06", "wiring", "PL-09")]
-deps = {"T01": [], "T02": ["T01"], "T03": ["T01"], "T04": ["T02"], "T05": ["T01"], "T06": ["T01"]}
+      task("T04", "thicken", "PL-09.e", mode="split", read_symbols=["data.Y"], reason="fold: spine folded into the thicken"),
+      task("T05", "thicken", "PL-09.d"), task("T06", "wiring", "PL-09"),
+      task("T07", "thicken", "PL-09.b", mode="split", read_symbols=["data.Y"])]
+deps = {"T01": [], "T02": ["T01"], "T03": ["T01"], "T04": ["T02"], "T05": ["T01"], "T06": ["T01"], "T07": ["T02"]}
 spines, testers = d.wave_ready(ts, {"T01"}, deps, {"data.Y"})
-case("wave_width", True, "spines and tester halves count", spines == ["T02", "T03"] and testers == ["T04"])
+case("wave_width", True, "spines and a fold's tester half count", spines == ["T02", "T03"] and testers == ["T04"])
 case("wave_width", False, "a solo thicken and a wiring task ready after the interface don't count", "T05" not in spines + testers and "T06" not in spines + testers)
+case("wave_width", False, "a library thicken's tester half doesn't count (it7 rl inc F11)", "T07" not in testers)
 case("wave_width", False, "3 ready against 4 units is under 0.8", len(spines + testers) < 0.8 * len(d.wave_units(m)))
 
 # ---- no_edge_to_code_when_interface (interface F13): file edges skipped; wiring → a frozen other component
@@ -312,6 +339,15 @@ case("types_in_contract", False, "WorldSettings and LearnerSettings are defined 
 ok_text = "`class Prices: frame: DataFrame  # dates × tickers; def returns(self) -> Returns`\n- **Invariants:** a Snake episode: T×N"
 case("types_in_contract", True, "library types, comments and prose are left out", d.field_types(ok_text) == [])
 case("types_in_contract", True, "a type defined inline resolves", d.defined_in("CovMethod", "`CovMethod = Literal['sample', 'shrink']`"))
+ctor = ("`team: dict[str, LearnerEntry | FixedEntry]`, where `LearnerEntry(kind: Literal[\"qtable\", \"dqn\"], settings)` "
+        "and `FixedEntry(spec: str)`")
+case("types_in_contract", True, "a constructor with every parameter typed defines its type (it8 rl aao F10)", d.defined_in("FixedEntry", ctor))
+case("types_in_contract", False, "a constructor with an untyped parameter doesn't", not d.defined_in("LearnerEntry", ctor))
+mirror = ("- **Invariants:** mirrors `qdata.Security`; `TickerSpanDto`, `SpellDto` and `ExitDto` mirror their `qdata` types "
+          "field for field\n- **Invariants:** `ActionDto` mirrors `qdata.CorporateAction`")
+case("types_in_contract", True, "a type that mirrors another, alone or in a list (it8 quant inc F10)",
+     all(d.defined_in(n, mirror) for n in ("ActionDto", "SpellDto", "ExitDto", "TickerSpanDto")))
+case("types_in_contract", False, "a type only named beside a mirror defines nothing", not d.defined_in("FlagDto", mirror + "; `FlagDto` rows"))
 
 
 # ---- data_sources_suggested (iteration-8 follow-up): the agent's own sources beyond Sharadar prices and yahooquery

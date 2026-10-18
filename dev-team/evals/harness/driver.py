@@ -18,13 +18,26 @@ they serve is revealed (all of them up front in all-at-once mode), and the user'
 After every turn the whole project is git-committed ("turn N") so doc evolution, and any code written during
 planning, can be diffed.
 
+The scenario as this run sees it (project facts, persona, stages, fake vendors) is saved to <out>/scenario.json, so
+the grader can tell which checks the run's user could meet. Each turn's stream in agent_stream.jsonl starts with a
+`{"type": "driver_turn", "turn": N}` line, which numbers the turns for the grader.
+
+The simulated user answers in JSON: `action`, `message`, `ran` (true when the message says it ran the scripts the
+assistant asked for) and `approves` (true when it approves what the assistant presented). Readiness skips a Draft
+the message approves. The closing message only approves; if a doc is still Draft after it, one more approve-only turn
+is sent.
+
 Probes (design/probes.md §10.1): a project's `fake_vendors` (scenarios.json) are served on 127.0.0.1 for the
-whole run (fakevendor/), and the agent is never told where. A vendor whose client takes no base URL (Yahoo) is
-served on its real hosts behind an HTTPS proxy whose environment the whole run gets (`start_vendors`). When the
-simulated user says "ran it", the driver runs each Ready probe as the user would: it writes the probe's .env from its
-.env.example (keys get the canary `sk-canary-<run id>`, base URLs the fake vendor), runs public.py with no
-environment but the proxy's, then each probe.py step its README gives with the fake vendors' environment, logs them
-to <out>/user_runs.jsonl and commits "user run before turn N".
+whole run (fakevendor/), and the agent is never told where. A vendor's real API hosts (`proxy_hosts`: Yahoo, whose
+client takes no base URL, and Sharadar's `api.sharadar.com`) are served behind an HTTPS proxy whose environment the
+whole run gets (`start_vendors`). User runs, and every public.py run the agent starts, go through a second, closed
+proxy that refuses every live host but the package indexes. When the simulated user says it ran the scripts (`ran`),
+the driver runs each Ready probe as the user would: it writes the probe's .env from its .env.example (keys get the
+canary `sk-canary-<run id>`, base URLs the fake vendor), runs public.py with no environment but the closed proxy's,
+then each probe.py step its README gives with the fake vendors' environment, logs them to <out>/user_runs.jsonl and
+commits "user run before turn N". The simulated user is then told which steps ran and each one's exit code (no
+output) and rewrites its message to match. When the user would move on while `dt next` says build-planning waits for
+Ready probes it never ran, readiness asks it to run them.
 
 Usage: driver.py <trajectory-id> <out-dir>
 
@@ -125,18 +138,23 @@ def ids(xs):
     return xs[0] if len(xs) == 1 else ", ".join(xs[:-1]) + " and " + xs[-1]
 
 
-def readiness(facts, stage_no, mode):
+def readiness(facts, stage_no, mode, nxt=None, probes_run=(), approved=()):
     """Why the user can't move on yet, as (reason, ask) pairs ([] = may move on): the reason is logged and the
     ask goes into the re-ask note. Lenient by design: statuses only; the sim user and the grader judge the
     content. The current stage's last layer (plan / queued plan / CONSTRAINTS) may still be Draft, since the
-    approving message is the one that moves on.
+    approving message is the one that moves on, and so may any doc in `approved` (the ones the user's message
+    approves).
 
     Stages come from the probe facts (`facts["stages"]`), not row counts: one stage may have several milestone
     rows, so every revealed stage must have a row of its own. All-at-once also needs every stage Designed
-    (its pipelines approved) before it can finish."""
+    (its pipelines approved) before it can finish. When `dt next` (`nxt`, after the turn) says build-planning
+    waits for probes, the Ready ones the user never ran (not in `probes_run`) must be run first (`ask_runs`)."""
     docs = facts["docs"]
     why = [(f"{rel} is {st}", f"ask for {rel} to be finished and presented for approval")
-           for rel, st in docs.items() if st in DRAFT and not LAST_LAYER.match(rel)]
+           for rel, st in docs.items() if st in DRAFT and not LAST_LAYER.match(rel) and rel not in approved]
+    unrun = probes_to_run(facts, nxt, probes_run)
+    if unrun:
+        why.append((f"build-planning waits for Ready probes never run: {', '.join(unrun)}", ask_runs(unrun)))
     why += [(f"{rel} not yet specced", f"ask for the idea in {rel} to be written into the spec")
             for rel, st in docs.items() if rel.startswith("docs/ideas/") and st in ("Draft", "Accepted")]
     if not any(p["dev_team"] and p["kind"] == "plan" for p in facts["plans"]):
@@ -170,7 +188,47 @@ def readiness(facts, stage_no, mode):
 
 
 def all_approved(facts):
-    return not any(st in DRAFT for st in facts["docs"].values())
+    return not draft_docs(facts)
+
+
+def draft_docs(facts):
+    return [rel for rel, st in facts["docs"].items() if st in DRAFT]
+
+
+def probes_to_run(facts, nxt, probes_run=()):
+    """The Ready probes `dt next` says build-planning waits for that the user hasn't run in this run."""
+    if not nxt or nxt.get("skill") != "api-probe" or nxt.get("mode") != "waiting":
+        return []
+    ready = {e["id"] for e in facts.get("probes", []) if e.get("kind") == "ready"}
+    return [p for p in dict.fromkeys(re.findall(r"\bPB-\d+\b", nxt.get("reason") or "")) if p in ready and p not in probes_run]
+
+
+def ask_runs(ids_):
+    return (f"run the Ready probes {ids(ids_)} as their READMEs say and tell the assistant you ran them "
+            "(set \"ran\": true)")
+
+
+GATE_DOCS = re.compile(r"^(.+?) (?:is|are) (?:Draft|Proposed):")
+
+
+def approved_docs(u, nxt, changed):
+    """The Draft docs the user's message approves: when it approves (`approves`), the docs at the gate `dt next`
+    names and the docs this turn changed."""
+    if not u.get("approves"):
+        return set()
+    m = GATE_DOCS.match((nxt or {}).get("reason") or "") if (nxt or {}).get("mode") == "gate" else None
+    return ({x.strip() for x in m.group(1).split(",")} if m else set()) | set(changed)
+
+
+def run_report(runs):
+    """What the user's run did, per step and without output: the simulated user reports from this."""
+    if not runs:
+        return "nothing ran: no probe was Ready"
+    out = []
+    for r in runs:
+        step = " ".join([r["script"].split("/")[-1], *r.get("args", [])]) if r.get("script") else "(no folder)"
+        out.append(f"{r['probe']} {step}: " + (r.get("error") or ("exit code " + str(r["rc"]))))
+    return "; ".join(out)
 
 
 def mcp_args(out):
@@ -214,8 +272,11 @@ def session_step(nxt, before, sess, action):
     return (False, skill) if skill in sess["seen"] and not just_approved else (True, skill)
 
 
-def agent_turn(proj, sid, msg, first, log_path, plugin_root, extra):
+def agent_turn(proj, sid, msg, first, log_path, plugin_root, extra, turn=None):
     # --include-hook-events: without it the stream carries only SessionStart and Stop hook events.
+    if turn is not None:  # one claude -p call may print several init lines; this marker numbers the turns
+        with open(log_path, "a") as f:
+            f.write(json.dumps({"type": "driver_turn", "turn": turn}) + "\n")
     cmd = [CLAUDE_BIN, "-p", msg, "--model", AGENT_MODEL, "--output-format", "stream-json", "--verbose",
            "--include-hook-events", "--permission-mode", "bypassPermissions", "--disallowedTools", "AskUserQuestion",
            "--plugin-dir", str(plugin_root), *extra, *ISOLATE]
@@ -313,7 +374,8 @@ ASSISTANT'S LATEST MESSAGE:
 >>>
 {note_txt}
 Decide your reply. If the assistant asked questions, answer them all briefly and consistently with your facts. If it presented a draft for review, approve it explicitly (or request one specific fix if it contradicts your facts). If it offers golden test cases or a test plan, say yes. If it asks which stage or milestone a reference file serves, or which skills to route to a stage, answer from your facts. If it offers to commit approved documents, say yes. If it asks you to choose options or defaults (for example for tooling), take its recommendation. If it is waiting with nothing to answer, tell it to continue to the next planning step. Never instruct it which skill to use, and never write code, documents or tests yourself. Never ask it to write code or tests or to start building. {build_rule} When you approve something and also introduce the next stage, put the approval first in the same message ("Approved. Next idea: ...").
-Return ONLY a JSON object: {{"action": "reply" | "next_stage" | "finish", "message": "<what you say to the assistant>"}}"""
+Return ONLY a JSON object: {{"action": "reply" | "next_stage" | "finish", "message": "<what you say to the assistant>", "ran": true | false, "approves": true | false}}
+"ran" is true only when your message tells the assistant you ran the scripts it asked you to run (you run them as you send it); saying you will run them later is false. "approves" is true when your message approves what the assistant presented for approval."""
     r = sh([CLAUDE_BIN, "-p", prompt, "--model", USER_MODEL, "--tools", "", "--output-format", "json",
             "--no-session-persistence", *ISOLATE], HERE, timeout=600)
     try:
@@ -321,7 +383,7 @@ Return ONLY a JSON object: {{"action": "reply" | "next_stage" | "finish", "messa
         m = re.search(r"\{.*\}", txt, re.S)
         return json.loads(m.group(0))
     except Exception:
-        return {"action": "reply", "message": "Looks good, approved. Please continue."}
+        return {"action": "reply", "message": "Looks good, approved. Please continue.", "approves": True}
 
 
 def opening(scn, traj):
@@ -380,31 +442,39 @@ def setup_project(out, project, ref_stages=()):
 
 
 def start_vendors(out, project, run_id):
-    """The project's fake vendors, each logging to <out>/vendor_<name>.jsonl: {name: {url, server, key, cfg}}.
+    """The project's fake vendors, each logging to <out>/vendor_<name>.jsonl: ({name: {url, server, key, cfg,
+    run_env}}, every server started).
 
-    A vendor with `proxy_hosts` (a client that takes no base URL, like yahooquery) is served on those hosts behind
-    one HTTPS proxy (fakevendor/proxy.py) for the whole run: its environment goes into ENV, so the agent, the
-    simulated user and the user's runs use it, and shims for python3, python, uv and curl lead PATH, so
-    `env -i PATH="$PATH" python3 public.py` still does. Such a vendor takes no key."""
-    vendors, routes = {}, {}
+    A vendor with a key (`key_env`) is served on 127.0.0.1 with the canary as its key, for the base URL its .env
+    names. A vendor's `proxy_hosts` (`host` or `host/path-prefix`: yahooquery's Yahoo hosts, Sharadar's own API host)
+    are served by the same fake behind one HTTPS proxy (fakevendor/proxy.py) for the whole run: its environment goes
+    into ENV, so the agent and the simulated user use it, and shims for python3, python, uv and curl lead PATH, so
+    `env -i PATH="$PATH" python3 public.py` still does. A second, closed proxy serves the same routes and refuses
+    every other live host: user runs get its environment (`run_env`), and so does every public.py the agent runs
+    (the shims). A vendor with proxy hosts and no key (Yahoo) has no base URL."""
+    vendors, routes, servers = {}, {}, []
     for name, cfg in project.get("fake_vendors", {}).items():
-        if cfg.get("proxy_hosts"):
+        if cfg.get("key_env") or not cfg.get("proxy_hosts"):
+            key = f"sk-canary-{run_id}"
+            url, server = fakevendor.start(name, out / f"vendor_{name}.jsonl", expect_key=key)
+            vendors[name] = {"url": url + cfg.get("path", ""), "server": server, "key": key, "cfg": cfg}
+            servers.append(server)
+            handler = server.RequestHandlerClass  # one fake per vendor: the same log and state behind the proxy
+        else:
             handler = fakevendor.handler_class(name, out / f"vendor_{name}.jsonl")
-            routes.update({h: handler for h in cfg["proxy_hosts"]})
             vendors[name] = {"url": None, "server": None, "key": None, "cfg": cfg}
-            continue
-        key = f"sk-canary-{run_id}"
-        url, server = fakevendor.start(name, out / f"vendor_{name}.jsonl", expect_key=key)
-        vendors[name] = {"url": url + cfg.get("path", ""), "server": server, "key": key, "cfg": cfg}
+        routes.update({h: handler for h in cfg.get("proxy_hosts", [])})
     if routes:
-        url, server, env = proxy.start_proxy(str(out / "proxy" / "certs"), routes, log=out / "proxy.jsonl")
-        bindir = proxy.shims(str(out / "proxy" / "bin"), env)
+        certs = str(out / "proxy" / "certs")
+        _, server, env = proxy.start_proxy(certs, routes, log=out / "proxy.jsonl")
+        _, closed, run_env = proxy.start_proxy(certs, routes, log=out / "proxy.jsonl", closed=True)
+        servers += [server, closed]
+        bindir = proxy.shims(str(out / "proxy" / "bin"), env, public_env=run_env)
         ENV.update(env)
         ENV["PATH"] = bindir + os.pathsep + ENV.get("PATH", "")
         for v in vendors.values():
-            if v["server"] is None:
-                v.update(url=url, server=server, env=env)
-    return vendors
+            v["run_env"] = run_env
+    return vendors, servers
 
 
 def vendor_env(names, vendors):
@@ -452,13 +522,13 @@ def user_steps(readme):
 
 
 def run_user_checks(proj, vendors, log_path, ids=None, timeout=600):
-    """The user's "ran it": every Ready probe (or just `ids`) is run as the user would run it: public.py with no
-    environment, then each probe.py step its README gives (`user_steps`), in order, stopping at the first that
-    fails. Returns one record per run; the canary is scrubbed from what is kept, and `printed_key` says whether a
-    script printed it."""
+    """The user's "ran it": every Ready probe (or just `ids`) is run as the user would run it, through the closed
+    proxy: public.py with no other environment, then each probe.py step its README gives (`user_steps`), in order,
+    stopping at the first that fails. Returns one record per run; the canary is scrubbed from what is kept, and
+    `printed_key` says whether a script printed it."""
     text = (proj / "docs" / "probes.md").read_text(errors="ignore") if (proj / "docs" / "probes.md").exists() else ""
     runs, keys = [], [v["key"] for v in vendors.values() if v.get("key")]
-    proxied = next((v["env"] for v in vendors.values() if v.get("env")), {})  # no secret: the proxy and its CA
+    proxied = next((v["run_env"] for v in vendors.values() if v.get("run_env")), {})  # no secret: the closed proxy and its CA
     scrub = lambda t: re.sub("|".join(map(re.escape, keys)) or r"(?!)", "<canary>", t or "")
     for e in probefacts.parse_probes(text)["entries"]:
         if e["kind"] != "ready" or (ids is not None and e["id"] not in ids):
@@ -500,6 +570,15 @@ def run_user_checks(proj, vendors, log_path, ids=None, timeout=600):
     return runs
 
 
+def scenario_snapshot(scn, project_id, mode, stages=None):
+    """What the run's simulated user knows and is served: the grader reads it back (scenario.json), so a check of a
+    fact a later scenario added reads n/a on a run whose user never had it."""
+    p = scn["projects"][project_id]
+    return {"project": project_id, "mode": mode, "persona": scn.get("persona"), "facts": p.get("facts", []),
+            "stages": [s["name"] for s in (stages if stages is not None else p.get("stages", []))],
+            "fake_vendors": p.get("fake_vendors", {})}
+
+
 def main():
     tid, out = sys.argv[1], pathlib.Path(sys.argv[2]).resolve()
     scn = json.loads((HERE / "scenarios.json").read_text())
@@ -514,11 +593,12 @@ def main():
     dt = plugin_root / "scripts" / "dt.py"
     extra = mcp_args(out)
     run_id = uuid.uuid4().hex[:12]
-    vendors = start_vendors(out, project, run_id)
+    (out / "scenario.json").write_text(json.dumps(scenario_snapshot(scn, traj["project"], traj["mode"], stages), indent=1))
+    vendors, servers = start_vendors(out, project, run_id)
     try:
         run_loop(scn, traj, project, stages, out, proj, plugin_root, dt, extra, msg, n_revealed, refs, vendors)
     finally:
-        for server in {id(v["server"]): v["server"] for v in vendors.values() if v.get("server")}.values():
+        for server in servers:
             server.shutdown()
 
 
@@ -529,8 +609,9 @@ def run_loop(scn, traj, project, stages, out, proj, plugin_root, dt, extra, msg,
     sess, before, action = None, {}, None  # the current session; dt next before its last message; the user's action
     stage_log = [{"turn": 1, "stage": stages[0]["name"] if traj["mode"] == "incremental" else "all"}]
     t_start = time.time()
-    closing, stop_reason = False, "max_turns"
+    closing, stop_reason = 0, "max_turns"  # closing: 1 once the closing approval is sent, 2 after one more
     user_run = None  # what the user ran before this turn ("ran it")
+    probes_run = set()  # the probes the user has run in this run
     stalled = 0  # consecutive turns where the user wanted to move on, readiness blocked it, and nothing changed since the turn began
     for t in range(1, (MAX_TURNS or traj["max_turns"]) + 1):
         # The commit the turn starts from (the previous turn's, or the user run's after it): diffing from it,
@@ -546,7 +627,7 @@ def run_loop(scn, traj, project, stages, out, proj, plugin_root, dt, extra, msg,
         before = nxt
         sent = f"/dev-team:{skill} {msg}" if fresh else msg
         reply, usage, tools, skills, dt_s, errors, hooks, init, agents, seen = agent_turn(
-            proj, sess["id"], sent, fresh, out / "agent_stream.jsonl", plugin_root, extra)
+            proj, sess["id"], sent, fresh, out / "agent_stream.jsonl", plugin_root, extra, turn=t)
         sess["seen"] = list(dict.fromkeys(sess["seen"] + seen))
         sess["turns"].append(t)
         cum = usage.get("cost_usd") or 0  # total_cost_usd is cumulative within one resumed session
@@ -576,6 +657,15 @@ def run_loop(scn, traj, project, stages, out, proj, plugin_root, dt, extra, msg,
               f"skills={skills} changed={changed.splitlines()[-1] if changed else '-'}", flush=True)
 
         if closing:
+            left = draft_docs(facts)
+            if closing == 1 and left:
+                # The closing message left a doc Draft: one more approval, which asks for nothing else.
+                closing = 2
+                turns[-1]["closing_drafts"] = left
+                msg, action = (f"Approved: {ids(left)}. Please mark {'it' if len(left) == 1 else 'them'} Approved; "
+                               "nothing else, planning is done for now."), "reply"
+                (out / "turns.json").write_text(json.dumps(turns, indent=1))
+                continue
             turns[-1]["sim_user_final"] = "(closing approval delivered)"
             (out / "turns.json").write_text(json.dumps(turns, indent=1))
             stop_reason = "finished"
@@ -587,7 +677,9 @@ def run_loop(scn, traj, project, stages, out, proj, plugin_root, dt, extra, msg,
         nxt = stages[n_revealed] if traj["mode"] == "incremental" and n_revealed < len(stages) else None
         ask = lambda note="": sim_user(scn, traj, revealed, nxt, "\n\n".join(history[-4:-1]), reply, status, refs, note)
         u = ask()
-        blocked = readiness(facts, n_revealed, traj["mode"])
+        dnext = dt_next(proj, dt)  # what dt says after this turn
+        changed_docs = sh(["git", "diff", "--name-only", base, "HEAD"], proj).stdout.split()
+        blocked = readiness(facts, n_revealed, traj["mode"], dnext, probes_run, approved_docs(u, dnext, changed_docs))
         why = [r for r, _ in blocked]
         rec["readiness"] = why
         rec["sim_action"] = u.get("action")
@@ -603,8 +695,11 @@ def run_loop(scn, traj, project, stages, out, proj, plugin_root, dt, extra, msg,
                     f"anything pending, then {'; '.join(asks)}. Ask for this even if the assistant recommended against "
                     "it or said it can wait. Do not introduce the next stage or finish.")
             if u.get("action") != "reply":
-                wants = "; and ".join(re.sub(r"^ask for ", "", a) for a in asks)
-                u = {"action": "reply", "message": f"Approved. Before we move on, I'd like {wants}."}
+                unrun = probes_to_run(facts, dnext, probes_run)
+                wants = "; and ".join(re.sub(r"^ask for ", "", a) for a in asks if not unrun or a != ask_runs(unrun))
+                u = {"action": "reply", "approves": True, "ran": bool(unrun),
+                     "message": "Approved." + (f" I ran {ids(unrun)} as their READMEs say." if unrun else "")
+                     + (f" Before we move on, I'd like {wants}." if wants else "")}
         else:
             stalled = 0
         if u.get("action") == "finish" and nxt and not why:
@@ -618,8 +713,13 @@ def run_loop(scn, traj, project, stages, out, proj, plugin_root, dt, extra, msg,
                 turns[-1]["sim_user_final"] = u.get("message")
                 stop_reason = "finished"
                 break
-            # Send the closing approval so the agent can mark the last doc Approved; stop after that turn.
-            closing = True
+            # The closing approval lets the agent mark the last docs Approved; it asks for nothing new. Stop after
+            # that turn, or after one more approval if a doc is still Draft.
+            closing = 1
+            u = ask("This is your closing message: planning is done. Approve what is pending in a sentence or two and "
+                    "ask for nothing new: no further work, extension, review or next step. Set action to \"finish\".")
+            if u.get("action") != "finish" or not u.get("message"):
+                u = {"action": "finish", "message": "Approved. That's all for now: planning is done."}
             u["action"] = "reply"
         new_refs = []
         if u.get("action") == "next_stage" and nxt:
@@ -629,9 +729,20 @@ def run_loop(scn, traj, project, stages, out, proj, plugin_root, dt, extra, msg,
             refs += new_refs
         msg = (u.get("message") or "Approved. Continue.") + refs_note(new_refs)
         action = u.get("action")
-        if vendors and re.search(r"\bran it\b", msg, re.I):
+        rec["sim_ran"], rec["sim_approves"] = bool(u.get("ran")), bool(u.get("approves"))
+        if vendors and u.get("ran"):
             user_run = run_user_checks(proj, vendors, out / "user_runs.jsonl")
+            probes_run |= {r_["probe"] for r_ in user_run}
             commit(proj, f"user run before turn {t + 1}")
+            # The user saw what ran and each step's exit code (never the output), and says only that.
+            report = run_report(user_run)
+            rec["user_run_report"] = report
+            told = ask(f"You just ran the scripts as their READMEs say. What ran: {report}. Rewrite your message "
+                       f"(keep its action, \"{u.get('action')}\"): say you ran them, name only these steps, and for a "
+                       "step that failed give its exit code, never any output. If nothing ran, say so. Keep the rest "
+                       f"of your message.\nYOUR MESSAGE: {u.get('message')}")
+            if told.get("message"):
+                msg = told["message"] + refs_note(new_refs)
         (out / "turns.json").write_text(json.dumps(turns, indent=1))
     summary = {"trajectory": tid, "turns": len(turns), "stages_reached": n_revealed, "stage_log": stage_log,
                "references": refs,

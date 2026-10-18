@@ -20,6 +20,10 @@ DT = dtrun.dt_path(run)
 turns = json.loads((run / "turns.json").read_text()) if (run / "turns.json").exists() else []
 summary = json.loads((run / "summary.json").read_text()) if (run / "summary.json").exists() else {}
 scn = json.loads((HERE / "scenarios.json").read_text())
+# The scenario as the run saw it (driver.py writes scenario.json when the run starts); older runs recorded none. A
+# check of something the user only says in a later scenario reads n/a on a run whose snapshot doesn't say it.
+run_scn = json.loads((run / "scenario.json").read_text()) if (run / "scenario.json").exists() else {}
+run_facts = "\n".join(run_scn.get("facts", []))
 tid = run.parent.name
 project = tid.split("-")[0]
 mode = "incremental" if "incremental" in tid else "all_at_once"
@@ -27,9 +31,12 @@ stages = scn["projects"][project]["stages"]
 PLANNING_SKILLS = ["idea-refine", "spec-writing", "architecture-design", "pipeline-design", "build-planning", "build-setup"]
 
 R = []
-def check(id_, text, passed, evidence, metrics=None):
-    """One graded check. `metrics` carries the numbers behind it (modecmp.py compares them across modes)."""
+def check(id_, text, passed, evidence, metrics=None, items=None):
+    """One graded check. `metrics` carries the numbers behind it (modecmp.py compares them across modes); `items`, the
+    full lists the evidence cuts short, go into `metrics["items"]` (adjudicate.py pins every item there)."""
     rec = {"id": id_, "text": text, "passed": bool(passed), "evidence": str(evidence)[:600]}
+    if items:
+        metrics = {**(metrics or {}), "items": {k: list(v) for k, v in items.items()}}
     if metrics is not None:
         rec["metrics"] = metrics
     R.append(rec)
@@ -212,7 +219,9 @@ check("tasks_well_formed", "Every task: Kind and Writes declared, Read IDs resol
       "Mode follows the rule, split allowed for interface-declared symbols (or a Reason)",
       tasks and not unresolved and not bad_size and not bad_mode and not dt_mode and not no_fields and not bad_kind,
       f"{len(tasks)} tasks; fields: {no_fields[:4]}; kind: {bad_kind[:4]}; unresolved: {unresolved[:6]}; size: {bad_size[:6]}; "
-      f"mode: {bad_mode[:6]}; dt mode_violations (not excused): {dt_mode[:4]}")
+      f"mode: {bad_mode[:6]}; dt mode_violations (not excused): {dt_mode[:4]}",
+      items={"fields": no_fields, "kind": bad_kind, "unresolved": unresolved, "size": bad_size, "mode": bad_mode,
+             "dt_mode_violations": dt_mode})
 big = {k: v for k, v in packets.items() if v >= 2000}
 check("context_packets_small", "`dt context` packets are under 2,000 lines", packets and not big,
       f"max {max(packets.values()) if packets else 0} lines over {len(packets)} packets; over: {big}")
@@ -221,7 +230,9 @@ check("context_packets_small", "`dt context` packets are under 2,000 lines", pac
 # Planned scope is the active milestone's plan; designed scope is every pipeline and the contract's type sections.
 # Every graph fact is worked out here from parser facts (Depends on, Writes, Kind, the dependency-graph table);
 # dt's own numbers (devteam.graph, `dt status`) are only a cross-check, so a dt bug can't grade itself.
-SYMBOL = re.compile(r"\b[a-z][a-z0-9_-]*(?:\.[A-Za-z_][A-Za-z0-9_]*)+\b")
+SYMBOL = re.compile(r"\b[a-z][a-z0-9_-]*(?:\.[A-Za-z_][A-Za-z0-9_]*)+(?:\*|\b)")
+# The scenario fact that leaves the fundamentals source to the agent (data_sources_suggested).
+SOURCE_QUESTION = re.compile(r"\bfundamentals\b[^.]*\b(suggest|haven't picked|pick a source)", re.I)
 PATHLIKE = re.compile(r"\.(py|md|json|csv|toml|ya?ml|txt|parquet|ts|tsx|js|sh|ipynb|html)$")
 # The structural rules live in dtrun.py, where selftest/checks.py runs each one good and bad.
 type_names, write_overlap = dtrun.type_names, dtrun.write_overlap
@@ -231,7 +242,9 @@ EDGE_KINDS = ("data", "call", "file", "code", "contract-change", "order")
 
 
 def symbols_in(text):
-    return [s for s in dict.fromkeys(SYMBOL.findall(text or "")) if not PATHLIKE.search(s)]
+    """Contract symbols a text names; a `*` glob (`data.load_*`) stands for the contract symbols it matches."""
+    names = [s for s in dict.fromkeys(SYMBOL.findall(text or "")) if not PATHLIKE.search(s)]
+    return dtrun.expand_globs(names, [s_["id"] for s_ in facts.get("symbols", [])])
 
 
 def find_key(d, key):
@@ -335,11 +348,12 @@ check("plan_parallelism", f"{ms_id} parallelism (tasks ÷ critical path) is at l
       metrics={"tasks": gm["tasks"], "critical_path": gm["critical_path"], "parallelism": gm["parallelism"], "max_width": gm["width"]})
 
 # Counted in spine units: steps sharing an owner module share one spine task, so the denominator is the distinct
-# owner modules; the numerator is spine tasks and tester halves only (implementer halves and wiring don't count).
+# owner modules; the numerator is spine tasks and the tester halves of split spines and folds only (implementer
+# halves, wiring and library thickens don't count).
 units = dtrun.wave_units(m_pls, m_tasks, PKGS)
 after_iface, early = dtrun.wave_ready(m_tasks, iface_ids, deps, declared, step_of)
 ready_n = len(after_iface) + len(early)
-check("wave_width", "Right after the interface task, the ready set (spines plus split tasks' tester halves) is at least "
+check("wave_width", "Right after the interface task, the ready set (spines plus split spines' and folds' tester halves) is at least "
       "0.8 × the milestone's step count", iface_ids and units and ready_n >= 0.8 * len(units),
       f"interface: {sorted(iface_ids)}; spines ready after it: {after_iface} + tester halves {early} = {ready_n}; "
       f"spine units (owner modules): {len(units)} ({units}); steps: {len(m_steps)}",
@@ -371,7 +385,8 @@ check("writes_disjoint", "No two tasks without a Depends-on path between them sh
       "owner module and its unit test; shared files only by interface, wiring or system tasks",
       m_tasks and not conflicts and not spine_bad and not shared_bad and not no_writes,
       f"conflicts: {conflicts[:5]}; spines writing more: {spine_bad[:4]}; shared files: {shared_bad[:4]}; no Writes: {no_writes[:6]}",
-      metrics={"conflicts": len(conflicts) + len(spine_bad) + len(shared_bad)})
+      metrics={"conflicts": len(conflicts) + len(spine_bad) + len(shared_bad)},
+      items={"conflicts": conflicts, "spines_writing_more": spine_bad, "shared_files": shared_bad, "no_writes": no_writes})
 
 
 def mitigation_ok(r):
@@ -390,7 +405,8 @@ check("edges_mitigated", "At least 90% of data/call edges name a mitigation the 
       f"{len(dc_ok)}/{len(dc_rows)} mitigated by a declared interface; not: "
       f"{[(r['from'], r['to'], r['mitigated_by'] or 'none') for r in dc_rows if r not in dc_ok][:5]}"
       + ("" if g_rows else "; the plan has no Dependency graph table"),
-      metrics={"edges_mitigated": mit_share, "data_call_edges": len(dc_rows)})
+      metrics={"edges_mitigated": mit_share, "data_call_edges": len(dc_rows)},
+      items={"not_mitigated": [f"{r['from']}→{r['to']}: {r['mitigated_by'] or 'none'}" for r in dc_rows if r not in dc_ok]})
 
 unmit = [r for r in dep_rows if not r["mitigated_by"]]
 # Judged by structure, not wording (see dtrun.unmitigated_class): integration, file, same module, contract change,
@@ -406,7 +422,8 @@ check("unmitigated_reasoned", "Every unmitigated (`none:`) edge gives a reason o
       "(same module, unsplittable shared file, real side-effect order, contract change)",
       g_rows and not unreasoned and not cross_step,
       f"{len(unmit)} unmitigated rows {classes}; code edges between steps: {cross_step[:4]}; no allowed kind: {unreasoned[:4]}",
-      metrics={"unmitigated": len(unmit), "by_class": classes, "cross_step_code": len(cross_step), "unreasoned": len(unreasoned)})
+      metrics={"unmitigated": len(unmit), "by_class": classes, "cross_step_code": len(cross_step), "unreasoned": len(unreasoned)},
+      items={"cross_step_code": cross_step, "unreasoned": unreasoned})
 
 
 def covered_boundary(a, b):
@@ -443,7 +460,8 @@ for t in m_tasks:
             to_code.append(f"{t['id']}→{d} (wiring waits on code it only calls, which a declared fake covers)")
 check("no_edge_to_code_when_interface", "No Depends on points at a code task across a boundary an interface covers",
       m_tasks and not to_code, f"violations: {to_code[:6]}; serial on a shared file (not counted): {serial_shared[:6]}",
-      metrics={"violations": len(to_code), "serial_on_shared_file": len(serial_shared)})
+      metrics={"violations": len(to_code), "serial_on_shared_file": len(serial_shared)},
+      items={"violations": to_code, "serial_on_shared_file": serial_shared})
 
 missing_rows = [f"{t['id']}→{d}" for t in m_tasks for d in deps[t["id"]] if d not in iface_ids and (t["id"], d) not in row_of]
 bad_rows = [f"line {r.get('line')}: {r['from'] or '?'}→{r['to'] or '?'} {r['kind']}" for r in g_rows
@@ -455,7 +473,8 @@ check("edge_table_consistent", "Every Depends on (beyond the interface task) has
       m_tasks and not missing_rows and not bad_rows and not unordered,
       f"{n_deps} Depends on, {len(g_rows)} rows; no row: {missing_rows[:5]}; unresolved: {bad_rows[:4]}; "
       f"unmitigated but not in Depends on: {unordered[:4]}",
-      metrics={"rows": len(g_rows), "missing": len(missing_rows) + len(bad_rows) + len(unordered)})
+      metrics={"rows": len(g_rows), "missing": len(missing_rows) + len(bad_rows) + len(unordered)},
+      items={"no_row": missing_rows, "unresolved": bad_rows, "unordered": unordered})
 
 # Steps grouped by owner module (one spine per module), system pipelines met by a system task, package-local
 # smoke tests, a step named in a spine's Reason, and recorded folds accepted (dtrun.phase0_misses).
@@ -463,12 +482,12 @@ split_miss = dtrun.phase0_misses(m_pls, m_tasks, iface_ids, declared_names, PKGS
 check("phase0_split", f"Every pipeline of {ms_id}: its types declared by an interface task, one spine task per step (or a fold "
       "rule applied), one wiring task writing the entry and its smoke test",
       m_pls and not split_miss, f"pipelines {[p['id'] for p in m_pls]}; missing: {split_miss[:6]}; "
-      f"dt no_spine: {st_bp.get('no_spine')}", metrics={"missing": len(split_miss)})
+      f"dt no_spine: {st_bp.get('no_spine')}", metrics={"missing": len(split_miss)}, items={"missing": split_miss})
 
 big_steps = [f"{t['id']} {t['kind']}={t['size']}" for t in m_tasks if t.get("kind") in ("spine", "thicken") and t["size"] not in ("XS", "S")]
 n_step_tasks = sum(1 for t in m_tasks if t.get("kind") in ("spine", "thicken"))
 check("step_tasks_small", "Spine and thicken tasks are XS or S", n_step_tasks and not big_steps,
-      f"{n_step_tasks} spine/thicken tasks; larger: {big_steps[:6]}")
+      f"{n_step_tasks} spine/thicken tasks; larger: {big_steps[:6]}", items={"larger": big_steps})
 
 split_tasks = [t for t in m_tasks if t["mode"] == "split"]
 early_all = [t["id"] for t in split_tasks if tester_early(t)]
@@ -477,7 +496,9 @@ check("tester_starts_early", "At least 80% of split tasks read only symbols the 
       m_tasks and (early_share is None or early_share >= 0.8),
       f"{len(early_all)}/{len(split_tasks)} split tasks; late: "
       f"{[(t['id'], sorted(x for x in t.get('read_symbols', []) if not dtrun.is_declared(x, declared, step_of.get(t['step'], {}).get('name', ''))) or 'no symbol in Read') for t in split_tasks if t['id'] not in early_all][:5]}",
-      metrics={"tester_early": early_share})
+      metrics={"tester_early": early_share},
+      items={"late": [f"{t['id']}: {sorted(x for x in t.get('read_symbols', []) if not dtrun.is_declared(x, declared, step_of.get(t['step'], {}).get('name', ''))) or 'no symbol in Read'}"
+                      for t in split_tasks if t["id"] not in early_all]})
 
 
 def fake_ok(sym, consumer_pl=None):
@@ -527,11 +548,11 @@ for t in m_tasks:
 check("fakes_only_cross_pipeline", "Fakes appear only where a pipeline calls another pipeline or package (within a pipeline, "
       "a type and a sample)", m_tasks and not fake_bad,
       f"fakes: {sorted(set(fakes))}; replay doubles (samples): {sorted(set(doubles))}; misplaced: {fake_bad[:5]}",
-      metrics={"violations": len(fake_bad)})
+      metrics={"violations": len(fake_bad)}, items={"misplaced": fake_bad})
 
 plan_writes = [f"{t['id']}: {w}" for _, t in tasks for w in t["writes"] if w.startswith("tasks/") or w == "tasks"]
 check("tasks_not_editing_plan", "No task's Writes is under tasks/ (only the orchestrator writes the plan)",
-      tasks and not plan_writes, f"{plan_writes[:6]}")
+      tasks and not plan_writes, f"{plan_writes[:6]}", items={"plan_writes": plan_writes})
 
 # milestone-size: the critical path the grader worked out, per planned milestone, against the cap.
 TRACK_MAX = 15
@@ -591,7 +612,8 @@ for pl in facts["pipelines"]:
                 cov_miss.append(f"{pl['id']} {a['name']}→{b['name']}: {nm} has no case an interface task writes under tests/contracts/")
 check("interface_coverage", "Every cross-owner step boundary has its type as a contract section; in the planned milestone also "
       "a sample under tests/contracts/", facts["pipelines"] and not cov_miss,
-      f"{n_bound} cross-owner boundaries; missing: {cov_miss[:6]}", metrics={"boundaries": n_bound, "missing": len(cov_miss)})
+      f"{n_bound} cross-owner boundaries; missing: {cov_miss[:6]}", metrics={"boundaries": n_bound, "missing": len(cov_miss)},
+      items={"missing": cov_miss})
 
 named_types = {(pl["id"], s_["name"], nm) for pl in facts["pipelines"] for s_ in pl["steps"]
                for nm in type_names(s_["in_type"]) + type_names(s_["out_type"])}
@@ -605,7 +627,8 @@ check("types_in_contract", "Every type named in a step table resolves to a contr
       f"{len({nm for _, _, nm in named_types})} types named in step tables, {len(type_secs)} type sections; unresolved: {unresolved_types[:10]}; "
       f"field types unresolved: {unresolved_fields[:10]}",
       metrics={"types_named": len({nm for _, _, nm in named_types}), "unresolved": len(unresolved_types),
-               "fields_unresolved": len(unresolved_fields)})
+               "fields_unresolved": len(unresolved_fields)},
+      items={"unresolved": unresolved_types, "fields_unresolved": unresolved_fields})
 
 # A stage may become several milestones (build-planning splits a stage too big for one), so milestones map to
 # stages, not by position. Incremental: a row sourced from the brief is stage 1, and an idea file belongs to the
@@ -752,7 +775,7 @@ if freeze is not None:
 check("frozen_interface_churn", "Reported: revisions to a type section or tests/contracts/ folder after the first plan froze them",
       True, (f"frozen at turn {freeze}: {len(types_at[freeze])} type sections, {len(contract_blobs(turn_commit[freeze]))} contract files; "
              f"{len(churn)} revisions: {churn[:8]}") if freeze is not None else "no plan was approved, nothing frozen",
-      metrics={"churn": len(churn), "frozen_turn": freeze})
+      metrics={"churn": len(churn), "frozen_turn": freeze}, items={"revisions": [list(c) for c in churn]})
 
 # ---- gates: one layer per turn; approvals only after the user approves
 def layer(path):
@@ -818,7 +841,8 @@ pd_types = [(n, sorted(set(types_at[n]) - set(types_at.get(max([k for k in types
 pd_types = [(n, ts) for n, ts in pd_types if ts]
 check("gate_discipline", "Every skill stops at its gate: no turn drafts two layers (brief/idea, references, spec, architecture, pipelines, tests, plan, setup) at once",
       turn_commit and not multi, f"turns: {multi[:10]}; routed Revise round trips (allowed): {routed[:6]}; "
-      f"types added in pipeline-design turns: {pd_types[:5]}")
+      f"types added in pipeline-design turns: {pd_types[:5]}",
+      items={"turns": [list(m) if isinstance(m, (list, tuple)) else m for m in multi], "routed": routed, "pd_types": pd_types})
 
 APPROVE = re.compile(r"\b(accept|accepted|approve|approved|looks good|lgtm|go ahead|yes)\b", re.I)
 bad, prev = [], {}
@@ -829,7 +853,8 @@ for t in turns:
         if s_now in ("Accepted", "Approved") and s_prev not in ("Accepted", "Approved", "Specced") and not APPROVE.search(t["user"]):
             bad.append((t["turn"], f))
     prev = cur
-check("approval_after_user", "Docs only flip to Accepted/Approved in a turn where the user approved", not bad, f"violations: {bad[:10]}")
+check("approval_after_user", "Docs only flip to Accepted/Approved in a turn where the user approved", not bad, f"violations: {bad[:10]}",
+      items={"violations": [list(b) for b in bad]})
 skills_used = sorted({dtrun.skill_name(s) for t in turns for s in t["skills"]})
 missing = [s for s in PLANNING_SKILLS if s not in skills_used]
 check("skills_invoked", "All six required planning skills were invoked (idea → build-setup)", not missing, f"used: {skills_used}; missing: {missing}")
@@ -873,10 +898,15 @@ if project == "quant":
                 [docs / "brief.md", docs / "spec.md", docs / "architecture.md", *pkg_docs, *ideas] if p.exists()}
     src_docs = {rel: txt for rel, txt in src_docs.items() if status(txt) in ("Approved", "Accepted", "Specced")}
     found, fundamentals = dtrun.data_sources(src_docs)
-    check("data_sources_suggested", "quant: approved docs name a data source beyond the user's two (Sharadar prices, "
-          "yahooquery), at least one of them for company fundamentals", bool(fundamentals),
-          f"found: {found}; fundamentals: {fundamentals}; docs searched: {sorted(src_docs)}",
-          {"sources": sorted(found), "fundamentals": fundamentals, "where": found})
+    T_SOURCES = ("quant: approved docs name a data source beyond the user's two (Sharadar prices, yahooquery), at least "
+                 "one of them for company fundamentals")
+    if not (re.search(r"yahooquery", run_facts, re.I) and SOURCE_QUESTION.search(run_facts)):
+        graded_or_na("data_sources_suggested", T_SOURCES, (None, "the run's scenario snapshot names no yahooquery "
+                     "cross-check or fundamentals question" if run_scn else "the run recorded no scenario snapshot"))
+    else:
+        check("data_sources_suggested", T_SOURCES, bool(fundamentals),
+              f"found: {found}; fundamentals: {fundamentals}; docs searched: {sorted(src_docs)}",
+              {"sources": sorted(found), "fundamentals": fundamentals, "where": found})
     viz = {k: bool(re.search(pat, arch_all, re.I)) for k, pat in
            [("typescript", r"TypeScript"), ("react", r"\bReact\b"), ("websocket", r"WebSocket"), ("json_schema", r"JSON Schema")]}
     check("arch_viz_boundary", "Architecture puts the viz app's TypeScript + React frontend across a WebSocket/HTTP boundary from the Python backend, "
@@ -1051,7 +1081,8 @@ else:
     unwritten = sorted({pid for d in src0 for pid in d["probe_ids"]} - {e["id"] for e in PR.probes})
     check("probe_not_guess", T_GUESS, first_ok is not None and src0 and not no_line and not early and not unwritten,
           f"first approved architecture at turn {first_ok}; data-source decisions {[(d['id'], d['status'], d['probe']) for d in src0]}; "
-          f"without a Probe line: {no_line}; Accepted too early: {list(early.values())[:4]}; cited but never written: {unwritten}")
+          f"without a Probe line: {no_line}; Accepted too early: {list(early.values())[:4]}; cited but never written: {unwritten}",
+          items={"without_probe_line": no_line, "accepted_too_early": list(early.values()), "unwritten": unwritten})
 
 T_COVER = ("The data-source probe's checks inform DATA-01, DATA-02 and the PRICE requirement on raw prices, every check "
            "names a Pass criterion, and `dt lint` has no error on docs/probes.md or probes/")
@@ -1119,6 +1150,9 @@ yahoo = fakevendor.VENDORS["yahoo"].PLANTED if "yahoo" in vendor_cfg else None
 y_entries = [e for e in PR.probes if re.search(r"yahoo|yfinance", e["title"] + e["folder"] + e["question"], re.I)]
 if not probing or yahoo is None:
     graded_or_na("crosscheck_facts_reached_design", T_CROSS, (None, NOT_PROBING if not probing else "the project has no proxied cross-check source"))
+elif not re.search(r"yahooquery", run_facts, re.I):
+    graded_or_na("crosscheck_facts_reached_design", T_CROSS, (None, "the run's scenario snapshot names no yahooquery "
+                 "cross-check" if run_scn else "the run recorded no scenario snapshot"))
 elif not y_entries:
     check("crosscheck_facts_reached_design", T_CROSS, False, "no probe of the Yahoo cross-check")
 else:

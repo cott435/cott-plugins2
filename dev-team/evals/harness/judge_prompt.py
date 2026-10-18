@@ -1,14 +1,19 @@
 #!/usr/bin/env python3
-"""Fill blind_judge_prompt.md for one pair of packaged runs (hand each prompt to a fresh agent session), and average
-the two orders.
+"""Fill blind_judge_prompt.md for one pair of packaged runs, run each order as a read-only judge, and average the two
+orders.
 
 Usage:
   judge_prompt.py <project> <dir-1> <dir-2> <out-json> [--sets DIR] [--extra TEXT]
       Print one prompt with dir-1 as Set A. Shuffle the dirs yourself and keep the key.
   judge_prompt.py <project> <dir-1> <dir-2> <out-json> --both <prompt-dir> [--labels L1 L2] [--extra TEXT]
-      Write <prompt-dir>/prompt-AB.md (dir-1 is A; the judge writes <out>.AB.json) and prompt-BA.md (dir-2 is A;
-      <out>.BA.json), plus the key <out>.key.json. Labels (e.g. incremental all_at_once) go in the key only.
-      The folder of <out-json> is created if it doesn't exist.
+      Write <prompt-dir>/prompt-AB.md (dir-1 is A; its verdict goes to <out>.AB.json) and prompt-BA.md (dir-2 is
+      A; <out>.BA.json), plus the key <out>.key.json. Labels (e.g. incremental all_at_once) go in the key only. The
+      folder of <out-json> is created if it doesn't exist; it must lie outside <prompt-dir>.
+  judge_prompt.py run <prompt-dir> <out-json>
+      Run both prompts, in parallel, each as its own `claude -p` (JUDGE_MODEL, default claude-opus-5-5) from
+      <prompt-dir> with only Read, Glob and Grep, no CLAUDE.md files, no MCP servers and no host settings, and save
+      each reply's JSON as <out>.AB.json and <out>.BA.json. A judge can't write, and a read outside <prompt-dir>
+      asks for a permission that a headless run in the default permission mode denies, so the key stays out of reach.
   judge_prompt.py average <out-json>
       Read <out>.AB.json, <out>.BA.json and the key; write <out-json> with each dir's scores averaged over the
       two orders (keyed by label), the winner per order, and the items whose two scores differ by more than 1.
@@ -17,10 +22,11 @@ Usage:
 Blinding: those paths name the mode, so the judge never sees them. Each dir is copied to a neutral folder, set-1
 (dir-1) and set-2 (dir-2), in <prompt-dir> (without --both: --sets DIR, default <out-json minus .json>-sets/),
 leaving out transcript.md and doc_evolution.md (older packaged runs kept them in outputs/). The prompt names only
-those copies and <out-json>. If any of those paths, or any copied file name, contains a mode word, nothing is
-written.
+those copies; the judge replies with its verdict. If any of those paths, or any copied file name, contains a mode
+word, nothing is written.
 """
-import argparse, json, pathlib, re, shutil, sys
+import argparse, json, os, pathlib, re, shutil, subprocess, sys
+from concurrent.futures import ThreadPoolExecutor
 
 HERE = pathlib.Path(__file__).resolve().parent
 COMMON_CONTENT = ["stage_completeness", "internal_consistency", "right_sizing", "milestone_quality", "pipeline_clarity",
@@ -38,7 +44,7 @@ def fill(project, dir_a, dir_b, out, extra):
                        "\n".join(f"- {s['reveal']}" for s in facts["stages"]),
               "DIR_A": str(pathlib.Path(dir_a).resolve()), "DIR_B": str(pathlib.Path(dir_b).resolve()),
               "CONTENT_KEYS": ", ".join(CONTENT[project]), "STRUCTURE_KEYS": ", ".join(STRUCTURE),
-              "EXTRA": extra, "OUT_PATH": str(pathlib.Path(out).resolve())}
+              "EXTRA": extra}
     text = (HERE / "blind_judge_prompt.md").read_text()
     for k, v in values.items():
         text = text.replace("{" + k + "}", v)
@@ -106,7 +112,35 @@ def average(out):
     return res
 
 
+def judge(prompt_dir, order, out):
+    """One order's verdict: the prompt run as a read-only `claude -p` from the prompt folder, its JSON saved."""
+    sys.path.insert(0, str(HERE))
+    import driver  # the isolated environment the eval's own sessions get
+    text = (prompt_dir / f"prompt-{order}.md").read_text()
+    cmd = [driver.CLAUDE_BIN, "-p", text, "--model", os.environ.get("JUDGE_MODEL", "claude-opus-5-5"),
+           "--tools", "Read,Glob,Grep", "--allowedTools", "Read,Glob,Grep", "--strict-mcp-config",
+           "--output-format", "json", "--no-session-persistence", *driver.ISOLATE]
+    r = subprocess.run(cmd, cwd=prompt_dir, env=driver.ENV, capture_output=True, text=True, timeout=7200)
+    try:
+        reply = json.loads(r.stdout)["result"]
+        verdict = json.loads(re.search(r"\{.*\}", reply, re.S).group(0))
+    except (ValueError, KeyError, TypeError, AttributeError):
+        raise SystemExit(f"judge_prompt: no JSON verdict from the {order} judge (rc {r.returncode}): "
+                         f"{(r.stdout or r.stderr)[-800:]}")
+    sibling(out, order).write_text(json.dumps(verdict, indent=1))
+    return order, verdict.get("winner")
+
+
 def main():
+    if len(sys.argv) > 1 and sys.argv[1] == "run":
+        if len(sys.argv) != 4:
+            sys.exit("usage: judge_prompt.py run <prompt-dir> <out-json>")
+        pdir, out = pathlib.Path(sys.argv[2]).resolve(), pathlib.Path(sys.argv[3]).resolve()
+        if pdir in sibling(out, "key").parents:
+            sys.exit(f"judge_prompt: the key {sibling(out, 'key')} is inside {pdir}, where the judge reads")
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            print(dict(pool.map(lambda o: judge(pdir, o, out), ("AB", "BA"))))
+        return
     if len(sys.argv) > 1 and sys.argv[1] == "average":
         if len(sys.argv) != 3:
             sys.exit("usage: judge_prompt.py average <out-json>")
@@ -131,11 +165,12 @@ def main():
         print(fill(a.project, s1, s2, out, a.extra))
         return
     pdir = pathlib.Path(a.both).resolve()
-    ab, ba = sibling(out, "AB"), sibling(out, "BA")
-    s1, s2 = neutral_sets([a.dir_1, a.dir_2], pdir, [ab, ba])
+    if pdir in sibling(out, "key").parents:
+        sys.exit(f"judge_prompt: put <out-json> outside {pdir}: the key must stay out of the judge's folder")
+    s1, s2 = neutral_sets([a.dir_1, a.dir_2], pdir, [])
     out.parent.mkdir(parents=True, exist_ok=True)
-    (pdir / "prompt-AB.md").write_text(fill(a.project, s1, s2, ab, a.extra))
-    (pdir / "prompt-BA.md").write_text(fill(a.project, s2, s1, ba, a.extra))
+    (pdir / "prompt-AB.md").write_text(fill(a.project, s1, s2, sibling(out, "AB"), a.extra))
+    (pdir / "prompt-BA.md").write_text(fill(a.project, s2, s1, sibling(out, "BA"), a.extra))
     key = {"dirs": {"1": str(pathlib.Path(a.dir_1).resolve()), "2": str(pathlib.Path(a.dir_2).resolve())},
            "sets": {"1": str(s1), "2": str(s2)},
            "labels": {"1": a.labels[0], "2": a.labels[1]}, "AB": {"A": "1", "B": "2"}, "BA": {"A": "2", "B": "1"}}

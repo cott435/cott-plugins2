@@ -477,3 +477,95 @@ Before another run:
 1. Allow an edge when the moved work's input is written by the other task.
 2. Restrict `oracle_edits` to values whose quoted turn contains the new value: a check `plan_review.py` can make itself.
 3. Let a task title change when only its stale words change.
+
+## Fixer v5: real edges, an oracle check, stale titles
+
+**What changed.**
+- **`plan_fix_prompt.md`:**
+  - "Fewer edges" now means no edge a task's inputs don't need. If moving work would make a task build from a file or symbol another task writes, with no contract fake standing in, the fixer adds the edge to the earlier task and leaves the work in place. The ban on edges between two interface tasks or two spines stays.
+  - A task heading's stale title words may change. Its ID, form and bold fields stay.
+- **`plan_review.py` `oracle_check`**, run after the fixer and before the commit:
+  - It diffs every changed `expected.json` against its committed version, leaf by leaf, rather than trusting the free-text `oracle_edits`.
+  - It checks each new or changed value against the turn(s) `oracle_edits` cites for that file:
+    - Every number the edit added must be in the turn. Accepted notations: digits with or without commas; number words (one–twenty, thirty, forty, fifty, hundred, dozen, half, single, once, twice); a percent as both 5 and 0.05; N k as N·1000; hours as minutes and back ("~1 hour" passes 60). Numbered-list markers ("3. Use", "3) Use") don't count.
+    - A 1 also passes on "a"/"an" up to two words before a word sharing four letters with the leaf ("a learning predator" for `"predators": 1`).
+    - A value that adds no number passes when one added word shares its first four letters with a word in the turn (circle/circular).
+    - A leaf that only lost items is a deletion: the fixer's route for a computed value, so it isn't checked.
+    - A changed file with no cited turn fails.
+  - A failing value is reverted and then deleted. Its case is routed as the fixer routes computed values: `dt route test-planning`, `tests.md` Status Draft and an Open questions bullet. A short model pass ($0.08–0.18, Read/Edit/Grep) then takes the value out of the case's wording.
+  - Results go to `fix.json` `oracle_check`, and the model pass's cost to `cost.json` `oracle_revert`.
+  - The check guards against numbers nobody said, not much more. A digit anywhere in the turn passes, and four-letter stems are loose.
+- **Dry run on v4's committed fixes.** The check reverts quant-incremental's four "≤ 3 of 20" bounds (TC-19, TC-38, TC-58, TC-72) and rl-all-at-once's TC-07 `"direction": "higher"` (turn 1 says "survive as long as possible", not "higher"). It passes the other seven: TC-46's two claims, TC-08, TC-09, TC-23, TC-24 and quant-all-at-once's TC-75. TC-30's shortened lists count as a deletion.
+
+**Method.** As in v4, on fresh copies in `dev-team-workspace/review-ab-v5/`, with v3's `review.json`, `prepare`, `fix`, `package.py` and the blind judge (scratchpad `v5/judge-rl` and `v5/judge-quant`). The quant BA judge first returned malformed JSON and was rerun once. Records are in `review-ab/v5/`. Two things went wrong on the way, and both were repaired before judging:
+- **The quant-all-at-once original has changed.** Two commits landed on `iteration-9/quant-all-at-once` at 11:27 today, after its turn-50 commit `9ece2e6`: "Add the M1 quality bar (build-setup New)" and "Record M1 base (dt base)". They came from outside this work. A fresh copy no longer packaged like `iteration-9/bench`. The v5 copy was reset to `9ece2e6`, which v1–v4 used, and then packaged byte-identical. The other three originals are unchanged. Later copies must reset the same way, or the bench needs re-packaging.
+- **The first oracle check over-reverted.** On quant-incremental it treated the fixer's deletions (the stale "≤ 1 of 20" removed, with nothing written) as unverified writes and deleted whole `property` lists. That threw away valid assertions in TC-58 and TC-72. The deletion rule above fixes it. That run was moved to `dev-team-workspace/review-ab-v5-discarded/` (its `fix.json` and `cost.json` are in `v5/discarded-quant-incremental/`). quant-incremental was rerun on a fresh copy. The other three runs had no deletion-only changes, so they are unaffected.
+
+**Scores (overall, mean of both orders).**
+
+| | Iteration 9 | v1 | v3 | v4 | v5 |
+|---|---|---|---|---|---|
+| rl-incremental | 7.65 | 7.4 | 7.7 | 7.4 | 7.7 |
+| rl-all-at-once | 7.45 | 7.35 | 7.35 | 7.9 | 7.25 |
+| quant-incremental | 7.7 | 7.8 | 7.65 | 7.6 | 7.45 |
+| quant-all-at-once | 7.45 | 7.65 | 7.95 | 7.75 | 7.7 |
+| **mean** | 7.56 | 7.55 | 7.66 | 7.66 | **7.53** |
+
+Mean item Δ against iteration 9, v1 / v3 / v4 / v5:
+
+| Item | v1 | v3 | v4 | v5 |
+|---|---|---|---|---|
+| task_buildability | +0.25 | +0.38 | +0.38 | +0.38 |
+| rl_soundness | −0.25 | +0.25 | +0.25 | +0.25 |
+| quant_soundness | +0.5 | +0.5 | 0 | +0.25 |
+| pipeline_clarity | 0 | 0 | −0.25 | −0.38 |
+| right_sizing | 0 | −0.12 | +0.25 | −0.25 |
+| readability_for_solo_learner | +0.12 | +0.12 | 0 | −0.25 |
+| internal_consistency | 0 | −0.25 | +0.12 | −0.12 |
+| **overall** | −0.01 | +0.10 | +0.10 | −0.04 |
+
+- **Winners:** incremental wins both rl orders, as in v3. all-at-once wins both quant orders.
+- **The same review list and nearly the same fixer gave rl-all-at-once 7.9 in v4 and 7.25 in v5.** Its internal_consistency, right_sizing, task_buildability and readability each fell a point. That is the run-to-run spread of one fixer run and one judge pair: ±0.3–0.65 on a set. It's bigger than any mean difference between versions. v3, v4 and v5 (+0.10, +0.10, −0.04) can't be told apart on single runs.
+
+**v4's three new failures: all gone.**
+- **rl-incremental M1-T26/T27.** M1-T27 keeps the CNN selection, writes `agent.py` and now depends on M1-T26. Neither judge cites either task. rl-incremental's dependency_graph_soundness is back to 4 and task_buildability to 4.
+- **quant-incremental computed oracles.** The fixer wrote no seed bound itself this time. R22 was skipped as "a value computed from a binomial", and the four stale "≤ 1 of 20" were deleted and routed.
+- **M1-T23's title** now reads "mount_runs spine (start, cancel, WebSocket)". No judge cites it.
+
+**New failures.**
+- **quant-incremental M1-T03, now a missing real edge.**
+  - R09 asked for the API fake in M1-T03 "or a task depending on both". The fixer put `fake.ts` in M1-T03's Writes, then refused the M1-T02 edge under the interface-to-interface ban. M1-T03 now builds on M1-T02's generated schema with "Depends on: —".
+  - Both judges list it as unbuildable or false parallelism, and dependency_graph_soundness is 3.5.
+  - v1 and v4 were marked down for that edge, and v5 for its absence. The fake belongs in a later task that depends on both. The two rules collide whenever moved work lands in an interface task.
+- **rl-all-at-once R16, the no-edge option.** The fixer made M1-T01 write pass-through stubs (`compare`, `holm`, `verdict`, `guard`) instead of adding edges. Their signatures are in no packet, so M1-T17 and M1-T09 are listed unbuildable in the BA order. v4 had applied R16 with edges.
+- **A duplicate Open question from the oracle revert.** `route_reverted` added "TC-07: re-derive direction" beside the fixer's own TC-07 bullet, and one judge cites the pair as duplicated. The revert should extend the case's existing bullet.
+- **A routed oracle blocks its task.** TC-17's seed bound, deleted and routed in v4 and v5 alike, now gets M1-T25 listed as unbuildable ("no fixed oracle") by one v5 judge. That is the expected cost of routing until test-planning runs.
+
+**Oracle check results (final runs).**
+
+| | Changed leaves | Passed | Deletions | Reverted |
+|---|---|---|---|---|
+| rl-incremental | 2 | 2 (TC-46: turn 19 "1", "school") | 0 | 0 |
+| rl-all-at-once | 6 | 5 (TC-07 property, TC-08, TC-09, TC-23, TC-24) | 0 | 1 (TC-07 `direction: higher`) |
+| quant-incremental | 6 | 0 | 6 (TC-19, TC-38, TC-58, TC-72, TC-30 ×2) | 0 |
+| quant-all-at-once | 0 (whole keys deleted only) | — | — | 0 |
+
+**Fixer cost.**
+
+| | Fixer | Oracle revert | v4 fixer |
+|---|---|---|---|
+| rl-incremental | $3.20 (125 turns, 7.1 min) | — | $2.86 |
+| rl-all-at-once | $3.14 (116, 8.6 min) | $0.08 | $3.01 |
+| quant-incremental | $4.71 (190, 8.9 min) | — | $4.56 |
+| quant-all-at-once | $6.60 (206, 14.5 min) | — | $6.50 |
+| **total** | **$17.65** | $0.08 | $16.93 |
+
+The discarded quant-incremental run cost $5.12 + $0.18 more, so $22.95 was spent in all. The judge calls aren't counted.
+
+**Verdict.** Every fixer failure named so far is fixed, but each version opens one or two new ones of the same kind. In v5 that is the edge rules colliding in interface tasks. On iteration 9's scale the mean has stayed within −0.04 to +0.10 for four versions, and one set moves ±0.3–0.65 between runs of the same inputs. More single-run prompt tuning can't show a gain of the size left to find.
+
+Before another version, measure the noise:
+- Three fixer runs of one version on the same review lists, judged as here.
+- Two extra judge pairs on one fixed set.
+
+Then judge a version on the mean of those runs.

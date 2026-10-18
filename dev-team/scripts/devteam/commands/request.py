@@ -11,7 +11,8 @@ from .. import requests as rq
 
 USAGE = ('dt request add <owner> "<words>" --skill S [--about TEXT] [--replaces UR-NN] · '
          "dt request trace UR-NN ID… · "
-         'dt request change UR-NN "<what instead>" --approved "<words>" --skill S · '
+         'dt request change UR-NN "<what instead>" --approved "<words>" --skill S --into ID… · '
+         "dt request change UR-NN --into ID… (add IDs to a change) · "
          "dt request [list] [--open] [--owner O] [--json]")
 
 
@@ -22,6 +23,8 @@ def add_arguments(parser):
     parser.add_argument("--about", default="", help="add: what the words answer, when they don't say it themselves")
     parser.add_argument("--replaces", metavar="UR-NN", help="add: an earlier request these words replace")
     parser.add_argument("--approved", help="change: the user's words approving the change")
+    parser.add_argument("--into", nargs="+", default=[], metavar="ID",
+                        help="change: the IDs the change was written into (every ID that honoured the old words)")
     parser.add_argument("--owner", choices=list(rq.OWNERS), help="list: only this owner's requests")
     parser.add_argument("--open", action="store_true", help="list: only requests nothing honours yet")
     parser.add_argument("--json", action="store_true", help="list: print JSON")
@@ -90,15 +93,38 @@ def _trace(args, repo) -> int:
 
 
 def _change(args, repo) -> int:
-    if len(args.args) < 2 or not args.approved or not re.fullmatch(r"[a-z-]+", args.skill or ""):
-        return _fail('change needs a UR-NN, what was done instead, --approved "<the user\'s words>" and --skill')
+    if not args.args:
+        return _fail("change needs a UR-NN")
     r = _find(repo, args.args[0])
     if r is None:
         return _fail(f"{args.args[0]} is not in {rq.PATH}")
     if r.state == "superseded":
         return _fail(f"{r.id} is {r.trace}: change that one")
+    into = [i.strip(",") for i in args.into]
+    unknown = [i for i in into if (d := repo.lookup(i, archive=False)) is None or d.retired]
+    if unknown:
+        return _fail(f"not defined: {', '.join(unknown)}")
+    if len(args.args) == 1 and not args.approved:
+        # More IDs for a recorded change: the approval stays as the user gave it.
+        if r.state != "changed" or not into:
+            return _fail(f"{r.id}: --into alone adds IDs to a recorded change")
+        skill, date = r.changed_by
+        rq.set_trace(repo, r, rq.changed_trace(r.changed, r.approval, skill, list(dict.fromkeys(r.into + into)), date))
+        print(f"{r.id} → {_find(repo, r.id).trace}")
+        return 0
+    if len(args.args) < 2 or not args.approved or not re.fullmatch(r"[a-z-]+", args.skill or "") or not into:
+        return _fail('change needs a UR-NN, what was done instead, --approved "<the user\'s words>", --skill and '
+                     "--into the IDs the change was written into")
+    kinds = rq.HONOUR_KINDS[r.owner]
+    if not any(repo.lookup(i, archive=False).doc.kind in kinds for i in into):
+        return _fail(f"{r.id} ({r.owner}): --into needs an ID defined in {', '.join(kinds)}")
+    missed = [i for i in rq.honouring(repo, r) if not rq.is_section(i) and i not in into]
+    if missed:
+        return _fail(f"{', '.join(missed)} honoured the old words: write the change into "
+                     f"{'it' if len(missed) == 1 else 'them'} too and name {'it' if len(missed) == 1 else 'them'} "
+                     "in --into")
     what = _one_line(" ".join(args.args[1:]))
-    rq.set_trace(repo, r, rq.changed_trace(what, _one_line(args.approved), args.skill))
+    rq.set_trace(repo, r, rq.changed_trace(what, _one_line(args.approved), args.skill, list(dict.fromkeys(into))))
     print(f"{r.id} → {_find(repo, r.id).trace}")
     return 0
 

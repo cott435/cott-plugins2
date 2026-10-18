@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import datetime
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from . import edit, md
 from .repo import Doc, Repo
@@ -27,7 +27,7 @@ LINE = re.compile(rf'^\s*[-*]\s+\*\*(?P<id>{ID})\*\*\s+(?P<owner>[a-z]+)\s+·\s+
                   r"(?:\s+\[(?P<about>[^\]]*)\])?\s+·\s+(?P<skill>[a-z-]+)\s+(?P<date>\d{4}-\d{2}-\d{2})"
                   r"(?:\s+→\s+(?P<trace>.*?))?\s*$")
 CHANGED = re.compile(r'^changed:\s*(?P<what>.+?)\s+\(approved\s+"(?P<words>.+)",\s+(?P<skill>[a-z-]+)\s+'
-                     r"(?P<date>\d{4}-\d{2}-\d{2})\)$")
+                     r"(?P<date>\d{4}-\d{2}-\d{2})(?:;\s*in\s+(?P<into>[^()]+?))?\)$")
 SUPERSEDED = re.compile(rf"^superseded by (?P<by>{ID})$")
 
 
@@ -45,6 +45,8 @@ class Request:
     changed: str          # what was done instead, when the user approved a change
     approval: str         # the user's words approving it
     superseded_by: str
+    into: list[str] = field(default_factory=list)   # the IDs a change was written into
+    changed_by: tuple[str, str] = ("", "")             # the skill and date of the approval
 
     @property
     def fixed(self) -> tuple[str, str, str, str]:
@@ -86,11 +88,12 @@ def parse(doc: Doc | None) -> tuple[list[Request], list[Bad]]:
             bad.append(Bad(i, m["id"], f"owner {m['owner']!r} is not one of {', '.join(OWNERS)}"))
             continue
         trace = (m["trace"] or "").strip()
-        honoured, changed, approval, by = [], "", "", ""
+        honoured, changed, approval, by, into, changed_by = [], "", "", "", [], ("", "")
         if trace:
             c, s = CHANGED.match(trace), SUPERSEDED.match(trace)
             if c:
-                changed, approval = c["what"].strip(), c["words"]
+                changed, approval, changed_by = c["what"].strip(), c["words"], (c["skill"], c["date"])
+                into = [md.strip_md(x) for x in md.split_list(c["into"])] if c["into"] else []
             elif s:
                 by = s["by"]
             else:
@@ -102,7 +105,7 @@ def parse(doc: Doc | None) -> tuple[list[Request], list[Bad]]:
                     continue
                 honoured = items
         out.append(Request(m["id"], i, m["owner"], m["words"], (m["about"] or "").strip(), m["skill"], m["date"],
-                           trace, honoured, changed, approval, by))
+                           trace, honoured, changed, approval, by, into, changed_by))
     return out, bad
 
 
@@ -225,5 +228,71 @@ def set_trace(repo: Repo, r: Request, trace: str) -> None:
     _write(repo, lines)
 
 
-def changed_trace(what: str, approval: str, skill: str) -> str:
-    return f'changed: {what} (approved "{approval}", {skill} {_today()})'
+def changed_trace(what: str, approval: str, skill: str, into: list[str], date: str = "") -> str:
+    return f'changed: {what} (approved "{approval}", {skill} {date or _today()}; in {", ".join(into)})'
+
+
+# ---- numbers (request-number, request-source) ------------------------------------------------------
+
+WORDS = {w: float(n) for n, w in enumerate("zero one two three four five six seven eight nine ten eleven twelve "
+                                           "thirteen fourteen fifteen sixteen seventeen eighteen nineteen twenty"
+                                           .split())} | {"thirty": 30.0, "forty": 40.0, "fifty": 50.0,
+                                                         "hundred": 100.0, "thousand": 1000.0, "dozen": 12.0}
+DATE = re.compile(r"\b\d{4}-\d{2}-\d{2}\b")
+MARKER = re.compile(r"(?:^|(?<=\s))\d+[.)](?=\s)")
+NUMBER = re.compile(r"(?<![\w.\-])(\d{1,3}(?:,\d{3})+|\d+(?:\.\d+)?)(?![\w-]*\d)\s*(%|k\b|hours?\b|hrs?\b|h\b|"
+                    r"minutes?\b|mins?\b)?", re.I)
+NUMBER_WORD = re.compile(r"\b(" + "|".join(WORDS) + r")\b(?:\s+(hours?|minutes?))?", re.I)
+
+
+def numbers(text: str) -> list[tuple[str, set[float], str]]:
+    """Each number stated in the text, as written, with the values it may appear as elsewhere (an hour is also 60
+    minutes, 5% is also 0.05, 2k is 2000) and its kind: "time" for hours and minutes, else "". IDs (AD-03, S2),
+    dates and list markers are not numbers."""
+    text = MARKER.sub(" ", DATE.sub(" ", text))
+    out = []
+    for m in NUMBER.finditer(text):
+        unit = (m.group(2) or "").lower()
+        out.append((m.group(0).strip(), _values(float(m.group(1).replace(",", "")), unit), _kind(unit)))
+    for m in NUMBER_WORD.finditer(text):
+        unit = (m.group(2) or "").lower()
+        out.append((m.group(0), _values(WORDS[m.group(1).lower()], unit), _kind(unit)))
+    return out
+
+
+def _kind(unit: str) -> str:
+    return "time" if unit[:1] in ("h", "m") else ""
+
+
+def _values(v: float, unit: str) -> set[float]:
+    if unit == "%":
+        return {v, v / 100}
+    if unit == "k":
+        return {v * 1000}
+    if unit.startswith("h"):
+        return {v, v * 60}
+    if unit.startswith("m"):
+        return {v, v / 60}
+    return {v}
+
+
+def unstated(text: str, sources: list[str]) -> list[str]:
+    """The numbers in the text that none of the sources states. A time (an hour, 90 minutes) matches only a time."""
+    have = [(vals, kind) for src in sources for _, vals, kind in numbers(src)]
+    return [shown for shown, vals, kind in numbers(text)
+            if not any((not kind or k == kind) and any(abs(v - h) < 1e-9 for v in vals for h in hv)
+                       for hv, k in have)]
+
+
+def definition_text(repo: Repo, id_: str) -> str:
+    d = repo.lookup(id_, archive=False)
+    return "" if d is None or d.retired else "\n".join(d.doc.lines[d.start:d.end])
+
+
+def stated(repo: Repo, r: "Request") -> str:
+    """What a request asks for now: its words, or what the user approved instead, or its replacement's."""
+    seen = set()
+    while r.superseded_by and r.id not in seen:
+        seen.add(r.id)
+        r = next((x for x in all_requests(repo) if x.id == r.superseded_by), r)
+    return r.changed or r.words

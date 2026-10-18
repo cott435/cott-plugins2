@@ -55,6 +55,8 @@ Two fixes were weighed: one session shared by idea-refine and spec-writing, or a
 6. **`dt request` writes every line,** like `dt route`: it assigns the ID, quotes the words, dates them and keeps the format, so a skill spends one command per statement.
 7. **The rule lives once,** in idea-refine's `references/requests.md`; every planning skill's SKILL.md names it in one line, and spec-writing and architecture-design add the honouring step to their own references.
 8. **Checked where it matters most:** once the spec or architecture is Approved, any open request it owns fails `dt lint` at that doc and sends `dt next` back to its skill. Brief, pipelines, tests, plan and constraints requests are reported by `dt status` (`requests_open`) only, for now.
+9. **A change names where it went.** `dt request change` takes `--into`, the IDs the change was written into, and refuses one that leaves out an ID that honoured the old words. A late change otherwise reaches the requirement it was approved for and leaves the cases that restate the old value behind.
+10. **The user's words are a Source.** A value taken from them (a golden case's expected output, a limit) cites the request; a number worked out from them is not theirs and cites its derivation. Three warnings check what text can: a traced request's numbers (`request-number`), citations of replaced or changed requests (`request-cite`) and case values sourced to requests (`request-source`).
 
 ---
 
@@ -78,7 +80,7 @@ The user's words, verbatim: one line per fact, constraint, tool, choice or answe
 ```
 
 - **Line form:** `- **UR-NN** <owner> · "<words>" [<context>] · <skill> <date> → <trace>`. The `[context]` says what bare words answer ("Go with A", "yes, 3"); it is the agent's note, never part of the quote.
-- **Trace forms:** IDs and sections (`TANK-02, §Out of scope`: `§` and a heading's text, case ignored); `changed: <what instead> (approved "<the user's words>", <skill> <date>)`; `superseded by UR-NN`. No trace: open.
+- **Trace forms:** IDs and sections (`TANK-02, §Out of scope`: `§` and a heading's text, case ignored); `changed: <what instead> (approved "<the user's words>", <skill> <date>; in <ID>, …)`, naming the IDs the change was written into; `superseded by UR-NN`. No trace: open.
 - **Open** means not changed, not superseded, and no traced item is a live definition in, or a heading of, a doc the owner writes (brief: brief.md and idea files; spec: spec.md; architecture: architecture docs and contracts; the others: their own docs). A trace to a retired ID is `retired-ref`, and the request is open again.
 - **The header** has no Status: the record is never Draft or Approved, only appended to.
 - **`UR` is reserved:** a spec requirement can't use it (`ref-prefix`).
@@ -107,12 +109,14 @@ The full rule (what counts, verbatim, owner, `--about`, replacing, honouring, ch
 | `dt status` | `requests_open` for each owning skill; architecture-design is `revise` when its Approved doc has one open |
 | `dt next` | After routed changes: an Approved spec, then architecture, with an open request of its own → spec-writing (extend), architecture-design (revise) |
 | `--summary` | `requests: N not honoured → <skills>` |
-| `dt lint` | `request-format`, `request-trace`, `request-open` (at the Approved spec.md or architecture.md header), `request-edit` (words changed or line deleted since HEAD), `request-ref` (a UR named anywhere that isn't defined); `ref-prefix` covers `UR` |
+| `dt request change` | `--into ID…`: the IDs the change was written into, every ID that honoured the old words among them; `--into` alone adds IDs to a recorded change |
+| `dt lint` | `request-format`, `request-trace`, `request-open` (at the Approved spec.md or architecture.md header), `request-edit` (words changed or line deleted since HEAD), `request-ref` (a UR named anywhere that isn't defined); `ref-prefix` covers `UR`. Warnings: `request-number` (a number in the words that the traced text doesn't state), `request-cite` (a doc citing a superseded request, or a changed one from an ID the change wasn't written into), `request-source` (a test case sourced only to requests, stating a number they don't) |
 
 ---
 
 ## 6. Limits and next steps
 
-- `dt` can't tell whether an ID really honours a request, only that the owner's doc defines it, nor whether an approved change reached every requirement it touches. The gate's **Your words** line puts each trace in front of the user, and the eval's judge reads them.
+- `dt` can't tell whether an ID really honours a request's meaning ("circular" traced to "a square"), only that the owner's doc defines it and states its numbers (`request-number`). The rule asks for the mechanism, not the name ("self-play" is play against past versions), and the gate's **Your words** line quotes the words beside the traced text, so the user sees the match. In iteration 9's plan-review A/B, a label traced in place of its mechanism was the one fact miss that only a reader caught.
+- A change reaches only the IDs named in `--into`; `dt` requires every ID that honoured the old words among them, and `request-cite` flags a doc that cites the request from any other ID. An ID that restates the old value without citing the request is not caught; golden cases built from the user's words cite it as their Source, so tests are.
 - A skill that doesn't record what it hears loses it as before. The eval checks it: each scenario fact the simulated user states must appear in a UR line's words (`requests_captured`), the final lint has no request error (`requests_honoured`), and no line's words change between turns (`requests_append_only`); see [evals/README.md](../evals/README.md).
 - Brief, pipelines, tests, plan and constraints requests aren't linted yet; add them to `DUE_WHEN_APPROVED` once a run shows they're used.

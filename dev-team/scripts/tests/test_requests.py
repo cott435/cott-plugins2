@@ -67,6 +67,21 @@ class ParserTest(unittest.TestCase):
         self.assertEqual([b.id for b in bad], ["UR-01", "UR-02", "UR-03", "UR-04"])
         self.assertIn("owner 'vibes'", bad[1].message)
 
+    def test_change_into(self):
+        text = ('- **UR-01** spec · "one predator" · idea-refine 2026-10-18 → changed: two predators (approved '
+                '"two is fine", spec-writing 2026-10-19; in DATA-01, TC-01)\n')
+        (r,), bad = rq.parse(self.doc(text))
+        self.assertEqual((bad, r.state, r.changed, r.into, r.changed_by),
+                         ([], "changed", "two predators", ["DATA-01", "TC-01"], ("spec-writing", "2026-10-19")))
+
+    def test_numbers(self):
+        self.assertEqual([n for n, _, _ in rq.numbers("6 prey, 2 predators and ten pellets; AD-03, S2, 2026-10-18")],
+                         ["6", "2", "ten"])
+        self.assertEqual(rq.numbers("1) Build the core"), [])
+        self.assertEqual(rq.unstated("within 90 minutes", ["under ~1 hour"]), ["90 minutes"])
+        self.assertEqual(rq.unstated("under ~1 hour", ["5 runs of one world within 90 minutes"]), ["1 hour"])
+        self.assertEqual(rq.unstated("≤ 60 minutes, 5% of 2k", ["under ~1 hour", "0.05 of 2000"]), [])
+
     def test_definitions(self):
         defs = [d for d in self.doc().definitions()]
         self.assertEqual([(d.id, d.how) for d in defs][:2], [("UR-01", "request"), ("UR-02", "request")])
@@ -153,13 +168,42 @@ class CommandTest(Base):
     def test_change(self):
         self.write(PATH, DOC)
         code, out, _ = self.dt("request", "change", "UR-03", "SQLite (option B)", "--approved", 'ok, "B" then',
-                               "--skill", "architecture-design")
+                               "--skill", "architecture-design", "--into", "AD-03")
         self.assertEqual(code, 0)
         r = self.requests()["UR-03"]
-        self.assertEqual((r.state, r.changed, r.approval), ("changed", "SQLite (option B)", 'ok, "B" then'))
-        self.assertEqual(r.trace, f'changed: SQLite (option B) (approved "ok, "B" then", architecture-design {TODAY})')
-        self.assertEqual(self.dt("request", "change", "UR-03", "x", "--skill", "s")[0], 2)    # no approval
-        self.assertEqual(self.dt("request", "change", "UR-05", "x", "--approved", "y", "--skill", "s")[0], 2)
+        self.assertEqual((r.state, r.changed, r.approval, r.into), ("changed", "SQLite (option B)", 'ok, "B" then',
+                                                                    ["AD-03"]))
+        self.assertEqual(r.trace, f'changed: SQLite (option B) (approved "ok, "B" then", architecture-design {TODAY}; '
+                                  "in AD-03)")
+        self.assertEqual(self.dt("request", "change", "UR-03", "x", "--skill", "s", "--into", "AD-03")[0], 2)
+        self.assertEqual(self.dt("request", "change", "UR-05", "x", "--approved", "y", "--skill", "s",
+                                 "--into", "DATA-01")[0], 2)
+
+    def test_change_needs_into(self):
+        self.write(PATH, DOC)
+        args = ("request", "change", "UR-03", "SQLite", "--approved", "B", "--skill", "architecture-design")
+        self.assertEqual(self.dt(*args)[0], 2)                                    # no --into
+        self.assertEqual(self.dt(*args, "--into", "DATA-01")[0], 2)               # no architecture ID
+        self.assertEqual(self.dt(*args, "--into", "AD-99")[0], 2)                 # not defined
+        self.assertEqual(self.read(PATH), DOC)
+
+    def test_change_covers_what_honoured_it(self):
+        self.write(PATH, DOC)
+        args = ("request", "change", "UR-02", "CSV", "--approved", "fine, CSV", "--skill", "architecture-design")
+        code, _, err = self.dt(*args, "--into", "AD-01")
+        self.assertEqual(code, 2)
+        self.assertIn("AD-03 honoured the old words", err)
+        self.assertEqual(self.dt(*args, "--into", "AD-01", "AD-03")[0], 0)
+        self.assertEqual(self.requests()["UR-02"].into, ["AD-01", "AD-03"])
+
+    def test_change_adds_ids(self):
+        self.write(PATH, DOC)
+        self.dt("request", "change", "UR-03", "SQLite", "--approved", "B", "--skill", "architecture-design",
+                "--into", "AD-03")
+        self.assertEqual(self.dt("request", "change", "UR-03", "--into", "TC-01")[0], 0)
+        r = self.requests()["UR-03"]
+        self.assertEqual((r.into, r.approval, r.changed_by), (["AD-03", "TC-01"], "B", ("architecture-design", TODAY)))
+        self.assertEqual(self.dt("request", "change", "UR-06", "--into", "TC-01")[0], 2)  # nothing changed yet
 
     def test_list(self):
         self.write(PATH, DOC)
@@ -231,6 +275,54 @@ class LintTest(Base):
         self.assertEqual([p.message for p in self.problems("ref-prefix")],
                          [f"UR-01: the UR prefix is reserved for {PATH}"])
         self.assertIn("UR", self.status("spec-writing")["reserved_prefixes"])
+
+    def test_trace_into_undefined(self):
+        self.write(PATH, DOC.replace('spec-writing 2026-10-19)', 'spec-writing 2026-10-19; in DATA-01, DATA-09)'))
+        self.assertEqual([p.message for p in self.problems("request-trace")],
+                         ["UR-04 was changed in DATA-09: DATA-09 is not defined"])
+
+    def test_number(self):
+        self.write(PATH, DOC + '- **UR-07** spec · "load 10 years of prices" · idea-refine 2026-10-19 → DATA-01\n'
+                   '- **UR-08** architecture · "under 40 s" · idea-refine 2026-10-19 → AD-03\n'
+                   '- **UR-09** spec · "five factors" · idea-refine 2026-10-19 → changed: three factors '
+                   '(approved "3 is fine", spec-writing 2026-10-19; in STAT-01)\n')
+        msgs = [p.message for p in self.problems("request-number")]
+        self.assertEqual([m.split(" ")[0] for m in msgs], ["UR-07", "UR-09"])
+        self.assertIn("UR-07 says '10', which DATA-01 doesn't state", msgs[0])
+        self.assertIn("UR-09 says 'three', which STAT-01 doesn't state", msgs[1])
+        self.assertEqual(lint.SEVERITY["request-number"], "W")
+
+    def test_cite(self):
+        changed = 'spec-writing 2026-10-19; in DATA-01)'
+        self.write(PATH, DOC.replace('spec-writing 2026-10-19)', changed))
+        self.replace("docs/architecture.md", "- **Decision:** Parquet via pyarrow.",
+                     "- **Decision:** Parquet via pyarrow, monthly as UR-05 asked.")
+        self.replace("docs/packages/quant/tests.md", "**Source:** user file `delisted_2018.csv` (given 2026-10-15)",
+                     "**Source:** UR-04 and user file `delisted_2018.csv` (given 2026-10-15)")
+        msgs = sorted(p.message for p in self.problems("request-cite"))
+        self.assertEqual(msgs, ["UR-04 was changed (two predators) in DATA-01, not TC-01: bring TC-01 in line, then "
+                                "`dt request change UR-04 --into TC-01`",
+                                "UR-05 is superseded by UR-06: follow and cite UR-06"])
+        self.write(PATH, DOC.replace('spec-writing 2026-10-19)', 'spec-writing 2026-10-19; in DATA-01, TC-01)'))
+        self.assertEqual([p.message[:5] for p in self.problems("request-cite")], ["UR-05"])
+
+    def test_source(self):
+        tests = "docs/packages/quant/tests.md"
+        self.write(PATH, DOC + '- **UR-07** spec · "the first factor should explain most of it" · '
+                   'test-planning 2026-10-19 → STAT-01\n')
+        self.replace(tests, "**Source:** generator `one_factor(T=500, N=20, beta=1.0, seed=3)`",
+                     "**Source:** UR-07 (the user, 2026-10-19)")
+        (p,) = self.problems("request-source")
+        self.assertEqual((p.path, p.line), (tests, 21))
+        self.assertIn("TC-03: Expected states '40%', which UR-07 doesn't", p.message)
+        self.write(PATH, DOC + '- **UR-07** spec · "the first factor explains at least 40%" · '
+                   'test-planning 2026-10-19 → STAT-01\n')
+        self.assertEqual(self.problems("request-source"), [])
+        self.write(PATH, DOC + '- **UR-07** spec · "the first factor should explain most of it" · '
+                   'test-planning 2026-10-19 → STAT-01\n')
+        self.replace(tests, "**Source:** UR-07 (the user, 2026-10-19)",
+                     "**Source:** UR-07, and generator `one_factor(T=500, N=20, beta=1.0, seed=3)`")
+        self.assertEqual(self.problems("request-source"), [])                   # derived: its Source says how
 
     def test_dup(self):
         self.write(PATH, DOC + '- **UR-06** spec · "again" · idea-refine 2026-10-19\n')

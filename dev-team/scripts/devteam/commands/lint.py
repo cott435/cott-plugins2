@@ -38,6 +38,7 @@ SEVERITY = {
     "probe-sample": "E", "probe-results": "E", "probe-stale": "W", "probe-large": "W",
     "boundaries": "E", "probe-open": "E", "milestone-depends": "E",
     "request-format": "E", "request-trace": "E", "request-open": "E", "request-edit": "E", "request-ref": "E",
+    "request-number": "W", "request-cite": "W", "request-source": "W",
 }
 
 # Size budgets (planning-stage.md §3), in lines. Package docs are budgeted per unit (lines per unit × units +
@@ -620,6 +621,9 @@ def check_request_trace(ctx: Context):
             if rq.is_section(i) and not rq.section_docs(ctx.repo, r.owner, i):
                 yield _p(doc, r.line, "request-trace",
                          f"{r.id} → {i}: no such heading in {', '.join(rq.HONOUR_KINDS[r.owner])}")
+        for i in r.into:
+            if (d := ctx.repo.lookup(i, archive=False)) is None or d.retired:
+                yield _p(doc, r.line, "request-trace", f"{r.id} was changed in {i}: {i} is not defined")
         if (defs and len(defs) == len(r.honoured_by) and all(d is not None and not d.retired for d in defs.values())
                 and not rq.honouring(ctx.repo, r)):
             yield _p(doc, r.line, "request-trace",
@@ -665,6 +669,69 @@ def check_request_ref(ctx: Context):
             for id_ in dict.fromkeys(re.findall(rf"(?<![\w-])({rq.ID})(?![\w-])", line)):
                 if id_ not in ctx.repo.index:
                     yield _p(doc, i, "request-ref", f"{id_} is not in {rq.PATH}")
+
+
+def check_request_number(ctx: Context):
+    """A traced or changed request whose number none of the IDs it names states: "under ~1 hour" traced to a
+    requirement that says 90 minutes."""
+    doc = ctx.repo.requests
+    for r in rq.parse(doc)[0] if doc else []:
+        ids = [i for i in (r.into if r.state == "changed" else r.honoured_by) if not rq.is_section(i)]
+        texts = [rq.definition_text(ctx.repo, i) for i in ids]
+        if not ids or not all(texts):
+            continue
+        for shown in rq.unstated(r.changed or r.words, texts):
+            yield _p(doc, r.line, "request-number",
+                     f"{r.id} says {shown!r}, which {', '.join(ids)} doesn't state: honour the number, or change it "
+                     "with the user's yes")
+
+
+def check_request_cite(ctx: Context):
+    """A doc citing a request that was replaced, or that the user changed when the citing ID isn't one the change
+    was written into: the citing text may still follow the old words."""
+    reqs = {r.id: r for r in rq.all_requests(ctx.repo)}
+    for doc in ctx.docs:
+        if doc.kind == "requests" or not ctx.in_scope(doc.rel):
+            continue
+        defs = doc.definitions()
+        for i, line in enumerate(doc.lines):
+            if doc.mask[i] or "UR-" not in line:
+                continue
+            for id_ in dict.fromkeys(re.findall(rf"(?<![\w-])({rq.ID})(?![\w-])", line)):
+                r = reqs.get(id_)
+                if r is None:
+                    continue
+                if r.superseded_by:
+                    yield _p(doc, i, "request-cite", f"{id_} is superseded by {r.superseded_by}: follow and cite "
+                                                     f"{r.superseded_by}")
+                elif r.state == "changed" and r.into:
+                    at = min((d for d in defs if d.start <= i < d.end), key=lambda d: d.end - d.start, default=None)
+                    if at is not None and at.id not in r.into:
+                        yield _p(doc, i, "request-cite",
+                                 f"{id_} was changed ({r.changed}) in {', '.join(r.into)}, not {at.id}: bring "
+                                 f"{at.id} in line, then `dt request change {id_} --into {at.id}`")
+
+
+def check_request_source(ctx: Context):
+    """A golden case whose Source is only the user's words, with an Expected number those words don't state: a value
+    worked out from the user's fact isn't theirs, so its Source must say how it was derived."""
+    reqs = {r.id: r for r in rq.all_requests(ctx.repo)}
+    if not reqs:
+        return
+    for doc in ctx.docs:
+        if doc.kind != "tests" or not ctx.in_scope(doc.rel):
+            continue
+        for case in model.test_cases(doc):
+            source = case.fields.get("Source", "")
+            cited = [i for i in dict.fromkeys(re.findall(rf"(?<![\w-])({rq.ID})(?![\w-])", source)) if i in reqs]
+            rest = re.sub(rf'{rq.ID}|"[^"]*"|“[^”]*”|\d{{4}}-\d{{2}}-\d{{2}}|\b(the|user|user\'s|words|and|as|given|'
+                          r'said|by|from)\b|[^\w]', " ", source, flags=re.I)
+            if not cited or rest.strip():
+                continue
+            for shown in rq.unstated(case.fields.get("Expected", ""), [rq.stated(ctx.repo, reqs[i]) for i in cited]):
+                yield _p(doc, case.start, "request-source",
+                         f"{case.id}: Expected states {shown!r}, which {', '.join(cited)} doesn't: cite how it "
+                         "was derived, or route it to the user")
 
 
 # ---- probe checks (design/probes.md §4, §5) --------------------------------------------------------
@@ -1396,6 +1463,7 @@ CHECKS = [
     check_probe_sample, check_probe_results, check_probe_stale, check_probe_large,
     check_boundaries, check_probe_open, check_milestone_depends,
     check_request_format, check_request_trace, check_request_open, check_request_edit, check_request_ref,
+    check_request_number, check_request_cite, check_request_source,
 ]
 
 

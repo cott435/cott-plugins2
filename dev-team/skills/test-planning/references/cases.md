@@ -6,7 +6,7 @@ Read when writing golden cases and Strategy rows. File shapes and a routed case 
 
 A user file, a paper table, a closed form, or a generator plus seed. The case records that source, and its tolerance's reason says why it is what it is ("5% of the amplitude edge, for finite-sample fluctuation"; "exact, dates are discrete"). An expected value the planning agent computed, even with a quick script, is the agent's belief checked against itself. Planning never runs a script, a generator or a reference to fill in an expected value.
 
-Facts the user gives (in chat, the brief or the spec: GridLoad's decommissioned meters and their retirement dates) are their Source as given: cite them ("the user, 2026-10-18") and don't re-verify them on the web. Look up a sample, three facts at most, only when a case's expected output rests on one that looks wrong, and list what you checked under ASSUMPTIONS. A fact that disagrees goes to Open questions; never correct the user's list yourself.
+Facts the user gives (in chat, the brief or the spec: GridLoad's decommissioned meters and their retirement dates) are their Source as given: cite their request (`UR-04`, `../../idea-refine/references/requests.md`) and don't re-verify them on the web. Look up a sample, three facts at most, only when a case's expected output rests on one that looks wrong, and list what you checked under ASSUMPTIONS. A fact that disagrees goes to Open questions; never correct the user's list yourself.
 
 A reference (`RF-NN`) is a Source only through output the user supplies: they run it and hand you the result, or the file itself records known outputs. Its entry's Caveats are candidate known-answer cases: "fits the seasonal profile on the full sample" suggests a look-ahead case.
 

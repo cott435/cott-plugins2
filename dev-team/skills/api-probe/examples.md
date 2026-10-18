@@ -54,7 +54,7 @@ Every check needs a key or a person, so there is no `public.py`. Even C10's sand
 **`probe.py`, one check** (C2: it runs before C3 spends anything):
 
 ```python
-from probe_kit import allow, load_env, private, record, save_private, write_evidence
+from probe_kit import allow, private, record, run, save_private
 import plaid_http as plaid   # urllib POST; host from PLAID_BASE_URL, else os.environ.get("PLAID_ENV")
 
 def c2_coverage() -> bool:
@@ -71,14 +71,11 @@ def c2_coverage() -> bool:
                   "oauth": sum(1 for v in found.values() if v and v["oauth"])}, passed=ok)
     return ok
 
-def main():
-    load_env(["PLAID_CLIENT_ID", "PLAID_SECRET"])         # keys only; PLAID_ENV is a shell setting
-    if c2_coverage():
-        ...                    # C3 is link_server.py; C4, C5, C8, C9, C11 from one collect run
-    write_evidence(runner="user", env=plaid.ENV, base_url=plaid.BASE)
+run({"sandbox": sandbox, "coverage": c2_coverage, "collect": collect, "rerun": rerun},   # C3 is link_server.py
+    env=plaid.ENV, base_url=plaid.BASE, keys=["PLAID_CLIENT_ID", "PLAID_SECRET"])  # PLAID_ENV: a shell setting
 ```
 
-**README order:** C0, C1 (manual) → C10 and a dry run in Sandbox → C2 → C3 → C4, C5, C8, C9, C11 in one collect run → C6, C7 a day later. C2 failing stops the run before C3.
+**README order:** C0, C1 (manual) → C10 and a dry run in Sandbox → C2 → C3 → C4, C5, C8, C9, C11 in one collect run → C6, C7 a day later. C2 failing stops the run before C3. No order across probes.
 
 **New gate**, besides the entry:
 

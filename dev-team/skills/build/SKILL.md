@@ -37,15 +37,16 @@ agent-skills' `/build`).
 
 ## Status lines
 
-Every agent ends with exactly one line, and the driver acts on that line alone:
+Every agent ends with one status line, and the driver acts on that line alone: the last
+non-empty line of the agent's final message; text above it is ignored, never read.
 
 | Agent | Line |
 |---|---|
 | tester, implementer, solo | `DONE <task> <role>` or `STOPPED <task> <role>: see dt escalate` |
 | reviewer | `REVIEW <checkpoint> <pkg>: <n> findings, <c> Critical` |
 
-Anything else (no line, an API error, a long report) is a harness failure: land it with
-`--harness` and read nothing more. Details live where `dt` reads them: escalation records,
+A final message whose last line is none of these (an API error, a report with no line) is a
+harness failure: land it with `--harness` and read nothing more. Details live where `dt` reads them: escalation records,
 recorded gate verdicts, findings files. The driver's own reports to the user are just as short:
 what landed, what is blocked and why, the decision needed, and the `detail_file` path for anyone
 who wants more.

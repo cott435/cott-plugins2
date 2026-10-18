@@ -1,0 +1,565 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1"><title>U12 implementer</title>
+<style>
+:root{--bg:#fbfbfa;--fg:#1d1d1f;--muted:#6b6b70;--line:#d9d9de;--box:#fff;--rowp:#eef3fb;--band:#fff4d6;
+--ok:#2e7d32;--bad:#c62828;--warn:#b26a00;--idle:#6b6b70}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#17171a;--fg:#ececf0;--muted:#9a9aa3;
+--line:#34343a;--box:#222227;--rowp:#1d2433;--band:#3a3015;--ok:#6fcf73;--bad:#ff6b6b;--warn:#f0b35a;--idle:#9a9aa3}}
+:root[data-theme="dark"]{--bg:#17171a;--fg:#ececf0;--muted:#9a9aa3;--line:#34343a;--box:#222227;--rowp:#1d2433;
+--band:#3a3015;--ok:#6fcf73;--bad:#ff6b6b;--warn:#f0b35a;--idle:#9a9aa3}
+body{margin:0;padding:16px;background:var(--bg);color:var(--fg);font:14px/1.45 -apple-system,system-ui,sans-serif}
+h1{font-size:18px;margin:0 0 4px}h2{font-size:15px;margin:22px 0 8px}.sub{color:var(--muted)}
+table{border-collapse:collapse;margin:4px 0 8px}td,th{border-bottom:1px solid var(--line);padding:4px 10px;text-align:left;
+vertical-align:top}th{color:var(--muted);font-weight:600}.chips span{display:inline-block;margin:0 4px 2px 0}
+.legend span{margin-right:14px;white-space:nowrap}.sw{display:inline-block;width:10px;height:10px;border-radius:2px;
+margin-right:4px;vertical-align:-1px}.scroll{overflow:auto;max-height:88vh;border:1px solid var(--line);border-radius:8px}
+.chart{display:grid;width:max-content}.chart>div{line-height:0}.corner{position:sticky;top:0;left:0;z-index:3}
+.colhead{position:sticky;top:0;z-index:2}.rowhead{position:sticky;left:0;z-index:2}
+svg.bg{background:var(--bg)}.colhead svg{border-bottom:1px solid var(--line)}.rowhead svg{border-right:1px solid var(--line)}
+.ok{color:var(--ok);fill:var(--ok)}.bad{color:var(--bad);fill:var(--bad)}.warn{color:var(--warn);fill:var(--warn)}
+.idle{color:var(--idle);fill:var(--idle)}
+svg text{fill:var(--fg);font-family:-apple-system,system-ui,sans-serif}
+.box{fill:var(--box);stroke:var(--line)}.unit:hover .box{stroke:var(--fg)}
+.role{font-size:12px;font-weight:600}.uid,.wmeta,.lmeta,.meta{font-size:10px;fill:var(--muted)}
+.sub{font-size:10.5px;fill:var(--muted)}.badge{font-size:11px;font-weight:600}
+.meta.bad{fill:var(--bad);font-weight:600}.lane{font-size:13px;font-weight:700}.wave{font-size:13px;font-weight:700}
+.par{fill:#4e79a7}.ser{fill:var(--muted)}.rowp{fill:var(--rowp)}.rows{fill:transparent}.band{fill:var(--band)}
+.bandt{font-size:11.5px}.grid{stroke:var(--line)}.link{stroke:var(--muted);stroke-width:1.2;opacity:.55}
+.arrowhead{fill:var(--muted)}.marks{font-size:10.5px}.audit{stroke:var(--box);stroke-width:2}.auditn{font-size:10px;font-weight:700;fill:#fff}
+a{color:inherit}svg a .box{cursor:pointer}
+
+:root{--c0:#2a78d6;--c1:#eb6834;--c2:#1baf7a;--c3:#eda100;--c4:#e87ba4;--c5:#008300;--c6:#6250d6;--c7:#e34948;
+--cx:#8a8985;--main:#52514e;--read:#dcdbd5;--readfg:#1d1d1f}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--c0:#3987e5;--c1:#d95926;--c2:#199e70;
+--c3:#c98500;--c4:#d55181;--c5:#008300;--c6:#9085e9;--c7:#e66767;--cx:#77766f;--main:#c3c2b7;--read:#3b3b40;
+--readfg:#ececf0}}
+:root[data-theme="dark"]{--c0:#3987e5;--c1:#d95926;--c2:#199e70;--c3:#c98500;--c4:#d55181;--c5:#008300;
+--c6:#9085e9;--c7:#e66767;--cx:#77766f;--main:#c3c2b7;--read:#3b3b40;--readfg:#ececf0}
+.c0{fill:var(--c0);background:var(--c0)}.c1{fill:var(--c1);background:var(--c1)}.c2{fill:var(--c2);background:var(--c2)}
+.c3{fill:var(--c3);background:var(--c3)}.c4{fill:var(--c4);background:var(--c4)}.c5{fill:var(--c5);background:var(--c5)}
+.c6{fill:var(--c6);background:var(--c6)}.c7{fill:var(--c7);background:var(--c7)}.cx{fill:var(--cx);background:var(--cx)}
+.cmain{fill:var(--main)}.sc0{stroke:var(--c0)}.sc1{stroke:var(--c1)}.sc2{stroke:var(--c2)}
+.tl text,.sm text,.lc text{font-size:10.5px;fill:var(--muted)}.tl .lbl-in,.sm .lbl-in{fill:#fff;font-size:10.5px;font-weight:600}
+.tl .rowl,.sm .rowl,.lc .rowl{fill:var(--fg);font-size:11.5px;font-weight:600}.tl .band{fill:var(--rowp)}
+.tl .brk{stroke:var(--muted);stroke-dasharray:2 3}.tl a:hover rect,.sm a:hover rect{stroke:var(--fg);stroke-width:1.5}
+.axis{stroke:var(--line)}.sm .val{fill:var(--fg);font-weight:600}.lc path.ln{fill:none;stroke-width:2}
+.lc circle{stroke:var(--bg);stroke-width:2}.lc .end{font-weight:600;fill:var(--fg)}
+.tiles{display:flex;flex-wrap:wrap;gap:10px;margin:12px 0}.tile{border:1px solid var(--line);border-radius:8px;
+padding:8px 12px;min-width:110px;background:var(--box)}.tile b{display:block;font-size:20px;line-height:1.2}
+.tile span{font-size:12px;color:var(--muted)}.tile i{font-style:normal;font-size:12px;margin-left:6px}
+.fm{border-collapse:separate;border-spacing:2px}.fm td,.fm th{border:0;padding:0;text-align:center;font-size:11px}
+.fm th{padding:0 2px;font-weight:600}.fm td.f,.fm th.f{text-align:left;padding-right:10px;white-space:nowrap;
+position:sticky;left:0;background:var(--bg);font:11.5px ui-monospace,Menlo,monospace;
+max-width:380px;overflow:hidden;text-overflow:ellipsis}
+.fm td.cell{min-width:22px;height:20px;border-radius:3px}.fm td.fw{background:var(--c0);color:#fff;font-weight:700}
+.fm td.fe{background:var(--c1);color:#fff;font-weight:700}.fm td.fr{background:var(--read);color:var(--readfg)}
+.fm td.n{color:var(--muted);padding:0 6px}.fm tr.grp td{text-align:left;padding-top:8px;color:var(--muted);
+font-weight:600}
+.key{display:inline-block;min-width:18px;text-align:center;border-radius:3px;font-size:11px;margin-right:4px}
+.bar{display:inline-block;height:9px;border-radius:2px;vertical-align:0}
+
+pre{white-space:pre-wrap;word-break:break-word;background:var(--box);border:1px solid var(--line);border-radius:6px;
+padding:8px 10px;margin:4px 0;font:12px/1.45 ui-monospace,SFMono-Regular,Menlo,monospace;max-width:100%;overflow:auto}
+.step{border-top:1px solid var(--line);padding:6px 0}.step:target{background:var(--rowp)}
+.sid{font:12px ui-monospace,Menlo,monospace;color:var(--muted);margin-right:8px}.kind{font-weight:600;margin-right:8px}
+.err{color:var(--bad);font-weight:600}.hook{color:var(--bad);margin:4px 0 0 16px}.lbl{font-size:12px;color:var(--muted);margin-top:6px}
+details summary{cursor:pointer;color:var(--muted);font-size:12px}.head td:first-child{color:var(--muted)}
+.top{font-size:13px}.narr{list-style:none;padding-left:0}.narr li{margin:3px 0}
+</style></head>
+<body>
+<p class="top"><a href="../flow.html">← the run's flow chart</a></p>
+
+<h1>U12 · implementer · M1-T02 solo</h1>
+<table class="head"><tr><td>Type</td><td>implementer</td></tr><tr><td>Description</td><td>M1-T02 solo</td></tr><tr><td>Spawned by</td><td>driver at D105</td></tr><tr><td>Turn</td><td><a href="../turns/T04.html">T04</a></td></tr><tr><td>Model</td><td>claude-opus-5-5</td></tr><tr><td>Start</td><td>2026-10-18 03:14:33 UTC</td></tr><tr><td>Duration</td><td>1 min</td></tr><tr><td>Tool calls</td><td>11</td></tr><tr><td>Errors</td><td>0</td></tr><tr><td>Hook blocks</td><td>1</td></tr><tr><td>Tokens</td><td>4.1k out · 16.6k new in · 135k cached in · peak context 21.2k</td></tr><tr><td>Skills invoked</td><td>none</td></tr><tr><td>Files written or edited</td><td>.claude/worktrees/agent-a0192e9a9e1d07e52/packages/mdata/src/mdata/io.py, .claude/worktrees/agent-a0192e9a9e1d07e52/tests/unit/mdata/test_io.py</td></tr><tr><td>Definition</td><td>none</td></tr><tr><td>Steps</td><td>14</td></tr><tr><td>Finished</td><td>yes</td></tr></table>
+
+
+<h2>Prompt</h2>
+<pre>You are the solo for M1-T02. Run `python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A1-r1/with_skill/plugin/dev-team/scripts/dt.py claim M1-T02 --role solo`, then read the packet it names.</pre>
+<h2>Files</h2>
+<table><tr><th>Op</th><th>File</th><th>Calls</th><th>By</th><th>Via</th><th>Steps</th></tr><tr><td>write</td><td><code>.claude/worktrees/agent-a0192e9a9e1d07e52/packages/mdata/src/mdata/io.py</code></td><td>2</td><td>U12</td><td>Write</td><td><a href="#8">U12.S8</a> <a href="#10">U12.S10</a></td></tr><tr><td>write</td><td><code>.claude/worktrees/agent-a0192e9a9e1d07e52/tests/unit/mdata/test_io.py</code></td><td>1</td><td>U12</td><td>Write</td><td><a href="#12">U12.S12</a></td></tr><tr><td>read</td><td><code>.claude/worktrees/agent-a0192e9a9e1d07e52/.claude/packet.md</code></td><td>1</td><td>U12</td><td>Read</td><td><a href="#3">U12.S3</a></td></tr><tr><td>read</td><td><code>.claude/worktrees/agent-a0192e9a9e1d07e52/CONSTRAINTS.md</code></td><td>1</td><td>U12</td><td>Read</td><td><a href="#4">U12.S4</a></td></tr><tr><td>read</td><td><code>.claude/worktrees/agent-a0192e9a9e1d07e52/packages/mdata/src/mdata/io.py</code></td><td>2</td><td>U12</td><td>Bash, Read</td><td><a href="#5">U12.S5</a> <a href="#9">U12.S9</a></td></tr><tr><td>read</td><td><code>.claude/worktrees/agent-a0192e9a9e1d07e52/packages/mdata/src/mdata/types.py</code></td><td>1</td><td>U12</td><td>Bash</td><td><a href="#5">U12.S5</a></td></tr><tr><td>read</td><td><code>.claude/worktrees/agent-a0192e9a9e1d07e52/tests/contracts/mdata.RawRow/sample.json</code></td><td>1</td><td>U12</td><td>Bash</td><td><a href="#5">U12.S5</a></td></tr></table>
+<h2>Steps</h2>
+<div class="step" id="S1"><span class="sid">U12.S1</span><span class="kind">user</span>You are the solo for M1-T02. Run `python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A1-r1/with_skill/plugin/dev-team/scripts/dt.py claim M1-T02 --role solo`, then read the packet it names.<details><summary>full text</summary><pre>You are the solo for M1-T02. Run `python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A1-r1/with_skill/plugin/dev-team/scripts/dt.py claim M1-T02 --role solo`, then read the packet it names.</pre></details></div><div class="step" id="S2"><span class="sid">U12.S2</span><span class="kind">Bash</span>python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A1-r1/with_skill/plugin/dev-team/scripts/dt.py claim M1-T02 --role solo<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A1-r1/with_skill/plugin/dev-team/scripts/dt.py claim M1-T02 --role solo&quot;,
+  &quot;description&quot;: &quot;Claim task M1-T02 as solo&quot;
+}</pre><div class="lbl">output</div><pre>packet: /Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A1-r1/with_skill/project/.claude/worktrees/agent-a0192e9a9e1d07e52/.claude/packet.md (65 lines; read it in full)
+task: M1-T02 read_csv spine (read every row) · role solo · package mdata · kind spine
+writes: packages/mdata/src/mdata/io.py, tests/unit/mdata/test_io.py
+done: Done when `scripts/check.sh gate` passes (the gate passes on your Writes); the Stop hook runs it. End with one line: `DONE M1-T02 solo`. If you can&#x27;t finish: `python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A1-r1/with_skill/plugin/dev-team/scripts/dt.py escalate &lt;TEST-WRONG|NEEDS-DEP&gt; &quot;&lt;why&gt;&quot;`, or `python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A1-r1/with_skill/plugin/dev-team/scripts/dt.py escalate CONTRACT-CHANGE &quot;&lt;why&gt;&quot; --type &lt;the contract symbol&gt;`, then end with one line: `STOPPED M1-T02 solo: see dt escalate`.
+previous rejection: harness, details in /Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A1-r1/with_skill/project/.git/dt-build/details/M1-T02.solo-1.txt
+  dt land M1-T02 --role solo
+  claim: M1-T02.solo
+  
+  ## reject: harness
+  the driver reports the agent ended without a status line</pre></details></div><div class="step" id="S3"><span class="sid">U12.S3</span><span class="kind">Read</span>/Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A1-r1/with_skill/project/.claude/worktrees/agent-a0192e9a9e1d07e52/.claude/packet.md<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A1-r1/with_skill/project/.claude/worktrees/agent-a0192e9a9e1d07e52/.claude/packet.md&quot;
+}</pre><div class="lbl">output</div><pre>1	# Packet: M1-T02 solo
+2	You are the solo for M1-T02. Your edit boundary is your Writes below (`.claude/.task_writes`); the guard blocks everything else.
+3	
+4	Done when `scripts/check.sh gate` passes (the gate passes on your Writes); the Stop hook runs it. End with one line: `DONE M1-T02 solo`. If you can&#x27;t finish: `python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A1-r1/with_skill/plugin/dev-team/scripts/dt.py escalate &lt;TEST-WRONG|NEEDS-DEP&gt; &quot;&lt;why&gt;&quot;`, or `python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A1-r1/with_skill/plugin/dev-team/scripts/dt.py escalate CONTRACT-CHANGE &quot;&lt;why&gt;&quot; --type &lt;the contract symbol&gt;`, then end with one line: `STOPPED M1-T02 solo: see dt escalate`.
+5	
+6	# Context for M1-T02: package mdata · mode solo · kind spine
+7	Read only what is below, plus CONSTRAINTS.md and the files you edit. Your task is the last section.
+8	
+9	&lt;!-- docs/packages/mdata/pipelines.md:5 --&gt;
+10	## PL-01: Load prices
+11	**Entry:** `packages/mdata/src/mdata/pipeline.py::load_prices` · **Trigger:** called from Python (`mdata.load_prices`)
+12	**Covers:** DATA-01–DATA-04, QR-01
+13	
+14	| # | Step | Owner | In → Out | Spine version | Covers |
+15	|---|---|---|---|---|---|
+16	| 1 | `read_csv` | mdata.io | path → RawRow | read every row | DATA-01 |
+17	| 2 | `validate_rows` | mdata.validate | RawRow → RawRow | keep rows with a close, sorted | DATA-02 |
+18	| 3 | `align_calendar` | mdata.calendar | RawRow → Prices | dates every ticker has, no fill | DATA-03, DATA-04 |
+19	
+20	### Entry sketch (pre-build — removed by spine task)
+21	```python
+22	def load_prices(path, tickers=None) -&gt; Prices:
+23	    rows = read_csv(path)
+24	    rows = validate_rows(rows, tickers)
+25	    return align_calendar(rows)
+26	```
+27	
+28	&lt;!-- docs/packages/mdata/contract.md:33 --&gt;
+29	### mdata.read_csv: Read the rows
+30	`def read_csv(path: str | Path) -&gt; list[RawRow]`
+31	- **Errors:** `ValueError` for a missing column or a malformed date
+32	- **Used by:** PL-01
+33	
+34	&lt;!-- docs/packages/mdata/contract.md:7 --&gt;
+35	### mdata.RawRow: One CSV row
+36	**Kind:** type · **Sample:** `tests/contracts/mdata.RawRow/sample.json` · **Cases:** eight rows of two tickers, one with a blank close
+37	`@dataclass(frozen=True) class RawRow: date: str; ticker: str; close: float | None`
+38	- **Invariants:** `date` is ISO `yyyy-mm-dd`; `close` is None for a blank cell
+39	- **Used by:** PL-01
+40	
+41	&lt;!-- docs/spec.md:11 --&gt;
+42	- **DATA-01** A `date,ticker,close` CSV is read row by row.
+43	  - Given a CSV, when it is read, then each row comes back in file order, and a blank close is missing, not zero.
+44	
+45	## Layout (`dt layout mdata`)
+46	packages/mdata/src/mdata/
+47	  __init__.py — mdata: daily closes from a CSV, validated and on one calendar.
+48	  calendar.py — PL-01 step 3: put every ticker on one calendar.
+49	  io.py — PL-01 step 1: read the `date,ticker,close` CSV.
+50	  pipeline.py — PL-01: Load prices. read_csv -&gt; validate_rows -&gt; align_calendar.
+51	  types.py — mdata&#x27;s boundary types: one CSV row, the aligned prices, and the long-gap error.
+52	  validate.py — PL-01 step 2: keep the usable rows, sorted.
+53	
+54	## Writes (edit only these files; the plan gives every other file to another task)
+55	- packages/mdata/src/mdata/io.py (exists)
+56	- tests/unit/mdata/test_io.py (new)
+57	
+58	&lt;!-- tasks/plan.md:33 --&gt;
+59	### M1-T02: read_csv spine (read every row)
+60	**Package:** mdata · **Step:** PL-01.read_csv · **Kind:** spine · **Covers:** DATA-01 · **Size:** XS · **Mode:** solo
+61	**Read:** PL-01, mdata.read_csv, mdata.RawRow, DATA-01
+62	**Acceptance:**
+63	- [ ] `read_csv` returns valid output on a synthetic input (its spine version: read every row); signature unchanged
+64	**Verify:** `pytest tests/unit/mdata/test_io.py` · `scripts/check.sh gate`
+65	**Depends on:** M1-T01 · **Writes:** packages/mdata/src/mdata/io.py, tests/unit/mdata/test_io.py
+66	</pre></details></div><div class="step" id="S4"><span class="sid">U12.S4</span><span class="kind">Read</span>/Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A1-r1/with_skill/project/.claude/worktrees/agent-a0192e9a9e1d07e52/CONSTRAINTS.md<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A1-r1/with_skill/project/.claude/worktrees/agent-a0192e9a9e1d07e52/CONSTRAINTS.md&quot;
+}</pre><div class="lbl">output</div><pre>1	# Constraints
+2	**Status:** Approved · **Last reviewed:** 2026-10-17 by @connor · **Ratcheted:** —
+3	
+4	The standing quality bar. `pyproject.toml` and `scripts/check.sh` enforce it; every number here names its config key, and `dt status` fails if the two disagree. Only `build-setup` changes this file, with the user: tightening is routine, loosening needs an explicit yes.
+5	
+6	## Floor
+7	- **CR-01** No new suppressions. Ruff runs with `--ignore-noqa` in gate and full, so a Ruff exception is a `per-file-ignores` entry in protected config with a row in Exceptions. `# type: ignore`, `pyright:` comments and `pragma: no cover` are caught by `floor_guard.sh` on the diff
+8	- **CR-02** No stubs: `raise NotImplementedError` outside abstract methods, `pass`-only bodies, bare `except: pass`. One carve-out: the interface task&#x27;s step signatures, whose body is only `raise NotImplementedError(&quot;&lt;task id&gt;&quot;)` naming the open task that replaces it. `check.sh gate` fails on one naming a task that isn&#x27;t open in `tasks/todo.md`; `check.sh full --exit` (the milestone exit) fails on any
+9	- **CR-03** No skipped, deleted or assertion-free tests, unless a row in Exceptions names the test file
+10	- **CR-04** No secrets in source
+11	- **CR-05** Oracle files (`tests/fixtures/**/expected.json`) change only with the user&#x27;s approval
+12	- **CR-06** The implementer never changes `tests/intent/**`
+13	- **CR-07** This file, `pyproject.toml` tool config, `scripts/` and `.claude/agents/` are not weakened to make a change pass
+14	- **CR-08** Nothing imports from `references/` or `probes/`, or adds either to `sys.path` (or `PYTHONPATH`, pytest `pythonpath`). References and probe scripts are outside the tooling, so imported code would bypass the bar; `floor_guard.sh` checks the diff for both. Code copied from either is project code and meets the same bar
+15	- **CR-09** A frozen interface (`tests/contracts/&lt;id&gt;.&lt;symbol&gt;/`: schema, samples, fake; and the types, signatures and exports the interface task wrote) is frozen once it exists at the task&#x27;s base. Only the interface task freezing it (`**Kind:** interface`) writes a new folder, and no other task&#x27;s `Writes:` names its `types.py` or `__init__.py`; a frozen interface changes only through `architecture-design` Revise, never to make a test pass
+16	
+17	## Readability
+18	- **CR-10** One entry function per pipeline; it reads top to bottom as its named steps (reviewer + `dt layout`)
+19	- **CR-11** No registries, plugin dispatch or config-driven wiring without an AD
+20	- **CR-12** New abstraction only with a second real implementation or a named seam
+21	
+22	
+23	## Enforced with numbers
+24	| ID | Dimension | Rule | Checked by | Config key | Runs at |
+25	|---|---|---|---|---|---|
+26	| CR-20 | Lint | zero errors; standing per-file-ignores only for `tests/**` and `__init__.py` | ruff | `tool.ruff.lint.select` | edit, gate |
+27	| CR-21 | Complexity | ≤ 10 per function | ruff C901 | `tool.ruff.lint.mccabe.max-complexity` | gate |
+28	| CR-22 | Size | ≤ 500 lines/module, ≤ 60/function | check_size.py | `tool.size_limits` | edit, gate |
+29	| CR-23 | Types | zero errors, strict | mypy | `tool.mypy.strict` | gate |
+30	| CR-24 | Boundaries | import contracts hold | import-linter | `tool.importlinter.contracts` | gate |
+31	| CR-25 | Dependencies | none missing or unused | deptry | `tool.deptry` | gate |
+32	| CR-26 | Deps security | nothing known-vulnerable | pip-audit | — | full, CI nightly |
+33	
+34	
+35	## Measured, not yet enforced
+36	| ID | Metric | Today | Direction |
+37	|---|---|---|---|
+38	| CR-40 | Coverage (branch) | 0% (`tool.coverage.report.fail_under`, raised by Ratchet) | must not fall |
+39	| CR-41 | vulture findings at `min_confidence = 60` (`scripts/vulture_whitelist.py`) | 0 | must not grow by `full --exit` (earlier `full` runs report) |
+40	| CR-42 | Duplicate blocks of ≥ 8 similar source lines (pylint `duplicate-code`, `[tool.pylint.similarities]` in pyproject.toml) | 0 | must not grow |
+41	
+42	## Boundaries (generated from architecture — do not edit)
+43	- `mdata` imports nothing first-party · `risk` → `mdata.types`, `mdata.load_prices`
+44	
+45	## Roles and protected paths
+46	| Role | May edit | May not edit | Stop gate |
+47	|---|---|---|---|
+48	| tester | `tests/intent/**`, within the task&#x27;s `Writes:` | everything else; reads no source | `check.sh collect` (lint, collect, red for the right reason) |
+49	| implementer / solo | `src/**`, `tests/unit/**`, within the task&#x27;s `Writes:`; an interface task also the `tests/contracts/&lt;id&gt;.&lt;symbol&gt;/` its `Writes:` names | the protected list; `tasks/` | `check.sh gate` + protected-path diff against the worktree&#x27;s base |
+50	| reviewer | its worktree, for the mutation check, and its findings file; nothing lands (the orchestrator records findings with `dt finding`) | everything else | runs `check.sh full` by hand |
+51	
+52	**Protected list** (`PROTECTED` in `scripts/check.sh`; `path_guard.sh deny --protected` reads the same list): `tests/intent/**`, `tests/fixtures/**`, `tests/conftest.py`, `pyproject.toml`, `uv.lock`, `CONSTRAINTS.md`, `scripts/**`, `.claude/agents/**`, `.claude/settings.json`, `references/**`, `probes/**`, `tests/contracts/**`, `packages/*/pyproject.toml`. `tests/contracts/**` covers the contract folders that exist at the task&#x27;s base (CR-09). **`Writes:`**: `dt claim`, in the builder&#x27;s worktree, writes the role&#x27;s share of the task&#x27;s `Writes:` to `.claude/.task_writes` and sets the worktree&#x27;s base (`refs/worktree/checks-base`); `path_guard.sh writes` blocks edits outside the list, and a tester&#x27;s or implementer&#x27;s edits before the claim. Only the orchestrator writes `tasks/` (`dt land`, `dt finding`).
+53	
+54	**Worktree links:** —
+55	
+56	## Review
+57	Run by the reviewer agent over what it is given (base, package, tasks, paths): the interface review after Phase 0, a phase review per package at each checkpoint, and the milestone exit. `dt land` already checked each landing&#x27;s `Writes:`, protected paths and gates; review judges what tools can&#x27;t.
+58	
+59	**Interface** (after Phase 0): the code is the contract, no more and no less.
+60	1. Types match `contract.md`: fields, types, invariants. Nothing a step&#x27;s In → Out needs is missing; no helper is frozen.
+61	2. Signatures match the step tables, in their owner modules. Each stub names the open task that owns its step; no logic beyond types and validation.
+62	3. One sample per case the contract names, valid and realistically shaped, never carrying a TC&#x27;s expected value. Replay doubles replay an interaction the Protocol allows; fakes serve their fixtures.
+63	4. `__init__.py` exports exactly the contract; each `Mitigated by` in the plan&#x27;s dependency graph exists; each split task&#x27;s tester can write its tests from the frozen interface and its `Read:`.
+64	
+65	**Each phase**, per package, tests before code:
+66	1. **Interfaces followed** (CR-09): no frozen type, signature or contract folder changed outside a Revise. Consumers use the declared types: no dict for a dataclass, no reaching into a provider&#x27;s internals, no local redefinition. A stub is replaced only by the task it names; no cross-package import outside the contract; spine tests run on samples and doubles, not another step&#x27;s code.
+67	2. **Tests prove something:** each intent test asserts its TC case or acceptance bullet, loading expected values and tolerances from fixtures; none is assertion-free or weakened; Hypothesis runs the `ci` profile. Unit tests are specific, never computing the expected value with the code under test or testing only a mock. **Mutation check** (`.claude/agents/reviewer.md`): per acceptance bullet, the smallest change that should break it; a mutation no test catches is a finding.
+68	3. **Correct to the spec:** each acceptance bullet truly met, not special-cased to the sample; the error paths the requirement names; seeding and determinism; numerical edge cases.
+69	4. **Simple** (CR-11, CR-12, CR-42): no abstraction with one implementation outside the contract or an AD; no forwarding wrapper, one-method class, or class where a function does; no parameter, flag or config key every caller sets the same; no `try/except` that only re-raises or swallows, no checks the types already guarantee; no loop the library already provides. No near-copies within or across the phase&#x27;s tasks: one concept is one function in its owner module (tests may repeat for readability). Each finding names the simpler form, with the same tests passing.
+70	5. **Pipelines** (CR-10): entry functions read as their step tables (`dt layout`); step owners respected; spine baselines still selectable.
+71	6. **The bar** (CR-07): diff this file, `pyproject.toml`, `scripts/` and `.claude/agents/` against the milestone&#x27;s Base. Any loosening is Critical; new exceptions need an owner and expiry.
+72	7. **Hidden and parallel risks:** where a real provider could act differently from its double (flagged for the system phase); fixed output paths, global state, test-order dependence.
+73	8. **The rest:** readability, security, performance where a QR sets a number; reused reference or probe code has its Caveats handled and fits the contract; `dt lint` clean, pre-build sections replaced by `dt layout` pointers.
+74	
+75	**Milestone exit**, over the whole diff, adds: the Scope&#x27;s Exit holds; every Covers ID has a test; `check.sh full --exit` finds no stub; system tests use real providers; the same sample through a real provider and its double agrees; deferred requirements untouched; pip-audit ran.
+76	
+77	**Severity:** Critical: a frozen interface changed, a weakened test, an intent test that misses a mutation changing its TC&#x27;s expected output, a wrong answer, a loosened bar, a security hole, lost data; it stops the build. Important: a consumer bypassing a type, any other surviving mutation, an unneeded abstraction, a duplicate across tasks. Suggestion and Nit: local. Findings go under the checkpoint block in `tasks/plan.md` (`dt finding`), each with a fix task or a reason.
+78	
+79	## Done
+80	agent-skills `references/definition-of-done.md`, tailored once:
+81	- **Correctness and Quality:** checked per task by the gate.
+82	- **Integration and Documentation:** checked at each checkpoint.
+83	- **The full list:** checked at milestone exit.
+84	
+85	## Exceptions
+86	| ID | Rule | Path | Reason | Owner | Expires |
+87	|---|---|---|---|---|---|
+88	
+89	</pre></details></div><div class="step" id="S5"><span class="sid">U12.S5</span><span class="kind">Bash</span>git status --short; git diff HEAD --stat; cat packages/mdata/src/mdata/io.py packages/mdata/src/mdata/types.py; ls tests/unit tests/unit/mdata tests/contracts/mdata.RawRow; cat tests/contracts/mdata.RawRow/sample.json<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;git status --short; git diff HEAD --stat; cat packages/mdata/src/mdata/io.py packages/mdata/src/mdata/types.py; ls tests/unit tests/unit/mdata tests/contracts/mdata.RawRow; cat tests/contracts/mdata.RawRow/sample.json&quot;,
+  &quot;description&quot;: &quot;Inspect state and relevant files&quot;
+}</pre><div class="lbl">output</div><pre>&quot;&quot;&quot;PL-01 step 1: read the `date,ticker,close` CSV.&quot;&quot;&quot;
+
+from __future__ import annotations
+
+from pathlib import Path
+
+from mdata.types import RawRow
+
+
+def read_csv(path: str | Path) -&gt; list[RawRow]:
+    &quot;&quot;&quot;Every row in file order; a blank close is None. ValueError for a missing column or bad date.&quot;&quot;&quot;
+    raise NotImplementedError(&quot;M1-T02&quot;)
+&quot;&quot;&quot;mdata&#x27;s boundary types: one CSV row, the aligned prices, and the long-gap error.&quot;&quot;&quot;
+
+from __future__ import annotations
+
+from collections.abc import Mapping
+from dataclasses import dataclass
+
+
+@dataclass(frozen=True)
+class RawRow:
+    &quot;&quot;&quot;One CSV row: `date` is ISO yyyy-mm-dd; `close` is None for a blank cell.&quot;&quot;&quot;
+
+    date: str
+    ticker: str
+    close: float | None
+
+
+@dataclass(frozen=True)
+class Prices:
+    &quot;&quot;&quot;Aligned daily closes: dates ascending, tickers sorted, one positive close per date.&quot;&quot;&quot;
+
+    dates: tuple[str, ...]
+    tickers: tuple[str, ...]
+    closes: Mapping[str, tuple[float, ...]]
+
+
+class GapError(ValueError):
+    &quot;&quot;&quot;A ticker misses more dates in a row than the gap limit allows.&quot;&quot;&quot;
+ls: tests/unit: No such file or directory
+ls: tests/unit/mdata: No such file or directory
+tests/contracts/mdata.RawRow:
+sample.json
+{
+  &quot;rows&quot;: [
+    {&quot;date&quot;: &quot;2024-03-04&quot;, &quot;ticker&quot;: &quot;AAA&quot;, &quot;close&quot;: 40.4},
+    {&quot;date&quot;: &quot;2024-03-01&quot;, &quot;ticker&quot;: &quot;AAA&quot;, &quot;close&quot;: 40.0},
+    {&quot;date&quot;: &quot;2024-03-01&quot;, &quot;ticker&quot;: &quot;BBB&quot;, &quot;close&quot;: 25.0},
+    {&quot;date&quot;: &quot;2024-03-04&quot;, &quot;ticker&quot;: &quot;BBB&quot;, &quot;close&quot;: 25.5},
+    {&quot;date&quot;: &quot;2024-03-05&quot;, &quot;ticker&quot;: &quot;AAA&quot;, &quot;close&quot;: 40.602},
+    {&quot;date&quot;: &quot;2024-03-05&quot;, &quot;ticker&quot;: &quot;BBB&quot;, &quot;close&quot;: null},
+    {&quot;date&quot;: &quot;2024-03-06&quot;, &quot;ticker&quot;: &quot;BBB&quot;, &quot;close&quot;: 24.7401},
+    {&quot;date&quot;: &quot;2024-03-06&quot;, &quot;ticker&quot;: &quot;AAA&quot;, &quot;close&quot;: 41.00802}
+  ]
+}</pre></details></div><div class="step" id="S6"><span class="sid">U12.S6</span><span class="kind">Bash</span>grep -rn &quot;read_csv&quot; tests packages --include=*.py<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;grep -rn \&quot;read_csv\&quot; tests packages --include=*.py&quot;,
+  &quot;description&quot;: &quot;Find read_csv usages in tests&quot;
+}</pre><div class="lbl">output</div><pre>(eval):1: no matches found: --include=*.py</pre></details></div><div class="step" id="S7"><span class="sid">U12.S7</span><span class="kind">Bash</span>grep -rn read_csv tests packages<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;grep -rn read_csv tests packages&quot;,
+  &quot;description&quot;: &quot;Find read_csv usages&quot;
+}</pre><div class="lbl">output</div><pre>packages/mdata/src/mdata/io.py:10:def read_csv(path: str | Path) -&gt; list[RawRow]:
+packages/mdata/src/mdata/__init__.py:4:from mdata.io import read_csv
+packages/mdata/src/mdata/__init__.py:15:    &quot;read_csv&quot;,
+packages/mdata/src/mdata/pipeline.py:1:&quot;&quot;&quot;PL-01: Load prices. read_csv -&gt; validate_rows -&gt; align_calendar.&quot;&quot;&quot;</pre></details></div><div class="step" id="S8"><span class="sid">U12.S8</span><span class="kind">Write</span>/Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A1-r1/with_skill/project/.claude/worktrees/agent-a0192e9a9e1d07e52/packages/mdata/src/mdata/io.py (39 lines)<div class="lbl">wrote /Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A1-r1/with_skill/project/.claude/worktrees/agent-a0192e9a9e1d07e52/packages/mdata/src/mdata/io.py</div><pre>&quot;&quot;&quot;PL-01 step 1: read the `date,ticker,close` CSV.&quot;&quot;&quot;
+
+from __future__ import annotations
+
+import csv
+from datetime import datetime
+from pathlib import Path
+
+from mdata.types import RawRow
+
+COLUMNS = (&quot;date&quot;, &quot;ticker&quot;, &quot;close&quot;)
+DATE_FORMAT = &quot;%Y-%m-%d&quot;
+
+
+def read_csv(path: str | Path) -&gt; list[RawRow]:
+    &quot;&quot;&quot;Every row in file order; a blank close is None. ValueError for a missing column or bad date.&quot;&quot;&quot;
+    with Path(path).open(newline=&quot;&quot;, encoding=&quot;utf-8&quot;) as handle:
+        reader = csv.DictReader(handle)
+        missing = [name for name in COLUMNS if name not in (reader.fieldnames or ())]
+        if missing:
+            raise ValueError(f&quot;{path}: missing column(s) {&#x27;, &#x27;.join(missing)}&quot;)
+        return [_to_row(record) for record in reader]
+
+
+def _to_row(record: dict[str, str]) -&gt; RawRow:
+    &quot;&quot;&quot;One CSV record as a RawRow, checking the date is ISO yyyy-mm-dd.&quot;&quot;&quot;
+    date = record[&quot;date&quot;].strip()
+    if not _is_iso_date(date):
+        raise ValueError(f&quot;malformed date {date!r}, expected yyyy-mm-dd&quot;)
+    close = record[&quot;close&quot;].strip()
+    return RawRow(date=date, ticker=record[&quot;ticker&quot;].strip(), close=float(close) if close else None)
+
+
+def _is_iso_date(text: str) -&gt; bool:
+    &quot;&quot;&quot;True when `text` is a real calendar date written exactly as yyyy-mm-dd.&quot;&quot;&quot;
+    try:
+        return datetime.strptime(text, DATE_FORMAT).strftime(DATE_FORMAT) == text
+    except ValueError:
+        return False
+</pre><div class="hook">⛔ hook PostToolUse:Write blocked: [bash &quot;$CLAUDE_PROJECT_DIR&quot;/scripts/hooks/post_edit.sh]: -&gt; ruff check --fix --quiet /Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A1-r1/with_skill/project/.claude/worktrees/agent-a0192e9a9e1d07e52/packages/mdata/src/mdata/io.py
+DTZ007 Naive datetime constructed using `datetime.datetime.strptime()` without %z
+  --&gt; packages/mdata/src/mdata/io.py:37:16
+   |
+35 |     &quot;&quot;&quot;True when `text` is a real calendar date written exactly as yyyy-mm-dd.&quot;&quot;&quot;
+36 |     try:
+37 |         return datetime.strptime(text, DATE_FORMAT).strftime(DATE_FORMAT) == text
+   |                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+38 |     except ValueError:
+39 |         return False
+   |
+help: Call `.replace(tzinfo=&lt;timezone&gt;)` or `.astimezone()` to convert to an aware datetime
+
+-&gt; ruff format --quiet /Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A1-r1/with_skill/project/.claude/worktrees/agent-a0192e9a9e1d07e52/packages/mdata/src/mdata/io.py
+-&gt; typos /Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A1-r1/with_skill/project/.claude/worktrees/agent-a0192e9a9e1d07e52/packages/mdata/src/mdata/io.py
+-&gt; python scripts/check_size.py /Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A1-r1/with_skill/project/.claude/worktrees/agent-a0192e9a9e1d07e52/packages/mdata/src/mdata/io.py
+FAILED: ruff check --fix --quiet /Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A1-r1/with_skill/project/.claude/worktrees/agent-a0192e9a9e1d07e52/packages/mdata/src/mdata/io.py
+</div><details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A1-r1/with_skill/project/.claude/worktrees/agent-a0192e9a9e1d07e52/packages/mdata/src/mdata/io.py&quot;,
+  &quot;content&quot;: &quot;\&quot;\&quot;\&quot;PL-01 step 1: read the `date,ticker,close` CSV.\&quot;\&quot;\&quot;\n\nfrom __future__ import annotations\n\nimport csv\nfrom datetime import datetime\nfrom pathlib import Path\n\nfrom mdata.types import RawRow\n\nCOLUMNS = (\&quot;date\&quot;, \&quot;ticker\&quot;, \&quot;close\&quot;)\nDATE_FORMAT = \&quot;%Y-%m-%d\&quot;\n\n\ndef read_csv(path: str | Path) -&gt; list[RawRow]:\n    \&quot;\&quot;\&quot;Every row in file order; a blank close is None. ValueError for a missing column or bad date.\&quot;\&quot;\&quot;\n    with Path(path).open(newline=\&quot;\&quot;, encoding=\&quot;utf-8\&quot;) as handle:\n        reader = csv.DictReader(handle)\n        missing = [name for name in COLUMNS if name not in (reader.fieldnames or ())]\n        if missing:\n            raise ValueError(f\&quot;{path}: missing column(s) {&#x27;, &#x27;.join(missing)}\&quot;)\n        return [_to_row(record) for record in reader]\n\n\ndef _to_row(record: dict[str, str]) -&gt; RawRow:\n    \&quot;\&quot;\&quot;One CSV record as a RawRow, checking the date is ISO yyyy-mm-dd.\&quot;\&quot;\&quot;\n    date = record[\&quot;date\&quot;].strip()\n    if not _is_iso_date(date):\n        raise ValueError(f\&quot;malformed date {date!r}, expected yyyy-mm-dd\&quot;)\n    close = record[\&quot;close\&quot;].strip()\n    return RawRow(date=date, ticker=record[\&quot;ticker\&quot;].strip(), close=float(close) if close else None)\n\n\ndef _is_iso_date(text: str) -&gt; bool:\n    \&quot;\&quot;\&quot;True when `text` is a real calendar date written exactly as yyyy-mm-dd.\&quot;\&quot;\&quot;\n    try:\n        return datetime.strptime(text, DATE_FORMAT).strftime(DATE_FORMAT) == text\n    except ValueError:\n        return False\n&quot;
+}</pre><div class="lbl">output</div><pre>The file /Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A1-r1/with_skill/project/.claude/worktrees/agent-a0192e9a9e1d07e52/packages/mdata/src/mdata/io.py has been updated successfully. (file state is current in your context — no need to Read it back)</pre></details></div><div class="step" id="S9"><span class="sid">U12.S9</span><span class="kind">Read</span>/Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A1-r1/with_skill/project/.claude/worktrees/agent-a0192e9a9e1d07e52/packages/mdata/src/mdata/io.py<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A1-r1/with_skill/project/.claude/worktrees/agent-a0192e9a9e1d07e52/packages/mdata/src/mdata/io.py&quot;
+}</pre><div class="lbl">output</div><pre>1	&quot;&quot;&quot;PL-01 step 1: read the `date,ticker,close` CSV.&quot;&quot;&quot;
+2	
+3	from __future__ import annotations
+4	
+5	import csv
+6	from datetime import datetime
+7	from pathlib import Path
+8	
+9	from mdata.types import RawRow
+10	
+11	COLUMNS = (&quot;date&quot;, &quot;ticker&quot;, &quot;close&quot;)
+12	DATE_FORMAT = &quot;%Y-%m-%d&quot;
+13	
+14	
+15	def read_csv(path: str | Path) -&gt; list[RawRow]:
+16	    &quot;&quot;&quot;Every row in file order; a blank close is None. ValueError for a missing column or bad date.&quot;&quot;&quot;
+17	    with Path(path).open(newline=&quot;&quot;, encoding=&quot;utf-8&quot;) as handle:
+18	        reader = csv.DictReader(handle)
+19	        missing = [name for name in COLUMNS if name not in (reader.fieldnames or ())]
+20	        if missing:
+21	            raise ValueError(f&quot;{path}: missing column(s) {&#x27;, &#x27;.join(missing)}&quot;)
+22	        return [_to_row(record) for record in reader]
+23	
+24	
+25	def _to_row(record: dict[str, str]) -&gt; RawRow:
+26	    &quot;&quot;&quot;One CSV record as a RawRow, checking the date is ISO yyyy-mm-dd.&quot;&quot;&quot;
+27	    date = record[&quot;date&quot;].strip()
+28	    if not _is_iso_date(date):
+29	        raise ValueError(f&quot;malformed date {date!r}, expected yyyy-mm-dd&quot;)
+30	    close = record[&quot;close&quot;].strip()
+31	    return RawRow(date=date, ticker=record[&quot;ticker&quot;].strip(), close=float(close) if close else None)
+32	
+33	
+34	def _is_iso_date(text: str) -&gt; bool:
+35	    &quot;&quot;&quot;True when `text` is a real calendar date written exactly as yyyy-mm-dd.&quot;&quot;&quot;
+36	    try:
+37	        return datetime.strptime(text, DATE_FORMAT).strftime(DATE_FORMAT) == text
+38	    except ValueError:
+39	        return False
+40	</pre></details></div><div class="step" id="S10"><span class="sid">U12.S10</span><span class="kind">Write</span>/Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A1-r1/with_skill/project/.claude/worktrees/agent-a0192e9a9e1d07e52/packages/mdata/src/mdata/io.py (44 lines)<div class="lbl">wrote /Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A1-r1/with_skill/project/.claude/worktrees/agent-a0192e9a9e1d07e52/packages/mdata/src/mdata/io.py</div><pre>&quot;&quot;&quot;PL-01 step 1: read the `date,ticker,close` CSV.&quot;&quot;&quot;
+
+from __future__ import annotations
+
+import csv
+import re
+from datetime import date
+from pathlib import Path
+
+from mdata.types import RawRow
+
+COLUMNS = (&quot;date&quot;, &quot;ticker&quot;, &quot;close&quot;)
+ISO_DATE = re.compile(r&quot;\d{4}-\d{2}-\d{2}&quot;)
+
+
+def read_csv(path: str | Path) -&gt; list[RawRow]:
+    &quot;&quot;&quot;Every row in file order; a blank close is None. ValueError for a missing column or bad date.&quot;&quot;&quot;
+    with Path(path).open(newline=&quot;&quot;, encoding=&quot;utf-8&quot;) as handle:
+        reader = csv.DictReader(handle)
+        missing = [name for name in COLUMNS if name not in (reader.fieldnames or ())]
+        if missing:
+            raise ValueError(f&quot;{path}: missing column(s) {&#x27;, &#x27;.join(missing)}&quot;)
+        return [_to_row(record) for record in reader]
+
+
+def _to_row(record: dict[str, str | None]) -&gt; RawRow:
+    &quot;&quot;&quot;One CSV record as a RawRow, checking the date is ISO yyyy-mm-dd.&quot;&quot;&quot;
+    day = (record[&quot;date&quot;] or &quot;&quot;).strip()
+    if not _is_iso_date(day):
+        raise ValueError(f&quot;malformed date {day!r}, expected yyyy-mm-dd&quot;)
+    close = (record[&quot;close&quot;] or &quot;&quot;).strip()
+    ticker = (record[&quot;ticker&quot;] or &quot;&quot;).strip()
+    return RawRow(date=day, ticker=ticker, close=float(close) if close else None)
+
+
+def _is_iso_date(text: str) -&gt; bool:
+    &quot;&quot;&quot;True when `text` is a real calendar date written exactly as yyyy-mm-dd.&quot;&quot;&quot;
+    if not ISO_DATE.fullmatch(text):
+        return False
+    try:
+        date.fromisoformat(text)
+    except ValueError:
+        return False
+    return True
+</pre><details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A1-r1/with_skill/project/.claude/worktrees/agent-a0192e9a9e1d07e52/packages/mdata/src/mdata/io.py&quot;,
+  &quot;content&quot;: &quot;\&quot;\&quot;\&quot;PL-01 step 1: read the `date,ticker,close` CSV.\&quot;\&quot;\&quot;\n\nfrom __future__ import annotations\n\nimport csv\nimport re\nfrom datetime import date\nfrom pathlib import Path\n\nfrom mdata.types import RawRow\n\nCOLUMNS = (\&quot;date\&quot;, \&quot;ticker\&quot;, \&quot;close\&quot;)\nISO_DATE = re.compile(r\&quot;\\d{4}-\\d{2}-\\d{2}\&quot;)\n\n\ndef read_csv(path: str | Path) -&gt; list[RawRow]:\n    \&quot;\&quot;\&quot;Every row in file order; a blank close is None. ValueError for a missing column or bad date.\&quot;\&quot;\&quot;\n    with Path(path).open(newline=\&quot;\&quot;, encoding=\&quot;utf-8\&quot;) as handle:\n        reader = csv.DictReader(handle)\n        missing = [name for name in COLUMNS if name not in (reader.fieldnames or ())]\n        if missing:\n            raise ValueError(f\&quot;{path}: missing column(s) {&#x27;, &#x27;.join(missing)}\&quot;)\n        return [_to_row(record) for record in reader]\n\n\ndef _to_row(record: dict[str, str | None]) -&gt; RawRow:\n    \&quot;\&quot;\&quot;One CSV record as a RawRow, checking the date is ISO yyyy-mm-dd.\&quot;\&quot;\&quot;\n    day = (record[\&quot;date\&quot;] or \&quot;\&quot;).strip()\n    if not _is_iso_date(day):\n        raise ValueError(f\&quot;malformed date {day!r}, expected yyyy-mm-dd\&quot;)\n    close = (record[\&quot;close\&quot;] or \&quot;\&quot;).strip()\n    ticker = (record[\&quot;ticker\&quot;] or \&quot;\&quot;).strip()\n    return RawRow(date=day, ticker=ticker, close=float(close) if close else None)\n\n\ndef _is_iso_date(text: str) -&gt; bool:\n    \&quot;\&quot;\&quot;True when `text` is a real calendar date written exactly as yyyy-mm-dd.\&quot;\&quot;\&quot;\n    if not ISO_DATE.fullmatch(text):\n        return False\n    try:\n        date.fromisoformat(text)\n    except ValueError:\n        return False\n    return True\n&quot;
+}</pre><div class="lbl">output</div><pre>The file /Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A1-r1/with_skill/project/.claude/worktrees/agent-a0192e9a9e1d07e52/packages/mdata/src/mdata/io.py has been updated successfully. (file state is current in your context — no need to Read it back)</pre></details></div><div class="step" id="S11"><span class="sid">U12.S11</span><span class="kind">say</span>Now the unit tests.<details><summary>full text</summary><pre>Now the unit tests.</pre></details></div><div class="step" id="S12"><span class="sid">U12.S12</span><span class="kind">Write</span>/Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A1-r1/with_skill/project/.claude/worktrees/agent-a0192e9a9e1d07e52/tests/unit/mdata/test_io.py (57 lines)<div class="lbl">wrote /Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A1-r1/with_skill/project/.claude/worktrees/agent-a0192e9a9e1d07e52/tests/unit/mdata/test_io.py</div><pre>&quot;&quot;&quot;Unit tests for mdata.io.read_csv (PL-01 step 1, DATA-01).&quot;&quot;&quot;
+
+from __future__ import annotations
+
+from pathlib import Path
+
+import pytest
+
+from mdata.io import read_csv
+from mdata.types import RawRow
+
+
+def _write(tmp_path: Path, text: str) -&gt; Path:
+    path = tmp_path / &quot;prices.csv&quot;
+    path.write_text(text, encoding=&quot;utf-8&quot;)
+    return path
+
+
+def test_rows_come_back_in_file_order(tmp_path: Path) -&gt; None:
+    path = _write(
+        tmp_path,
+        &quot;date,ticker,close\n2024-03-04,AAA,40.4\n2024-03-01,AAA,40.0\n2024-03-01,BBB,25.0\n&quot;,
+    )
+    assert read_csv(path) == [
+        RawRow(date=&quot;2024-03-04&quot;, ticker=&quot;AAA&quot;, close=40.4),
+        RawRow(date=&quot;2024-03-01&quot;, ticker=&quot;AAA&quot;, close=40.0),
+        RawRow(date=&quot;2024-03-01&quot;, ticker=&quot;BBB&quot;, close=25.0),
+    ]
+
+
+def test_blank_close_is_none_not_zero(tmp_path: Path) -&gt; None:
+    path = _write(tmp_path, &quot;date,ticker,close\n2024-03-05,BBB,\n2024-03-06,BBB,0\n&quot;)
+    rows = read_csv(str(path))
+    assert rows[0].close is None
+    assert rows[1].close == 0.0
+
+
+def test_column_order_does_not_matter(tmp_path: Path) -&gt; None:
+    path = _write(tmp_path, &quot;ticker,close,date\nAAA,41.5,2024-03-06\n&quot;)
+    assert read_csv(path) == [RawRow(date=&quot;2024-03-06&quot;, ticker=&quot;AAA&quot;, close=41.5)]
+
+
+def test_header_only_gives_no_rows(tmp_path: Path) -&gt; None:
+    assert read_csv(_write(tmp_path, &quot;date,ticker,close\n&quot;)) == []
+
+
+def test_missing_column_raises(tmp_path: Path) -&gt; None:
+    path = _write(tmp_path, &quot;date,ticker\n2024-03-04,AAA\n&quot;)
+    with pytest.raises(ValueError, match=&quot;close&quot;):
+        read_csv(path)
+
+
+@pytest.mark.parametrize(&quot;bad&quot;, [&quot;2024/03/04&quot;, &quot;04-03-2024&quot;, &quot;2024-02-30&quot;, &quot;20240304&quot;, &quot;&quot;])
+def test_malformed_date_raises(tmp_path: Path, bad: str) -&gt; None:
+    path = _write(tmp_path, f&quot;date,ticker,close\n{bad},AAA,40.4\n&quot;)
+    with pytest.raises(ValueError, match=&quot;malformed date&quot;):
+        read_csv(path)
+</pre><details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A1-r1/with_skill/project/.claude/worktrees/agent-a0192e9a9e1d07e52/tests/unit/mdata/test_io.py&quot;,
+  &quot;content&quot;: &quot;\&quot;\&quot;\&quot;Unit tests for mdata.io.read_csv (PL-01 step 1, DATA-01).\&quot;\&quot;\&quot;\n\nfrom __future__ import annotations\n\nfrom pathlib import Path\n\nimport pytest\n\nfrom mdata.io import read_csv\nfrom mdata.types import RawRow\n\n\ndef _write(tmp_path: Path, text: str) -&gt; Path:\n    path = tmp_path / \&quot;prices.csv\&quot;\n    path.write_text(text, encoding=\&quot;utf-8\&quot;)\n    return path\n\n\ndef test_rows_come_back_in_file_order(tmp_path: Path) -&gt; None:\n    path = _write(\n        tmp_path,\n        \&quot;date,ticker,close\\n2024-03-04,AAA,40.4\\n2024-03-01,AAA,40.0\\n2024-03-01,BBB,25.0\\n\&quot;,\n    )\n    assert read_csv(path) == [\n        RawRow(date=\&quot;2024-03-04\&quot;, ticker=\&quot;AAA\&quot;, close=40.4),\n        RawRow(date=\&quot;2024-03-01\&quot;, ticker=\&quot;AAA\&quot;, close=40.0),\n        RawRow(date=\&quot;2024-03-01\&quot;, ticker=\&quot;BBB\&quot;, close=25.0),\n    ]\n\n\ndef test_blank_close_is_none_not_zero(tmp_path: Path) -&gt; None:\n    path = _write(tmp_path, \&quot;date,ticker,close\\n2024-03-05,BBB,\\n2024-03-06,BBB,0\\n\&quot;)\n    rows = read_csv(str(path))\n    assert rows[0].close is None\n    assert rows[1].close == 0.0\n\n\ndef test_column_order_does_not_matter(tmp_path: Path) -&gt; None:\n    path = _write(tmp_path, \&quot;ticker,close,date\\nAAA,41.5,2024-03-06\\n\&quot;)\n    assert read_csv(path) == [RawRow(date=\&quot;2024-03-06\&quot;, ticker=\&quot;AAA\&quot;, close=41.5)]\n\n\ndef test_header_only_gives_no_rows(tmp_path: Path) -&gt; None:\n    assert read_csv(_write(tmp_path, \&quot;date,ticker,close\\n\&quot;)) == []\n\n\ndef test_missing_column_raises(tmp_path: Path) -&gt; None:\n    path = _write(tmp_path, \&quot;date,ticker\\n2024-03-04,AAA\\n\&quot;)\n    with pytest.raises(ValueError, match=\&quot;close\&quot;):\n        read_csv(path)\n\n\n@pytest.mark.parametrize(\&quot;bad\&quot;, [\&quot;2024/03/04\&quot;, \&quot;04-03-2024\&quot;, \&quot;2024-02-30\&quot;, \&quot;20240304\&quot;, \&quot;\&quot;])\ndef test_malformed_date_raises(tmp_path: Path, bad: str) -&gt; None:\n    path = _write(tmp_path, f\&quot;date,ticker,close\\n{bad},AAA,40.4\\n\&quot;)\n    with pytest.raises(ValueError, match=\&quot;malformed date\&quot;):\n        read_csv(path)\n&quot;
+}</pre><div class="lbl">output</div><pre>File created successfully at: /Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A1-r1/with_skill/project/.claude/worktrees/agent-a0192e9a9e1d07e52/tests/unit/mdata/test_io.py (file state is current in your context — no need to Read it back)</pre></details></div><div class="step" id="S13"><span class="sid">U12.S13</span><span class="kind">Bash</span>scripts/check.sh gate<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;scripts/check.sh gate&quot;,
+  &quot;description&quot;: &quot;Run the gate&quot;,
+  &quot;timeout&quot;: 600000
+}</pre><div class="lbl">output</div><pre>-&gt; ruff check --ignore-noqa .
+All checks passed!
+-&gt; ruff format --check .
+44 files already formatted
+-&gt; mypy
+Success: no issues found in 16 source files
+-&gt; python scripts/check_size.py packages/mdata/src packages/risk/src
+-&gt; deptry packages/mdata
+Scanning 6 files...
+
+Success! No dependency issues found.
+-&gt; deptry packages/risk
+Scanning 10 files...
+
+Success! No dependency issues found.
+-&gt; lint-imports --no-logo
+
+---------
+Contracts
+---------
+
+Analyzed 16 files, 27 dependencies.
+-----------------------------------
+
+Layers: risk &gt; mdata KEPT
+
+Contracts: 1 kept, 0 broken.
+-&gt; pytest tests/unit tests/contracts --no-cov -q -x
+....................                                                     [100%]
+20 passed in 0.03s
+-&gt; bash scripts/floor_guard.sh
+floor_guard: clean
+-&gt; protected files unchanged since refs/worktree/checks-base</pre></details></div><div class="step" id="S14"><span class="sid">U12.S14</span><span class="kind">say</span>DONE M1-T02 solo<details><summary>full text</summary><pre>DONE M1-T02 solo</pre></details></div>
+<h2>Commits</h2>
+<p>None.</p>
+<h2>Returned</h2>
+<pre>DONE M1-T02 solo</pre>
+</body></html>

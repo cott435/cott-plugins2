@@ -18,6 +18,11 @@
 **Verify:** `pytest tests/contracts` · `scripts/check.sh gate`
 **Depends on:** — · **Writes:** packages/mdata/src/mdata/__init__.py, packages/mdata/src/mdata/types.py, packages/mdata/src/mdata/io.py, packages/mdata/src/mdata/validate.py, packages/mdata/src/mdata/calendar.py, packages/mdata/src/mdata/pipeline.py, packages/risk/src/risk/__init__.py, packages/risk/src/risk/types.py, packages/risk/src/risk/returns.py, packages/risk/src/risk/vol.py, packages/risk/src/risk/annualize.py, packages/risk/src/risk/summary.py, packages/risk/src/risk/drawdown.py, packages/risk/src/risk/report.py, packages/risk/src/risk/vol_pipeline.py, packages/risk/src/risk/report_pipeline.py, tests/contracts/**
 
+### Checkpoint after M1-T01 (barrier)
+- [ ] The interface code is the contract: types, signatures, stubs, samples, fakes and exports match contract.md, no more and no less
+- [ ] Every split task's tester can write its tests from what is frozen
+- [ ] `scripts/check.sh full` passes; Review checklist done; every finding has a disposition
+
 ## Phase 1: Step spines
 
 ### M1-T02: read_csv spine (read every row)
@@ -205,7 +210,7 @@
 - [ ] `risk.risk_report` runs PL-03 → PL-02 → PL-01 on a CSV with no fakes; the fakes are used only by smoke and contract tests
 - [ ] All smoke tests and TC-01–TC-08 pass
 **Verify:** `pytest tests/unit/mdata/test_pl01_smoke.py` · `pytest tests/unit/risk/test_pl02_smoke.py` · `pytest tests/unit/risk/test_pl03_smoke.py` · `pytest tests` · `scripts/check.sh full --exit`
-**Depends on:** M1-T11, M1-T12, M1-T13, M1-T14, M1-T15, M1-T16, M1-T17, M1-T18, M1-T19, M1-T20 · **Writes:** packages/risk/src/risk/report_pipeline.py, tests/system/test_e2e.py
+**Depends on:** M1-T11, M1-T12, M1-T13, M1-T14, M1-T15, M1-T16, M1-T17, M1-T18, M1-T19, M1-T20 · **Writes:** packages/risk/src/risk/report_pipeline.py, tests/system/test_e2e.py, tests/unit/risk/test_risk_report.py
 
 ### Checkpoint: milestone exit
 - [ ] Every pipeline in the milestone runs end to end (smoke commands)

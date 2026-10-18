@@ -13,4 +13,8 @@ SAMPLE = Path(__file__).resolve().parent.parent / "mdata.Prices" / "sample.json"
 def load_prices(path: object = None, tickers: object = None) -> Prices:
     data = json.loads(SAMPLE.read_text())
     names = tuple(tickers) if tickers else tuple(data["tickers"])
-    return Prices(dates=tuple(data["dates"]), tickers=names, closes={t: tuple(data["closes"][t]) for t in names})
+    return Prices(
+        dates=tuple(data["dates"]),
+        tickers=names,
+        closes={t: tuple(data["closes"][t]) for t in names},
+    )

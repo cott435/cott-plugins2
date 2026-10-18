@@ -12,8 +12,13 @@ from .types import Report
 from .vol_pipeline import vol_series
 
 
-def risk_report(path: str | Path, out_path: str | Path, *, window: int = 20,
-                tickers: Sequence[str] | None = None) -> Report:
+def risk_report(
+    path: str | Path,
+    out_path: str | Path,
+    *,
+    window: int = 20,
+    tickers: Sequence[str] | None = None,
+) -> Report:
     """Per-ticker return, volatility, Sharpe and drawdown of a prices CSV, written to `out_path`."""
     vol = vol_series(path, window=window, tickers=tickers)
     summary = summary_stats(vol)

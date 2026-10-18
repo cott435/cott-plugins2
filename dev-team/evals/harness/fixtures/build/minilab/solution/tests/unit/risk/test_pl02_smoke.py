@@ -6,7 +6,9 @@ from risk.types import VolSeries
 
 
 def test_pl02_runs_end_to_end_on_the_fake(monkeypatch, contract_fake):
-    monkeypatch.setattr(mdata, "load_prices", contract_fake("mdata.load_prices").load_prices, raising=False)
+    monkeypatch.setattr(
+        mdata, "load_prices", contract_fake("mdata.load_prices").load_prices, raising=False
+    )
     v = risk.vol_pipeline.vol_series("unused.csv", window=2)
     assert isinstance(v, VolSeries)
     assert v.window == 2

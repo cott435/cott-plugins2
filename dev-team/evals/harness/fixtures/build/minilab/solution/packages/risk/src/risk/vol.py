@@ -14,5 +14,7 @@ def rolling_vol(returns: Returns, window: int) -> VolSeries:
     values = {}
     for t in returns.tickers:
         r = returns.values[t]
-        values[t] = tuple(None if i < window else statistics.stdev(r[i - window : i]) for i in range(len(r)))
+        values[t] = tuple(
+            None if i < window else statistics.stdev(r[i - window : i]) for i in range(len(r))
+        )
     return VolSeries(returns=returns, window=window, annualized=False, values=values)

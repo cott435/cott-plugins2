@@ -1,6 +1,7 @@
 """M1 validate thicken · TC-01 (DATA-02)."""
 
 import pytest
+
 from mdata.types import RawRow
 from mdata.validate import validate_rows
 

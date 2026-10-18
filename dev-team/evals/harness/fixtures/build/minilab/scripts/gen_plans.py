@@ -1,12 +1,25 @@
 #!/usr/bin/env python3
-"""Write plan-interface/tasks/{plan.md,todo.md}: minilab's M1 cut interface-first (§5–§6 of
-dev-team/design/interface-first-design.md). Kept as a generator so the 21 tasks and their graph rows stay
-consistent; the output is hand-checked and committed, and `--check` fails if it drifts.
+"""Write minilab's plan variants, so they stay in step: `python3 gen_plans.py [--check]`.
+
+- plan-interface/: M1 cut interface-first (§5–§6 of dev-team/design/interface-first-design.md), 21 tasks, a
+  barrier checkpoint after the interface task and one at each phase end.
+- plan-interface-solo/ (arm A4): the same tasks, every Mode solo with a `**Reason:** mode:` line, each intent
+  test moved under tests/unit/ (`tests/unit/<pkg>/test_<step>_golden.py`).
+- plan-interface-pertask/ (arm A3-RT): the same tasks, a (non-barrier) checkpoint after every task.
+- plan-spine/: plan-spine/legacy/ (the M1 cut the way build-planning did before interface-first) converted for
+  the build: `Files likely` becomes `Writes` (the files each task writes, from replay.json; a split task's
+  tests/intent/ path added), `Kind` (the contract task and the three pipeline spines `interface`, which they are:
+  they create and freeze the step modules) and a barrier checkpoint after the contract task added, `Parallel` removed,
+  and a `## Dependency graph` row per `Depends on` so `dt lint` reads the order as declared; nothing else moves.
+
+The output is hand-checked and committed; `--check` fails if any file drifts.
 """
+import json
 import pathlib
+import re
 import sys
 
-OUT = pathlib.Path(__file__).resolve().parents[1] / "plan-interface" / "tasks"
+FIX = pathlib.Path(__file__).resolve().parents[1]
 M, R = "packages/mdata/src/mdata", "packages/risk/src/risk"
 
 # step: (task, pipeline, step, owner module, unit test, spine title, read, covers)
@@ -70,6 +83,12 @@ INTERFACE_WRITES = [f"{M}/{f}" for f in ("__init__.py", "types.py", "io.py", "va
 INTERFACE_READ = ("PL-01, PL-02, PL-03, mdata.RawRow, mdata.Prices, mdata.GapError, risk.Returns, risk.VolSeries, "
                   "risk.TickerSummary, risk.Drawdown, risk.Report, mdata.load_prices, risk.vol_series")
 
+BARRIER = """- [ ] The interface code is the contract: types, signatures, stubs, samples, fakes and exports match contract.md, no more and no less
+- [ ] Every split task's tester can write its tests from what is frozen
+- [ ] `scripts/check.sh full` passes; Review checklist done; every finding has a disposition"""
+PER_TASK = """- [ ] The task's acceptance holds; its tests prove it (mutation-checked)
+- [ ] `scripts/check.sh full` passes; Review checklist done; every finding has a disposition"""
+SOLO_REASON = "mode: arm A4, one builder writes the golden-case tests and the code"
 CHECKPOINT = """- [ ] Every pipeline in the milestone runs end to end (smoke commands)
 - [ ] Every stub names an open task (`scripts/check.sh gate`)
 - [ ] Entry functions still read top to bottom as the step table says (Sync if not)
@@ -77,27 +96,45 @@ CHECKPOINT = """- [ ] Every pipeline in the milestone runs end to end (smoke com
 - [ ] `scripts/check.sh full` passes; Review checklist done; every finding has a disposition"""
 
 
+def solo_golden(intent):
+    """Where a solo thicken writes its golden-case tests: tests/intent/risk/test_vol.py → tests/unit/risk/test_vol_golden.py."""
+    return intent.replace("tests/intent/", "tests/unit/", 1).removesuffix(".py") + "_golden.py"
+
+
 def pkg_of(path):
     return "mdata" if "/mdata/" in path else "risk"
 
 
-def task(tid, title, pkg, step, kind, size, mode, read, acceptance, verify, depends, writes, covers=""):
+def task(tid, title, pkg, step, kind, size, mode, read, acceptance, verify, depends, writes, covers="", reason=""):
     head = f"**Package:** {pkg} · **Step:** {step} · **Kind:** {kind}" + (f" · **Covers:** {covers}" if covers else "")
-    lines = [f"### M1-{tid}: {title}", f"{head} · **Size:** {size} · **Mode:** {mode}", f"**Read:** {read}",
+    lines = [f"### M1-{tid}: {title}", f"{head} · **Size:** {size} · **Mode:** {mode}",
+             *([f"**Reason:** {reason}"] if reason else []), f"**Read:** {read}",
              "**Acceptance:**", *[f"- [ ] {a}" for a in acceptance], f"**Verify:** {verify}",
              f"**Depends on:** {', '.join('M1-' + d for d in depends) or '—'} · **Writes:** {', '.join(writes)}", ""]
     return lines, (tid, title, pkg, size, mode)
 
 
-def build():
+def checkpoint(after, items, barrier=False):
+    return [f"### Checkpoint after M1-{after}" + (" (barrier)" if barrier else ""), items, ""]
+
+
+def build(variant="interface"):
+    """plan.md and todo.md of one interface-first variant: interface, solo or pertask."""
     body, todo, graph = [], [], []
-    add = lambda lines_meta: (body.extend(lines_meta[0]), todo.append(lines_meta[1]))
+
+    def add(lines_meta):
+        body.extend(lines_meta[0])
+        todo.append(lines_meta[1])
+        tid = lines_meta[1][0]
+        if variant == "pertask" and tid != "T01":
+            body.extend(checkpoint(tid, PER_TASK))
     body += ["## Phase 0: Interface", ""]
     add(task("T01", "Freeze the M1 interfaces", "mdata", "contract", "interface", "M", "solo", INTERFACE_READ,
              ["Boundary types in `mdata/types.py` and `risk/types.py`, one sample each under `tests/contracts/<pkg>.<Type>/`",
               "Every M1 step and entry signature in its owner module, body `raise NotImplementedError(\"<task>\")` naming the task that replaces it",
               "`mdata.load_prices` and `risk.vol_series` fakes backed by the samples; `__init__` exports"],
              "`pytest tests/contracts` · `scripts/check.sh gate`", [], INTERFACE_WRITES))
+    body += checkpoint("T01", BARRIER, barrier=True)
     body += ["## Phase 1: Step spines", ""]
     for tid, pl, step, mod, unit, spine, read, covers in STEPS:
         sample = SPINE_IN.get(tid)
@@ -108,7 +145,9 @@ def build():
         for src in SPINE_FROM.get(tid, []):
             sym = SPINE_SAMPLE.get((tid, src), sample)
             graph.append((tid, f"{step} spine", src, f"{STEP_OF[src][2]} spine", "data", f"{sym} sample (M1-T01)"))
-    body += ["### Checkpoint after M1-T10", CHECKPOINT, "", "## Phase 2: Wiring", ""]
+    if variant != "pertask":
+        body += checkpoint("T10", CHECKPOINT)
+    body += ["## Phase 2: Wiring", ""]
     for tid, pl, pkg, entry, smoke, spines, call in WIRING:
         fake = f" on the {call[1]} fake" if call else ""
         acc = [f"`pytest {smoke}` runs {pl} end to end{fake}", f"{pl} entry sketch replaced by a `dt layout` pointer"]
@@ -125,10 +164,18 @@ def build():
         _, pl, step, mod, unit, _, read, _ = STEP_OF[spine_t]
         reads = ", ".join(x for x in read.split(", ") if x not in ("DATA-01", "REP-01"))
         rf = ", RF-01" if tid in ("T17", "T18", "T19", "T20") else ""
-        add(task(tid, title, pkg_of(mod), f"{pl}.{step}", "thicken", "S", "split", f"{reads}, {tcs}, {covers}{rf}",
-                 acc, f"`pytest {intent} {unit}` · `scripts/check.sh gate`", [spine_t], [mod, intent, unit], covers))
+        if variant == "solo":
+            golden = solo_golden(intent)
+            add(task(tid, title, pkg_of(mod), f"{pl}.{step}", "thicken", "S", "solo", f"{reads}, {tcs}, {covers}{rf}",
+                     acc, f"`pytest {golden} {unit}` · `scripts/check.sh gate`", [spine_t], [mod, golden, unit],
+                     covers, SOLO_REASON))
+        else:
+            add(task(tid, title, pkg_of(mod), f"{pl}.{step}", "thicken", "S", "split", f"{reads}, {tcs}, {covers}{rf}",
+                     acc, f"`pytest {intent} {unit}` · `scripts/check.sh gate`", [spine_t], [mod, intent, unit], covers))
         graph.append((tid, title.lower(), spine_t, f"{step} spine", "code", "none: thickens the same module"))
-    body += ["### Checkpoint after M1-T20", CHECKPOINT, "", "## Phase 3: System", ""]
+    if variant != "pertask":
+        body += checkpoint("T20", CHECKPOINT)
+    body += ["## Phase 3: System", ""]
     deps = ["T11", "T12", "T13"] + [t[0] for t in THICKEN]
     add(task("T21", "Risk report on the real pipelines", "mdata", "PL-03", "system", "S", "solo",
              "PL-01, PL-02, PL-03, TC-01, TC-02, TC-03, TC-04, TC-05, TC-06, TC-07, TC-08, mdata.load_prices, risk.vol_series, risk.risk_report",
@@ -136,13 +183,16 @@ def build():
               "All smoke tests and TC-01–TC-08 pass"],
              "`pytest tests/unit/mdata/test_pl01_smoke.py` · `pytest tests/unit/risk/test_pl02_smoke.py` · "
              "`pytest tests/unit/risk/test_pl03_smoke.py` · "
-             "`pytest tests` · `scripts/check.sh full --exit`", deps, [f"{R}/report_pipeline.py", "tests/system/test_e2e.py"]))
+             "`pytest tests` · `scripts/check.sh full --exit`", deps,
+             [f"{R}/report_pipeline.py", "tests/system/test_e2e.py", "tests/unit/risk/test_risk_report.py"]))
     for d in deps[:3]:
         graph.append(("T21", "system", d, f"wire {[w for w in WIRING if w[0] == d][0][1]}", "code",
                       "none: runs the real pipeline end to end, no fakes"))
     for d in deps[3:]:
         graph.append(("T21", "system", d, [t for t in THICKEN if t[0] == d][0][2].lower(), "order",
                       "none: the golden cases run on the finished steps"))
+    if variant == "pertask":
+        body = body[:-3]                     # the last task's checkpoint is the milestone exit
     body += ["### Checkpoint: milestone exit",
              "- [ ] Every pipeline in the milestone runs end to end (smoke commands)",
              "- [ ] All golden cases pass; no `NotImplementedError` stub is left (`scripts/check.sh full --exit`)",
@@ -162,13 +212,71 @@ def build():
     return {"plan.md": plan, "todo.md": todo_md}
 
 
+# ---- plan-spine, converted ----------------------------------------------------------------------------
+
+# The legacy pipeline spines create and freeze their step modules (and write types.py, __init__.py and the entry
+# modules), as an interface task does; marked spine, dt would release the thickens' testers before the modules
+# they import exist.
+SPINE_KIND = {"M1-T01": "interface", "M1-T02": "interface", "M1-T03": "interface", "M1-T04": "interface",
+              "M1-T05": "system"}
+SPINE_EDGE = {("M1-T04", "M1-T03"): ("call", "none: integration: PL-03's spine runs on PL-02 as built"),
+              ("M1-T05", "M1-T02"): ("code", "none: swaps the load_prices fake for the real PL-01"),
+              ("M1-T05", "M1-T04"): ("code", "none: runs PL-03 → PL-02 → PL-01 end to end")}
+
+
+SPINE_UNIT = {"M1-T05": ["tests/unit/risk/test_risk_report.py"]}     # a system task writes unit tests too
+
+
+def spine_writes(tid, likely):
+    """`Files likely`, plus every file the task writes (replay.json), plus a split task's intent test."""
+    m = json.loads((FIX / "replay.json").read_text())["plan-spine"][tid]
+    files = likely + [f.split("@")[0] for f in m["files"] + m.get("tester", [])] + SPINE_UNIT.get(tid, [])
+    return list(dict.fromkeys(files))
+
+
+def convert_spine():
+    """plan-spine/legacy/ → plan-spine/tasks/: see the module docstring."""
+    src = (FIX / "plan-spine" / "legacy" / "plan.md").read_text()
+    blocks = re.split(r"(?m)^(?=### M1-T\d+:)", src)
+    out, edges = [blocks[0]], []
+    for b in blocks[1:]:
+        tid = re.match(r"### (M1-T\d+):", b).group(1)
+        title = b.splitlines()[0].split(": ", 1)[1]
+        kind = SPINE_KIND.get(tid, "thicken")
+        b = re.sub(r"(\*\*Step:\*\* [^·\n]+?) ·", rf"\1 · **Kind:** {kind} ·", b, count=1)
+        b = re.sub(r" · \*\*Parallel:\*\* G\d+", "", b)
+        likely = [f.strip() for f in re.search(r"\*\*Files likely:\*\* ([^\n]*)", b).group(1).split(",")]
+        b = re.sub(r"\*\*Files likely:\*\* [^\n]*", "**Writes:** " + ", ".join(spine_writes(tid, likely)), b)
+        deps = re.findall(r"M1-T\d+", re.search(r"\*\*Depends on:\*\* ([^·\n]*)", b).group(1))
+        for d in deps:
+            if SPINE_KIND.get(d) == "interface":
+                continue
+            k, why = SPINE_EDGE.get((tid, d), ("code", "none: thickens the step the spine built"))
+            edges.append(f"| {tid} {title.lower()} | {d} | {k} | {why} |")
+        if tid == "M1-T01":
+            b = b.rstrip("\n") + "\n\n" + "\n".join(checkpoint("T01", BARRIER, barrier=True)) + "\n"
+        out.append(b)
+    plan = "".join(out)
+    graph = ["## Dependency graph", "| From | To | Kind | Mitigated by |", "|---|---|---|---|", *edges, ""]
+    plan = plan.replace("## Risks\n", "\n".join(graph) + "\n## Risks\n", 1)
+    return {"plan.md": plan, "todo.md": (FIX / "plan-spine" / "legacy" / "todo.md").read_text()}
+
+
+def outputs():
+    return {"plan-interface": build("interface"), "plan-interface-solo": build("solo"),
+            "plan-interface-pertask": build("pertask"), "plan-spine": convert_spine()}
+
+
 if __name__ == "__main__":
-    files = build()
+    files = outputs()
     if "--check" in sys.argv:
-        bad = [n for n, t in files.items() if (OUT / n).read_text() != t]
+        bad = [f"{v}/{n}" for v, fs in files.items() for n, t in fs.items()
+               if not (FIX / v / "tasks" / n).exists() or (FIX / v / "tasks" / n).read_text() != t]
         print("\n".join(f"differs: {b}" for b in bad) or "ok")
         sys.exit(1 if bad else 0)
-    OUT.mkdir(parents=True, exist_ok=True)
-    for n, t in files.items():
-        (OUT / n).write_text(t)
-    print(f"wrote {', '.join(files)} to {OUT}")
+    for v, fs in files.items():
+        out = FIX / v / "tasks"
+        out.mkdir(parents=True, exist_ok=True)
+        for n, t in fs.items():
+            (out / n).write_text(t)
+    print(f"wrote {', '.join(files)}")

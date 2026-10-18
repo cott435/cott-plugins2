@@ -2,7 +2,8 @@
 """The plan map's data: `<run>/flow/plan.json` (schema `plan-map/2`), one plan snapshot per turn that changed the plan
 (design/interface-first-design.md §8.2–8.3). workflow-analyzer's `planmap.write` draws it.
 
-For each `turn N` commit of the run's project (driver.py commits one per turn), a turn whose commit leaves `docs/`
+For each `turn N` commit of the run's project (driver.py commits one per turn; build_driver.py chains them on
+`refs/eval/turns`, off the build branch), a turn whose commit leaves `docs/`
 and `tasks/` as they were is recorded as `{"turn": N, "same_as": <last changed turn>}`. Any other turn's snapshot
 comes from, in order:
 1. the snapshot driver.py kept right after that turn (`<run>/plans/T<nnn>.json`, when its commit matches);
@@ -125,8 +126,12 @@ def git(proj, *a, **kw):
     return subprocess.run(["git", *a], cwd=proj, capture_output=True, **kw)
 
 
+TURNS_REF = "refs/eval/turns"   # build runs: build_driver.py chains its turn commits here, off the build branch
+
+
 def turn_commits(proj):
-    out = git(proj, "log", "--reverse", "--format=%H%x09%cI%x09%s", text=True).stdout
+    ref = TURNS_REF if git(proj, "rev-parse", "-q", "--verify", TURNS_REF).returncode == 0 else "HEAD"
+    out = git(proj, "log", "--reverse", "--format=%H%x09%cI%x09%s", ref, text=True).stdout
     res = []
     for line in out.splitlines():
         sha, ts, subj = (line.split("\t", 2) + ["", ""])[:3]

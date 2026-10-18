@@ -1,57 +1,49 @@
 # Build evals
 
-Do interface-first plans build faster and more correctly, and which part earns it: parallel dispatch, interface-first, or test-driven design? One fixed project, [minilab](fixtures/build/minilab/README.md), is built in several arms and graded deterministically. Design: [interface-first-design.md](../../design/interface-first-design.md) §9.2–§9.4. Nothing here has been run against a real model yet.
+Do interface-first plans build faster and more correctly, and which part earns it: parallel dispatch, interface-first, or test-driven design? One fixed project, [minilab](fixtures/build/minilab/README.md), is built in several arms and graded deterministically. Design: [interface-first-design.md](../../design/interface-first-design.md) §9.2–§9.4 and §12, [build-phase.md](../../design/build-phase.md) §15.
 
 ## Arms (`scenarios.json` → `arms`)
 
-| Arm | Plan | Dispatch | TDD | Isolates |
-|---|---|---|---|---|
-| A0 | interface | serial, one agent, no subagents | solo | floor; with/without-design Δ |
-| A1 | interface | serial orchestrator, one builder at a time | split | parallel dispatch (vs A3) |
-| A2 | spine (today) | `Parallel:` groups, worktrees + merge + check agent | split | interface-first (vs A3) |
-| A3 | interface | waves from `dt ready`, worktrees + merge + check agent | split | the proposal |
-| A4 | interface | as A3 | solo (Mode overridden) | TDD (vs A3) |
-| A5 (optional) | spine | serial | split | plan × dispatch interaction |
+Every arm but A0 runs dev-team's `build` skill (Run mode) in one headless session, with the go in the opening prompt.
 
-Each arm's prompt is `build_common_prompt` (commit convention, gates, who writes `tasks/`, oracle and contract-change rules, checkpoints) plus the arm's own text. Parallel arms run one workflow per checkpoint segment (`CLAUDE_CODE_WORKFLOWS=1`); serial arms set `CLAUDE_CODE_DISABLE_BACKGROUND_TASKS=1`.
+| Arm | Plan | Dispatch | Isolates |
+|---|---|---|---|
+| A0 | `plan-interface` | one session, no subagents, plan order: `dt context`, `check.sh collect`/`gate`, `dt tick`, a commit with a `Dt-Landed:` trailer | the floor; with/without-design Δ |
+| A1 | `plan-interface` | build skill, `--cap 1` | parallel dispatch (vs A3) |
+| A2 | `plan-spine` (the legacy cut converted for dt) | build skill, cap 6 | interface-first (vs A3) |
+| A3 | `plan-interface` | build skill, cap 6 | the proposal |
+| A4 | `plan-interface-solo` (every task solo) | build skill, cap 6 | TDD (vs A3) |
+| A3-RT | `plan-interface-pertask` (a checkpoint after every task) | build skill, cap 6 | per-task vs per-phase review |
+| A3-WF | `plan-interface` | `dt build workflow M1` (not built yet) | a generated workflow vs the main-session driver |
 
-## Files
+## How a run goes (`build_driver.py <target> <arm> <out>`)
 
-| File | What it does |
+1. Stage the plugin into `<out>/plugin/`; make the project with the staged plugin's build-setup templates (`fixtures/build/minilab/scripts/make_live.py`: the real bar, the arm's plan, `dt base`).
+2. One session, resumed at each stop: `claude -p --plugin-dir <plugin> --add-dir <plugin> --agents <rendered agents, hooks included> --allowedTools <rendered allow rules> --permission-mode acceptEdits --output-format stream-json`, every model `AGENT_MODEL`. A turn's outcome is its last `result` event.
+3. A scripted persona answers each stop from the project's state: a CONTRACT-CHANGE gets a yes, architecture-design Revise, build-planning Replan, then the go; a TEST-WRONG gets `--test-stands`; a Critical is resolved; a blocked half is retried once; the exit is approved with no fix tasks (Important findings counted) and no merge.
+4. After each turn the tree at HEAD is chained as `turn N` on `refs/eval/turns` (the plan map's snapshots); build/M1 is never touched by the driver.
+5. The run ends at the exit, the turn budget, or three turns with nothing new in `log.jsonl` or git. Then `runviz.py --run` (flow and plan map), `grade_build.py`, and the flow again with the checks.
+
+## What the grader reads (`grade_build.py <run>`)
+
+| Source | Gives |
 |---|---|
-| `build_driver.py <target> <arm> <out>` | Copies the fixture's `project/` and the arm's plan, stages the plugin, re-renders tester/implementer/reviewer from the staged build-setup templates, passes all agents with `--agents`, runs the orchestrator session turn by turn with the deterministic build persona, commits `turn N`, then draws the flow, grades and redraws |
-| `grade_build.py <run>` | Every §9.2 metric into `grading.json` (expectations with a `category`, `summary` over design checks, `harness_summary` apart) |
-| `dryrun_build.py [out]` | Fixture checks, a good replay of every arm from `solution/`, and five bad replays the grader must catch |
-| `run_build.sh <iteration> [target] [arm …]` | Arms one at a time, order rotated per replicate (`REPLICATES`, default 3); writes `build_summary.json` |
-| `permission_mcp.py` | `EVALPERM_POLICY=deny-oracle`: denies writes under `tests/fixtures/` and logs each decision (default `allow` keeps planning as it was) |
-| `fake_claude.py` | `FAKE_MODE=build`: each turn replays the next checkpoint segment, so the whole loop runs for free |
+| `Dt-Landed:` trailers on build/M1's first parent and on `dt/<task>-tests` | tasks and roles landed, each landing's diff (A0 writes its own trailers: weaker evidence) |
+| `.git/dt-build/log.jsonl` | concurrency (claims in flight, claim → finished), rejects by kind (`conflict`, `writes`, `integration`, `gate`, `harness`) with their detail files, escalations, resolves, reviews |
+| each tester landing's tree | red for the right reason, the intent tests run there |
+| stream `permission_denials`, subagent transcripts | protected-test edit attempts (with `writes` rejects on protected paths) |
+| `oracle/`, `holdout/`, `mutants/` | golden pass rates, planted beliefs caught, mutant kill rate (pytest in the project's venv) |
+| stream `result` events, `flow/index.json` | wall clock, cost, tokens per role |
 
-## Conventions the grader reads
-
-- **Commits:** `M1-T05 tester: …`, `M1-T05 implementer: …`, `M1-T05 solo: …`, `M1-T22 interface: …` for builders; `dt: …` (ticks, replans, findings) and `merge M1-T05: <branch>` for the orchestrator. Builder branches are `worktree-*`.
-- **Gates:** `scripts/check.sh collect|gate --task <id>` appends a verdict to `.dt/gates/<id>.json` in the main checkout.
-- **Plan at turn 0** is the plan graded for graph facts and claims; the final plan adds replanned tasks (the contract change).
-
-## Checks (`grading.json` ids)
-
-| Category | Checks |
-|---|---|
-| efficiency | `wall_clock`, `achieved_concurrency` (units' time overlap, else git commit spans); `extra.efficiency`: agent time, per-role units and tokens, parallel efficiency, planned vs achieved rounds |
-| integration | `merge_conflicts` (`git merge-tree --write-tree` per recorded branch), `writes_respected` (advisory for `Files likely` plans), `builders_never_edit_tasks`, `no_rework`, `integration_failures` (failed wiring/system gates), `interface_changes` (≤ 1, classed missing field / wrong type / wrong boundary), `planted_flaw_contract_change` |
-| correctness | `golden_visible_pass_rate`, `holdout_pass_rate` (the grader's own runs), `planted_beliefs_caught` (0–3), `oracle_unchanged` |
-| tdd | `mutant_kill_rate` (final suite on `solution/` + each mutant), `suite_agrees_with_solution`, `red_right_reason` (each tester commit run on its own tree: AssertionError, NotImplementedError or DID NOT RAISE), `red_import_errors`, `split_tester_first`, `protected_edits_landed`, `protected_edit_attempts` |
-| process | `gates_pass`, `milestone_built`, `no_stub_left`; `extra.process`: escalations, human interventions, checkpoint findings |
-| harness | `agent_errors`, `worktrees_merged`, `gates_recorded`, `work_committed_by_agents`, `flow_drawn` (never counted against the design) |
-
-Cross-arm effects (A3 wall ≤ 0.5 × A1, …) are read from `build_summary.json`, not graded per run.
+Checks per category: efficiency `wall_clock`, `achieved_concurrency`; integration `merge_conflicts`, `writes_respected`, `builders_never_edit_tasks`, `integration_failures`, `interface_changes` (≤ 1), `planted_flaw_contract_change`; correctness `golden_visible_pass_rate`, `holdout_pass_rate`, `planted_beliefs_caught`, `oracle_unchanged`; tdd `mutant_kill_rate`, `suite_agrees_with_solution`, `red_right_reason`, `red_import_errors`, `split_tester_first`, `protected_edits_landed`, `protected_edit_attempts`; process `milestone_built`, `gates_pass`, `no_stub_left`; harness `agent_errors`, `harness_rejects`, `main_checkout_clean`, `flow_drawn` (never counted against the design). Cross-arm effects (A3 wall ≤ 0.5 × A1, …) are read from `build_summary.json`.
 
 ## Running
 
 ```bash
-python3 evals/harness/dryrun_build.py                     # free: fixture, 6 good replays, 5 bad replays caught
+python3 evals/harness/dryrun_build.py                     # free: fixture and real-bar checks, every arm's good replay through the real dt, 5 bad replays caught
 CLAUDE_BIN=$PWD/evals/harness/fake_claude.py FAKE_MODE=build \
   python3 evals/harness/build_driver.py minilab A3 /tmp/b/minilab-A3-r1/with_skill   # free: the driver loop
-evals/harness/run_build.sh iteration-b1 minilab A0 A3      # real: stage 4 (n=3 unless REPLICATES=1)
+REPLICATES=1 evals/harness/run_build.sh iteration-b1 minilab A0 A1 A3      # real: stage 4
 ```
 
-Env: `AGENT_MODEL` (pinned; the Claude Code version is recorded), `COST_CAP_USD` (per run, default none), `MAX_TURNS` (target's, 12), `TURN_TIMEOUT` (5400 s), `PRESSURE=1`.
+Env: `AGENT_MODEL` (pinned for every agent; the Claude Code version is recorded), `MAX_TURNS` (target's, 12), `TURN_TIMEOUT` (5400 s), `PRESSURE=1`, `REPLICATES`, `FIRST_REPLICATE`. No cost cap. Pages and gradings are copied into `evals/results-<iteration>/`.

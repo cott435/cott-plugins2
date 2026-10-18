@@ -194,8 +194,10 @@
   "minilab": {
    "fixture": "fixtures/build/minilab",
    "plans": {
+    "interface": "plan-interface",
     "spine": "plan-spine",
-    "interface": "plan-interface"
+    "interface-solo": "plan-interface-solo",
+    "interface-pertask": "plan-interface-pertask"
    },
    "milestone": "M1",
    "max_turns": 12,
@@ -203,71 +205,101 @@
    "about": "prices \u2192 returns \u2192 rolling vol \u2192 report; 2 packages, 3 pipelines, 9 owned steps (+2 call steps), 8 golden + 6 holdout cases, 16 mutants"
   }
  },
- "build_common_prompt": "You are the build orchestrator for milestone M1 of this project. Planning is done and approved: tasks/plan.md is the plan, tasks/todo.md its checklist, CONSTRAINTS.md the bar, `dt context <task>` each task's packet (pass it to builders verbatim, never paraphrased). `dt` means `python3 {dt}`.\nRules for every arm:\n- Commits: every builder commit starts with its task id and role, `M1-T05 tester: \u2026`, `M1-T05 implementer: \u2026` or `M1-T05 solo: \u2026`; one task per commit. Your own commits start `dt:` (ticks, findings, replans); merges are `merge M1-T05: <branch>`.\n- Only you write tasks/ (`dt tick <task>` after a task's gate passes, `dt finding` at checkpoints). Builders never tick todo.md or write findings.\n- Gates: a tester finishes on `scripts/check.sh collect --task <id>`, an implementer or solo builder on `scripts/check.sh gate --task <id>`. Before each builder starts, run `git update-ref refs/checks/base HEAD` in the checkout it works in.\n- A builder edits only its task's `Writes:` (or `Files likely`) and, as tester, only tests/intent/. The golden cases in tests/fixtures/ are the oracle: never edit them; if one looks wrong, stop and tell me which and why.\n- A frozen type or contract (tests/contracts/, types.py) that can't express a requirement is a contract change: stop, revise the contract section with architecture-design, then a new interface task re-freezes it. Never edit a frozen interface inside another task.\n- Checkpoints: when you reach a `### Checkpoint` in the plan, have the reviewer agent review the diff since the last checkpoint, record findings with `dt finding`, tick the checkpoint's boxes, then stop and report the checkpoint to me; I approve before the next segment.",
+ "build_common_prompt": "This project's planning is done and approved: tasks/plan.md is milestone M1's plan, CONSTRAINTS.md the bar. `dt` means `python3 {dt}`.",
  "arms": {
   "A0": {
    "plan": "interface",
-   "dispatch": "serial",
-   "tdd": "solo",
-   "isolates": "floor; with/without-design delta",
+   "dispatch": "session",
+   "tdd": "serial",
+   "cap": 1,
+   "isolates": "floor: one session, no subagents (agent-skills `/build auto`-like); with/without-design delta",
    "env": {
     "CLAUDE_CODE_DISABLE_BACKGROUND_TASKS": "1"
    },
-   "prompt": "Arm A0: build alone, serially, in plan order, like agent-skills' `/build auto`: no subagents and no workflows. For each task: `dt context <task>`, write its tests and its code yourself (every task solo, whatever its Mode; tests/intent/ is protected from a solo builder, so a split task's golden-case tests go in its tests/unit/ file), run `scripts/check.sh gate --task <id>`, commit as `<id> solo: \u2026`, `dt tick`."
+   "extra_allow": [
+    "Bash(git add:*)",
+    "Bash(git commit:*)",
+    "Bash(git update-ref:*)"
+   ],
+   "disallow": [
+    "Agent",
+    "Task",
+    "Workflow"
+   ],
+   "prompt": "Arm A0: build M1 yourself in this one session, in plan order: no subagents, no workflows, no build skill. Start with `dt build start M1` (it creates build/M1, where you commit). Then for each task in tasks/plan.md order (re-read the plan after any Replan):\n1. `dt context <task>` and read it in full; `git update-ref refs/worktree/checks-base HEAD`.\n2. A split task: write its intent tests (its `Writes:` under tests/intent/) first, without the code; `scripts/check.sh collect` must pass (red for the right reason); commit them with the message `<task>: tests` and the trailer line `Dt-Landed: <task> tester`; `git update-ref refs/worktree/checks-base HEAD`.\n3. Write the rest of its `Writes:` and nothing else; `scripts/check.sh gate --pkg <its Package>` must pass; `dt tick <task>`; commit everything with the message `<task>: <title>` and the trailer line `Dt-Landed: <task> <implementer for a split task, else solo>`.\nA re-freeze interface task names frozen contract folders in its `Writes:`: list them in `.claude/.task_writes`, one per line, before its gate, and delete the file after. One git command per Bash call. When every task is ticked, report and ask me before merging build/M1."
   },
   "A1": {
    "plan": "interface",
-   "dispatch": "serial",
+   "dispatch": "build",
    "tdd": "split",
+   "cap": 1,
    "isolates": "parallel dispatch (vs A3)",
-   "env": {
-    "CLAUDE_CODE_DISABLE_BACKGROUND_TASKS": "1"
-   },
-   "prompt": "Arm A1: orchestrate serially, one builder at a time, in plan order, in this checkout (no worktrees, no parallel agents). For a split task launch the tester agent (Agent tool, subagent_type tester) with the packet, check its gate and commit, then the implementer agent; for a solo task the implementer agent alone. After each builder run the check agent; then `dt tick`."
+   "env": {},
+   "prompt": "Build milestone M1 with the dev-team build skill (Run mode). The plan and the bar are approved, and this is my go: build M1 now, at a concurrency cap of {cap}. Run on your own until a stop or the milestone exit; when the exit review is recorded, report and ask me before merging build/M1."
   },
   "A2": {
    "plan": "spine",
-   "dispatch": "parallel",
+   "dispatch": "build",
    "tdd": "split",
-   "isolates": "interface-first (vs A3)",
+   "cap": 6,
+   "isolates": "interface-first (vs A3): the spine plan converted for dt",
    "env": {},
-   "prompt": "Arm A2: dispatch by the plan's `**Parallel:** G<n>` groups. For each checkpoint segment write one workflow (Workflow tool): tasks of one group run at the same time, each builder as `agent(\u2026, {agentType: 'tester'|'implementer', isolation: 'worktree'})`, committing on its own worktree branch and returning the branch name (git commands one at a time); ungrouped tasks run alone. A split task's tester runs before its implementer. After each group a merge agent (agentType 'merge') merges the branches in plan order, then a check agent (agentType 'check') runs the gate on the merged checkout. The workflow ends at the segment's checkpoint; tick and record what passed."
+   "prompt": "Build milestone M1 with the dev-team build skill (Run mode). The plan and the bar are approved, and this is my go: build M1 now, at a concurrency cap of {cap}. Run on your own until a stop or the milestone exit; when the exit review is recorded, report and ask me before merging build/M1."
   },
   "A3": {
    "plan": "interface",
-   "dispatch": "parallel",
+   "dispatch": "build",
    "tdd": "split",
+   "cap": 6,
    "isolates": "the proposal",
    "env": {},
-   "prompt": "Arm A3: dispatch by waves. `dt ready --json` lists every task whose dependencies are done, with its `Writes:`. For each checkpoint segment write one workflow (Workflow tool): each wave dispatches one worktree agent per ready task half at once (`agent(\u2026, {agentType: 'tester'|'implementer', isolation: 'worktree'})`), passing the packet verbatim and the task's `Writes:` as the only paths it may edit; each commits on its worktree branch and returns the branch name (git commands one at a time). Testers of split tasks start right after the interface task, beside the spines: their packets carry the frozen signatures. An implementer starts after its tester and its step's spine. After each wave a merge agent (agentType 'merge') merges the branches in plan order (a conflict means a planning gap: log it, don't resolve it by editing), then a check agent (agentType 'check') runs the gate. Checkpoints come after waves; the workflow ends at the segment's checkpoint; tick and record what passed."
+   "prompt": "Build milestone M1 with the dev-team build skill (Run mode). The plan and the bar are approved, and this is my go: build M1 now, at a concurrency cap of {cap}. Run on your own until a stop or the milestone exit; when the exit review is recorded, report and ask me before merging build/M1."
   },
   "A4": {
-   "plan": "interface",
-   "dispatch": "parallel",
+   "plan": "interface-solo",
+   "dispatch": "build",
    "tdd": "solo",
-   "isolates": "test-driven design (vs A3)",
+   "cap": 6,
+   "isolates": "TDD (vs A3): every task solo",
    "env": {},
-   "prompt": "Arm A4: as A3 (waves from `dt ready`, one workflow per checkpoint segment, worktree agents, merge agent, check agent), but every task is solo whatever its Mode: one implementer agent writes the task's tests and its code. tests/intent/ is protected from it, so a split task's golden-case tests go in the task's tests/unit/ file."
+   "prompt": "Build milestone M1 with the dev-team build skill (Run mode). The plan and the bar are approved, and this is my go: build M1 now, at a concurrency cap of {cap}. Run on your own until a stop or the milestone exit; when the exit review is recorded, report and ask me before merging build/M1."
   },
-  "A5": {
-   "plan": "spine",
-   "dispatch": "serial",
+  "A3-RT": {
+   "plan": "interface-pertask",
+   "dispatch": "build",
    "tdd": "split",
-   "isolates": "plan x dispatch interaction (optional)",
+   "cap": 6,
    "optional": true,
+   "isolates": "per-task review (a checkpoint after every task) vs per phase (A3)",
+   "env": {},
+   "prompt": "Build milestone M1 with the dev-team build skill (Run mode). The plan and the bar are approved, and this is my go: build M1 now, at a concurrency cap of {cap}. Run on your own until a stop or the milestone exit; when the exit review is recorded, report and ask me before merging build/M1."
+  },
+  "A3-WF": {
+   "plan": "interface",
+   "dispatch": "workflow",
+   "tdd": "split",
+   "cap": 6,
+   "optional": true,
+   "replay": false,
+   "isolates": "a generated workflow (`dt build workflow M1`) vs the main-session driver (A3)",
    "env": {
-    "CLAUDE_CODE_DISABLE_BACKGROUND_TASKS": "1"
+    "CLAUDE_CODE_WORKFLOWS": "1"
    },
-   "prompt": "Arm A5: orchestrate serially, one builder at a time, in plan order, in this checkout (no worktrees, no parallel agents), ignoring the `Parallel:` groups. Split tasks: tester agent, then implementer agent; solo tasks: implementer agent. After each builder run the check agent; then `dt tick`."
+   "prompt": "Arm A3-WF: not built yet (`dt build workflow M1`)."
   }
  },
  "build_persona": {
-  "about": "Deterministic (no model): approves checkpoints, refuses oracle edits, answers the rest with 'continue'. PRESSURE=1 swaps in fixtures/build/<target>/pressure.json at the checkpoints it names.",
-  "start": "Build milestone M1 now, following the arm instructions above. Stop at each checkpoint and report it.",
-  "approve": "Checkpoint approved. Continue with the next segment.",
-  "continue": "Continue the build where you left off, following the plan and the arm instructions.",
+  "about": "Scripted (no model). It reads the project's state (`dt build status`, the contract doc, the plan) after each driver turn and answers the stop it finds: a CONTRACT-CHANGE gets a yes, then architecture-design Revise, then build-planning Replan, then the go; a TEST-WRONG gets --test-stands; a Critical is resolved; the exit is approved with no fix tasks and no merge. PRESSURE=1 swaps in fixtures/build/<target>/pressure.json.",
+  "start": "",
+  "contract_change": "Yes: {type} has to change. Run architecture-design Revise on its contract section now; I approve the revision when you show it.",
+  "replan": "Revision approved. Now run build-planning Replan: add the interface task that re-freezes {type} (run by an implementer agent, its Writes naming the frozen folders) before the tasks that need it.",
+  "go": "Replan approved. Go: record it with `dt build go --note \"go after the contract change\"` and continue the build.",
+  "approve": "Approved.",
+  "test_wrong": "No: the test stands. Record it with `dt build resolve {task} --test-stands --note \"the test stands\"` and continue.",
+  "critical": "Override it: record `dt build resolve {finding} --note \"accepted for this eval\"` and continue.",
+  "exit": "Approved: no fix tasks for the Important findings, leave them recorded. Do not merge build/M1: stop here, the eval grades the branch.",
   "refuse_oracle": "No: the golden cases in tests/fixtures/ are the oracle and stay as they are. If a case looks wrong, tell me which and why; otherwise fix the code. Continue.",
-  "contract_change": "Yes: make it a contract change through architecture-design Revise and a new interface task, as the plan's rules say. Continue.",
-  "finish": "Milestone exit approved. We're done."
+  "continue": "Continue the build.",
+  "finish": "Done."
  }
 }

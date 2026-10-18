@@ -7,10 +7,10 @@
   Skill call (plus one Agent call per reference file on the reference-intake layer) and a cumulative
   total_cost_usd, like the real CLI.
 - Simulated user (`-p … --output-format json`): always answers {"action": "finish", "message": "Approved."}.
-- FAKE_MODE=build (build_driver.py): each agent turn replays one checkpoint segment of a good build of the
-  target fixture into the cwd (dryrun_build.Replayer, arm from BUILD_ARM): worktree-* branches, merges, gate
-  files and ticks, as the arm's orchestrator would. The stream shows one Workflow call per segment for
-  parallel arms and one Agent call per builder job.
+- FAKE_MODE=build (build_driver.py): each agent turn replays a good build of the target fixture in the cwd up to
+  its next stop (dryrun_build.Replay, arm from BUILD_ARM, through the run's staged dt): reservations, worktrees,
+  claims, landings and reviews, as the build skill's driver and its agents would. The stream shows the build
+  skill and one Agent call per half.
 
 Usage: CLAUDE_BIN=evals/harness/fake_claude.py python3 evals/harness/driver.py quant-all-at-once <out>
        CLAUDE_BIN=evals/harness/fake_claude.py FAKE_MODE=build python3 evals/harness/build_driver.py minilab A3 <out>
@@ -30,29 +30,31 @@ if args[:1] == ["--version"]:
 
 
 def build_turn():
-    """One orchestrator turn of a build: the next checkpoint segment, replayed."""
-    from dryrun_build import Replayer  # noqa: E402
-    arm = os.environ.get("BUILD_ARM", "A3")
-    rp = Replayer(pathlib.Path(".").resolve(), arm)
-    res = rp.run_segment()
-    state = rp.state()
-    jobs = [e for e in res["events"]]
-    print(json.dumps({"type": "system", "subtype": "init", "skills": [], "agents": ["tester", "implementer", "reviewer", "check", "merge"],
-                      "mcp_servers": [{"name": "evalperm", "status": "connected"}], "session_id": "00000000-0000-4000-8000-000000000000"}))
-    content = []
-    if rp.arm["dispatch"] == "parallel" and jobs:
-        content.append({"type": "tool_use", "name": "Workflow", "input": {"script": f"// fake: segment {res['segment'] + 1}\n" + "\n".join(jobs)}})
-    for e in jobs:
-        branch = e.split()[0]
-        content.append({"type": "tool_use", "name": "Agent", "input": {
-            "subagent_type": "implementer" if "tester" not in branch else "tester", "description": e,
-            "isolation": "worktree" if branch.startswith("worktree-") else None, "prompt": f"(fake) {e}"}})
+    """One driver turn of a build: dryrun_build.Replay up to its next stop, through the run's staged dt."""
+    from dryrun_build import Replay  # noqa: E402
+    proj = pathlib.Path(".").resolve()
+    staged = proj.parent / "plugin" / "dev-team" / "scripts" / "dt.py"
+    rp = Replay(proj.parent, os.environ.get("BUILD_ARM", "A3"), **({"dt": staged} if staged.exists() else {}))
+    stop = rp.turn()
+    sid = "00000000-0000-4000-8000-000000000000"
+    print(json.dumps({"type": "system", "subtype": "init", "skills": ["dev-team:build"], "session_id": sid,
+                      "agents": ["tester", "implementer", "reviewer"], "claude_code_version": "0.0.0 (fake)"}))
+    content = [{"type": "tool_use", "name": "Skill", "input": {"skill": "dev-team:build"}}]
+    for e in rp.events:
+        task, role = (e.split(":")[0].split() + ["", ""])[:2]
+        if role in ("tester", "implementer", "solo"):
+            content.append({"type": "tool_use", "name": "Agent", "input": {
+                "subagent_type": "tester" if role == "tester" else "implementer", "description": f"{task} {role}",
+                "isolation": "worktree", "run_in_background": True, "prompt": f"(fake) {e}"}})
     print(json.dumps({"type": "assistant", "message": {"content": content}}))
-    done = "Milestone exit checkpoint reached; every task is ticked." if res["done"] else "Checkpoint reached; approve to continue?"
-    print(json.dumps({"type": "result", "result": f"(fake) segment {res['segment'] + 1}/{res['segments']}: "
-                      f"{len(jobs)} jobs ({'; '.join(jobs[:6])}{' …' if len(jobs) > 6 else ''}). {done}",
-                      "total_cost_usd": 0.5 * state.get("segment", 1), "duration_ms": 1, "num_turns": 1,
-                      "usage": {"output_tokens": 100}}))
+    text = {"contract-change": "Build M1 stopped: a CONTRACT-CHANGE escalation needs your decision. Change the contract?",
+            "exit": "M1 is built: every task landed and the exit review is recorded. Merge build/M1?",
+            }.get(stop, f"Build M1 stopped ({stop}).")
+    if rp.problems:
+        text += " Problems: " + "; ".join(x.splitlines()[0] for x in rp.problems[:4])
+    print(json.dumps({"type": "result", "result": f"(fake) {len(rp.events)} events. {text}", "session_id": sid,
+                      "total_cost_usd": 0.5, "duration_ms": 1, "num_turns": 1, "usage": {"output_tokens": 100},
+                      "permission_denials": []}))
 
 
 fmt0 = args[args.index("--output-format") + 1] if "--output-format" in args else "text"

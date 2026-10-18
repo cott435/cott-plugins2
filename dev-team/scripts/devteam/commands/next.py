@@ -8,12 +8,16 @@ start each run from this answer.
 from __future__ import annotations
 
 import json
+import re
 
+from .. import model
 from .. import probes as pb
 from .. import references as refs
 from .. import requests as rq
 from .. import routes
 from ..status import report
+from ..status.common import milestone_row
+from . import roadmap as roadmap_cmd
 
 ORDER = ["idea-refine", "spec-writing", "architecture-design", "pipeline-design", "test-planning", "build-planning",
          "build-setup"]
@@ -69,9 +73,15 @@ def decide(repo, skip=()) -> dict:
         elif skill == "test-planning":
             # Optional: a project that reached a build plan with no tests.md anywhere skipped it.
             skipped = not repo.docs("tests") and (repo.plan or repo.docs("queued-plan", "archived-plan", archive=True))
-            untested = sorted(set(r["pipelines_no_smoke"]) & set(r["pipelines_no_golden"]))
-            if not skipped and (mode in ("new", "revise", "grow") or (mode == "extend" and untested)):
-                return _per_package(skill, r, "golden cases and test strategy (optional)"
+            units, scope = _test_scope(repo)
+            pkgs = {p: m for p, m in r["packages"].items() if m == "revise" or scope is None or p in scope}
+            home = {p.id: p.package for p in model.all_pipelines(repo)}
+            untested = sorted(i for i in set(r["pipelines_no_smoke"]) & set(r["pipelines_no_golden"])
+                              if scope is None or home.get(i) in scope)
+            mode = next((m for m in ("new", "revise", "extend") if m in pkgs.values()), "current")
+            if not skipped and (mode in ("new", "revise") or (mode == "extend" and untested)):
+                what = "golden cases and test strategy" + (f" for {', '.join(units)}" if scope is not None else "")
+                return _per_package(skill, {**r, "mode": mode, "packages": pkgs}, what + " (optional)"
                                     + (f"; pipelines with no tests: {', '.join(untested)}" if untested else ""))
         elif skill == "build-planning" and mode == "blocked":
             if r["probes_blocking"]:
@@ -94,6 +104,25 @@ def decide(repo, skip=()) -> dict:
             return _out(skill, mode, _why(skill, r))
     return _out(None, "done", "every planning skill is current: build the active milestone (/build), "
                 "or bring a new idea to idea-refine", True)
+
+
+def _test_scope(repo) -> tuple[list[str], set[str] | None]:
+    """(units, packages) that optional test-planning covers: the active milestone's and the next unit
+    build-planning plans (a milestone, or a stage to cut); a later milestone's packages wait until it comes next.
+    Packages are a unit's Packages cell, its pipelines' packages and those of package pipelines Part of its system
+    pipelines. (_, None), every package, when the project has no roadmap unit to scope by."""
+    active = roadmap_cmd.active_plan(repo)
+    units = [u for u in (milestone_row(repo, model.milestone_of(active)) if active else None,
+                         roadmap_cmd.next_unit(repo)) if u is not None]
+    by_id = {p.id: p for p in model.all_pipelines(repo)}
+    pkgs: set[str] = set()
+    for u in units:
+        pls = set(roadmap_cmd.milestone_pipelines(repo, u)[0])
+        pkgs |= set(getattr(u, "packages", []))
+        pkgs |= {p.package for p in by_id.values() if p.package and (p.id in pls or set(
+            re.findall(r"PL-\d{2,}", p.fields.get("Part of", ""))) & pls)}
+    names = list(dict.fromkeys(u.id for u in units))
+    return (names, pkgs) if pkgs else (names, None)
 
 
 def _rank(skill: str) -> int:

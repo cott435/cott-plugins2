@@ -3,10 +3,12 @@
 One stdlib-only CLI that parses every planning doc. Skills, hooks and agents get IDs, statuses, sections, coverage and lint from it instead of reading and counting by hand. Design: [design/planning-stage.md §10, §13](../design/planning-stage.md); the task graph, `dt ready` and `dt plan`: [design/interface-first-design.md §6, §8.3, §13](../design/interface-first-design.md); probes: [design/probes.md §3.4, §4, §5, §11](../design/probes.md).
 
 ```
+<plugin>/scripts/dt [--root DIR] <command> …
 python3 <plugin>/scripts/dt.py [--root DIR] <command> …
 ```
 
-- **Skills** call it as `python3 ../../scripts/dt.py …` relative to the skill's own folder (resolve the skill folder first; the project root is the current directory).
+- **`scripts/dt`** is an executable shim (`#!/usr/bin/env python3`) that runs dt.py: one word, so a shell variable holding its path works in zsh, which doesn't word-split `$DT="python3 …"`.
+- **Skills** call it as `../../scripts/dt …` or `python3 ../../scripts/dt.py …` relative to the skill's own folder (resolve the skill folder first; the project root is the current directory).
 - **Hooks** call `python3 "${CLAUDE_PLUGIN_ROOT}/scripts/dt.py" …`.
 - Stdlib only, Python ≥ 3.9. Tests: `python3 -m unittest discover -s scripts/tests`.
 
@@ -15,6 +17,7 @@ python3 <plugin>/scripts/dt.py [--root DIR] <command> …
 ```
 scripts/
   dt.py                    CLI entry; dispatches to devteam/commands/<command>.py
+  dt                       executable shim: runs dt.py's main without `python3`
   devteam/
     md.py                  markdown primitives: fences, headings, header line, bold-key fields, tables, ID refs
     repo.py                Repo: doc map, doc kinds, ID definitions (incl. retired), lookup, next_id
@@ -129,7 +132,7 @@ With an active plan or not, the plain report (no `--skill`) and `build-planning`
 
 `skills` and `skills_available` list installed skills by name: the project's `.claude/skills/*/SKILL.md` plus `$CLAUDE_PLUGIN_ROOT/skills/*` when that is set, minus dev-team's own planning skills (reference-intake and api-probe included).
 
-`--summary` (SessionStart hook) prints at most 8 lines: active milestone and plan status, progress and next task, blocked tasks, queued plans, docs waiting for approval (Draft), a stale roadmap, `references: N waiting → reference-intake` when any reference file is unindexed, changed or missing, `probes: N waiting → api-probe` when results aren't recorded yet (`probes_results`) or a cited PB has no entry (`probes_unwritten`), `requests: N not honoured → <skills>` when an Approved spec or architecture has open requests, and `dt: python3 <resolved path to dt.py>`. It prints nothing in a project with none of `docs/brief.md`, `docs/spec.md`, `docs/roadmap.md`, `tasks/plan.md`, never fails (an internal error prints one `dt status: error: …` line) and always exits 0.
+`--summary` (SessionStart hook) prints at most 8 lines: active milestone and plan status, progress and next task, blocked tasks, queued plans, docs waiting for approval (Draft), a stale roadmap, `references: N waiting → reference-intake` when any reference file is unindexed, changed or missing, `probes: N waiting → api-probe` when results aren't recorded yet (`probes_results`) or a cited PB has no entry (`probes_unwritten`), `requests: N not honoured → <skills>` when an Approved spec or architecture has open requests, and `dt: <resolved path to scripts/dt>` (`dt: python3 <…/dt.py>` when the shim isn't executable). It prints nothing in a project with none of `docs/brief.md`, `docs/spec.md`, `docs/roadmap.md`, `tasks/plan.md`, never fails (an internal error prints one `dt status: error: …` line) and always exits 0.
 
 Mode rules:
 - **blocked** — idea-refine never; spec-writing: no brief; architecture-design: no spec (as arch-status.py; a Draft spec shows in `docs`); pipeline-design: architecture missing or not Approved; test-planning: no package has an Approved pipelines.md (a package whose pipelines.md isn't Approved is `pkg=blocked`); build-planning: the next milestone to plan has pipelines not all Approved, the next stage has spec IDs on no Approved pipeline, a Revise is open on the active milestone's docs, or (all-at-once) a brief stage is below Designed (below); build-setup: no active plan, or the plan is Draft.
@@ -167,7 +170,7 @@ The next skill run, its mode and why, for `/dev-team:plan` and the eval driver. 
 2. **References waiting** (once the roadmap exists) → reference-intake; **probes waiting** (`probes_unwritten`, `probes_results`) → api-probe.
 3. **A routed change** (`dt route`) → its owner, owners in planning order; the owner's report gives the mode (`revise`, spec-writing's `extend`).
 4. **A user request an Approved spec or architecture doesn't honour** (open, `request-open`) → spec-writing (`extend`), then architecture-design (`revise`).
-5. **The first planning skill with work**, in order idea-refine, spec-writing, architecture-design, pipeline-design, test-planning, build-planning, build-setup. A skill reporting `blocked` or `current` has none, and also: idea-refine unless `new` or the roadmap is missing; spec-writing unless `new` or `ideas_ready`; pipeline-design's `extend` without `uncovered_ids` (an unowned component is a gap its gate may accept); test-planning's `extend` unless a pipeline has neither smoke nor golden case, and test-planning at all once a plan exists with no tests.md anywhere (the user skipped it) or with `--skip`; build-planning's `extend` with an active milestone and no `stage_to_cut` (a queued plan is the user's request). A blocked build-planning sends the run to api-probe (`probes_blocking`: mode `waiting`, the user runs the checks) or to pipeline-design when its reason says `run pipeline-design` (all-at-once: a stage below Designed), else stops there.
+5. **The first planning skill with work**, in order idea-refine, spec-writing, architecture-design, pipeline-design, test-planning, build-planning, build-setup. A skill reporting `blocked` or `current` has none, and also: idea-refine unless `new` or the roadmap is missing; spec-writing unless `new` or `ideas_ready`; pipeline-design's `extend` without `uncovered_ids` (an unowned component is a gap its gate may accept); test-planning beyond its scope, the packages of the active milestone and of the next unit build-planning plans (`roadmap.next_unit`): the unit's Packages, its pipelines' packages and those of package pipelines Part of its system pipelines, plus any package in `revise` (with no unit to scope by, every package; the reason names the units, `for M1, M2`); test-planning's `extend` unless an in-scope pipeline has neither smoke nor golden case, and test-planning at all once a plan exists with no tests.md anywhere (the user skipped it) or with `--skip`; build-planning's `extend` with an active milestone and no `stage_to_cut` (a queued plan is the user's request). A blocked build-planning sends the run to api-probe (`probes_blocking`: mode `waiting`, the user runs the checks) or to pipeline-design when its reason says `run pipeline-design` (all-at-once: a stage below Designed), else stops there.
 6. Otherwise `done`: nothing left to plan.
 
 ```
@@ -308,6 +311,7 @@ Checks (code: severity):
   - `kind-title` E — a task title with the word "spine" or "thicken" whose Kind is another (a fold is Kind thicken, never titled a spine)
   - `covers-vs-deferred` — the Scope's Covers and Deferred both list an ID, or a task covers an ID the Scope defers: **E**. A task covers an ID that another step's Covers cell lists and its own step's (`PL-NN.<name>`) doesn't: W. That Covers and Deferred account for every ID is `uncovered` (`dt status`)
   - `parallel-step` W — two thicken tasks on one step (`PL-NN.<name>`) with no `Depends on` path between them: the step is one function, so each needs the file the other changes even when their Writes don't overlap
+  - `spine-claim` W — a spine task's Reason names (backticked, bare or `<component>.<name>`) a contract function or class that is no pipeline's step or entry and sits outside the step's owner, while the task writes a source file outside that owner's folder or module (owner `train.loop` → `…/train/loop/…`, `…/train/loop.py`): give the symbol its own step, or its home in the step's folder owner. A symbol beside the step's own module raises nothing
   - `deprecated` W — a task's `**Parallel:**` (derived now) or `**Files likely:**` (use `**Writes:**`)
   - `verify-smoke` E — a task whose `Verify:` lacks its Step pipeline's smoke command (tests.md Strategy `Smoke` cell, else the pipeline's Trigger + ` --smoke`) when one is due: always for wiring and system tasks, and for any other task once its `Depends on` path reaches that pipeline's wiring task (with no Kind: every task outside Phase 0). Interface and spine tasks, and thicken tasks beside the wiring, land before the pipeline runs
   - `finding-disposition` E — a finding under a checkpoint with no `→ <disposition>`

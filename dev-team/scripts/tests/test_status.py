@@ -837,7 +837,7 @@ class SummaryTest(Base):
         self.assertEqual(lines[0], "milestone: M1 Data + stats · plan In progress")
         self.assertEqual(lines[1], "progress: 1/14 · next: M1-T02 read_raw spine on a synthetic CSV")
         self.assertEqual(lines[2], "blocked: none")
-        self.assertTrue(lines[-1].startswith("dt: python3 /") and lines[-1].endswith("dt.py"))
+        self.assertTrue(lines[-1].startswith("dt: /") and lines[-1].endswith("/dt"))
 
     def test_drafts_blocked_queued(self):
         self.edit("docs/spec.md", "**Status:** Approved", "**Status:** Draft")

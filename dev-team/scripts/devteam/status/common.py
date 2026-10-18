@@ -264,7 +264,7 @@ def summary(repo: Repo) -> list[str]:
     due = {s: n for o, s in rq.OWNERS.items() if (n := len(rq.due(repo, o)))}
     if due:
         out.append(f"requests: {sum(due.values())} not honoured → {', '.join(due)}")
-    dt = Path(__file__).resolve().parents[2] / "dt.py"
+    shim = Path(__file__).resolve().parents[2] / "dt"
     out = out[:7]
-    out.append(f"dt: python3 {dt}")
+    out.append(f"dt: {shim}" if os.access(shim, os.X_OK) else f"dt: python3 {shim}.py")
     return out

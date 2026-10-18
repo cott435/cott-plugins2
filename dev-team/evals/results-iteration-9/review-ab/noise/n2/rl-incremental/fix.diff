@@ -1,0 +1,746 @@
+diff --git a/docs/architecture.md b/docs/architecture.md
+index 781a27d..75616fe 100644
+--- a/docs/architecture.md
++++ b/docs/architecture.md
+@@ -87,11 +87,11 @@ tests/       → folders only; files are planned in pipelines.md
+ - **Context:** A solo learning lab with one install on one laptop. The brief wants a core reused across environments, not separately deployed parts.
+ - **Decision:** One Python 3.12 package, `rllab`, with one folder per component.
+ - **Alternatives:** A package per environment — no real boundary yet; the core would be guessed before the second environment exists. Python 3.13 — some scientific wheels lag.
+-- **Consequences:** Pin `requires-python = ">=3.12,<3.13"`. A later environment adds an `envs` module and a settings file, not a package. The contract runs past the 200-line guide for one package; that is accepted because tasks load only the sections they read. `reference` sits behind an optional extra, ready to split out if it ever needs its own install. It also stays one package with five or more pipelines and twelve components, at or above the ~3-pipeline and ~12-module Grow guides. All five are commands of one command line over the same run folders, and each has its own entry module, so their tasks never share a file. PyTorch stays because `agents` is its only importer.
++- **Consequences:** Pin `requires-python = ">=3.12,<3.13"`. A later environment adds an `envs` module and a settings file, not a package. The contract runs past the 200-line guide for one package; that is accepted because tasks load only the sections they read. `reference` sits behind an optional extra, ready to split out if it ever needs its own install. It also stays one package with six pipelines and twelve components, at or above the ~3-pipeline and ~12-module Grow guides. All six are commands of one command line over the same run folders, and each has its own entry module, so their tasks never share a file. PyTorch stays because `agents` is its only importer.
+ 
+ ### AD-02: Hand-written agents on NumPy arrays and PyTorch tensors
+ **Status:** Accepted · **Date:** 2026-10-17 · **Scope:** `agents`
+-- **Context:** AGENT-06 needs the agents written by hand from array and tensor operations, with automatic gradients allowed. The lesson is value learning, not backpropagation.
++- **Context:** AGENT-06 needs the agents written by hand from array and tensor operations, with automatic gradients allowed. The lesson is the RL algorithm (value learning, policy gradients), not backpropagation.
+ - **Decision:** The table-based agent is pure NumPy. The neural agents use PyTorch tensors, `torch.nn` layers, autograd and the Adam optimizer. Everything RL-specific is written by hand in `agents`: the memory of past steps, sampling, the target copy, the learning targets, the loss and the exploration schedule.
+ - **Alternatives:** NumPy only, with hand-written backpropagation — more to learn, but debugging gradients would crowd out the RL lesson, and the CNN in AD-05 becomes a project of its own. JAX — capable, but less familiar CPU tooling on a Mac.
+ - **Consequences:** PyTorch is a dependency of `agents` only. Swapping in hand-written backpropagation later stays local to the network module.
+@@ -139,12 +139,12 @@ tests/       → folders only; files are planned in pipelines.md
+ - **Alternatives:** The Apple GPU backend — no gain on networks this small, and its determinism is weaker. Several threads — little gain, and reduction order can vary.
+ - **Consequences:** The 5 seeds of one ladder rung can run as 5 parallel processes without fighting over threads.
+ 
+-### AD-09: A batch-first environment interface over agents, adopted before M1 is built
++### AD-09: A batch-first environment interface over agents
+ **Status:** Accepted · **Date:** 2026-10-17 · **Scope:** `core`
+-- **Context:** CORE-01 now needs one interface for Snake (one agent, 3 discrete actions) and the fish tank (up to 16 fish, 2-D continuous actions). CORE-06 needs Snake and the corridor to behave as before. M1's plan is approved but no code exists yet.
+-- **Decision:** Every environment is batch-first over its agents. Observations are `(n_agents, *obs_shape)`, actions `(n_agents,)` discrete or `(n_agents, dim)` continuous, per `core.ActionSpace`. Rewards and per-agent `done` are `(n_agents,)`, and the game-level `terminated`/`truncated` stay booleans. Snake and the corridor are the `n_agents == 1` case. `core.Agent.act` takes and returns batches, and `core.Transition` carries per-agent arrays with an `active` mask. M1 adopts this interface before it is built: a Replan of its interface task, so Snake is never written against the old shape.
++- **Context:** CORE-01 now needs one interface for Snake (one agent, 3 discrete actions) and the fish tank (up to 16 fish, 2-D continuous actions). CORE-06 needs Snake and the corridor to behave as before.
++- **Decision:** Every environment is batch-first over its agents. Observations are `(n_agents, *obs_shape)`, actions `(n_agents,)` discrete or `(n_agents, dim)` continuous, per `core.ActionSpace`. Rewards and per-agent `done` are `(n_agents,)`, and the game-level `terminated`/`truncated` stay booleans. Snake and the corridor are the `n_agents == 1` case. `core.Agent.act` takes and returns batches, and `core.Transition` carries per-agent arrays with an `active` mask.
+ - **Alternatives:** A separate multi-agent protocol beside the single-agent one — two interfaces for `train`, `evaluate` and `replay` to handle, against CORE-07. Per-agent dicts (PettingZoo style) — flexible, but slow for 8 fish in NumPy and unneeded with a fixed agent count. Migrating after M1 is built — the honest "revise the core" lesson, at the cost of rewriting a finished milestone's core and agents.
+-- **Consequences:** AD-13 adds teams on top: each team is batch-first as above. Value learners and Snake baselines handle a batch of 1. CORE-06 is met by M1's golden cases passing on the new interface, with their expected values unchanged. `pipeline-design`, `test-planning` and `build-planning` revisit M1's types and plan before the build starts.
++- **Consequences:** AD-13 adds teams on top: each team is batch-first as above. Value learners and Snake baselines handle a batch of 1. CORE-06 is met by M1's golden cases passing on the new interface, with their expected values unchanged.
+ 
+ ### AD-10: Stable-Baselines3 PPO as the tank's reference
+ **Status:** Accepted · **Date:** 2026-10-17 · **Scope:** `reference`
+@@ -168,17 +168,17 @@ tests/       → folders only; files are planned in pipelines.md
+ - **Alternatives:** A physics library — collision solving the spec rules out (FISH-07). Rasterising the tank to a grid for replay — loses the continuous positions the replay should show.
+ - **Consequences:** Ball reflection is computed exactly at the wall each step, never by small sub-steps. Recordings stay small (K ≤ 17 circles per frame).
+ 
+-### AD-13: Teams in the core, adopted before M1 is built
++### AD-13: Teams in the core
+ **Status:** Accepted · **Date:** 2026-10-17 · **Scope:** `core`
+-- **Context:** CORE-01 now needs environments with two teams of different sizes and views: predator-prey's 1-agent predator (19 values) and 6-agent prey (18 values). AD-09's batch-first arrays assume one observation shape per environment. M1 is approved but not yet built.
+-- **Decision:** `core.Env` declares `teams: Mapping[str, TeamSpec]`. Observations, actions, rewards and `done` are maps from team name to AD-09's batch-first arrays. Single-team environments use one team, `core.SOLO` (`"agents"`). One `core.Agent` acts for one team, and `train` and `evaluate` take one agent per team. `info` carries `score:<team>` per team, plus `score` for the first. M1 adopts this before it's built: a Replan of its interface task.
++- **Context:** CORE-01 now needs environments with two teams of different sizes and views: predator-prey's 1-agent predator (19 values) and 6-agent prey (18 values). AD-09's batch-first arrays assume one observation shape per environment.
++- **Decision:** `core.Env` declares `teams: Mapping[str, TeamSpec]`. Observations, actions, rewards and `done` are maps from team name to AD-09's batch-first arrays. Single-team environments use one team, `core.SOLO` (`"agents"`). One `core.Agent` acts for one team, and `train` and `evaluate` take one agent per team. `info` carries `score:<team>` per team, plus `score` for the first.
+ - **Alternatives:** A separate two-team protocol beside `core.Env` — two code paths in `train`, `evaluate` and replay, against CORE-07. Padding both teams to one observation shape with a team flag — one array, but a policy would see the other team's padding, and the scripted players get fiddly. Adding teams after M1 — rewrites M1's loop and evaluation.
+ - **Consequences:** M1's Snake and corridor code addresses `SOLO`; its golden values don't change. M2's fish tank is also one team. S3 adds no second loop.
+ 
+ ### AD-14: Self-play through opponent pools inside the shared training loop
+ **Status:** Accepted · **Date:** 2026-10-17 · **Scope:** `selfplay`, `train`
+ - **Context:** SELF-01–SELF-04 need co-learning and pool-based self-play. CORE-07 forbids a training loop of predator-prey's own. SELF-05–SELF-06 need cross-play and ratings over saved generations.
+-- **Decision:** A new `selfplay` component owns `OpponentPool` (the latest policy with probability `pool_latest`, otherwise a uniformly drawn past generation, loaded once and frozen), `cross_play` and `ratings`. `train` saves each learner's generation every tenth of the run through `runs.RunWriter.save_generation`, adds it to the other team's pool, and asks the pool for each game's opponent. Both teams learn in the same loop with their own PPO agents.
++- **Decision:** A new `selfplay` component owns `OpponentPool` (the latest policy with probability `pool_latest`, otherwise a uniformly drawn past generation, loaded once and frozen), `cross_play` and `ratings`. `train` saves each learner's generation every tenth of the run through `runs.RunWriter.save_generation` and adds it to that team's own pool. In a pool run, the two teams take turns, game by game, as the learning side: that side plays its latest policy and learns, and the other side's policy for the game comes from the other side's pool. Both teams learn in the same loop with their own PPO agents.
+ - **Alternatives:** A separate self-play trainer — duplicates the loop, and the spec forbids it. Opponent sampling per step instead of per game — opponents would switch mid-chase, which is unrealistic and noisier.
+ - **Consequences:** `train` gains generation and pool handling, guarded by settings, so single-team runs are unaffected. Cross-play costs 100 cells × 50 games of up to 1,000 steps. It's a separate command, not part of training time.
+ 
+@@ -201,9 +201,8 @@ tests/       → folders only; files are planned in pipelines.md
+ - **Scripted player too strong (EVAL-04):** every rung may tie the scripted player. Mitigation: reward and step-budget settings are per run (SNAKE-06), and the grid rung has the most room to beat it.
+ - **Matching the reference (REF-01):** Stable-Baselines3 has defaults the hand-written agents lack (DQN's gradient clipping at 10 and Huber loss; PPO's advantage normalisation and value-loss weight). Mitigation: the mapping in `reference` lists every one, and the hand-written agents adopt the same values, so a gap is the learner's code rather than a hidden setting.
+ - **Escape too easy or too hard (EVAL-07):** if fish at 0.8 × the ball's speed survive the cap easily, or never, the rungs can't separate from the scripted fish. Mitigation: the spec's numbers are tank constants; a measurement run of the two baselines comes first in S2's build, and a change to the numbers goes back through spec-writing.
+-- **The teams revision ripples into M1 (AD-13):** M1's pipelines and interface task were planned against one team per environment. Mitigation: they're revised and re-approved before `/build`; the expected values of TC-01–TC-49 don't change.
+ - **Self-play inside 60 minutes (QR-07):** two PPO learners sharing one run's budget may not reach a visible rung-2 failure, or a rung-3 fix. Mitigation: a timing run comes first in S3's build. The world numbers are spec constants, so any change goes back through spec-writing.
+-- **Cross-play cost:** 5,000 games of up to 1,000 steps with 7 animals is several minutes per run, and isn't covered by a QR. Mitigation: it's a separate command; measure it in S3's build and propose a QR if it hurts.
++- **Cross-play cost:** 5,000 games of up to 1,000 steps with 7 animals is up to about 25 minutes per run at QR-04's rate, and isn't covered by a QR. Mitigation: it's a separate command; measure it in S3's build and propose a QR if it hurts.
+ - **Package size:** 12 components and a contract of about 450 lines are at the Grow guides. AD-01 keeps one package. The natural seam, if one is needed, is `selfplay` with predator-prey.
+ 
+ ## Changelog
+diff --git a/docs/brief.md b/docs/brief.md
+index 9a46f0c..c13577f 100644
+--- a/docs/brief.md
++++ b/docs/brief.md
+@@ -11,7 +11,7 @@ Me: comfortable with Python, learning RL and machine learning as I go. A persona
+ ## Goals
+ 1. Each environment teaches one named RL concept, and I can explain, backed by my own runs, why the agent learns.
+ 2. Algorithms I write from scratch are trustworthy: on the same environment, they perform about as well as a well-known library version.
+-3. Every trained agent clearly beats both a random player and a simple scripted player, measured over many games rather than judged by eye.
++3. Every trained agent clearly beats a random player, and each environment's agents match or beat a simple scripted player as its spec sets out, measured over many games rather than judged by eye.
+ 4. I can watch a replay of any trained agent playing.
+ 5. A new environment reuses a shared core (environment interface, training loop, logging, replay viewer), so it only needs its own game and concept code.
+ 
+@@ -22,7 +22,7 @@ Me: comfortable with Python, learning RL and machine learning as I go. A persona
+ - Solo. All data comes from the games themselves.
+ 
+ ## What success looks like
+-- For Snake, the first environment: a learning curve that rises above both baselines and stays there.
++- For Snake, the first environment: a learning curve that rises above the random baseline, matches or beats the scripted one, and stays there.
+ - A replay of the trained snake that visibly eats food and avoids walls and itself.
+ - I can show what each piece contributes by removing it and rerunning.
+ 
+@@ -38,4 +38,4 @@ Me: comfortable with Python, learning RL and machine learning as I go. A persona
+ - Large hyperparameter searches or multi-machine training. Beyond the budget, and not the lesson.
+ 
+ ## Open questions
+-- Can the hardest rung of Snake (learning from the whole grid rather than a compact view) train within an hour on a laptop processor? If not, it becomes optional or uses the small cloud budget.
++None.
+diff --git a/docs/packages/rllab/contract.md b/docs/packages/rllab/contract.md
+index 19f461a..138301d 100644
+--- a/docs/packages/rllab/contract.md
++++ b/docs/packages/rllab/contract.md
+@@ -72,7 +72,7 @@ class RunSettings:
+     rewards: Rewards; exploration: Exploration; params: AgentParams
+     steps: int; seed: int; eval_every: int; eval_games: int
+ ```
+-- **Invariants:** `seed` in `[0, 1_000_000)`. `steps` > 0. `view` belongs to `env` (Snake `compact`/`grid`, corridor `index`, tank `full`/`limited`). `n_agents` is 1 except for the tank (1–16, FISH-07). `reinforce` and `ppo` only with the tank; `tabular` and `dqn` only with Snake or the corridor. `reference` on the tank needs `n_agents == 1` and `full`. For `predprey`, `view` is `limited`, `agent` is `ppo` or `reference`, and `opponents` names both teams (`predator`, `prey`): `learn` teams train with `agent`; `self_play` is `latest` or `pool` only when both learn (rung 2, rung 3), `none` otherwise; `generations` is 10 when any team learns, else 0; `pool_latest` defaults to 0.5 (SELF-03). Single-team runs have `opponents == {}`. `ablation` matches `agent` (`no_memory` and `no_target` with `dqn`, `no_explore` with `tabular`).
++- **Invariants:** `seed` in `[0, 1_000_000)`. `steps` > 0. `view` belongs to `env` (Snake `compact`/`grid`, corridor `index`, tank `full`/`limited`). `n_agents` is 1 except for the tank (1–16, FISH-07); predprey ignores it (teams are fixed at 1 and 6). `reinforce` and `ppo` only with the tank; `tabular` and `dqn` only with Snake or the corridor. `reference` on the tank needs `n_agents == 1` and `full`. For `predprey`, `view` is `limited`, `agent` is `ppo` or `reference`, and `opponents` names both teams (`predator`, `prey`): `learn` teams train with `agent`; `self_play` is `latest` or `pool` only when both learn (rung 2, rung 3), `none` otherwise; `generations` is 10 when any team learns, else 0; `pool_latest` defaults to 0.5 (SELF-03). Single-team runs have `opponents == {}`. `ablation` matches `agent` (`no_memory` and `no_target` with `dqn`, `no_explore` with `tabular`).
+ - **Boundary:** lab, train, runs, reference · **Fixtures:** tests/contracts/core.RunSettings/ · **Cases:** the dqn-compact ladder settings; a corridor tabular settings; a no_target ablation; the rung-3 tank settings (ppo, 8 fish, full view); the tank reference settings; predator-prey rung 1 (prey learn, scripted predator); rung 3 (both learn, pool)
+ - **Used by:** lab, train, runs, reference, agents; PL-01, PL-02, PL-03, PL-04, PL-06
+ 
+@@ -101,13 +101,20 @@ class RunSettings:
+ - **Boundary:** lab · **Fixtures:** tests/contracts/core.load_settings/ · **Cases:** the dqn-compact ladder file; a file naming an unknown agent
+ - **Used by:** lab; PL-01, PL-02
+ 
++### core.with_seed: Swap a run's seed
++`def with_seed(settings: RunSettings, seed: int) -> RunSettings`
++- **Invariants:** returns a copy of `settings` with only `seed` changed.
++- **Errors:** `ValueError` if `seed` is outside `[0, 1_000_000)`
++- **Boundary:** lab · **Fixtures:** tests/contracts/core.with_seed/ · **Cases:** the dqn-compact ladder settings moved to seed 3; seed 1,000,000 refused
++- **Used by:** lab; PL-01, PL-02
++
+ ## envs
+ 
+ ### envs.Snake: Snake game
+ ```python
+ class Snake(Env):
+     def __init__(self, *, view: Literal["compact", "grid"], rewards: Rewards = Rewards(), size: int = 10) -> None: ...
+-    def reset_to(self, body: Sequence[tuple[int, int]], heading: Literal["up", "right", "down", "left"], food: tuple[int, int]) -> tuple[np.ndarray, dict[str, int]]: ...
++    def reset_to(self, body: Sequence[tuple[int, int]], heading: Literal["up", "right", "down", "left"], food: tuple[int, int]) -> tuple[dict[str, np.ndarray], dict[str, float]]: ...
+ ```
+ - **Invariants:** SNAKE-01–SNAKE-09. `reset_to` starts a game from a given board (cells are `(row, col)`, row 0 at the top, body head first), with score 0 and the step count at 0; later food is seeded as after `reset`. One team, `SOLO`, of 1 agent; `board == "grid"`. Actions: discrete 3, 0 straight, 1 turn left, 2 turn right. The compact observation has per-agent shape `(11,)`, laid out as `COMPACT_FIELDS`. The grid observation has per-agent shape `(3, size, size)`: head, body and food channels. Filling the board ends the game with `terminated=True` and no death reward.
+ - **Errors:** as `core.Env`; `reset_to` raises `ValueError` if the body is not contiguous, leaves the grid, or the food is on the snake
+@@ -131,7 +138,7 @@ class Snake(Env):
+ ```python
+ class FishTank(Env):
+     def __init__(self, *, view: Literal["full", "limited"], n_fish: int = 8, rewards: Rewards = Rewards(food=0.0, death=0.0, step=1.0)) -> None: ...
+-    def reset_to(self, fish: Sequence[tuple[float, float]], ball: tuple[float, float], ball_velocity: tuple[float, float]) -> tuple[np.ndarray, dict[str, float]]: ...
++    def reset_to(self, fish: Sequence[tuple[float, float]], ball: tuple[float, float], ball_velocity: tuple[float, float]) -> tuple[dict[str, np.ndarray], dict[str, float]]: ...
+ ```
+ - **Invariants:** FISH-01–FISH-10 with the spec's numbers as module constants. One team, `SOLO`, of `n_fish` agents; actions are continuous with `dim == 2`; `board == "tank"`. The full view has per-fish shape `(8,)` laid out as `TANK_FULL_FIELDS`, and the limited view `(9,)` as `TANK_LIMITED_FIELDS`. `info["score"]` is the mean survival time per fish so far. `reset_to` starts from given positions, at step 0.
+ - **Errors:** as `core.Env`; `reset_to` raises `ValueError` for a position outside the tank or a fish within 0.11 of the ball
+@@ -184,7 +191,7 @@ class PredatorPrey(Env):
+ ### baselines.ScriptedPlayer: Scripted baseline
+ `class ScriptedPlayer(Agent): def __init__(self) -> None`
+ - **Invariants:** BASE-02 on the compact view, deterministic. Ties go straight, then left, then right.
+-- **Errors:** `ValueError` if the observation is not shape `(11,)`
++- **Errors:** `ValueError` if the observation is not shape `(1, 11)`
+ - **Boundary:** lab · **Fixtures:** tests/contracts/baselines.ScriptedPlayer/ · **Cases:** food ahead and safe; food left but danger left
+ - **Used by:** lab; PL-03, PL-04
+ 
+@@ -314,7 +321,7 @@ class RunWriter:
+ 
+ ### evaluate.ScoreSet: type
+ `@dataclass(frozen=True) class ScoreSet: player: str; train_seed: int; scores: np.ndarray; games: tuple[GameRecording, ...]`
+-- **Invariants:** `scores` has one float score per evaluation game (food eaten, or mean survival steps per fish). `games` holds the first `record` games played.
++- **Invariants:** `scores` has one float score per evaluation game (food eaten, mean survival steps per fish, catches per game for the predator, or mean reward per prey). `games` holds the first `record` games played.
+ - **Boundary:** compare, lab · **Fixtures:** tests/contracts/evaluate.ScoreSet/ · **Cases:** 200 scripted-player scores for seed 0; 200 random-player scores for seed 0; 200 scripted-fish scores for seed 0
+ - **Used by:** compare, train, lab; PL-03, PL-04
+ 
+@@ -335,7 +342,7 @@ class RunWriter:
+ 
+ ### train.train: Training loop
+ `def train(make_env: Callable[[], Env], agents: Mapping[str, Agent], settings: RunSettings, *, root: Path = Path("runs")) -> RunRecord`
+-- **Invariants:** `agents` has one agent per team; the teams `settings.opponents` marks `learn` (or `SOLO` in a single-team run) are learners. Steps the environment for `settings.steps` steps, building one batch-first `Transition` per learning team and calling that team's `learn` after every step (CORE-07). With `settings.generations`, it saves each learner's generation every tenth of the run (SELF-04); with `self_play == "pool"`, each game's opponent for every learner comes from its `selfplay.OpponentPool` (SELF-03, AD-14). Curve points evaluate the first learning team against the run's fixed opposition. It evaluates every `eval_every` steps (including step 0) into a `CurvePoint`. It prints a progress line at least every 30 s (RUN-04). It saves each learner's checkpoint and 5 recorded evaluation games at the end. The same settings give the same curve (RUN-03). It knows nothing environment-specific (CORE-02).
++- **Invariants:** `agents` has one agent per team; the teams `settings.opponents` marks `learn` (or `SOLO` in a single-team run) are learners. Steps the environment for `settings.steps` steps, building one batch-first `Transition` per learning team and calling that team's `learn` after every step (CORE-07). With `settings.generations`, it saves each learner's generation every tenth of the run (SELF-04); with `self_play == "pool"`, the two teams take turns, game by game, as the learning side: that side plays its latest policy and learns, and the other side's policy for the game is that side's `selfplay.OpponentPool.sample()` (SELF-03, AD-14). Curve points evaluate the first learning team against the run's fixed opposition. It evaluates every `eval_every` steps (including step 0) into a `CurvePoint`. It prints a progress line at least every 30 s (RUN-04). It saves each learner's checkpoint and 5 recorded evaluation games at the end. The same settings give the same curve (RUN-03). It knows nothing environment-specific (CORE-02).
+ - **Errors:** on `KeyboardInterrupt`, finishes the run `incomplete`, then re-raises
+ - **Boundary:** lab · **Fixtures:** tests/contracts/train.train/ · **Cases:** a fake returning a complete 3-point corridor RunRecord
+ - **Used by:** lab; PL-01
+@@ -408,8 +415,8 @@ class OpponentPool:
+ - **Used by:** lab; PL-04
+ 
+ ### compare.run_claims: Tested claims and report
+-`def run_claims(scores: Mapping[str, Sequence[ScoreSet]], specs: Sequence[ClaimSpec], *, alpha: float = 0.05, charts: Sequence[Chart] = (), out: Path) -> list[Claim]`
+-- **Invariants:** each player's scores are pooled across its 5 training seeds. The correction covers every spec in one call. Writes `out/report.md` listing every player's mean and spread (BASE-03) and every claim, with stretch claims labelled "stretch" (EVAL-05), and links each chart in `charts` by its path under a "Cross-play" section (EVAL-11).
++`def run_claims(scores: Mapping[str, Sequence[ScoreSet]], specs: Sequence[ClaimSpec], *, alpha: float = 0.05, crossplay: Sequence[tuple[Path, str]] = (), out: Path) -> list[Claim]`
++- **Invariants:** each player's scores are pooled across its 5 training seeds. The correction covers every spec in one call. Writes `out/report.md` listing every player's mean and spread (BASE-03) and every claim, with stretch claims labelled "stretch" (EVAL-05), and links each `crossplay` chart path under a "Cross-play" section with its label (such as "reported") (EVAL-11).
+ - **Errors:** `ValueError` if a spec names a player missing from `scores`
+ - **Boundary:** lab · **Fixtures:** tests/contracts/compare.run_claims/ · **Cases:** a fake returning one passed and one failed Claim
+ - **Used by:** lab; PL-04
+@@ -450,6 +457,36 @@ class Replay:
+ 
+ ### lab.main: Command line
+ `def main(argv: Sequence[str] | None = None) -> int`
+-- **Invariants:** subcommands are `train <settings.toml> [--seeds 0-4]`, `eval <run | random | scripted>… [--env snake|tank|predprey] [--team T]`, `replay <run> [--game N | --new --seed S | --pair <predator gen> <prey gen>]`, `crossplay <run>` and `report <report.toml>`. `train` builds the env and agent from the settings alone (RUN-01), and runs reference settings through `train_reference`. An ablation settings file carries its full agent's step budget, and `report` refuses an ablation whose seeds or steps differ from its full agent's (ABL-04). Returns 0 on success, 2 on bad input.
++- **Invariants:** subcommands are `train <settings.toml> [--seeds 0-4]`, `eval <run | random | scripted>… [--env snake|tank|predprey] [--team T] [--vs scripted|random|<run>] [--seed S]`, `replay <run> [--game N | --new --seed S | --pair <predator gen> <prey gen>]`, `crossplay <run> [--label reported]` and `report <report.toml>`. Every subcommand takes `--smoke`, which runs it on a tiny step and game budget. `train` builds the env and agent from the settings alone (RUN-01), and runs reference settings through `train_reference`. An ablation settings file carries its full agent's step budget, and `report` refuses an ablation whose seeds or steps differ from its full agent's (ABL-04). Returns 0 on success, 2 on bad input.
+ - **Errors:** bad settings and missing runs print the `ValueError` or `FileNotFoundError` message and return 2
+ - **Used by:** the learner; PL-01, PL-02, PL-03, PL-04, PL-05, PL-06
++
++### lab.make_env: Environment factory from settings
++`def make_env(settings: RunSettings) -> Callable[[], Env]`
++- **Invariants:** returns a zero-argument factory of the environment `settings.env` names, built with its view, `n_agents` (the tank's fish) and `rewards`. Each call gives a fresh environment.
++- **Errors:** `ValueError` naming the key for an environment or view it can't build
++- **Boundary:** lab · **Fixtures:** tests/contracts/lab.make_env/ · **Cases:** the dqn-compact ladder settings; a corridor tabular settings
++- **Used by:** lab; PL-01, PL-03, PL-05, PL-06
++
++### lab.make_agent: One agent per team from settings
++`def make_agent(settings: RunSettings, env: Env) -> dict[str, Agent]`
++- **Invariants:** one agent per team of `env.teams`: learning teams get `settings.agent`, sized from the team's `TeamSpec` and built with `params`, `exploration` and the `ablation` switch; other teams get the scripted or random player `settings.opponents` names. Single-team environments give `{SOLO: agent}`.
++- **Errors:** `ValueError` naming the key for an agent the environment can't take
++- **Boundary:** lab · **Fixtures:** tests/contracts/lab.make_agent/ · **Cases:** `{SOLO: DQNAgent}` for the dqn-compact settings; `{SOLO: TabularAgent}` for a no_explore ablation
++- **Used by:** lab; PL-01, PL-03
++
++### lab.ReportTargets: type
++```python
++@dataclass(frozen=True)
++class PlayerTarget:
++    runs: tuple[Path, ...]; baseline: str | None; team: str = SOLO; vs: tuple[str, ...] = ()
++
++@dataclass(frozen=True)
++class ReportTargets:
++    players: Mapping[str, PlayerTarget]; baselines: tuple[str, ...]
++    ladder: Mapping[str, tuple[Path, ...]]; ablations: Mapping[str, tuple[Path, ...]]
++    crossplay: tuple[tuple[Path, str], ...]
++```
++- **Invariants:** a `PlayerTarget` names run folders or a baseline (`random`, `scripted`), never both; `team` and `vs` matter only for predator-prey, where `vs` lists the panel (SELF-07). `ladder` and `ablations` map each chart group to its run folders; `open_curve_runs` returns the same two maps with each folder opened as a `RunRecord`. `crossplay` holds each PL-06 chart path with its label ("reported" or "").
++- **Boundary:** lab · **Fixtures:** tests/contracts/lab.ReportTargets/ · **Cases:** the smoke report's targets; a predator-prey player with a three-opponent panel
++- **Used by:** lab; PL-04
+diff --git a/docs/packages/rllab/pipelines.md b/docs/packages/rllab/pipelines.md
+index e0833fb..9f4230f 100644
+--- a/docs/packages/rllab/pipelines.md
++++ b/docs/packages/rllab/pipelines.md
+@@ -85,7 +85,7 @@ def run_evaluate(target: str, seed: int, env: str = "snake", team: str = SOLO, v
+ 
+ | # | Step | Owner | In → Out | Spine version | Covers |
+ |---|---|---|---|---|---|
+-| 1 | `load_report_spec` | lab.report_spec | path → ClaimSpec, targets | TOML: players (name → run folders or a baseline name, plus `team` and `vs` for predator-prey), claims, two curve charts, and PL-06's cross-play chart paths | EVAL-02–EVAL-05, EVAL-09–EVAL-11 |
++| 1 | `load_report_spec` | lab.report_spec | path → ClaimSpec, ReportTargets | TOML: players (name → run folders or a baseline name, plus `team` and `vs` for predator-prey), claims, two curve charts, and PL-06's cross-play chart paths with their labels | EVAL-02–EVAL-05, EVAL-09–EVAL-11 |
+ | 2 | `score_players` | lab.players | targets → ScoreSet | for each player, opponent and seed: PL-03 steps 1, 9 and 10 as built; a predator-prey player's panel scores are pooled over its `vs` opponents | EVAL-01, BASE-03, SELF-07 |
+ | 3 | `open_curve_runs` | lab.players | targets → RunRecord | `runs.open_run` per folder; `ValueError` if an ablation's seeds or `steps` differ from its full agent's | ABL-04, RUN-05 |
+ | 4 | `run_claims` | compare.claims | ScoreSet, ClaimSpec → Claim | each claim through the `null-hypothesis-testing` skill, one correction over all claims; REF-02's ratio as arithmetic; writes `report.md`, linking the cross-play charts by path | EVAL-02–EVAL-05, EVAL-07–EVAL-11, REF-02, REF-03, BASE-03 |
+@@ -97,7 +97,7 @@ def run_report(spec_path: Path, out: Path) -> list[Claim]:
+     specs, targets = load_report_spec(spec_path)
+     scores = score_players(targets)
+     curves = open_curve_runs(targets)
+-    claims = run_claims(scores, specs, charts=targets.crossplay, out=out)
++    claims = run_claims(scores, specs, crossplay=targets.crossplay, out=out)
+     plot_curves(curves.ladder, scores=scores, baselines=targets.baselines, out=out / "ladder.png")
+     plot_curves(curves.ablations, scores=scores, baselines=targets.baselines, out=out / "ablations.png")
+     return claims
+diff --git a/docs/packages/rllab/tests.md b/docs/packages/rllab/tests.md
+index 300bac0..6d6e9ae 100644
+--- a/docs/packages/rllab/tests.md
++++ b/docs/packages/rllab/tests.md
+@@ -1,10 +1,10 @@
+ # rllab — Tests
+ 
+-**Package:** rllab · **Status:** Approved · **Last updated:** 2026-10-17 · **Pipelines:** [pipelines.md](pipelines.md)
++**Package:** rllab · **Status:** Draft · **Last updated:** 2026-10-17 · **Pipelines:** [pipelines.md](pipelines.md)
+ 
+ Board coordinates are `(row, col)` with row 0 at the top, so "up" decreases the row. Bodies are listed head first. Boards are set with `Snake.reset_to`. Snake and corridor cases address agent 0 of a batch of one (AD-09): an action list is one action per step, and an expected observation is agent 0's row.
+ 
+-Tank positions are `(x, y)` in tank radii with the centre at the origin, set with `FishTank.reset_to`. The ball reflects when its edge reaches the wall, that is, when its centre is 0.92 from the origin. Predator-prey positions use the same frame, set with `PredatorPrey.reset_to`; each case's `input.json` lists all 6 prey; unless a case says otherwise, the other prey sit at `(−0.5, 0)`, `(0, 0.5)`, `(0, −0.5)`, `(−0.4, 0.4)`, `(−0.4, −0.4)` and the 8 pellets on the circle of radius 0.9 at 45° steps from `(0.9, 0)`, every animal at rest.
++Tank positions are `(x, y)` in tank radii with the centre at the origin, set with `FishTank.reset_to`. The ball reflects when its edge reaches the wall, that is, when its centre is 0.92 from the origin. Predator-prey positions use the same frame, set with `PredatorPrey.reset_to`; each case's `input.json` lists all 6 prey; unless a case says otherwise, the other prey sit at `(−0.5, 0)`, `(0, 0.5)`, `(0, −0.5)`, `(−0.4, 0.4)`, `(−0.4, −0.4)` and the 8 pellets on the circle of radius 0.9 at 45° steps from `(0.9, 0)`, every animal at rest. When a case places more than one prey, the remaining prey take the default positions in the listed order.
+ 
+ ## Strategy
+ | Pipeline | Smoke | Step unit tests | Golden cases | Model eval |
+@@ -12,7 +12,7 @@ Tank positions are `(x, y)` in tank radii with the centre at the origin, set wit
+ | PL-01 | `python -m rllab.lab train settings/smoke-corridor.toml --smoke` | core.settings, envs.snake, envs.corridor, lab.build, agents.tabular, agents.dqn, train.loop; boundary: `core.Env`, `core.StepResult`, `core.Transition`, `core.Agent`, `core.RunSettings`, `runs.CurvePoint`, `runs.RunWriter` samples | TC-01–TC-09 (Env → Snake.step → StepResult), TC-10 (whole Snake game), TC-11 (Env → Corridor.step → StepResult), TC-12–TC-13 (Transition → TabularAgent.learn → Agent), TC-14 (Transition → DQNAgent.learn → Agent), TC-15 (whole pipeline), TC-29–TC-38 (Env → FishTank.step → StepResult), TC-41–TC-43 (arrays → policy-gradient maths → arrays), TC-44–TC-45 (Transition, obs → PPOAgent → actions), TC-49 (whole tank pipeline), TC-50–TC-58 (Env → PredatorPrey.step → StepResult), TC-62 (OpponentPool.sample), TC-63, TC-66 (whole predator-prey run) | TC-16 |
+ | PL-02 | `python -m rllab.lab train settings/smoke-reference.toml --smoke` | reference.train (adapter, mapping); boundary: `runs.RunRecord` sample | TC-17 (Env → adapter → gymnasium env) | — |
+ | PL-03 | `python -m rllab.lab eval scripted --seed 0 --smoke` | lab.players, baselines.random, baselines.scripted, reference.player, evaluate.protocol, lab.printing; boundary: `evaluate.ScoreSet` samples | TC-18 (train_seed → eval_seeds → seeds), TC-19 (obs → ScriptedPlayer.act → action), TC-20 (RandomPlayer.act ×30,000), TC-39 (RandomSwimmer.act ×30,000), TC-40 (obs → ScriptedFish.act → action), TC-59 (obs → ScriptedPredator.act → action), TC-60 (obs → ScriptedPrey.act → action), TC-61 (RandomSwimmer.act for the predator ×30,000) | — |
+-| PL-04 | `python -m rllab.lab report reports/smoke.toml --smoke` | lab.report_spec, lab.players, compare.claims, viz.curves; boundary: `compare.ClaimSpec`, `compare.Claim`, `viz.Chart` samples | TC-21–TC-24 (ScoreSet, ClaimSpec → run_claims → Claim), TC-25 (RunRecord → open_curve_runs), TC-70 (ScoreSet, ClaimSpec, Chart → run_claims → report.md) | TC-26, TC-27, TC-46, TC-47, TC-67, TC-68, TC-69 |
++| PL-04 | `python -m rllab.lab report reports/smoke.toml --smoke` | lab.report_spec, lab.players, compare.claims, viz.curves; boundary: `compare.ClaimSpec`, `compare.Claim`, `viz.Chart` samples | TC-21–TC-24 (ScoreSet, ClaimSpec → run_claims → Claim), TC-25 (RunRecord → open_curve_runs), TC-70 (ScoreSet, ClaimSpec, cross-play chart paths → run_claims → report.md) | TC-26, TC-27, TC-46, TC-47, TC-67, TC-68, TC-69 |
+ | PL-05 | `python -m rllab.lab replay runs/<smoke run> --smoke` | runs.store, lab.replay, viz.replay; boundary: `runs.GameRecording` samples | TC-28 (GameRecording → Replay), TC-48 (tank GameRecording → Replay), TC-71 (RunRecord, pair → pick_game → GameRecording) | — |
+ | PL-06 | `python -m rllab.lab crossplay runs/<smoke co-learning run> --smoke` | selfplay.crossplay, selfplay.ratings, viz.crossplay; boundary: `selfplay.CrossPlay`, `selfplay.Ratings`, `viz.Chart` samples | TC-64 (CrossPlay → ratings → Ratings), TC-65 (RunRecord, Env → cross_play → CrossPlay) | — |
+ 
+@@ -248,7 +248,7 @@ Tank positions are `(x, y)` in tank radii with the centre at the origin, set wit
+ ### TC-42: Generalised advantage estimates
+ **Pipeline:** PL-01 · **Covers:** PG-03 · **Kind:** closed form · **Fixture:** tests/fixtures/rllab/TC-42/
+ **Source:** GAE, `A_t = Σ_l (γλ)^l δ_{t+l}` with `δ_t = r_t + γV(s_{t+1}) − V(s_t)` and no bootstrap after a terminal step (Schulman et al., 2016, eq. 16)
+-**Expected:** rewards `[1, 1]`, values `[0.5, 0.5]`, the second step terminal, γ = 0.9, λ = 0.95 → advantages `[1.3775, 0.5]` · **Tolerance:** 1e-12 absolute
++**Expected:** rewards `[1, 1]`, values `[0.5, 0.5, 0.0]` (the last is the bootstrap value, ignored because step 2 is terminal), the second step terminal, γ = 0.9, λ = 0.95 → advantages `[1.3775, 0.5]` · **Tolerance:** 1e-12 absolute
+ 
+ ### TC-43: The clipped objective
+ **Pipeline:** PL-01 · **Covers:** PG-03 · **Kind:** closed form · **Fixture:** tests/fixtures/rllab/TC-43/
+@@ -266,13 +266,12 @@ Tank positions are `(x, y)` in tank radii with the centre at the origin, set wit
+ **Expected:** `act(explore=False)` returns the policy's mean exactly, twice in a row. `act(explore=True)` with log-std 0 gives samples whose mean is within 0.1 of the policy's mean per dimension, and whose spread is within [0.9, 1.1] over 10,000 draws · **Tolerance:** exact for the mean action; the sampling bands are over 10 standard errors wide
+ 
+ ### TC-46: The tank ladder clears the spec's bars
+-**Pipeline:** PL-04 · **Covers:** EVAL-02, EVAL-05, EVAL-07, EVAL-08, QR-07 · **Kind:** model evaluation · **Fixture:** tests/fixtures/rllab/TC-46/
+-**Source:** spec EVAL-02, EVAL-05, EVAL-07 and EVAL-08, approved 2026-10-17; the real tank rungs, training seeds 0–4, each evaluated on 200 held-out games per seed
++**Pipeline:** PL-04 · **Covers:** EVAL-02, EVAL-07, EVAL-08, QR-07 · **Kind:** model evaluation · **Fixture:** tests/fixtures/rllab/TC-46/
++**Source:** spec EVAL-02, EVAL-07 and EVAL-08, approved 2026-10-17, and the developer's bar "Survival time beats random and the scripted swim-away fish"; the real tank rungs, training seeds 0–4, each evaluated on 200 held-out games per seed
+ **Expected:**
+ - each of the four rungs beats the random swimmer
+-- rungs 2 and 3 beat the scripted fish
++- each of the four rungs beats the scripted fish
+ - rung 2 beats rung 1
+-- rung 4 vs the scripted fish is reported and labelled "stretch", and doesn't count toward passing
+ - every rung trained in ≤ 60 minutes per seed
+ 
+ **Tolerance:** α = 0.05 after one correction over all the report's claims
+@@ -356,7 +355,7 @@ Tank positions are `(x, y)` in tank radii with the centre at the origin, set wit
+ 
+ ### TC-62: The opponent pool's mix
+ **Pipeline:** PL-01 · **Covers:** SELF-03 · **Kind:** synthetic known-answer · **Fixture:** tests/fixtures/rllab/TC-62/
+-**Source:** spec SELF-03 criterion and edge case; generator: `OpponentPool(latest_share=0.5, seed=0)` with 5 added generations, 1,000 `sample` calls
++**Source:** spec SELF-03 criterion (the draw for the side that isn't learning this game) and edge case; generator: `OpponentPool(latest_share=0.5, seed=0)` with 5 added generations, 1,000 `sample` calls
+ **Expected:** before any `add`, 10 samples are all the latest policy; after 5 adds, the latest is drawn in 45%–55% of the 1,000 samples and each of the 5 generations at least once · **Tolerance:** the spec's band; at n = 1,000 the share's standard error is about 0.016, so the band is about 3 standard errors each side
+ 
+ ### TC-63: Ten generations per learning team
+@@ -371,8 +370,8 @@ Tank positions are `(x, y)` in tank radii with the centre at the origin, set wit
+ 
+ ### TC-65: The cross-play table's shape and repeatability
+ **Pipeline:** PL-06 · **Covers:** SELF-05 · **Kind:** synthetic known-answer · **Fixture:** tests/fixtures/rllab/TC-65/
+-**Source:** spec SELF-05 criterion; generator: the TC-63 run, cross-played twice with 50 games per cell
+-**Expected:** both tables are 10 × 10 for each team, built from 50 games per cell on held-out seeds, and identical · **Tolerance:** exact, determinism is the requirement
++**Source:** spec SELF-05 criterion; generator: the TC-63 run, cross-played twice with `games=2` per cell; the 50-games-per-cell check is in the M3 system run
++**Expected:** both tables are 10 × 10 for each team, built on held-out seeds, and identical · **Tolerance:** exact, determinism is the requirement
+ 
+ ### TC-66: A rung-1 run trains only its own team
+ **Pipeline:** PL-01 · **Covers:** SELF-01, SELF-02 · **Kind:** synthetic known-answer · **Fixture:** tests/fixtures/rllab/TC-66/
+@@ -404,7 +403,7 @@ Tank positions are `(x, y)` in tank radii with the centre at the origin, set wit
+ 
+ ### TC-70: The report links the cross-play charts and labels rung 2
+ **Pipeline:** PL-04 · **Covers:** EVAL-11 · **Kind:** synthetic known-answer · **Fixture:** tests/fixtures/rllab/TC-70/
+-**Source:** spec EVAL-11 criterion and the `compare.run_claims` contract; generator: two `viz.Chart` samples (rung 2 labelled "reported", rung 3 unlabelled) and the TC-21 score sets
++**Source:** spec EVAL-11 criterion and the `compare.run_claims` contract; generator: two (chart path, label) pairs (rung 2 labelled "reported", rung 3 unlabelled) and the TC-21 score sets
+ **Expected:** `report.md` has a "Cross-play" section linking both chart paths, and rung 2's entry carries the label "reported" · **Tolerance:** exact, text
+ 
+ ### TC-71: Replaying a pairing of generations
+@@ -412,4 +411,8 @@ Tank positions are `(x, y)` in tank radii with the centre at the origin, set wit
+ **Source:** spec REPLAY-03 example and the `runs.GameRecording` circle kinds (AD-12); generator: the TC-63 run, `--pair 9 2`, held-out seed for train seed 0
+ **Expected:** one new recording with `board == "tank"`; every frame holds exactly one circle of kind 3 (predator), six of kind 4 or 5 (prey, swimming or caught) and up to eight of kind 6 (pellets); the same pairing and seed give the same recording twice · **Tolerance:** exact
+ 
++## Open questions
++- TC-65: re-derive the fixture's `games_per_cell` in `input.json` and `expected.json` for `games=2` per cell, because the case no longer cross-plays 50 games per cell (that check moved to the M3 system run).
++- TC-42: regenerate `input.json`'s `values` as `[0.5, 0.5, 0.0]`, because `agents.gae` needs one more value than rewards; the expected advantages don't change.
++
+ ## Retired
+diff --git a/docs/roadmap.md b/docs/roadmap.md
+index 01ee67d..0eb69c9 100644
+--- a/docs/roadmap.md
++++ b/docs/roadmap.md
+@@ -30,11 +30,13 @@
+ 
+ ## M1: Snake value learning
+ **Outline:** Train the table-based and neural value learners on Snake and the corridor, evaluate them against the random and scripted players and the library agent, report tested claims with charts, and replay any game.
+-**Exit:** All five smoke commands run; TC-01–TC-25 and TC-28 pass; the real 5-seed runs pass TC-15, TC-16, TC-26 and TC-27 within QR-01–QR-05.
++**Exit:** All five smoke commands run; TC-01–TC-25 and TC-28 pass; the real 5-seed runs pass TC-16, TC-26 and TC-27 within QR-01–QR-05.
+ **Plan:** [../tasks/plan.md](../tasks/plan.md)
+ 
+ ## M2: Fish tank ladder
+ **Outline:** Train the plain and clipped policy-gradient fish in the tank, from one fish to a school of 8 with limited vision, evaluate them against the random and scripted fish and the library PPO, report the tested claims and replay the school.
++**Exit:** The tank smoke commands run; TC-29–TC-45, TC-48 and TC-49 pass; the real 5-seed tank runs pass TC-46 and TC-47 within QR-05 and QR-07.
+ 
+ ## M3: Predator-prey self-play
+ **Outline:** Train the predator and the foraging prey with the hand-written PPO through the three rungs, save their generations, play them against each other in cross-play, report the tested claims and replay any pairing of generations.
++**Exit:** All six smoke commands run; TC-50–TC-66, TC-70 and TC-71 pass; the real 5-seed predator-prey runs pass TC-67, TC-68 and TC-69 within QR-05 and QR-07, and their cross-play tables hold 50 games per cell.
+diff --git a/docs/routes.md b/docs/routes.md
+index f9382a7..045e477 100644
+--- a/docs/routes.md
++++ b/docs/routes.md
+@@ -9,3 +9,5 @@ Changes a skill found that another skill owns, waiting for the owner's Revise. W
+ - [x] architecture-design · contract.md agents: add returns_to_go(rewards: np.ndarray, gamma: float) -> np.ndarray, gae(rewards: np.ndarray, values: np.ndarray, terminated: np.ndarray, gamma: float, lam: float) -> np.ndarray and clipped_objective(ratio: np.ndarray, advantage: np.ndarray, clip: float) -> np.ndarray, used by ReinforceAgent and PPOAgent (TC-41–TC-43) (from test-planning, 2026-10-17)
+ - [x] pipeline-design · AD-13 teams: core.Env/StepResult per-team maps, core.TeamSpec, core.SOLO; train.train and evaluate.evaluate take one agent per team (evaluate gains team=); RunRecord.checkpoints/generations; GameRecording.scores per team — revisit PL-01–PL-05 step types and add predator-prey steps (PL-01, PL-02, PL-03, PL-04, PL-05) (from architecture-design, 2026-10-17)
+ - [x] architecture-design · contract.md compare.run_claims: add keyword charts: Sequence[Chart] = () whose PNG paths report.md links under a Cross-play section (EVAL-11; PL-04 cites PL-06's charts by path) (from pipeline-design, 2026-10-17)
++- [ ] test-planning · TC-65: re-derive games_per_cell in input.json and expected.json for games=2 per cell (cross-play games per cell in TC-65 changed from 50 to 2) (from plan-review, 2026-10-18)
++- [ ] test-planning · TC-42: regenerate input.json values as [0.5, 0.5, 0.0] (agents.gae needs the bootstrap value; expected advantages unchanged) (from plan-review, 2026-10-18)
+diff --git a/docs/spec.md b/docs/spec.md
+index 29e67fa..e8f0da2 100644
+--- a/docs/spec.md
++++ b/docs/spec.md
+@@ -23,7 +23,6 @@ A personal reinforcement learning lab where each environment teaches one named c
+ - A learned or adaptive ball in the fish tank.
+ - Fish colliding with or blocking each other.
+ - A library comparison on the fish-tank school rungs; the library can't run several agents in one tank fairly.
+-- A fish-tank rung with 8 fixed swim directions played by a value learner.
+ - Using a reinforcement learning library inside the lab's own agents. A library is used only for the comparison.
+ 
+ ## Features
+@@ -193,12 +192,14 @@ All three are written by hand.
+ 3. A school of 8, one shared clipped policy-gradient policy, full view.
+ 4. A school of 8, the same, limited view.
+ 
++Optional, not required for S2: rung 0, one fish choosing among 8 fixed swim directions with the S1 value learner.
++
+ **Requirements**
+ - **PG-01** The policy maps each observation to a Gaussian over the 2-D swim vector: a mean from a neural network, and a learned spread. Training samples actions from it.
+   - Given any observation, when the policy acts during training, then the action is drawn from the Gaussian, and its log-probability is available for learning.
+ - **PG-02** The plain policy-gradient agent updates after each batch of whole games. Each action is pushed toward or away from in proportion to the discounted return from that step, normalised within the batch.
+   - Given a batch where one action led to a higher return than the batch mean, when the agent updates, then that action's log-probability rises.
+-- **PG-03** The clipped policy-gradient agent learns from batches of steps. It estimates each step's advantage with a learned value estimate, then updates for several passes with an objective that clips the policy's change to within 0.2 of its previous probability ratio.
++- **PG-03** The clipped policy-gradient agent learns from batches of steps. It estimates each step's advantage with a learned value estimate, then updates for several passes with an objective that clips the new-to-old probability ratio to within 0.2 of 1 (between 0.8 and 1.2).
+   - Given a batch whose new-to-old probability ratio exceeds 1.2 for a step with positive advantage, when the objective is computed, then that step contributes no further gain beyond the 1.2 ratio.
+ - **PG-04** In a school, one shared policy acts for each fish independently from that fish's own view, and every fish's experience trains it.
+   - Given a school of 8, when one step is taken, then the policy is queried once per swimming fish, and each fish's step enters the same training batch.
+@@ -221,8 +222,8 @@ Saved generations show how the two sides adapt.
+   - Given a rung-2 run, when it trains, then the predator and prey policies are updated from their own teams' experience only.
+ - **SELF-02** Rung 1 is two runs, each training one team against the other team's scripted player.
+   - Given the rung-1 prey settings, when the run trains, then the predator is the scripted predator throughout.
+-- **SELF-03** In rung 3, each game's opponent for a team is the other team's latest policy with probability 0.5, and otherwise one of its saved past generations, chosen uniformly.
+-  - Given 1,000 rung-3 games after generation 5, when the opponents are counted, then the latest policy is chosen in 45%–55% of them, and every earlier generation appears.
++- **SELF-03** In rung 3, the two teams take turns, game by game, as the learning side. The learning side plays its latest policy and learns from the game. The other side's policy is drawn from that side's opponent pool: its latest policy with probability 0.5, and otherwise one of its saved past generations, chosen uniformly.
++  - Given 1,000 rung-3 games after generation 5, when the opponents are counted, then each team learns in half of them, the opponent's latest policy is chosen in 45%–55% of them, and every earlier generation appears.
+ - **SELF-04** A learning run saves each learning team's policy every tenth of its step budget, giving 10 generations per team.
+   - Given a finished co-learning run, when its record is opened, then each team has 10 numbered generations.
+ - **SELF-05** A cross-play table pits every predator generation against every prey generation of a run: 50 games per pairing on held-out seeds, recording both teams' scores.
+@@ -252,11 +253,11 @@ Saved generations show how the two sides adapt.
+   - Given both players' EVAL-01 scores, when tested for "agent worse than scripted", then the result is not significant.
+ - **EVAL-04** At least one agent significantly beats the scripted player, tested with the `null-hypothesis-testing` skill at 5% after correction.
+   - Given all three agents' EVAL-01 scores, when each is tested against the scripted player, then at least one corrected result is significant.
+-- **EVAL-05** The report states, as stretch targets that are not pass conditions, whether Snake's full-grid agent beats the scripted player and whether the limited-view school beats the scripted fish.
+-  - Given either agent's scores, when the report is produced, then it shows that test's result and labels it "stretch".
++- **EVAL-05** The report states, as stretch targets that are not pass conditions, whether Snake's full-grid agent beats the scripted player.
++  - Given the full-grid agent's scores, when the report is produced, then it shows that test's result and labels it "stretch".
+ - **EVAL-06** Each agent's learning curve shows evaluation score against training steps, with the two baseline means drawn as reference lines.
+   - Given a finished run, when its curve is shown, then both baseline lines appear on the same chart.
+-- **EVAL-07** The full-view clipped rungs (2 and 3) each significantly beat the scripted fish, tested with the `null-hypothesis-testing` skill at 5% after correction.
++- **EVAL-07** Every fish-tank rung (1–4) significantly beats the scripted fish, tested with the `null-hypothesis-testing` skill at 5% after correction.
+   - Given each rung's and the scripted fish's EVAL-01 scores, when tested, then each corrected result is significant.
+ - **EVAL-08** The single-fish clipped agent (rung 2) significantly beats the single-fish plain agent (rung 1), with the same step budget and seeds, tested with the `null-hypothesis-testing` skill at 5% after correction.
+   - Given both rungs' EVAL-01 scores, when tested for "rung 2 greater than rung 1", then the corrected result is significant.
+@@ -274,7 +275,7 @@ Saved generations show how the two sides adapt.
+ 
+ **Requirements**
+ - **REF-01** For each environment, the reference implementation trains on the compared rung's setup: the same game, view, agent counts, opponent, rewards, number of training steps and training seeds. It is evaluated with EVAL-01.
+-  - Given a reference run, when its settings are compared with the compared rung's, then game, view, fish count, rewards, steps and seeds match.
++  - Given a reference run, when its settings are compared with the compared rung's, then game, view, agent counts, opponent, rewards, steps and seeds match.
+ - **REF-02** The compared rung's mean score is at least 90% of the reference's mean score.
+   - Given both EVAL-01 results, when compared, then agent mean ≥ 0.9 × reference mean.
+ - **REF-03** The compared rung is not significantly worse than the reference, tested with the `null-hypothesis-testing` skill at 5% after correction.
+@@ -323,7 +324,7 @@ Saved generations show how the two sides adapt.
+ **Behavior:** Any recorded game can be watched step by step, showing the board, score and step count.
+ 
+ **Requirements**
+-- **REPLAY-01** Any recorded game from any saved run can be played back, showing the board (Snake's grid, the corridor, or the tank with the ball and every fish, caught fish marked), the score and the step number.
++- **REPLAY-01** Any recorded game from any saved run can be played back, showing the board (Snake's grid, the corridor, the fish tank with the ball and every fish, or the predator-prey tank with the predator, prey and pellets; caught animals marked), the score and the step number.
+   - Given a saved run, when one of its games is replayed, then each frame matches the recorded game state.
+ - **REPLAY-02** Playback can be paused, stepped one frame at a time, and sped up or slowed down.
+   - Given a paused replay, when "step" is pressed, then exactly one frame advances.
+@@ -381,7 +382,7 @@ Saved generations show how the two sides adapt.
+ ## Assumptions
+ - The learner is the only user. No sharing, accounts or remote access.
+ - Score means food eaten in one Snake game, mean survival steps per fish in one fish-tank game, and in predator-prey either catches per game (predator) or mean reward per prey (prey).
+-- Agents act with moves relative to their heading (straight, left, right), not with compass directions.
++- Snake agents act with moves relative to their heading (straight, left, right), not with compass directions.
+ - "Not worse than" is shown by a non-significant test for "worse", not by a separate equivalence test.
+ 
+ ## Changelog
+diff --git a/tasks/plan.md b/tasks/plan.md
+index da26bf0..5333489 100644
+--- a/tasks/plan.md
++++ b/tasks/plan.md
+@@ -3,7 +3,7 @@
+ **Milestone:** M1 · **Status:** Approved · **Base:** 670366c · **Last updated:** 2026-10-17 · **Roadmap:** [../docs/roadmap.md](../docs/roadmap.md)
+ 
+ ## Scope
+-**Exit:** All five pipelines run end to end (smoke commands); TC-01–TC-25 and TC-28 pass; the real 5-seed ladder and reference runs pass TC-15, TC-16, TC-26 and TC-27 within QR-01–QR-05
++**Exit:** All five pipelines run end to end (smoke commands); TC-01–TC-25 and TC-28 pass; the real 5-seed runs pass TC-16, TC-26 and TC-27 within QR-01–QR-05
+ **Covers:** SNAKE-01–SNAKE-09, BASE-01–BASE-03, AGENT-01–AGENT-07, EVAL-01–EVAL-06, REF-01–REF-03, ABL-01–ABL-04, RUN-01–RUN-05, REPLAY-01–REPLAY-03, CORE-01–CORE-06, DATA-01, DATA-02, QR-01–QR-06 · **Deferred:** FISH-01–FISH-10, PG-01–PG-05, BASE-04, BASE-05, EVAL-07, EVAL-08, CORE-07, QR-07 (to M2: S2's fish-tank ladder, which builds on M1's batch-first core); HUNT-01–HUNT-09, SELF-01–SELF-07, BASE-06–BASE-08, EVAL-09–EVAL-11 (to M3: S3's predator-prey self-play, which builds on M2's tank and policy-gradient agents)
+ **Skills:** null-hypothesis-testing (compare.run_claims and the ladder and reference evaluations)
+ 
+@@ -11,11 +11,11 @@
+ 
+ ### M1-T01: M1 interface
+ **Package:** rllab · **Step:** contract · **Kind:** interface · **Covers:** — · **Size:** M · **Mode:** solo
+-**Read:** PL-01, PL-02, PL-03, PL-04, PL-05, AD-09, AD-13, core.TeamSpec, core.SOLO, core.ActionSpace, core.Env, core.StepResult, core.Transition, core.Agent, core.RunSettings, core.Rewards, core.Exploration, core.AgentParams, runs.CurvePoint, runs.GameRecording, runs.RunRecord, runs.RunWriter, evaluate.ScoreSet, compare.ClaimSpec, compare.Claim, viz.Chart, viz.Replay, envs.COMPACT_FIELDS, core.load_settings, envs.Snake, envs.Corridor, baselines.RandomPlayer, baselines.ScriptedPlayer, agents.TabularAgent, agents.DQNAgent, runs.create_run, runs.open_run, evaluate.eval_seeds, evaluate.evaluate, train.train, reference.train_reference, reference.ReferencePlayer, compare.run_claims, viz.plot_curves, lab.main, AD-03, AD-06
++**Read:** PL-01, PL-02, PL-03, PL-04, PL-05, AD-09, AD-13, core.TeamSpec, core.SOLO, core.ActionSpace, core.Env, core.StepResult, core.Transition, core.Agent, core.RunSettings, core.Rewards, core.Exploration, core.AgentParams, runs.CurvePoint, runs.GameRecording, runs.RunRecord, runs.RunWriter, evaluate.ScoreSet, compare.ClaimSpec, compare.Claim, viz.Chart, viz.Replay, envs.COMPACT_FIELDS, core.load_settings, envs.Snake, envs.Corridor, baselines.RandomPlayer, baselines.ScriptedPlayer, agents.TabularAgent, agents.DQNAgent, runs.create_run, runs.open_run, evaluate.eval_seeds, evaluate.evaluate, train.train, reference.train_reference, reference.ReferencePlayer, compare.run_claims, viz.plot_curves, lab.main, core.with_seed, lab.make_env, lab.make_agent, lab.ReportTargets, AD-03, AD-06
+ **Acceptance:**
+ - [ ] Every contract type is code in its component's `types.py` (Protocols in `core/protocols.py`), with `core.Env` and `core.StepResult` keyed by team (`core.TeamSpec`, `core.SOLO`) and each team batch-first, `core.Transition` and `core.Agent` per team, and `core.ActionSpace` (AD-09, AD-13); each `tests/contracts/<id>.<Type>/` sample validates against its schema, and the `core.Agent`, `core.Env`, `runs.RunWriter` and `viz.Replay` replay doubles serve their recordings
+-- [ ] Every step, contract function and entry function imports with its contract signature, its body `raise NotImplementedError("<task id>")`; the function fakes named on `**Boundary:**` lines serve their fixtures
+-- [ ] Each component `__init__.py` exports only its contract; `src/rllab/lab/__main__.py` dispatches `train` (PL-01, or PL-02 when `agent = "reference"`), `eval`, `report` and `replay`, one entry call per seed or target
++- [ ] Every M1 step (the Snake, corridor, tabular, DQN, Snake-baseline, reference, evaluate, compare, viz and lab steps), contract function and entry function imports with its contract signature, its body `raise NotImplementedError("<task id>")`; the function fakes named on `**Boundary:**` lines serve their fixtures
++- [ ] Each component `__init__.py` exports only its contract; `src/rllab/lab/__main__.py` dispatches `train` (PL-01, or PL-02 when `agent = "reference"`), `eval`, `report` and `replay`, one entry call per seed or target, and parses the `lab.main` flags (`--smoke` on every subcommand; eval's `--env`, `--team`, `--vs` and `--seed`)
+ **Verify:** `pytest tests/contracts` · `scripts/check.sh gate`
+ **Depends on:** — · **Writes:** src/rllab/__init__.py, src/rllab/core/**, src/rllab/envs/**, src/rllab/baselines/**, src/rllab/agents/**, src/rllab/runs/**, src/rllab/evaluate/**, src/rllab/train/**, src/rllab/reference/**, src/rllab/compare/**, src/rllab/viz/**, src/rllab/lab/**, tests/contracts/**
+ 
+@@ -23,16 +23,16 @@
+ 
+ ### M1-T02: load_settings spine (TOML into frozen settings)
+ **Package:** rllab · **Step:** PL-01.load_settings · **Kind:** spine · **Covers:** RUN-01 · **Size:** XS · **Mode:** solo
+-**Read:** PL-01, core.load_settings, core.RunSettings, core.Rewards, core.Exploration, core.AgentParams
++**Read:** PL-01, core.load_settings, core.with_seed, core.RunSettings, core.Rewards, core.Exploration, core.AgentParams
+ **Acceptance:**
+-- [ ] The `core.RunSettings` sample's TOML loads to an equal `RunSettings`; an unknown agent raises `ValueError` naming the key; `with_seed` swaps only the seed
++- [ ] The `core.RunSettings` sample's TOML loads to an equal `RunSettings`; an unknown agent raises `ValueError` naming the key; `with_seed` swaps only the seed and refuses a seed outside `[0, 1_000_000)`
+ **Verify:** `pytest tests/unit/rllab -k settings` · `scripts/check.sh gate`
+ **Depends on:** M1-T01 · **Writes:** src/rllab/core/settings.py, tests/unit/rllab/test_settings.py
+ 
+ ### M1-T03: runs store spine (one folder per run)
+ **Package:** rllab · **Step:** PL-05.open_run · **Kind:** spine · **Covers:** RUN-02, RUN-05 · **Size:** XS · **Mode:** solo
+ **Reason:** `create_run` and `RunWriter` share the module and are built with it
+-**Read:** PL-05, runs.create_run, runs.RunWriter, runs.open_run, runs.RunRecord, runs.CurvePoint, runs.GameRecording, AD-06
++**Read:** PL-05, runs.create_run, runs.RunWriter, runs.open_run, runs.RunRecord, runs.CurvePoint, runs.GameRecording, core.RunSettings, core.Rewards, core.Exploration, core.AgentParams, core.Agent, core.SOLO, AD-06
+ **Acceptance:**
+ - [ ] A run written with `create_run` and `RunWriter` from the samples reads back through `open_run` as an equal `RunRecord`; a folder without `settings.json` raises `FileNotFoundError` naming the run
+ **Verify:** `pytest tests/unit/rllab -k store` · `scripts/check.sh gate`
+@@ -41,23 +41,24 @@
+ ### M1-T04: build spine (env, agent from settings)
+ **Package:** rllab · **Step:** PL-01.make_env · **Kind:** spine · **Covers:** CORE-01, DATA-02 · **Size:** XS · **Mode:** solo
+ **Reason:** `make_agent` (PL-01.make_agent) shares `lab/build.py` and is built with it
+-**Read:** PL-01, core.RunSettings, core.Env, core.TeamSpec, core.SOLO, core.Agent, envs.Snake, envs.Corridor, agents.TabularAgent, agents.DQNAgent
++**Read:** PL-01, lab.make_env, lab.make_agent, core.RunSettings, core.Env, core.TeamSpec, core.SOLO, core.Agent, core.ActionSpace, core.Rewards, core.AgentParams, core.Exploration, envs.Snake, envs.Corridor, agents.TabularAgent, agents.DQNAgent, baselines.RandomPlayer, baselines.ScriptedPlayer
+ **Acceptance:**
+ - [ ] On the `core.RunSettings` samples, `make_env` returns a zero-argument factory of the named environment, and `make_agent` one agent per team (`{SOLO: agent}` for Snake and the corridor), sized from the team's `TeamSpec`, with the ablation switch from `settings.ablation`
++- [ ] `make_env`/`make_agent` raise `ValueError` for `tank` and `predprey` until M2/M3
+ **Verify:** `pytest tests/unit/rllab -k build` · `scripts/check.sh gate`
+ **Depends on:** M1-T01 · **Writes:** src/rllab/lab/build.py, tests/unit/rllab/test_build.py
+ 
+ ### M1-T05: DQNAgent spine (MLP, memory, target copy)
+-**Package:** rllab · **Step:** PL-01.DQNAgent · **Kind:** spine · **Covers:** AGENT-03, AGENT-06, QR-06 · **Size:** XS · **Mode:** solo
++**Package:** rllab · **Step:** PL-01.DQNAgent · **Kind:** spine · **Covers:** AGENT-03, AGENT-06, QR-06 · **Size:** M · **Mode:** solo
+ **Read:** PL-01, agents.DQNAgent, core.Agent, core.Transition, core.AgentParams, core.Exploration, AD-02, AD-05, AD-08
+ **Acceptance:**
+ - [ ] On the `core.Transition` samples, the agent learns after `learn_start` from random batches of its memory, with a 128×128 MLP, a hard target refresh, Huber loss and gradient clip 10, on CPU in one thread; `act(explore=False)` is its argmax
+ **Verify:** `pytest tests/unit/rllab -k dqn` · `scripts/check.sh gate`
+-**Depends on:** M1-T01 · **Writes:** src/rllab/agents/dqn/**, tests/unit/rllab/test_dqn.py
++**Depends on:** M1-T01 · **Writes:** src/rllab/agents/dqn/agent.py, src/rllab/agents/dqn/memory.py, src/rllab/agents/dqn/networks.py, tests/unit/rllab/test_dqn.py
+ 
+ ### M1-T06: train spine (step loop, curve, progress)
+ **Package:** rllab · **Step:** PL-01.train · **Kind:** spine · **Covers:** RUN-04, CORE-02 · **Size:** XS · **Mode:** solo
+-**Read:** PL-01, train.train, core.Env, core.Agent, core.RunSettings, runs.RunWriter, runs.CurvePoint, evaluate.evaluate
++**Read:** PL-01, train.train, core.Env, core.Agent, core.RunSettings, core.Transition, core.StepResult, core.TeamSpec, core.SOLO, runs.create_run, runs.RunWriter, runs.CurvePoint, runs.GameRecording, evaluate.evaluate, evaluate.ScoreSet
+ **Acceptance:**
+ - [ ] On the `core.Env` and `core.Agent` replay doubles, `train` takes one agent per team, builds one batch-first `Transition` per learning team per step and calls its `learn`, adds a CurvePoint at step 0 and every `eval_every`, prints a progress line at least every 30 s, and saves a checkpoint and 5 recorded games
+ **Verify:** `pytest tests/unit/rllab -k train_loop` · `scripts/check.sh gate`
+@@ -65,9 +66,9 @@
+ 
+ ### M1-T07: train_reference spine (library DQN on the adapter)
+ **Package:** rllab · **Step:** PL-02.train_reference · **Kind:** spine · **Covers:** REF-01, QR-06 · **Size:** XS · **Mode:** solo
+-**Read:** PL-02, reference.train_reference, core.RunSettings, core.Env, runs.RunWriter, evaluate.evaluate, AD-03, AD-04
++**Read:** PL-02, reference.train_reference, core.RunSettings, core.Env, core.StepResult, core.TeamSpec, core.SOLO, envs.Snake, runs.create_run, runs.RunWriter, runs.CurvePoint, evaluate.evaluate, AD-03, AD-04
+ **Acceptance:**
+-- [ ] On the reference `core.RunSettings` sample, `train_reference` trains Stable-Baselines3 DQN with `MlpPolicy` and `device="cpu"` through a `gymnasium.Env` adapter, with curve points from `evaluate.evaluate`; non-Snake or non-compact settings raise `ValueError`
++- [ ] On the reference `core.RunSettings` sample, `train_reference` trains Stable-Baselines3 DQN with `MlpPolicy` and `device="cpu"` through a `gymnasium.Env` adapter, with curve points from `evaluate.evaluate`; settings other than Snake with the compact view raise `ValueError` in M1 (tank and predator-prey references arrive in M2 and M3)
+ **Verify:** `pytest tests/unit/rllab -k train_reference` · `scripts/check.sh gate`
+ **Depends on:** M1-T01 · **Writes:** src/rllab/reference/train/**, tests/unit/rllab/test_train_reference.py
+ 
+@@ -82,7 +83,7 @@
+ ### M1-T09: players spine (load, score, open runs)
+ **Package:** rllab · **Step:** PL-03.load_player · **Kind:** spine · **Covers:** RUN-05 · **Size:** XS · **Mode:** solo
+ **Reason:** `score_players` and `open_curve_runs` (PL-04) share `lab/players.py` and are built with it
+-**Read:** PL-03, PL-04, runs.open_run, runs.RunRecord, evaluate.evaluate, evaluate.ScoreSet, core.Agent, core.RunSettings
++**Read:** PL-03, PL-04, runs.open_run, runs.RunRecord, runs.GameRecording, evaluate.evaluate, evaluate.ScoreSet, core.Agent, core.Env, core.RunSettings, core.SOLO, envs.Snake, baselines.RandomPlayer, baselines.ScriptedPlayer, lab.make_env, lab.make_agent, lab.ReportTargets
+ **Acceptance:**
+ - [ ] `load_player` turns the `runs.RunRecord` sample into an agent loaded from its checkpoint, and `random`/`scripted` into baselines on default Snake compact settings; `score_players` returns a ScoreSet per player and seed through the `evaluate.evaluate` fake
+ **Verify:** `pytest tests/unit/rllab -k players` · `scripts/check.sh gate`
+@@ -90,15 +91,15 @@
+ 
+ ### M1-T10: load_report_spec spine (players, claims, charts)
+ **Package:** rllab · **Step:** PL-04.load_report_spec · **Kind:** spine · **Covers:** EVAL-02 · **Size:** XS · **Mode:** solo
+-**Read:** PL-04, compare.ClaimSpec
++**Read:** PL-04, compare.ClaimSpec, lab.ReportTargets
+ **Acceptance:**
+-- [ ] A report TOML gives its `ClaimSpec` list and targets (players, baseline names, ladder and ablation groups); a claim naming an unlisted player raises `ValueError`
++- [ ] A report TOML gives its `ClaimSpec` list and `ReportTargets` (players, baseline names, ladder and ablation groups, cross-play chart paths and labels); a claim naming an unlisted player raises `ValueError`
+ **Verify:** `pytest tests/unit/rllab -k report_spec` · `scripts/check.sh gate`
+ **Depends on:** M1-T01 · **Writes:** src/rllab/lab/report_spec.py, tests/unit/rllab/test_report_spec.py
+ 
+ ### M1-T11: plot_curves spine (mean, band, baselines)
+ **Package:** rllab · **Step:** PL-04.plot_curves · **Kind:** spine · **Covers:** EVAL-06, ABL-04 · **Size:** XS · **Mode:** solo
+-**Read:** PL-04, viz.plot_curves, viz.Chart, runs.RunRecord, evaluate.ScoreSet
++**Read:** PL-04, viz.plot_curves, viz.Chart, runs.RunRecord, runs.CurvePoint, evaluate.ScoreSet
+ **Acceptance:**
+ - [ ] On the `runs.RunRecord` and `evaluate.ScoreSet` samples, `plot_curves` writes a PNG with one mean line and min–max band per group and a horizontal line per baseline, and returns a `Chart` listing them; a missing baseline name raises `ValueError`
+ **Verify:** `pytest tests/unit/rllab -k curves` · `scripts/check.sh gate`
+@@ -106,16 +107,16 @@
+ 
+ ### M1-T12: pick_game spine (recorded or new game)
+ **Package:** rllab · **Step:** PL-05.pick_game · **Kind:** spine · **Covers:** REPLAY-03 · **Size:** XS · **Mode:** solo
+-**Read:** PL-05, runs.RunRecord, runs.GameRecording, evaluate.evaluate, evaluate.eval_seeds
++**Read:** PL-05, runs.RunRecord, runs.GameRecording, evaluate.evaluate, evaluate.eval_seeds, evaluate.ScoreSet, core.Agent, core.Env, lab.make_env
+ **Acceptance:**
+-- [ ] `pick_game` returns game N of the `runs.RunRecord` sample; with `new_seed=S` it records one game on `eval_seeds(S, 1)` through the `evaluate.evaluate` fake
++- [ ] `pick_game` returns game N of the `runs.RunRecord` sample; with `new_seed=S` it records one game on `eval_seeds(S, 1)` through the `evaluate.evaluate` fake, with the player loader and `make_env` passed in by its caller
+ **Verify:** `pytest tests/unit/rllab -k pick_game` · `scripts/check.sh gate`
+ **Depends on:** M1-T01 · **Writes:** src/rllab/lab/replay.py, tests/unit/rllab/test_pick_game.py
+ 
+ ### M1-T13: Snake rules with both views
+-**Package:** rllab · **Step:** PL-01.Snake · **Kind:** thicken · **Covers:** SNAKE-01–SNAKE-09 · **Size:** XS · **Mode:** split
++**Package:** rllab · **Step:** PL-01.Snake · **Kind:** thicken · **Covers:** SNAKE-01–SNAKE-09 · **Size:** S · **Mode:** split
+ **Reason:** fold: spine is the whole behavior
+-**Read:** PL-01, envs.Snake, envs.COMPACT_FIELDS, core.Env, core.StepResult, core.Rewards, TC-01, TC-02, TC-03, TC-04, TC-05, TC-06, TC-07, TC-08, TC-09, TC-10
++**Read:** PL-01, envs.Snake, envs.COMPACT_FIELDS, core.Env, core.StepResult, core.Rewards, core.TeamSpec, core.SOLO, core.ActionSpace, TC-01, TC-02, TC-03, TC-04, TC-05, TC-06, TC-07, TC-08, TC-09, TC-10
+ **Acceptance:**
+ - [ ] TC-01–TC-06 and TC-09 pass (collisions, tail cell, eating, turns, starvation, full-board win)
+ - [ ] TC-07 and TC-08 pass (compact and full-grid views)
+@@ -126,7 +127,7 @@
+ ### M1-T14: Corridor environment
+ **Package:** rllab · **Step:** PL-01.Corridor · **Kind:** thicken · **Covers:** CORE-03, CORE-05 · **Size:** XS · **Mode:** split
+ **Reason:** fold: spine is the whole behavior
+-**Read:** PL-01, envs.Corridor, core.Env, core.StepResult, core.Rewards, TC-11
++**Read:** PL-01, envs.Corridor, core.Env, core.StepResult, core.Rewards, core.TeamSpec, core.SOLO, core.ActionSpace, TC-11
+ **Acceptance:**
+ - [ ] TC-11 passes; the corridor touches no file outside `envs/corridor.py` and its tests (CORE-05)
+ **Verify:** `pytest tests/intent/rllab tests/unit/rllab -k corridor` · `scripts/check.sh gate`
+@@ -156,14 +157,14 @@
+ **Reason:** fold: spine is the whole behavior
+ **Read:** PL-03, baselines.ScriptedPlayer, envs.COMPACT_FIELDS, core.Agent, TC-19
+ **Acceptance:**
+-- [ ] TC-19 passes (a straight, b right, c straight, d straight); a non-(11,) observation raises `ValueError`
++- [ ] TC-19 passes (a straight, b right, c straight, d straight); a non-(1, 11) observation raises `ValueError`
+ **Verify:** `pytest tests/intent/rllab tests/unit/rllab -k scripted` · `scripts/check.sh gate`
+ **Depends on:** M1-T01 · **Writes:** src/rllab/baselines/scripted.py, tests/intent/rllab/test_scripted.py, tests/unit/rllab/test_scripted.py
+ 
+ ### M1-T18: Held-out greedy evaluation
+ **Package:** rllab · **Step:** PL-03.evaluate · **Kind:** thicken · **Covers:** EVAL-01, DATA-01, AGENT-07, QR-04 · **Size:** XS · **Mode:** split
+ **Reason:** fold: spine is the whole behavior
+-**Read:** PL-03, evaluate.evaluate, evaluate.eval_seeds, evaluate.ScoreSet, core.Env, core.Agent, core.SOLO, runs.GameRecording, TC-18
++**Read:** PL-03, evaluate.evaluate, evaluate.eval_seeds, evaluate.ScoreSet, core.Env, core.Agent, core.SOLO, core.StepResult, core.TeamSpec, runs.GameRecording, TC-18
+ **Acceptance:**
+ - [ ] TC-18 passes (seed formula, no overlap, n > 1000 refused)
+ - [ ] On the `core.Env` and `core.Agent` replay doubles, `evaluate` plays `n_games` with one agent per team and `explore=False`, scores `team` (default `SOLO`), never calls `learn`, and records the first `record` games
+@@ -174,7 +175,7 @@
+ **Package:** rllab · **Step:** PL-04.run_claims · **Kind:** thicken · **Covers:** EVAL-02, EVAL-03, EVAL-04, EVAL-05, REF-02, REF-03, BASE-03 · **Size:** XS · **Mode:** split
+ **Reason:** fold: spine is the whole behavior
+ **Skills:** null-hypothesis-testing
+-**Read:** PL-04, compare.run_claims, compare.ClaimSpec, compare.Claim, evaluate.ScoreSet, TC-21, TC-22, TC-23, TC-24
++**Read:** PL-04, compare.run_claims, compare.ClaimSpec, compare.Claim, evaluate.ScoreSet, runs.GameRecording, TC-21, TC-22, TC-23, TC-24
+ **Acceptance:**
+ - [ ] TC-21 and TC-22 pass (planted gap found; ≤ 3 of 20 noise claims pass), with the test chosen by `null-hypothesis-testing` and recorded in `Claim.method`
+ - [ ] TC-23 and TC-24 pass ("not worse" both ways; the 0.9 ratio is inclusive)
+@@ -196,9 +197,9 @@
+ 
+ ### M1-T21: Wire PL-01
+ **Package:** rllab · **Step:** PL-01 · **Kind:** wiring · **Covers:** CORE-02, RUN-03 · **Size:** S · **Mode:** solo
+-**Read:** PL-01, TC-15, core.load_settings, train.train
++**Read:** PL-01, TC-15, core.load_settings, core.with_seed, train.train
+ **Acceptance:**
+-- [ ] `python -m rllab.lab train settings/smoke-corridor.toml --smoke` runs end to end; committed as PL-01's smoke test
++- [ ] `python -m rllab.lab train settings/smoke-corridor.toml --smoke` runs end to end; committed as PL-01's smoke test; a `tank` or `predprey` settings file exits with code 2, because `make_env`/`make_agent` raise `ValueError` for them until M2/M3
+ - [ ] TC-15 passes on the corridor (same settings and seed, same run)
+ - [ ] PL-01 pre-build sections replaced by a `dt layout` pointer
+ **Verify:** `python -m rllab.lab train settings/smoke-corridor.toml --smoke` · `scripts/check.sh gate`
+@@ -206,7 +207,7 @@
+ 
+ ### M1-T22: Wire PL-02
+ **Package:** rllab · **Step:** PL-02 · **Kind:** wiring · **Covers:** REF-01 · **Size:** S · **Mode:** solo
+-**Read:** PL-02, core.load_settings, reference.train_reference
++**Read:** PL-02, core.load_settings, core.with_seed, reference.train_reference
+ **Acceptance:**
+ - [ ] `python -m rllab.lab train settings/smoke-reference.toml --smoke` runs end to end; committed as PL-02's smoke test
+ - [ ] PL-02 pre-build sections replaced by a `dt layout` pointer
+@@ -226,7 +227,7 @@
+ ### M1-T24: Wire PL-04
+ **Package:** rllab · **Step:** PL-04 · **Kind:** wiring · **Covers:** EVAL-06 · **Size:** S · **Mode:** solo
+ **Skills:** null-hypothesis-testing
+-**Read:** PL-04, compare.run_claims, viz.plot_curves
++**Read:** PL-04, compare.run_claims, viz.plot_curves, lab.ReportTargets
+ **Acceptance:**
+ - [ ] `python -m rllab.lab report reports/smoke.toml --smoke` runs end to end, writing `report.md`, `ladder.png` and `ablations.png`; committed as PL-04's smoke test
+ - [ ] PL-04 pre-build sections replaced by a `dt layout` pointer
+@@ -240,7 +241,7 @@
+ - [ ] `python -m rllab.lab replay runs/<smoke run> --smoke` runs end to end headless on a run folder written from the `runs.RunRecord` sample; committed as PL-05's smoke test
+ - [ ] PL-05 pre-build sections replaced by a `dt layout` pointer
+ **Verify:** `python -m rllab.lab replay runs/<smoke run> --smoke` · `scripts/check.sh gate`
+-**Depends on:** M1-T03, M1-T12, M1-T20 · **Writes:** src/rllab/lab/pipelines/pl05_replay.py, tests/unit/rllab/test_pl05_smoke.py
++**Depends on:** M1-T03, M1-T04, M1-T09, M1-T12, M1-T18, M1-T20 · **Writes:** src/rllab/lab/pipelines/pl05_replay.py, tests/unit/rllab/test_pl05_smoke.py
+ 
+ ### M1-T26: Memory, target-copy ablation switches
+ **Package:** rllab · **Step:** PL-01.DQNAgent · **Kind:** thicken · **Covers:** AGENT-04, ABL-01, ABL-02 · **Size:** XS · **Mode:** split
+@@ -252,17 +253,17 @@
+ **Depends on:** M1-T05 · **Writes:** src/rllab/agents/dqn/agent.py, tests/intent/rllab/test_dqn_switches.py, tests/unit/rllab/test_dqn.py
+ 
+ ### M1-T27: Full-grid convolutional network
+-**Package:** rllab · **Step:** PL-01.DQNAgent · **Kind:** thicken · **Covers:** AGENT-05 · **Size:** XS · **Mode:** split
++**Package:** rllab · **Step:** PL-01.DQNAgent · **Kind:** thicken · **Covers:** AGENT-05 · **Size:** S · **Mode:** split
+ **Read:** PL-01, agents.DQNAgent, envs.Snake, AD-05
+ **Acceptance:**
+ - [ ] Given `net="cnn"` and a `(3,10,10)` observation, when the agent acts, then it returns one of 3 actions from two 3×3 convolutions (16, 32) and a 128-unit layer; a non-3-D `obs_shape` raises `ValueError`
+ - [ ] Given a full-grid run, when training starts, then the agent receives only the grid view (AGENT-05)
+ **Verify:** `pytest tests/intent/rllab tests/unit/rllab -k cnn` · `scripts/check.sh gate`
+-**Depends on:** M1-T05 · **Writes:** src/rllab/agents/dqn/networks.py, tests/intent/rllab/test_cnn.py, tests/unit/rllab/test_networks.py
++**Depends on:** M1-T05, M1-T26 · **Writes:** src/rllab/agents/dqn/networks.py, src/rllab/agents/dqn/agent.py, tests/intent/rllab/test_cnn.py, tests/unit/rllab/test_networks.py
+ 
+ ### M1-T28: Interrupted run kept as incomplete
+ **Package:** rllab · **Step:** PL-01.train · **Kind:** thicken · **Covers:** RUN-02 · **Size:** XS · **Mode:** split
+-**Read:** PL-01, train.train, runs.RunWriter, AD-06
++**Read:** PL-01, train.train, core.StepResult, runs.create_run, runs.RunWriter, AD-06
+ **Acceptance:**
+ - [ ] Given a run interrupted by `KeyboardInterrupt` after 3 curve points, when its folder is opened, then status is `incomplete`, the 3 points are kept, and the interrupt is re-raised
+ **Verify:** `pytest tests/intent/rllab tests/unit/rllab -k interrupt` · `scripts/check.sh gate`
+@@ -279,7 +280,7 @@
+ 
+ ### M1-T30: Mismatched ablations refused
+ **Package:** rllab · **Step:** PL-04.open_curve_runs · **Kind:** thicken · **Covers:** ABL-04 · **Size:** XS · **Mode:** split
+-**Read:** PL-04, runs.open_run, runs.RunRecord, TC-25
++**Read:** PL-04, runs.open_run, runs.RunRecord, lab.ReportTargets, TC-25
+ **Acceptance:**
+ - [ ] TC-25 passes (steps mismatch and seeds mismatch raise `ValueError` naming them; an exact match passes)
+ **Verify:** `pytest tests/intent/rllab tests/unit/rllab -k ablation_pairs` · `scripts/check.sh gate`
+@@ -361,10 +362,14 @@
+ | M1-T24 wire PL-04 | M1-T18 held-out evaluation | order | none: integration: the smoke runs it |
+ | M1-T24 wire PL-04 | M1-T19 tested claims | order | none: integration: the smoke runs it |
+ | M1-T25 wire PL-05 | M1-T03 runs store spine | order | none: integration: the smoke runs it |
++| M1-T25 wire PL-05 | M1-T04 build spine | order | none: integration: `--new` builds the env with `make_env` |
++| M1-T25 wire PL-05 | M1-T09 players spine | order | none: integration: `--new` loads the player with `load_player` |
+ | M1-T25 wire PL-05 | M1-T12 pick_game spine | order | none: integration: the smoke runs it |
++| M1-T25 wire PL-05 | M1-T18 held-out evaluation | order | none: integration: `--new` records through `evaluate` |
+ | M1-T25 wire PL-05 | M1-T20 replay viewer | order | none: integration: the smoke runs it |
+ | M1-T26 memory and target switches | M1-T05 DQNAgent spine | code | none: thickens the same folder |
+ | M1-T27 full-grid CNN | M1-T05 DQNAgent spine | code | none: thickens the same folder |
++| M1-T27 full-grid CNN | M1-T26 memory and target switches | file | none: both write `agents/dqn/agent.py` |
+ | M1-T28 interrupted run | M1-T06 train spine | code | none: thickens the same module |
+ | M1-T29 reference mapping | M1-T07 train_reference spine | code | none: thickens the same folder |
+ | M1-T30 mismatched ablations | M1-T09 players spine | code | none: thickens the same module |
+@@ -389,5 +394,3 @@
+ ## Open questions
+ 
+ ## Replan notes
+-- 2026-10-17: AD-09 adopted before the build: M1-T01 freezes the batch-first `core.Env`, `StepResult`, `Transition`, `Agent` and the new `core.ActionSpace`; M1-T06's loop builds batch-first transitions; M1-T31 proves CORE-06 with TC-01–TC-28 unchanged. The fish-tank IDs are deferred to M2. No task added, dropped or reordered.
+-- 2026-10-17: AD-13 adopted before the build: M1-T01 also freezes `core.TeamSpec` and `core.SOLO`, with `core.Env`/`StepResult` keyed by team; M1-T04's `make_agent`, M1-T06's `train` and M1-T18's `evaluate` take one agent per team (`SOLO` for Snake and the corridor); M1-T19's `run_claims` has the `charts` keyword from the frozen contract. The predator-prey IDs are deferred to M3. No task added, dropped or reordered.
+diff --git a/tasks/todo.md b/tasks/todo.md
+index 30fa7a2..2dc5fc9 100644
+--- a/tasks/todo.md
++++ b/tasks/todo.md
+@@ -4,7 +4,7 @@
+ - [ ] M1-T02 load_settings spine (TOML into frozen settings) (rllab, XS, solo)
+ - [ ] M1-T03 runs store spine (one folder per run) (rllab, XS, solo)
+ - [ ] M1-T04 build spine (env, agent from settings) (rllab, XS, solo)
+-- [ ] M1-T05 DQNAgent spine (MLP, memory, target copy) (rllab, XS, solo)
++- [ ] M1-T05 DQNAgent spine (MLP, memory, target copy) (rllab, M, solo)
+ - [ ] M1-T06 train spine (step loop, curve, progress) (rllab, XS, solo)
+ - [ ] M1-T07 train_reference spine (library DQN on the adapter) (rllab, XS, solo)
+ - [ ] M1-T08 ReferencePlayer spine (greedy library model) (rllab, XS, solo)
+@@ -12,7 +12,7 @@
+ - [ ] M1-T10 load_report_spec spine (players, claims, charts) (rllab, XS, solo)
+ - [ ] M1-T11 plot_curves spine (mean, band, baselines) (rllab, XS, solo)
+ - [ ] M1-T12 pick_game spine (recorded or new game) (rllab, XS, solo)
+-- [ ] M1-T13 Snake rules with both views (rllab, XS, split)
++- [ ] M1-T13 Snake rules with both views (rllab, S, split)
+ - [ ] M1-T14 Corridor environment (rllab, XS, split)
+ - [ ] M1-T15 Table-based value learner (rllab, XS, split)
+ - [ ] M1-T16 Random baseline player (rllab, XS, split)
+@@ -26,7 +26,7 @@
+ - [ ] M1-T24 Wire PL-04 (rllab, S, solo)
+ - [ ] M1-T25 Wire PL-05 (rllab, XS, solo)
+ - [ ] M1-T26 Memory, target-copy ablation switches (rllab, XS, split)
+-- [ ] M1-T27 Full-grid convolutional network (rllab, XS, split)
++- [ ] M1-T27 Full-grid convolutional network (rllab, S, split)
+ - [ ] M1-T28 Interrupted run kept as incomplete (rllab, XS, split)
+ - [ ] M1-T29 One-to-one reference settings mapping (rllab, XS, split)
+ - [ ] M1-T30 Mismatched ablations refused (rllab, XS, split)
+diff --git a/tests/fixtures/rllab/TC-46/expected.json b/tests/fixtures/rllab/TC-46/expected.json
+index 6e83436..2d690d1 100644
+--- a/tests/fixtures/rllab/TC-46/expected.json
++++ b/tests/fixtures/rllab/TC-46/expected.json
+@@ -1 +1 @@
+-{"claims": {"reinforce-1 > random": true, "ppo-1 > random": true, "ppo-school > random": true, "ppo-school-limited > random": true, "ppo-1 > scripted": true, "ppo-school > scripted": true, "ppo-1 > reinforce-1": true}, "stretch": {"ppo-school-limited > scripted": "reported, labelled stretch, not a pass condition"}, "max_train_minutes_per_seed": 60, "alpha": 0.05}
++{"claims": {"reinforce-1 > random": true, "ppo-1 > random": true, "ppo-school > random": true, "ppo-school-limited > random": true, "reinforce-1 > scripted": true, "ppo-1 > scripted": true, "ppo-school > scripted": true, "ppo-school-limited > scripted": true, "ppo-1 > reinforce-1": true}, "max_train_minutes_per_seed": 60, "alpha": 0.05}
+diff --git a/tests/fixtures/rllab/TC-65/expected.json b/tests/fixtures/rllab/TC-65/expected.json
+index df9fe0f..11e2dd0 100644
+--- a/tests/fixtures/rllab/TC-65/expected.json
++++ b/tests/fixtures/rllab/TC-65/expected.json
+@@ -1 +1 @@
+-{"shape": [10, 10], "games_per_cell": 50, "property": "both plays give identical predator and prey tables", "tol": 0}
++{"shape": [10, 10], "property": "both plays give identical predator and prey tables", "tol": 0}

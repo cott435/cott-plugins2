@@ -569,3 +569,78 @@ Before another version, measure the noise:
 - Two extra judge pairs on one fixed set.
 
 Then judge a version on the mean of those runs.
+
+## Noise: how much one fixer run and one judge pair move a score
+
+**Method.** The committed v5 harness (f021648) was used unchanged. Records are in `review-ab/noise/`: the fixer records per run, the judge verdicts and keys, `stats.json`, and the scripts and log that produced them.
+- **Fixer runs.** Three new v5 fixer runs per project (`n1`–`n3`), each on a fresh copy in `dev-team-workspace/review-ab-n{1,2,3}/` with v3's `review.json`, using `prepare` then `fix`. Every copy packaged byte-identical to `iteration-9/bench` before fixing.
+  - quant-all-at-once's copies were reset to `9ece2e6`. The original is still being built in place (now at "M1-T01" and "Tick M1-T01").
+  - Its ignored `packages/` tree was also removed from the copies only, since `dt context` adds a Layout section for it. Turn 50 had no `packages/`.
+- **Run judgments.** Each run's reviewed incremental was judged against the same run's reviewed all-at-once, in both orders: 12 calls. The committed v5 run counts as a fourth sample, so n = 4 per set.
+- **Judge only.** The committed v5 rl pairing was re-judged twice more in both orders, from the same prompt folder (4 calls). That gives 3 draws with the inputs fixed.
+- **Baseline.** Iteration 9's original pairing was re-judged twice more per project in both orders (8 calls), so its scores have 3 draws too.
+- **Malformed replies.** 8 judge orders returned malformed JSON and were retried, all successfully. The judge's malformed rate this session is about 1 in 4.
+
+**Per set (overall, mean of both orders).**
+
+| | v5 runs (n1, n2, n3, v5) | Mean | Min–max | SD | Judge-only SD (v5 rl, 3 draws) | Iteration 9 draws | Iteration 9 mean (SD) | v5 − iteration 9 |
+|---|---|---|---|---|---|---|---|---|
+| rl-incremental | 7.65, 7.6, 7.65, 7.7 | 7.65 | 7.6–7.7 | 0.04 | 0.03 (7.7, 7.65, 7.65) | 7.65, 7.75, 7.6 | 7.67 (0.08) | −0.02 |
+| rl-all-at-once | 7.7, 7.65, 7.25, 7.25 | 7.46 | 7.25–7.7 | 0.25 | **0.30** (7.25, 7.3, 7.8) | 7.45, 7.1, 7.35 | 7.30 (0.18) | +0.16 |
+| quant-incremental | 7.55, 7.8, 8.2, 7.45 | 7.75 | 7.45–8.2 | **0.33** | — | 7.7, 7.75, 7.6 | 7.68 (0.08) | +0.07 |
+| quant-all-at-once | 7.55, 7.95, 8.05, 7.7 | 7.81 | 7.55–8.05 | 0.23 | — | 7.45, 7.65, 7.45 | 7.52 (0.12) | +0.30 |
+
+**The sets differ a lot.** rl-incremental barely moves under the fixer or the judge. quant-incremental spans 0.75 across four fixer runs of the same review list.
+
+**Fixer share and judge share.** Pooled over the four sets, the run SD is 0.24 (12 df). The judge SD is 0.16 (12 df): 0.12 from the baseline draws and 0.22 from the v5 rl draws. A run's variance is the fixer's plus the judge's, so the fixer SD is √(0.24² − 0.16²) ≈ **0.18**: about 56% fixer and 44% judge. Per set, as far as 3–4 draws allow:
+- **rl-all-at-once is judge noise.** Its judge-only SD (0.30) is as large as its run SD (0.25). The judge alone moved the fixed v5 set from 7.25 to 7.8. **v4's 7.9 against v5's 7.25 doesn't need a fixer difference to explain it.**
+- **quant-incremental is mostly fixer noise.** Its run SD of 0.33 is about four times its baseline judge SD of 0.08, which leaves a fixer SD of about 0.32.
+- **quant-all-at-once is about two-thirds fixer:** run SD 0.23 against judge SD 0.12.
+
+An SD from 3–4 draws has about ±40–50% relative error, so these shares are rough.
+
+**Does v5 beat iteration 9 on the mean of runs?** Not significantly.
+- v5's four runs average **7.67** over the four sets: 7.61, 7.75, 7.79 and 7.525 for the committed run. Their SD is 0.12.
+- Iteration 9's three draws average **7.54** (7.5625, 7.5625, 7.50), SD 0.04.
+- The difference is **+0.13** (Welch t = 1.97, df ≈ 3.7, p ≈ 0.13). Without the committed v5 run, n1–n3 give +0.175 (t = 3.06, p ≈ 0.07). Either way it points up and stays short of 5%.
+- Per set, the gain sits in quant-all-at-once (+0.30) and rl-all-at-once (+0.16). Both incremental sets are flat.
+- Within a judge pair the two sets' scores move against each other. So iteration 9's 4-set mean varies far less (SD 0.04) than its per-set scores (≈0.12). A version's mean of runs doesn't get that cancellation, because each run's fixer varies on both sets.
+
+**v1, v3 and v4 against v5's run range** (one run each; inside or outside only):
+- **4-set mean:** v1 7.55, v3 7.66 and v4 7.66 all fall inside v5's 7.525–7.79.
+- **Per set:**
+  - rl-incremental: v1 7.4 and v4 7.4 fall outside (below 7.6–7.7); v3 is inside.
+  - rl-all-at-once: v4 7.9 falls outside (above 7.25–7.7); v1 and v3 are inside.
+  - quant-incremental and quant-all-at-once: v1, v3 and v4 are all inside.
+
+**Runs needed** (two-sided 5%, 80% power, equal runs per arm, SDs as measured):
+
+| Effect | On the 4-set mean (run-mean SD 0.12, baseline SD 0.04) | On one set (run SD 0.24, judge SD 0.16) |
+|---|---|---|
+| +0.25 | **3 runs each** | 11 each |
+| +0.125 (about what v5 shows) | 9 each | 42 each |
+| +0.10 | 13 each | 65 each |
+
+So 3 runs each would detect a +0.25 gain on the overall mean, and v5 has 4. But v5's own gain looks closer to +0.13. Confirming that would take about 9 fixer runs against 9 baseline pairs. A single set can't settle anything at these sizes.
+
+**The oracle check across the new runs.** It reverted:
+- rl-all-at-once's TC-07 `direction: higher` in all three runs, and n3's TC-17 `bound`.
+- n1 quant-all-at-once's TC-48 `min_variance_period_2` values.
+- In n1 quant-incremental, the fixer again wrote the "≤ 3 of 20" seed bounds. The check reverted TC-19, TC-38 and TC-72. That fixer behaviour recurs in about 1 run in 4, and the check catches it.
+
+**Fixer cost per run** (fixer + oracle revert):
+
+| | n1 | n2 | n3 | Mean |
+|---|---|---|---|---|
+| rl-incremental | $3.25 | $3.25 | $3.50 | $3.33 |
+| rl-all-at-once | $3.27 | $3.41 | $3.44 | $3.37 |
+| quant-incremental | $4.85 | $4.98 | $4.85 | $4.89 |
+| quant-all-at-once | $6.79 | $5.56 | $5.65 | $6.00 |
+| **all four** | $17.98 | $17.20 | $17.44 | **$17.54** |
+
+$52.62 for the three runs. The 24 judge calls (32 with retries) aren't costed.
+
+**Verdict.** The noise is now measured. One judge pair moves a set by up to 0.55 with its inputs fixed. One fixer run moves quant-incremental by up to 0.75. Against that, v5's mean of four runs is +0.13 over iteration 9's mean of three, with p ≈ 0.13: a likely small gain, not a shown one.
+- The per-version comparisons in v3–v5 were single runs, and each lies inside v5's run range on the overall mean. Their differences can't be read as fixer effects.
+- To confirm a +0.13 gain: about 9 runs and 9 baseline pairs, roughly $160 of fixer runs plus about 36 judge calls.
+- Otherwise, judge a future version only on a mean of at least 3 runs, against this baseline, and only for effects of +0.25 or more.

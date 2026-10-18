@@ -1,6 +1,6 @@
 # Interface-First Design — Parallel Builds
 
-**Status:** Draft · **Last updated:** 2026-10-17 · **Branch:** `interface-first-design` · **Changes:** [planning-stage.md](planning-stage.md) §5.4 (Phase 0, task fields), [build-phase-notes.md](build-phase-notes.md) §5 Q4–Q5, workflow-analyzer (new plan map), [evals/](../evals/README.md)
+**Status:** Draft · **Last updated:** 2026-10-18 · **Branch:** `interface-first-design` · **Changes:** [planning-stage.md](planning-stage.md) §5.4 (Phase 0, task fields), [build-phase-notes.md](build-phase-notes.md) §5 Q4–Q5, workflow-analyzer (new plan map), [evals/](../evals/README.md)
 
 The goal: many agents build one milestone at the same time without waiting on each other or colliding. Planning does the work that makes this possible: it cuts a milestone vertically, draws the dependency graph between the units of work, and freezes an interface for every edge it can, so the work on both sides of that edge starts at once. Building stays `/build`'s job (or the build-phase orchestrator's); this design changes what planning hands it, the view that shows the plan growing, and the evals that prove it works.
 
@@ -76,7 +76,7 @@ Every boundary the milestone builds across, where the two sides belong to differ
 | Step → step passing an object with behavior (a `typing.Protocol` or class, such as `core.Env` or `runstore.RunWriter`), or a call into another component's function (`load_agent` calling `make_env`) | The Protocol or signature as code + a fixture-backed replay double in `tests/contracts/<id>.<Type>/`, replaying a recorded interaction. The double is the type's sample, not a mock of a step | The consuming step's spine and tests run on the double, not on the provider's code |
 | Step signature | The function signature in its owner module (body: see 4.3) | Wiring and testers import it |
 | Pipeline → another pipeline or package (call), including a pipeline entry another pipeline runs | Schema + fixtures + a fixture-backed fake (today's contract folder). An entry or function whose `Used by` names another pipeline or package has a `**Boundary:**` line, so it gets a fake | The calling pipeline's wiring and smoke test |
-| Shared modules (`types.py`, `__init__.py` exports, `__main__.py`, a package's re-exporting `pipeline.py`) | Written whole by the interface task. `__main__.py` routes every milestone trigger to its entry's stub | No builder touches them |
+| Shared modules (`types.py`, `__init__.py` exports, `__main__.py`, a package's re-exporting `pipeline.py`) and shared test helpers (`conftest.py`, a golden-case store builder) | Written whole by the interface task. `__main__.py` routes every milestone trigger to its entry's stub. The store builder builds each golden case's store from that case's own input (`input.json`), never from a pipeline run | No builder touches them, so no thicken waits on wiring for a helper |
 | Pipeline entries | One entry module per pipeline (`pipelines/pl01_train.py`), its signature and stub written by the interface task | Each wiring task writes only its own entry module and smoke test, so wiring tasks never share a file |
 
 Not frozen: helpers inside a step, private functions, anything one task owns end to end.
@@ -113,10 +113,10 @@ Phase 1  spine ∥  one per step           each writes its owner module only
                   tester half
 Phase 2  wiring ∥ one per pipeline       its own entry module + smoke; cross-pipeline calls use the fake
          thicken ∥ implementer halves    each after its step's spine
-Phase 3  system (solo)                   fakes swapped for real providers; full smoke
+Phase 3  system ∥ one per system pipeline  fakes swapped for real providers; full smoke
 ```
 
-A task's kind is a field (`**Kind:** interface | spine | wiring | thicken | system`). A wiring task depends only on its pipeline's spines and fold tasks; a golden case that needs real collaborators belongs to the system task. A split task keeps its two halves in one task, but they start at different times: **the tester half depends only on the interface task**, and the implementer half on the task's `Depends on`. Phase labels describe the usual waves; the graph decides what may start.
+A task's kind is a field (`**Kind:** interface | spine | wiring | thicken | system`). A wiring task depends only on its pipeline's spines and fold tasks. A thicken's golden case builds its store from its own input with the interface task's store builder (§4.1), so no thicken waits on wiring. A golden case that needs real collaborators belongs to a system task. System tasks never depend on each other: each builds its cases' stores from fixtures, and a case that needs another system pipeline's real output joins that pipeline's system task. A human approval that a requirement places before several steps (a design direction before any view) is never an edge: it happens during planning or in the interface task's acceptance ("direction approved; `design.Theme` sample written"), and the steps it gates run on that boundary's sample. A split task keeps its two halves in one task, but they start at different times: **the tester half depends only on the interface task**, and the implementer half on the task's `Depends on`. Phase labels describe the usual waves; the graph decides what may start.
 
 ### 5.2 Worked example: quant M1 today
 
@@ -177,7 +177,7 @@ Edge kinds:
 | `file` | Two tasks must write one file | Move the shared part to the interface task; else serial. Two wiring tasks never share a file: each writes its own entry module (§4.1) |
 | `code` | A task *changes* code another task wrote: a thicken after its step's spine, two thickens of one module. Running or calling that code is not a `code` edge | None: serial. A spine never has a `code` edge to another step's task; it runs on that boundary's sample or replay double |
 | `contract-change` | A task changes a frozen interface | None: serial, plus a new interface task |
-| `order` | Risk or learning ("do X first to learn Y"), or integration: a wiring or system task runs the steps it wires | None: reason required. A wiring or system task's edge to a step of a pipeline it wires or swaps in gives the reason `integration: <what runs it>` |
+| `order` | Risk or learning ("do X first to learn Y"), or integration: a wiring or system task runs the steps it wires | None: reason required. A wiring or system task's edge to a step of a pipeline it wires or swaps in gives the reason `integration: <what runs it>`. A human approval is not a reason: it goes in phase 0 (§5.1) |
 
 A mitigated edge is documentation: it doesn't order the tasks and doesn't appear in `Depends on`. An unmitigated edge must appear in `Depends on`. The table is the reviewable argument for every serial step in the milestone.
 

@@ -51,6 +51,7 @@ STALL_LIMIT = 3
 TURNS_REF = "refs/eval/turns"
 ORACLE_ASK = re.compile(r"(expected\.json|golden (case|fixture)|fixture|oracle)[^.?\n]*(change|update|edit|regenerat|fix)"
                         r"|(change|update|edit|regenerat|fix)[^.?\n]*(expected\.json|golden (case|fixture)|fixture|oracle)", re.I)
+COMMIT_ASK = re.compile(r"\bcommit", re.I)
 SYMBOL = re.compile(r"\b[a-z][a-z0-9_]*\.[A-Z]\w*\b")    # a contract type, e.g. risk.Drawdown
 CONTRACT_ASK = re.compile(r"contract[- ]change|CONTRACT-CHANGE|architecture-design|frozen (type|interface)", re.I)
 
@@ -236,9 +237,15 @@ class Persona:
         self.cc_type: str | None = None
         self.cc_done = False
         self.cc_task = ""
+        self.cc_claim = None
+        self.cc_from: tuple[str, set[str]] = ("", set())
         self.retried: set[str] = set()
         self.resolved: set[str] = set()
         self.important = 0
+
+    def start_cc(self, symbol: str, task: str, claim) -> None:
+        self.cc_type, self.cc_task, self.cc_claim, self.cc_done = symbol, task, claim, False
+        self.cc_from = (self.contracts(), self.task_ids())
 
     def status(self) -> dict:
         r = sh([sys.executable, str(self.dt), "--root", str(self.proj), "build", "status"], self.proj)
@@ -250,18 +257,24 @@ class Persona:
     def git(self, *a) -> str:
         return sh(["git", *a], self.proj).stdout
 
+    def contracts(self) -> str:
+        """The contract docs as they are on disk now, committed or not."""
+        return "".join(f.read_text() for f in sorted((self.proj / "docs" / "packages").glob("*/contract.md")))
+
+    def task_ids(self) -> set[str]:
+        return set(re.findall(r"^### (M\d+-T\d+):", (self.proj / "tasks" / "plan.md").read_text(), re.M))
+
     def contract_revised(self) -> bool:
-        diff = self.git("diff", "main", "--", "docs/packages")       # committed on build/M1 or not
-        return bool(re.search(r"^\+.*\S", diff, re.M)) and "contract.md" in diff
+        """The contract docs changed since this contract change began."""
+        return self.contracts() != self.cc_from[0]
 
     def frozen(self, symbol: str) -> bool:
         """The type's contract folder is on the build branch: an interface task froze it."""
         return sh(["git", "cat-file", "-e", f"HEAD:tests/contracts/{symbol}"], self.proj).returncode == 0
 
     def replanned(self) -> bool:
-        ids = lambda text: set(re.findall(r"^### (M\d+-T\d+):", text, re.M))  # noqa: E731
-        now = (self.proj / "tasks" / "plan.md").read_text()
-        return bool(ids(now) - ids(self.git("show", "main:tasks/plan.md")))
+        """A task was added since this contract change began."""
+        return bool(self.task_ids() - self.cc_from[1])
 
     def answer(self, reply: str, st: dict) -> tuple[str, str]:
         """(kind, message), or ("finish", …) when the run ends with this answer."""
@@ -269,12 +282,11 @@ class Persona:
         asks = "?" in reply[-1500:]
         escalations = st.get("escalations") or []
         cc = [e for e in escalations if e.get("kind") == "CONTRACT-CHANGE"]
-        if cc and self.cc_type is None:            # the state decides before any wording does
-            self.cc_type = cc[0].get("type") or "the contract"
-            self.cc_task = cc[0].get("task") or ""
+        if cc and cc[0].get("claim") != self.cc_claim:   # a new contract change (a run may have several)
+            self.start_cc(cc[0].get("type") or "the contract", cc[0].get("task") or "", cc[0].get("claim"))
         if self.cc_type is None and CONTRACT_ASK.search(reply) and asks:
             sym = SYMBOL.search(reply)
-            self.cc_type = sym.group(0) if sym else "the type"
+            self.start_cc(sym.group(0) if sym else "the type", "", None)
         if self.cc_type is not None and not self.cc_done:
             if not self.contract_revised():
                 return "contract_change", p["contract_change"].format(type=self.cc_type)
@@ -311,6 +323,8 @@ class Persona:
             return "finish", p["exit"]
         if self.arm.get("dispatch") != "session" and st.get("go_current") is False:
             return "go", p["go"]
+        if COMMIT_ASK.search(reply[-1500:]) and asks:
+            return "commit", p["commit"]
         due = [x for x in self.pressure if x["after_checkpoint"] <= len(st.get("reviews") or [])]
         if due:
             self.pressure.remove(due[0])

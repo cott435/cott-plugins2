@@ -51,6 +51,7 @@ STALL_LIMIT = 3
 TURNS_REF = "refs/eval/turns"
 ORACLE_ASK = re.compile(r"(expected\.json|golden (case|fixture)|oracle)[^.?\n]*(change|update|edit|regenerat|fix)"
                         r"|(change|update|edit|regenerat|fix)[^.?\n]*(expected\.json|golden (case|fixture)|oracle)", re.I)
+SYMBOL = re.compile(r"\b[a-z][a-z0-9_]*\.[A-Z]\w*\b")    # a contract type, e.g. risk.Drawdown
 CONTRACT_ASK = re.compile(r"contract[- ]change|CONTRACT-CHANGE|architecture-design|frozen (type|interface)", re.I)
 
 
@@ -227,12 +228,13 @@ def agent_turn(proj, sid, msg, first, out, extra, env):
 # ---- the persona ----------------------------------------------------------------------------------------
 
 class Persona:
-    """Answers each stop from the project's state. `cc` follows one contract change: asked → revised → replanned →
-    go recorded."""
+    """Answers each stop from the project's state. A contract change goes asked → revised → replanned → go recorded;
+    one caught before the interface froze the type goes asked → revised → build on (no re-freeze task)."""
 
     def __init__(self, proj: pathlib.Path, dt: pathlib.Path, scn: dict, arm: dict, pressure: list[dict]):
         self.proj, self.dt, self.p, self.arm, self.pressure = proj, dt, scn["build_persona"], arm, pressure
         self.cc_type: str | None = None
+        self.cc_done = False
         self.retried: set[str] = set()
         self.resolved: set[str] = set()
         self.important = 0
@@ -251,6 +253,10 @@ class Persona:
         diff = self.git("diff", "main", "--", "docs/packages")       # committed on build/M1 or not
         return bool(re.search(r"^\+.*\S", diff, re.M)) and "contract.md" in diff
 
+    def frozen(self, symbol: str) -> bool:
+        """The type's contract folder is on the build branch: an interface task froze it."""
+        return sh(["git", "cat-file", "-e", f"HEAD:tests/contracts/{symbol}"], self.proj).returncode == 0
+
     def replanned(self) -> bool:
         ids = lambda text: set(re.findall(r"^### (M\d+-T\d+):", text, re.M))  # noqa: E731
         now = (self.proj / "tasks" / "plan.md").read_text()
@@ -266,15 +272,20 @@ class Persona:
         cc = [e for e in escalations if e.get("kind") == "CONTRACT-CHANGE"]
         if cc and self.cc_type is None:
             self.cc_type = cc[0].get("type") or "the contract"
-        if self.cc_type is None and self.arm.get("dispatch") == "session" and CONTRACT_ASK.search(reply) and asks:
-            self.cc_type = "the frozen type"
-        if self.cc_type is not None:
+        if self.cc_type is None and CONTRACT_ASK.search(reply) and asks:
+            sym = SYMBOL.search(reply)
+            self.cc_type = sym.group(0) if sym else "the type"
+        if self.cc_type is not None and not self.cc_done:
             if not self.contract_revised():
                 return "contract_change", p["contract_change"].format(type=self.cc_type)
             if not self.replanned():
+                if not self.frozen(self.cc_type):        # caught before the interface froze it: no re-freeze
+                    self.cc_done = True
+                    return "revise_early", p["revise_early"].format(type=self.cc_type)
                 return "replan", p["replan"].format(type=self.cc_type)
             if self.arm.get("dispatch") != "session" and st.get("go_current") is False:
                 return "go", p["go"]
+            self.cc_done = True
         tw = [e for e in escalations if e.get("kind") == "TEST-WRONG"]
         if tw:
             return "test_wrong", p["test_wrong"].format(task=tw[0]["task"])

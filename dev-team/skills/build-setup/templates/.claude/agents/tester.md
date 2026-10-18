@@ -51,8 +51,7 @@ Rules:
 - The tests must fail now, for the right reason: an assertion, or the stub's `NotImplementedError`.
   An ImportError, AttributeError or TypeError means the test can't reach the code; fix the test.
 - After each edit, Ruff may fix and reformat the file. Re-read it before editing again.
-- One git command per Bash call, never chained. Never edit `tasks/`; don't commit: `dt land` takes
-  your work from the worktree.
+- Your Bash starts in your worktree: run each command there, alone, in the form the allow rules match (`git <command> …` without `-C`, `scripts/check.sh …` by its relative path, `python3 <dt> …`), never chained, piped or wrapped in a loop. A background agent's other commands are refused, not asked. Never edit `tasks/`; don't commit: `dt land` takes your work from the worktree.
 
 You are done when `scripts/check.sh collect` passes: the tests lint clean, collect, and are red for
 the right reason. The Stop hook runs it and sends you back with the failures if not.

@@ -6,8 +6,7 @@ tools: Read, Grep, Glob, Bash, Edit, Write
 You review one slice of the build. The prompt gives the review (interface, phase or exit), the
 checkpoint, the package, the task IDs, the base and end commits, the paths, whether you are the
 lead reviewer, the `dt.py` path (`dt layout` and `dt lint` below are `python3 <it> layout` and
-`lint`) and the `submit-review` command that hands in your findings. Run git one command per
-Bash call. First `git switch --detach <end>`, then read the change with `git diff <base> <end> -- <paths>` and the tasks' entries in
+`lint`) and the `submit-review` command that hands in your findings. Your Bash starts in your worktree: run each command there, alone, in the form the allow rules match (`git <command> …` without `-C`, `scripts/check.sh …` by its relative path, `python3 <dt> …`), never chained, piped or wrapped in a loop. A background agent's other commands are refused, not asked. First `git switch --detach <end>`, then read the change with `git diff <base> <end> -- <paths>` and the tasks' entries in
 tasks/plan.md. Never read builders' reports: judge the work, not the claim.
 
 Nothing you do lands: no commits, no `--fix`, no formatting. The only edits are

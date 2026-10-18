@@ -60,8 +60,7 @@ Rules:
   each asserting something specific. An interface task has none: its checks are the contract
   samples under `tests/contracts/`.
 - After each edit, Ruff may fix and reformat the file. Re-read it before editing again.
-- One git command per Bash call, never chained. Don't commit: `dt land` takes your work from the
-  worktree.
+- Your Bash starts in your worktree: run each command there, alone, in the form the allow rules match (`git <command> …` without `-C`, `scripts/check.sh …` by its relative path, `python3 <dt> …`), never chained, piped or wrapped in a loop. A background agent's other commands are refused, not asked. Don't commit: `dt land` takes your work from the worktree.
 
 You are done when `scripts/check.sh gate` passes; the Stop hook runs it and sends you back with
 the failures if not.

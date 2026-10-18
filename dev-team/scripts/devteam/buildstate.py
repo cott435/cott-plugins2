@@ -31,7 +31,7 @@ import tempfile
 import time
 from pathlib import Path
 
-KINDS = ("reserved", "claims", "gates", "escalations", "rejects", "resolved", "reviews", "details")
+KINDS = ("reserved", "claims", "gates", "escalations", "rejects", "resolved", "reviews", "details", "go")
 ROLES = ("tester", "implementer", "solo")
 ESCALATIONS = ("TEST-WRONG", "CONTRACT-CHANGE", "NEEDS-DEP")
 TRAILER = "Dt-Landed"

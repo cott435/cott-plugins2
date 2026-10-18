@@ -33,7 +33,7 @@ paths = ["src", "scripts/vulture_whitelist.py"]
 min_confidence = 60
 ```
 
-- New mode writes the whitelist from today's findings (`uv run vulture --make-whitelist`, appended under the file's header comment), so `full` passes and any *new* dead code fails. That is CR-41's "must not grow".
+- New mode writes the whitelist from today's findings (`uv run vulture --make-whitelist`, appended under the file's header comment), so `full` passes and any *new* dead code fails. That is CR-41's "must not grow". It fails only `full --exit` (the milestone exit): mid-milestone, `full` prints the findings and passes, because the interface task's stub parameters and type fields are unused until later tasks use them.
 - Ratchet regenerates it; a shorter whitelist is the tightening.
 - The whitelist lives in `scripts/`, so it is protected, and Ruff excludes it (it isn't real code).
 - `__all__` re-exports count as uses.

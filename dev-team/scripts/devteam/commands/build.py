@@ -4,11 +4,16 @@ build-phase.md §6.5, §10. The last three are called by the project's hook scri
 
 - `start M<n>`: refuses a dirty tree; creates and switches to `build/M<n>` from HEAD; records `**Build:**` in the
   plan header and commits it there.
+- `go [--note TEXT]`: the user's new go after a Replan; `dt ready` holds everything while the plan's tasks differ
+  from the ones the last go saw (`go_current` in status).
 - `status`: the run's state as one JSON object (landed, tests landed, reserved, claims with `finished`, ready,
   held and why, reviews, findings by severity, the next checkpoint).
 - `resolve <finding|task> [--note TEXT]`: the user's decision. A finding: a Critical stops holding the build. A
   task: its escalations and reject counts clear, a `**Risk:** external` task may be released, and after a
-  TEST-WRONG its tests branch is dropped so a fresh tester rewrites the tests.
+  TEST-WRONG its tests branch is dropped so a fresh tester rewrites the tests, or, with `--test-stands`, kept
+  and the implementer retried; its next `dt claim` prints the user's decision.
+- `prune [--dry-run]`: in the main checkout, deletes a done task's tests branch and the branch and worktree of
+  every claim no longer live (a rejected half's, for one); Exit runs it after the merge.
 - `release <task> <role>`: drops a reservation or claim the driver gave up on (`<checkpoint>.<pkg> reviewer`
   for a review).
 - `submit-review <checkpoint>.<pkg> FILE`: run by the reviewer in its worktree; copies its findings file into
@@ -38,9 +43,15 @@ def add_arguments(parser):
     p = sub.add_parser("start", help="create build/M<n> and record the go")
     p.add_argument("milestone", help="M<n>, the active plan's milestone")
     sub.add_parser("status", help="the run's state as JSON")
+    p = sub.add_parser("go", help="record the user's new go after a Replan changed the plan's tasks")
+    p.add_argument("--note", default="", help="the go, in the user's words")
     p = sub.add_parser("resolve", help="record the user's decision on a finding or a blocked task")
     p.add_argument("id", help="a finding (M1-R03) or a task (M1-T05)")
     p.add_argument("--note", default="", help="the decision, in the user's words")
+    p.add_argument("--test-stands", action="store_true",
+                   help="after a TEST-WRONG: the user says the test is right; keep it and retry the implementer")
+    p = sub.add_parser("prune", help="delete the branches and worktrees a finished build left behind")
+    p.add_argument("--dry-run", action="store_true", help="list what would go, delete nothing")
     p = sub.add_parser("release", help="drop a reservation or claim")
     p.add_argument("task", help="task ID, or <checkpoint>.<pkg> for a review")
     p.add_argument("role", choices=bs.ROLES + ("reviewer",))
@@ -99,6 +110,8 @@ def start(args, repo) -> int:
         state.path(kind).mkdir(parents=True, exist_ok=True)
     # Agent-tool worktrees live under .claude/worktrees/; they must never make the main checkout look dirty.
     state.exclude(["# dt build: agent worktrees", "/.claude/worktrees/"])
+    state.write("go", "go", {"milestone": mid, "tasks": dispatch.tasks_fingerprint(model.tasks(active_plan(repo))),
+                             "commit": commit, "time": bs.now()})
     state.log("start", milestone=mid, branch=branch, commit=commit)
     emit({"milestone": mid, "branch": branch, "build": value, "commit": commit})
     return 0
@@ -121,6 +134,7 @@ def status(args, repo) -> int:
         "milestone": model.milestone_of(plan),
         "branch": bs.current_branch(root),
         "go": md.strip_md(plan.header.get("Build", "")) or None,
+        "go_current": build.go_current(),
         "progress": f"{len(build.done & set(build.by_id))}/{len(build.tasks)}",
         "landed": landed,
         "tests_landed": [t.id for t in build.tasks if t.mode == "split" and t.id not in build.done
@@ -163,16 +177,71 @@ def resolve(args, repo) -> int:
     for role in bs.ROLES:
         state.remove("rejects", dispatch.half_id(rid, role))
     reopened = False
-    if any(e.get("kind") == "TEST-WRONG" for e in escalations):
+    test_stands = bool(getattr(args, "test_stands", False))
+    if any(e.get("kind") == "TEST-WRONG" for e in escalations) and not test_stands:
         branch = bs.tests_branch(rid)
         if bs.ref_exists(repo.root, f"refs/heads/{branch}"):
             bs.git(repo.root, "branch", "-D", branch, check=False)
             reopened = True
     state.write("resolved", rid, {"id": rid, "kind": "task", "note": note, "escalations": escalations,
-                                  "reopened_tester": reopened, "time": bs.now()})
-    state.log("resolve", id=rid, kind="task", note=note, reopened_tester=reopened)
+                                  "reopened_tester": reopened, "test_stands": test_stands, "time": bs.now()})
+    state.log("resolve", id=rid, kind="task", note=note, reopened_tester=reopened, test_stands=test_stands)
     emit({"resolved": rid, "kind": "task", "escalations_cleared": [e["claim"] for e in escalations],
-          "reopened_tester": reopened})
+          "reopened_tester": reopened, "test_stands": test_stands})
+    return 0
+
+
+def go(args, repo) -> int:
+    plan = active_plan(repo)
+    state = bs.State(repo.root)
+    if plan is None or state.read("go", "go") is None:
+        return fail("dt build go: no build started (dt build start M<n>)")
+    note = " ".join(args.note.split())
+    fp = dispatch.tasks_fingerprint(model.tasks(plan))
+    state.write("go", "go", {"milestone": model.milestone_of(plan), "tasks": fp, "note": note,
+                             "commit": bs.head(repo.root), "time": bs.now()})
+    state.log("go", tasks=fp, note=note)
+    emit({"go": model.milestone_of(plan), "tasks": fp})
+    return 0
+
+
+def prune(args, repo) -> int:
+    """Branches the build made and no longer needs: a done task's tests branch, and the branch (and worktree) of
+    every claim that isn't live. A branch a live claim or reservation uses is never touched."""
+    root = bs.toplevel(repo.root)
+    if not bs.is_main_checkout(root):
+        return fail("dt build prune: run it in the main checkout", 2)
+    state = bs.State(root)
+    build = dispatch.Build(repo, state)
+    live = {c.get("branch") for c in build.claims.values()} | {c.get("worktree") for c in build.claims.values()}
+    worktrees = {}                                            # branch -> worktree path
+    path = None
+    for line in bs.out(root, "worktree", "list", "--porcelain").splitlines():
+        if line.startswith("worktree "):
+            path = line[len("worktree "):]
+        elif line.startswith("branch refs/heads/") and path:
+            worktrees[line[len("branch refs/heads/"):]] = path
+    claimed = {}
+    for e in state.events():
+        if e.get("event") == "claim":
+            br = e.get("branch") or ("worktree-" + Path(e["worktree"]).name if e.get("worktree") else "")
+            if br:
+                claimed[br] = e.get("worktree", "")
+    branches = [b for b in bs.out(root, "for-each-ref", "--format=%(refname:short)", "refs/heads").splitlines()]
+    gone = [b for b in branches if b in claimed and b not in live and claimed[b] not in live]
+    gone += [bs.tests_branch(t.id) for t in build.tasks if t.id in build.done and bs.tests_branch(t.id) in branches]
+    removed = []
+    for br in gone:
+        wt = worktrees.get(br)
+        if wt and wt != str(root) and not args.dry_run:
+            bs.git(root, "worktree", "remove", "--force", wt, check=False)
+        if not args.dry_run:
+            bs.git(root, "branch", "-D", br, check=False)
+        removed.append({"branch": br, "worktree": wt})
+    if not args.dry_run:
+        bs.git(root, "worktree", "prune", check=False)
+        state.log("prune", branches=[r["branch"] for r in removed])
+    emit({"pruned" if not args.dry_run else "would_prune": removed})
     return 0
 
 
@@ -250,7 +319,7 @@ def mark_finished(args, repo) -> int:
     return 0
 
 
-ACTIONS = {"start": start, "status": status, "resolve": resolve, "release": release, "verdict": verdict,
+ACTIONS = {"start": start, "status": status, "go": go, "prune": prune, "resolve": resolve, "release": release, "verdict": verdict,
            "escalated": escalated, "mark-finished": mark_finished, "submit-review": submit_review}
 
 

@@ -124,7 +124,8 @@ def run(args, repo) -> int:
                  "base": bs.head(root), "time": bs.now(), "finished": False}
         state.write("claims", cid, claim)
         state.remove("reserved", cid)
-        state.log("claim", claim=cid, task=task_id, role=role, worktree=str(root), base=claim["base"])
+        state.log("claim", claim=cid, task=task_id, role=role, worktree=str(root), branch=claim.get("branch"),
+                  base=claim["base"])
 
     p = ctx.packet(repo, task, writes=writes, tester=role == "tester")
     head = (f"# Packet: {task_id} {role}\n"
@@ -142,6 +143,10 @@ def run(args, repo) -> int:
         lines.append("packet problems: " + "; ".join(p["problems"]))
     if linked:
         lines.append("links: " + "; ".join(linked))
+    decided = state.read("resolved", task_id) or {}
+    if decided.get("test_stands") and role == "implementer":
+        lines.append("the user decided the intent tests stand: make them pass, don't escalate them again"
+                     + (f" ({decided['note']})" if decided.get("note") else ""))
     last = (state.read("rejects", cid) or {}).get("last")
     if last:
         lines.append(f"previous rejection: {last.get('reject')}"

@@ -86,6 +86,13 @@ run() {
   uv run --frozen --quiet "$@" || { rc=1; failed+=("$*"); }
 }
 
+# A measured check that fails only at the milestone exit: it prints its findings, and the reviewer
+# records them, but a mid-milestone run passes.
+report() {
+  echo "-> $* (reported; fails only with --exit)" >&2
+  uv run --frozen --quiet "$@" || echo "(reported, not failing: $*)" >&2
+}
+
 # pytest exits 5 when it collects nothing. That is fine for gate and full on a project with no
 # tests yet; collect calls pytest through run() so an empty tests/intent fails.
 run_tests() {
@@ -253,7 +260,8 @@ case "$mode" in
     static_checks
     other_parts
     if [ "$TYPE_GATE" = mypy ]; then run pyright; else run mypy; fi
-    run vulture
+    # CR-41: the interface task's stubs and fields stay unused until later tasks use them.
+    if [ ${#exit_check[@]} -gt 0 ]; then run vulture; else report vulture; fi
     run pylint --disable=all --enable=duplicate-code --recursive=y --score=n --fail-under=10 "${SRC_DIRS[@]}"   # CR-42
     run typos
     run pip-audit --skip-editable   # the external opinion: a vulnerability database (CR-26)

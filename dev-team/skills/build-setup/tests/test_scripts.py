@@ -95,6 +95,15 @@ class SingleProject(unittest.TestCase):
         self.assertEqual(result.returncode, 1)
         self.assertIn("duplicate-code", result.stdout + result.stderr)  # CR-42
 
+    def test_vulture_fails_only_at_the_exit(self) -> None:
+        append(self.root, "src/tinyq/data/prices.py",
+               '\n\ndef _unused_helper() -> int:\n    """Nobody calls this."""\n    return 1\n')
+        failed = [line for line in check(self.root, "full").stderr.splitlines() if line.startswith("FAILED:")]
+        self.assertNotIn("FAILED: vulture", failed)  # CR-41: reported mid-milestone
+        result = check(self.root, "full", "--exit")
+        self.assertIn("FAILED: vulture", result.stderr)
+        self.assertIn("_unused_helper", result.stdout + result.stderr)
+
     def test_fast_fixes_and_reports(self) -> None:
         write(self.root, "src/tinyq/data/extra.py", '"""Extra."""\nimport os\n\n\ndef f() -> int:\n    return 1\n')
         result = check(self.root, "fast", str(self.root / "src/tinyq/data/extra.py"))

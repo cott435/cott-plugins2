@@ -36,7 +36,7 @@ The standing quality bar. `pyproject.toml` and `scripts/check.sh` enforce it; ev
 | ID | Metric | Today | Direction |
 |---|---|---|---|
 | CR-40 | Coverage (branch) | {{coverage_today}} (`tool.coverage.report.fail_under`, raised by Ratchet) | must not fall |
-| CR-41 | vulture findings at `min_confidence = 60` (`scripts/vulture_whitelist.py`) | {{vulture_today}} | must not grow |
+| CR-41 | vulture findings at `min_confidence = 60` (`scripts/vulture_whitelist.py`) | {{vulture_today}} | must not grow by `full --exit` (earlier `full` runs report) |
 | CR-42 | Duplicate blocks of ≥ 8 similar source lines (pylint `duplicate-code`, `[tool.pylint.similarities]` in pyproject.toml) | {{duplicates_today}} | must not grow |
 
 ## Boundaries (generated from architecture — do not edit)
@@ -54,7 +54,7 @@ The standing quality bar. `pyproject.toml` and `scripts/check.sh` enforce it; ev
 **Worktree links:** {{worktree_links}}
 
 ## Review
-Run by the reviewer agent over what it is given (base, package, tasks, paths): the interface review after Phase 0, a phase review per package at each checkpoint, and the milestone exit. `dt land` has already checked each landing's `Writes:`, protected paths and role gate, and the gate on the merged tree; review judges what tools can't.
+Run by the reviewer agent over what it is given (base, package, tasks, paths): the interface review after Phase 0, a phase review per package at each checkpoint, and the milestone exit. `dt land` already checked each landing's `Writes:`, protected paths and gates; review judges what tools can't.
 
 **Interface** (after Phase 0): the code is the contract, no more and no less.
 1. Types match `contract.md`: fields, types, invariants. Nothing a step's In → Out needs is missing; no helper is frozen.

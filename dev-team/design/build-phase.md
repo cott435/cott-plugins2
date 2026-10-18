@@ -185,6 +185,8 @@ Run by an agent that can't finish: `TEST-WRONG` (implementer: an intent test is 
 - `start M<n>`: refuses on a dirty tree; records `**Build:**` in `plan.md`; creates `build/M<n>` from HEAD (the plan's Base precedes the commit that records it).
 - `status`: the run's state from `dt-build/` and the trailers: landed, reserved, claimed (with whether its agent finished, §10), ready, blocked (with why), reviews and findings by severity, the next checkpoint.
 - `resolve <finding|task>`: records the user's decision on a Critical or a blocked task.
+- `go`: the user's new go after a Replan; `dt ready` holds everything while the plan's tasks differ from the last go's.
+- `prune`: after the merge, deletes the tests branches and the branches and worktrees of claims no longer live.
 - `release <task> <role>`: drops a reservation or claim the driver has given up on.
 - `submit-review <checkpoint>.<pkg> FILE`: run by a reviewer in its worktree; copies its findings file into `reviews/`, which the reviewer's Write tool can't reach.
 
@@ -326,7 +328,7 @@ With the first two, T23 reaches T17 only through T18, so T23's `Depends on` must
 
 ## 15. Decisions and follow-ups
 
-**Decided (2026-10-17):** the review runs per phase, plus a barrier interface review (§4); the main session is the orchestrator, as a low-context driver (§5); the interface review is a reviewer agent that checks the interface code against the approved contract, and later phases check that interfaces were followed (§4); the reviewer mutation-checks tests in its own worktree; simplicity is a review item with a duplicate-code metric (CR-42).
+**Decided (2026-10-17):** the review runs per phase, plus a barrier interface review (§4); the main session is the orchestrator, as a low-context driver (§5); the interface review is a reviewer agent that checks the interface code against the approved contract, and later phases check that interfaces were followed (§4); the reviewer mutation-checks tests in its own worktree; simplicity is a review item with a duplicate-code metric (CR-42). Also decided: CR-41's vulture check fails only at the milestone exit (`full --exit`) and is reported at mid-milestone checkpoints, since the interface's stubs and fields are unused until later tasks; a re-freeze task may write the frozen contract folders its `Writes:` names (a narrow CR-09 carve-out); after a `TEST-WRONG`, the user's no is `dt build resolve <task> --test-stands`, which retries the implementer; the go is recorded against a fingerprint of the plan's tasks; the driver merges `build/M<n>` itself after the user's yes, then `dt build prune`.
 
 **Decided:** PURPOSE says "reviewers that land nothing", since the mutation check edits files in the reviewer's worktree.
 

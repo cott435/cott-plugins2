@@ -79,12 +79,26 @@ class ReadyTest(BuildCase):
         self.edit("tasks/plan.md", "**Package:** mini · **Step:** PL-01 · **Kind:** wiring",
                   "**Risk:** external (writes to a server)\n**Package:** mini · **Step:** PL-01 · **Kind:** wiring")
         self.commit("risk")
+        self.dt("build", "go")                          # the plan changed after the go
         self.to_phase1()
         self.fake_land("M1-T02")
         held = {h["id"]: h["why"] for h in self.ready()["held"]}
         self.assertTrue(held["M1-T04"].startswith("Risk: external"))
         self.assertEqual(self.dt_json("build", "resolve", "M1-T04", "--note", "yes, go")[0], 0)
         self.assertIn(("M1-T04", "solo"), [(x["id"], x["role"]) for x in self.ready()["rows"]])
+
+    def test_a_replan_needs_a_new_go(self):
+        self.to_phase1()
+        self.edit("tasks/plan.md", "- [ ] TC-01 passes", "- [ ] TC-01 passes, mean rounded to 2 places")
+        self.commit("replan")
+        out = self.ready()
+        self.assertEqual(out["rows"], [])
+        self.assertTrue(out["holds"][0].startswith("go: the plan's tasks changed"))
+        self.assertFalse(self.dt_json("build", "status")[1]["go_current"])
+        self.assertEqual(self.dt_json("build", "go", "--note", "go with the replan")[0], 0)
+        self.assertTrue(self.ready()["rows"])
+        self.fake_land("M1-T02")                                 # a todo tick isn't a replan
+        self.assertTrue(self.dt_json("build", "status")[1]["go_current"])
 
     def test_no_git(self):
         import shutil
@@ -143,6 +157,7 @@ class ClaimTest(BuildCase):
         self.edit("tasks/plan.md", "**Read:** PL-01, TC-01, SUM-02, core.Summary, core.summarize",
                   "**Read:** PL-01, TC-01, SUM-02, core.Summary, core.summarize, src/mini/__init__.py")
         self.commit("read a source file")
+        self.dt("build", "go")                          # the plan changed after the go
         self.to_phase1()
         wt = self.run_half("M1-T03", "tester", {})
         packet = self.read(".claude/packet.md", wt)
@@ -228,6 +243,28 @@ class LandTest(BuildCase):
         base_line = [c for c in self.calls() if c.startswith(str(self.root.resolve()) + " gate")]
         self.assertEqual(len(base_line), 1)
 
+    def test_prune_leaves_live_work_alone(self):
+        self.to_phase1()
+        self.run_half("M1-T02", "solo", {"src/mini/summary.py": SPINE, "src/mini/extra.py": "x = 1\n"})
+        self.assertEqual(self.land("M1-T02", "solo")["reject"], "writes")      # its branch is left behind
+        self.run_half("M1-T03", "tester", {"tests/intent/mini/test_tc01.py": TC01_TEST})
+        self.assertTrue(self.land("M1-T03", "tester")["landed"])
+        live = self.run_half("M1-T02", "solo", {"src/mini/summary.py": SPINE}, name="live")
+        code, out = self.dt_json("build", "prune", "--dry-run")
+        self.assertEqual([r["branch"] for r in out["would_prune"]], ["wt-M1-T02-solo"])
+        self.assertIn("wt-M1-T02-solo", git(self.root, "branch"))               # a dry run deletes nothing
+        self.assertEqual(self.dt_json("build", "prune")[0], 0)
+        branches = git(self.root, "branch")
+        self.assertNotIn("wt-M1-T02-solo", branches)
+        self.assertIn("wt-live", branches)                                     # a live claim's
+        self.assertIn("dt/M1-T03-tests", branches)                             # M1-T03 isn't done
+        self.assertTrue(live.exists())
+        self.assertTrue(self.land("M1-T02", "solo")["landed"])
+        self.run_half("M1-T03", "implementer", {"src/mini/summary.py": SPINE + "# mean\n"})
+        self.assertTrue(self.land("M1-T03", "implementer")["landed"])
+        self.dt_json("build", "prune")
+        self.assertNotIn("dt/M1-T03-tests", git(self.root, "branch"))
+
     def test_writes_reject_then_redispatch(self):
         self.to_phase1()
         wt = self.run_half("M1-T02", "solo", {"src/mini/summary.py": SPINE, "src/mini/extra.py": "x = 1\n"})
@@ -255,6 +292,7 @@ class LandTest(BuildCase):
         self.edit("tasks/plan.md", "**Depends on:** M1-T01 · **Writes:** src/mini/summary.py, tests/unit/mini/test_summary.py",
                   "**Depends on:** M1-T01 · **Writes:** src/mini/summary.py, tests/unit/mini/test_summary.py, pyproject.toml")
         self.commit("a protected path in Writes")
+        self.dt("build", "go")                          # the plan changed after the go
         self.to_phase1()
         self.run_half("M1-T02", "solo", {"src/mini/summary.py": SPINE, "pyproject.toml": "[project]\n"})
         out = self.land("M1-T02", "solo")
@@ -303,6 +341,23 @@ class LandTest(BuildCase):
         code, res = self.dt_json("build", "resolve", "M1-T03", "--note", "the test is wrong")
         self.assertEqual((res["reopened_tester"], res["escalations_cleared"]), (True, ["M1-T03.implementer"]))
         self.assertIn(("M1-T03", "tester"), [(r["id"], r["role"]) for r in self.ready()["rows"]])
+
+    def test_test_stands_retries_the_implementer(self):
+        self.to_phase1()
+        git(self.root, "branch", "dt/M1-T03-tests")
+        self.fake_land("M1-T02")
+        wt = self.run_half("M1-T03", "implementer", {})
+        self.dt("escalate", "test-wrong", "TC-01 looks off", root=wt)
+        self.land("M1-T03", "implementer")
+        code, res = self.dt_json("build", "resolve", "M1-T03", "--test-stands", "--note", "TC-01 is right")
+        self.assertEqual((res["reopened_tester"], res["test_stands"]), (False, True))
+        self.assertIn("refs/heads/dt/M1-T03-tests", git(self.root, "for-each-ref", "refs/heads/dt"))
+        rows = [(r["id"], r["role"]) for r in self.ready()["rows"]]
+        self.assertIn(("M1-T03", "implementer"), rows)
+        self.assertNotIn(("M1-T03", "tester"), rows)
+        self.reserve()
+        code, out, _ = self.claim("M1-T03", "implementer", self.worktree("again"))
+        self.assertIn("the user decided the intent tests stand", out)
 
     def test_escalate_needs_a_claim_and_the_right_role(self):
         self.to_phase1()

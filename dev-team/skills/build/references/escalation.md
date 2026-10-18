@@ -12,7 +12,7 @@ recorded doesn't exist for a resumed build.
 |---|---|---|
 | A test can't pass, or the build breaks | `reject` `gate` or `integration` a second time on one half | Blocked. Report the task, its dependents held back and the `detail_file` (both outputs). The user decides: a Replan, a bar change through `build-setup` Revise, or a retry (`dt build resolve <task>`) |
 | Writes outside the task, or a merge conflict | `reject` `writes` or `conflict` a second time | Blocked, as above. A `conflict` means two tasks claim one path: a plan gap for `build-planning` Replan, whatever the user decides |
-| An intent test is wrong | `escalated`, `kind` `TEST-WRONG` | Blocked. Give the user the implementer's one-line reason from `dt build status` and the `detail_file` path; never judge it yourself. On their yes, `dt build resolve <task>` reopens the tester half and a fresh tester rewrites the test, never a fixture or expected value (oracle changes go through `test-planning` and `dt guard`). A no means the test stands and the code must change: a `build-planning` Replan of the task, the escalation unresolved until then |
+| An intent test is wrong | `escalated`, `kind` `TEST-WRONG` | Blocked. Give the user the implementer's one-line reason from `dt build status` and the `detail_file` path; never judge it yourself. On their yes, `dt build resolve <task>` reopens the tester half and a fresh tester rewrites the test, never a fixture or expected value (oracle changes go through `test-planning` and `dt guard`). A no means the test stands: `dt build resolve <task> --test-stands --note "<their words>"` keeps the tests and retries the implementer, whose claim prints the decision |
 | The interface can't express what a task needs | `escalated`, `CONTRACT-CHANGE` | Every half reading that interface is held. After the drain: `architecture-design` Revise, then `build-planning` Replan adds a re-freeze interface task (run by an `implementer` agent, its `Writes:` naming the frozen folders); the user approves both, each committed on the build branch, then the loop resumes |
 | A dependency isn't declared | `escalated`, `NEEDS-DEP` | Drain everything in flight. `build-setup` Extend adds it on the build branch (`pyproject.toml`, `uv.lock`) with the user's yes; new worktrees start from the new head |
 | High risk or irreversible | a `**Risk:** external` task `dt ready` never lists | At the go or when it is next, ask; on a yes, `dt build resolve <task>` |
@@ -37,7 +37,8 @@ Decide: rewrite the intent test (a fresh tester), or keep it and retry the imple
 
 The user's answer is recorded first (`dt build resolve`), then the skills it calls for run, each
 through its own gate, and the loop resumes with `dt ready`. The go covers one plan version: after a
-Replan, ask for it again before dispatching. Never resume on a hedge.
+Replan, `dt ready` holds everything (`go:`) until the user's new go, recorded with
+`dt build go --note "<their words>"`. Never resume on a hedge.
 
 ## Never
 

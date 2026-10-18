@@ -13,6 +13,7 @@ Holds, in the order they are reported:
 """
 from __future__ import annotations
 
+import hashlib
 import re
 from dataclasses import dataclass
 
@@ -72,6 +73,11 @@ def phases(plan) -> list[Phase]:
     return out
 
 
+def tasks_fingerprint(tasks: list[model.Task]) -> str:
+    """A hash of the plan's task blocks, ticked boxes read as unticked, so a Replan changes it and a tick doesn't."""
+    text = "".join(re.sub(r"\[[xX]\]", "[ ]", t.text) for t in tasks)
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()[:16]
+
 class Build:
     """One snapshot of the plan, todo.md, git and dt-build/ for the checkout at `repo.root`."""
 
@@ -106,8 +112,16 @@ class Build:
         """Critical finding IDs recorded by a review and not resolved."""
         return [f for r in self.reviews.values() for f in r.get("critical", []) if f not in self.resolved]
 
+    def go_current(self) -> bool | None:
+        """Whether the recorded go still matches the plan's tasks; None when no go is recorded."""
+        go = self.state.read("go", "go")
+        return None if go is None else go.get("tasks") == tasks_fingerprint(self.tasks)
+
     def global_holds(self) -> list[str]:
         out = []
+        if self.go_current() is False:
+            out.append("go: the plan's tasks changed since the go (a Replan); the user's new go is recorded "
+                       "with dt build go")
         crit = self.open_critical()
         if crit:
             out.append(f"critical: {', '.join(crit)} unresolved (dt build resolve <finding>)")

@@ -21,7 +21,7 @@ stop (`escalation.md`).
 point to the checkpoint blocks in `tasks/plan.md`. Important findings get fix tasks; Suggestions
 and Nits only if the user asks. The tasks come from `build-planning` Replan, through its own gate;
 on its approval it commits the plan on the build branch. The go covers one plan version, so ask
-for it again for the fix tasks, then run the loop until they land. No findings needing a task:
+for it again for the fix tasks and record it with `dt build go`, then run the loop until they land. No findings needing a task:
 step 4.
 
 **3. Exit review again.** After the fix tasks land, `dt ready` lists the exit reviewers again,
@@ -41,7 +41,8 @@ findings go back to step 2; repeat only with the user's yes, and say how many ro
 
 **5. Merge.** The one git the driver runs itself, only after that yes, from a clean main
 checkout: `git switch <the branch the build started from>`, then `git merge --no-ff build/M<n>`,
-each in its own Bash call. A conflict: `git merge --abort`, report it, stop. Never push.
+each in its own Bash call. A conflict: `git merge --abort`, report it, stop. Never push. Then
+`dt build prune`: it deletes the tests branches and the rejected halves' branches and worktrees.
 
 **6. Hand on.** Say the milestone is built and merged, and that the next step is
 `build-planning` Advance (exit checkpoint, archive), which offers `build-setup` Ratchet. Stop.

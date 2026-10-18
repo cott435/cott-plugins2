@@ -15,9 +15,9 @@ earlier conversation counts, approvals least of all.
 **1. Read the state.** `dt build status`. The main checkout must be on `build/M<n>` and clean; if
 not, report it and stop (never stash, reset or switch yourself).
 
-**2. Check the go.** It stands for this milestone and this plan version. If the plan's
-`**Last updated:**` is later than the go (`go` in `dt build status`), a Replan came since: ask for
-a new go (what changed, the halves left) and stop the turn until it comes.
+**2. Check the go.** It stands for this milestone and this plan version. If `go_current` in
+`dt build status` is false, a Replan changed the tasks since: ask for a new go (what changed, the
+halves left), record it with `dt build go --note "<their words>"`, and stop the turn until it comes.
 
 **3. Reconcile, one row at a time:**
 

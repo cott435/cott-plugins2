@@ -3,7 +3,8 @@ as design/interface-first-design.md §4.1 has it: the interface task writes `__i
 re-exporting `pipeline.py` and the types; each wiring task writes only its own entry module and smoke test.
 
 `dt lint`: `writes`, `boundaries`, `probe-open`, the brief `budget`, `milestone-depends`; `dt roadmap --check`'s
-cycle; `Milestone.depends`; `dt status --skill build-planning`'s `no_spine` and `boundaries_unfrozen`."""
+cycle; `Milestone.depends`; `dt status --skill build-planning`'s `no_spine` and `boundaries_unfrozen`; pipeline drift
+with library-class rows."""
 from __future__ import annotations
 
 import json
@@ -16,7 +17,7 @@ from unittest import mock
 
 from dt_helpers import HERE, run_dt
 
-from devteam import model  # noqa: E402
+from devteam import code, model  # noqa: E402
 from devteam.commands import lint  # noqa: E402
 from devteam.repo import Repo  # noqa: E402
 
@@ -290,6 +291,26 @@ class BoundariesUnfrozenTest(GridLoadCase):
         self.edit(PLAN, self.READ, "profile.Report, ingest.load_readings")
         # profile.Profile is both a Boundary to the component forecast and a type PL-02's steps name: one item.
         self.assertEqual(self.status()["boundaries_unfrozen"], ["profile.Profile (forecast)"])
+
+
+class DriftTest(GridLoadCase):
+    """design §3: a library class row (Step `ExportFile`) is a step the entry function never calls."""
+    ENTRY = "src/gridload/pipelines/pl01_ingest.py"
+
+    def drift(self, body: str) -> str | None:
+        path = self.root / self.ENTRY
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(f"def run_ingest(cfg):\n{body}", encoding="utf-8")
+        repo = Repo(self.root)
+        return code.pipeline_drift(repo, next(p for p in model.all_pipelines(repo) if p.id == "PL-01"))
+
+    def test_class_rows_are_not_entry_calls(self):
+        self.edit(PIPES, "| read a synthetic export | LOAD-01 |\n",
+                  "| read a synthetic export | LOAD-01 |\n| 2 | `ExportFile` | ingest | path → RawReadings | one CSV, "
+                  "read whole | LOAD-01 |\n")
+        self.assertIsNone(self.drift("    raw = read_export(cfg.start, cfg.end)\n    return clean_units(raw)\n"))
+        self.assertEqual(self.drift("    raw = ExportFile(cfg.path)\n    return clean_units(read_export(raw))\n"),
+                         "calls [ExportFile, clean_units] vs steps [read_export, clean_units]")
 
 
 if __name__ == "__main__":

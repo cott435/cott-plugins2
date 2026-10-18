@@ -110,8 +110,9 @@ class PipelineCheck:
 
 
 def check_pipeline(repo: Repo, pipeline: Pipeline) -> PipelineCheck:
-    """Compare the entry function's top-level calls with the step table's step names, in order."""
-    steps = [s.name for s in pipeline.steps]
+    """Compare the entry function's top-level calls with the step table's function step names, in order (library
+    class rows aside: the entry reaches them through their factory)."""
+    steps = [s.name for s in pipeline.steps if not s.is_class]
     pc = PipelineCheck(pipeline.id, pipeline.entry_file, pipeline.entry_function, "ok", steps=steps)
     if not pipeline.entry_file or not pipeline.entry_function:
         pc.status = "no-entry"

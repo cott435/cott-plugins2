@@ -306,6 +306,12 @@ class Step:
         return parts[n] if len(parts) == 2 else (self.io if n == 1 else "")
 
     @property
+    def is_class(self) -> bool:
+        """A library class a factory step returns (Step cell `SingleCropSet`, interface-first-design.md §3): a step
+        with its own owner and spine that the entry function never calls."""
+        return self.name[:1].isupper()
+
+    @property
     def in_types(self) -> list[str]:
         """Type names on the In side of the `In → Out` cell (CamelCase or `pkg.Name`)."""
         return type_names(self._side(0))

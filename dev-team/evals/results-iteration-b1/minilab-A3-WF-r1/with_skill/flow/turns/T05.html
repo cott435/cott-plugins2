@@ -1,0 +1,709 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1"><title>T05 turn</title>
+<style>
+:root{--bg:#fbfbfa;--fg:#1d1d1f;--muted:#6b6b70;--line:#d9d9de;--box:#fff;--rowp:#eef3fb;--band:#fff4d6;
+--ok:#2e7d32;--bad:#c62828;--warn:#b26a00;--idle:#6b6b70}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#17171a;--fg:#ececf0;--muted:#9a9aa3;
+--line:#34343a;--box:#222227;--rowp:#1d2433;--band:#3a3015;--ok:#6fcf73;--bad:#ff6b6b;--warn:#f0b35a;--idle:#9a9aa3}}
+:root[data-theme="dark"]{--bg:#17171a;--fg:#ececf0;--muted:#9a9aa3;--line:#34343a;--box:#222227;--rowp:#1d2433;
+--band:#3a3015;--ok:#6fcf73;--bad:#ff6b6b;--warn:#f0b35a;--idle:#9a9aa3}
+body{margin:0;padding:16px;background:var(--bg);color:var(--fg);font:14px/1.45 -apple-system,system-ui,sans-serif}
+h1{font-size:18px;margin:0 0 4px}h2{font-size:15px;margin:22px 0 8px}.sub{color:var(--muted)}
+table{border-collapse:collapse;margin:4px 0 8px}td,th{border-bottom:1px solid var(--line);padding:4px 10px;text-align:left;
+vertical-align:top}th{color:var(--muted);font-weight:600}.chips span{display:inline-block;margin:0 4px 2px 0}
+.legend span{margin-right:14px;white-space:nowrap}.sw{display:inline-block;width:10px;height:10px;border-radius:2px;
+margin-right:4px;vertical-align:-1px}.scroll{overflow:auto;max-height:88vh;border:1px solid var(--line);border-radius:8px}
+.chart{display:grid;width:max-content}.chart>div{line-height:0}.corner{position:sticky;top:0;left:0;z-index:3}
+.colhead{position:sticky;top:0;z-index:2}.rowhead{position:sticky;left:0;z-index:2}
+svg.bg{background:var(--bg)}.colhead svg{border-bottom:1px solid var(--line)}.rowhead svg{border-right:1px solid var(--line)}
+.ok{color:var(--ok);fill:var(--ok)}.bad{color:var(--bad);fill:var(--bad)}.warn{color:var(--warn);fill:var(--warn)}
+.idle{color:var(--idle);fill:var(--idle)}
+svg text{fill:var(--fg);font-family:-apple-system,system-ui,sans-serif}
+.box{fill:var(--box);stroke:var(--line)}.unit:hover .box{stroke:var(--fg)}
+.role{font-size:12px;font-weight:600}.uid,.wmeta,.lmeta,.meta{font-size:10px;fill:var(--muted)}
+.sub{font-size:10.5px;fill:var(--muted)}.badge{font-size:11px;font-weight:600}
+.meta.bad{fill:var(--bad);font-weight:600}.lane{font-size:13px;font-weight:700}.wave{font-size:13px;font-weight:700}
+.par{fill:#4e79a7}.ser{fill:var(--muted)}.rowp{fill:var(--rowp)}.rows{fill:transparent}.band{fill:var(--band)}
+.bandt{font-size:11.5px}.grid{stroke:var(--line)}.link{stroke:var(--muted);stroke-width:1.2;opacity:.55}
+.arrowhead{fill:var(--muted)}.marks{font-size:10.5px}.audit{stroke:var(--box);stroke-width:2}.auditn{font-size:10px;font-weight:700;fill:#fff}
+a{color:inherit}svg a .box{cursor:pointer}
+
+:root{--c0:#2a78d6;--c1:#eb6834;--c2:#1baf7a;--c3:#eda100;--c4:#e87ba4;--c5:#008300;--c6:#6250d6;--c7:#e34948;
+--cx:#8a8985;--main:#52514e;--read:#dcdbd5;--readfg:#1d1d1f}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--c0:#3987e5;--c1:#d95926;--c2:#199e70;
+--c3:#c98500;--c4:#d55181;--c5:#008300;--c6:#9085e9;--c7:#e66767;--cx:#77766f;--main:#c3c2b7;--read:#3b3b40;
+--readfg:#ececf0}}
+:root[data-theme="dark"]{--c0:#3987e5;--c1:#d95926;--c2:#199e70;--c3:#c98500;--c4:#d55181;--c5:#008300;
+--c6:#9085e9;--c7:#e66767;--cx:#77766f;--main:#c3c2b7;--read:#3b3b40;--readfg:#ececf0}
+.c0{fill:var(--c0);background:var(--c0)}.c1{fill:var(--c1);background:var(--c1)}.c2{fill:var(--c2);background:var(--c2)}
+.c3{fill:var(--c3);background:var(--c3)}.c4{fill:var(--c4);background:var(--c4)}.c5{fill:var(--c5);background:var(--c5)}
+.c6{fill:var(--c6);background:var(--c6)}.c7{fill:var(--c7);background:var(--c7)}.cx{fill:var(--cx);background:var(--cx)}
+.cmain{fill:var(--main)}.sc0{stroke:var(--c0)}.sc1{stroke:var(--c1)}.sc2{stroke:var(--c2)}
+.tl text,.sm text,.lc text{font-size:10.5px;fill:var(--muted)}.tl .lbl-in,.sm .lbl-in{fill:#fff;font-size:10.5px;font-weight:600}
+.tl .rowl,.sm .rowl,.lc .rowl{fill:var(--fg);font-size:11.5px;font-weight:600}.tl .band{fill:var(--rowp)}
+.tl .brk{stroke:var(--muted);stroke-dasharray:2 3}.tl a:hover rect,.sm a:hover rect{stroke:var(--fg);stroke-width:1.5}
+.axis{stroke:var(--line)}.sm .val{fill:var(--fg);font-weight:600}.lc path.ln{fill:none;stroke-width:2}
+.lc circle{stroke:var(--bg);stroke-width:2}.lc .end{font-weight:600;fill:var(--fg)}
+.tiles{display:flex;flex-wrap:wrap;gap:10px;margin:12px 0}.tile{border:1px solid var(--line);border-radius:8px;
+padding:8px 12px;min-width:110px;background:var(--box)}.tile b{display:block;font-size:20px;line-height:1.2}
+.tile span{font-size:12px;color:var(--muted)}.tile i{font-style:normal;font-size:12px;margin-left:6px}
+.fm{border-collapse:separate;border-spacing:2px}.fm td,.fm th{border:0;padding:0;text-align:center;font-size:11px}
+.fm th{padding:0 2px;font-weight:600}.fm td.f,.fm th.f{text-align:left;padding-right:10px;white-space:nowrap;
+position:sticky;left:0;background:var(--bg);font:11.5px ui-monospace,Menlo,monospace;
+max-width:380px;overflow:hidden;text-overflow:ellipsis}
+.fm td.cell{min-width:22px;height:20px;border-radius:3px}.fm td.fw{background:var(--c0);color:#fff;font-weight:700}
+.fm td.fe{background:var(--c1);color:#fff;font-weight:700}.fm td.fr{background:var(--read);color:var(--readfg)}
+.fm td.n{color:var(--muted);padding:0 6px}.fm tr.grp td{text-align:left;padding-top:8px;color:var(--muted);
+font-weight:600}
+.key{display:inline-block;min-width:18px;text-align:center;border-radius:3px;font-size:11px;margin-right:4px}
+.bar{display:inline-block;height:9px;border-radius:2px;vertical-align:0}
+
+pre{white-space:pre-wrap;word-break:break-word;background:var(--box);border:1px solid var(--line);border-radius:6px;
+padding:8px 10px;margin:4px 0;font:12px/1.45 ui-monospace,SFMono-Regular,Menlo,monospace;max-width:100%;overflow:auto}
+.step{border-top:1px solid var(--line);padding:6px 0}.step:target{background:var(--rowp)}
+.sid{font:12px ui-monospace,Menlo,monospace;color:var(--muted);margin-right:8px}.kind{font-weight:600;margin-right:8px}
+.err{color:var(--bad);font-weight:600}.hook{color:var(--bad);margin:4px 0 0 16px}.lbl{font-size:12px;color:var(--muted);margin-top:6px}
+details summary{cursor:pointer;color:var(--muted);font-size:12px}.head td:first-child{color:var(--muted)}
+.top{font-size:13px}.narr{list-style:none;padding-left:0}.narr li{margin:3px 0}
+</style></head>
+<body>
+<p class="top"><a href="../flow.html">← the run's flow chart</a></p>
+<p class="top"><a href="../plan/T01.html">The plan as of T05</a>: unchanged since T01 · <a href="../plan/index.html">plan map</a></p>
+<h1>T05 · turn · Continue the build.</h1>
+<table class="head"><tr><td>Type</td><td>turn</td></tr><tr><td>Description</td><td>Continue the build.</td></tr><tr><td>Spawned by</td><td>user</td></tr><tr><td>Model</td><td>claude-opus-5-5</td></tr><tr><td>Start</td><td>2026-10-18 13:16:36 UTC</td></tr><tr><td>Duration</td><td>5 min</td></tr><tr><td>Tool calls</td><td>10</td></tr><tr><td>Errors</td><td>0</td></tr><tr><td>Hook blocks</td><td>0</td></tr><tr><td>Tokens</td><td>3.4k out · 14.8k new in · 555k cached in · peak context 79.4k</td></tr><tr><td>Skills invoked</td><td>none</td></tr><tr><td>Files written or edited</td><td>none</td></tr><tr><td>Definition</td><td>none</td></tr><tr><td>Steps</td><td>16</td></tr><tr><td>Finished</td><td>yes</td></tr></table>
+
+
+<h2>Prompt</h2>
+<pre>Continue the build.</pre>
+<h2>Files</h2>
+<table><tr><th>Op</th><th>File</th><th>Calls</th><th>By</th><th>Via</th><th>Steps</th></tr><tr><td>read</td><td><code>../plugin/dev-team/skills/build/references/exit.md</code></td><td>1</td><td>main</td><td>Bash</td><td><a href="#D58">D58</a></td></tr><tr><td>read</td><td><code>../plugin/dev-team/skills/build/references/resume.md</code></td><td>1</td><td>main</td><td>Bash</td><td><a href="#D49">D49</a></td></tr></table>
+<h2>Steps</h2>
+<div class="step" id="SD47"><span class="sid">D47</span><span class="kind">user</span>Continue the build.<details><summary>full text</summary><pre>Continue the build.</pre></details></div><div class="step" id="SD48"><span class="sid">D48</span><span class="kind">Bash</span>python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A3-WF-r1/with_skill/plugin/dev-team/scripts/dt.py build status<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A3-WF-r1/with_skill/plugin/dev-team/scripts/dt.py build status&quot;,
+  &quot;description&quot;: &quot;Check build status after session resume&quot;
+}</pre><div class="lbl">output</div><pre>{
+  &quot;milestone&quot;: &quot;M1&quot;,
+  &quot;branch&quot;: &quot;build/M1&quot;,
+  &quot;go&quot;: &quot;build/M1 started 2026-10-18&quot;,
+  &quot;go_current&quot;: true,
+  &quot;progress&quot;: &quot;19/21&quot;,
+  &quot;landed&quot;: [
+    {
+      &quot;task&quot;: &quot;M1-T01&quot;,
+      &quot;role&quot;: &quot;solo&quot;,
+      &quot;commit&quot;: &quot;266938094ffc622491ad7ec5473aaa8c9df84374&quot;
+    },
+    {
+      &quot;task&quot;: &quot;M1-T02&quot;,
+      &quot;role&quot;: &quot;solo&quot;,
+      &quot;commit&quot;: &quot;9f12597c2f07c90fcb6ac8262f8f800c8feec518&quot;
+    },
+    {
+      &quot;task&quot;: &quot;M1-T03&quot;,
+      &quot;role&quot;: &quot;solo&quot;,
+      &quot;commit&quot;: &quot;fc6bbdd6fb46a92030152efee8c4524738280f2e&quot;
+    },
+    {
+      &quot;task&quot;: &quot;M1-T04&quot;,
+      &quot;role&quot;: &quot;solo&quot;,
+      &quot;commit&quot;: &quot;12e4e520e7c436414d7cdb3c6921fe134a79d6e3&quot;
+    },
+    {
+      &quot;task&quot;: &quot;M1-T05&quot;,
+      &quot;role&quot;: &quot;solo&quot;,
+      &quot;commit&quot;: &quot;539c4a98b263085660c6fd3cf57aeabc4b66e006&quot;
+    },
+    {
+      &quot;task&quot;: &quot;M1-T06&quot;,
+      &quot;role&quot;: &quot;solo&quot;,
+      &quot;commit&quot;: &quot;17e7d8232698190a3f94a66fdabd294dca3dd9f8&quot;
+    },
+    {
+      &quot;task&quot;: &quot;M1-T07&quot;,
+      &quot;role&quot;: &quot;solo&quot;,
+      &quot;commit&quot;: &quot;57a8c0d313591dd2aec3051654a3d4eb5653dc3d&quot;
+    },
+    {
+      &quot;task&quot;: &quot;M1-T08&quot;,
+      &quot;role&quot;: &quot;solo&quot;,
+      &quot;commit&quot;: &quot;e0b8425967e316af1676ecdc0bfca65fdb832808&quot;
+    },
+    {
+      &quot;task&quot;: &quot;M1-T09&quot;,
+      &quot;role&quot;: &quot;solo&quot;,
+      &quot;commit&quot;: &quot;635bf1e2344c06435d32cf8f9658d28586ccfc30&quot;
+    },
+    {
+      &quot;task&quot;: &quot;M1-T10&quot;,
+      &quot;role&quot;: &quot;solo&quot;,
+      &quot;commit&quot;: &quot;946892da33809ae580112daf2d5b34ebfe78e2af&quot;
+    },
+    {
+      &quot;task&quot;: &quot;M1-T11&quot;,
+      &quot;role&quot;: &quot;solo&quot;,
+      &quot;commit&quot;: &quot;cc4cc48afe96f9f56736ac332d235a58c9f7641b&quot;
+    },
+    {
+      &quot;task&quot;: &quot;M1-T12&quot;,
+      &quot;role&quot;: &quot;solo&quot;,
+      &quot;commit&quot;: &quot;7819dbd87a341a4756b67b5bcd7db5f4ca04fa0c&quot;
+    },
+    {
+      &quot;task&quot;: &quot;M1-T13&quot;,
+      &quot;role&quot;: &quot;solo&quot;,
+      &quot;commit&quot;: &quot;4d67ac74ad52af35626a1930815c3a56b70e8524&quot;
+    },
+    {
+      &quot;task&quot;: &quot;M1-T14&quot;,
+      &quot;role&quot;: &quot;implementer&quot;,
+      &quot;commit&quot;: &quot;6a468b69272aa48dbab9736534ee71695a118a6b&quot;
+    },
+    {
+      &quot;task&quot;: &quot;M1-T15&quot;,
+      &quot;role&quot;: &quot;implementer&quot;,
+      &quot;commit&quot;: &quot;7e5b454439bc9ef6afd5cbf8014e5d6b8883c7a7&quot;
+    },
+    {
+      &quot;task&quot;: &quot;M1-T16&quot;,
+      &quot;role&quot;: &quot;implementer&quot;,
+      &quot;commit&quot;: &quot;54b45b6dde23b049b82e37161bc26f4eb324c5b1&quot;
+    },
+    {
+      &quot;task&quot;: &quot;M1-T17&quot;,
+      &quot;role&quot;: &quot;implementer&quot;,
+      &quot;commit&quot;: &quot;f31f944e3fa759b32f1296d63f154348de920709&quot;
+    },
+    {
+      &quot;task&quot;: &quot;M1-T18&quot;,
+      &quot;role&quot;: &quot;implementer&quot;,
+      &quot;commit&quot;: &quot;011f8edb82cc0435299f8807d2551098faa0ff9b&quot;
+    },
+    {
+      &quot;task&quot;: &quot;M1-T20&quot;,
+      &quot;role&quot;: &quot;implementer&quot;,
+      &quot;commit&quot;: &quot;644925a3796b6af488a35232f6011ac15832411b&quot;
+    }
+  ],
+  &quot;tests_landed&quot;: [
+    &quot;M1-T19&quot;
+  ],
+  &quot;reserved&quot;: [
+    &quot;M1-T10.mdata.reviewer&quot;,
+    &quot;M1-T10.risk.reviewer&quot;
+  ],
+  &quot;claims&quot;: [
+    {
+      &quot;id&quot;: &quot;M1-T19.implementer&quot;,
+      &quot;task&quot;: &quot;M1-T19&quot;,
+      &quot;role&quot;: &quot;implementer&quot;,
+      &quot;worktree&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A3-WF-r1/with_skill/project/.claude/worktrees/wf_455dddf8-aee-70&quot;,
+      &quot;finished&quot;: true,
+      &quot;since&quot;: &quot;2026-10-18T09:15:28-0400&quot;
+    }
+  ],
+  &quot;ready&quot;: [],
+  &quot;holds&quot;: [],
+  &quot;blocked&quot;: [],
+  &quot;held&quot;: [],
+  &quot;escalations&quot;: [],
+  &quot;reviews&quot;: [
+    {
+      &quot;review&quot;: &quot;M1-T01.mdata&quot;,
+      &quot;outcome&quot;: &quot;passed&quot;,
+      &quot;critical&quot;: [],
+      &quot;critical_open&quot;: [],
+      &quot;tasks&quot;: [
+        &quot;M1-T01&quot;
+      ]
+    }
+  ],
+  &quot;findings&quot;: {
+    &quot;Suggestion&quot;: 2,
+    &quot;Nit&quot;: 1
+  },
+  &quot;next_checkpoint&quot;: {
+    &quot;checkpoint&quot;: &quot;M1-T10&quot;,
+    &quot;title&quot;: &quot;Checkpoint after M1-T10&quot;,
+    &quot;kind&quot;: &quot;phase&quot;,
+    &quot;waiting_on&quot;: []
+  },
+  &quot;all_landed&quot;: false
+}</pre></details></div><div class="step" id="SD49"><span class="sid">D49</span><span class="kind">Bash</span>cat /Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A3-WF-r1/with_skill/plugin/dev-team/skills/build/references/resume.md<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;cat /Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A3-WF-r1/with_skill/plugin/dev-team/skills/build/references/resume.md&quot;,
+  &quot;description&quot;: &quot;Read the build skill&#x27;s resume guide&quot;
+}</pre><div class="lbl">output</div><pre># Resume
+
+Read when a build is recorded and this session has started no agents: a new session after a
+stop, a crash or a closed terminal. No agent of the old session is still running, so every claim
+is either finished work to land or a dead agent&#x27;s to release. The loop is `loop.md`; stops are
+`escalation.md`.
+
+Everything the driver needs is on disk: `dt-build/` under the git common directory, the
+`Dt-Landed:` trailers on `build/M&lt;n&gt;` (never commit subjects, which an agent could imitate), the
+`tasks/todo.md` ticks, the findings in `tasks/plan.md` and the recorded go. Nothing from an
+earlier conversation counts, approvals least of all.
+
+## Steps
+
+**1. Read the state.** `dt build status`. The main checkout must be on `build/M&lt;n&gt;` and clean; if
+not, report it and stop (never stash, reset or switch yourself).
+
+**2. Check the go.** It stands for this milestone and this plan version. If `go_current` in
+`dt build status` is false, a Replan changed the tasks since: ask for a new go (what changed, the
+halves left), record it with `dt build go --note &quot;&lt;their words&gt;&quot;`, and stop the turn until it comes.
+
+**3. Reconcile, one row at a time:**
+
+| `dt build status` shows | Do |
+|---|---|
+| a claim marked finished | `dt land &lt;task&gt; --role &lt;role&gt;`: the gate re-runs if no verdict matches, so finished work isn&#x27;t lost. Branch on the result as `loop.md` says |
+| a claim not finished, or a reservation | its agent died with the old session: `dt build release &lt;task&gt; &lt;role&gt;`; the half comes back through `dt ready` (tasks are XS or S, so redoing is cheap) |
+| a tester half landed, its implementer not | nothing: the implementer half is ready |
+| a review reserved but not recorded | `dt build release &lt;checkpoint&gt;.&lt;pkg&gt; reviewer`; `dt ready` lists the review again |
+| a barrier unpassed, a Critical open, a half blocked | stays until the user decides (`escalation.md`); report it with the rest |
+
+**4. Report, then continue.** One message: what landed before, what was re-landed or released
+now, what is blocked and the decision it needs. With a decision pending and nothing ready, end the
+turn there. Otherwise run the loop (`loop.md`).
+
+## Example
+
+```
+$ dt build status
+M1 · go recorded 2026-10-18 (plan unchanged) · landed 9/19 halves
+claims: M1-T11 implementer finished · M1-T12 tester not finished · M1-T13 tester reserved
+blocked: none · reviews: M1-T01.gridload passed · next checkpoint: after M1-T07
+
+$ dt land M1-T11 --role implementer      → landed
+$ dt build release M1-T12 tester
+$ dt build release M1-T13 tester
+```
+
+&gt; Resumed M1: 10/19 halves landed (M1-T11 implementer just now); M1-T12 and M1-T13 testers
+&gt; released, their agents died with the last session. Nothing blocked. Dispatching.</pre></details></div><div class="step" id="SD50"><span class="sid">D50</span><span class="kind">Bash</span>git status --short --branch<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;git status --short --branch&quot;,
+  &quot;description&quot;: &quot;Check the main checkout is clean on build/M1&quot;
+}</pre><div class="lbl">output</div><pre>## build/M1</pre></details></div><div class="step" id="SD51"><span class="sid">D51</span><span class="kind">Bash</span>python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A3-WF-r1/with_skill/plugin/dev-team/scripts/dt.py land M1-T19 --role implementer<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A3-WF-r1/with_skill/plugin/dev-team/scripts/dt.py land M1-T19 --role implementer&quot;,
+  &quot;description&quot;: &quot;Land the finished M1-T19 implementer claim&quot;
+}</pre><div class="lbl">output</div><pre>{
+  &quot;landed&quot;: true,
+  &quot;reject&quot;: null,
+  &quot;kind&quot;: null,
+  &quot;detail_file&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A3-WF-r1/with_skill/project/.git/dt-build/details/M1-T19.implementer-1.txt&quot;,
+  &quot;task&quot;: &quot;M1-T19&quot;,
+  &quot;role&quot;: &quot;implementer&quot;,
+  &quot;commit&quot;: &quot;d77c21c485c66b1eeacc0b77c3dfb0b259931d85&quot;,
+  &quot;flaky&quot;: false
+}</pre></details></div><div class="step" id="SD52"><span class="sid">D52</span><span class="kind">Bash</span>python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A3-WF-r1/with_skill/plugin/dev-team/scripts/dt.py build release M1-T10.mdata reviewer<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A3-WF-r1/with_skill/plugin/dev-team/scripts/dt.py build release M1-T10.mdata reviewer&quot;,
+  &quot;description&quot;: &quot;Release the dead mdata reviewer reservation&quot;
+}</pre><div class="lbl">output</div><pre>{
+  &quot;released&quot;: &quot;M1-T10.mdata.reviewer&quot;,
+  &quot;dropped&quot;: [
+    &quot;reserved&quot;
+  ],
+  &quot;worktree&quot;: null
+}</pre></details></div><div class="step" id="SD53"><span class="sid">D53</span><span class="kind">Bash</span>python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A3-WF-r1/with_skill/plugin/dev-team/scripts/dt.py build release M1-T10.risk reviewer<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A3-WF-r1/with_skill/plugin/dev-team/scripts/dt.py build release M1-T10.risk reviewer&quot;,
+  &quot;description&quot;: &quot;Release the dead risk reviewer reservation&quot;
+}</pre><div class="lbl">output</div><pre>{
+  &quot;released&quot;: &quot;M1-T10.risk.reviewer&quot;,
+  &quot;dropped&quot;: [
+    &quot;reserved&quot;
+  ],
+  &quot;worktree&quot;: null
+}</pre></details></div><div class="step" id="SD54"><span class="sid">D54</span><span class="kind">think</span>I landed M1-T19, bringing the build to 20/21 tasks, and released the two stalled M1-T10 reviewer reservations so they&#x27;re ready again. No blockers remain, so I&#x27;m rerunning the workflow to complete the M1-T10 reviews and any remaining tasks.<details><summary>full text</summary><pre>I landed M1-T19, bringing the build to 20/21 tasks, and released the two stalled M1-T10 reviewer reservations so they&#x27;re ready again. No blockers remain, so I&#x27;m rerunning the workflow to complete the M1-T10 reviews and any remaining tasks.
+
+</pre></details></div><div class="step" id="SD55"><span class="sid">D55</span><span class="kind">Workflow</span>{&quot;scriptPath&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A3-WF-r1/with_skill/project/.dt/build.workflow.js&quot;}<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;scriptPath&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A3-WF-r1/with_skill/project/.dt/build.workflow.js&quot;
+}</pre><div class="lbl">output</div><pre>Workflow launched in background. Task ID: w82wzzq03
+Summary: Build M1: dispatch what dt ready lists, land each finish with dt land, until nothing is ready or running
+Transcript dir: /Users/connorott/.claude/projects/-Users-connorott-plugins-dev-team-workspace-iteration-b1-minilab-A3-WF-r1-with-skill-project/5364ab1d-0090-4508-acd1-14fa67b86c49/subagents/workflows/wf_be1f809f-a90
+Script file: /Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A3-WF-r1/with_skill/project/.dt/build.workflow.js
+(Edit this file with Write/Edit and re-invoke Workflow with {scriptPath: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A3-WF-r1/with_skill/project/.dt/build.workflow.js&quot;} to iterate without resending the script.)
+Run ID: wf_be1f809f-a90
+To resume after editing the script: Workflow({scriptPath: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A3-WF-r1/with_skill/project/.dt/build.workflow.js&quot;, resumeFromRunId: &quot;wf_be1f809f-a90&quot;}) — completed agents return cached results (cached results may themselves be empty — inspect journal.jsonl before assuming there is something to recover).
+
+You will be notified when it completes. Use /workflows to watch live progress.</pre></details></div><div class="step" id="SD56"><span class="sid">D56</span><span class="kind">say</span>The workflow is running. I&#x27;ll handle its summary when it returns.<details><summary>full text</summary><pre>The workflow is running. I&#x27;ll handle its summary when it returns.</pre></details></div><div class="step" id="SD57"><span class="sid">D57</span><span class="kind">notify</span>← background task w82wzzq03 completed<details><summary>full text</summary><pre>&lt;task-notification&gt;
+&lt;task-id&gt;w82wzzq03&lt;/task-id&gt;
+&lt;tool-use-id&gt;toolu_01K23Uay8tHE2nDXJp64ox52&lt;/tool-use-id&gt;
+&lt;output-file&gt;/private/tmp/claude-501/-Users-connorott-plugins-dev-team-workspace-iteration-b1-minilab-A3-WF-r1-with-skill-project/5364ab1d-0090-4508-acd1-14fa67b86c49/tasks/w82wzzq03.output&lt;/output-file&gt;
+&lt;status&gt;completed&lt;/status&gt;
+&lt;summary&gt;Dynamic workflow &quot;Build M1: dispatch what dt ready lists, land each finish with dt land, until nothing is ready or running&quot; completed&lt;/summary&gt;
+&lt;result&gt;{&quot;milestone&quot;:&quot;M1&quot;,&quot;all_landed&quot;:true,&quot;exit_ready&quot;:true,&quot;progress&quot;:&quot;21/21&quot;,&quot;next_checkpoint&quot;:null,&quot;go_current&quot;:true,&quot;holds&quot;:[],&quot;blocked&quot;:[],&quot;held&quot;:[],&quot;escalations&quot;:[],&quot;critical_open&quot;:[],&quot;claims&quot;:[],&quot;review_failures&quot;:[],&quot;landings&quot;:[{&quot;id&quot;:&quot;M1-T21&quot;,&quot;role&quot;:&quot;solo&quot;,&quot;status&quot;:&quot;DONE&quot;,&quot;landed&quot;:true,&quot;reject&quot;:null,&quot;kind&quot;:null,&quot;detail_file&quot;:&quot;/Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A3-WF-r1/with_skill/project/.git/dt-build/details/M1-T21.solo-1.txt&quot;}],&quot;reviews&quot;:[{&quot;review&quot;:&quot;M1-T10.risk&quot;,&quot;outcome&quot;:&quot;passed&quot;,&quot;findings&quot;:4,&quot;critical&quot;:[]},{&quot;review&quot;:&quot;M1-T10.mdata&quot;,&quot;outcome&quot;:&quot;passed&quot;,&quot;findings&quot;:3,&quot;critical&quot;:[]},{&quot;review&quot;:&quot;M1-T20.risk&quot;,&quot;outcome&quot;:&quot;passed&quot;,&quot;findings&quot;:3,&quot;critical&quot;:[]},{&quot;review&quot;:&quot;M1-T20.mdata&quot;,&quot;outcome&quot;:&quot;passed&quot;,&quot;findings&quot;:2,&quot;critical&quot;:[]},{&quot;review&quot;:&quot;exit.risk&quot;,&quot;outcome&quot;:&quot;passed&quot;,&quot;findings&quot;:4,&quot;critical&quot;:[]},{&quot;review&quot;:&quot;exit.mdata&quot;,&quot;outcome&quot;:&quot;passed&quot;,&quot;findings&quot;:8,&quot;critical&quot;:[]}],&quot;notes&quot;:[]}&lt;/result&gt;
+&lt;diagnostics&gt;Per-agent results: /Users/connorott/.claude/projects/-Users-connorott-plugins-dev-team-workspace-iteration-b1-minilab-A3-WF-r1-with-skill-project/5364ab1d-0090-4508-acd1-14fa67b86c49/subagents/workflows/wf_be1f809f-a90/journal.jsonl — one {&quot;type&quot;:&quot;result&quot;,...} line per completed agent with its full return value.
+If the result above is empty or unexpected, Read this file BEFORE diagnosing — do not assume agents returned non-empty results.
+To re-run with edited post-processing: Workflow({scriptPath: &#x27;/Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A3-WF-r1/with_skill/project/.dt/build.workflow.js&#x27;, resumeFromRunId: &#x27;wf_be1f809f-a90&#x27;}) — agents whose (prompt, opts) are unchanged replay from cache.&lt;/diagnostics&gt;
+&lt;usage&gt;&lt;agent_count&gt;23&lt;/agent_count&gt;&lt;agents_done&gt;23&lt;/agents_done&gt;&lt;agents_error&gt;0&lt;/agents_error&gt;&lt;agents_skipped&gt;0&lt;/agents_skipped&gt;&lt;agents_empty_result&gt;0&lt;/agents_empty_result&gt;&lt;subagent_tokens&gt;820905&lt;/subagent_tokens&gt;&lt;tool_uses&gt;378&lt;/tool_uses&gt;&lt;duration_ms&gt;254504&lt;/duration_ms&gt;&lt;/usage&gt;
+&lt;/task-notification&gt;</pre></details></div><div class="step" id="SD58"><span class="sid">D58</span><span class="kind">Bash</span>cat /Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A3-WF-r1/with_skill/plugin/dev-team/skills/build/references/exit.md<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;cat /Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A3-WF-r1/with_skill/plugin/dev-team/skills/build/references/exit.md&quot;,
+  &quot;description&quot;: &quot;Read the build skill&#x27;s exit guide&quot;
+}</pre><div class="lbl">output</div><pre># Exit
+
+Read when every task of the milestone has landed. The exit review, its fix tasks, a second exit
+review over them, the user&#x27;s yes, the merge. Each user gate ends a turn; run `dt build status` at
+the start of each turn to see where you are. The loop is `loop.md`; stops are `escalation.md`.
+
+```
+exit review → findings → [fix tasks: build-planning Replan, the user] → loop → exit review again
+  → [the user&#x27;s yes] → merge build/M&lt;n&gt; → build-planning Advance
+```
+
+## Steps
+
+**1. Exit review.** Once the last task lands, `dt ready` lists the exit reviewers (one per
+package with changes over the milestone diff, one lead), which run the Milestone exit list too:
+the Scope&#x27;s Exit, every Covers ID tested, no stub left (`check.sh full --exit`), real providers in
+system tests, the slow and perf tests. Spawn and record them as `loop.md` says. A Critical is a
+stop (`escalation.md`).
+
+**2. Fix tasks.** With the review recorded, show `dt build status`&#x27;s findings by severity and
+point to the checkpoint blocks in `tasks/plan.md`. Important findings get fix tasks; Suggestions
+and Nits only if the user asks. The tasks come from `build-planning` Replan, through its own gate;
+on its approval it commits the plan on the build branch. The go covers one plan version, so ask
+for it again for the fix tasks and record it with `dt build go`, then run the loop until they land. No findings needing a task:
+step 4.
+
+**3. Exit review again.** After the fix tasks land, `dt ready` lists the exit reviewers again,
+over the fix tasks&#x27; landings plus the Milestone exit list. Record them as before. New Important
+findings go back to step 2; repeat only with the user&#x27;s yes, and say how many rounds have run.
+
+**4. The user&#x27;s yes.** One message, then **stop the turn**:
+- the exit review&#x27;s findings and each one&#x27;s disposition (fix task landed, or won&#x27;t fix and why);
+- the Definition of Done (CONSTRAINTS.md, Done: the full list) and the Scope&#x27;s `**Exit:**` line,
+  each held or not, from the reviewers&#x27; lines;
+- what merges: `build/M&lt;n&gt;` into the branch the build started from, with the landing count.
+
+| The user says | Do |
+|---|---|
+| An unambiguous yes (&quot;merge it&quot;) | Step 5 |
+| A change, or a hedge (&quot;looks fine I guess&quot;) | Not a yes. Ask what to change; a fix is a Replan (step 2) |
+
+**5. Merge.** The one git the driver runs itself, only after that yes, from a clean main
+checkout: `git switch &lt;the branch the build started from&gt;`, then `git merge --no-ff build/M&lt;n&gt;`,
+each in its own Bash call. A conflict: `git merge --abort`, report it, stop. Never push. Then
+`dt build prune`: it deletes the tests branches and the rejected halves&#x27; branches and worktrees.
+
+**6. Hand on.** Say the milestone is built and merged, and that the next step is
+`build-planning` Advance (exit checkpoint, archive), which offers `build-setup` Ratchet. Stop.
+
+## Example: the gate message
+
+```
+M1 is built: all 14 tasks and fix task M1-T15 landed; the exit review ran twice.
+Findings: M1-R04 Important (duplicate window loop in profile/fourier.py and profile/spectrum.py)
+  → fix task M1-T15, landed; M1-R05 Nit (column names) → won&#x27;t fix: matches the utility&#x27;s notation.
+Definition of Done: held. Exit: &quot;the Fourier profile and the residual spectrum run on 10y of hourly
+  load; TC-01–TC-03 pass&quot;: held (exit review).
+Merge build/M1 (15 task landings) into main?
+```</pre></details></div><div class="step" id="SD59"><span class="sid">D59</span><span class="kind">Bash</span>python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A3-WF-r1/with_skill/plugin/dev-team/scripts/dt.py build status<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A3-WF-r1/with_skill/plugin/dev-team/scripts/dt.py build status&quot;,
+  &quot;description&quot;: &quot;Check final build status&quot;
+}</pre><div class="lbl">output</div><pre>{
+  &quot;milestone&quot;: &quot;M1&quot;,
+  &quot;branch&quot;: &quot;build/M1&quot;,
+  &quot;go&quot;: &quot;build/M1 started 2026-10-18&quot;,
+  &quot;go_current&quot;: true,
+  &quot;progress&quot;: &quot;21/21&quot;,
+  &quot;landed&quot;: [
+    {
+      &quot;task&quot;: &quot;M1-T01&quot;,
+      &quot;role&quot;: &quot;solo&quot;,
+      &quot;commit&quot;: &quot;266938094ffc622491ad7ec5473aaa8c9df84374&quot;
+    },
+    {
+      &quot;task&quot;: &quot;M1-T02&quot;,
+      &quot;role&quot;: &quot;solo&quot;,
+      &quot;commit&quot;: &quot;9f12597c2f07c90fcb6ac8262f8f800c8feec518&quot;
+    },
+    {
+      &quot;task&quot;: &quot;M1-T03&quot;,
+      &quot;role&quot;: &quot;solo&quot;,
+      &quot;commit&quot;: &quot;fc6bbdd6fb46a92030152efee8c4524738280f2e&quot;
+    },
+    {
+      &quot;task&quot;: &quot;M1-T04&quot;,
+      &quot;role&quot;: &quot;solo&quot;,
+      &quot;commit&quot;: &quot;12e4e520e7c436414d7cdb3c6921fe134a79d6e3&quot;
+    },
+    {
+      &quot;task&quot;: &quot;M1-T05&quot;,
+      &quot;role&quot;: &quot;solo&quot;,
+      &quot;commit&quot;: &quot;539c4a98b263085660c6fd3cf57aeabc4b66e006&quot;
+    },
+    {
+      &quot;task&quot;: &quot;M1-T06&quot;,
+      &quot;role&quot;: &quot;solo&quot;,
+      &quot;commit&quot;: &quot;17e7d8232698190a3f94a66fdabd294dca3dd9f8&quot;
+    },
+    {
+      &quot;task&quot;: &quot;M1-T07&quot;,
+      &quot;role&quot;: &quot;solo&quot;,
+      &quot;commit&quot;: &quot;57a8c0d313591dd2aec3051654a3d4eb5653dc3d&quot;
+    },
+    {
+      &quot;task&quot;: &quot;M1-T08&quot;,
+      &quot;role&quot;: &quot;solo&quot;,
+      &quot;commit&quot;: &quot;e0b8425967e316af1676ecdc0bfca65fdb832808&quot;
+    },
+    {
+      &quot;task&quot;: &quot;M1-T09&quot;,
+      &quot;role&quot;: &quot;solo&quot;,
+      &quot;commit&quot;: &quot;635bf1e2344c06435d32cf8f9658d28586ccfc30&quot;
+    },
+    {
+      &quot;task&quot;: &quot;M1-T10&quot;,
+      &quot;role&quot;: &quot;solo&quot;,
+      &quot;commit&quot;: &quot;946892da33809ae580112daf2d5b34ebfe78e2af&quot;
+    },
+    {
+      &quot;task&quot;: &quot;M1-T11&quot;,
+      &quot;role&quot;: &quot;solo&quot;,
+      &quot;commit&quot;: &quot;cc4cc48afe96f9f56736ac332d235a58c9f7641b&quot;
+    },
+    {
+      &quot;task&quot;: &quot;M1-T12&quot;,
+      &quot;role&quot;: &quot;solo&quot;,
+      &quot;commit&quot;: &quot;7819dbd87a341a4756b67b5bcd7db5f4ca04fa0c&quot;
+    },
+    {
+      &quot;task&quot;: &quot;M1-T13&quot;,
+      &quot;role&quot;: &quot;solo&quot;,
+      &quot;commit&quot;: &quot;4d67ac74ad52af35626a1930815c3a56b70e8524&quot;
+    },
+    {
+      &quot;task&quot;: &quot;M1-T14&quot;,
+      &quot;role&quot;: &quot;implementer&quot;,
+      &quot;commit&quot;: &quot;6a468b69272aa48dbab9736534ee71695a118a6b&quot;
+    },
+    {
+      &quot;task&quot;: &quot;M1-T15&quot;,
+      &quot;role&quot;: &quot;implementer&quot;,
+      &quot;commit&quot;: &quot;7e5b454439bc9ef6afd5cbf8014e5d6b8883c7a7&quot;
+    },
+    {
+      &quot;task&quot;: &quot;M1-T16&quot;,
+      &quot;role&quot;: &quot;implementer&quot;,
+      &quot;commit&quot;: &quot;54b45b6dde23b049b82e37161bc26f4eb324c5b1&quot;
+    },
+    {
+      &quot;task&quot;: &quot;M1-T17&quot;,
+      &quot;role&quot;: &quot;implementer&quot;,
+      &quot;commit&quot;: &quot;f31f944e3fa759b32f1296d63f154348de920709&quot;
+    },
+    {
+      &quot;task&quot;: &quot;M1-T18&quot;,
+      &quot;role&quot;: &quot;implementer&quot;,
+      &quot;commit&quot;: &quot;011f8edb82cc0435299f8807d2551098faa0ff9b&quot;
+    },
+    {
+      &quot;task&quot;: &quot;M1-T19&quot;,
+      &quot;role&quot;: &quot;implementer&quot;,
+      &quot;commit&quot;: &quot;d77c21c485c66b1eeacc0b77c3dfb0b259931d85&quot;
+    },
+    {
+      &quot;task&quot;: &quot;M1-T20&quot;,
+      &quot;role&quot;: &quot;implementer&quot;,
+      &quot;commit&quot;: &quot;644925a3796b6af488a35232f6011ac15832411b&quot;
+    },
+    {
+      &quot;task&quot;: &quot;M1-T21&quot;,
+      &quot;role&quot;: &quot;solo&quot;,
+      &quot;commit&quot;: &quot;1aa7e1b710f2b730d1427a8f6757fcb393103dfa&quot;
+    }
+  ],
+  &quot;tests_landed&quot;: [],
+  &quot;reserved&quot;: [],
+  &quot;claims&quot;: [],
+  &quot;ready&quot;: [],
+  &quot;holds&quot;: [],
+  &quot;blocked&quot;: [],
+  &quot;held&quot;: [],
+  &quot;escalations&quot;: [],
+  &quot;reviews&quot;: [
+    {
+      &quot;review&quot;: &quot;M1-T01.mdata&quot;,
+      &quot;outcome&quot;: &quot;passed&quot;,
+      &quot;critical&quot;: [],
+      &quot;critical_open&quot;: [],
+      &quot;tasks&quot;: [
+        &quot;M1-T01&quot;
+      ]
+    },
+    {
+      &quot;review&quot;: &quot;M1-T10.mdata&quot;,
+      &quot;outcome&quot;: &quot;passed&quot;,
+      &quot;critical&quot;: [],
+      &quot;critical_open&quot;: [],
+      &quot;tasks&quot;: [
+        &quot;M1-T02&quot;,
+        &quot;M1-T03&quot;,
+        &quot;M1-T04&quot;
+      ]
+    },
+    {
+      &quot;review&quot;: &quot;M1-T10.risk&quot;,
+      &quot;outcome&quot;: &quot;passed&quot;,
+      &quot;critical&quot;: [],
+      &quot;critical_open&quot;: [],
+      &quot;tasks&quot;: [
+        &quot;M1-T05&quot;,
+        &quot;M1-T06&quot;,
+        &quot;M1-T07&quot;,
+        &quot;M1-T08&quot;,
+        &quot;M1-T09&quot;,
+        &quot;M1-T10&quot;
+      ]
+    },
+    {
+      &quot;review&quot;: &quot;M1-T20.mdata&quot;,
+      &quot;outcome&quot;: &quot;passed&quot;,
+      &quot;critical&quot;: [],
+      &quot;critical_open&quot;: [],
+      &quot;tasks&quot;: [
+        &quot;M1-T11&quot;,
+        &quot;M1-T14&quot;,
+        &quot;M1-T15&quot;
+      ]
+    },
+    {
+      &quot;review&quot;: &quot;M1-T20.risk&quot;,
+      &quot;outcome&quot;: &quot;passed&quot;,
+      &quot;critical&quot;: [],
+      &quot;critical_open&quot;: [],
+      &quot;tasks&quot;: [
+        &quot;M1-T12&quot;,
+        &quot;M1-T13&quot;,
+        &quot;M1-T16&quot;,
+        &quot;M1-T17&quot;,
+        &quot;M1-T18&quot;,
+        &quot;M1-T19&quot;,
+        &quot;M1-T20&quot;
+      ]
+    },
+    {
+      &quot;review&quot;: &quot;exit.mdata&quot;,
+      &quot;outcome&quot;: &quot;passed&quot;,
+      &quot;critical&quot;: [],
+      &quot;critical_open&quot;: [],
+      &quot;tasks&quot;: [
+        &quot;M1-T01&quot;,
+        &quot;M1-T02&quot;,
+        &quot;M1-T03&quot;,
+        &quot;M1-T04&quot;,
+        &quot;M1-T11&quot;,
+        &quot;M1-T14&quot;,
+        &quot;M1-T15&quot;,
+        &quot;M1-T21&quot;
+      ]
+    },
+    {
+      &quot;review&quot;: &quot;exit.risk&quot;,
+      &quot;outcome&quot;: &quot;passed&quot;,
+      &quot;critical&quot;: [],
+      &quot;critical_open&quot;: [],
+      &quot;tasks&quot;: [
+        &quot;M1-T05&quot;,
+        &quot;M1-T06&quot;,
+        &quot;M1-T07&quot;,
+        &quot;M1-T08&quot;,
+        &quot;M1-T09&quot;,
+        &quot;M1-T10&quot;,
+        &quot;M1-T12&quot;,
+        &quot;M1-T13&quot;,
+        &quot;M1-T16&quot;,
+        &quot;M1-T17&quot;,
+        &quot;M1-T18&quot;,
+        &quot;M1-T19&quot;,
+        &quot;M1-T20&quot;
+      ]
+    }
+  ],
+  &quot;findings&quot;: {
+    &quot;Suggestion&quot;: 7,
+    &quot;Nit&quot;: 5,
+    &quot;Important&quot;: 15
+  },
+  &quot;next_checkpoint&quot;: null,
+  &quot;all_landed&quot;: true
+}</pre></details></div><div class="step" id="SD60"><span class="sid">D60</span><span class="kind">Bash</span>grep -n &quot;Important&quot; /Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A3-WF-r1/with_skill/project/tasks/plan.md<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;grep -n \&quot;Important\&quot; /Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A3-WF-r1/with_skill/project/tasks/plan.md&quot;,
+  &quot;description&quot;: &quot;List the Important findings recorded in the plan&quot;
+}</pre><div class="lbl">output</div><pre>111:- M1-R04 Important · correct to spec · packages/risk/src/risk/summary.py:24::_ticker_summary `sharpe=mean / spread` raises ZeroDivisionError for a constant (zero-volatility) ticker, so the spine crashes PL-03 on TC-07&#x27;s Y series, where the spec expects a Sharpe of 0 → write `sharpe=mean / spread if spread else 0.0` and add a unit test with a constant series (M1-T19 must keep this)
+112:- M1-R05 Important · correct to spec · packages/risk/src/risk/annualize.py:10::annualize the spine returns `vol` with `annualized=False`, so `vol_series` breaks its contract invariant &quot;`annualized` is True&quot; and calling annualize twice never raises → return `dataclasses.replace(vol, annualized=True)` (values still pass through) and assert `out.annualized` in tests/unit/risk/test_annualize.py::test_daily_values_pass_through
+113:- M1-R06 Important · tests prove something · tests/unit/risk/test_returns.py:9::_prices and tests/unit/risk/test_report.py:11::ACME the M1-T05 and M1-T10 acceptance bullets say &quot;turns the mdata.Prices / risk.TickerSummary sample into a valid output&quot;, but neither test loads tests/contracts/mdata.Prices/sample.json or risk.TickerSummary/sample.json (test_drawdown.py:42 also copies the Returns sample inline instead of loading it) → add one test per step that loads its contract sample and checks the output&#x27;s shape
+115:- M1-R08 Important · Tests prove something · packages/mdata/src/mdata/calendar.py:17::align_calendar the mutant `dates = tuple(shared)` (sort dropped) survives tests/unit/mdata/test_calendar.py on some PYTHONHASHSEED values (passed once, failed with another seed) because the tests use only 2-3 shared dates, so the &quot;dates ascending&quot; invariant of Prices is only checked by chance → add a unit test that feeds about 20 dates in reverse file order for two tickers and asserts prices.dates == tuple(sorted(...)) so set order can&#x27;t match by luck
+116:- M1-R09 Important · Correct to the spec · packages/mdata/src/mdata/io.py:26::_to_row a short data row under a full header (e.g. `2024-01-02,AAA`) makes csv.DictReader fill close with None, so `record[&quot;close&quot;].strip()` raises AttributeError instead of the ValueError contract.md gives for a malformed file (load_prices: &quot;ValueError for a malformed file&quot;); a non-numeric close gives a bare float() ValueError with no path or line → in _to_row treat a None field as malformed and raise ValueError naming the path and line (reader.line_num), wrap float() the same way, and add a test_io case for each
+219:- M1-R11 Important · Mutation · packages/risk/src/risk/drawdown.py:21::_drawdown mutant `if level &gt; peak` -&gt; `if level &gt;= peak` (later of two equal peaks becomes the peak date, against RISK-05 &quot;the first if tied&quot;) passes all 19 drawdown tests; TC-08 has no tied peak and test_tied_falls_keep_the_first only ties troughs → add a unit test in tests/unit/risk/test_drawdown.py with levels 1, 2, 2, 1 (returns log 2, 0.0, -log 2) expecting peak_date &quot;2024-03-05&quot;, trough_date &quot;2024-03-07&quot;
+220:- M1-R12 Important · Mutation · packages/risk/src/risk/vol_pipeline.py:20::vol_series mutant `return vol` (annualize step dropped from PL-02) passes the whole suite (118 tests, -m &quot;&quot;); the smoke test checks shape only and no test runs the wired pipeline&#x27;s values → cover it in M1-T21&#x27;s system test (assert `vol.annualized is True` and a value equals the step-level sigma*sqrt(252)), flagged for the system phase
+221:- M1-R13 Important · Mutation · packages/risk/src/risk/report_pipeline.py:21::risk_report mutant dropping `tickers=tickers` from the vol_series call passes the whole suite; nothing checks PL-03 forwards `tickers` → add to tests/unit/risk/test_pl03_smoke.py `with pytest.raises(LookupError): risk_report(&quot;ignored.csv&quot;, tmp_path / &quot;r.json&quot;, window=2, tickers=[&quot;ACME&quot;])` (the risk.vol_series fake raises LookupError for any tickers, so this proves the pass-through)
+222:- M1-R14 Important · correctness · packages/mdata/src/mdata/calendar.py:20::align_calendar _fill counts gaps over every traded date, including dates before the common start that are dropped from the calendar. So a ticker missing more than max_gap dates before the last ticker starts raises GapError even though it misses nothing on the calendar DATA-03 defines (e.g. A trades d1 and d8-d10, D trades d1-d10, C starts d8: GapError naming A, but A is complete from d8). A gap that straddles the start is also counted across it. No TC exercises this → fill over `calendar = [d for d in traded if d &gt;= start]` only, seeding each ticker with its last close on or before `start`, and add a unit test for an early gap before the start
+241:- M1-R16 Important · Mutation · packages/risk/src/risk/drawdown.py:21::_drawdown the mutant `if level &gt;= peak:` (moving the peak to a later equal high) passes every risk test with `-m &quot;&quot;`, so RISK-05&#x27;s &quot;the first if tied&quot; is untested for the peak date (test_tied_falls_keep_the_first only ties the trough, and TC-08 has no tied peak) → add a unit test with levels 1, 2, 1, 2, 1.5 whose deepest fall must keep the peak at the first 2
+242:- M1-R17 Important · Mutation · packages/risk/src/risk/vol_pipeline.py:20::vol_series the mutant `return vol` (skipping annualize) passes every test at d77c21c: the PL-02 smoke checks shape only and no system test exists in the range, so the wiring of RISK-03 into the entry is not checked → have M1-T21&#x27;s system test (or the PL-02 smoke) assert `vol.annualized is True`
+243:- M1-R18 Important · QR-01 · packages/risk/src/risk/report_pipeline.py:24::risk_report QR-01 (a run is deterministic: two runs on the same CSV and window give identical files) has no test anywhere under tests/ at d77c21c, and the exit&#x27;s Covers list includes QR-01 → add a test that runs risk_report twice into two tmp paths and compares the bytes (M1-T21 system test)
+245:- M1-R20 Important · Correct to spec · packages/mdata/src/mdata/calendar.py:46::_fill counts a ticker&#x27;s gap over every traded date after its own first close, including dates before the common start that the calendar then drops. Example: A has closes on d1 and d8-d9, C on d1-d9, B on d8-d9. The calendar starts at d8 and A misses none of its dates, yet A&#x27;s six misses on d2-d7 raise GapError, against DATA-03/DATA-04 (&quot;missing more than 5 calendar dates in a row&quot;). No TC exercises it → fill only over traded[first:], seeded with the ticker&#x27;s last close on or before start, so gaps are counted on calendar dates only; add a unit test with this three-ticker case
+246:- M1-R21 Important · Milestone exit · tests/system/test_e2e.py:1::QR-01 is in Scope Covers but has no test anywhere (grep finds QR-01 only in report_pipeline.py&#x27;s docstring), so the exit rule &quot;every Covers ID has a test&quot; fails → add a system test that runs risk_report twice on the same CSV and window to two out paths and asserts the two files&#x27; bytes are equal
+247:- M1-R22 Important · Milestone exit · tests/contracts/test_contracts.py:121::test_load_prices_fake_serves_the_prices_sample no test runs the same sample through a real provider and its double: the real mdata.load_prices is never run on the sample&#x27;s &quot;csv&quot; and compared with the fake&#x27;s Prices, and the same holds for risk.vol_series and its fake. The exit&#x27;s &quot;real provider and its double agree&quot; is unproven → add a contract test that writes sample[&quot;csv&quot;] to tmp_path and asserts mdata.load_prices(path) == fake.load_prices(path), with and without [&quot;BOLT&quot;], and the same for risk.vol_series(path, window=2)</pre></details></div><div class="step" id="SD61"><span class="sid">D61</span><span class="kind">say</span>M1 isn&#x27;t ready to merge yet. All 21 tasks have landed and the exit review is recorded with no Criticals, but the reviewers found two milestone exit rules not met and 15 Important findings, which need fix tasks first. ⏎ How the build went: after the `risk.Drawdown` contract fix, every task landed. The checkpoint reviews after M1-T01, M1-T10 and M1-T20, and the exit review, all passed for both mdata and risk. Nothing is blocked and no decisions are pending. ⏎ Findings: 15 Important, 7 Suggestions and 5 Nits. They&#x27;re recorded under the checkpoint blocks in `tasks/plan.md` (lines 111–247). …[+1779 chars]<details><summary>full text</summary><pre>M1 isn&#x27;t ready to merge yet. All 21 tasks have landed and the exit review is recorded with no Criticals, but the reviewers found two milestone exit rules not met and 15 Important findings, which need fix tasks first.
+
+**How the build went:** after the `risk.Drawdown` contract fix, every task landed. The checkpoint reviews after M1-T01, M1-T10 and M1-T20, and the exit review, all passed for both mdata and risk. Nothing is blocked and no decisions are pending.
+
+**Findings:** 15 Important, 7 Suggestions and 5 Nits. They&#x27;re recorded under the checkpoint blocks in `tasks/plan.md` (lines 111–247). The 15 Important ones reduce to about 10 separate problems, because some were found twice:
+
+- **Exit rules not met:**
+  - QR-01 (a run gives the same output every time) has no test, though M1 must cover it (R18, R21).
+  - No test checks that the real `mdata.load_prices` and `risk.vol_series` give the same results as their test stand-ins (R22).
+- **Behaviour bugs:**
+  - A ticker with a gap only before the shared start date raises `GapError` anyway (R14, R20).
+  - A short or malformed CSV row raises `AttributeError` instead of the `ValueError` the contract promises (R09).
+  - A zero-volatility ticker makes the Sharpe calculation divide by zero (R04).
+  - `annualize` leaves `annualized=False` (R05).
+
+  R04 and R05 were found at the M1-T10 checkpoint, before later tasks landed, so they may already be fixed. The fix-task planning should confirm each one.
+- **Gaps in the tests:**
+  - Nothing tests that a tied peak keeps the first date (R11, R16).
+  - Nothing checks that `vol_series` actually annualizes or that PL-03 passes `tickers` through (R12, R13, R17).
+  - The calendar&#x27;s date order is only checked by chance (R08).
+  - Some steps never load their contract sample (R06).
+
+**Definition of Done:** not met yet, because of the two failed exit rules.
+
+**What would merge:** `build/M1`, with its 21 task landings, into `main`.
+
+**Decision needed:** I recommend running `build-planning` Replan to turn the Important findings into fix tasks, with duplicates merged and anything already fixed dropped. You&#x27;d approve that plan and give a new go, then the same workflow builds them and the exit review runs again. Suggestions and Nits stay as they are unless you want them included. Shall I run the Replan, or do you want to merge as it stands?</pre></details></div><div class="step" id="SD62"><span class="sid">D62</span><span class="kind">hook</span><span class="hook">SessionStart:resume said: milestone: M1 Risk report · plan Approved
+progress: 21/21 · next: none
+blocked: none
+roadmap: Status* column stale (run dt roadmap)
+dt: python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A3-WF-r1/with_skill/plugin/dev-team/scripts/dt.py
+</span></div>
+<h2>Commits</h2>
+<p>None.</p>
+<h2>Returned</h2>
+<pre>M1 isn&#x27;t ready to merge yet. All 21 tasks have landed and the exit review is recorded with no Criticals, but the reviewers found two milestone exit rules not met and 15 Important findings, which need fix tasks first.
+
+**How the build went:** after the `risk.Drawdown` contract fix, every task landed. The checkpoint reviews after M1-T01, M1-T10 and M1-T20, and the exit review, all passed for both mdata and risk. Nothing is blocked and no decisions are pending.
+
+**Findings:** 15 Important, 7 Suggestions and 5 Nits. They&#x27;re recorded under the checkpoint blocks in `tasks/plan.md` (lines 111–247). The 15 Important ones reduce to about 10 separate problems, because some were found twice:
+
+- **Exit rules not met:**
+  - QR-01 (a run gives the same output every time) has no test, though M1 must cover it (R18, R21).
+  - No test checks that the real `mdata.load_prices` and `risk.vol_series` give the same results as their test stand-ins (R22).
+- **Behaviour bugs:**
+  - A ticker with a gap only before the shared start date raises `GapError` anyway (R14, R20).
+  - A short or malformed CSV row raises `AttributeError` instead of the `ValueError` the contract promises (R09).
+  - A zero-volatility ticker makes the Sharpe calculation divide by zero (R04).
+  - `annualize` leaves `annualized=False` (R05).
+
+  R04 and R05 were found at the M1-T10 checkpoint, before later tasks landed, so they may already be fixed. The fix-task planning should confirm each one.
+- **Gaps in the tests:**
+  - Nothing tests that a tied peak keeps the first date (R11, R16).
+  - Nothing checks that `vol_series` actually annualizes or that PL-03 passes `tickers` through (R12, R13, R17).
+  - The calendar&#x27;s date order is only checked by chance (R08).
+  - Some steps never load their contract sample (R06).
+
+**Definition of Done:** not met yet, because of the two failed exit rules.
+
+**What would merge:** `build/M1`, with its 21 task landings, into `main`.
+
+**Decision needed:** I recommend running `build-planning` Replan to turn the Important findings into fix tasks, with duplicates merged and anything already fixed dropped. You&#x27;d approve that plan and give a new go, then the same workflow builds them and the exit review runs again. Suggestions and Nits stay as they are unless you want them included. Shall I run the Replan, or do you want to merge as it stands?</pre>
+</body></html>

@@ -1,0 +1,119 @@
+{
+ "winner": "A",
+ "reasoning": "Set A matches the ground truth more closely and has the stronger RL design. Its fish tank is circular and scores survival time, it uses one learning predator, and Stage 3 includes the self-play concept itself: naive co-learning, then an opponent pool of past generations, a cross-play table and ratings. It also builds clear concept ladders: tabular \u2192 DQN \u2192 CNN with ablations, and REINFORCE \u2192 PPO \u2192 school \u2192 limited view, each backed by library comparisons and checked golden cases (the GAE, clip and ballistics numbers check out). Set B is leaner and easier to read, and its check-world gate is an excellent RL safeguard. But it drifts from the ground truth: a square tank, hit counting with respawn instead of survival, two predators, and no self-play against past opponents, only naive co-training plus a pairing grid. Its milestone split is also weak. M1 delivers a training stack whose snake doesn't have to learn yet (its DQN spine has no replay buffer or target network) and has no replay. Replay, the reference check, write-ups and the real learning bar are carved off into M2, 'See, check and explain the snake', which is exactly the leftover 'replays + reference' pattern. B also never freezes the snake observation layout, even though the SnakeRule baseline and the learners depend on it, and its pipelines.md keeps stale open questions. A has its own flaws: stale framing in the brief and architecture, a bloated contract and context packets that carry fish and predator-prey material into M1, and a train-spine packet without core.Transition. On balance A is the better plan.",
+ "rubric": {
+  "A": {
+   "content": {
+    "rl_soundness": 5,
+    "stage_completeness": 5,
+    "internal_consistency": 3,
+    "right_sizing": 3,
+    "milestone_quality": 4,
+    "pipeline_clarity": 4,
+    "interface_quality": 4,
+    "dependency_graph_soundness": 4,
+    "task_buildability": 3
+   },
+   "structure": {
+    "organization": 4,
+    "readability_for_solo_learner": 3,
+    "ease_of_finding_next_build_step": 4,
+    "layout_sensibility": 4
+   },
+   "content_score": 3.9,
+   "structure_score": 3.8,
+   "overall_score": 7.7
+  },
+  "B": {
+   "content": {
+    "rl_soundness": 3,
+    "stage_completeness": 3,
+    "internal_consistency": 3,
+    "right_sizing": 4,
+    "milestone_quality": 2,
+    "pipeline_clarity": 4,
+    "interface_quality": 3,
+    "dependency_graph_soundness": 4,
+    "task_buildability": 2
+   },
+   "structure": {
+    "organization": 4,
+    "readability_for_solo_learner": 4,
+    "ease_of_finding_next_build_step": 4,
+    "layout_sensibility": 4
+   },
+   "content_score": 3.1,
+   "structure_score": 4.0,
+   "overall_score": 7.1
+  }
+ },
+ "output_quality": {
+  "A": {
+   "score": 8,
+   "strengths": [
+    "Concept ladders per stage (tabular/DQN/CNN plus ablations; REINFORCE\u2192PPO\u2192school\u2192limited view; fixed opponents\u2192naive co-learning\u2192opponent pool) that teach each named RL concept",
+    "Faithful to the ground truth: circular tank, survive as long as possible, one learning predator, self-play with past generations and a cross-play table",
+    "Precise golden cases with checkable numbers (GAE 1.3775, clipped objective, ball reflection, catch timing)",
+    "Frozen observation layouts (COMPACT_FIELDS, TANK_*_FIELDS, PREY/PREDATOR_FIELDS) make baselines and agents buildable in parallel",
+    "One milestone per stage, each a full end-to-end capability, with correct Depends cells"
+   ],
+   "weaknesses": [
+    "Contract and context packets carry Stage 2/3 symbols into M1 packets (bloat)",
+    "Stale process framing in the brief and architecture (e.g. 'Not doing: Designing future environments now'; 'TC-01\u2013TC-49 don't change')",
+    "The M1-T06 train spine packet leaves out core.Transition, TeamSpec, GameRecording and create_run",
+    "Test helpers frozen as contract symbols (returns_to_go, gae, clipped_objective)",
+    "M1 is large (31 tasks)"
+   ]
+  },
+  "B": {
+   "score": 6,
+   "strengths": [
+    "Check-world gate before every batch (two-exit corridor with a hand-derived Q*) is a strong guard against silent RL bugs",
+    "Clear brief and readable spec, with learner write-ups (NOTES) serving 'explain why it works'",
+    "Small, clean pipelines with honest minimal spine versions (online Q-learning; REINFORCE as the PPO spine)",
+    "Replay with step-back, side-by-side checkpoints and a sight overlay suits a learner"
+   ],
+   "weaknesses": [
+    "Fish tank is a square with hit counting and respawn, not the circular survive-as-long-as-possible tank",
+    "No self-play against past opponents; predator-prey has only naive co-training and two predators",
+    "M2 is a leftover milestone (replay, reference check, write-ups, real learning bar) carved off M1; M1 has no replay and no learning bar",
+    "The snake observation layout is never frozen, yet the SnakeRule baseline and the learners cross that boundary",
+    "Stale open questions in pipelines.md, already resolved by AD-10 and the contract"
+   ]
+  }
+ },
+ "unbuildable_tasks": {
+  "A": [
+   "M1-T06: the packet builds a Transition per learning team but has no core.Transition definition; TeamSpec/SOLO, GameRecording and runs.create_run are also missing",
+   "M1-T13: Snake must declare `teams: Mapping[str, TeamSpec]`, but core.TeamSpec, core.SOLO and core.ActionSpace are not in the packet"
+  ],
+  "B": [
+   "M1-T15: SnakeRule must read SNAKE-06 observations, but no field order or length is frozen anywhere; it also says 'moves right' in absolute terms while actions are relative turns",
+   "M1-T09: no methods.Transition, runlog.Checkpoint, core.Episode/EpisodeResult or WorldSpec in the packet, though train_loop builds transitions and writes checkpoints",
+   "M1-T28/M1-T29: they write only charts/check.py and charts/style.py and cannot edit charts/curve.py, so learning_curve can't call the refusal or style code",
+   "M1-T06: core.WorldSpec, TeamSpec and ActionSpace are missing, though the Snake world must expose `spec`"
+  ]
+ },
+ "defects": {
+  "A": [
+   "brief.md: \"Not doing: Designing future environments now. Each gets refined in its turn.\" \u2014 contradicts the spec and architecture, which fully design the fish tank and predator-prey",
+   "architecture.md Risks: \"the expected values of TC-01\u2013TC-49 don't change\" \u2014 stale; tests now run to TC-71",
+   "architecture.md AD-09: \"M1's plan is approved but no code exists yet\" / \"CORE-01 now needs\" \u2014 process history kept in a decision record",
+   "tasks/plan.md Exit: \"the real 5-seed ladder and reference runs pass TC-15\" \u2014 TC-15 is a 2,000-step synthetic corridor determinism case, not a real 5-seed run",
+   "context__M1-T21.md: includes envs.FishTank, envs.PredatorPrey, ScriptedPredator, ReinforceAgent and PPOAgent \u2014 symbols not in M1 (bloat)",
+   "pipelines.md PL-01: entry sketch calls `with_seed`, which is not in contract.md",
+   "contract.md: agents.returns_to_go / gae / clipped_objective \u2014 private helpers frozen as contract symbols for tests"
+  ],
+  "B": [
+   "spec.md FISH-01: \"The tank is a square with walls\" \u2014 the ground truth is a circular tank",
+   "spec.md FISH-04: \"the score is hits per fish per episode (lower is better)\" with respawn \u2014 the ground truth is survive as long as possible",
+   "spec.md PREY-01: \"2 predators\" \u2014 the ground truth is a single learning predator; no self-play against past opponents is planned anywhere",
+   "roadmap.md M2: \"See, check and explain the snake\" \u2014 a leftover milestone (replay, reference, notes) split from M1, and M1 can't be watched",
+   "roadmap.md M1 Outline: \"final evaluation gives a tested verdict\" while SNAKE-08 (beats baselines) is deferred to M2 \u2014 M1's DQN spine isn't required to learn",
+   "pipelines.md Open questions: \"New contract types ... are routed to architecture-design: core.Output ... (assumed: as written)\" \u2014 stale; already in contract.md and AD-10",
+   "spec.md SNAKE-06: \"danger straight ahead, left and right; its heading; the food's direction ...; and its length\" \u2014 no layout frozen in the contract, though baselines.snake and methods depend on it",
+   "context__M1-T30.md Writes: \"src/rllab/train/pipelines/pl03_batch.py (new)\" \u2014 M1-T21 already created this file",
+   "contract.md evaluate.compare \u2014 no Boundary/Fixtures line, unlike every other contract symbol"
+  ]
+ }
+}

@@ -1,0 +1,81 @@
+# Driver segment 1 · `/dev-team:idea-refine I want to start a personal quant research platform for market research on US equities, built in stages. Let's refine the idea and plan it until it's ready to build.
+
+Here is everything I eventually want it to do:
+1. Stage 1 — Data: a reliable daily US equity dataset and loader (prices, returns, corporate actions, point-in-time universe), with scripts to download, clean, validate, and store it, plus basic exploratory analysis, and a data-viz app to explore it: a TypeScript + React browser frontend over a Python backend (HTTP and WebSocket).
+2. Stage 2 — Return structure & classical portfolios, no ML: PCA decomposition of returns to remove the market (and other dominant) factors, Marchenko–Pastur random-matrix denoising of the correlation matrix, and covariance estimation (sample, shrinkage, denoised) compared on real data. Then minimum-variance, risk parity and hierarchical risk parity built on those estimates, compared out of sample on realized variance. Get variance optimization right before any return prediction.
+3. Stage 3 — Features & ML: build candidate features, then test them with ML for information gain over the residual (market-removed) returns. Every feature claim must pass a proper null-hypothesis test so we don't fool ourselves; this needs scripting and real data analysis.
+4. Stage 4 — Forecasting & trading agents: return/volatility forecasting with neural networks (e.g. sequence models), built on the features that survived stage 3 and compared against simple forecasting baselines. Then portfolios driven by those forecasts, and PPO trading/allocation agents trained in a backtest environment. Both must beat the stage-2 classical portfolios out of sample, paper trading only.
+
+I've put my reference code for this in references/: market_decomposition.py, tft_dataset.py, tft_targets.py.`
+
+- **Steps:** D1–D37 · **definition:** `/Users/connorott/plugins/dev-team-workspace/iteration-9/quant-all-at-once/with_skill/plugin/dev-team/skills/idea-refine/SKILL.md`
+- **Units spawned here:** U01, U02, U03
+
+## Steps
+
+- `D1` **USER TYPED** `/dev-team:idea-refine I want to start a personal quant research platform for market research on US equities, built in stages. Let's refine the idea and plan it until it's ready to build.
+
+Here is everything I eventually want it to do:
+1. Stage 1 — Data: a reliable daily US equity dataset and loader (prices, returns, corporate actions, point-in-time universe), with scripts to download, clean, validate, and store it, plus basic exploratory analysis, and a data-viz app to explore it: a TypeScript + React browser frontend over a Python backend (HTTP and WebSocket).
+2. Stage 2 — Return structure & classical portfolios, no ML: PCA decomposition of returns to remove the market (and other dominant) factors, Marchenko–Pastur random-matrix denoising of the correlation matrix, and covariance estimation (sample, shrinkage, denoised) compared on real data. Then minimum-variance, risk parity and hierarchical risk parity built on those estimates, compared out of sample on realized variance. Get variance optimization right before any return prediction.
+3. Stage 3 — Features & ML: build candidate features, then test them with ML for information gain over the residual (market-removed) returns. Every feature claim must pass a proper null-hypothesis test so we don't fool ourselves; this needs scripting and real data analysis.
+4. Stage 4 — Forecasting & trading agents: return/volatility forecasting with neural networks (e.g. sequence models), built on the features that survived stage 3 and compared against simple forecasting baselines. Then portfolios driven by those forecasts, and PPO trading/allocation agents trained in a backtest environment. Both must beat the stage-2 classical portfolios out of sample, paper trading only.
+
+I've put my reference code for this in references/: market_decomposition.py, tft_dataset.py, tft_targets.py.`
+- `D2` skill loaded from `/Users/connorott/plugins/dev-team-workspace/iteration-9/quant-all-at-once/with_skill/plugin/dev-team/skills/idea-refine`
+- `D3` **Bash** python3 ../plugin/dev-team/scripts/dt.py status --skill idea-refine; ls -R | head -50
+      ↳ …[133 chars] ints missing ⏎ next ids: AD-01 PL-01 TC-01 M1 ⏎ references_unindexed: references/market_decomposition.py, references/tft_dataset.py, references/tft_targets.py ⏎ references_changed: none ⏎ references_missing: none ⏎ brief_words: 0 ⏎ brief_goals: 0 ⏎ ideas: none ⏎ roadmap_rows: none ⏎ references_unassigned: none ⏎ references ⏎ ./references: ⏎ market_decomposition.py ⏎ tft_dataset.py ⏎ tft_targets.py
+- `D4` **Bash** cd /Users/connorott/plugins/dev-team-workspace/iteration-9/quant-all-at-once/with_skill/plugin/dev-team/skills && cat idea-refine/references/new.md; ls idea-refine/references
+      ↳ …[2863 chars] **The Not Doing list is mandatory.** It is the most valuable part: it makes trade-offs explicit. ⏎ examples-data.md ⏎ examples-extend.md ⏎ examples-ml.md ⏎ examples-new.md ⏎ examples-process.md ⏎ extend.md ⏎ frameworks.md ⏎ ideation.md ⏎ new.md ⏎ refinement-criteria.md ⏎ roadmap.md ⏎ Shell cwd was reset to /Users/connorott/plugins/dev-team-workspace/iteration-9/quant-all-at-once/with_skill/project
+- `D5` **Bash** cd /Users/connorott/plugins/dev-team-workspace/iteration-9/quant-all-at-once/with_skill/plugin/dev-team/skills && cat idea-refine/references/ideation.md idea-refine/references/roadmap.md idea-refine/references/examples-data.md idea-refine/references/examples-ml.md
+      ↳ …[18309 chars] ns anything. Accept it or tell me what to change." *(Turn ends.)* ⏎ *An idea file for an ML feature adds a **Data** section. It names the data, where it lives, and how it will be evaluated. It still says nothing about model type or libraries; those are decided in the architecture.* ⏎ Shell cwd was reset to /Users/connorott/plugins/dev-team-workspace/iteration-9/quant-all-at-once/with_skill/project
+- `D6` _said:_ References are waiting in `references/`, so I'll index them first (reference-intake), then come back to refine the idea.
+- `D7` **Skill** dev-team:reference-intake
+- `D8` skill loaded from `/Users/connorott/plugins/dev-team-workspace/iteration-9/quant-all-at-once/with_skill/plugin/dev-team/skills/reference-intake`
+- `D9` **Bash** python3 ../plugin/dev-team/scripts/dt.py status --skill reference-intake; cat ../plugin/dev-team/skills/reference-intake/examples.md; wc -l references/*
+      ↳ …[10544 chars] d ⏎ - ~~RF-02: Holiday calendar~~ Retired 2027-01-10: file removed; superseded by RF-04 ⏎ ``` ⏎ RF-04 is indexed as a new file. `dt lint` reports `retired-ref` for any task `Read:` that still cites RF-02. Name those tasks at the gate, for `build-planning` Replan. ⏎      105 references/market_decomposition.py ⏎      105 references/tft_dataset.py ⏎       84 references/tft_targets.py ⏎      294 total
+- `D10` **Agent** Explore — Summarize market_decomposition.py → **U01**
+      ↳ status=completed tools=1 ms=11454 model=claude-opus-5-5
+- `D11` **Agent** Explore — Summarize tft_dataset.py → **U02**
+      ↳ status=completed tools=1 ms=16388 model=claude-opus-5-5
+- `D12` **Agent** Explore — Summarize tft_targets.py → **U03**
+      ↳ status=completed tools=1 ms=16554 model=claude-opus-5-5
+- `D13` **Bash** grep -nE "^def |^class |^@dataclass" references/*.py
+      ↳ …[1742 chars] :33:def forward_volatility(prices: pd.DataFrame, horizon: int, annualise: bool = True, ⏎ references/tft_targets.py:48:def make_targets(prices: pd.DataFrame, horizons: tuple[int, ...] = (1, 5, 21), ⏎ references/tft_targets.py:62:def demean_cross_section(targets: pd.DataFrame, cols: list[str]) -> pd.DataFrame: ⏎ references/tft_targets.py:69:def drop_incomplete(targets: pd.DataFrame) -> pd.DataFrame:
+- `D14` _said:_ All named parts exist. No roadmap stages exist yet, so every entry gets `Milestones: —`; idea-refine will assign them when it adds the stages.
+- `D15` **Write** /Users/connorott/plugins/dev-team-workspace/iteration-9/quant-all-at-once/with_skill/project/docs/references.md (27 lines)
+- `D16` **Bash** DT="python3 ../plugin/dev-team/scripts/dt.py"; $DT references --stamp && $DT lint docs/references.md; $DT status --skill reference-intake | grep -E "references_|mode"
+      ↳ (eval):1: no such file or directory: python3 ../plugin/dev-team/scripts/dt.py ⏎ (eval):1: no such file or directory: python3 ../plugin/dev-team/scripts/dt.py
+- `D17` **Bash** python3 ../plugin/dev-team/scripts/dt.py references --stamp && python3 ../plugin/dev-team/scripts/dt.py lint docs/references.md; python3 ../plugin/dev-team/scripts/dt.py status --skill reference-intake | grep -E "references_|mode"
+      ↳ RF-01: b3993e95 ⏎ RF-02: fdf31b69 ⏎ RF-03: fd947a4a ⏎ references: stamped 3 ⏎ 0 errors, 0 warnings ⏎ mode: current ⏎ references_unindexed: none ⏎ references_changed: none ⏎ references_missing: none
+- `D18` _said:_ Done the reference intake. Before refining the idea I need your approval of the index and answers to a few questions. ⏎ ## Part 1: Reference index (`docs/references.md`, Draft) ⏎ I indexed 3 files. Hashes are stamped, `dt lint` is clean and nothing else is waiting. ⏎ - **RF-01: Market-mode removal by PCA** (`market_decomposition.py`). Removes the top-k principal components from a returns panel and checks how much correlation is left in the residuals. ⏎   - **Caveat:** fits everything (means, eigenvectors, betas) on the full sample, so it looks ahead. ⏎   - **Caveat:** silently drops thin colum …[+4549 chars]
+- `D19` **USER:** Approved, the index looks good. ⏎ Answers: ⏎ 1. Data: free or under $50/month. I already subscribe to Sharadar for prices. I need delisted names included to avoid survivorship bias. I'll accept a smaller universe, e.g. S&P 500 history with point-in-time membership. ⏎ 2. Success: learn quant research properly and find out whether any signal survives honest testing. Research and paper trading only, no real money. Classical portfolios are compared out of sample on realized variance first. ML-driven ones must beat them. ⏎ 3. Compute: laptop, plus an occasional rented GPU for neural nets. ⏎ 4. App: …[+467 chars]
+- `D20` **Bash** sed -i '' 's/^\*\*Status:\*\* Draft · \*\*Last updated:\*\* .*/**Status:** Approved · **Last updated:** 2026-10-17/' docs/references.md && head -3 docs/references.md && git status --short
+      ↳ # Quant Research Platform — References ⏎ **Status:** Approved · **Last updated:** 2026-10-17 ⏎  M docs/references.md
+- `D21` _said:_ Now the brief, from the direction you picked: one out-of-sample engine, a hypothesis ledger, PPO with a kill rule, and the app in Stage 1.
+- `D22` **Write** /Users/connorott/plugins/dev-team-workspace/iteration-9/quant-all-at-once/with_skill/project/docs/brief.md (45 lines)
+- `D23` _said:_ The draft is over a page, so I'll trim it.
+- `D24` **Bash** python3 - <<'EOF'
+p='docs/brief.md'; s=open(p).read()
+rep=[
+("I want to learn quant research on US equities properly and find out whether any signal survives honest testing. Ad-hoc research fools itself easily. Stocks that later delisted go missing, models peek at the future, and \"out of sample\" means something different in every experiment. Most results that look good are chance. Without a trustworthy dataset and a disciplined way to test claims, I can't tell a real finding from a lucky one." …[+3299 chars]
+      ↳ 483 docs/brief.md ⏎ 0 errors, 0 warnings
+- `D25` _said:_ I've written the brief to `docs/brief.md` as a Draft. It's 483 words and lint is clean. The reference index is now marked Approved. ⏎ - **Problem:** ad-hoc research fools itself. Stocks that later delisted go missing, models peek at the future, and most results that look good are chance. ⏎ - **Top goal:** every result rests on data you can trust: index membership as it was on each date, delisted stocks included, corporate actions applied, every download validated. ⏎ - **Biggest "Not doing":** return prediction before risk estimation is right. Variance comes first. ⏎ The out-of-sample engine (y …[+1839 chars]
+- `D26` HOOK SessionStart:resume said: milestone: none (no tasks/plan.md) ⏎ draft (waiting for approval): docs/brief.md ⏎ dt: python3 /Users/connorott/plugins/dev-team-workspace/iteration-9/quant-all-at-once/with_skill/plugin/dev-team/scripts/dt.py
+- `D27` **USER:** Yes to the routing as listed. Accepted.
+- `D28` **Bash** DT=../plugin/dev-team/scripts/dt.py; sed -i '' 's/^\*\*Status:\*\* Draft · \*\*Last updated:\*\* .*/**Status:** Accepted · **Last updated:** 2026-10-17/' docs/brief.md; python3 $DT next-id S; grep -n "Milestones" docs/references.md; git status --short
+      ↳ S1 ⏎ 6:**File:** `references/market_decomposition.py` · **Hash:** b3993e95 · **Kind:** code · **Milestones:** — ⏎ 14:**File:** `references/tft_dataset.py` · **Hash:** fdf31b69 · **Kind:** code · **Milestones:** — ⏎ 22:**File:** `references/tft_targets.py` · **Hash:** fd947a4a · **Kind:** code · **Milestones:** — ⏎  M docs/brief.md
+- `D29` **Write** /Users/connorott/plugins/dev-team-workspace/iteration-9/quant-all-at-once/with_skill/project/docs/roadmap.md (28 lines)
+- `D30` **Bash** DT=../plugin/dev-team/scripts/dt.py
+sed -i '' -e '6s/\*\*Milestones:\*\* —/**Milestones:** S2/' -e '14s/\*\*Milestones:\*\* —/**Milestones:** S4/' -e '22s/\*\*Milestones:\*\* —/**Milestones:** S3, S4/' docs/references.md
+grep -n Milestones docs/references.md; python3 $DT roadmap; python3 $DT next-id S; python3 $DT lint; sed -n 5,11p docs/roadmap.md
+      ↳ …[549 chars] md:16: roadmap-skill S1 Skills names dev-team:api-probe, dataviz: not installed (.claude/skills or the plugin) ⏎ 0 errors, 2 warnings ⏎ | Stage | Name | Source | Status* | ⏎ |---|---|---|---| ⏎ | S1 | Trusted data & explorer | brief | Idea | ⏎ | S2 | Risk structure & classical portfolios | brief | Idea | ⏎ | S3 | Features & significance | brief | Idea | ⏎ | S4 | Forecasts & agents | brief | Idea |
+- `D31` _said:_ Lint flagged two skill names on S1. Let me check how it resolves them.
+- `D32` **Bash** ls .claude/skills 2>/dev/null; ls ../plugin/dev-team/skills; grep -n "roadmap-skill" -A25 ../plugin/dev-team/scripts/dt.py | grep -nE "skills|SKILL|prefix|split|:" | head -30
+      ↳ data-analysis ⏎ frontend-design ⏎ null-hypothesis-testing ⏎ api-probe ⏎ architecture-design ⏎ build-planning ⏎ build-setup ⏎ idea-refine ⏎ pipeline-design ⏎ reference-intake ⏎ spec-writing ⏎ test-planning
+- `D33` _said:_ The plugin's skills are named without the `dev-team:` prefix, so I'll fix that one. `dataviz` is a global skill, not one in this project or the plugin. I'll leave it in and flag it below.
+- `D34` **Bash** sed -i '' 's/^\*\*Skills:\*\* dev-team:api-probe,/**Skills:** api-probe,/' docs/roadmap.md && python3 ../plugin/dev-team/scripts/dt.py lint; git status --short
+      ↳ docs/references.md:3: approved-edit Approved doc changed since HEAD without going back to Draft (or the approval isn't committed) ⏎ docs/roadmap.md:16: roadmap-skill S1 Skills names api-probe, dataviz: not installed (.claude/skills or the plugin) ⏎ 0 errors, 2 warnings ⏎  M docs/brief.md ⏎  M docs/references.md ⏎ ?? docs/roadmap.md
+- `D35` _said:_ The brief is accepted and the roadmap is set up. Nothing is committed yet. ⏎ - **Brief:** `docs/brief.md` is marked Accepted. ⏎ - **Roadmap:** `docs/roadmap.md` has four stages, all at status Idea, each with its outline and skills as you approved: ⏎   - S1: Trusted data & explorer ⏎   - S2: Risk structure & classical portfolios ⏎   - S3: Features & significance ⏎   - S4: Forecasts & agents ⏎ - **References:** RF-01 is assigned to S2, RF-02 to S4, and RF-03 to S3 and S4. ⏎ `dt lint` shows two warnings: ⏎ 1. **Two of S1's skills aren't found:** `api-probe` and `dataviz`. ⏎    - I changed `dev-te …[+762 chars]
+- `D36` HOOK Stop said: {"systemMessage": "dt lint: 2 problems\ndocs/references.md:3: approved-edit Approved doc changed since HEAD without going back to Draft (or the approval isn't committed)\ndocs/roadmap.md:16: roadmap-skill S1 Skills names api-probe, dataviz: not installed (.claude/skills or the plugin)"}
+- `D37` HOOK SessionStart:startup said: milestone: none (no tasks/plan.md) ⏎ dt: python3 /Users/connorott/plugins/dev-team-workspace/iteration-9/quant-all-at-once/with_skill/plugin/dev-team/scripts/dt.py

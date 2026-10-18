@@ -1,0 +1,647 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1"><title>T05 turn</title>
+<style>
+:root{--bg:#fbfbfa;--fg:#1d1d1f;--muted:#6b6b70;--line:#d9d9de;--box:#fff;--rowp:#eef3fb;--band:#fff4d6;
+--ok:#2e7d32;--bad:#c62828;--warn:#b26a00;--idle:#6b6b70}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#17171a;--fg:#ececf0;--muted:#9a9aa3;
+--line:#34343a;--box:#222227;--rowp:#1d2433;--band:#3a3015;--ok:#6fcf73;--bad:#ff6b6b;--warn:#f0b35a;--idle:#9a9aa3}}
+:root[data-theme="dark"]{--bg:#17171a;--fg:#ececf0;--muted:#9a9aa3;--line:#34343a;--box:#222227;--rowp:#1d2433;
+--band:#3a3015;--ok:#6fcf73;--bad:#ff6b6b;--warn:#f0b35a;--idle:#9a9aa3}
+body{margin:0;padding:16px;background:var(--bg);color:var(--fg);font:14px/1.45 -apple-system,system-ui,sans-serif}
+h1{font-size:18px;margin:0 0 4px}h2{font-size:15px;margin:22px 0 8px}.sub{color:var(--muted)}
+table{border-collapse:collapse;margin:4px 0 8px}td,th{border-bottom:1px solid var(--line);padding:4px 10px;text-align:left;
+vertical-align:top}th{color:var(--muted);font-weight:600}.chips span{display:inline-block;margin:0 4px 2px 0}
+.legend span{margin-right:14px;white-space:nowrap}.sw{display:inline-block;width:10px;height:10px;border-radius:2px;
+margin-right:4px;vertical-align:-1px}.scroll{overflow:auto;max-height:88vh;border:1px solid var(--line);border-radius:8px}
+.chart{display:grid;width:max-content}.chart>div{line-height:0}.corner{position:sticky;top:0;left:0;z-index:3}
+.colhead{position:sticky;top:0;z-index:2}.rowhead{position:sticky;left:0;z-index:2}
+svg.bg{background:var(--bg)}.colhead svg{border-bottom:1px solid var(--line)}.rowhead svg{border-right:1px solid var(--line)}
+.ok{color:var(--ok);fill:var(--ok)}.bad{color:var(--bad);fill:var(--bad)}.warn{color:var(--warn);fill:var(--warn)}
+.idle{color:var(--idle);fill:var(--idle)}
+svg text{fill:var(--fg);font-family:-apple-system,system-ui,sans-serif}
+.box{fill:var(--box);stroke:var(--line)}.unit:hover .box{stroke:var(--fg)}
+.role{font-size:12px;font-weight:600}.uid,.wmeta,.lmeta,.meta{font-size:10px;fill:var(--muted)}
+.sub{font-size:10.5px;fill:var(--muted)}.badge{font-size:11px;font-weight:600}
+.meta.bad{fill:var(--bad);font-weight:600}.lane{font-size:13px;font-weight:700}.wave{font-size:13px;font-weight:700}
+.par{fill:#4e79a7}.ser{fill:var(--muted)}.rowp{fill:var(--rowp)}.rows{fill:transparent}.band{fill:var(--band)}
+.bandt{font-size:11.5px}.grid{stroke:var(--line)}.link{stroke:var(--muted);stroke-width:1.2;opacity:.55}
+.arrowhead{fill:var(--muted)}.marks{font-size:10.5px}.audit{stroke:var(--box);stroke-width:2}.auditn{font-size:10px;font-weight:700;fill:#fff}
+a{color:inherit}svg a .box{cursor:pointer}
+
+:root{--c0:#2a78d6;--c1:#eb6834;--c2:#1baf7a;--c3:#eda100;--c4:#e87ba4;--c5:#008300;--c6:#6250d6;--c7:#e34948;
+--cx:#8a8985;--main:#52514e;--read:#dcdbd5;--readfg:#1d1d1f}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--c0:#3987e5;--c1:#d95926;--c2:#199e70;
+--c3:#c98500;--c4:#d55181;--c5:#008300;--c6:#9085e9;--c7:#e66767;--cx:#77766f;--main:#c3c2b7;--read:#3b3b40;
+--readfg:#ececf0}}
+:root[data-theme="dark"]{--c0:#3987e5;--c1:#d95926;--c2:#199e70;--c3:#c98500;--c4:#d55181;--c5:#008300;
+--c6:#9085e9;--c7:#e66767;--cx:#77766f;--main:#c3c2b7;--read:#3b3b40;--readfg:#ececf0}
+.c0{fill:var(--c0);background:var(--c0)}.c1{fill:var(--c1);background:var(--c1)}.c2{fill:var(--c2);background:var(--c2)}
+.c3{fill:var(--c3);background:var(--c3)}.c4{fill:var(--c4);background:var(--c4)}.c5{fill:var(--c5);background:var(--c5)}
+.c6{fill:var(--c6);background:var(--c6)}.c7{fill:var(--c7);background:var(--c7)}.cx{fill:var(--cx);background:var(--cx)}
+.cmain{fill:var(--main)}.sc0{stroke:var(--c0)}.sc1{stroke:var(--c1)}.sc2{stroke:var(--c2)}
+.tl text,.sm text,.lc text{font-size:10.5px;fill:var(--muted)}.tl .lbl-in,.sm .lbl-in{fill:#fff;font-size:10.5px;font-weight:600}
+.tl .rowl,.sm .rowl,.lc .rowl{fill:var(--fg);font-size:11.5px;font-weight:600}.tl .band{fill:var(--rowp)}
+.tl .brk{stroke:var(--muted);stroke-dasharray:2 3}.tl a:hover rect,.sm a:hover rect{stroke:var(--fg);stroke-width:1.5}
+.axis{stroke:var(--line)}.sm .val{fill:var(--fg);font-weight:600}.lc path.ln{fill:none;stroke-width:2}
+.lc circle{stroke:var(--bg);stroke-width:2}.lc .end{font-weight:600;fill:var(--fg)}
+.tiles{display:flex;flex-wrap:wrap;gap:10px;margin:12px 0}.tile{border:1px solid var(--line);border-radius:8px;
+padding:8px 12px;min-width:110px;background:var(--box)}.tile b{display:block;font-size:20px;line-height:1.2}
+.tile span{font-size:12px;color:var(--muted)}.tile i{font-style:normal;font-size:12px;margin-left:6px}
+.fm{border-collapse:separate;border-spacing:2px}.fm td,.fm th{border:0;padding:0;text-align:center;font-size:11px}
+.fm th{padding:0 2px;font-weight:600}.fm td.f,.fm th.f{text-align:left;padding-right:10px;white-space:nowrap;
+position:sticky;left:0;background:var(--bg);font:11.5px ui-monospace,Menlo,monospace;
+max-width:380px;overflow:hidden;text-overflow:ellipsis}
+.fm td.cell{min-width:22px;height:20px;border-radius:3px}.fm td.fw{background:var(--c0);color:#fff;font-weight:700}
+.fm td.fe{background:var(--c1);color:#fff;font-weight:700}.fm td.fr{background:var(--read);color:var(--readfg)}
+.fm td.n{color:var(--muted);padding:0 6px}.fm tr.grp td{text-align:left;padding-top:8px;color:var(--muted);
+font-weight:600}
+.key{display:inline-block;min-width:18px;text-align:center;border-radius:3px;font-size:11px;margin-right:4px}
+.bar{display:inline-block;height:9px;border-radius:2px;vertical-align:0}
+
+pre{white-space:pre-wrap;word-break:break-word;background:var(--box);border:1px solid var(--line);border-radius:6px;
+padding:8px 10px;margin:4px 0;font:12px/1.45 ui-monospace,SFMono-Regular,Menlo,monospace;max-width:100%;overflow:auto}
+.step{border-top:1px solid var(--line);padding:6px 0}.step:target{background:var(--rowp)}
+.sid{font:12px ui-monospace,Menlo,monospace;color:var(--muted);margin-right:8px}.kind{font-weight:600;margin-right:8px}
+.err{color:var(--bad);font-weight:600}.hook{color:var(--bad);margin:4px 0 0 16px}.lbl{font-size:12px;color:var(--muted);margin-top:6px}
+details summary{cursor:pointer;color:var(--muted);font-size:12px}.head td:first-child{color:var(--muted)}
+.top{font-size:13px}.narr{list-style:none;padding-left:0}.narr li{margin:3px 0}
+</style></head>
+<body>
+<p class="top"><a href="../flow.html">← the run's flow chart</a></p>
+<p class="top"><a href="../plan/T05.html">The plan as of T05</a>: this turn changed the plan (+85 ~0 −0) · <a href="../plan/index.html">plan map</a></p>
+<h1>T05 · turn · Option 1: draft the spec now from the accepted brief. List your assumptions and I&#x27;ll review it.</h1>
+<table class="head"><tr><td>Type</td><td>turn</td></tr><tr><td>Description</td><td>Option 1: draft the spec now from the accepted brief. List your assumptions and I&#x27;ll review it.</td></tr><tr><td>Spawned by</td><td>user</td></tr><tr><td>Model</td><td>claude-opus-5-5</td></tr><tr><td>Start</td><td>2026-10-18 02:23:30 UTC</td></tr><tr><td>Duration</td><td>3 min</td></tr><tr><td>Tool calls</td><td>3</td></tr><tr><td>Errors</td><td>0</td></tr><tr><td>Hook blocks</td><td>0</td></tr><tr><td>Tokens</td><td>16.5k out · 19.8k new in · 111k cached in · peak context 55.0k</td></tr><tr><td>Skills invoked</td><td>none</td></tr><tr><td>Files written or edited</td><td>docs/spec.md</td></tr><tr><td>Definition</td><td>none</td></tr><tr><td>Steps</td><td>6</td></tr><tr><td>Finished</td><td>yes</td></tr></table>
+
+
+<h2>Prompt</h2>
+<pre>Option 1: draft the spec now from the accepted brief. List your assumptions and I&#x27;ll review it.</pre>
+<h2>Files</h2>
+<table><tr><th>Op</th><th>File</th><th>Calls</th><th>By</th><th>Via</th><th>Steps</th></tr><tr><td>write</td><td><code>docs/spec.md</code></td><td>1</td><td>main</td><td>Write</td><td><a href="#D26">D26</a></td></tr><tr><td>read</td><td><code>../plugin/dev-team/skills/spec-writing/references/new.md</code></td><td>1</td><td>main</td><td>Bash</td><td><a href="#D25">D25</a></td></tr><tr><td>read</td><td><code>../plugin/dev-team/skills/spec-writing/references/spec.md</code></td><td>1</td><td>main</td><td>Bash</td><td><a href="#D25">D25</a></td></tr><tr><td>read</td><td><code>.claude/skills/null-hypothesis-testing/SKILL.md</code></td><td>1</td><td>main</td><td>Bash</td><td><a href="#D25">D25</a></td></tr><tr><td>read</td><td><code>docs/brief.md</code></td><td>1</td><td>main</td><td>Bash</td><td><a href="#D25">D25</a></td></tr><tr><td>read</td><td><code>docs/roadmap.md</code></td><td>1</td><td>main</td><td>Bash</td><td><a href="#D25">D25</a></td></tr></table>
+<h2>Steps</h2>
+<div class="step" id="SD24"><span class="sid">D24</span><span class="kind">user</span>Option 1: draft the spec now from the accepted brief. List your assumptions and I&#x27;ll review it.<details><summary>full text</summary><pre>Option 1: draft the spec now from the accepted brief. List your assumptions and I&#x27;ll review it.</pre></details></div><div class="step" id="SD25"><span class="sid">D25</span><span class="kind">Bash</span>cd /Users/connorott/plugins/dev-team-workspace/iteration-9/rl-all-at-once/with_skill/plugin/dev-team/skills/spec-writing &amp;&amp; cat references/new.md references/spec.md; cat /Users/connorott/plugins/dev-team-workspace/iteration-9/rl-all-at-once/with_skill/project/docs/roadmap.md; sed -n 30,60p /Users/connorott/plugins/dev-team-workspace/iteration-9/rl-all-at-once/with_skill/project/docs/brief.md; cat /Users/connorott/plugins/dev-team-workspace/iteration-9/rl-all-at-once/with_skill/project/.claude/sk …[+37 chars]<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;cd /Users/connorott/plugins/dev-team-workspace/iteration-9/rl-all-at-once/with_skill/plugin/dev-team/skills/spec-writing &amp;&amp; cat references/new.md references/spec.md; cat /Users/connorott/plugins/dev-team-workspace/iteration-9/rl-all-at-once/with_skill/project/docs/roadmap.md; sed -n 30,60p /Users/connorott/plugins/dev-team-workspace/iteration-9/rl-all-at-once/with_skill/project/docs/brief.md; cat /Users/connorott/plugins/dev-team-workspace/iteration-9/rl-all-at-once/with_skill/project/.claude/skills/null-hypothesis-testing/SKILL.md&quot;
+}</pre><div class="lbl">output</div><pre># New mode: writing the spec from the brief
+
+Read when `dt status` reports `mode: new`: there is no `docs/spec.md`, and the accepted brief is the input.
+
+```
+READ BRIEF ─→ SURFACE ASSUMPTIONS ─→ CLARIFY ─→ WRITE SPEC ─→ [user approves] ─→ architecture-design
+```
+
+## Step 1: Map goals to features
+
+From the brief&#x27;s numbered goals, propose features and show the mapping before writing:
+
+```
+Goal 1 (regulars reorder in &lt; 30s)     → Saved orders (S1), Text reorder (S2)
+Goal 2 (no extra daily work for owner) → Regulars setup (S1), Order notifications (S2)
+```
+
+Every goal has a feature, and every feature names its roadmap stage (`references/spec.md`). **Every stage the brief and roadmap list is specced in full**: features, requirements, criteria and edge cases for all of them, never &quot;S1 in full, the rest outlined&quot;. Later skills design only what the spec holds.
+
+## Steps 2-3: Surface assumptions, then clarify
+
+As SKILL.md&#x27;s Asking section says.
+
+## Step 4: Write the spec
+
+Read `references/spec.md` and write `docs/spec.md` from its template, following its writing rules (and its data and ML rules where they apply).
+
+## Step 5: Review Gate
+
+SKILL.md&#x27;s Review Gate. This mode adds no gate steps and no on-approval step.
+# The spec: template, writing rules, hygiene check
+
+Read before writing or extending `docs/spec.md`, and again for the hygiene check at the Review Gate.
+
+## Template
+
+```markdown
+# [Project Name] — Spec
+
+**Status:** Draft · **Last updated:** YYYY-MM-DD · **Brief:** [brief.md](brief.md)
+
+## Summary
+[2-3 sentences: what is being built. Link to the brief for why — don&#x27;t repeat it.]
+
+## Users
+| User | What they need to do |
+|---|---|
+| [Primary user] | [...] |
+
+## Scope
+**In scope:** [features, by name]
+**Out of scope:** [what we&#x27;re not building — include everything on the brief&#x27;s Not Doing list, plus anything decided during clarification]
+
+## Features
+
+### [Feature name] (`CODE`)
+**Serves:** Goal 1, Goal 3
+**Stage:** S2
+**Source:** [ideas/&lt;slug&gt;.md](ideas/&lt;slug&gt;.md) *(extend mode only — omit for features from the original brief)*
+**Behavior:** [2-4 sentences or a short numbered flow describing what the user experiences.]
+
+**Requirements**
+- **CODE-01** [One testable statement of what the system does.]
+  - Given [context], when [action], then [observable result].
+  - Given [...], when [...], then [...].
+- **CODE-02** [...]
+  - Given [...], when [...], then [...].
+
+**Edge cases &amp; errors**
+- [Situation] → [expected behavior]
+
+## Data requirements
+*(Data and ML projects only — omit otherwise.)*
+- **DATA-01** [What data the system needs: content, coverage, history, frequency, freshness — not which vendor.]
+  - Given [...], when [...], then [...].
+
+## Quality requirements
+- **QR-01** [Measurable non-functional requirement: speed, reliability, accessibility, privacy, security, cost, licence.]
+  - [How it&#x27;s checked.]
+
+## Assumptions
+- [Assumptions the user confirmed]
+
+## Open questions
+- [Unresolved items, each with who can answer it. Omit if none. A question about what an external source really returns is &quot;answered by a probe during architecture&quot;.]
+
+## Changelog
+| Date | Change | Source | IDs |
+|---|---|---|---|
+| YYYY-MM-DD | Initial spec | brief.md | all |
+```
+
+**Writing rules:**
+
+- **One requirement, one behavior.** If a requirement contains &quot;and&quot;, it&#x27;s probably two.
+- **Every requirement has at least one acceptance criterion** in Given/When/Then form. If you can&#x27;t write one, the requirement isn&#x27;t clear yet.
+- **Describe behavior, not implementation.** &quot;The customer sees their usual order&quot; — not &quot;the app queries the orders table.&quot;
+- **Use exact numbers.** &quot;≤ 2 seconds&quot;, &quot;up to 50 regulars&quot;, never &quot;fast&quot; or &quot;many&quot;.
+- **Every feature names one stage.** Its `**Stage:**` line holds only the ID of the roadmap stage that first builds it. `dt lint` fails a feature with no stage, or one naming no stage row.
+- **Requirement IDs are permanent.** `CODE-NN`, numbered within the feature, never reused or renumbered.
+- **Quality requirements only when measurable.** Leave out generic wishes (&quot;should be secure&quot;); keep checkable ones (&quot;passwords are never shown in full&quot;). Cost, licence and budget limits are `QR-` items (&quot;data costs ≤ $50 a month&quot;), never `DATA-` or feature requirements.
+- **No tech stack, libraries, vendors, schemas, endpoints, or file structure, even when the user names them.** Write the behavior the name stands for. The name itself belongs to `architecture-design`, which reads the idea file and the conversation.
+- **Describe the product as it is now, not how it got here.** Requirement text, scope lists and assumptions carry no change notes, provenance tags (&quot;from the field-photo idea&quot;) or process notes (&quot;numbers chosen for review&quot;). History goes in one Changelog row per round, and in git.
+
+**Data and ML projects — extra rules:**
+
+- **Specify the data, not the source.** `DATA-NN` requirements say what the data must contain and guarantee (&quot;hourly readings for every meter in the service area, including decommissioned ones, since 2015&quot;; &quot;every record is stamped with the date it became known&quot;). Which API, vendor, or dataset meets them is an architecture decision, made by checking candidates against these requirements. Name a source only when the brief makes it a fixed constraint (our own database, a required benchmark).
+- **Write data guarantees as testable criteria.** Leakage, look-ahead, selection bias, and coverage gaps are requirements, not hopes: &quot;Given a forecast issued at time T, when the model requests weather, then no value published after T is returned.&quot;
+- **Model quality is a requirement with a baseline.** Acceptance criteria name the metric, the held-out data, the threshold, and the baseline to beat: &quot;Given the most recent 6 months of plates (never trained on), when ranked, then reviewing the top 20% catches ≥ 90% of scientist-failed plates, and beats ranking by Z′ alone.&quot; Never &quot;the model is accurate&quot;.
+- **No model types or libraries.** &quot;Gradient boosting&quot; or &quot;PyTorch&quot; are architecture decisions; the spec says what the model must achieve.
+- **Learning projects: &quot;build it by hand, then compare with a library&quot; is a valid requirement. Write it without the names.** &quot;The hand-written CNN reaches ≥ 90% of the accuracy of an established reference implementation on the same dataset.&quot; &quot;The logistic regression is written from basic array operations; a reference library is used only to check its output.&quot; The architecture picks the reference.
+
+## Hygiene check
+
+Run on everything above the Changelog before presenting a Draft.
+
+- **Implementation names.** Search for library, framework, vendor, dataset, file-format, database and model-type names, file and function names (a reference&#x27;s included), including names the user, the brief or the idea file used. Rewrite each one as the behavior or guarantee it stands for: &quot;within 10% of torchvision&#x27;s ResNet-18&quot; becomes &quot;within 10% of an established reference implementation&quot;, and &quot;NumPy only&quot; becomes &quot;written from basic array operations&quot;. The only exception is a source the brief makes a fixed constraint.
+# RL Lab — Roadmap
+
+**Last updated:** 2026-10-17
+
+| Stage | Name | Source | Status* |
+|---|---|---|---|
+| S1 | Snake + shared core | brief | Idea |
+| S2 | Fish tank | brief | Idea |
+| S3 | Predator-prey | brief | Idea |
+
+*Written by `dt roadmap` from doc statuses and todo checkboxes; never hand-edited.
+
+## S1: Snake + shared core
+**Outline:** I can train a snake that clearly beats random and rule-based play and watch its replay, using a shared core (world interface, training loop, logging, replay viewer) that later worlds reuse.
+**Skills:** null-hypothesis-testing, dataviz
+
+## S2: Fish tank
+**Outline:** I can train fish with smooth movement to dodge a bouncing ball, built up from one fish that sees everything, to many fish, to fish that only see nearby things, and watch them beat the baselines.
+**Skills:** null-hypothesis-testing, dataviz
+
+## S3: Predator-prey
+**Outline:** I can train prey and a predator at the same time, then watch and explain the back-and-forth as each side adapts to the other.
+**Skills:** null-hypothesis-testing, dataviz
+- One shared core can serve a grid game, smooth movement and two competing teams without bending out of shape.
+
+## Not doing
+- 3D physics — 2D teaches the same ideas.
+- Learning from screen pixels or Atari games — too slow for a laptop and adds a separate vision problem.
+- Reproducing research papers — the goal is understanding, not matching published numbers.
+- Web deployment or a hosted demo — replays run locally.
+- Chasing top scores — beating the baselines clearly is enough.
+
+## Known risk
+- In the predator-prey world, both sides learn at once, so each keeps changing the other&#x27;s problem. It may never look &quot;solved.&quot; Watching and explaining that behavior counts as success there.
+---
+name: null-hypothesis-testing
+description: Analyzes and tests a controlled hypothesis — defines the null and alternative hypotheses, the test statistic, significance level, multiple-testing correction, and the null distribution (permutation, bootstrap, or analytic), then runs the test on real data and reports whether the null is rejected. Use whenever a result needs to be shown to be more than chance: feature information gain, signal significance, model-vs-baseline comparisons, backtest performance.
+---
+
+# Null Hypothesis Testing (eval stub)
+
+This is a placeholder for the user&#x27;s real skill during a planning-docs eval. The full procedure is not loaded here.
+
+When planning documents (brief, idea, spec, architecture) need a hypothesis-testing step, reference this skill by name (`null-hypothesis-testing`) at the point where the test happens, and write down what it will be given:
+
+- the hypothesis in plain words, plus H0 and H1
+- the metric / test statistic
+- how the null distribution is built (e.g. permuted labels, shuffled time blocks)
+- significance level and multiple-testing correction
+- the data split it runs on
+
+Do not run any analysis during planning.
+Shell cwd was reset to /Users/connorott/plugins/dev-team-workspace/iteration-9/rl-all-at-once/with_skill/project</pre></details></div><div class="step" id="SD26"><span class="sid">D26</span><span class="kind">Write</span>/Users/connorott/plugins/dev-team-workspace/iteration-9/rl-all-at-once/with_skill/project/docs/spec.md (306 lines)<div class="lbl">wrote /Users/connorott/plugins/dev-team-workspace/iteration-9/rl-all-at-once/with_skill/project/docs/spec.md</div><pre># RL Lab — Spec
+
+**Status:** Draft · **Last updated:** 2026-10-17 · **Brief:** [brief.md](brief.md)
+
+## Summary
+A set of small 2D reinforcement-learning worlds (Snake, Fish tank, Predator-prey) built on one shared core: a world interface, a training loop, logging with learning-curve charts, a replay viewer, and baseline evaluation. In each world a hand-written learning agent is trained on a laptop, checked against random and rule-based play, watched in replays, and explained in a write-up. See the [brief](brief.md) for why.
+
+## Users
+| User | What they need to do |
+|---|---|
+| The learner (sole user) | Add a world, train agents in it on a laptop, check they beat the baselines, watch replays across training, and write up why the method works and where it struggles |
+
+## Scope
+**In scope:** World interface, Training runs, Run logging &amp; learning curves, Replay viewer, Baseline evaluation, Reference check, World write-ups, Snake, Fish tank, Predator-prey.
+
+**Out of scope:**
+- 3D physics.
+- Learning from screen pixels, or Atari games.
+- Reproducing research papers or matching published numbers.
+- Web deployment or a hosted demo; everything runs locally.
+- Chasing top scores; clearly beating the baselines is enough.
+- Hyperparameter search beyond what the learner tunes by hand.
+- Written explanations generated for the learner; write-ups are the learner&#x27;s own words.
+
+## Features
+
+### World interface (`WORLD`)
+**Serves:** Goal 4
+**Stage:** S1
+**Behavior:** Every world presents the same face to the rest of the system: it can be reset from a seed, it reports what each agent observes as a short list of numbers, it accepts each agent&#x27;s action, and it returns rewards, an end-of-episode signal and a world-specific score. It also describes its current state in a form the replay viewer can draw.
+
+**Requirements**
+- **WORLD-01** A world starts a new episode from a seed, and the same seed always gives the same starting state.
+  - Given a world and seed 42, when two episodes are started, then both starting states are identical.
+- **WORLD-02** Given the same seed and the same sequence of actions, a world produces the same sequence of observations, rewards and end signals.
+  - Given a recorded episode&#x27;s seed and actions, when they are replayed into a fresh world, then every observation, reward and end signal matches the recording.
+- **WORLD-03** Each agent&#x27;s observation is a fixed-length list of numbers, never an image.
+  - Given any world, when an observation is taken at any step, then it has the same length as at every other step of that world and variant.
+- **WORLD-04** A world declares its agents, the observation length and the action format (a choice from a fixed set, or a list of numbers within stated limits) before any episode starts.
+  - Given any world, when the training loop asks for its description, then it receives the agent list, observation length and action format without running an episode.
+- **WORLD-05** Every world reports a per-episode score with a stated direction (higher is better, or lower is better), used by evaluation and charts.
+  - Given a finished episode, when its score is requested, then a single number and the world&#x27;s direction are returned.
+- **WORLD-06** A world reports its drawable state at every step (positions, sizes and kinds of every object) for the replay viewer.
+  - Given any step of any episode, when the drawable state is requested, then every object on screen is listed with its position.
+- **WORLD-07** A world can hold more than one agent, each agent belonging to a named team.
+  - Given a world with agents on two teams, when a step is taken, then each agent receives its own observation and reward, labelled with its team.
+
+**Edge cases &amp; errors**
+- An action outside the declared format or limits → the step is refused with an error naming the agent and the bad value; it is never silently clipped.
+- An agent that has left the episode (e.g. a caught prey) is sent an action → the action is ignored and the agent receives no further observations that episode.
+
+### Training runs (`TRAIN`)
+**Serves:** Goal 1, Goal 4
+**Stage:** S1
+**Behavior:** The learner starts a training run by naming a world, its variant, the learning method&#x27;s settings and a seed. The run trains for a fixed budget of environment steps, saves checkpoints of the agent as it goes, and runs periodic evaluations. The same loop runs every world without change.
+
+**Requirements**
+- **TRAIN-01** A training run is started from a world, a variant, the method&#x27;s settings and a seed, and runs for a stated budget of environment steps.
+  - Given snake, its default settings, seed 1 and a budget of N steps, when the run is started, then it stops after exactly N environment steps.
+- **TRAIN-02** The same world, settings and seed on the same machine give an identical training run.
+  - Given two runs with identical inputs, when both finish, then their logged results and final checkpoints are identical.
+- **TRAIN-03** A run saves a checkpoint at 10 evenly spaced points in its budget, plus at the start (untrained) and the end.
+  - Given a finished run, when its checkpoints are listed, then there are 12, at 0%, 10%, … 100% of the budget.
+- **TRAIN-04** A run evaluates its current agent at every 5% of its budget on 20 episodes whose seeds are never used in training.
+  - Given a finished run, when its evaluation log is read, then there are 21 evaluation points, each the mean score of 20 held-out-seed episodes.
+- **TRAIN-05** Several runs of the same world with different seeds can be started together, one per processor core.
+  - Given 5 seeds, when a batch of runs is started, then 5 runs proceed at the same time and each finishes with its own log and checkpoints.
+- **TRAIN-06** Every learning method, before it is used in a world, learns the known best behavior in a tiny check world whose best behavior is worked out by hand.
+  - Given a learning method and its check world, when it is trained for the check budget, then the trained agent picks the hand-derived best action in at least 95% of check-world states.
+- **TRAIN-07** In worlds with more than one team, each team has its own learning method and settings, and all teams learn during the same run.
+  - Given predator-prey with a learning method for each team, when a run proceeds, then both teams&#x27; agents change between consecutive checkpoints.
+
+**Edge cases &amp; errors**
+- A run is stopped before its budget ends → it is marked incomplete, keeps its checkpoints so far, and is left out of learning-curve charts and evaluation unless the learner includes it by name.
+- A run&#x27;s training produces an invalid number (not-a-number or infinite) in the agent → the run stops at once, saves the last good checkpoint, and records the step and the value.
+- A run would overwrite an existing run with the same name → it is refused; the learner picks a new name or deletes the old run first.
+
+### Run logging &amp; learning curves (`LOG`)
+**Serves:** Goal 1, Goal 4
+**Stage:** S1
+**Behavior:** Every run records its settings and results as it trains. From a group of runs of the same world and variant, the learner gets a learning-curve chart showing the agent against both baselines, across all runs.
+
+**Requirements**
+- **LOG-01** Every run records its world, variant, method settings, seed, budget, start and end times, and whether it finished.
+  - Given any finished run, when its record is opened, then every one of those fields is present.
+- **LOG-02** Every run logs, for each training episode, the episode&#x27;s score, length and total reward per team.
+  - Given a finished run, when its episode log is read, then it has one entry per training episode with those values.
+- **LOG-03** For a world and variant with at least 3 finished runs, a learning-curve chart shows evaluation score against environment steps: the mean across runs as a line, the lowest-to-highest range across runs as a band, and each baseline&#x27;s mean score as a horizontal reference line.
+  - Given 5 finished snake runs, when the chart is made, then it shows one mean line, one band, a random-play line and a rule-based line, with the axes labelled with the score name and &quot;environment steps&quot;.
+- **LOG-04** Learning-curve charts follow the `dataviz` skill&#x27;s guidance for form, colour and labelling.
+  - Given any learning-curve chart, when it is reviewed against the `dataviz` skill, then it passes that skill&#x27;s checks.
+- **LOG-05** Each world can add its own logged measures (e.g. snake length at death, hits per fish), which are charted the same way as the score.
+  - Given a world that declares an extra measure, when its chart is requested, then it is drawn with the same mean line and range band.
+- **LOG-06** The learner can view the latest logged values of a run while it trains.
+  - Given a run in progress, when the learner checks it, then they see the current step, the latest evaluation score and the time elapsed, no more than 1 evaluation point behind.
+
+**Edge cases &amp; errors**
+- Runs with different budgets or settings are asked for in one chart → refused, naming the differing settings; one chart only combines runs that differ by seed.
+- Fewer than 3 finished runs → the chart is still drawn, but titled with the run count and a note that the band is not meaningful.
+
+### Replay viewer (`REPLAY`)
+**Serves:** Goal 2, Goal 4
+**Stage:** S1
+**Behavior:** The learner picks a run, one of its checkpoints and a seed, and watches that agent play an episode in a local window. They can pause, step and change speed, and put two checkpoints side by side on the same starting state to see how training changed the behavior.
+
+**Requirements**
+- **REPLAY-01** The learner can watch an episode played by any checkpoint of any run, from a seed they choose.
+  - Given a snake run&#x27;s 50% checkpoint and seed 7, when the replay is opened, then the episode plays from its first step to its end.
+- **REPLAY-02** Replays are exact: the same checkpoint and seed always show the same episode.
+  - Given a checkpoint and seed, when the replay is played twice, then every frame matches.
+- **REPLAY-03** The replay can be paused, stepped one step forward or back, and played at 0.25×, 1×, 4× or 16× speed.
+  - Given a paused replay at step 30, when the learner steps forward, then step 31 is shown; when they step back twice, step 29 is shown.
+- **REPLAY-04** Two checkpoints can be shown side by side on the same starting state, stepping in sync.
+  - Given the 10% and 100% snake checkpoints and seed 7, when compared, then both start from the same board and advance one step at a time together; when one episode ends, its last frame stays while the other continues.
+- **REPLAY-05** The replay shows the current step, the running score and each agent&#x27;s latest reward next to the world.
+  - Given any frame, when it is shown, then the step number, the score so far and the latest rewards are visible.
+- **REPLAY-06** The learner can also watch the random-play and rule-based baselines in the same viewer, including side by side with a checkpoint.
+  - Given the rule-based snake and the final checkpoint on seed 7, when compared, then both play side by side as in REPLAY-04.
+- **REPLAY-07** A replay can be saved as a video file to keep alongside the write-up.
+  - Given an open replay, when the learner saves it, then a video of the whole episode at 1× speed is written and plays in a standard video player.
+
+**Edge cases &amp; errors**
+- A checkpoint from a world or variant whose observation length or action format no longer matches → the replay refuses to open and names the mismatch.
+- An episode that never ends on its own → the replay stops at the world&#x27;s step limit and says so.
+
+### Baseline evaluation (`EVAL`)
+**Serves:** Goal 1
+**Stage:** S1
+**Behavior:** For every world and variant there are two baselines: random play and a simple hand-written rule. A final evaluation plays every run&#x27;s final checkpoint and both baselines on the same held-out seeds and tests whether the learned agent beats each baseline by more than chance.
+
+**Requirements**
+- **EVAL-01** Every world and variant has a random-play baseline that picks each action uniformly from the allowed actions.
+  - Given any world, when the random baseline plays 100 steps, then every action it takes is within the declared action format.
+- **EVAL-02** Every world and variant has a rule-based baseline that the learner writes by hand, described in one sentence in the world&#x27;s feature below.
+  - Given any world, when its rule baseline is listed, then its one-sentence description is shown with it.
+- **EVAL-03** Final evaluation plays every final checkpoint and both baselines on the same 100 seeds, none of which was used in training or in-training evaluation.
+  - Given 5 finished runs, when final evaluation is run, then 700 episodes are played (5 × 100 learned, 100 random, 100 rule-based), all on the same 100 held-out seeds.
+- **EVAL-04** Whether the learned agent beats each baseline is tested with the `null-hypothesis-testing` skill. It is given: the hypothesis &quot;the trained agent scores better than the baseline&quot;; H0 = the learned agent&#x27;s mean score is no better than the baseline&#x27;s, H1 = it is better (in the world&#x27;s score direction); the statistic = difference in mean episode score, learned (averaged over the runs, per seed) minus baseline; the null built by randomly swapping the learned and baseline labels within each held-out seed (paired permutation, 10,000 permutations); α = 0.05 with Holm correction across all baseline comparisons in that world (2 per variant); the EVAL-03 held-out episodes. The learned agent passes only if both nulls are rejected.
+  - Given final evaluation results for one variant, when tested, then a report shows, for each baseline, the mean scores, the difference, the corrected p-value and reject/keep.
+- **EVAL-05** &quot;Clearly beats&quot; also needs every single run to beat the rule baseline: each run&#x27;s final mean score is better than the rule-based baseline&#x27;s mean score.
+  - Given 5 runs where 4 beat the rule baseline and 1 does not, when the verdict is made, then the world is marked &quot;not yet beating the baselines&quot; and names the failing run.
+- **EVAL-06** Final evaluation produces one summary per world and variant: mean and range of learned scores across runs, both baseline means, the EVAL-04 test results and the EVAL-05 verdict.
+  - Given a finished evaluation, when the summary is opened, then all of those values are present.
+
+**Edge cases &amp; errors**
+- Fewer than 5 finished runs → the test is not run and the summary says how many more runs are needed.
+- A baseline scores better than the learned agent → reported plainly as a failed result, never hidden or re-run with new seeds.
+
+### Reference check (`CHECK`)
+**Serves:** Goal 1, Goal 3
+**Stage:** S1
+**Behavior:** After the hand-written method works in a world, the learner trains an established reference implementation of the same kind of method on the same world and budget, as a check that the hand-written version has no silent bugs.
+
+**Requirements**
+- **CHECK-01** The learning algorithms are written by the learner from basic array operations; an established reference implementation is used only for this check, never inside training runs.
+  - Given any training run, when it runs, then no outside reinforcement-learning code takes part in it.
+- **CHECK-02** For each world and variant, 5 runs of a reference implementation of the same kind of method are trained on the same world, budget and seeds as the hand-written method, and evaluated as in EVAL-03.
+  - Given a finished reference check, when its summary is opened, then it shows the reference&#x27;s mean and range next to the hand-written method&#x27;s.
+- **CHECK-03** The hand-written method passes the check if its mean final score is at least 80% of the reference&#x27;s (or at most 125% for lower-is-better scores).
+  - Given a hand-written snake mean of 18 food and a reference mean of 20, when checked, then it passes; at 15 against 20, it is flagged for investigation.
+
+**Edge cases &amp; errors**
+- The hand-written method scores far better than the reference (more than 150% of it) → also flagged, since it may point to a bug in scoring or evaluation rather than a better method.
+
+### World write-ups (`NOTES`)
+**Serves:** Goal 3
+**Stage:** S1
+**Behavior:** Each world has a short write-up, written by the learner, that explains why its learning method works and where it struggles, pointing to the charts and replays that show it.
+
+**Requirements**
+- **NOTES-01** Each world has a write-up with three parts: how the learning method works, why it works in this world, and where it struggles.
+  - Given a finished world, when its write-up is opened, then all three parts are present and non-empty.
+- **NOTES-02** The &quot;where it struggles&quot; part points to at least one saved replay or chart that shows the struggle.
+  - Given a write-up, when its struggle part is read, then it names at least one saved replay or chart that exists.
+- **NOTES-03** Write-ups are the learner&#x27;s own words; nothing in the system writes or fills them in.
+  - Given a new world, when it is set up, then its write-up starts with only the three part headings.
+
+**Edge cases &amp; errors**
+- A write-up points to a replay or chart that no longer exists → the world&#x27;s finish check lists the broken link.
+
+### Snake (`SNAKE`)
+**Serves:** Goal 1, Goal 2, Goal 3
+**Stage:** S1
+**Behavior:** The classic snake game on a square grid. The snake moves one cell per step, turns left, right or keeps going, grows when it eats food, and dies when it hits a wall or itself. The learner trains a snake that eats steadily and avoids itself, and watches it do so.
+
+**Requirements**
+- **SNAKE-01** The world is a 10 × 10 grid with one snake starting 3 cells long in the middle, and one food item on a random free cell.
+  - Given seed 3, when an episode starts, then the snake is 3 cells long near the center and one food item is on a cell the snake does not cover.
+- **SNAKE-02** Each step the snake chooses one of three actions: turn left, turn right or go straight.
+  - Given the snake heading up, when it turns left, then its head moves one cell left.
+- **SNAKE-03** Eating food grows the snake by one cell, adds 1 to the score and places new food on a random free cell.
+  - Given the head moves onto food, when the step ends, then the snake is one cell longer, the score is up by 1 and new food is on a free cell.
+- **SNAKE-04** The episode ends when the head hits a wall or the snake&#x27;s body, or after 100 steps without eating.
+  - Given the head moves into its own body, when the step ends, then the episode is over.
+- **SNAKE-05** The score is the food eaten in the episode (higher is better).
+  - Given an episode where 12 food items were eaten, when it ends, then its score is 12.
+- **SNAKE-06** The snake observes a fixed list of numbers: danger straight ahead, left and right; its heading; the food&#x27;s direction relative to its head; and its length.
+  - Given any step, when the observation is taken, then it has the same length and holds those values.
+- **SNAKE-07** The rule-based baseline moves toward the food along the shorter axis, unless that move would end the episode next step, in which case it takes any move that does not.
+  - Given the food to the right and a free cell to the right, when the rule acts, then it moves right.
+- **SNAKE-08** The trained snake beats both baselines as in EVAL-04 and EVAL-05.
+  - Given 5 finished snake runs, when evaluated, then both baselines are beaten.
+
+**Edge cases &amp; errors**
+- The snake fills every free cell → the episode ends as a win and the score counts all food eaten.
+- Turning back into its own neck is impossible by construction, since actions are relative turns.
+
+### Fish tank (`FISH`)
+**Serves:** Goal 1, Goal 2, Goal 3, Goal 4
+**Stage:** S2
+**Behavior:** A 2D tank with walls and a ball that bounces around at constant speed. Fish move smoothly by choosing how hard to push in each direction, and lose points when the ball hits them. It is built in three variants: one fish that sees everything, many fish that see everything, and many fish that only see nearby things.
+
+**Requirements**
+- **FISH-01** The tank is a square with walls; the ball moves in straight lines at constant speed and bounces off walls.
+  - Given the ball heading into the right wall, when it touches the wall, then its sideways direction reverses and its speed is unchanged.
+- **FISH-02** Each step a fish chooses a push as two numbers between −1 and 1 (left-right and up-down); its speed changes smoothly with the push, up to a top speed below the ball&#x27;s.
+  - Given a still fish pushing (1, 0) for several steps, when its speed is read, then it rises step by step toward its top speed, never above it.
+- **FISH-03** When the ball touches a fish, the hit is counted and the fish reappears at a random spot at least one quarter of the tank&#x27;s width from the ball.
+  - Given the ball touching a fish, when the step ends, then the hit count is up by 1 and the fish is at least a quarter-width from the ball.
+- **FISH-04** An episode lasts 1,000 steps; the score is hits per fish per episode (lower is better).
+  - Given 4 fish and 6 total hits in an episode, when it ends, then the score is 1.5.
+- **FISH-05** Variant &quot;one fish&quot;: a single fish observes its own position and velocity and the ball&#x27;s position and velocity.
+  - Given the one-fish variant, when an observation is taken, then it holds those values for the fish and the ball.
+- **FISH-06** Variant &quot;many fish&quot;: 8 fish share the tank; each observes itself, the ball and the 3 nearest other fish.
+  - Given the many-fish variant, when an observation is taken for any fish, then it holds its own state, the ball&#x27;s and the 3 nearest fish&#x27;s.
+- **FISH-07** Variant &quot;local sight&quot;: as &quot;many fish&quot;, but a fish sees the ball and other fish only within a radius of one quarter of the tank&#x27;s width; anything outside is reported as &quot;not seen&quot;.
+  - Given the ball beyond the radius, when a fish&#x27;s observation is taken, then the ball&#x27;s entries read &quot;not seen&quot;.
+- **FISH-08** Fish pass through each other; only the ball can hit them.
+  - Given two fish moving onto the same spot, when the step ends, then both are there and no hit is counted.
+- **FISH-09** The rule-based baseline pushes each fish directly away from the ball at full strength (from the ball it sees, or randomly when it sees none).
+  - Given the ball to the fish&#x27;s left, when the rule acts, then the push is (1, 0).
+- **FISH-10** Every variant&#x27;s trained fish beat both baselines as in EVAL-04 and EVAL-05.
+  - Given 5 finished runs of each variant, when evaluated, then both baselines are beaten in each variant.
+- **FISH-11** Fish tank runs through the same training runs, logging, replay viewer and evaluation as snake, and snake&#x27;s results reproduce unchanged after fish tank is added.
+  - Given a snake run repeated with its original settings and seed after fish tank exists, when it finishes, then its results match the original run exactly.
+
+**Edge cases &amp; errors**
+- A fish pushes into a wall → it stops at the wall and slides along it; it never leaves the tank.
+- The ball starts touching a fish → the episode&#x27;s start is re-drawn so that every fish starts at least a quarter-width from the ball.
+
+### Predator-prey (`PREY`)
+**Serves:** Goal 1, Goal 2, Goal 3, Goal 4
+**Stage:** S3
+**Behavior:** A 2D arena with food pellets, a team of prey and a team of predators, all moving smoothly as fish do. Prey score by eating food and are removed when caught; predators score by catching prey. Both teams learn at the same time. The learner watches and explains how each side adapts to the other; it may never look &quot;solved&quot;, and that is acceptable.
+
+**Requirements**
+- **PREY-01** The arena is a square with walls, 6 prey, 2 predators and 10 food pellets; an eaten pellet reappears at a random spot after 50 steps.
+  - Given seed 5, when an episode starts, then the counts are 6, 2 and 10, with no two objects touching.
+- **PREY-02** Prey and predators move by smooth pushes as in FISH-02; predators&#x27; top speed is 1.2 × the prey&#x27;s.
+  - Given both at full speed, when their speeds are read, then the predator&#x27;s is 1.2 × the prey&#x27;s.
+- **PREY-03** A prey touching a pellet eats it; a predator touching a prey catches it and the prey leaves the episode.
+  - Given a predator touching a prey, when the step ends, then the prey is gone and the predator&#x27;s catch count is up by 1.
+- **PREY-04** An episode lasts 1,000 steps or until every prey is caught.
+  - Given all 6 prey caught at step 600, when the step ends, then the episode is over.
+- **PREY-05** Each team has its own score: prey score = pellets eaten per prey (higher is better); predator score = prey caught per episode (higher is better).
+  - Given 18 pellets eaten and 3 prey caught, when the episode ends, then the prey score is 3 and the predator score is 3.
+- **PREY-06** Every agent observes itself, and the nearest 2 food pellets, nearest 2 prey and nearest 2 predators within a radius of one third of the arena&#x27;s width; anything outside reads &quot;not seen&quot;.
+  - Given a predator beyond the radius, when a prey&#x27;s observation is taken, then that predator&#x27;s entries read &quot;not seen&quot;.
+- **PREY-07** Rule-based baselines: prey flee the nearest seen predator, else move toward the nearest seen pellet; predators chase the nearest seen prey, else wander randomly.
+  - Given a prey that sees a predator to its right, when the rule acts, then it pushes left.
+- **PREY-08** Each trained team is evaluated against fixed opponents: trained prey against the rule-based predators, compared with random and rule-based prey; trained predators against the rule-based prey, compared with random and rule-based predators. Each passes as in EVAL-04 and EVAL-05.
+  - Given 5 finished runs, when evaluated, then a separate verdict is shown for the prey team and the predator team.
+- **PREY-09** The learner can play any prey checkpoint against any predator checkpoint from the same run, and see a grid of mean scores for every pairing of the 12 checkpoints of each side.
+  - Given a finished run, when the pairing grid is made, then it shows a 12 × 12 grid of prey scores and of predator scores, each cell the mean of 20 held-out episodes.
+- **PREY-10** The learning curve shows both teams&#x27; scores on the same step axis, so the back-and-forth between them is visible.
+  - Given 5 finished runs, when the chart is made, then both teams&#x27; mean lines and bands appear against the same environment-steps axis.
+- **PREY-11** Predator-prey runs through the same training runs, logging, replay viewer and evaluation as snake and fish tank, and their results reproduce unchanged after predator-prey is added.
+  - Given a snake run and a fish run repeated with their original settings and seeds, when they finish, then their results match the originals exactly.
+
+**Edge cases &amp; errors**
+- One team stops improving or collapses during co-training (e.g. predators catch nothing for the last half of the budget) → the run still finishes and the summary flags the collapse with the step it began; it is a result to explain, not an error.
+- All prey are caught early in most episodes → prey score is still computed per starting prey, so it is never inflated by fewer survivors.
+
+## Quality requirements
+- **QR-01** A single training run of any world and variant finishes within 60 minutes on the learner&#x27;s laptop (Apple Silicon, CPU only).
+  - Checked by the run&#x27;s logged start and end times.
+- **QR-02** A batch of 5 runs of one world and variant finishes within 90 minutes on the same laptop, running in parallel.
+  - Checked by the batch&#x27;s first start and last end time.
+- **QR-03** Rented GPU time, if a world truly needs it, costs at most $10 per world, and is used only after a laptop run is shown to miss QR-01.
+  - Checked against the rental bill, recorded in the world&#x27;s write-up.
+- **QR-04** The replay viewer plays at least 30 steps per second at 1× on the laptop, for every world.
+  - Checked by timing a 1,000-step replay.
+- **QR-05** Final evaluation (EVAL-03 and EVAL-04) of one world and variant finishes within 10 minutes on the laptop.
+  - Checked by timing the evaluation.
+- **QR-06** Everything runs locally with no network connection once installed.
+  - Checked by running a full train, evaluate and replay cycle with networking off.
+
+## Assumptions
+*(Not yet confirmed by the learner — see the list in the review.)*
+- &quot;About an hour of training per world&quot; means one run ≤ 60 minutes, with the 5 runs needed for evaluation running in parallel.
+- &quot;Several training runs&quot; means 5 runs with different seeds.
+- &quot;Clearly beats&quot; means significant at 5% after correction, and every single run beats the rule baseline.
+- &quot;Write the core learning algorithms myself&quot; means the learning updates and any function approximator (including how its gradients are computed) are hand-written from basic array operations.
+- The reference check is an 80% bar, not a requirement to match a library.
+- Fish and predator-prey both use smooth movement; predator-prey reuses the fish movement rules.
+- The world sizes, counts and step limits above are starting values the learner may tune before a stage&#x27;s build.
+
+## Open questions
+- Does &quot;write it myself&quot; allow an automatic-gradient tool, or must gradients also be hand-derived? — the learner.
+- Should training be resumable after a stop, or is an incomplete run simply discarded? — the learner.
+- Should the replay viewer also show what the agent sees (e.g. its sight radius) as an overlay? — the learner.
+
+## Changelog
+| Date | Change | Source | IDs |
+|---|---|---|---|
+| 2026-10-17 | Initial spec | brief.md | all |
+</pre><details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-9/rl-all-at-once/with_skill/project/docs/spec.md&quot;,
+  &quot;content&quot;: &quot;# RL Lab — Spec\n\n**Status:** Draft · **Last updated:** 2026-10-17 · **Brief:** [brief.md](brief.md)\n\n## Summary\nA set of small 2D reinforcement-learning worlds (Snake, Fish tank, Predator-prey) built on one shared core: a world interface, a training loop, logging with learning-curve charts, a replay viewer, and baseline evaluation. In each world a hand-written learning agent is trained on a laptop, checked against random and rule-based play, watched in replays, and explained in a write-up. See the [brief](brief.md) for why.\n\n## Users\n| User | What they need to do |\n|---|---|\n| The learner (sole user) | Add a world, train agents in it on a laptop, check they beat the baselines, watch replays across training, and write up why the method works and where it struggles |\n\n## Scope\n**In scope:** World interface, Training runs, Run logging &amp; learning curves, Replay viewer, Baseline evaluation, Reference check, World write-ups, Snake, Fish tank, Predator-prey.\n\n**Out of scope:**\n- 3D physics.\n- Learning from screen pixels, or Atari games.\n- Reproducing research papers or matching published numbers.\n- Web deployment or a hosted demo; everything runs locally.\n- Chasing top scores; clearly beating the baselines is enough.\n- Hyperparameter search beyond what the learner tunes by hand.\n- Written explanations generated for the learner; write-ups are the learner&#x27;s own words.\n\n## Features\n\n### World interface (`WORLD`)\n**Serves:** Goal 4\n**Stage:** S1\n**Behavior:** Every world presents the same face to the rest of the system: it can be reset from a seed, it reports what each agent observes as a short list of numbers, it accepts each agent&#x27;s action, and it returns rewards, an end-of-episode signal and a world-specific score. It also describes its current state in a form the replay viewer can draw.\n\n**Requirements**\n- **WORLD-01** A world starts a new episode from a seed, and the same seed always gives the same starting state.\n  - Given a world and seed 42, when two episodes are started, then both starting states are identical.\n- **WORLD-02** Given the same seed and the same sequence of actions, a world produces the same sequence of observations, rewards and end signals.\n  - Given a recorded episode&#x27;s seed and actions, when they are replayed into a fresh world, then every observation, reward and end signal matches the recording.\n- **WORLD-03** Each agent&#x27;s observation is a fixed-length list of numbers, never an image.\n  - Given any world, when an observation is taken at any step, then it has the same length as at every other step of that world and variant.\n- **WORLD-04** A world declares its agents, the observation length and the action format (a choice from a fixed set, or a list of numbers within stated limits) before any episode starts.\n  - Given any world, when the training loop asks for its description, then it receives the agent list, observation length and action format without running an episode.\n- **WORLD-05** Every world reports a per-episode score with a stated direction (higher is better, or lower is better), used by evaluation and charts.\n  - Given a finished episode, when its score is requested, then a single number and the world&#x27;s direction are returned.\n- **WORLD-06** A world reports its drawable state at every step (positions, sizes and kinds of every object) for the replay viewer.\n  - Given any step of any episode, when the drawable state is requested, then every object on screen is listed with its position.\n- **WORLD-07** A world can hold more than one agent, each agent belonging to a named team.\n  - Given a world with agents on two teams, when a step is taken, then each agent receives its own observation and reward, labelled with its team.\n\n**Edge cases &amp; errors**\n- An action outside the declared format or limits → the step is refused with an error naming the agent and the bad value; it is never silently clipped.\n- An agent that has left the episode (e.g. a caught prey) is sent an action → the action is ignored and the agent receives no further observations that episode.\n\n### Training runs (`TRAIN`)\n**Serves:** Goal 1, Goal 4\n**Stage:** S1\n**Behavior:** The learner starts a training run by naming a world, its variant, the learning method&#x27;s settings and a seed. The run trains for a fixed budget of environment steps, saves checkpoints of the agent as it goes, and runs periodic evaluations. The same loop runs every world without change.\n\n**Requirements**\n- **TRAIN-01** A training run is started from a world, a variant, the method&#x27;s settings and a seed, and runs for a stated budget of environment steps.\n  - Given snake, its default settings, seed 1 and a budget of N steps, when the run is started, then it stops after exactly N environment steps.\n- **TRAIN-02** The same world, settings and seed on the same machine give an identical training run.\n  - Given two runs with identical inputs, when both finish, then their logged results and final checkpoints are identical.\n- **TRAIN-03** A run saves a checkpoint at 10 evenly spaced points in its budget, plus at the start (untrained) and the end.\n  - Given a finished run, when its checkpoints are listed, then there are 12, at 0%, 10%, … 100% of the budget.\n- **TRAIN-04** A run evaluates its current agent at every 5% of its budget on 20 episodes whose seeds are never used in training.\n  - Given a finished run, when its evaluation log is read, then there are 21 evaluation points, each the mean score of 20 held-out-seed episodes.\n- **TRAIN-05** Several runs of the same world with different seeds can be started together, one per processor core.\n  - Given 5 seeds, when a batch of runs is started, then 5 runs proceed at the same time and each finishes with its own log and checkpoints.\n- **TRAIN-06** Every learning method, before it is used in a world, learns the known best behavior in a tiny check world whose best behavior is worked out by hand.\n  - Given a learning method and its check world, when it is trained for the check budget, then the trained agent picks the hand-derived best action in at least 95% of check-world states.\n- **TRAIN-07** In worlds with more than one team, each team has its own learning method and settings, and all teams learn during the same run.\n  - Given predator-prey with a learning method for each team, when a run proceeds, then both teams&#x27; agents change between consecutive checkpoints.\n\n**Edge cases &amp; errors**\n- A run is stopped before its budget ends → it is marked incomplete, keeps its checkpoints so far, and is left out of learning-curve charts and evaluation unless the learner includes it by name.\n- A run&#x27;s training produces an invalid number (not-a-number or infinite) in the agent → the run stops at once, saves the last good checkpoint, and records the step and the value.\n- A run would overwrite an existing run with the same name → it is refused; the learner picks a new name or deletes the old run first.\n\n### Run logging &amp; learning curves (`LOG`)\n**Serves:** Goal 1, Goal 4\n**Stage:** S1\n**Behavior:** Every run records its settings and results as it trains. From a group of runs of the same world and variant, the learner gets a learning-curve chart showing the agent against both baselines, across all runs.\n\n**Requirements**\n- **LOG-01** Every run records its world, variant, method settings, seed, budget, start and end times, and whether it finished.\n  - Given any finished run, when its record is opened, then every one of those fields is present.\n- **LOG-02** Every run logs, for each training episode, the episode&#x27;s score, length and total reward per team.\n  - Given a finished run, when its episode log is read, then it has one entry per training episode with those values.\n- **LOG-03** For a world and variant with at least 3 finished runs, a learning-curve chart shows evaluation score against environment steps: the mean across runs as a line, the lowest-to-highest range across runs as a band, and each baseline&#x27;s mean score as a horizontal reference line.\n  - Given 5 finished snake runs, when the chart is made, then it shows one mean line, one band, a random-play line and a rule-based line, with the axes labelled with the score name and \&quot;environment steps\&quot;.\n- **LOG-04** Learning-curve charts follow the `dataviz` skill&#x27;s guidance for form, colour and labelling.\n  - Given any learning-curve chart, when it is reviewed against the `dataviz` skill, then it passes that skill&#x27;s checks.\n- **LOG-05** Each world can add its own logged measures (e.g. snake length at death, hits per fish), which are charted the same way as the score.\n  - Given a world that declares an extra measure, when its chart is requested, then it is drawn with the same mean line and range band.\n- **LOG-06** The learner can view the latest logged values of a run while it trains.\n  - Given a run in progress, when the learner checks it, then they see the current step, the latest evaluation score and the time elapsed, no more than 1 evaluation point behind.\n\n**Edge cases &amp; errors**\n- Runs with different budgets or settings are asked for in one chart → refused, naming the differing settings; one chart only combines runs that differ by seed.\n- Fewer than 3 finished runs → the chart is still drawn, but titled with the run count and a note that the band is not meaningful.\n\n### Replay viewer (`REPLAY`)\n**Serves:** Goal 2, Goal 4\n**Stage:** S1\n**Behavior:** The learner picks a run, one of its checkpoints and a seed, and watches that agent play an episode in a local window. They can pause, step and change speed, and put two checkpoints side by side on the same starting state to see how training changed the behavior.\n\n**Requirements**\n- **REPLAY-01** The learner can watch an episode played by any checkpoint of any run, from a seed they choose.\n  - Given a snake run&#x27;s 50% checkpoint and seed 7, when the replay is opened, then the episode plays from its first step to its end.\n- **REPLAY-02** Replays are exact: the same checkpoint and seed always show the same episode.\n  - Given a checkpoint and seed, when the replay is played twice, then every frame matches.\n- **REPLAY-03** The replay can be paused, stepped one step forward or back, and played at 0.25×, 1×, 4× or 16× speed.\n  - Given a paused replay at step 30, when the learner steps forward, then step 31 is shown; when they step back twice, step 29 is shown.\n- **REPLAY-04** Two checkpoints can be shown side by side on the same starting state, stepping in sync.\n  - Given the 10% and 100% snake checkpoints and seed 7, when compared, then both start from the same board and advance one step at a time together; when one episode ends, its last frame stays while the other continues.\n- **REPLAY-05** The replay shows the current step, the running score and each agent&#x27;s latest reward next to the world.\n  - Given any frame, when it is shown, then the step number, the score so far and the latest rewards are visible.\n- **REPLAY-06** The learner can also watch the random-play and rule-based baselines in the same viewer, including side by side with a checkpoint.\n  - Given the rule-based snake and the final checkpoint on seed 7, when compared, then both play side by side as in REPLAY-04.\n- **REPLAY-07** A replay can be saved as a video file to keep alongside the write-up.\n  - Given an open replay, when the learner saves it, then a video of the whole episode at 1× speed is written and plays in a standard video player.\n\n**Edge cases &amp; errors**\n- A checkpoint from a world or variant whose observation length or action format no longer matches → the replay refuses to open and names the mismatch.\n- An episode that never ends on its own → the replay stops at the world&#x27;s step limit and says so.\n\n### Baseline evaluation (`EVAL`)\n**Serves:** Goal 1\n**Stage:** S1\n**Behavior:** For every world and variant there are two baselines: random play and a simple hand-written rule. A final evaluation plays every run&#x27;s final checkpoint and both baselines on the same held-out seeds and tests whether the learned agent beats each baseline by more than chance.\n\n**Requirements**\n- **EVAL-01** Every world and variant has a random-play baseline that picks each action uniformly from the allowed actions.\n  - Given any world, when the random baseline plays 100 steps, then every action it takes is within the declared action format.\n- **EVAL-02** Every world and variant has a rule-based baseline that the learner writes by hand, described in one sentence in the world&#x27;s feature below.\n  - Given any world, when its rule baseline is listed, then its one-sentence description is shown with it.\n- **EVAL-03** Final evaluation plays every final checkpoint and both baselines on the same 100 seeds, none of which was used in training or in-training evaluation.\n  - Given 5 finished runs, when final evaluation is run, then 700 episodes are played (5 × 100 learned, 100 random, 100 rule-based), all on the same 100 held-out seeds.\n- **EVAL-04** Whether the learned agent beats each baseline is tested with the `null-hypothesis-testing` skill. It is given: the hypothesis \&quot;the trained agent scores better than the baseline\&quot;; H0 = the learned agent&#x27;s mean score is no better than the baseline&#x27;s, H1 = it is better (in the world&#x27;s score direction); the statistic = difference in mean episode score, learned (averaged over the runs, per seed) minus baseline; the null built by randomly swapping the learned and baseline labels within each held-out seed (paired permutation, 10,000 permutations); α = 0.05 with Holm correction across all baseline comparisons in that world (2 per variant); the EVAL-03 held-out episodes. The learned agent passes only if both nulls are rejected.\n  - Given final evaluation results for one variant, when tested, then a report shows, for each baseline, the mean scores, the difference, the corrected p-value and reject/keep.\n- **EVAL-05** \&quot;Clearly beats\&quot; also needs every single run to beat the rule baseline: each run&#x27;s final mean score is better than the rule-based baseline&#x27;s mean score.\n  - Given 5 runs where 4 beat the rule baseline and 1 does not, when the verdict is made, then the world is marked \&quot;not yet beating the baselines\&quot; and names the failing run.\n- **EVAL-06** Final evaluation produces one summary per world and variant: mean and range of learned scores across runs, both baseline means, the EVAL-04 test results and the EVAL-05 verdict.\n  - Given a finished evaluation, when the summary is opened, then all of those values are present.\n\n**Edge cases &amp; errors**\n- Fewer than 5 finished runs → the test is not run and the summary says how many more runs are needed.\n- A baseline scores better than the learned agent → reported plainly as a failed result, never hidden or re-run with new seeds.\n\n### Reference check (`CHECK`)\n**Serves:** Goal 1, Goal 3\n**Stage:** S1\n**Behavior:** After the hand-written method works in a world, the learner trains an established reference implementation of the same kind of method on the same world and budget, as a check that the hand-written version has no silent bugs.\n\n**Requirements**\n- **CHECK-01** The learning algorithms are written by the learner from basic array operations; an established reference implementation is used only for this check, never inside training runs.\n  - Given any training run, when it runs, then no outside reinforcement-learning code takes part in it.\n- **CHECK-02** For each world and variant, 5 runs of a reference implementation of the same kind of method are trained on the same world, budget and seeds as the hand-written method, and evaluated as in EVAL-03.\n  - Given a finished reference check, when its summary is opened, then it shows the reference&#x27;s mean and range next to the hand-written method&#x27;s.\n- **CHECK-03** The hand-written method passes the check if its mean final score is at least 80% of the reference&#x27;s (or at most 125% for lower-is-better scores).\n  - Given a hand-written snake mean of 18 food and a reference mean of 20, when checked, then it passes; at 15 against 20, it is flagged for investigation.\n\n**Edge cases &amp; errors**\n- The hand-written method scores far better than the reference (more than 150% of it) → also flagged, since it may point to a bug in scoring or evaluation rather than a better method.\n\n### World write-ups (`NOTES`)\n**Serves:** Goal 3\n**Stage:** S1\n**Behavior:** Each world has a short write-up, written by the learner, that explains why its learning method works and where it struggles, pointing to the charts and replays that show it.\n\n**Requirements**\n- **NOTES-01** Each world has a write-up with three parts: how the learning method works, why it works in this world, and where it struggles.\n  - Given a finished world, when its write-up is opened, then all three parts are present and non-empty.\n- **NOTES-02** The \&quot;where it struggles\&quot; part points to at least one saved replay or chart that shows the struggle.\n  - Given a write-up, when its struggle part is read, then it names at least one saved replay or chart that exists.\n- **NOTES-03** Write-ups are the learner&#x27;s own words; nothing in the system writes or fills them in.\n  - Given a new world, when it is set up, then its write-up starts with only the three part headings.\n\n**Edge cases &amp; errors**\n- A write-up points to a replay or chart that no longer exists → the world&#x27;s finish check lists the broken link.\n\n### Snake (`SNAKE`)\n**Serves:** Goal 1, Goal 2, Goal 3\n**Stage:** S1\n**Behavior:** The classic snake game on a square grid. The snake moves one cell per step, turns left, right or keeps going, grows when it eats food, and dies when it hits a wall or itself. The learner trains a snake that eats steadily and avoids itself, and watches it do so.\n\n**Requirements**\n- **SNAKE-01** The world is a 10 × 10 grid with one snake starting 3 cells long in the middle, and one food item on a random free cell.\n  - Given seed 3, when an episode starts, then the snake is 3 cells long near the center and one food item is on a cell the snake does not cover.\n- **SNAKE-02** Each step the snake chooses one of three actions: turn left, turn right or go straight.\n  - Given the snake heading up, when it turns left, then its head moves one cell left.\n- **SNAKE-03** Eating food grows the snake by one cell, adds 1 to the score and places new food on a random free cell.\n  - Given the head moves onto food, when the step ends, then the snake is one cell longer, the score is up by 1 and new food is on a free cell.\n- **SNAKE-04** The episode ends when the head hits a wall or the snake&#x27;s body, or after 100 steps without eating.\n  - Given the head moves into its own body, when the step ends, then the episode is over.\n- **SNAKE-05** The score is the food eaten in the episode (higher is better).\n  - Given an episode where 12 food items were eaten, when it ends, then its score is 12.\n- **SNAKE-06** The snake observes a fixed list of numbers: danger straight ahead, left and right; its heading; the food&#x27;s direction relative to its head; and its length.\n  - Given any step, when the observation is taken, then it has the same length and holds those values.\n- **SNAKE-07** The rule-based baseline moves toward the food along the shorter axis, unless that move would end the episode next step, in which case it takes any move that does not.\n  - Given the food to the right and a free cell to the right, when the rule acts, then it moves right.\n- **SNAKE-08** The trained snake beats both baselines as in EVAL-04 and EVAL-05.\n  - Given 5 finished snake runs, when evaluated, then both baselines are beaten.\n\n**Edge cases &amp; errors**\n- The snake fills every free cell → the episode ends as a win and the score counts all food eaten.\n- Turning back into its own neck is impossible by construction, since actions are relative turns.\n\n### Fish tank (`FISH`)\n**Serves:** Goal 1, Goal 2, Goal 3, Goal 4\n**Stage:** S2\n**Behavior:** A 2D tank with walls and a ball that bounces around at constant speed. Fish move smoothly by choosing how hard to push in each direction, and lose points when the ball hits them. It is built in three variants: one fish that sees everything, many fish that see everything, and many fish that only see nearby things.\n\n**Requirements**\n- **FISH-01** The tank is a square with walls; the ball moves in straight lines at constant speed and bounces off walls.\n  - Given the ball heading into the right wall, when it touches the wall, then its sideways direction reverses and its speed is unchanged.\n- **FISH-02** Each step a fish chooses a push as two numbers between −1 and 1 (left-right and up-down); its speed changes smoothly with the push, up to a top speed below the ball&#x27;s.\n  - Given a still fish pushing (1, 0) for several steps, when its speed is read, then it rises step by step toward its top speed, never above it.\n- **FISH-03** When the ball touches a fish, the hit is counted and the fish reappears at a random spot at least one quarter of the tank&#x27;s width from the ball.\n  - Given the ball touching a fish, when the step ends, then the hit count is up by 1 and the fish is at least a quarter-width from the ball.\n- **FISH-04** An episode lasts 1,000 steps; the score is hits per fish per episode (lower is better).\n  - Given 4 fish and 6 total hits in an episode, when it ends, then the score is 1.5.\n- **FISH-05** Variant \&quot;one fish\&quot;: a single fish observes its own position and velocity and the ball&#x27;s position and velocity.\n  - Given the one-fish variant, when an observation is taken, then it holds those values for the fish and the ball.\n- **FISH-06** Variant \&quot;many fish\&quot;: 8 fish share the tank; each observes itself, the ball and the 3 nearest other fish.\n  - Given the many-fish variant, when an observation is taken for any fish, then it holds its own state, the ball&#x27;s and the 3 nearest fish&#x27;s.\n- **FISH-07** Variant \&quot;local sight\&quot;: as \&quot;many fish\&quot;, but a fish sees the ball and other fish only within a radius of one quarter of the tank&#x27;s width; anything outside is reported as \&quot;not seen\&quot;.\n  - Given the ball beyond the radius, when a fish&#x27;s observation is taken, then the ball&#x27;s entries read \&quot;not seen\&quot;.\n- **FISH-08** Fish pass through each other; only the ball can hit them.\n  - Given two fish moving onto the same spot, when the step ends, then both are there and no hit is counted.\n- **FISH-09** The rule-based baseline pushes each fish directly away from the ball at full strength (from the ball it sees, or randomly when it sees none).\n  - Given the ball to the fish&#x27;s left, when the rule acts, then the push is (1, 0).\n- **FISH-10** Every variant&#x27;s trained fish beat both baselines as in EVAL-04 and EVAL-05.\n  - Given 5 finished runs of each variant, when evaluated, then both baselines are beaten in each variant.\n- **FISH-11** Fish tank runs through the same training runs, logging, replay viewer and evaluation as snake, and snake&#x27;s results reproduce unchanged after fish tank is added.\n  - Given a snake run repeated with its original settings and seed after fish tank exists, when it finishes, then its results match the original run exactly.\n\n**Edge cases &amp; errors**\n- A fish pushes into a wall → it stops at the wall and slides along it; it never leaves the tank.\n- The ball starts touching a fish → the episode&#x27;s start is re-drawn so that every fish starts at least a quarter-width from the ball.\n\n### Predator-prey (`PREY`)\n**Serves:** Goal 1, Goal 2, Goal 3, Goal 4\n**Stage:** S3\n**Behavior:** A 2D arena with food pellets, a team of prey and a team of predators, all moving smoothly as fish do. Prey score by eating food and are removed when caught; predators score by catching prey. Both teams learn at the same time. The learner watches and explains how each side adapts to the other; it may never look \&quot;solved\&quot;, and that is acceptable.\n\n**Requirements**\n- **PREY-01** The arena is a square with walls, 6 prey, 2 predators and 10 food pellets; an eaten pellet reappears at a random spot after 50 steps.\n  - Given seed 5, when an episode starts, then the counts are 6, 2 and 10, with no two objects touching.\n- **PREY-02** Prey and predators move by smooth pushes as in FISH-02; predators&#x27; top speed is 1.2 × the prey&#x27;s.\n  - Given both at full speed, when their speeds are read, then the predator&#x27;s is 1.2 × the prey&#x27;s.\n- **PREY-03** A prey touching a pellet eats it; a predator touching a prey catches it and the prey leaves the episode.\n  - Given a predator touching a prey, when the step ends, then the prey is gone and the predator&#x27;s catch count is up by 1.\n- **PREY-04** An episode lasts 1,000 steps or until every prey is caught.\n  - Given all 6 prey caught at step 600, when the step ends, then the episode is over.\n- **PREY-05** Each team has its own score: prey score = pellets eaten per prey (higher is better); predator score = prey caught per episode (higher is better).\n  - Given 18 pellets eaten and 3 prey caught, when the episode ends, then the prey score is 3 and the predator score is 3.\n- **PREY-06** Every agent observes itself, and the nearest 2 food pellets, nearest 2 prey and nearest 2 predators within a radius of one third of the arena&#x27;s width; anything outside reads \&quot;not seen\&quot;.\n  - Given a predator beyond the radius, when a prey&#x27;s observation is taken, then that predator&#x27;s entries read \&quot;not seen\&quot;.\n- **PREY-07** Rule-based baselines: prey flee the nearest seen predator, else move toward the nearest seen pellet; predators chase the nearest seen prey, else wander randomly.\n  - Given a prey that sees a predator to its right, when the rule acts, then it pushes left.\n- **PREY-08** Each trained team is evaluated against fixed opponents: trained prey against the rule-based predators, compared with random and rule-based prey; trained predators against the rule-based prey, compared with random and rule-based predators. Each passes as in EVAL-04 and EVAL-05.\n  - Given 5 finished runs, when evaluated, then a separate verdict is shown for the prey team and the predator team.\n- **PREY-09** The learner can play any prey checkpoint against any predator checkpoint from the same run, and see a grid of mean scores for every pairing of the 12 checkpoints of each side.\n  - Given a finished run, when the pairing grid is made, then it shows a 12 × 12 grid of prey scores and of predator scores, each cell the mean of 20 held-out episodes.\n- **PREY-10** The learning curve shows both teams&#x27; scores on the same step axis, so the back-and-forth between them is visible.\n  - Given 5 finished runs, when the chart is made, then both teams&#x27; mean lines and bands appear against the same environment-steps axis.\n- **PREY-11** Predator-prey runs through the same training runs, logging, replay viewer and evaluation as snake and fish tank, and their results reproduce unchanged after predator-prey is added.\n  - Given a snake run and a fish run repeated with their original settings and seeds, when they finish, then their results match the originals exactly.\n\n**Edge cases &amp; errors**\n- One team stops improving or collapses during co-training (e.g. predators catch nothing for the last half of the budget) → the run still finishes and the summary flags the collapse with the step it began; it is a result to explain, not an error.\n- All prey are caught early in most episodes → prey score is still computed per starting prey, so it is never inflated by fewer survivors.\n\n## Quality requirements\n- **QR-01** A single training run of any world and variant finishes within 60 minutes on the learner&#x27;s laptop (Apple Silicon, CPU only).\n  - Checked by the run&#x27;s logged start and end times.\n- **QR-02** A batch of 5 runs of one world and variant finishes within 90 minutes on the same laptop, running in parallel.\n  - Checked by the batch&#x27;s first start and last end time.\n- **QR-03** Rented GPU time, if a world truly needs it, costs at most $10 per world, and is used only after a laptop run is shown to miss QR-01.\n  - Checked against the rental bill, recorded in the world&#x27;s write-up.\n- **QR-04** The replay viewer plays at least 30 steps per second at 1× on the laptop, for every world.\n  - Checked by timing a 1,000-step replay.\n- **QR-05** Final evaluation (EVAL-03 and EVAL-04) of one world and variant finishes within 10 minutes on the laptop.\n  - Checked by timing the evaluation.\n- **QR-06** Everything runs locally with no network connection once installed.\n  - Checked by running a full train, evaluate and replay cycle with networking off.\n\n## Assumptions\n*(Not yet confirmed by the learner — see the list in the review.)*\n- \&quot;About an hour of training per world\&quot; means one run ≤ 60 minutes, with the 5 runs needed for evaluation running in parallel.\n- \&quot;Several training runs\&quot; means 5 runs with different seeds.\n- \&quot;Clearly beats\&quot; means significant at 5% after correction, and every single run beats the rule baseline.\n- \&quot;Write the core learning algorithms myself\&quot; means the learning updates and any function approximator (including how its gradients are computed) are hand-written from basic array operations.\n- The reference check is an 80% bar, not a requirement to match a library.\n- Fish and predator-prey both use smooth movement; predator-prey reuses the fish movement rules.\n- The world sizes, counts and step limits above are starting values the learner may tune before a stage&#x27;s build.\n\n## Open questions\n- Does \&quot;write it myself\&quot; allow an automatic-gradient tool, or must gradients also be hand-derived? — the learner.\n- Should training be resumable after a stop, or is an incomplete run simply discarded? — the learner.\n- Should the replay viewer also show what the agent sees (e.g. its sight radius) as an overlay? — the learner.\n\n## Changelog\n| Date | Change | Source | IDs |\n|---|---|---|---|\n| 2026-10-17 | Initial spec | brief.md | all |\n&quot;
+}</pre><div class="lbl">output</div><pre>File created successfully at: /Users/connorott/plugins/dev-team-workspace/iteration-9/rl-all-at-once/with_skill/project/docs/spec.md (file state is current in your context — no need to Read it back)</pre></details></div><div class="step" id="SD27"><span class="sid">D27</span><span class="kind">Bash</span>python3 ../plugin/dev-team/scripts/dt.py lint 2&gt;&amp;1 | tail -20; grep -niE &#x27;numpy|pytorch|torch|gym|json|csv|sqlite|python|mp4|pygame|matplotlib|q-learning|dqn|ppo|neural&#x27; docs/spec.md<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;python3 ../plugin/dev-team/scripts/dt.py lint 2&gt;&amp;1 | tail -20; grep -niE &#x27;numpy|pytorch|torch|gym|json|csv|sqlite|python|mp4|pygame|matplotlib|q-learning|dqn|ppo|neural&#x27; docs/spec.md&quot;
+}</pre><div class="lbl">output</div><pre>docs/roadmap.md:15: roadmap-skill S1 Skills names dataviz: not installed (.claude/skills or the plugin)
+docs/roadmap.md:19: roadmap-skill S2 Skills names dataviz: not installed (.claude/skills or the plugin)
+docs/roadmap.md:23: roadmap-skill S3 Skills names dataviz: not installed (.claude/skills or the plugin)
+0 errors, 3 warnings
+261:- **PREY-08** Each trained team is evaluated against fixed opponents: trained prey against the rule-based predators, compared with random and rule-based prey; trained predators against the rule-based prey, compared with random and rule-based predators. Each passes as in EVAL-04 and EVAL-05.</pre></details></div><div class="step" id="SD28"><span class="sid">D28</span><span class="kind">say</span>I&#x27;ve written the draft spec to `docs/spec.md`, status Draft and not committed. It has 10 features, 69 feature requirements and 6 quality requirements, and every requirement has at least one Given/When/Then test. The lint check found no errors. Its 3 warnings are about the roadmap, not the spec: the roadmap lists a chart-design skill (`dataviz`) for each stage, but it isn&#x27;t installed in the project. It is available in my session, and LOG-04 relies on it. ⏎ Which goals each feature serves ⏎ - Goal 1 (beat random and rule-based play): Training runs, Logging &amp; learning curves, Baseline eva …[+3146 chars]<details><summary>full text</summary><pre>I&#x27;ve written the draft spec to `docs/spec.md`, status Draft and not committed. It has 10 features, 69 feature requirements and 6 quality requirements, and every requirement has at least one Given/When/Then test. The lint check found no errors. Its 3 warnings are about the roadmap, not the spec: the roadmap lists a chart-design skill (`dataviz`) for each stage, but it isn&#x27;t installed in the project. It is available in my session, and LOG-04 relies on it.
+
+**Which goals each feature serves**
+- **Goal 1 (beat random and rule-based play):** Training runs, Logging &amp; learning curves, Baseline evaluation, Reference check, and the three world features
+- **Goal 2 (replays and comparisons across training):** Replay viewer and the three world features
+- **Goal 3 (explain why it works and where it struggles):** Write-ups, Reference check and the three world features
+- **Goal 4 (one shared core):** World interface, Training runs, Logging, Replay viewer, and a &quot;nothing breaks&quot; test in each later world (FISH-11, PREY-11)
+
+**Which stage builds each feature**
+- **S1:** the shared core (World interface, Training runs, Logging, Replay viewer, Baseline evaluation, Reference check, Write-ups) plus Snake
+- **S2:** Fish tank, in three versions: one fish that sees everything, 8 fish that see everything, 8 fish that only see nearby
+- **S3:** Predator-prey, with both teams learning at once and a grid that plays every saved prey snapshot against every saved predator snapshot
+
+## ASSUMPTIONS I&#x27;M MAKING (correct me now or I&#x27;ll keep them)
+
+1. **Time limit:** one training run takes at most 60 minutes. A batch of 5 runs at once takes at most 90 minutes. Rented GPU time is capped at $10 per world.
+2. **&quot;Several training runs&quot;** means 5 runs, each with a different random seed.
+3. **&quot;Clearly beats&quot;** has two parts:
+   - The `null-hypothesis-testing` skill finds the gap real, not chance. It compares the agent and the baseline on the same 100 test games, using 10,000 random shuffles of which result came from whom. The cutoff is 5%, with a correction (Holm) for the two baselines being tested at once.
+   - Every one of the 5 runs also beats the rule-based baseline on its own.
+4. **Library check:** your hand-written method must reach at least 80% of an established library version&#x27;s score on the same world and training length. Scoring much higher than the library (above 150%) is also flagged, since that may point to a scoring bug.
+5. **Starting sizes, which you can tune before each stage is built:**
+   - Snake: 10×10 grid; the game ends after 100 steps without eating.
+   - Fish tank: 8 fish in the multi-fish versions; local fish see a quarter of the tank&#x27;s width.
+   - Predator-prey: 6 prey, 2 predators and 10 food pellets; predators move 1.2× faster than prey.
+   - Fish and predator-prey games last 1,000 steps.
+6. **Shared movement rules:** predator-prey reuses the fish tank&#x27;s smooth movement, and fish pass through each other.
+7. **Saved snapshots:** 12 per run, from untrained to fully trained. Progress is checked every 5% of training on 20 test games, using seeds never used in training.
+
+## Open questions
+
+These change requirements:
+- **Hand-written learning:** does &quot;I write the core algorithms myself&quot; also mean working out the gradients by hand? Or is a tool that computes gradients automatically allowed?
+- **Stopped runs:** should a stopped run be resumable? The draft keeps its saved snapshots but marks it incomplete and leaves it out of the charts.
+- **Replay overlay:** should the replay viewer show what each agent can see, such as its sight radius?
+
+Approve it, or tell me what to change. I&#x27;ll update the spec and stop there; the architecture starts in a later turn.</pre></details></div><div class="step" id="SD29"><span class="sid">D29</span><span class="kind">hook</span><span class="hook">SessionStart:resume said: milestone: none (no tasks/plan.md)
+draft (waiting for approval): docs/spec.md
+dt: python3 /Users/connorott/plugins/dev-team-workspace/iteration-9/rl-all-at-once/with_skill/plugin/dev-team/scripts/dt.py
+</span></div>
+<h2>Commits</h2>
+<p>None.</p>
+<h2>Returned</h2>
+<pre>I&#x27;ve written the draft spec to `docs/spec.md`, status Draft and not committed. It has 10 features, 69 feature requirements and 6 quality requirements, and every requirement has at least one Given/When/Then test. The lint check found no errors. Its 3 warnings are about the roadmap, not the spec: the roadmap lists a chart-design skill (`dataviz`) for each stage, but it isn&#x27;t installed in the project. It is available in my session, and LOG-04 relies on it.
+
+**Which goals each feature serves**
+- **Goal 1 (beat random and rule-based play):** Training runs, Logging &amp; learning curves, Baseline evaluation, Reference check, and the three world features
+- **Goal 2 (replays and comparisons across training):** Replay viewer and the three world features
+- **Goal 3 (explain why it works and where it struggles):** Write-ups, Reference check and the three world features
+- **Goal 4 (one shared core):** World interface, Training runs, Logging, Replay viewer, and a &quot;nothing breaks&quot; test in each later world (FISH-11, PREY-11)
+
+**Which stage builds each feature**
+- **S1:** the shared core (World interface, Training runs, Logging, Replay viewer, Baseline evaluation, Reference check, Write-ups) plus Snake
+- **S2:** Fish tank, in three versions: one fish that sees everything, 8 fish that see everything, 8 fish that only see nearby
+- **S3:** Predator-prey, with both teams learning at once and a grid that plays every saved prey snapshot against every saved predator snapshot
+
+## ASSUMPTIONS I&#x27;M MAKING (correct me now or I&#x27;ll keep them)
+
+1. **Time limit:** one training run takes at most 60 minutes. A batch of 5 runs at once takes at most 90 minutes. Rented GPU time is capped at $10 per world.
+2. **&quot;Several training runs&quot;** means 5 runs, each with a different random seed.
+3. **&quot;Clearly beats&quot;** has two parts:
+   - The `null-hypothesis-testing` skill finds the gap real, not chance. It compares the agent and the baseline on the same 100 test games, using 10,000 random shuffles of which result came from whom. The cutoff is 5%, with a correction (Holm) for the two baselines being tested at once.
+   - Every one of the 5 runs also beats the rule-based baseline on its own.
+4. **Library check:** your hand-written method must reach at least 80% of an established library version&#x27;s score on the same world and training length. Scoring much higher than the library (above 150%) is also flagged, since that may point to a scoring bug.
+5. **Starting sizes, which you can tune before each stage is built:**
+   - Snake: 10×10 grid; the game ends after 100 steps without eating.
+   - Fish tank: 8 fish in the multi-fish versions; local fish see a quarter of the tank&#x27;s width.
+   - Predator-prey: 6 prey, 2 predators and 10 food pellets; predators move 1.2× faster than prey.
+   - Fish and predator-prey games last 1,000 steps.
+6. **Shared movement rules:** predator-prey reuses the fish tank&#x27;s smooth movement, and fish pass through each other.
+7. **Saved snapshots:** 12 per run, from untrained to fully trained. Progress is checked every 5% of training on 20 test games, using seeds never used in training.
+
+## Open questions
+
+These change requirements:
+- **Hand-written learning:** does &quot;I write the core algorithms myself&quot; also mean working out the gradients by hand? Or is a tool that computes gradients automatically allowed?
+- **Stopped runs:** should a stopped run be resumable? The draft keeps its saved snapshots but marks it incomplete and leaves it out of the charts.
+- **Replay overlay:** should the replay viewer show what each agent can see, such as its sight radius?
+
+Approve it, or tell me what to change. I&#x27;ll update the spec and stop there; the architecture starts in a later turn.</pre>
+</body></html>

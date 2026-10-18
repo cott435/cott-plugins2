@@ -1,0 +1,832 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1"><title>T09 turn</title>
+<style>
+:root{--bg:#fbfbfa;--fg:#1d1d1f;--muted:#6b6b70;--line:#d9d9de;--box:#fff;--rowp:#eef3fb;--band:#fff4d6;
+--ok:#2e7d32;--bad:#c62828;--warn:#b26a00;--idle:#6b6b70}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#17171a;--fg:#ececf0;--muted:#9a9aa3;
+--line:#34343a;--box:#222227;--rowp:#1d2433;--band:#3a3015;--ok:#6fcf73;--bad:#ff6b6b;--warn:#f0b35a;--idle:#9a9aa3}}
+:root[data-theme="dark"]{--bg:#17171a;--fg:#ececf0;--muted:#9a9aa3;--line:#34343a;--box:#222227;--rowp:#1d2433;
+--band:#3a3015;--ok:#6fcf73;--bad:#ff6b6b;--warn:#f0b35a;--idle:#9a9aa3}
+body{margin:0;padding:16px;background:var(--bg);color:var(--fg);font:14px/1.45 -apple-system,system-ui,sans-serif}
+h1{font-size:18px;margin:0 0 4px}h2{font-size:15px;margin:22px 0 8px}.sub{color:var(--muted)}
+table{border-collapse:collapse;margin:4px 0 8px}td,th{border-bottom:1px solid var(--line);padding:4px 10px;text-align:left;
+vertical-align:top}th{color:var(--muted);font-weight:600}.chips span{display:inline-block;margin:0 4px 2px 0}
+.legend span{margin-right:14px;white-space:nowrap}.sw{display:inline-block;width:10px;height:10px;border-radius:2px;
+margin-right:4px;vertical-align:-1px}.scroll{overflow:auto;max-height:88vh;border:1px solid var(--line);border-radius:8px}
+.chart{display:grid;width:max-content}.chart>div{line-height:0}.corner{position:sticky;top:0;left:0;z-index:3}
+.colhead{position:sticky;top:0;z-index:2}.rowhead{position:sticky;left:0;z-index:2}
+svg.bg{background:var(--bg)}.colhead svg{border-bottom:1px solid var(--line)}.rowhead svg{border-right:1px solid var(--line)}
+.ok{color:var(--ok);fill:var(--ok)}.bad{color:var(--bad);fill:var(--bad)}.warn{color:var(--warn);fill:var(--warn)}
+.idle{color:var(--idle);fill:var(--idle)}
+svg text{fill:var(--fg);font-family:-apple-system,system-ui,sans-serif}
+.box{fill:var(--box);stroke:var(--line)}.unit:hover .box{stroke:var(--fg)}
+.role{font-size:12px;font-weight:600}.uid,.wmeta,.lmeta,.meta{font-size:10px;fill:var(--muted)}
+.sub{font-size:10.5px;fill:var(--muted)}.badge{font-size:11px;font-weight:600}
+.meta.bad{fill:var(--bad);font-weight:600}.lane{font-size:13px;font-weight:700}.wave{font-size:13px;font-weight:700}
+.par{fill:#4e79a7}.ser{fill:var(--muted)}.rowp{fill:var(--rowp)}.rows{fill:transparent}.band{fill:var(--band)}
+.bandt{font-size:11.5px}.grid{stroke:var(--line)}.link{stroke:var(--muted);stroke-width:1.2;opacity:.55}
+.arrowhead{fill:var(--muted)}.marks{font-size:10.5px}.audit{stroke:var(--box);stroke-width:2}.auditn{font-size:10px;font-weight:700;fill:#fff}
+a{color:inherit}svg a .box{cursor:pointer}
+
+:root{--c0:#2a78d6;--c1:#eb6834;--c2:#1baf7a;--c3:#eda100;--c4:#e87ba4;--c5:#008300;--c6:#6250d6;--c7:#e34948;
+--cx:#8a8985;--main:#52514e;--read:#dcdbd5;--readfg:#1d1d1f}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--c0:#3987e5;--c1:#d95926;--c2:#199e70;
+--c3:#c98500;--c4:#d55181;--c5:#008300;--c6:#9085e9;--c7:#e66767;--cx:#77766f;--main:#c3c2b7;--read:#3b3b40;
+--readfg:#ececf0}}
+:root[data-theme="dark"]{--c0:#3987e5;--c1:#d95926;--c2:#199e70;--c3:#c98500;--c4:#d55181;--c5:#008300;
+--c6:#9085e9;--c7:#e66767;--cx:#77766f;--main:#c3c2b7;--read:#3b3b40;--readfg:#ececf0}
+.c0{fill:var(--c0);background:var(--c0)}.c1{fill:var(--c1);background:var(--c1)}.c2{fill:var(--c2);background:var(--c2)}
+.c3{fill:var(--c3);background:var(--c3)}.c4{fill:var(--c4);background:var(--c4)}.c5{fill:var(--c5);background:var(--c5)}
+.c6{fill:var(--c6);background:var(--c6)}.c7{fill:var(--c7);background:var(--c7)}.cx{fill:var(--cx);background:var(--cx)}
+.cmain{fill:var(--main)}.sc0{stroke:var(--c0)}.sc1{stroke:var(--c1)}.sc2{stroke:var(--c2)}
+.tl text,.sm text,.lc text{font-size:10.5px;fill:var(--muted)}.tl .lbl-in,.sm .lbl-in{fill:#fff;font-size:10.5px;font-weight:600}
+.tl .rowl,.sm .rowl,.lc .rowl{fill:var(--fg);font-size:11.5px;font-weight:600}.tl .band{fill:var(--rowp)}
+.tl .brk{stroke:var(--muted);stroke-dasharray:2 3}.tl a:hover rect,.sm a:hover rect{stroke:var(--fg);stroke-width:1.5}
+.axis{stroke:var(--line)}.sm .val{fill:var(--fg);font-weight:600}.lc path.ln{fill:none;stroke-width:2}
+.lc circle{stroke:var(--bg);stroke-width:2}.lc .end{font-weight:600;fill:var(--fg)}
+.tiles{display:flex;flex-wrap:wrap;gap:10px;margin:12px 0}.tile{border:1px solid var(--line);border-radius:8px;
+padding:8px 12px;min-width:110px;background:var(--box)}.tile b{display:block;font-size:20px;line-height:1.2}
+.tile span{font-size:12px;color:var(--muted)}.tile i{font-style:normal;font-size:12px;margin-left:6px}
+.fm{border-collapse:separate;border-spacing:2px}.fm td,.fm th{border:0;padding:0;text-align:center;font-size:11px}
+.fm th{padding:0 2px;font-weight:600}.fm td.f,.fm th.f{text-align:left;padding-right:10px;white-space:nowrap;
+position:sticky;left:0;background:var(--bg);font:11.5px ui-monospace,Menlo,monospace;
+max-width:380px;overflow:hidden;text-overflow:ellipsis}
+.fm td.cell{min-width:22px;height:20px;border-radius:3px}.fm td.fw{background:var(--c0);color:#fff;font-weight:700}
+.fm td.fe{background:var(--c1);color:#fff;font-weight:700}.fm td.fr{background:var(--read);color:var(--readfg)}
+.fm td.n{color:var(--muted);padding:0 6px}.fm tr.grp td{text-align:left;padding-top:8px;color:var(--muted);
+font-weight:600}
+.key{display:inline-block;min-width:18px;text-align:center;border-radius:3px;font-size:11px;margin-right:4px}
+.bar{display:inline-block;height:9px;border-radius:2px;vertical-align:0}
+
+pre{white-space:pre-wrap;word-break:break-word;background:var(--box);border:1px solid var(--line);border-radius:6px;
+padding:8px 10px;margin:4px 0;font:12px/1.45 ui-monospace,SFMono-Regular,Menlo,monospace;max-width:100%;overflow:auto}
+.step{border-top:1px solid var(--line);padding:6px 0}.step:target{background:var(--rowp)}
+.sid{font:12px ui-monospace,Menlo,monospace;color:var(--muted);margin-right:8px}.kind{font-weight:600;margin-right:8px}
+.err{color:var(--bad);font-weight:600}.hook{color:var(--bad);margin:4px 0 0 16px}.lbl{font-size:12px;color:var(--muted);margin-top:6px}
+details summary{cursor:pointer;color:var(--muted);font-size:12px}.head td:first-child{color:var(--muted)}
+.top{font-size:13px}.narr{list-style:none;padding-left:0}.narr li{margin:3px 0}
+</style></head>
+<body>
+<p class="top"><a href="../flow.html">← the run's flow chart</a></p>
+<p class="top"><a href="../plan/T09.html">The plan as of T09</a>: this turn changed the plan (+84 ~0 −0) · <a href="../plan/index.html">plan map</a></p>
+<h1>T09 · turn · Approved. All 12 workflows get pipelines. Your assumptions are fine. Continue to the next planning s</h1>
+<table class="head"><tr><td>Type</td><td>turn</td></tr><tr><td>Description</td><td>Approved. All 12 workflows get pipelines. Your assumptions are fine. Continue to the next planning s</td></tr><tr><td>Spawned by</td><td>user</td></tr><tr><td>Model</td><td>claude-opus-5-5</td></tr><tr><td>Start</td><td>2026-10-18 02:45:19 UTC</td></tr><tr><td>Duration</td><td>5 min</td></tr><tr><td>Tool calls</td><td>12</td></tr><tr><td>Errors</td><td>1</td></tr><tr><td>Hook blocks</td><td>3</td></tr><tr><td>Tokens</td><td>34.1k out · 53.3k new in · 2.3M cached in · peak context 277k</td></tr><tr><td>Skills invoked</td><td>none</td></tr><tr><td>Files written or edited</td><td>docs/packages/qdata/pipelines.md, docs/packages/qserver/pipelines.md, docs/packages/explorer/pipelines.md, docs/packages/qdata/contract.md</td></tr><tr><td>Definition</td><td>none</td></tr><tr><td>Steps</td><td>21</td></tr><tr><td>Finished</td><td>yes</td></tr></table>
+
+
+<h2>Prompt</h2>
+<pre>Approved. All 12 workflows get pipelines. Your assumptions are fine. Continue to the next planning step.</pre>
+<h2>Files</h2>
+<table><tr><th>Op</th><th>File</th><th>Calls</th><th>By</th><th>Via</th><th>Steps</th></tr><tr><td>write</td><td><code>docs/packages/explorer/pipelines.md</code></td><td>1</td><td>main</td><td>Write</td><td><a href="#D156">D156</a></td></tr><tr><td>write</td><td><code>docs/packages/qdata/pipelines.md</code></td><td>1</td><td>main</td><td>Write</td><td><a href="#D148">D148</a></td></tr><tr><td>write</td><td><code>docs/packages/qserver/pipelines.md</code></td><td>1</td><td>main</td><td>Write</td><td><a href="#D155">D155</a></td></tr><tr><td>edit</td><td><code>docs/packages/qdata/contract.md</code></td><td>1</td><td>main</td><td>Bash</td><td><a href="#D162">D162</a></td></tr><tr><td>read</td><td><code>../plugin/dev-team/skills/pipeline-design/references/examples-new.md</code></td><td>1</td><td>main</td><td>Bash</td><td><a href="#D147">D147</a></td></tr></table>
+<h2>Steps</h2>
+<div class="step" id="SD145"><span class="sid">D145</span><span class="kind">user</span>Approved. All 12 workflows get pipelines. Your assumptions are fine. Continue to the next planning step.<details><summary>full text</summary><pre>Approved. All 12 workflows get pipelines. Your assumptions are fine. Continue to the next planning step.</pre></details></div><div class="step" id="SD146"><span class="sid">D146</span><span class="kind">say</span>Writing the three `pipelines.md` files now, starting with `qdata`.<details><summary>full text</summary><pre>Writing the three `pipelines.md` files now, starting with `qdata`.</pre></details></div><div class="step" id="SD147"><span class="sid">D147</span><span class="kind">Bash</span>sed -n 1,60p ../plugin/dev-team/skills/pipeline-design/references/examples-new.md; grep -n &quot;^### &quot; docs/packages/qdata/contract.md docs/packages/qserver/contract.md | cut -d: -f3 | tr &#x27;\n&#x27; &#x27; &#x27;<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;sed -n 1,60p ../plugin/dev-team/skills/pipeline-design/references/examples-new.md; grep -n \&quot;^### \&quot; docs/packages/qdata/contract.md docs/packages/qserver/contract.md | cut -d: -f3 | tr &#x27;\\n&#x27; &#x27; &#x27;&quot;,
+  &quot;description&quot;: &quot;Skim example and list contract symbols&quot;
+}</pre><div class="lbl">output</div><pre># New: worked examples
+
+Two New rounds, each from `dt status` to the gate. The format is `template.md`.
+
+## Example 1: GridLoad, M1 (New, single package)
+
+**Context:** the architecture is Approved, single package `gridload`, components `data`, `profile`, `forecast`. M1 covers DATA-01, DATA-02, PROF-01–PROF-04, QR-01, QR-02. `forecast` is M2.
+
+```
+$ dt status --skill pipeline-design
+skill: pipeline-design
+mode: new
+next ids: AD-04 PL-01 TC-01 M3
+packages: gridload=new
+uncovered_ids: none  (and the other lists: none)
+```
+
+In New mode the lists stay empty until the gate&#x27;s re-run; the scope comes from the architecture&#x27;s Covers.
+
+**Interview:**
+
+```
+Candidates for M1 (nothing is written until you confirm):
+1. `load` — pull hourly readings for the meter registry and a date range   M1
+2. `season-report` — daily and weekly Fourier fit on loaded demand          M1
+3. `holdout` — seasonal-naive forecast scored on held-out weeks             M2 (later)
+Q:       Which will you actually run in M1?   (multi-select; recommended: 1, 2)
+User:    1 and 2. And the report should be runnable on its own; it can load readings itself.
+
+Q:       Should `season-report` read readings saved by `load`, or call the loader directly?
+GUESS:   call it directly; a separate cache step is more than M1 needs.
+DEFAULT: call it directly.
+User:    Directly.
+```
+
+**`contract.md` after the write** (only `Used by:` changes; each step-table type already has its `type` section):
+
+```markdown
+### profile.fit_seasonality: Seasonal profile fit
+`def fit_seasonality(demand: Demand, *, terms: Terms = &quot;daily+weekly&quot;) -&gt; Profile`
+- **Invariants:** one sine/cosine pair per harmonic; `residuals` has the input&#x27;s length and mean zero
+- **Errors:** `ValueError` if there are fewer than 168 hours or the input contains NaN
+- **Used by:** forecast; PL-02
+```
+
+**Result — `docs/packages/gridload/pipelines.md`:**
+
+````markdown
+# gridload — Pipelines
+
+**Package:** gridload · **Status:** Draft · **Last updated:** 2026-10-16 · **Contract:** [contract.md](contract.md)
+
+## PL-01: Load readings
+**Entry:** `src/gridload/data/pipeline.py::run_load_readings` · **Trigger:** `python -m gridload.data load`
+**Covers:** DATA-01, DATA-02, QR-01
+
+| # | Step | Owner | In → Out | Spine version | Covers |
+|---|---|---|---|---|---|
+| 1 | `read_raw` | data.raw | dates → RawReadings | read a synthetic CSV | DATA-01 |
+| 2 | `apply_registry` | data.registry | RawReadings, dates → Readings | static registry, no decommissioned meters | DATA-02 |
+### runs.RunInfo ### runs.ProgressEvent ### runs.RunRefused ### runs.RunManager ### api.create_app ### api.VersionMessage ### api.SearchHit ### api.CompanyPage ### api.PriceSeries ### api.CrossCheckView ### api.UniverseDay ### api.FailureMessage ### api.CheckSummaryMessage ### api.RunMessage ### api.RunEvent ### core.CompanyId ### core.VersionId ### core.QueryRefused ### core.RunContext ### core.RunCancelled ### sources.SourceError ### sources.RawPage ### sources.PrimarySource ### sources.SecondarySource ### store.DataVersion ### store.VersionedStore ### store.Catalog ### load.download ### query.Bars ### query.Returns ### query.Actions ### query.Company ### query.PitReader ### checks.Failure ### checks.CheckSummary ### checks.run_checks ### checks.explain ### xcheck.Comparison ### xcheck.run_crosscheck</pre></details></div><div class="step" id="SD148"><span class="sid">D148</span><span class="kind">Write</span>/Users/connorott/plugins/dev-team-workspace/iteration-9/quant-incremental/with_skill/project/docs/packages/qdata/pipelines.md (135 lines)<div class="lbl">wrote /Users/connorott/plugins/dev-team-workspace/iteration-9/quant-incremental/with_skill/project/docs/packages/qdata/pipelines.md</div><pre># qdata — Pipelines
+
+**Package:** qdata · **Status:** Draft · **Last updated:** 2026-10-17 · **Contract:** [contract.md](contract.md)
+
+## PL-04: Download run
+**Entry:** `packages/qdata/src/qdata/load/pipeline.py::download` · **Trigger:** called by qserver&#x27;s run worker (PL-09) with `kind` full or refresh · **Part of:** PL-01
+**Covers:** LOAD-01–LOAD-05, DATA-01–DATA-06, UNIV-02, UNIV-03, PRICE-01, QR-01, QR-03, QR-06
+
+| # | Step | Owner | In → Out | Spine version | Covers |
+|---|---|---|---|---|---|
+| 1 | `open_primary` | sources.factory | settings → PrimarySource | the synthetic source unless settings name Sharadar (PB-01 open) | DATA-01 |
+| 2 | `SharadarSource` | sources.sharadar | api key → PrimarySource | urllib datatables calls with cursor paging, as PB-01&#x27;s probe; every page archived as a RawPage (AD-02) | DATA-01–DATA-03, QR-01, QR-06 |
+| 3 | `SyntheticPrimarySource` | sources.primary_synthetic | seed → PrimarySource | 6 companies over 2000–2003: one delisted (acquired), one 2-for-1 split, one ticker change, one reused ticker | DATA-01 |
+| 4 | `fetch_universe` | load.universe | PrimarySource, VersionedStore, RunContext → Company | SP500 events to intervals, TICKERS to `permaticker` and ticker spans, ACTIONS exits through one mapping table (AD-02) | LOAD-01, DATA-04, DATA-06, UNIV-02, UNIV-03 |
+| 5 | `fetch_prices` | load.prices | PrimarySource, Company, VersionedStore, RunContext → Bars | SEP in 10-ticker batches; unadjusted OHLC = value × closeunadj / close; refresh filters on `lastupdated` (PB-02) | LOAD-01, LOAD-02, DATA-02, PRICE-01, QR-03 |
+| 6 | `fetch_actions` | load.actions | PrimarySource, Company, VersionedStore, RunContext → Actions | ACTIONS to split, dividend, ticker change and delisting rows | DATA-03 |
+| 7 | `stamp_revisions` | load.revisions | Bars, Actions, Company, VersionedStore → Bars, Actions | keep rows whose unadjusted values differ from the latest version; `first_known` per AD-05 | LOAD-02, DATA-05 |
+| 8 | `commit_version` | load.commit | VersionedStore, Bars, Actions, Company → DataVersion | append the run&#x27;s partitions, then rename the manifest into place | LOAD-03, LOAD-04, LOAD-05 |
+
+### Entry sketch (pre-build — removed by spine task)
+```python
+def download(kind: Literal[&quot;full&quot;, &quot;refresh&quot;], store: VersionedStore, source: PrimarySource, ctx: RunContext) -&gt; DataVersion:
+    companies = fetch_universe(source, store, ctx)
+    bars = fetch_prices(source, companies, store, ctx, kind=kind)
+    actions = fetch_actions(source, companies, store, ctx)
+    bars, actions = stamp_revisions(bars, actions, companies, store)
+    return commit_version(store, bars, actions, companies)
+```
+`open_primary` runs in the caller (PL-09), which passes the source in.
+
+## PL-05: Check run
+**Entry:** `packages/qdata/src/qdata/checks/pipelines/pl05_check.py::run_checks` · **Trigger:** called by qserver&#x27;s run worker (PL-09) for a check run · **Part of:** PL-01
+**Covers:** CHECK-01–CHECK-11, QR-03
+
+| # | Step | Owner | In → Out | Spine version | Covers |
+|---|---|---|---|---|---|
+| 1 | `check_bars` | checks.bars | PitReader, CheckConfig, RunContext → Failure | completeness against the XNYS calendar, bar consistency and uniqueness as DuckDB queries | CHECK-01, CHECK-02, CHECK-08 |
+| 2 | `check_returns` | checks.returns | PitReader, CheckConfig, RunContext → Failure | extreme moves on days with no action; split ratio against the close step | CHECK-03, CHECK-04 |
+| 3 | `check_universe` | checks.universe | PitReader, CheckConfig, RunContext → Failure | member days without a bar; daily counts outside the configured range | CHECK-05, CHECK-06 |
+| 4 | `check_point_in_time` | checks.pit | PitReader, RunContext → Failure | for each record known after its own date, an as-of read the day before must not return it | CHECK-07 |
+| 5 | `check_reference` | checks.reference | PitReader, CheckConfig → Failure | the user&#x27;s 10 companies, field by field | CHECK-09 |
+| 6 | `record_failures` | checks.explanations | Failure, Catalog → CheckSummary | fingerprints against stored explanations: failed, explained, failed again, resolved; a step that raised is `not_run` (AD-11) | CHECK-10, CHECK-11 |
+
+### Entry sketch (pre-build — removed by spine task)
+```python
+def run_checks(reader: PitReader, catalog: Catalog, ctx: RunContext, *, config: CheckConfig) -&gt; CheckSummary:
+    bars = check_bars(reader, config, ctx)
+    returns = check_returns(reader, config, ctx)
+    universe = check_universe(reader, config, ctx)
+    pit = check_point_in_time(reader, ctx)
+    reference = check_reference(reader, config)
+    return record_failures([bars, returns, universe, pit, reference], catalog, ctx.run_id)
+```
+
+## PL-06: Cross-check run
+**Entry:** `packages/qdata/src/qdata/xcheck/pipeline.py::run_crosscheck` · **Trigger:** called by qserver&#x27;s run worker (PL-09), after PL-05 in a check run or on its own · **Part of:** PL-01
+**Covers:** XCHK-01–XCHK-05, DATA-07, QR-05
+
+| # | Step | Owner | In → Out | Spine version | Covers |
+|---|---|---|---|---|---|
+| 1 | `open_secondary` | sources.factory | settings → SecondarySource | the synthetic source unless settings name Yahoo (PB-03 open) | DATA-07 |
+| 2 | `YahooSource` | sources.yahoo | cache dir → SecondarySource | one ticker per request at 1 per second, cached per day (AD-03); the client PB-03 confirms | DATA-07, QR-05 |
+| 3 | `SyntheticSecondarySource` | sources.secondary_synthetic | seed → SecondarySource | the synthetic primary&#x27;s companies with returns perturbed by ±0.02 points, one not covered | DATA-07 |
+| 4 | `match_tickers` | xcheck.match | PitReader → Company | each company&#x27;s ticker spans; a reused ticker only on its holder&#x27;s days | XCHK-01 |
+| 5 | `fetch_secondary` | xcheck.fetch | SecondarySource, Company, RunContext → RawPage | one request per span; `None` → not covered | DATA-07, QR-05 |
+| 6 | `compare_returns` | xcheck.compare | PitReader, RawPage → Comparison | daily total returns on shared days; &gt; 1-point days listed; pass per XCHK-02 | XCHK-01–XCHK-03 |
+| 7 | `report_coverage` | xcheck.report | Comparison, Catalog → CrossCheckReport | current and former coverage, `sufficient` at 95%, failures as Failure rows | XCHK-04, XCHK-05 |
+
+### Entry sketch (pre-build — removed by spine task)
+```python
+def run_crosscheck(reader: PitReader, source: SecondarySource, catalog: Catalog, ctx: RunContext) -&gt; CrossCheckReport:
+    companies = match_tickers(reader)
+    pages = fetch_secondary(source, companies, ctx)
+    comparisons = compare_returns(reader, pages)
+    return report_coverage(comparisons, catalog, ctx.run_id)
+```
+
+## PL-07: Threshold calibration
+**Entry:** `packages/qdata/src/qdata/checks/pipelines/pl07_calibrate.py::run_calibrate` · **Trigger:** `python -m qdata calibrate`, once after the first full version
+**Covers:** CHECK-12
+
+| # | Step | Owner | In → Out | Spine version | Covers |
+|---|---|---|---|---|---|
+| 1 | `open_reader` | query.reader | VersionedStore, version → PitReader | PL-08 as built | QUERY-02 |
+| 2 | `characterise` | checks.calibrate | PitReader → report path | with the `data-analysis` skill: return distribution and tails by decade, days beyond each candidate threshold, the member-count series, missing-bar rates by year, written to `reports/calibration/` | CHECK-12 |
+| 3 | `write_thresholds` | checks.config | approved values → config path | write the values the user approves to `config/checks.toml` | CHECK-12 |
+
+### Entry sketch (pre-build — removed by spine task)
+```python
+def run_calibrate(home: Path, approved: dict[str, float] | None = None) -&gt; Path:
+    reader = open_reader(VersionedStore(home), None)
+    report = characterise(reader)
+    return write_thresholds(approved, report)
+```
+
+## PL-08: Research read
+**Entry:** `packages/qdata/src/qdata/query/pipeline.py::run_research_read` · **Trigger:** research code: `from qdata.query import run_research_read`
+**Covers:** QUERY-01–QUERY-05, UNIV-01, UNIV-04, PRICE-01–PRICE-04
+
+| # | Step | Owner | In → Out | Spine version | Covers |
+|---|---|---|---|---|---|
+| 1 | `open_reader` | query.reader | VersionedStore, version → PitReader | the latest version unless one is named; refuse with QueryRefused when none exists | QUERY-02, QUERY-05 |
+| 2 | `PitReader` | query.reader | VersionedStore, version, as_of → PitReader | DuckDB views over the version&#x27;s partitions, latest row per key with `first_known` ≤ as-of | QUERY-01 |
+| 3 | `resolve_company` | query.companies | PitReader, ticker → Company | the holder of the ticker on the as-of date | QUERY-04 |
+| 4 | `read_universe` | query.universe | PitReader, start, end → Bars | members per day joined with their bars and total returns | QUERY-03, UNIV-01, UNIV-04, PRICE-01, PRICE-04 |
+| 5 | `read_returns` | query.returns | PitReader, Company, start, end → Returns | AD-06&#x27;s formula on actions known as of the read, anchored on request | PRICE-02, PRICE-03 |
+
+### Entry sketch (pre-build — removed by spine task)
+```python
+def run_research_read(store: VersionedStore, start: date, end: date, *, as_of: date | None = None, ticker: str | None = None) -&gt; tuple[Bars, Returns]:
+    reader = open_reader(store, None, as_of=as_of)
+    company = resolve_company(reader, ticker)
+    universe = read_universe(reader, start, end)
+    returns = read_returns(reader, company, start, end)
+    return universe, returns
+```
+
+## Planned layout (pre-build — removed by spine task)
+```
+packages/qdata/src/qdata/
+  __init__.py        contract exports only
+  __main__.py        CLI: calibrate → PL-07
+  types.py
+  core/              ids.py calendar.py errors.py context.py
+  sources/           factory.py  sharadar/  primary_synthetic/  yahoo/  secondary_synthetic/
+  store/             versions.py  raw.py  views.py  catalog.py
+  load/              pipeline.py (PL-04)  universe.py  prices.py  actions.py  revisions.py  commit.py  exits.py
+  query/             pipeline.py (PL-08)  reader.py  companies.py  universe.py  returns.py
+  checks/            pipelines/pl05_check.py  pipelines/pl07_calibrate.py  bars.py  returns.py  universe.py  pit.py  reference.py  explanations.py  calibrate.py  config.py
+  xcheck/            pipeline.py (PL-06)  match.py  fetch.py  compare.py  report.py
+tests/intent/qdata/  tests/unit/qdata/
+```
+
+## Open questions
+- Which client `sources.yahoo` uses, yfinance or the chart endpoint, waits on PB-03 (assumed: the synthetic stand-in carries S1 until then).
+</pre><div class="hook">⛔ hook PostToolUse:Write blocked: dt lint found problems in docs/packages/qdata/pipelines.md:
+docs/packages/qdata/pipelines.md:14: step-io-types PL-04 step `fetch_universe` names VersionedStore, which no contract.md type section defines (`### &lt;component&gt;.VersionedStore: type`)
+docs/packages/qdata/pipelines.md:15: step-io-types PL-04 step `fetch_prices` names VersionedStore, which no contract.md type section defines (`### &lt;component&gt;.VersionedStore: type`)
+docs/packages/qdata/pipelines.md:16: step-io-types PL-04 step `fetch_actions` names VersionedStore, which no contract.md type section defines (`### &lt;component&gt;.VersionedStore: type`)
+docs/packages/qdata/pipelines.md:17: step-io-types PL-04 step `stamp_revisions` names VersionedStore, which no contract.md type section defines (`### &lt;component&gt;.VersionedStore: type`)
+docs/packages/qdata/pipelines.md:18: step-io-types PL-04 step `commit_version` names VersionedStore, which no contract.md type section defines (`### &lt;component&gt;.VersionedStore: type`)
+docs/packages/qdata/pipelines.md:37: step-io-types PL-05 step `check_bars` names CheckConfig, which no contract.md type section defines (`### &lt;component&gt;.CheckConfig: type`)
+docs/packages/qdata/pipelines.md:37: step-io-types PL-05 step `check_bars` names PitReader, which no contract.md type section defines (`### &lt;component&gt;.PitReader: type`)
+docs/packages/qdata/pipelines.md:38: step-io-types PL-05 step `check_returns` names CheckConfig, which no contract.md type section defines (`### &lt;component&gt;.CheckConfig: type`)
+docs/packages/qdata/pipelines.md:38: step-io-types PL-05 step `check_returns` names PitReader, which no contract.md type section defines (`### &lt;component&gt;.PitReader: type`)
+docs/packages/qdata/pipelines.md:39: step-io-types PL-05 step `check_universe` names CheckConfig, which no contract.md type section defines (`### &lt;component&gt;.CheckConfig: type`)
+docs/packages/qdata/pipelines.md:39: step-io-types PL-05 step `check_universe` names PitReader, which no contract.md type section defines (`### &lt;component&gt;.PitReader: type`)
+docs/packages/qdata/pipelines.md:40: step-io-types PL-05 step `check_point_in_time` names PitReader, which no contract.md type section defines (`### &lt;component&gt;.PitReader: type`)
+docs/packages/qdata/pipelines.md:41: step-io-types PL-05 step `check_reference` names CheckConfig, which no contract.md type section defines (`### &lt;component&gt;.CheckConfig: type`)
+docs/packages/qdata/pipelines.md:41: step-io-types PL-05 step `check_reference` names PitReader, which no contract.md type section defines (`### &lt;component&gt;.PitReader: type`)
+docs/packages/qdata/pipelines.md:42: step-io-types PL-05 step `record_failures` names Catalog, which no contract.md type section defines (`### &lt;component&gt;.Catalog: type`)
+docs/packages/qdata/pipelines.md:64: step-io-types PL-06 step `match_tickers` names PitReader, which no contract.md type section defines (`### &lt;component&gt;.PitReader: type`)
+docs/packages/qdata/pipelines.md:66: step-io-types PL-06 step `compare_returns` names PitReader, which no contract.md type section defines (`### &lt;component&gt;.PitReader: type`)
+docs/packages/qdata/pipelines.md:67: step-io-types PL-06 step `report_coverage` names Catalog, which no contract.md type section defines (`### &lt;component&gt;.Catalog: type`)
+docs/packages/qdata/pipelines.md:67: step-io-types PL-06 step `report_coverage` names CrossCheckReport, which no contract.md type section defines (`### &lt;component&gt;.CrossCheckReport: type`)
+docs/packages/qdata/pipelines.md:84: step-io-types PL-07 step `open_reader` names PitReader, which no contract.md type section defines (`### &lt;component&gt;.PitReader: type`)
+docs/packages/qdata/pipelines.md:84: step-io-types PL-07 step `open_reader` names VersionedStore, which no contract.md type section defines (`### &lt;component&gt;.VersionedStore: type`)
+docs/packages/qdata/pipelines.md:85: step-io-types PL-07 step `characterise` names PitReader, which no contract.md type section defines (`### &lt;component&gt;.PitReader: type`)
+docs/packages/qdata/pipelines.md:85: step-io-types PL-07 step `characterise`: its Out names no contract type
+docs/packages/qdata/pipelines.md:86: step-io-types PL-07 step `write_thresholds`: its Out names no contract type
+docs/packages/qdata/pipelines.md:102: step-io-types PL-08 step `open_reader` names PitReader, which no contract.md type section defines (`### &lt;component&gt;.PitReader: type`)
+docs/packages/qdata/pipelines.md:102: step-io-types PL-08 step `open_reader` names VersionedStore, which no contract.md type section defines (`### &lt;component&gt;.VersionedStore: type`)
+docs/packages/qdata/pipelines.md:103: step-io-types PL-08 step `PitReader` names PitReader, which no contract.md type section defines (`### &lt;component&gt;.PitReader: type`)
+docs/packages/qdata/pipelines.md:103: step-io-types PL-08 step `PitReader` names VersionedStore, which no contract.md type section defines (`### &lt;component&gt;.VersionedStore: type`)
+docs/packages/qdata/pipelines.md:104: step-io-types PL-08 step `resolve_company` names PitReader, which no contract.md type section defines (`### &lt;component&gt;.PitReader: type`)
+docs/packages/qdata/pipelines.md:105: step-io-types PL-08 step `read_universe` names PitReader, which no contract.md type section defines (`### &lt;component&gt;.PitReader: type`)
+docs/packages/qdata/pipelines.md:106: step-io-types PL-08 step `read_returns` names PitReader, which no contract.md type section defines (`### &lt;component&gt;.PitReader: type`)
+31 errors, 0 warnings</div><details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-9/quant-incremental/with_skill/project/docs/packages/qdata/pipelines.md&quot;,
+  &quot;content&quot;: &quot;# qdata — Pipelines\n\n**Package:** qdata · **Status:** Draft · **Last updated:** 2026-10-17 · **Contract:** [contract.md](contract.md)\n\n## PL-04: Download run\n**Entry:** `packages/qdata/src/qdata/load/pipeline.py::download` · **Trigger:** called by qserver&#x27;s run worker (PL-09) with `kind` full or refresh · **Part of:** PL-01\n**Covers:** LOAD-01–LOAD-05, DATA-01–DATA-06, UNIV-02, UNIV-03, PRICE-01, QR-01, QR-03, QR-06\n\n| # | Step | Owner | In → Out | Spine version | Covers |\n|---|---|---|---|---|---|\n| 1 | `open_primary` | sources.factory | settings → PrimarySource | the synthetic source unless settings name Sharadar (PB-01 open) | DATA-01 |\n| 2 | `SharadarSource` | sources.sharadar | api key → PrimarySource | urllib datatables calls with cursor paging, as PB-01&#x27;s probe; every page archived as a RawPage (AD-02) | DATA-01–DATA-03, QR-01, QR-06 |\n| 3 | `SyntheticPrimarySource` | sources.primary_synthetic | seed → PrimarySource | 6 companies over 2000–2003: one delisted (acquired), one 2-for-1 split, one ticker change, one reused ticker | DATA-01 |\n| 4 | `fetch_universe` | load.universe | PrimarySource, VersionedStore, RunContext → Company | SP500 events to intervals, TICKERS to `permaticker` and ticker spans, ACTIONS exits through one mapping table (AD-02) | LOAD-01, DATA-04, DATA-06, UNIV-02, UNIV-03 |\n| 5 | `fetch_prices` | load.prices | PrimarySource, Company, VersionedStore, RunContext → Bars | SEP in 10-ticker batches; unadjusted OHLC = value × closeunadj / close; refresh filters on `lastupdated` (PB-02) | LOAD-01, LOAD-02, DATA-02, PRICE-01, QR-03 |\n| 6 | `fetch_actions` | load.actions | PrimarySource, Company, VersionedStore, RunContext → Actions | ACTIONS to split, dividend, ticker change and delisting rows | DATA-03 |\n| 7 | `stamp_revisions` | load.revisions | Bars, Actions, Company, VersionedStore → Bars, Actions | keep rows whose unadjusted values differ from the latest version; `first_known` per AD-05 | LOAD-02, DATA-05 |\n| 8 | `commit_version` | load.commit | VersionedStore, Bars, Actions, Company → DataVersion | append the run&#x27;s partitions, then rename the manifest into place | LOAD-03, LOAD-04, LOAD-05 |\n\n### Entry sketch (pre-build — removed by spine task)\n```python\ndef download(kind: Literal[\&quot;full\&quot;, \&quot;refresh\&quot;], store: VersionedStore, source: PrimarySource, ctx: RunContext) -&gt; DataVersion:\n    companies = fetch_universe(source, store, ctx)\n    bars = fetch_prices(source, companies, store, ctx, kind=kind)\n    actions = fetch_actions(source, companies, store, ctx)\n    bars, actions = stamp_revisions(bars, actions, companies, store)\n    return commit_version(store, bars, actions, companies)\n```\n`open_primary` runs in the caller (PL-09), which passes the source in.\n\n## PL-05: Check run\n**Entry:** `packages/qdata/src/qdata/checks/pipelines/pl05_check.py::run_checks` · **Trigger:** called by qserver&#x27;s run worker (PL-09) for a check run · **Part of:** PL-01\n**Covers:** CHECK-01–CHECK-11, QR-03\n\n| # | Step | Owner | In → Out | Spine version | Covers |\n|---|---|---|---|---|---|\n| 1 | `check_bars` | checks.bars | PitReader, CheckConfig, RunContext → Failure | completeness against the XNYS calendar, bar consistency and uniqueness as DuckDB queries | CHECK-01, CHECK-02, CHECK-08 |\n| 2 | `check_returns` | checks.returns | PitReader, CheckConfig, RunContext → Failure | extreme moves on days with no action; split ratio against the close step | CHECK-03, CHECK-04 |\n| 3 | `check_universe` | checks.universe | PitReader, CheckConfig, RunContext → Failure | member days without a bar; daily counts outside the configured range | CHECK-05, CHECK-06 |\n| 4 | `check_point_in_time` | checks.pit | PitReader, RunContext → Failure | for each record known after its own date, an as-of read the day before must not return it | CHECK-07 |\n| 5 | `check_reference` | checks.reference | PitReader, CheckConfig → Failure | the user&#x27;s 10 companies, field by field | CHECK-09 |\n| 6 | `record_failures` | checks.explanations | Failure, Catalog → CheckSummary | fingerprints against stored explanations: failed, explained, failed again, resolved; a step that raised is `not_run` (AD-11) | CHECK-10, CHECK-11 |\n\n### Entry sketch (pre-build — removed by spine task)\n```python\ndef run_checks(reader: PitReader, catalog: Catalog, ctx: RunContext, *, config: CheckConfig) -&gt; CheckSummary:\n    bars = check_bars(reader, config, ctx)\n    returns = check_returns(reader, config, ctx)\n    universe = check_universe(reader, config, ctx)\n    pit = check_point_in_time(reader, ctx)\n    reference = check_reference(reader, config)\n    return record_failures([bars, returns, universe, pit, reference], catalog, ctx.run_id)\n```\n\n## PL-06: Cross-check run\n**Entry:** `packages/qdata/src/qdata/xcheck/pipeline.py::run_crosscheck` · **Trigger:** called by qserver&#x27;s run worker (PL-09), after PL-05 in a check run or on its own · **Part of:** PL-01\n**Covers:** XCHK-01–XCHK-05, DATA-07, QR-05\n\n| # | Step | Owner | In → Out | Spine version | Covers |\n|---|---|---|---|---|---|\n| 1 | `open_secondary` | sources.factory | settings → SecondarySource | the synthetic source unless settings name Yahoo (PB-03 open) | DATA-07 |\n| 2 | `YahooSource` | sources.yahoo | cache dir → SecondarySource | one ticker per request at 1 per second, cached per day (AD-03); the client PB-03 confirms | DATA-07, QR-05 |\n| 3 | `SyntheticSecondarySource` | sources.secondary_synthetic | seed → SecondarySource | the synthetic primary&#x27;s companies with returns perturbed by ±0.02 points, one not covered | DATA-07 |\n| 4 | `match_tickers` | xcheck.match | PitReader → Company | each company&#x27;s ticker spans; a reused ticker only on its holder&#x27;s days | XCHK-01 |\n| 5 | `fetch_secondary` | xcheck.fetch | SecondarySource, Company, RunContext → RawPage | one request per span; `None` → not covered | DATA-07, QR-05 |\n| 6 | `compare_returns` | xcheck.compare | PitReader, RawPage → Comparison | daily total returns on shared days; &gt; 1-point days listed; pass per XCHK-02 | XCHK-01–XCHK-03 |\n| 7 | `report_coverage` | xcheck.report | Comparison, Catalog → CrossCheckReport | current and former coverage, `sufficient` at 95%, failures as Failure rows | XCHK-04, XCHK-05 |\n\n### Entry sketch (pre-build — removed by spine task)\n```python\ndef run_crosscheck(reader: PitReader, source: SecondarySource, catalog: Catalog, ctx: RunContext) -&gt; CrossCheckReport:\n    companies = match_tickers(reader)\n    pages = fetch_secondary(source, companies, ctx)\n    comparisons = compare_returns(reader, pages)\n    return report_coverage(comparisons, catalog, ctx.run_id)\n```\n\n## PL-07: Threshold calibration\n**Entry:** `packages/qdata/src/qdata/checks/pipelines/pl07_calibrate.py::run_calibrate` · **Trigger:** `python -m qdata calibrate`, once after the first full version\n**Covers:** CHECK-12\n\n| # | Step | Owner | In → Out | Spine version | Covers |\n|---|---|---|---|---|---|\n| 1 | `open_reader` | query.reader | VersionedStore, version → PitReader | PL-08 as built | QUERY-02 |\n| 2 | `characterise` | checks.calibrate | PitReader → report path | with the `data-analysis` skill: return distribution and tails by decade, days beyond each candidate threshold, the member-count series, missing-bar rates by year, written to `reports/calibration/` | CHECK-12 |\n| 3 | `write_thresholds` | checks.config | approved values → config path | write the values the user approves to `config/checks.toml` | CHECK-12 |\n\n### Entry sketch (pre-build — removed by spine task)\n```python\ndef run_calibrate(home: Path, approved: dict[str, float] | None = None) -&gt; Path:\n    reader = open_reader(VersionedStore(home), None)\n    report = characterise(reader)\n    return write_thresholds(approved, report)\n```\n\n## PL-08: Research read\n**Entry:** `packages/qdata/src/qdata/query/pipeline.py::run_research_read` · **Trigger:** research code: `from qdata.query import run_research_read`\n**Covers:** QUERY-01–QUERY-05, UNIV-01, UNIV-04, PRICE-01–PRICE-04\n\n| # | Step | Owner | In → Out | Spine version | Covers |\n|---|---|---|---|---|---|\n| 1 | `open_reader` | query.reader | VersionedStore, version → PitReader | the latest version unless one is named; refuse with QueryRefused when none exists | QUERY-02, QUERY-05 |\n| 2 | `PitReader` | query.reader | VersionedStore, version, as_of → PitReader | DuckDB views over the version&#x27;s partitions, latest row per key with `first_known` ≤ as-of | QUERY-01 |\n| 3 | `resolve_company` | query.companies | PitReader, ticker → Company | the holder of the ticker on the as-of date | QUERY-04 |\n| 4 | `read_universe` | query.universe | PitReader, start, end → Bars | members per day joined with their bars and total returns | QUERY-03, UNIV-01, UNIV-04, PRICE-01, PRICE-04 |\n| 5 | `read_returns` | query.returns | PitReader, Company, start, end → Returns | AD-06&#x27;s formula on actions known as of the read, anchored on request | PRICE-02, PRICE-03 |\n\n### Entry sketch (pre-build — removed by spine task)\n```python\ndef run_research_read(store: VersionedStore, start: date, end: date, *, as_of: date | None = None, ticker: str | None = None) -&gt; tuple[Bars, Returns]:\n    reader = open_reader(store, None, as_of=as_of)\n    company = resolve_company(reader, ticker)\n    universe = read_universe(reader, start, end)\n    returns = read_returns(reader, company, start, end)\n    return universe, returns\n```\n\n## Planned layout (pre-build — removed by spine task)\n```\npackages/qdata/src/qdata/\n  __init__.py        contract exports only\n  __main__.py        CLI: calibrate → PL-07\n  types.py\n  core/              ids.py calendar.py errors.py context.py\n  sources/           factory.py  sharadar/  primary_synthetic/  yahoo/  secondary_synthetic/\n  store/             versions.py  raw.py  views.py  catalog.py\n  load/              pipeline.py (PL-04)  universe.py  prices.py  actions.py  revisions.py  commit.py  exits.py\n  query/             pipeline.py (PL-08)  reader.py  companies.py  universe.py  returns.py\n  checks/            pipelines/pl05_check.py  pipelines/pl07_calibrate.py  bars.py  returns.py  universe.py  pit.py  reference.py  explanations.py  calibrate.py  config.py\n  xcheck/            pipeline.py (PL-06)  match.py  fetch.py  compare.py  report.py\ntests/intent/qdata/  tests/unit/qdata/\n```\n\n## Open questions\n- Which client `sources.yahoo` uses, yfinance or the chart endpoint, waits on PB-03 (assumed: the synthetic stand-in carries S1 until then).\n&quot;
+}</pre><div class="lbl">output</div><pre>File created successfully at: /Users/connorott/plugins/dev-team-workspace/iteration-9/quant-incremental/with_skill/project/docs/packages/qdata/pipelines.md (file state is current in your context — no need to Read it back)</pre></details></div><div class="step" id="SD149"><span class="sid">D149</span><span class="kind">Bash</span>python3 ../plugin/dev-team/scripts/dt.py lint docs/packages/qdata/pipelines.md <span class="err">error</span><details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;python3 ../plugin/dev-team/scripts/dt.py lint docs/packages/qdata/pipelines.md&quot;,
+  &quot;description&quot;: &quot;Lint the qdata pipelines&quot;
+}</pre><div class="lbl">output</div><pre>Exit code 1
+docs/packages/qdata/pipelines.md:14: step-io-types PL-04 step `fetch_universe` names VersionedStore, which no contract.md type section defines (`### &lt;component&gt;.VersionedStore: type`)
+docs/packages/qdata/pipelines.md:15: step-io-types PL-04 step `fetch_prices` names VersionedStore, which no contract.md type section defines (`### &lt;component&gt;.VersionedStore: type`)
+docs/packages/qdata/pipelines.md:16: step-io-types PL-04 step `fetch_actions` names VersionedStore, which no contract.md type section defines (`### &lt;component&gt;.VersionedStore: type`)
+docs/packages/qdata/pipelines.md:17: step-io-types PL-04 step `stamp_revisions` names VersionedStore, which no contract.md type section defines (`### &lt;component&gt;.VersionedStore: type`)
+docs/packages/qdata/pipelines.md:18: step-io-types PL-04 step `commit_version` names VersionedStore, which no contract.md type section defines (`### &lt;component&gt;.VersionedStore: type`)
+docs/packages/qdata/pipelines.md:37: step-io-types PL-05 step `check_bars` names CheckConfig, which no contract.md type section defines (`### &lt;component&gt;.CheckConfig: type`)
+docs/packages/qdata/pipelines.md:37: step-io-types PL-05 step `check_bars` names PitReader, which no contract.md type section defines (`### &lt;component&gt;.PitReader: type`)
+docs/packages/qdata/pipelines.md:38: step-io-types PL-05 step `check_returns` names CheckConfig, which no contract.md type section defines (`### &lt;component&gt;.CheckConfig: type`)
+docs/packages/qdata/pipelines.md:38: step-io-types PL-05 step `check_returns` names PitReader, which no contract.md type section defines (`### &lt;component&gt;.PitReader: type`)
+docs/packages/qdata/pipelines.md:39: step-io-types PL-05 step `check_universe` names CheckConfig, which no contract.md type section defines (`### &lt;component&gt;.CheckConfig: type`)
+docs/packages/qdata/pipelines.md:39: step-io-types PL-05 step `check_universe` names PitReader, which no contract.md type section defines (`### &lt;component&gt;.PitReader: type`)
+docs/packages/qdata/pipelines.md:40: step-io-types PL-05 step `check_point_in_time` names PitReader, which no contract.md type section defines (`### &lt;component&gt;.PitReader: type`)
+docs/packages/qdata/pipelines.md:41: step-io-types PL-05 step `check_reference` names CheckConfig, which no contract.md type section defines (`### &lt;component&gt;.CheckConfig: type`)
+docs/packages/qdata/pipelines.md:41: step-io-types PL-05 step `check_reference` names PitReader, which no contract.md type section defines (`### &lt;component&gt;.PitReader: type`)
+docs/packages/qdata/pipelines.md:42: step-io-types PL-05 step `record_failures` names Catalog, which no contract.md type section defines (`### &lt;component&gt;.Catalog: type`)
+docs/packages/qdata/pipelines.md:64: step-io-types PL-06 step `match_tickers` names PitReader, which no contract.md type section defines (`### &lt;component&gt;.PitReader: type`)
+docs/packages/qdata/pipelines.md:66: step-io-types PL-06 step `compare_returns` names PitReader, which no contract.md type section defines (`### &lt;component&gt;.PitReader: type`)
+docs/packages/qdata/pipelines.md:67: step-io-types PL-06 step `report_coverage` names Catalog, which no contract.md type section defines (`### &lt;component&gt;.Catalog: type`)
+docs/packages/qdata/pipelines.md:67: step-io-types PL-06 step `report_coverage` names CrossCheckReport, which no contract.md type section defines (`### &lt;component&gt;.CrossCheckReport: type`)
+docs/packages/qdata/pipelines.md:84: step-io-types PL-07 step `open_reader` names PitReader, which no contract.md type section defines (`### &lt;component&gt;.PitReader: type`)
+docs/packages/qdata/pipelines.md:84: step-io-types PL-07 step `open_reader` names VersionedStore, which no contract.md type section defines (`### &lt;component&gt;.VersionedStore: type`)
+docs/packages/qdata/pipelines.md:85: step-io-types PL-07 step `characterise` names PitReader, which no contract.md type section defines (`### &lt;component&gt;.PitReader: type`)
+docs/packages/qdata/pipelines.md:85: step-io-types PL-07 step `characterise`: its Out names no contract type
+docs/packages/qdata/pipelines.md:86: step-io-types PL-07 step `write_thresholds`: its Out names no contract type
+docs/packages/qdata/pipelines.md:102: step-io-types PL-08 step `open_reader` names PitReader, which no contract.md type section defines (`### &lt;component&gt;.PitReader: type`)
+docs/packages/qdata/pipelines.md:102: step-io-types PL-08 step `open_reader` names VersionedStore, which no contract.md type section defines (`### &lt;component&gt;.VersionedStore: type`)
+docs/packages/qdata/pipelines.md:103: step-io-types PL-08 step `PitReader` names PitReader, which no contract.md type section defines (`### &lt;component&gt;.PitReader: type`)
+docs/packages/qdata/pipelines.md:103: step-io-types PL-08 step `PitReader` names VersionedStore, which no contract.md type section defines (`### &lt;component&gt;.VersionedStore: type`)
+docs/packages/qdata/pipelines.md:104: step-io-types PL-08 step `resolve_company` names PitReader, which no contract.md type section defines (`### &lt;component&gt;.PitReader: type`)
+docs/packages/qdata/pipelines.md:105: step-io-types PL-08 step `read_universe` names PitReader, which no contract.md type section defines (`### &lt;component&gt;.PitReader: type`)
+docs/packages/qdata/pipelines.md:106: step-io-types PL-08 step `read_returns` names PitReader, which no contract.md type section defines (`### &lt;component&gt;.PitReader: type`)
+31 errors, 0 warnings</pre></details></div><div class="step" id="SD150"><span class="sid">D150</span><span class="kind">think</span>The lint errors point to contract gaps: PitReader, VersionedStore, and Catalog are class sections rather than type sections, and CheckConfig/CrossCheckReport only exist inline. Since contract changes belong to architecture-design, I&#x27;ll route those there, but first I&#x27;ll check how lint handles a plain last-step result.<details><summary>full text</summary><pre>The lint errors point to contract gaps: PitReader, VersionedStore, and Catalog are class sections rather than type sections, and CheckConfig/CrossCheckReport only exist inline. Since contract changes belong to architecture-design, I&#x27;ll route those there, but first I&#x27;ll check how lint handles a plain last-step result.
+
+</pre></details></div><div class="step" id="SD151"><span class="sid">D151</span><span class="kind">Bash</span>cd /Users/connorott/plugins/dev-team-workspace/iteration-9/quant-incremental/with_skill/plugin/dev-team/scripts &amp;&amp; grep -n &quot;names no contract type&quot; -B30 dt.py | grep -n &quot;def \|plain\|last\|lower\|PLAIN\|allow&quot; | head -30<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;cd /Users/connorott/plugins/dev-team-workspace/iteration-9/quant-incremental/with_skill/plugin/dev-team/scripts &amp;&amp; grep -n \&quot;names no contract type\&quot; -B30 dt.py | grep -n \&quot;def \\|plain\\|last\\|lower\\|PLAIN\\|allow\&quot; | head -30&quot;,
+  &quot;description&quot;: &quot;Inspect lint rule for step outputs&quot;
+}</pre><div class="lbl">output</div><pre>Shell cwd was reset to /Users/connorott/plugins/dev-team-workspace/iteration-9/quant-incremental/with_skill/project</pre></details></div><div class="step" id="SD152"><span class="sid">D152</span><span class="kind">Bash</span>cd /Users/connorott/plugins/dev-team-workspace/iteration-9/quant-incremental/with_skill/plugin/dev-team/scripts &amp;&amp; grep -rn &quot;names no contract type&quot; . | head;<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;cd /Users/connorott/plugins/dev-team-workspace/iteration-9/quant-incremental/with_skill/plugin/dev-team/scripts &amp;&amp; grep -rn \&quot;names no contract type\&quot; . | head; &quot;,
+  &quot;description&quot;: &quot;Find the lint rule source&quot;
+}</pre><div class="lbl">output</div><pre>README.md:292:- `step-io-types` — in a package pipeline&#x27;s step table, a type an `In → Out` cell names that no contract type section defines (bare name or `pkg.Name`), or a step whose Out names no contract type (entry arguments on the In side may stay plain). E once any contract has a type section, W before (projects from before typed contracts)
+devteam/commands/lint.py:1069:                                  f&quot;{p.id} step `{s.name}`: its Out names no contract type&quot;, sev)
+Shell cwd was reset to /Users/connorott/plugins/dev-team-workspace/iteration-9/quant-incremental/with_skill/project</pre></details></div><div class="step" id="SD153"><span class="sid">D153</span><span class="kind">think</span>I&#x27;ll bundle all the missing contract types into a single routed change for architecture-design, then move on to writing `qserver` and `explorer`.<details><summary>full text</summary><pre>I&#x27;ll bundle all the missing contract types into a single routed change for architecture-design, then move on to writing `qserver` and `explorer`.
+
+</pre></details></div><div class="step" id="SD154"><span class="sid">D154</span><span class="kind">Bash</span>python3 - &lt;&lt;&#x27;EOF&#x27;
+import pathlib
+p=pathlib.Path(&quot;docs/packages/qdata/pipelines.md&quot;); s=p.read_text()
+s=s.replace(&quot;| 2 | `characterise` | checks.calibrate | PitReader → report path |&quot;,&quot;| 2 | `characterise` | checks.calibrate | PitReader → CalibrationReport |&quot;)
+s=s.replace(&quot;| 3 | `write_thresholds` | checks.config | approved values → config path | write the values the user approves to `config/checks.toml` | CHECK-12 |&quot;,
+&quot;| 3 | `write_thresholds` | checks.config | CalibrationReport, approved values …[+428 chars]<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;python3 - &lt;&lt;&#x27;EOF&#x27;\nimport pathlib\np=pathlib.Path(\&quot;docs/packages/qdata/pipelines.md\&quot;); s=p.read_text()\ns=s.replace(\&quot;| 2 | `characterise` | checks.calibrate | PitReader → report path |\&quot;,\&quot;| 2 | `characterise` | checks.calibrate | PitReader → CalibrationReport |\&quot;)\ns=s.replace(\&quot;| 3 | `write_thresholds` | checks.config | approved values → config path | write the values the user approves to `config/checks.toml` | CHECK-12 |\&quot;,\n\&quot;| 3 | `write_thresholds` | checks.config | CalibrationReport, approved values → CheckConfig | write the values the user approves to `config/checks.toml` and return them loaded | CHECK-12 |\&quot;)\ns=s.replace(\&quot;def run_calibrate(home: Path, approved: dict[str, float] | None = None) -&gt; Path:\&quot;,\&quot;def run_calibrate(home: Path, approved: dict[str, float] | None = None) -&gt; CheckConfig:\&quot;)\ns=s.replace(\&quot;    return write_thresholds(approved, report)\&quot;,\&quot;    return write_thresholds(report, approved)\&quot;)\np.write_text(s)\nEOF&quot;,
+  &quot;description&quot;: &quot;Type PL-07 step outputs&quot;
+}</pre><div class="lbl">output</div><pre>(Bash completed with no output)</pre></details></div><div class="step" id="SD155"><span class="sid">D155</span><span class="kind">Write</span>/Users/connorott/plugins/dev-team-workspace/iteration-9/quant-incremental/with_skill/project/docs/packages/qserver/pipelines.md (88 lines)<div class="lbl">wrote /Users/connorott/plugins/dev-team-workspace/iteration-9/quant-incremental/with_skill/project/docs/packages/qserver/pipelines.md</div><pre># qserver — Pipelines
+
+**Package:** qserver · **Status:** Draft · **Last updated:** 2026-10-17 · **Contract:** [contract.md](contract.md)
+
+## PL-09: Run worker
+**Entry:** `packages/qserver/src/qserver/runs/pipeline.py::run_worker` · **Trigger:** `python -m qserver.runs.worker &lt;run_id&gt;`, spawned by `RunManager.start` · **Part of:** PL-01
+**Covers:** RUN-01–RUN-06, LOAD-04
+
+| # | Step | Owner | In → Out | Spine version | Covers |
+|---|---|---|---|---|---|
+| 1 | `claim_run` | runs.manager | Catalog, run_id → RunInfo | read the run row and record this worker&#x27;s PID | RUN-02 |
+| 2 | `open_context` | runs.context | Catalog, RunInfo → RunContext | returns a `CatalogRunContext` for the run | RUN-03 |
+| 3 | `CatalogRunContext` | runs.context | Catalog, run_id → RunContext | `progress` writes a ProgressEvent row at most once a second; `check_cancel` reads the run&#x27;s cancel flag | RUN-03, RUN-04 |
+| 4 | `load_check_config` | runs.config | config dir → CheckConfig | read `config/checks.toml` and `config/reference_delisted.toml` | CHECK-09 |
+| 5 | `execute_run` | runs.worker | RunInfo, RunContext, CheckConfig → RunInfo | full or refresh: PL-04 as built; check: PL-05 then PL-06 as built; sources from `open_primary` and `open_secondary` | RUN-01, LOAD-04 |
+| 6 | `finish_run` | runs.manager | Catalog, RunInfo → RunInfo | succeeded; cancelled on RunCancelled; failed with the SourceError detail | RUN-04, RUN-05 |
+
+### Entry sketch (pre-build — removed by spine task)
+```python
+def run_worker(home: Path, run_id: str) -&gt; RunInfo:
+    catalog = Catalog(home / &quot;catalog.sqlite&quot;)
+    run = claim_run(catalog, run_id)
+    ctx = open_context(catalog, run)
+    config = load_check_config(Path(&quot;config&quot;))
+    run = execute_run(run, ctx, config)
+    return finish_run(catalog, run)
+```
+
+## PL-10: Serve the app
+**Entry:** `packages/qserver/src/qserver/api/pipelines/pl10_serve.py::run_serve` · **Trigger:** `qserver` (console script)
+**Covers:** QR-02, QR-04, QR-06, RUN-01, RUN-02, RUN-04–RUN-06, EXPL-01–EXPL-10
+
+| # | Step | Owner | In → Out | Spine version | Covers |
+|---|---|---|---|---|---|
+| 1 | `open_runs` | runs.manager | Catalog, home → RunManager | mark running runs whose worker PID is gone as failed &quot;interrupted&quot; | RUN-06 |
+| 2 | `RunManager` | runs.manager | Catalog, home → RunManager | Popen one worker per run; the unique index refuses a second download (RunRefused); cancel sets a flag; `events(after)` reads ProgressEvent rows | RUN-01, RUN-02, RUN-04, RUN-05 |
+| 3 | `create_app` | api.app | VersionedStore, Catalog, RunManager → App | FastAPI with a loopback `Host` guard; no bulk export route | QR-04, QR-06 |
+| 4 | `mount_reads` | api.reads | App, VersionedStore → App | versions, search, company, prices, cross-check and universe from a PitReader per request, as VersionMessage, SearchHit, CompanyPage, PriceSeries, CrossCheckView, UniverseDay | EXPL-01–EXPL-06, EXPL-09, EXPL-10, QR-02 |
+| 5 | `mount_checks` | api.checks | App, Catalog → App | latest CheckSummaryMessage, filtered FailureMessage lists, the explanation PUT through `checks.explain` | EXPL-07, EXPL-08 |
+| 6 | `mount_runs` | api.runs | App, RunManager → App | start (409 on RunRefused), cancel, history as RunMessage, SSE of RunEvent resuming from `Last-Event-ID` | RUN-01–RUN-06 |
+| 7 | `mount_static` | api.static | App, dist dir → App | explorer&#x27;s build served at `/` | QR-04 |
+| 8 | `serve` | api.serve | App → App | uvicorn on 127.0.0.1:8765 | QR-04 |
+
+### Entry sketch (pre-build — removed by spine task)
+```python
+def run_serve(home: Path) -&gt; App:
+    store, catalog = VersionedStore(home), Catalog(home / &quot;catalog.sqlite&quot;)
+    runs = open_runs(catalog, home)
+    app = create_app(store, catalog, runs)
+    app = mount_reads(app, store)
+    app = mount_checks(app, catalog)
+    app = mount_runs(app, runs)
+    app = mount_static(app, Path(&quot;packages/explorer/dist&quot;))
+    return serve(app)
+```
+
+## PL-11: Export the API schema
+**Entry:** `packages/qserver/src/qserver/api/pipelines/pl11_export_openapi.py::run_export_openapi` · **Trigger:** `python -m qserver export-openapi [--check]`, also in CI
+**Covers:** QR-08
+
+| # | Step | Owner | In → Out | Spine version | Covers |
+|---|---|---|---|---|---|
+| 1 | `create_app` | api.app | VersionedStore, Catalog, RunManager → App | PL-10 as built, on an empty temporary home | QR-08 |
+| 2 | `export_openapi` | api.schema | App → OpenApiDocument | `app.openapi()` plus the RunEvent component, keys sorted | QR-08 |
+| 3 | `write_schema` | api.schema | OpenApiDocument, check flag → OpenApiDocument | write `contracts/openapi.json`; with `--check`, exit 1 on any difference | QR-08 |
+
+### Entry sketch (pre-build — removed by spine task)
+```python
+def run_export_openapi(out: Path, *, check: bool = False) -&gt; OpenApiDocument:
+    app = create_app(*empty_backend())
+    doc = export_openapi(app)
+    return write_schema(doc, out, check=check)
+```
+
+## Planned layout (pre-build — removed by spine task)
+```
+packages/qserver/src/qserver/
+  __init__.py   contract exports only
+  __main__.py   CLI: export-openapi → PL-11; the `qserver` console script → PL-10
+  types.py
+  runs/         pipeline.py (PL-09)  worker.py  manager.py  context.py  config.py
+  api/          pipelines/pl10_serve.py  pipelines/pl11_export_openapi.py  app.py  messages.py  reads.py  checks.py  runs.py  static.py  serve.py  schema.py
+tests/intent/qserver/  tests/unit/qserver/
+```
+`empty_backend()` in PL-11&#x27;s sketch is a helper in `pl11_export_openapi.py` that opens a temporary home; it should become a step if it grows.
+
+## Open questions
+- None.
+</pre><div class="hook">⛔ hook PostToolUse:Write blocked: dt lint found problems in docs/packages/qserver/pipelines.md:
+docs/packages/qserver/pipelines.md:11: step-io-types PL-09 step `claim_run` names Catalog, which no contract.md type section defines (`### &lt;component&gt;.Catalog: type`)
+docs/packages/qserver/pipelines.md:12: step-io-types PL-09 step `open_context` names Catalog, which no contract.md type section defines (`### &lt;component&gt;.Catalog: type`)
+docs/packages/qserver/pipelines.md:13: step-io-types PL-09 step `CatalogRunContext` names Catalog, which no contract.md type section defines (`### &lt;component&gt;.Catalog: type`)
+docs/packages/qserver/pipelines.md:14: step-io-types PL-09 step `load_check_config` names CheckConfig, which no contract.md type section defines (`### &lt;component&gt;.CheckConfig: type`)
+docs/packages/qserver/pipelines.md:15: step-io-types PL-09 step `execute_run` names CheckConfig, which no contract.md type section defines (`### &lt;component&gt;.CheckConfig: type`)
+docs/packages/qserver/pipelines.md:16: step-io-types PL-09 step `finish_run` names Catalog, which no contract.md type section defines (`### &lt;component&gt;.Catalog: type`)
+docs/packages/qserver/pipelines.md:35: step-io-types PL-10 step `open_runs` names Catalog, which no contract.md type section defines (`### &lt;component&gt;.Catalog: type`)
+docs/packages/qserver/pipelines.md:35: step-io-types PL-10 step `open_runs` names RunManager, which no contract.md type section defines (`### &lt;component&gt;.RunManager: type`)
+docs/packages/qserver/pipelines.md:36: step-io-types PL-10 step `RunManager` names Catalog, which no contract.md type section defines (`### &lt;component&gt;.Catalog: type`)
+docs/packages/qserver/pipelines.md:36: step-io-types PL-10 step `RunManager` names RunManager, which no contract.md type section defines (`### &lt;component&gt;.RunManager: type`)
+docs/packages/qserver/pipelines.md:37: step-io-types PL-10 step `create_app` names App, which no contract.md type section defines (`### &lt;component&gt;.App: type`)
+docs/packages/qserver/pipelines.md:37: step-io-types PL-10 step `create_app` names Catalog, which no contract.md type section defines (`### &lt;component&gt;.Catalog: type`)
+docs/packages/qserver/pipelines.md:37: step-io-types PL-10 step `create_app` names RunManager, which no contract.md type section defines (`### &lt;component&gt;.RunManager: type`)
+docs/packages/qserver/pipelines.md:37: step-io-types PL-10 step `create_app` names VersionedStore, which no contract.md type section defines (`### &lt;component&gt;.VersionedStore: type`)
+docs/packages/qserver/pipelines.md:38: step-io-types PL-10 step `mount_reads` names App, which no contract.md type section defines (`### &lt;component&gt;.App: type`)
+docs/packages/qserver/pipelines.md:38: step-io-types PL-10 step `mount_reads` names VersionedStore, which no contract.md type section defines (`### &lt;component&gt;.VersionedStore: type`)
+docs/packages/qserver/pipelines.md:39: step-io-types PL-10 step `mount_checks` names App, which no contract.md type section defines (`### &lt;component&gt;.App: type`)
+docs/packages/qserver/pipelines.md:39: step-io-types PL-10 step `mount_checks` names Catalog, which no contract.md type section defines (`### &lt;component&gt;.Catalog: type`)
+docs/packages/qserver/pipelines.md:40: step-io-types PL-10 step `mount_runs` names App, which no contract.md type section defines (`### &lt;component&gt;.App: type`)
+docs/packages/qserver/pipelines.md:40: step-io-types PL-10 step `mount_runs` names RunManager, which no contract.md type section defines (`### &lt;component&gt;.RunManager: type`)
+docs/packages/qserver/pipelines.md:41: step-io-types PL-10 step `mount_static` names App, which no contract.md type section defines (`### &lt;component&gt;.App: type`)
+docs/packages/qserver/pipelines.md:42: step-io-types PL-10 step `serve` names App, which no contract.md type section defines (`### &lt;component&gt;.App: type`)
+docs/packages/qserver/pipelines.md:63: step-io-types PL-11 step `create_app` names App, which no contract.md type section defines (`### &lt;component&gt;.App: type`)
+docs/packages/qserver/pipelines.md:63: step-io-types PL-11 step `create_app` names Catalog, which no contract.md type section defines (`### &lt;component&gt;.Catalog: type`)
+docs/packages/qserver/pipelines.md:63: step-io-types PL-11 step `create_app` names RunManager, which no contract.md type section defines (`### &lt;component&gt;.RunManager: type`)
+docs/packages/qserver/pipelines.md:63: step-io-types PL-11 step `create_app` names VersionedStore, which no contract.md type section defines (`### &lt;component&gt;.VersionedStore: type`)
+docs/packages/qserver/pipelines.md:64: step-io-types PL-11 step `export_openapi` names App, which no contract.md type section defines (`### &lt;component&gt;.App: type`)
+docs/packages/qserver/pipelines.md:64: step-io-types PL-11 step `export_openapi` names OpenApiDocument, which no contract.md type section defines (`### &lt;component&gt;.OpenApiDocument: type`)
+docs/packages/qserver/pipelines.md:65: step-io-types PL-11 step `write_schema` names OpenApiDocument, which no contract.md type section defines (`### &lt;component&gt;.OpenApiDocument: type`)
+29 errors, 0 warnings</div><details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-9/quant-incremental/with_skill/project/docs/packages/qserver/pipelines.md&quot;,
+  &quot;content&quot;: &quot;# qserver — Pipelines\n\n**Package:** qserver · **Status:** Draft · **Last updated:** 2026-10-17 · **Contract:** [contract.md](contract.md)\n\n## PL-09: Run worker\n**Entry:** `packages/qserver/src/qserver/runs/pipeline.py::run_worker` · **Trigger:** `python -m qserver.runs.worker &lt;run_id&gt;`, spawned by `RunManager.start` · **Part of:** PL-01\n**Covers:** RUN-01–RUN-06, LOAD-04\n\n| # | Step | Owner | In → Out | Spine version | Covers |\n|---|---|---|---|---|---|\n| 1 | `claim_run` | runs.manager | Catalog, run_id → RunInfo | read the run row and record this worker&#x27;s PID | RUN-02 |\n| 2 | `open_context` | runs.context | Catalog, RunInfo → RunContext | returns a `CatalogRunContext` for the run | RUN-03 |\n| 3 | `CatalogRunContext` | runs.context | Catalog, run_id → RunContext | `progress` writes a ProgressEvent row at most once a second; `check_cancel` reads the run&#x27;s cancel flag | RUN-03, RUN-04 |\n| 4 | `load_check_config` | runs.config | config dir → CheckConfig | read `config/checks.toml` and `config/reference_delisted.toml` | CHECK-09 |\n| 5 | `execute_run` | runs.worker | RunInfo, RunContext, CheckConfig → RunInfo | full or refresh: PL-04 as built; check: PL-05 then PL-06 as built; sources from `open_primary` and `open_secondary` | RUN-01, LOAD-04 |\n| 6 | `finish_run` | runs.manager | Catalog, RunInfo → RunInfo | succeeded; cancelled on RunCancelled; failed with the SourceError detail | RUN-04, RUN-05 |\n\n### Entry sketch (pre-build — removed by spine task)\n```python\ndef run_worker(home: Path, run_id: str) -&gt; RunInfo:\n    catalog = Catalog(home / \&quot;catalog.sqlite\&quot;)\n    run = claim_run(catalog, run_id)\n    ctx = open_context(catalog, run)\n    config = load_check_config(Path(\&quot;config\&quot;))\n    run = execute_run(run, ctx, config)\n    return finish_run(catalog, run)\n```\n\n## PL-10: Serve the app\n**Entry:** `packages/qserver/src/qserver/api/pipelines/pl10_serve.py::run_serve` · **Trigger:** `qserver` (console script)\n**Covers:** QR-02, QR-04, QR-06, RUN-01, RUN-02, RUN-04–RUN-06, EXPL-01–EXPL-10\n\n| # | Step | Owner | In → Out | Spine version | Covers |\n|---|---|---|---|---|---|\n| 1 | `open_runs` | runs.manager | Catalog, home → RunManager | mark running runs whose worker PID is gone as failed \&quot;interrupted\&quot; | RUN-06 |\n| 2 | `RunManager` | runs.manager | Catalog, home → RunManager | Popen one worker per run; the unique index refuses a second download (RunRefused); cancel sets a flag; `events(after)` reads ProgressEvent rows | RUN-01, RUN-02, RUN-04, RUN-05 |\n| 3 | `create_app` | api.app | VersionedStore, Catalog, RunManager → App | FastAPI with a loopback `Host` guard; no bulk export route | QR-04, QR-06 |\n| 4 | `mount_reads` | api.reads | App, VersionedStore → App | versions, search, company, prices, cross-check and universe from a PitReader per request, as VersionMessage, SearchHit, CompanyPage, PriceSeries, CrossCheckView, UniverseDay | EXPL-01–EXPL-06, EXPL-09, EXPL-10, QR-02 |\n| 5 | `mount_checks` | api.checks | App, Catalog → App | latest CheckSummaryMessage, filtered FailureMessage lists, the explanation PUT through `checks.explain` | EXPL-07, EXPL-08 |\n| 6 | `mount_runs` | api.runs | App, RunManager → App | start (409 on RunRefused), cancel, history as RunMessage, SSE of RunEvent resuming from `Last-Event-ID` | RUN-01–RUN-06 |\n| 7 | `mount_static` | api.static | App, dist dir → App | explorer&#x27;s build served at `/` | QR-04 |\n| 8 | `serve` | api.serve | App → App | uvicorn on 127.0.0.1:8765 | QR-04 |\n\n### Entry sketch (pre-build — removed by spine task)\n```python\ndef run_serve(home: Path) -&gt; App:\n    store, catalog = VersionedStore(home), Catalog(home / \&quot;catalog.sqlite\&quot;)\n    runs = open_runs(catalog, home)\n    app = create_app(store, catalog, runs)\n    app = mount_reads(app, store)\n    app = mount_checks(app, catalog)\n    app = mount_runs(app, runs)\n    app = mount_static(app, Path(\&quot;packages/explorer/dist\&quot;))\n    return serve(app)\n```\n\n## PL-11: Export the API schema\n**Entry:** `packages/qserver/src/qserver/api/pipelines/pl11_export_openapi.py::run_export_openapi` · **Trigger:** `python -m qserver export-openapi [--check]`, also in CI\n**Covers:** QR-08\n\n| # | Step | Owner | In → Out | Spine version | Covers |\n|---|---|---|---|---|---|\n| 1 | `create_app` | api.app | VersionedStore, Catalog, RunManager → App | PL-10 as built, on an empty temporary home | QR-08 |\n| 2 | `export_openapi` | api.schema | App → OpenApiDocument | `app.openapi()` plus the RunEvent component, keys sorted | QR-08 |\n| 3 | `write_schema` | api.schema | OpenApiDocument, check flag → OpenApiDocument | write `contracts/openapi.json`; with `--check`, exit 1 on any difference | QR-08 |\n\n### Entry sketch (pre-build — removed by spine task)\n```python\ndef run_export_openapi(out: Path, *, check: bool = False) -&gt; OpenApiDocument:\n    app = create_app(*empty_backend())\n    doc = export_openapi(app)\n    return write_schema(doc, out, check=check)\n```\n\n## Planned layout (pre-build — removed by spine task)\n```\npackages/qserver/src/qserver/\n  __init__.py   contract exports only\n  __main__.py   CLI: export-openapi → PL-11; the `qserver` console script → PL-10\n  types.py\n  runs/         pipeline.py (PL-09)  worker.py  manager.py  context.py  config.py\n  api/          pipelines/pl10_serve.py  pipelines/pl11_export_openapi.py  app.py  messages.py  reads.py  checks.py  runs.py  static.py  serve.py  schema.py\ntests/intent/qserver/  tests/unit/qserver/\n```\n`empty_backend()` in PL-11&#x27;s sketch is a helper in `pl11_export_openapi.py` that opens a temporary home; it should become a step if it grows.\n\n## Open questions\n- None.\n&quot;
+}</pre><div class="lbl">output</div><pre>File created successfully at: /Users/connorott/plugins/dev-team-workspace/iteration-9/quant-incremental/with_skill/project/docs/packages/qserver/pipelines.md (file state is current in your context — no need to Read it back)</pre></details></div><div class="step" id="SD156"><span class="sid">D156</span><span class="kind">Write</span>/Users/connorott/plugins/dev-team-workspace/iteration-9/quant-incremental/with_skill/project/docs/packages/explorer/pipelines.md (118 lines)<div class="lbl">wrote /Users/connorott/plugins/dev-team-workspace/iteration-9/quant-incremental/with_skill/project/docs/packages/explorer/pipelines.md</div><pre># explorer — Pipelines
+
+**Package:** explorer · **Status:** Draft · **Last updated:** 2026-10-17 · **Contract:** [contract.md](contract.md)
+
+## PL-12: Explore a company and the universe
+**Entry:** `packages/explorer/src/pipelines/pl12_explore.tsx::ExploreRoutes` · **Trigger:** browser routes `/search`, `/companies/:id`, `/universe` · **Part of:** PL-02
+**Covers:** EXPL-01–EXPL-06, EXPL-09, EXPL-10, QR-02, QR-07
+
+| # | Step | Owner | In → Out | Spine version | Covers |
+|---|---|---|---|---|---|
+| 1 | `createTheme` | design.theme | color scheme → Theme | the direction set with the `frontend-design` skill and approved by the user; spine: CSS variables for light and dark | QR-07 |
+| 2 | `useVersion` | api.version | VersionMessage → VersionMessage | the latest version by default, kept in app state and named in the header | EXPL-10 |
+| 3 | `useSearch` | api.queries | query text, VersionMessage → SearchHit | `GET /search` through the generated client, debounced | EXPL-01 |
+| 4 | `useCompany` | api.queries | company id, VersionMessage → CompanyPage | `GET /companies/{id}` | EXPL-04, EXPL-05 |
+| 5 | `usePrices` | api.queries | company id, adjusted, VersionMessage → PriceSeries | `GET /companies/{id}/prices` | EXPL-02 |
+| 6 | `useCrossCheck` | api.queries | company id, VersionMessage → CrossCheckView | `GET /companies/{id}/crosscheck` | EXPL-06 |
+| 7 | `useUniverse` | api.queries | day, VersionMessage → UniverseDay | `GET /universe` | EXPL-09 |
+| 8 | `priceChartOptions` | charts.price | PriceSeries, CompanyPage, Theme → ChartOptions | ECharts line; `markArea` membership, `markPoint` splits and dividends, `markLine` last trading day | EXPL-02, EXPL-03, QR-02 |
+| 9 | `crossCheckOptions` | charts.crosscheck | CrossCheckView, Theme → ChartOptions | two cumulative-return lines and the listed disagreement days | EXPL-06 |
+| 10 | `SearchView` | pages.search | SearchHit → RouteView | results with exit type; &quot;no company found&quot; with the covered-period hint | EXPL-01 |
+| 11 | `CompanyView` | pages.company | CompanyPage, ChartOptions, ChartOptions → RouteView | the charts, actions table, ticker history, failures linking to their detail | EXPL-02–EXPL-06 |
+| 12 | `UniverseView` | pages.universe | UniverseDay → RouteView | date picker, count, members, that day&#x27;s additions and removals | EXPL-09 |
+
+### Entry sketch (pre-build — removed by spine task)
+```tsx
+export function ExploreRoutes() {
+  const theme = createTheme(useColorScheme());
+  const version = useVersion();
+  const hits = useSearch(useQueryText(), version);
+  const page = useCompany(useCompanyId(), version);
+  const prices = usePrices(useCompanyId(), useAdjusted(), version);
+  const xcheck = useCrossCheck(useCompanyId(), version);
+  const universe = useUniverse(useDay(), version);
+  const price = priceChartOptions(prices, page, theme);
+  const compare = crossCheckOptions(xcheck, theme);
+  return &lt;Routes search={SearchView(hits)} company={CompanyView(page, price, compare)} universe={UniverseView(universe)} /&gt;;
+}
+```
+
+## PL-13: Review and explain failures
+**Entry:** `packages/explorer/src/pipelines/pl13_failures.tsx::FailureRoutes` · **Trigger:** browser routes `/checks`, `/failures/:key` · **Part of:** PL-03
+**Covers:** EXPL-07, EXPL-08
+
+| # | Step | Owner | In → Out | Spine version | Covers |
+|---|---|---|---|---|---|
+| 1 | `useCheckSummary` | api.queries | VersionMessage → CheckSummaryMessage | `GET /checks/latest` | EXPL-07 |
+| 2 | `useFailures` | api.queries | filters, VersionMessage → FailureMessage | `GET /failures` with check, company, status and date range | EXPL-07 |
+| 3 | `useExplain` | api.mutations | FailureMessage, note → FailureMessage | `PUT /failures/{key}/explanation`, then refetch the summary and list | EXPL-08 |
+| 4 | `ChecksView` | pages.checks | CheckSummaryMessage, FailureMessage → RouteView | per-check counts, filters, failures grouped by company and check | EXPL-07 |
+| 5 | `FailureView` | pages.failure | FailureMessage → RouteView | expected against found, the note editor, the old note on a failed-again failure | EXPL-08 |
+
+### Entry sketch (pre-build — removed by spine task)
+```tsx
+export function FailureRoutes() {
+  const version = useVersion();
+  const summary = useCheckSummary(version);
+  const failures = useFailures(useFilters(), version);
+  const explain = useExplain();
+  return &lt;Routes checks={ChecksView(summary, failures)} failure={FailureView(explain)} /&gt;;
+}
+```
+
+## PL-14: Start and watch runs
+**Entry:** `packages/explorer/src/pipelines/pl14_runs.tsx::RunRoutes` · **Trigger:** browser routes `/runs`, `/runs/:id` · **Part of:** PL-01
+**Covers:** RUN-01–RUN-06
+
+| # | Step | Owner | In → Out | Spine version | Covers |
+|---|---|---|---|---|---|
+| 1 | `useRuns` | api.queries | — → RunMessage | `GET /runs`, newest first | RUN-05 |
+| 2 | `useStartRun` | api.mutations | kind → RunMessage | `POST /runs`; a 409 shows the running run | RUN-01, RUN-02 |
+| 3 | `useRunEvents` | api.events | run id → RunEvent | `EventSource` resuming with `Last-Event-ID`; &quot;reconnecting&quot; while it is down | RUN-03, RUN-06 |
+| 4 | `useCancelRun` | api.mutations | run id → RunMessage | `POST /runs/{id}/cancel` | RUN-04 |
+| 5 | `RunsView` | pages.runs | RunMessage, RunEvent → RouteView | phase, done of total, elapsed, errors; with no version, a prompt to start a full download | RUN-01, RUN-03, RUN-05 |
+
+### Entry sketch (pre-build — removed by spine task)
+```tsx
+export function RunRoutes() {
+  const runs = useRuns();
+  const start = useStartRun();
+  const events = useRunEvents(useRunId());
+  const cancel = useCancelRun();
+  return &lt;Routes runs={RunsView(runs, events, start, cancel)} /&gt;;
+}
+```
+
+## PL-15: Generate API types
+**Entry:** `packages/explorer/scripts/gen-api.ts::runGenApi` · **Trigger:** `pnpm gen:api [--check]`, also in CI
+**Covers:** QR-08
+
+| # | Step | Owner | In → Out | Spine version | Covers |
+|---|---|---|---|---|---|
+| 1 | `readSchema` | api.schema | contracts path → OpenApiDocument | read `contracts/openapi.json` (written by PL-11) | QR-08 |
+| 2 | `generateTypes` | api.schema | OpenApiDocument, check flag → Schema | `openapi-typescript` into `src/api/schema.ts`; with `--check`, exit 1 on any difference | QR-08 |
+
+### Entry sketch (pre-build — removed by spine task)
+```ts
+export async function runGenApi(check = false): Promise&lt;Schema&gt; {
+  const doc = await readSchema(&quot;../../contracts/openapi.json&quot;);
+  return generateTypes(doc, check);
+}
+```
+
+## Planned layout (pre-build — removed by spine task)
+```
+packages/explorer/
+  scripts/gen-api.ts          PL-15
+  src/
+    main.tsx                  router: mounts PL-12, PL-13, PL-14
+    pipelines/                pl12_explore.tsx  pl13_failures.tsx  pl14_runs.tsx
+    api/                      schema.ts (generated)  schema-tools.ts  client.ts  version.ts  queries.ts  mutations.ts  events.ts
+    design/                   theme.ts  tokens.css
+    charts/                   price.ts  crosscheck.ts
+    pages/                    search.tsx  company.tsx  universe.tsx  checks.tsx  failure.tsx  runs.tsx
+tests/intent/explorer/  tests/unit/explorer/
+```
+
+## Open questions
+- None.
+</pre><div class="hook">⛔ hook PostToolUse:Write blocked: dt lint found problems in docs/packages/explorer/pipelines.md:
+docs/packages/explorer/pipelines.md:11: step-io-types PL-12 step `createTheme` names Theme, which no contract.md type section defines (`### &lt;component&gt;.Theme: type`)
+docs/packages/explorer/pipelines.md:18: step-io-types PL-12 step `priceChartOptions` names ChartOptions, which no contract.md type section defines (`### &lt;component&gt;.ChartOptions: type`)
+docs/packages/explorer/pipelines.md:18: step-io-types PL-12 step `priceChartOptions` names Theme, which no contract.md type section defines (`### &lt;component&gt;.Theme: type`)
+docs/packages/explorer/pipelines.md:19: step-io-types PL-12 step `crossCheckOptions` names ChartOptions, which no contract.md type section defines (`### &lt;component&gt;.ChartOptions: type`)
+docs/packages/explorer/pipelines.md:19: step-io-types PL-12 step `crossCheckOptions` names Theme, which no contract.md type section defines (`### &lt;component&gt;.Theme: type`)
+docs/packages/explorer/pipelines.md:20: step-io-types PL-12 step `SearchView` names RouteView, which no contract.md type section defines (`### &lt;component&gt;.RouteView: type`)
+docs/packages/explorer/pipelines.md:21: step-io-types PL-12 step `CompanyView` names ChartOptions, which no contract.md type section defines (`### &lt;component&gt;.ChartOptions: type`)
+docs/packages/explorer/pipelines.md:21: step-io-types PL-12 step `CompanyView` names RouteView, which no contract.md type section defines (`### &lt;component&gt;.RouteView: type`)
+docs/packages/explorer/pipelines.md:22: step-io-types PL-12 step `UniverseView` names RouteView, which no contract.md type section defines (`### &lt;component&gt;.RouteView: type`)
+docs/packages/explorer/pipelines.md:49: step-io-types PL-13 step `ChecksView` names RouteView, which no contract.md type section defines (`### &lt;component&gt;.RouteView: type`)
+docs/packages/explorer/pipelines.md:50: step-io-types PL-13 step `FailureView` names RouteView, which no contract.md type section defines (`### &lt;component&gt;.RouteView: type`)
+docs/packages/explorer/pipelines.md:73: step-io-types PL-14 step `RunsView` names RouteView, which no contract.md type section defines (`### &lt;component&gt;.RouteView: type`)
+docs/packages/explorer/pipelines.md:92: step-io-types PL-15 step `readSchema` names OpenApiDocument, which no contract.md type section defines (`### &lt;component&gt;.OpenApiDocument: type`)
+docs/packages/explorer/pipelines.md:93: step-io-types PL-15 step `generateTypes` names OpenApiDocument, which no contract.md type section defines (`### &lt;component&gt;.OpenApiDocument: type`)
+docs/packages/explorer/pipelines.md:93: step-io-types PL-15 step `generateTypes` names Schema, which no contract.md type section defines (`### &lt;component&gt;.Schema: type`)
+15 errors, 0 warnings</div><details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-9/quant-incremental/with_skill/project/docs/packages/explorer/pipelines.md&quot;,
+  &quot;content&quot;: &quot;# explorer — Pipelines\n\n**Package:** explorer · **Status:** Draft · **Last updated:** 2026-10-17 · **Contract:** [contract.md](contract.md)\n\n## PL-12: Explore a company and the universe\n**Entry:** `packages/explorer/src/pipelines/pl12_explore.tsx::ExploreRoutes` · **Trigger:** browser routes `/search`, `/companies/:id`, `/universe` · **Part of:** PL-02\n**Covers:** EXPL-01–EXPL-06, EXPL-09, EXPL-10, QR-02, QR-07\n\n| # | Step | Owner | In → Out | Spine version | Covers |\n|---|---|---|---|---|---|\n| 1 | `createTheme` | design.theme | color scheme → Theme | the direction set with the `frontend-design` skill and approved by the user; spine: CSS variables for light and dark | QR-07 |\n| 2 | `useVersion` | api.version | VersionMessage → VersionMessage | the latest version by default, kept in app state and named in the header | EXPL-10 |\n| 3 | `useSearch` | api.queries | query text, VersionMessage → SearchHit | `GET /search` through the generated client, debounced | EXPL-01 |\n| 4 | `useCompany` | api.queries | company id, VersionMessage → CompanyPage | `GET /companies/{id}` | EXPL-04, EXPL-05 |\n| 5 | `usePrices` | api.queries | company id, adjusted, VersionMessage → PriceSeries | `GET /companies/{id}/prices` | EXPL-02 |\n| 6 | `useCrossCheck` | api.queries | company id, VersionMessage → CrossCheckView | `GET /companies/{id}/crosscheck` | EXPL-06 |\n| 7 | `useUniverse` | api.queries | day, VersionMessage → UniverseDay | `GET /universe` | EXPL-09 |\n| 8 | `priceChartOptions` | charts.price | PriceSeries, CompanyPage, Theme → ChartOptions | ECharts line; `markArea` membership, `markPoint` splits and dividends, `markLine` last trading day | EXPL-02, EXPL-03, QR-02 |\n| 9 | `crossCheckOptions` | charts.crosscheck | CrossCheckView, Theme → ChartOptions | two cumulative-return lines and the listed disagreement days | EXPL-06 |\n| 10 | `SearchView` | pages.search | SearchHit → RouteView | results with exit type; \&quot;no company found\&quot; with the covered-period hint | EXPL-01 |\n| 11 | `CompanyView` | pages.company | CompanyPage, ChartOptions, ChartOptions → RouteView | the charts, actions table, ticker history, failures linking to their detail | EXPL-02–EXPL-06 |\n| 12 | `UniverseView` | pages.universe | UniverseDay → RouteView | date picker, count, members, that day&#x27;s additions and removals | EXPL-09 |\n\n### Entry sketch (pre-build — removed by spine task)\n```tsx\nexport function ExploreRoutes() {\n  const theme = createTheme(useColorScheme());\n  const version = useVersion();\n  const hits = useSearch(useQueryText(), version);\n  const page = useCompany(useCompanyId(), version);\n  const prices = usePrices(useCompanyId(), useAdjusted(), version);\n  const xcheck = useCrossCheck(useCompanyId(), version);\n  const universe = useUniverse(useDay(), version);\n  const price = priceChartOptions(prices, page, theme);\n  const compare = crossCheckOptions(xcheck, theme);\n  return &lt;Routes search={SearchView(hits)} company={CompanyView(page, price, compare)} universe={UniverseView(universe)} /&gt;;\n}\n```\n\n## PL-13: Review and explain failures\n**Entry:** `packages/explorer/src/pipelines/pl13_failures.tsx::FailureRoutes` · **Trigger:** browser routes `/checks`, `/failures/:key` · **Part of:** PL-03\n**Covers:** EXPL-07, EXPL-08\n\n| # | Step | Owner | In → Out | Spine version | Covers |\n|---|---|---|---|---|---|\n| 1 | `useCheckSummary` | api.queries | VersionMessage → CheckSummaryMessage | `GET /checks/latest` | EXPL-07 |\n| 2 | `useFailures` | api.queries | filters, VersionMessage → FailureMessage | `GET /failures` with check, company, status and date range | EXPL-07 |\n| 3 | `useExplain` | api.mutations | FailureMessage, note → FailureMessage | `PUT /failures/{key}/explanation`, then refetch the summary and list | EXPL-08 |\n| 4 | `ChecksView` | pages.checks | CheckSummaryMessage, FailureMessage → RouteView | per-check counts, filters, failures grouped by company and check | EXPL-07 |\n| 5 | `FailureView` | pages.failure | FailureMessage → RouteView | expected against found, the note editor, the old note on a failed-again failure | EXPL-08 |\n\n### Entry sketch (pre-build — removed by spine task)\n```tsx\nexport function FailureRoutes() {\n  const version = useVersion();\n  const summary = useCheckSummary(version);\n  const failures = useFailures(useFilters(), version);\n  const explain = useExplain();\n  return &lt;Routes checks={ChecksView(summary, failures)} failure={FailureView(explain)} /&gt;;\n}\n```\n\n## PL-14: Start and watch runs\n**Entry:** `packages/explorer/src/pipelines/pl14_runs.tsx::RunRoutes` · **Trigger:** browser routes `/runs`, `/runs/:id` · **Part of:** PL-01\n**Covers:** RUN-01–RUN-06\n\n| # | Step | Owner | In → Out | Spine version | Covers |\n|---|---|---|---|---|---|\n| 1 | `useRuns` | api.queries | — → RunMessage | `GET /runs`, newest first | RUN-05 |\n| 2 | `useStartRun` | api.mutations | kind → RunMessage | `POST /runs`; a 409 shows the running run | RUN-01, RUN-02 |\n| 3 | `useRunEvents` | api.events | run id → RunEvent | `EventSource` resuming with `Last-Event-ID`; \&quot;reconnecting\&quot; while it is down | RUN-03, RUN-06 |\n| 4 | `useCancelRun` | api.mutations | run id → RunMessage | `POST /runs/{id}/cancel` | RUN-04 |\n| 5 | `RunsView` | pages.runs | RunMessage, RunEvent → RouteView | phase, done of total, elapsed, errors; with no version, a prompt to start a full download | RUN-01, RUN-03, RUN-05 |\n\n### Entry sketch (pre-build — removed by spine task)\n```tsx\nexport function RunRoutes() {\n  const runs = useRuns();\n  const start = useStartRun();\n  const events = useRunEvents(useRunId());\n  const cancel = useCancelRun();\n  return &lt;Routes runs={RunsView(runs, events, start, cancel)} /&gt;;\n}\n```\n\n## PL-15: Generate API types\n**Entry:** `packages/explorer/scripts/gen-api.ts::runGenApi` · **Trigger:** `pnpm gen:api [--check]`, also in CI\n**Covers:** QR-08\n\n| # | Step | Owner | In → Out | Spine version | Covers |\n|---|---|---|---|---|---|\n| 1 | `readSchema` | api.schema | contracts path → OpenApiDocument | read `contracts/openapi.json` (written by PL-11) | QR-08 |\n| 2 | `generateTypes` | api.schema | OpenApiDocument, check flag → Schema | `openapi-typescript` into `src/api/schema.ts`; with `--check`, exit 1 on any difference | QR-08 |\n\n### Entry sketch (pre-build — removed by spine task)\n```ts\nexport async function runGenApi(check = false): Promise&lt;Schema&gt; {\n  const doc = await readSchema(\&quot;../../contracts/openapi.json\&quot;);\n  return generateTypes(doc, check);\n}\n```\n\n## Planned layout (pre-build — removed by spine task)\n```\npackages/explorer/\n  scripts/gen-api.ts          PL-15\n  src/\n    main.tsx                  router: mounts PL-12, PL-13, PL-14\n    pipelines/                pl12_explore.tsx  pl13_failures.tsx  pl14_runs.tsx\n    api/                      schema.ts (generated)  schema-tools.ts  client.ts  version.ts  queries.ts  mutations.ts  events.ts\n    design/                   theme.ts  tokens.css\n    charts/                   price.ts  crosscheck.ts\n    pages/                    search.tsx  company.tsx  universe.tsx  checks.tsx  failure.tsx  runs.tsx\ntests/intent/explorer/  tests/unit/explorer/\n```\n\n## Open questions\n- None.\n&quot;
+}</pre><div class="lbl">output</div><pre>File created successfully at: /Users/connorott/plugins/dev-team-workspace/iteration-9/quant-incremental/with_skill/project/docs/packages/explorer/pipelines.md (file state is current in your context — no need to Read it back)</pre></details></div><div class="step" id="SD157"><span class="sid">D157</span><span class="kind">Bash</span>python3 ../plugin/dev-team/scripts/dt.py lint docs/ 2&gt;&amp;1 | sed -E &#x27;s/.*names ([A-Za-z]+),.*/\1/&#x27; | sort | uniq -c | sort -rn | head -30<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;python3 ../plugin/dev-team/scripts/dt.py lint docs/ 2&gt;&amp;1 | sed -E &#x27;s/.*names ([A-Za-z]+),.*/\\1/&#x27; | sort | uniq -c | sort -rn | head -30&quot;,
+  &quot;description&quot;: &quot;Summarize remaining lint errors by type name&quot;
+}</pre><div class="lbl">output</div><pre>  14 PitReader
+  11 VersionedStore
+  11 Catalog
+   8 App
+   7 CheckConfig
+   6 RouteView
+   5 RunManager
+   4 OpenApiDocument
+   3 Theme
+   3 ChartOptions
+   2 CalibrationReport
+   1 Schema
+   1 CrossCheckReport
+   1 76 errors, 0 warnings</pre></details></div><div class="step" id="SD158"><span class="sid">D158</span><span class="kind">think</span>All 76 lint errors trace back to 13 undefined type names, so I&#x27;ll route this as a single change to architecture-design and update the contracts&#x27; `Used by:` lines with the pipeline IDs.<details><summary>full text</summary><pre>All 76 lint errors trace back to 13 undefined type names, so I&#x27;ll route this as a single change to architecture-design and update the contracts&#x27; `Used by:` lines with the pipeline IDs.
+
+</pre></details></div><div class="step" id="SD159"><span class="sid">D159</span><span class="kind">Bash</span>python3 ../plugin/dev-team/scripts/dt.py route architecture-design &quot;Contract types the pipelines hand between steps but no contract defines as a type section (dt lint step-io-types, 76 errors): retitle as &#x27;: type&#x27; sections the classes query.PitReader, store.VersionedStore, store.Catalog (qdata) and runs.RunManager (qserver); add type sections for checks.CheckConfig and xcheck.CrossCheckReport (now defined only inline), checks.CalibrationReport (PL-07 characterise output), api.App (the FastAPI ap …[+2273 chars]<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;python3 ../plugin/dev-team/scripts/dt.py route architecture-design \&quot;Contract types the pipelines hand between steps but no contract defines as a type section (dt lint step-io-types, 76 errors): retitle as &#x27;: type&#x27; sections the classes query.PitReader, store.VersionedStore, store.Catalog (qdata) and runs.RunManager (qserver); add type sections for checks.CheckConfig and xcheck.CrossCheckReport (now defined only inline), checks.CalibrationReport (PL-07 characterise output), api.App (the FastAPI app create_app returns; PL-10 steps), api.OpenApiDocument (PL-11 output, read by explorer PL-15); give explorer&#x27;s contract type sections for design.Theme, charts.ChartOptions, pages.RouteView and api.Schema (generated schema.ts). Each needs Invariants, Boundary and Cases.\&quot; --from pipeline-design &amp;&amp; python3 - &lt;&lt;&#x27;EOF&#x27;\nimport pathlib,re\nM={\&quot;qdata\&quot;:{\&quot;core.RunContext\&quot;:\&quot;PL-04, PL-05, PL-06, PL-09\&quot;,\&quot;core.RunCancelled\&quot;:\&quot;PL-09\&quot;,\&quot;core.QueryRefused\&quot;:\&quot;PL-08, PL-10\&quot;,\n\&quot;sources.SourceError\&quot;:\&quot;PL-09\&quot;,\&quot;sources.RawPage\&quot;:\&quot;PL-06\&quot;,\&quot;sources.PrimarySource\&quot;:\&quot;PL-04\&quot;,\&quot;sources.SecondarySource\&quot;:\&quot;PL-06\&quot;,\n\&quot;store.DataVersion\&quot;:\&quot;PL-04\&quot;,\&quot;store.VersionedStore\&quot;:\&quot;PL-04, PL-07, PL-08, PL-10, PL-11\&quot;,\&quot;store.Catalog\&quot;:\&quot;PL-05, PL-06, PL-09, PL-10, PL-11\&quot;,\n\&quot;load.download\&quot;:\&quot;PL-09\&quot;,\&quot;query.Bars\&quot;:\&quot;PL-04, PL-08\&quot;,\&quot;query.Returns\&quot;:\&quot;PL-08\&quot;,\&quot;query.Actions\&quot;:\&quot;PL-04\&quot;,\&quot;query.Company\&quot;:\&quot;PL-04, PL-06, PL-08\&quot;,\n\&quot;query.PitReader\&quot;:\&quot;PL-05, PL-06, PL-07, PL-08, PL-10\&quot;,\&quot;checks.Failure\&quot;:\&quot;PL-05\&quot;,\&quot;checks.CheckSummary\&quot;:\&quot;PL-05\&quot;,\&quot;checks.run_checks\&quot;:\&quot;PL-09\&quot;,\n\&quot;checks.explain\&quot;:\&quot;PL-10\&quot;,\&quot;xcheck.Comparison\&quot;:\&quot;PL-06\&quot;,\&quot;xcheck.run_crosscheck\&quot;:\&quot;PL-09\&quot;},\n\&quot;qserver\&quot;:{\&quot;runs.RunInfo\&quot;:\&quot;PL-09\&quot;,\&quot;runs.ProgressEvent\&quot;:\&quot;PL-09, PL-10\&quot;,\&quot;runs.RunRefused\&quot;:\&quot;PL-10\&quot;,\&quot;runs.RunManager\&quot;:\&quot;PL-10, PL-11\&quot;,\n\&quot;api.create_app\&quot;:\&quot;PL-10, PL-11\&quot;,\&quot;api.VersionMessage\&quot;:\&quot;PL-10, PL-12\&quot;,\&quot;api.SearchHit\&quot;:\&quot;PL-10, PL-12\&quot;,\&quot;api.CompanyPage\&quot;:\&quot;PL-10, PL-12\&quot;,\n\&quot;api.PriceSeries\&quot;:\&quot;PL-10, PL-12\&quot;,\&quot;api.CrossCheckView\&quot;:\&quot;PL-10, PL-12\&quot;,\&quot;api.UniverseDay\&quot;:\&quot;PL-10, PL-12\&quot;,\&quot;api.FailureMessage\&quot;:\&quot;PL-10, PL-13\&quot;,\n\&quot;api.CheckSummaryMessage\&quot;:\&quot;PL-10, PL-13\&quot;,\&quot;api.RunMessage\&quot;:\&quot;PL-10, PL-14\&quot;,\&quot;api.RunEvent\&quot;:\&quot;PL-10, PL-14\&quot;}}\nfor pkg,m in M.items():\n    p=pathlib.Path(f\&quot;docs/packages/{pkg}/contract.md\&quot;); s=p.read_text()\n    for sym,ids in m.items():\n        pat=re.compile(r\&quot;(### %s:.*?\\n(?:(?!### ).*\\n)*?- \\*\\*Used by:\\*\\* )(.*)\\n\&quot;%re.escape(sym))\n        mm=pat.search(s); assert mm, sym\n        s=s[:mm.start(2)]+mm.group(2)+\&quot;; \&quot;+ids+s[mm.end(2):]\n    p.write_text(s)\nEOF\ngrep -h \&quot;Used by\&quot; docs/packages/qdata/contract.md docs/packages/qserver/contract.md | head -50; python3 ../plugin/dev-team/scripts/dt.py lint docs/ 2&gt;&amp;1 | grep -v step-io-types; python3 ../plugin/dev-team/scripts/dt.py status --skill pipeline-design | grep -E \&quot;^(mode|packages|uncovered|components|drift|retired|misplaced|routed)\&quot;&quot;,
+  &quot;description&quot;: &quot;Route contract gaps, append PL IDs, rerun checks&quot;
+}</pre><div class="lbl">output</div><pre>routed: architecture-design · Contract types the pipelines hand between steps but no contract defines as a type section (dt lint step-io-types, 76 errors): retitle as &#x27;: type&#x27; sections the classes query.PitReader, store.VersionedStore, store.Catalog (qdata) and runs.RunManager (qserver); add type sections for checks.CheckConfig and xcheck.CrossCheckReport (now defined only inline), checks.CalibrationReport (PL-07 characterise output), api.App (the FastAPI app create_app returns; PL-10 steps), api.OpenApiDocument (PL-11 output, read by explorer PL-15); give explorer&#x27;s contract type sections for design.Theme, charts.ChartOptions, pages.RouteView and api.Schema (generated schema.ts). Each needs Invariants, Boundary and Cases.
+- **Used by:** api; PL-09
+- **Used by:** api; PL-09, PL-10
+- **Used by:** api; PL-10
+- **Used by:** api; PL-10, PL-11
+- **Used by:** explorer (PL-01, PL-02, PL-03); PL-10, PL-11
+- **Used by:** explorer (PL-02); PL-10, PL-12
+- **Used by:** explorer (PL-02); PL-10, PL-12
+- **Used by:** explorer (PL-02); PL-10, PL-12
+- **Used by:** explorer (PL-02); PL-10, PL-12
+- **Used by:** explorer (PL-02); PL-10, PL-12
+- **Used by:** explorer (PL-02); PL-10, PL-12
+- **Used by:** explorer (PL-02, PL-03); PL-10, PL-13
+- **Used by:** explorer (PL-03); PL-10, PL-13
+- **Used by:** explorer (PL-01); PL-10, PL-14
+- **Used by:** explorer (PL-01); PL-10, PL-14
+- **Used by:** every component
+- **Used by:** store, query, checks, qserver
+- **Used by:** query, qserver; PL-08, PL-10
+- **Used by:** load, checks, xcheck; implemented by qserver; PL-04, PL-05, PL-06, PL-09
+- **Used by:** load, checks, xcheck, qserver; PL-09
+- **Used by:** load, xcheck, qserver; PL-09
+- **Used by:** store, load, xcheck; PL-06
+- **Used by:** load; PL-04
+- **Used by:** xcheck; PL-06
+- **Used by:** query, checks, qserver; PL-04
+- **Used by:** load, query, checks, qserver; PL-04, PL-07, PL-08, PL-10, PL-11
+- **Used by:** checks, xcheck, qserver; PL-05, PL-06, PL-09, PL-10, PL-11
+- **Used by:** qserver; PL-09
+- **Used by:** checks, xcheck, qserver; PL-04, PL-08
+- **Used by:** checks, xcheck, qserver; PL-08
+- **Used by:** checks, qserver; PL-04
+- **Used by:** checks, xcheck, qserver; PL-04, PL-06, PL-08
+- **Used by:** checks, xcheck, qserver, research code; PL-05, PL-06, PL-07, PL-08, PL-10
+- **Used by:** xcheck, qserver; PL-05
+- **Used by:** qserver; PL-05
+- **Used by:** qserver; PL-09
+- **Used by:** qserver; PL-10
+- **Used by:** qserver; PL-06
+- **Used by:** qserver; PL-09
+76 errors, 0 warnings
+mode: extend
+packages: explorer=current, qdata=extend, qserver=current
+uncovered_ids: none
+components_unowned: qdata.core, qdata.store
+drift: none
+retired_refs: none
+misplaced: none
+routed_changes: none</pre></details></div><div class="step" id="SD160"><span class="sid">D160</span><span class="kind">think</span>I&#x27;ve assigned `qdata.store` the store-opening step in PL-08 and `qdata.core` the trading-calendar step used by the checks. Next I&#x27;ll resolve the calendar type gap for the route.<details><summary>full text</summary><pre>I&#x27;ve assigned `qdata.store` the store-opening step in PL-08 and `qdata.core` the trading-calendar step used by the checks. Next I&#x27;ll resolve the calendar type gap for the route.
+
+</pre></details></div><div class="step" id="SD161"><span class="sid">D161</span><span class="kind">Bash</span>python3 - &lt;&lt;&#x27;EOF&#x27;
+import pathlib
+p=pathlib.Path(&quot;docs/packages/qdata/pipelines.md&quot;); s=p.read_text()
+def r(a,b):
+    global s
+    assert a in s, a[:70]; s=s.replace(a,b)
+# PL-05: calendar step first
+r(&quot;&quot;&quot;| 1 | `check_bars` | checks.bars | PitReader, CheckConfig, RunContext → Failure | completeness against the XNYS calendar, bar consistency and uniqueness as DuckDB queries | CHECK-01, CHECK-02, CHECK-08 |
+| 2 | `check_returns` | checks.returns | PitReader, CheckConfig, RunContext → Failure | extr …[+3958 chars]<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;python3 - &lt;&lt;&#x27;EOF&#x27;\nimport pathlib\np=pathlib.Path(\&quot;docs/packages/qdata/pipelines.md\&quot;); s=p.read_text()\ndef r(a,b):\n    global s\n    assert a in s, a[:70]; s=s.replace(a,b)\n# PL-05: calendar step first\nr(\&quot;\&quot;\&quot;| 1 | `check_bars` | checks.bars | PitReader, CheckConfig, RunContext → Failure | completeness against the XNYS calendar, bar consistency and uniqueness as DuckDB queries | CHECK-01, CHECK-02, CHECK-08 |\n| 2 | `check_returns` | checks.returns | PitReader, CheckConfig, RunContext → Failure | extreme moves on days with no action; split ratio against the close step | CHECK-03, CHECK-04 |\n| 3 | `check_universe` | checks.universe | PitReader, CheckConfig, RunContext → Failure | member days without a bar; daily counts outside the configured range | CHECK-05, CHECK-06 |\n| 4 | `check_point_in_time` | checks.pit | PitReader, RunContext → Failure | for each record known after its own date, an as-of read the day before must not return it | CHECK-07 |\n| 5 | `check_reference` | checks.reference | PitReader, CheckConfig → Failure | the user&#x27;s 10 companies, field by field | CHECK-09 |\n| 6 | `record_failures` |\&quot;\&quot;\&quot;,\&quot;\&quot;\&quot;| 1 | `trading_days` | core.calendar | DataVersion → TradingCalendar | XNYS sessions from `exchange_calendars` over the version&#x27;s covered range | CHECK-01, CHECK-05 |\n| 2 | `check_bars` | checks.bars | PitReader, TradingCalendar, CheckConfig, RunContext → Failure | completeness against the calendar, bar consistency and uniqueness as DuckDB queries | CHECK-01, CHECK-02, CHECK-08 |\n| 3 | `check_returns` | checks.returns | PitReader, CheckConfig, RunContext → Failure | extreme moves on days with no action; split ratio against the close step | CHECK-03, CHECK-04 |\n| 4 | `check_universe` | checks.universe | PitReader, TradingCalendar, CheckConfig, RunContext → Failure | member days without a bar; daily counts outside the configured range | CHECK-05, CHECK-06 |\n| 5 | `check_point_in_time` | checks.pit | PitReader, RunContext → Failure | for each record known after its own date, an as-of read the day before must not return it | CHECK-07 |\n| 6 | `check_reference` | checks.reference | PitReader, CheckConfig → Failure | the user&#x27;s 10 companies, field by field | CHECK-09 |\n| 7 | `record_failures` |\&quot;\&quot;\&quot;)\nr(\&quot;\&quot;\&quot;    bars = check_bars(reader, config, ctx)\n    returns = check_returns(reader, config, ctx)\n    universe = check_universe(reader, config, ctx)\&quot;\&quot;\&quot;,\&quot;\&quot;\&quot;    calendar = trading_days(reader.version)\n    bars = check_bars(reader, calendar, config, ctx)\n    returns = check_returns(reader, config, ctx)\n    universe = check_universe(reader, calendar, config, ctx)\&quot;\&quot;\&quot;)\n# PL-08: open_store first\nr(\&quot;\&quot;\&quot;| 1 | `open_reader` | query.reader | VersionedStore, version → PitReader | the latest version unless one is named; refuse with QueryRefused when none exists | QUERY-02, QUERY-05 |\n| 2 | `PitReader` |\&quot;\&quot;\&quot;,\&quot;\&quot;\&quot;| 1 | `open_store` | store.versions | home → VersionedStore | open `$QDATA_HOME`: version manifests, partitions, DuckDB connection | LOAD-03 |\n| 2 | `open_reader` | query.reader | VersionedStore, version → PitReader | the latest version unless one is named; refuse with QueryRefused when none exists | QUERY-02, QUERY-05 |\n| 3 | `PitReader` |\&quot;\&quot;\&quot;)\nr(\&quot;| 3 | `resolve_company` |\&quot;,\&quot;| 4 | `resolve_company` |\&quot;); r(\&quot;| 4 | `read_universe` |\&quot;,\&quot;| 5 | `read_universe` |\&quot;); r(\&quot;| 5 | `read_returns` |\&quot;,\&quot;| 6 | `read_returns` |\&quot;)\nr(\&quot;\&quot;\&quot;def run_research_read(store: VersionedStore, start: date, end: date, *, as_of: date | None = None, ticker: str | None = None) -&gt; tuple[Bars, Returns]:\n    reader = open_reader(store, None, as_of=as_of)\&quot;\&quot;\&quot;,\&quot;\&quot;\&quot;def run_research_read(home: Path, start: date, end: date, *, as_of: date | None = None, ticker: str | None = None) -&gt; tuple[Bars, Returns]:\n    store = open_store(home)\n    reader = open_reader(store, None, as_of=as_of)\&quot;\&quot;\&quot;)\np.write_text(s)\nEOF\npython3 ../plugin/dev-team/scripts/dt.py route architecture-design \&quot;Also add core.TradingCalendar: type (XNYS sessions over a version&#x27;s covered range), the Out of PL-05&#x27;s trading_days step, read by check_bars and check_universe.\&quot; --from pipeline-design; python3 ../plugin/dev-team/scripts/dt.py status --skill pipeline-design | grep -E \&quot;^(mode|packages|uncovered|components|retired)\&quot;; python3 ../plugin/dev-team/scripts/dt.py lint docs/ 2&gt;&amp;1 | grep -v \&quot;step-io-types.*names \\(PitReader\\|VersionedStore\\|Catalog\\|App\\|CheckConfig\\|RouteView\\|RunManager\\|OpenApiDocument\\|Theme\\|ChartOptions\\|CalibrationReport\\|Schema\\|CrossCheckReport\\|TradingCalendar\\),\&quot; &quot;,
+  &quot;description&quot;: &quot;Give core and store steps, route calendar type, recheck&quot;
+}</pre><div class="lbl">output</div><pre>routed: architecture-design · Also add core.TradingCalendar: type (XNYS sessions over a version&#x27;s covered range), the Out of PL-05&#x27;s trading_days step, read by check_bars and check_universe.
+mode: current
+packages: explorer=current, qdata=current, qserver=current
+uncovered_ids: none
+components_unowned: none
+retired_refs: none
+80 errors, 0 warnings</pre></details></div><div class="step" id="SD162"><span class="sid">D162</span><span class="kind">Bash</span>sed -i &#x27;&#x27; &#x27;s/- \*\*Used by:\*\* query, checks, qserver; PL-04$/- Used by: query, checks, qserver; PL-04, PL-05/&#x27; docs/packages/qdata/contract.md &amp;&amp; grep -c &quot;PL-04, PL-05$&quot; docs/packages/qdata/contract.md; git status --short<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;sed -i &#x27;&#x27; &#x27;s/- \\*\\*Used by:\\*\\* query, checks, qserver; PL-04$/- **Used by:** query, checks, qserver; PL-04, PL-05/&#x27; docs/packages/qdata/contract.md &amp;&amp; grep -c \&quot;PL-04, PL-05$\&quot; docs/packages/qdata/contract.md; git status --short&quot;,
+  &quot;description&quot;: &quot;Add PL-05 to DataVersion Used by&quot;
+}</pre><div class="lbl">output</div><pre>1
+ M docs/packages/qdata/contract.md
+ M docs/packages/qserver/contract.md
+?? docs/packages/explorer/pipelines.md
+?? docs/packages/qdata/pipelines.md
+?? docs/packages/qserver/pipelines.md
+?? docs/routes.md</pre></details></div><div class="step" id="SD163"><span class="sid">D163</span><span class="kind">say</span>I&#x27;ve written all 12 pipelines across the three packages (PL-04 to PL-15, all Draft). Every spec requirement and component is on a step. But `dt lint` reports 80 errors: the step tables use 14 type names that no contract defines yet. Contracts belong to architecture-design, so I routed that change instead of editing them here. ⏎ ## What was written ⏎ `qdata` ⏎ - PL-04 Download run (from the PL-09 worker, full or refresh): pick the primary source (Sharadar or a synthetic stand-in), fetch the universe, fetch prices, fetch actions, stamp revisions, commit the version. ⏎ - PL-05 Check run …[+3990 chars]<details><summary>full text</summary><pre>I&#x27;ve written all 12 pipelines across the three packages (PL-04 to PL-15, all Draft). Every spec requirement and component is on a step. But `dt lint` reports 80 errors: the step tables use 14 type names that no contract defines yet. Contracts belong to architecture-design, so I routed that change instead of editing them here.
+
+## What was written
+
+**`qdata`**
+- **PL-04 Download run** (from the PL-09 worker, full or refresh): pick the primary source (Sharadar or a synthetic stand-in), fetch the universe, fetch prices, fetch actions, stamp revisions, commit the version.
+- **PL-05 Check run** (from the worker): trading calendar, bar checks, return checks, universe checks, point-in-time check, reference-list check, then record failures and the summary.
+- **PL-06 Cross-check run** (from the worker, after PL-05 or on its own): pick the secondary source (Yahoo or a synthetic stand-in), match tickers, fetch Yahoo, compare returns, report coverage.
+- **PL-07 Threshold calibration** (`python -m qdata calibrate`): open a reader, characterise the data with the `data-analysis` skill, write the thresholds you approve.
+- **PL-08 Research read** (from research code): open the store, open a reader, resolve a ticker, read the universe, read returns.
+
+**`qserver`**
+- **PL-09 Run worker** (spawned per run): claim the run, open the run context, load the check config, run PL-04 or PL-05 then PL-06, finish the run.
+- **PL-10 Serve the app** (the `qserver` command): mark orphaned runs interrupted, create the app, add the read, check and run routes plus the app&#x27;s static files, serve on 127.0.0.1:8765.
+- **PL-11 Export the API schema** (`python -m qserver export-openapi [--check]`): create the app, export the schema, write it or fail on a difference.
+
+**`explorer`**
+- **PL-12 Explore a company and the universe**: theme, version, data hooks for search, company, prices, cross-check and universe, the two chart builders, and the search, company and universe views.
+- **PL-13 Review and explain failures**: summary, failures, explain, and the checks and failure views.
+- **PL-14 Start and watch runs**: runs, start, live events, cancel, and the runs view.
+- **PL-15 Generate API types** (`pnpm gen:api [--check]`): read `contracts/openapi.json`, then generate the TypeScript types.
+
+**Planned layout:** one entry module per pipeline and one module per step owner. In `qdata`, `checks/pipelines/` holds PL-05 and PL-07. In `qserver`, `api/pipelines/` holds PL-10 and PL-11. In `explorer`, `src/pipelines/` holds PL-12 to PL-14. Test folders are `tests/intent/&lt;pkg&gt;/` and `tests/unit/&lt;pkg&gt;/`. I also added each calling pipeline&#x27;s ID to the `Used by:` lines in the `qdata` and `qserver` contracts.
+
+## What&#x27;s blocked on architecture-design
+Fourteen type names have no contract definition:
+- **Classes to retitle as types:** `PitReader`, `VersionedStore`, `Catalog`, `RunManager`
+- **Types to add in `qdata`:** `CheckConfig`, `CrossCheckReport`, `CalibrationReport`, `TradingCalendar`
+- **Types to add in `qserver`:** `App`, `OpenApiDocument`
+- **Types to add in `explorer`:** `Theme`, `ChartOptions`, `RouteView`, `Schema`
+
+All 80 lint errors are these names. Once they&#x27;re added, lint should be clean, because these pipeline docs use the names as they&#x27;ll be defined.
+
+## Assumptions
+- **One change from the list you approved:** download, check and cross-check runs start only from the qserver worker, not from `python -m qdata …`. The worker loads the check config and the sources, so a separate qdata command would duplicate that. Calibration keeps its own command.
+- The download and cross-check runs start on synthetic stand-in sources until PB-01 and PB-03 are answered. Settings choose Sharadar or Yahoo once they are.
+- The design direction (QR-07) is the first step of PL-12.
+- The stand-in data:
+  - **Synthetic primary:** 6 companies over 2000–2003, including a delisting, a split, a ticker change and a reused ticker.
+  - **Synthetic secondary:** the same companies, with returns perturbed by ±0.02 points and one company not covered.
+- `CompanyView` takes both chart configurations, price and cross-check.
+- PL-11&#x27;s empty temporary home is a helper inside PL-11&#x27;s entry module.
+
+## Open questions
+- Whether the Yahoo source uses yfinance or the chart endpoint waits on PB-03.
+
+## Uncovered
+None.
+
+Do you approve the pipelines? If you do, I&#x27;ll mark them Approved and offer to commit them with the contract `Used by:` updates. Next comes architecture-design&#x27;s Revise to add the 14 types; that clears the lint errors.</pre></details></div><div class="step" id="SD164"><span class="sid">D164</span><span class="kind">hook</span><span class="hook">Stop said: {&quot;systemMessage&quot;: &quot;dt lint: 80 problems\ndocs/packages/explorer/pipelines.md:11: step-io-types PL-12 step `createTheme` names Theme, which no contract.md type section defines (`### &lt;component&gt;.Theme: type`)\ndocs/packages/explorer/pipelines.md:18: step-io-types PL-12 step `priceChartOptions` names ChartOptions, which no contract.md type section defines (`### &lt;component&gt;.ChartOptions: type`)\ndocs/packages/explorer/pipelines.md:18: step-io-types PL-12 step `priceChartOptions` names Theme, which no contract.md type section defines (`### &lt;component&gt;.Theme: type`)\ndocs/packages/explorer/pipelines.md:19: step-io-types PL-12 step `crossCheckOptions` names ChartOptions, which no contract.md type section defines (`### &lt;component&gt;.ChartOptions: type`)\ndocs/packages/explorer/pipelines.md:19: step-io-types PL-12 step `crossCheckOptions` names Theme, which no contract.md type section defines (`### &lt;component&gt;.Theme: type`)\ndocs/packages/explorer/pipelines.md:20: step-io-types PL-12 step `SearchView` names RouteView, which no contract.md type section defines (`### &lt;component&gt;.RouteView: type`)\ndocs/packages/explorer/pipelines.md:21: step-io-types PL-12 step `CompanyView` names ChartOptions, which no contract.md type section defines (`### &lt;component&gt;.ChartOptions: type`)\ndocs/packages/explorer/pipelines.md:21: step-io-types PL-12 step `CompanyView` names RouteView, which no contract.md type section defines (`### &lt;component&gt;.RouteView: type`)\ndocs/packages/explorer/pipelines.md:22: step-io-types PL-12 step `UniverseView` names RouteView, which no contract.md type section defines (`### &lt;component&gt;.RouteView: type`)\ndocs/packages/explorer/pipelines.md:49: step-io-types PL-13 step `ChecksView` names RouteView, which no contract.md type section defines (`### &lt;component&gt;.RouteView: type`)\ndocs/packages/explorer/pipelines.md:50: step-io-types PL-13 step `FailureView` names RouteView, which no contract.md type section defines (`### &lt;component&gt;.RouteView: type`)\ndocs/packages/explorer/pipelines.md:73: step-io-types PL-14 step `RunsView` names RouteView, which no contract.md type section defines (`### &lt;component&gt;.RouteView: type`)\ndocs/packages/explorer/pipelines.md:92: step-io-types PL-15 step `readSchema` names OpenApiDocument, which no contract.md type section defines (`### &lt;component&gt;.OpenApiDocument: type`)\ndocs/packages/explorer/pipelines.md:93: step-io-types PL-15 step `generateTypes` names OpenApiDocument, which no contract.md type section defines (`### &lt;component&gt;.OpenApiDocument: type`)\ndocs/packages/explorer/pipelines.md:93: step-io-types PL-15 step `generateTypes` names Schema, which no contract.md type section defines (`### &lt;component&gt;.Schema: type`)\ndocs/packages/qdata/pipelines.md:14: step-io-types PL-04 step `fetch_universe` names VersionedStore, which no contract.md type section defines (`### &lt;component&gt;.VersionedStore: type`)\ndocs/packages/qdata/pipelines.md:15: step-io-types PL-04 step `fetch_prices` names VersionedStore, which no contract.md type section defines (`### &lt;component&gt;.VersionedStore: type`)\ndocs/packages/qdata/pipelines.md:16: step-io-types PL-04 step `fetch_actions` names VersionedStore, which no contract.md type section defines (`### &lt;component&gt;.VersionedStore: type`)\ndocs/packages/qdata/pipelines.md:17: step-io-types PL-04 step `stamp_revisions` names VersionedStore, which no contract.md type section defines (`### &lt;component&gt;.VersionedStore: type`)\ndocs/packages/qdata/pipelines.md:18: step-io-types PL-04 step `commit_version` names VersionedStore, which no contract.md type section defines (`### &lt;component&gt;.VersionedStore: type`)\ndocs/packages/qdata/pipelines.md:37: step-io-types PL-05 step `trading_days` names TradingCalendar, which no contract.md type section defines (`### &lt;component&gt;.TradingCalendar: type`)\ndocs/packages/qdata/pipelines.md:38: step-io-types PL-05 step `check_bars` names CheckConfig, which no contract.md type section defines (`### &lt;component&gt;.CheckConfig: type`)\ndocs/packages/qdata/pipelines.md:38: step-io-types PL-05 step `check_bars` names PitReader, which no contract.md type section defines (`### &lt;component&gt;.PitReader: type`)\ndocs/packages/qdata/pipelines.md:38: step-io-types PL-05 step `check_bars` names TradingCalendar, which no contract.md type section defines (`### &lt;component&gt;.TradingCalendar: type`)\ndocs/packages/qdata/pipelines.md:39: step-io-types PL-05 step `check_returns` names CheckConfig, which no contract.md type section defines (`### &lt;component&gt;.CheckConfig: type`)\ndocs/packages/qdata/pipelines.md:39: step-io-types PL-05 step `check_returns` names PitReader, which no contract.md type section defines (`### &lt;component&gt;.PitReader: type`)\ndocs/packages/qdata/pipelines.md:40: step-io-types PL-05 step `check_universe` names CheckConfig, which no contract.md type section defines (`### &lt;component&gt;.CheckConfig: type`)\ndocs/packages/qdata/pipelines.md:40: step-io-types PL-05 step `check_universe` names PitReader, which no contract.md type section defines (`### &lt;component&gt;.PitReader: type`)\ndocs/packages/qdata/pipelines.md:40: step-io-types PL-05 step `check_universe` names TradingCalendar, which no contract.md type section defines (`### &lt;component&gt;.TradingCalendar: type`)\ndocs/packages/qdata/pipelines.md:41: step-io-types PL-05 step `check_point_in_time` names PitReader, which no contract.md type section defines (`### &lt;component&gt;.PitReader: type`)\ndocs/packages/qdata/pipelines.md:42: step-io-types PL-05 step `check_reference` names CheckConfig, which no contract.md type section defines (`### &lt;component&gt;.CheckConfig: type`)\ndocs/packages/qdata/pipelines.md:42: step-io-types PL-05 step `check_reference` names PitReader, which no contract.md type section defines (`### &lt;component&gt;.PitReader: type`)\ndocs/packages/qdata/pipelines.md:43: step-io-types PL-05 step `record_failures` names Catalog, which no contract.md type section defines (`### &lt;component&gt;.Catalog: type`)\ndocs/packages/qdata/pipelines.md:66: step-io-types PL-06 step `match_tickers` names PitReader, which no contract.md type section defines (`### &lt;component&gt;.PitReader: type`)\ndocs/packages/qdata/pipelines.md:68: step-io-types PL-06 step `compare_returns` names PitReader, which no contract.md type section defines (`### &lt;component&gt;.PitReader: type`)\ndocs/packages/qdata/pipelines.md:69: step-io-types PL-06 step `report_coverage` names Catalog, which no contract.md type section defines (`### &lt;component&gt;.Catalog: type`)\ndocs/packages/qdata/pipelines.md:69: step-io-types PL-06 step `report_coverage` names CrossCheckReport, which no contract.md type section defines (`### &lt;component&gt;.CrossCheckReport: type`)\ndocs/packages/qdata/pipelines.md:86: step-io-types PL-07 step `open_reader` names PitReader, which no contract.md type section defines (`### &lt;component&gt;.PitReader: type`)\ndocs/packages/qdata/pipelines.md:86: step-io-types PL-07 step `open_reader` names VersionedStore, which no contract.md type section defines (`### &lt;component&gt;.VersionedStore: type`)\ndocs/packages/qdata/pipelines.md:87: step-io-types PL-07 step `characterise` names CalibrationReport, which no contract.md type section defines (`### &lt;component&gt;.CalibrationReport: type`)\ndocs/packages/qdata/pipelines.md:87: step-io-types PL-07 step `characterise` names PitReader, which no contract.md type section defines (`### &lt;component&gt;.PitReader: type`)\ndocs/packages/qdata/pipelines.md:88: step-io-types PL-07 step `write_thresholds` names CalibrationReport, which no contract.md type section defines (`### &lt;component&gt;.CalibrationReport: type`)\ndocs/packages/qdata/pipelines.md:88: step-io-types PL-07 step `write_thresholds` names CheckConfig, which no contract.md type section defines (`### &lt;component&gt;.CheckConfig: type`)\ndocs/packages/qdata/pipelines.md:104: step-io-types PL-08 step `open_store` names VersionedStore, which no contract.md type section defines (`### &lt;component&gt;.VersionedStore: type`)\ndocs/packages/qdata/pipelines.md:105: step-io-types PL-08 step `open_reader` names PitReader, which no contract.md type section defines (`### &lt;component&gt;.PitReader: type`)\ndocs/packages/qdata/pipelines.md:105: step-io-types PL-08 step `open_reader` names VersionedStore, which no contract.md type section defines (`### &lt;component&gt;.VersionedStore: type`)\ndocs/packages/qdata/pipelines.md:106: step-io-types PL-08 step `PitReader` names PitReader, which no contract.md type section defines (`### &lt;component&gt;.PitReader: type`)\ndocs/packages/qdata/pipelines.md:106: step-io-types PL-08 step `PitReader` names VersionedStore, which no contract.md type section defines (`### &lt;component&gt;.VersionedStore: type`)\ndocs/packages/qdata/pipelines.md:107: step-io-types PL-08 step `resolve_company` names PitReader, which no contract.md type section defines (`### &lt;component&gt;.PitReader: type`)\ndocs/packages/qdata/pipelines.md:108: step-io-types PL-08 step `read_universe` names PitReader, which no contract.md type section defines (`### &lt;component&gt;.PitReader: type`)\ndocs/packages/qdata/pipelines.md:109: step-io-types PL-08 step `read_returns` names PitReader, which no contract.md type section defines (`### &lt;component&gt;.PitReader: type`)\ndocs/packages/qserver/pipelines.md:11: step-io-types PL-09 step `claim_run` names Catalog, which no contract.md type section defines (`### &lt;component&gt;.Catalog: type`)\ndocs/packages/qserver/pipelines.md:12: step-io-types PL-09 step `open_context` names Catalog, which no contract.md type section defines (`### &lt;component&gt;.Catalog: type`)\ndocs/packages/qserver/pipelines.md:13: step-io-types PL-09 step `CatalogRunContext` names Catalog, which no contract.md type section defines (`### &lt;component&gt;.Catalog: type`)\ndocs/packages/qserver/pipelines.md:14: step-io-types PL-09 step `load_check_config` names CheckConfig, which no contract.md type section defines (`### &lt;component&gt;.CheckConfig: type`)\ndocs/packages/qserver/pipelines.md:15: step-io-types PL-09 step `execute_run` names CheckConfig, which no contract.md type section defines (`### &lt;component&gt;.CheckConfig: type`)\ndocs/packages/qserver/pipelines.md:16: step-io-types PL-09 step `finish_run` names Catalog, which no contract.md type section defines (`### &lt;component&gt;.Catalog: type`)\ndocs/packages/qserver/pipelines.md:35: step-io-types PL-10 step `open_runs` names Catalog, which no contract.md type section defines (`### &lt;component&gt;.Catalog: type`)\ndocs/packages/qserver/pipelines.md:35: step-io-types PL-10 step `open_runs` names RunManager, which no contract.md type section defines (`### &lt;component&gt;.RunManager: type`)\ndocs/packages/qserver/pipelines.md:36: step-io-types PL-10 step `RunManager` names Catalog, which no contract.md type section defines (`### &lt;component&gt;.Catalog: type`)\ndocs/packages/qserver/pipelines.md:36: step-io-types PL-10 step `RunManager` names RunManager, which no contract.md type section defines (`### &lt;component&gt;.RunManager: type`)\ndocs/packages/qserver/pipelines.md:37: step-io-types PL-10 step `create_app` names App, which no contract.md type section defines (`### &lt;component&gt;.App: type`)\ndocs/packages/qserver/pipelines.md:37: step-io-types PL-10 step `create_app` names Catalog, which no contract.md type section defines (`### &lt;component&gt;.Catalog: type`)\ndocs/packages/qserver/pipelines.md:37: step-io-types PL-10 step `create_app` names RunManager, which no contract.md type section defines (`### &lt;component&gt;.RunManager: type`)\ndocs/packages/qserver/pipelines.md:37: step-io-types PL-10 step `create_app` names VersionedStore, which no contract.md type section defines (`### &lt;component&gt;.VersionedStore: type`)\ndocs/packages/qserver/pipelines.md:38: step-io-types PL-10 step `mount_reads` names App, which no contract.md type section defines (`### &lt;component&gt;.App: type`)\ndocs/packages/qserver/pipelines.md:38: step-io-types PL-10 step `mount_reads` names VersionedStore, which no contract.md type section defines (`### &lt;component&gt;.VersionedStore: type`)\ndocs/packages/qserver/pipelines.md:39: step-io-types PL-10 step `mount_checks` names App, which no contract.md type section defines (`### &lt;component&gt;.App: type`)\ndocs/packages/qserver/pipelines.md:39: step-io-types PL-10 step `mount_checks` names Catalog, which no contract.md type section defines (`### &lt;component&gt;.Catalog: type`)\ndocs/packages/qserver/pipelines.md:40: step-io-types PL-10 step `mount_runs` names App, which no contract.md type section defines (`### &lt;component&gt;.App: type`)\ndocs/packages/qserver/pipelines.md:40: step-io-types PL-10 step `mount_runs` names RunManager, which no contract.md type section defines (`### &lt;component&gt;.RunManager: type`)\ndocs/packages/qserver/pipelines.md:41: step-io-types PL-10 step `mount_static` names App, which no contract.md type section defines (`### &lt;component&gt;.App: type`)\ndocs/packages/qserver/pipelines.md:42: step-io-types PL-10 step `serve` names App, which no contract.md type section defines (`### &lt;component&gt;.App: type`)\ndocs/packages/qserver/pipelines.md:63: step-io-types PL-11 step `create_app` names App, which no contract.md type section defines (`### &lt;component&gt;.App: type`)\ndocs/packages/qserver/pipelines.md:63: step-io-types PL-11 step `create_app` names Catalog, which no contract.md type section defines (`### &lt;component&gt;.Catalog: type`)\ndocs/packages/qserver/pipelines.md:63: step-io-types PL-11 step `create_app` names RunManager, which no contract.md type section defines (`### &lt;component&gt;.RunManager: type`)\ndocs/packages/qserver/pipelines.md:63: step-io-types PL-11 step `create_app` names VersionedStore, which no contract.md type section defines (`### &lt;component&gt;.VersionedStore: type`)\ndocs/packages/qserver/pipelines.md:64: step-io-types PL-11 step `export_openapi` names App, which no contract.md type section defines (`### &lt;component&gt;.App: type`)\ndocs/packages/qserver/pipelines.md:64: step-io-types PL-11 step `export_openapi` names OpenApiDocument, which no contract.md type section defines (`### &lt;component&gt;.OpenApiDocument: type`)\ndocs/packages/qserver/pipelines.md:65: step-io-types PL-11 step `write_schema` names OpenApiDocument, which no contract.md type section defines (`### &lt;component&gt;.OpenApiDocument: type`)&quot;}
+</span></div><div class="step" id="SD165"><span class="sid">D165</span><span class="kind">hook</span><span class="hook">SessionStart:resume said: milestone: none (no tasks/plan.md)
+draft (waiting for approval): docs/packages/explorer/pipelines.md, docs/packages/qdata/pipelines.md, docs/packages/qserver/pipelines.md
+probes: 1 waiting → api-probe
+dt: python3 /Users/connorott/plugins/dev-team-workspace/iteration-9/quant-incremental/with_skill/plugin/dev-team/scripts/dt.py
+</span></div>
+<h2>Commits</h2>
+<p>None.</p>
+<h2>Returned</h2>
+<pre>I&#x27;ve written all 12 pipelines across the three packages (PL-04 to PL-15, all Draft). Every spec requirement and component is on a step. But `dt lint` reports 80 errors: the step tables use 14 type names that no contract defines yet. Contracts belong to architecture-design, so I routed that change instead of editing them here.
+
+## What was written
+
+**`qdata`**
+- **PL-04 Download run** (from the PL-09 worker, full or refresh): pick the primary source (Sharadar or a synthetic stand-in), fetch the universe, fetch prices, fetch actions, stamp revisions, commit the version.
+- **PL-05 Check run** (from the worker): trading calendar, bar checks, return checks, universe checks, point-in-time check, reference-list check, then record failures and the summary.
+- **PL-06 Cross-check run** (from the worker, after PL-05 or on its own): pick the secondary source (Yahoo or a synthetic stand-in), match tickers, fetch Yahoo, compare returns, report coverage.
+- **PL-07 Threshold calibration** (`python -m qdata calibrate`): open a reader, characterise the data with the `data-analysis` skill, write the thresholds you approve.
+- **PL-08 Research read** (from research code): open the store, open a reader, resolve a ticker, read the universe, read returns.
+
+**`qserver`**
+- **PL-09 Run worker** (spawned per run): claim the run, open the run context, load the check config, run PL-04 or PL-05 then PL-06, finish the run.
+- **PL-10 Serve the app** (the `qserver` command): mark orphaned runs interrupted, create the app, add the read, check and run routes plus the app&#x27;s static files, serve on 127.0.0.1:8765.
+- **PL-11 Export the API schema** (`python -m qserver export-openapi [--check]`): create the app, export the schema, write it or fail on a difference.
+
+**`explorer`**
+- **PL-12 Explore a company and the universe**: theme, version, data hooks for search, company, prices, cross-check and universe, the two chart builders, and the search, company and universe views.
+- **PL-13 Review and explain failures**: summary, failures, explain, and the checks and failure views.
+- **PL-14 Start and watch runs**: runs, start, live events, cancel, and the runs view.
+- **PL-15 Generate API types** (`pnpm gen:api [--check]`): read `contracts/openapi.json`, then generate the TypeScript types.
+
+**Planned layout:** one entry module per pipeline and one module per step owner. In `qdata`, `checks/pipelines/` holds PL-05 and PL-07. In `qserver`, `api/pipelines/` holds PL-10 and PL-11. In `explorer`, `src/pipelines/` holds PL-12 to PL-14. Test folders are `tests/intent/&lt;pkg&gt;/` and `tests/unit/&lt;pkg&gt;/`. I also added each calling pipeline&#x27;s ID to the `Used by:` lines in the `qdata` and `qserver` contracts.
+
+## What&#x27;s blocked on architecture-design
+Fourteen type names have no contract definition:
+- **Classes to retitle as types:** `PitReader`, `VersionedStore`, `Catalog`, `RunManager`
+- **Types to add in `qdata`:** `CheckConfig`, `CrossCheckReport`, `CalibrationReport`, `TradingCalendar`
+- **Types to add in `qserver`:** `App`, `OpenApiDocument`
+- **Types to add in `explorer`:** `Theme`, `ChartOptions`, `RouteView`, `Schema`
+
+All 80 lint errors are these names. Once they&#x27;re added, lint should be clean, because these pipeline docs use the names as they&#x27;ll be defined.
+
+## Assumptions
+- **One change from the list you approved:** download, check and cross-check runs start only from the qserver worker, not from `python -m qdata …`. The worker loads the check config and the sources, so a separate qdata command would duplicate that. Calibration keeps its own command.
+- The download and cross-check runs start on synthetic stand-in sources until PB-01 and PB-03 are answered. Settings choose Sharadar or Yahoo once they are.
+- The design direction (QR-07) is the first step of PL-12.
+- The stand-in data:
+  - **Synthetic primary:** 6 companies over 2000–2003, including a delisting, a split, a ticker change and a reused ticker.
+  - **Synthetic secondary:** the same companies, with returns perturbed by ±0.02 points and one company not covered.
+- `CompanyView` takes both chart configurations, price and cross-check.
+- PL-11&#x27;s empty temporary home is a helper inside PL-11&#x27;s entry module.
+
+## Open questions
+- Whether the Yahoo source uses yfinance or the chart endpoint waits on PB-03.
+
+## Uncovered
+None.
+
+Do you approve the pipelines? If you do, I&#x27;ll mark them Approved and offer to commit them with the contract `Used by:` updates. Next comes architecture-design&#x27;s Revise to add the 14 types; that clears the lint errors.</pre>
+</body></html>

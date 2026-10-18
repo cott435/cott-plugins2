@@ -24,9 +24,9 @@ A target with `"project": <abs path>` (and `"port_bar": true`) instead of `fixtu
 
 1. Stage the plugin into `<out>/plugin/`; make the project with the staged plugin's build-setup templates (`fixtures/build/minilab/scripts/make_live.py`: the real bar, the arm's plan, `dt base`; a project target: `port_bar.py`, its report in `<out>/port_bar.json`).
 2. One session, resumed at each stop: `claude -p --plugin-dir <plugin> --add-dir <plugin> --agents <rendered agents, hooks included> --allowedTools <rendered allow rules> --permission-mode acceptEdits --output-format stream-json`, every model `AGENT_MODEL`. A turn's outcome is its last `result` event.
-3. The rendered allow rules plus `git add` and `git commit` (a headless run has no one to approve the commits of an approved Revise or Replan; A0 also `git update-ref`). A scripted persona answers each stop from the project's state: a CONTRACT-CHANGE gets a yes, architecture-design Revise, build-planning Replan, then the go; a TEST-WRONG gets `--test-stands`; a Critical is resolved; a blocked half is retried once; the exit is approved with no fix tasks (Important findings counted) and no merge.
+3. The rendered allow rules plus `git add` and `git commit`, each git rule also in its `git -C <dir>` form, with `status`, `log`, `diff` and `show` (Opus writes that form) (a headless run has no one to approve the commits of an approved Revise or Replan; A0 also `git update-ref`). A scripted persona answers each stop from the project's state: a CONTRACT-CHANGE gets a yes, architecture-design Revise, build-planning Replan, then the go; a TEST-WRONG gets `--test-stands`; a Critical is resolved; a blocked half is retried once; the exit is approved with no fix tasks (Important findings counted) and no merge.
 4. After each turn the tree at HEAD is chained as `turn N` on `refs/eval/turns` (the plan map's snapshots); build/M1 is never touched by the driver.
-5. The run ends at the exit, the turn budget, or three turns with nothing new in `log.jsonl` or git. Then `runviz.py --run` (flow and plan map), `grade_build.py`, and the flow again with the checks.
+5. The run ends at the exit, the turn budget, or three turns with nothing new in `log.jsonl` or on a branch. Then `runviz.py --run` (flow and plan map), `grade_build.py`, and the flow again with the checks.
 
 ## What the grader reads (`grade_build.py <run>`)
 

@@ -140,7 +140,11 @@ def allow_rules(proj: pathlib.Path, arm: dict) -> list[str]:
         rules = json.loads((proj / ".claude" / "settings.json").read_text())["permissions"]["allow"]
     except (OSError, ValueError, KeyError):
         rules = []
-    return list(dict.fromkeys(rules + arm.get("extra_allow", [])))
+    rules += arm.get("extra_allow", [])
+    # Opus often writes `git -C <abs> <verb>`; a user would approve that form too (A3-RT r3 stalled on it)
+    verbs = {r[len("Bash(git "):].split(":")[0] for r in rules if r.startswith("Bash(git ") and r.endswith(":*)")}
+    rules += [f"Bash(git -C * {v} *)" for v in sorted(verbs | {"status", "log", "diff", "show"})]
+    return list(dict.fromkeys(rules))
 
 
 # ---- setup ----------------------------------------------------------------------------------------------
@@ -350,7 +354,7 @@ class Persona:
 
 def progress(proj: pathlib.Path) -> int:
     log = proj / ".git" / "dt-build" / "log.jsonl"
-    commits = sh(["git", "rev-list", "--count", "--all"], proj).stdout.strip()
+    commits = sh(["git", "rev-list", "--count", "--branches"], proj).stdout.strip()   # not refs/eval/turns
     return (len(log.read_text().splitlines()) if log.exists() else 0) + int(commits or 0)
 
 

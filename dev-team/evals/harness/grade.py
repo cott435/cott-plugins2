@@ -452,6 +452,8 @@ for t in m_tasks:
         r = row_of.get((t["id"], d))
         if r and r["mitigated_by"]:
             to_code.append(f"{t['id']}→{d} (its row says mitigated by {r['mitigated_by']})")
+        elif dtrun.wiring_shared_file(t, by_id[d]):
+            to_code.append(f"{t['id']}→{d} (two wiring tasks chained on a shared file; each pipeline has its own entry module)")
         elif dtrun.writes_overlap(t, by_id[d]):
             serial_shared.append(f"{t['id']}→{d}")  # a real file edge: reported, not a violation here
         elif covered_boundary(t, by_id[d]):

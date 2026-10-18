@@ -514,6 +514,12 @@ def phase0_misses(m_pls, m_tasks, iface_ids, declared_names, packages=()):
     return miss
 
 
+def wiring_shared_file(a, b):
+    """Two wiring tasks chained on a file both write (a shared `__main__.py` or entry module): each pipeline has its
+    own entry module (build-planning phase0.md), so the chain is a false serialization (iteration 8's F1)."""
+    return a.get("kind") == "wiring" and b.get("kind") == "wiring" and bool(writes_overlap(a, b))
+
+
 def wiring_crosses_frozen(a, b, pl_by_id, step_info, faked, packages=()):
     """A wiring task waits on a step task of code its pipeline only calls (another package's step, or another
     pipeline's), although the interface task declares a fake for that call: the wiring should run against the

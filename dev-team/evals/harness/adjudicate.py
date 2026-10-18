@@ -11,7 +11,10 @@ selftest/adjudicated/iteration-<N>.json holds one record per (trajectory, check)
   mixed fail must keep and the false items it must drop. Evidence is cut to 600 characters; `metrics.items` holds
   the full lists;
 - `finding`, `reason`; `basis` is "analyst" when the findings name this run and check, "derived" when they name
-  the defect and the record applies it to a check the analyst filed under another finding.
+  the defect and the record applies it to a check the analyst filed under another finding, and "rule" when no
+  analyst ruled on it but a later skill rule (`rule`) makes the archived plan's defect real;
+- `under_rule`: a later skill rule (`rule`) that changes an analyst's ruling. Its `expect`, `must_match`,
+  `must_not_match` and `reason` replace the record's when comparing; the analyst's own stay in the record.
 
 Each run is copied from the workspace (iteration-<N>/<trajectory>/with_skill) into a scratch dir without its
 virtualenv, node_modules, caches, flow/ and grading.json, and graded there; the workspace is only read.
@@ -52,7 +55,8 @@ def regrade(src, dst, reuse=False):
 
 
 def compare(rec, c):
-    """The ways the grader's check disagrees with the record (empty when it agrees)."""
+    """The ways the grader's check disagrees with the record (empty when it agrees), under any later rule."""
+    rec = {**rec, **rec.get("under_rule", {})}
     if c is None:
         return ["check missing from grading.json"]
     if c.get("na"):
@@ -60,7 +64,7 @@ def compare(rec, c):
     got = "pass" if c["passed"] else "fail"
     if got != rec["expect"]:
         return [f"{'passes' if c['passed'] else 'fails'}, ruled {rec['expect']}"]
-    ev = c["evidence"] + " " + json.dumps(c.get("metrics", {}))
+    ev = c["evidence"] + " " + json.dumps(c.get("metrics", {}), ensure_ascii=False)
     out = [f"evidence lacks /{p}/ (a real item)" for p in rec.get("must_match", []) if not re.search(p, ev, re.M)]
     out += [f"evidence still lists /{p}/ (ruled false)" for p in rec.get("must_not_match", []) if re.search(p, ev, re.M)]
     return out
@@ -102,6 +106,10 @@ def main():
 
     print(f"{len(rows)} adjudicated records over {len(runs)} runs; the grader agrees with {len(rows) - len(bad)}, "
           f"disagrees with {len(bad)}")
+    later = [x for x in rows if x.get("under_rule") or x["basis"] == "rule"]
+    if later:
+        print(f"  {len(later)} of them judged under a later skill rule: "
+              + "; ".join(sorted({(x.get("under_rule") or x)["rule"] for x in later})))
     for kind, title in (("grader", "still a false fail"), ("false-pass", "still a false pass"),
                         ("mixed", "mixed: wrong outcome or wrong items"), ("real", "a real failure the grader no longer sees")):
         group = [x for x in bad if x["verdict"] == kind]

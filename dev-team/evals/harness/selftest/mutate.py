@@ -11,7 +11,8 @@ what the sample can't meet (dryrun.CONTENT, plus the Yahoo cross-check for the p
 Each mutation names the check that owns the defect: the one design/interface-first-design.md §9.1 or the findings
 that found it in a real run give it to. Its outcome against its baseline is:
 - `exact`: the owner fails, and nothing else does except dt's own mirrors (dt_lint_clean and the sim_* checks,
-  which run dt over the plan and see the same defect);
+  which run dt over the plan and see the same defect, plus any check a mutation names in DT_SEES: one that fails
+  only through its own dt clause);
 - `overlap`: the owner fails, and so do other grader checks;
 - `other`: the owner passes, but another grader check fails;
 - `dt-only`: only dt's mirrors fail; the grader has no check of its own for it;
@@ -92,8 +93,14 @@ def type_missing_from_interface(fx):
 
 
 def depends_cycle(fx):
-    """M1's Depends cell carries a build-order note naming M2, and M2 depends on M1: dt reads every M\\d+ in the cell,
-    so the two form a cycle (iteration 8's F13)."""
+    """M1 depends on M2 and M2 on M1: a real Depends cycle (iteration 8's F13, once its build-order note is read the
+    way dt now reads it)."""
+    dr.sub(fx / "docs" / "roadmap.md", "| PL-01, PL-02 | — | Planned |", "| PL-01, PL-02 | M2 | Planned |")
+
+
+def depends_order_note(fx):
+    """M1's Depends cell carries a build-order note naming M2 (iteration 8's F13 as written). dt reads no ID inside
+    parentheses, so there is no cycle; the skill rule says Depends holds no build-order notes."""
     dr.sub(fx / "docs" / "roadmap.md", "| PL-01, PL-02 | — | Planned |", "| PL-01, PL-02 | — (build order: before M2) | Planned |")
 
 
@@ -112,25 +119,32 @@ MUTATIONS = [
     ("false-spine-edge", "no_edge_to_code_when_interface", false_spine_edge, "ifd"),
     ("accepted-while-probe-ready", "probe_not_guess", accepted_while_ready, "probe"),
     ("type-missing-from-interface", "phase0_split", type_missing_from_interface, "ifd"),
-    ("depends-cycle-in-note", "milestone_depends", depends_cycle, "ifd"),
+    ("depends-cycle", "milestone_depends", depends_cycle, "ifd"),
+    ("depends-order-note", "milestone_depends", depends_order_note, "ifd"),
 ]
 PINNED = {
-    "wiring-shared-entry": "gap",
+    "wiring-shared-entry": "exact",
     "wiring-shared-entry-parallel": "exact",
     "boundary-removed": "dt-only",
     "false-spine-edge": "exact",
     "accepted-while-probe-ready": "exact",
     "type-missing-from-interface": "exact",
-    "depends-cycle-in-note": "exact",
+    "depends-cycle": "exact",
+    "depends-order-note": "gap",
 }
+
+
+# Checks that fail on a mutation only through a dt clause of their own: roadmap_rows requires `dt roadmap --check`
+# to exit 0, and dt's roadmap check errors on a Depends cycle.
+DT_SEES = {"depends-cycle": {"roadmap_rows"}}
 
 
 def failing(res):
     return {cid for cid, c in res.items() if c.get("passed") is False}
 
 
-def outcome(owner, new):
-    others = new - DT_MIRRORS - {owner}
+def outcome(owner, new, mirrors=frozenset()):
+    others = new - DT_MIRRORS - mirrors - {owner}
     if owner in new:
         return "overlap" if others else "exact"
     return "other" if others else ("dt-only" if new else "gap")
@@ -187,7 +201,7 @@ def main():
             else:
                 res = probe_replay(out, f"quant-incremental-mut-{name}", pfx, plant)[0]
             new, cured = failing(res) - base[kind], base[kind] - failing(res)
-            got = outcome(owner, new) if owner in res else "gap (no such check)"
+            got = outcome(owner, new, DT_SEES.get(name, frozenset())) if owner in res else "gap (no such check)"
             rows.append((name, owner, got, sorted(new), sorted(cured), res.get(owner, {}).get("evidence", "")))
             if got != PINNED.get(name):
                 bad.append(f"{name}: {got}, pinned {PINNED.get(name)}")

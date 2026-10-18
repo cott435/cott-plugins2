@@ -259,6 +259,11 @@ case("no_edge_to_code_when_interface", True, "wiring waits on its own pipeline's
      not d.wiring_crosses_frozen(task("T27", "wiring", "PL-02"), T["T04"], {"PL-02": pl2}, info, {"stats.Cov", "stats.cov"}))
 case("no_edge_to_code_when_interface", True, "two thickens writing one module are a file edge (reported, not a violation)",
      d.writes_overlap(task("T31", "thicken", writes=["packages/data/src/data/validate.py"]), task("T30", "thicken", writes=["packages/data/src/data/validate.py"])))
+case("no_edge_to_code_when_interface", True, "...and so are they for the wiring rule",
+     not d.wiring_shared_file(task("T31", "thicken", writes=["packages/data/src/data/validate.py"]), task("T30", "thicken", writes=["packages/data/src/data/validate.py"])))
+case("no_edge_to_code_when_interface", False, "two wiring tasks chained on a shared __main__.py (it8 F1)",
+     d.wiring_shared_file(task("T09", "wiring", "PL-02", ["src/quant/__main__.py", "src/quant/stats/pipeline.py"]),
+                          task("T08", "wiring", "PL-01", ["src/quant/__main__.py", "src/quant/data/pipeline.py"])))
 
 # ---- first_planned_rest_designed (flow F4): stages with no rows; dt's Cut is now Split, both read as cut
 st = [{"id": "S1", "name": "data", "derived": "Planned"}, {"id": "S2", "name": "structure", "derived": "Cut"},

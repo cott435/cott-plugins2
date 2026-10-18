@@ -68,7 +68,7 @@ M2-T02 `allocate` spine (equal split) as in `../examples.md`; M2-T03 `compare` s
 - [ ] `python -m gridload.reserve evaluate --smoke` runs end to end on synthetic load, every step at its spine version; committed as PL-03's smoke test
 - [ ] PL-03 pre-build sections replaced by a `dt layout` pointer
 **Verify:** `python -m gridload.reserve evaluate --smoke` · `scripts/check.sh gate`
-**Depends on:** M2-T02, M2-T03 · **Writes:** src/gridload/reserve/pipeline.py, src/gridload/reserve/__main__.py, tests/unit/gridload/test_pl03_smoke.py
+**Depends on:** M2-T02, M2-T03 · **Writes:** src/gridload/reserve/pipeline.py, tests/unit/gridload/test_pl03_smoke.py
 
 M2-T05 Out-of-sample comparison (`compare`, split, RES-02, on M2-T03): Given a walk-forward split, each allocation uses only load before its week; realized held-out shortfall is reported next to the equal split. M2-T06 Optimized reserve allocation as in `../examples.md`.
 

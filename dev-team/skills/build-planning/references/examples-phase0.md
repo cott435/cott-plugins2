@@ -18,7 +18,7 @@ wave 3  T14  system: PL-02 on the real PL-01
 **Read:** PL-01, PL-02, data.RawReadings, data.Readings, profile.Load, profile.Profile, profile.Spectrum, profile.SeasonalityReport, data.load_readings
 **Acceptance:**
 - [ ] Each type is code in `data/types.py` or `profile/types.py`; each `tests/contracts/<id>.<Type>/` sample validates against its schema
-- [ ] Every step imports with its contract signature, body `raise NotImplementedError("<its spine task>")`; each `__init__.py` exports its contract
+- [ ] Every step and entry function imports with its contract signature, body `raise NotImplementedError("<its spine or wiring task>")`; each `__init__.py` exports its contract; `__main__.py` dispatches each trigger
 - [ ] The `data.load_readings` fake serves its fixtures
 **Verify:** `pytest tests/contracts` · `scripts/check.sh gate`
 **Depends on:** — · **Writes:** src/gridload/data/**, src/gridload/profile/**, tests/contracts/**
@@ -38,7 +38,7 @@ wave 3  T14  system: PL-02 on the real PL-01
 - [ ] `python -m gridload.profile seasonality-report --smoke` runs end to end on the `data.load_readings` fake; committed as PL-02's smoke test
 - [ ] PL-02 pre-build sections replaced by a `dt layout` pointer
 **Verify:** `python -m gridload.profile seasonality-report --smoke` · `scripts/check.sh gate`
-**Depends on:** M1-T04, M1-T05, M1-T06, M1-T07 · **Writes:** src/gridload/profile/pipeline.py, src/gridload/profile/__main__.py, tests/unit/gridload/test_pl02_smoke.py
+**Depends on:** M1-T04, M1-T05, M1-T06, M1-T07 · **Writes:** src/gridload/profile/pipeline.py, tests/unit/gridload/test_pl02_smoke.py
 
 ### M1-T11: Least-squares amplitudes
 **Package:** gridload · **Step:** PL-02.spectrum · **Kind:** thicken · **Covers:** STAT-03 · **Size:** XS · **Mode:** split

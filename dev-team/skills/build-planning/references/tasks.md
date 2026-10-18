@@ -30,7 +30,7 @@ Read when writing thicken tasks, the dependency graph and the files. Templates: 
 ## 9. Dependencies, Writes, the graph, Verify
 
 - **`Depends on:`** resolves, points only backward (position counts, not ID number), is acyclic, and holds only edges nothing mitigates.
-- **`Writes:`** is exact paths, or a folder glob the task owns, and is an exclusive claim: two tasks with no `Depends on` path between them never write the same path (`writes`). Shared files (`__init__.py`, `types.py`, `pipeline.py`, `__main__.py`) belong to the interface, wiring or system task. No `Writes:` under `tasks/`: builders never tick `todo.md` or record findings; the orchestrator does after each merge.
+- **`Writes:`** is exact paths, or a folder glob the task owns, and is an exclusive claim: two tasks with no `Depends on` path between them never write the same path (`writes`). Shared files (`__init__.py`, `types.py`, `__main__.py`) belong to the interface task; each pipeline's entry module to its wiring and system tasks (`phase0.md`). No `Writes:` under `tasks/`: builders never tick `todo.md` or record findings; the orchestrator does after each merge.
 - **`## Dependency graph`**, after the last checkpoint: one row per edge between tasks, `| From | To | Kind | Mitigated by |`. From is the task that needs, To the one it needs; each cell starts with the task ID. Mitigated by names the interface and the task freezing it (`profile.Profile sample (M1-T01)`), or says `none: <reason>`.
 
 | Kind | Meaning | Mitigation |

@@ -291,7 +291,7 @@ On restart (Resume mode, a new session, so no agent of the old one is running), 
 
 **Verified by a live build** ([evidence/2026-10-17-live-build.md](evidence/2026-10-17-live-build.md), buildmini M1, five runs, $2.85): a split task end to end with the build branch never red (the tester's tests reach `build/M1` only in the implementer's landing); two worktree agents in parallel, landed one after the other under the lock; the merged-tree gate catching a real integration error; retries on `writes` and `integration` rejects; the Stop gate's verdict reused at land; the interface and exit reviews recorded through `submit-review`. The runs also showed that project allow rules apply only in a trusted folder, and that worktree agents can't Write outside their worktree or into `.claude/`.
 
-**Still to verify:** in the interactive app, how a background agent's permission prompt, or a guard's `ask`, surfaces.
+**Verified by hand in the interactive app** ([evidence](evidence/2026-10-17-build-smoke.md#interactive-app-background-agents-prompts-2026-10-17-by-hand)): a background agent's permission request, and a guard's `ask`, reach the user in the main session, labelled with the agent; the agent waits for the answer, and the main session takes no input until it is given. So a missing allow rule stalls every agent that hits it and the driver with them, interactively as well as headless.
 
 ---
 

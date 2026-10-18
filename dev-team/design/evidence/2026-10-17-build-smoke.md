@@ -44,3 +44,19 @@ Not tested: smoke tests 1–2 (a split task end to end, parallel landing), which
 - **Liveness by `cwd` works**: SubagentStop's `cwd` is the worktree that holds the claim.
 - **Per-worktree venvs are cheap** with a warm uv cache; a cold torch import (~6 s) is the larger cost per first test run.
 - **Eval harness:** read the last `result` event of a `-p` stream, not the first.
+
+## Interactive app: background agents' prompts (2026-10-17, by hand)
+
+The user ran the same probe interactively in the throwaway repo (trusted, default permission mode): one `general-purpose` agent with `isolation: "worktree"`, in the background, running the fake `dt claim` by absolute path, then writing `oracle/expected.json` (the `ask` hook). Two sessions; the agents' transcripts are under `~/.claude/projects/…-scratchpad-smoke-repo/<session>/subagents/`.
+
+| Question | Result | Evidence |
+|---|---|---|
+| Does a background agent's permission request reach the user? | **Yes, in the main session**, labelled with the agent: "Create file · from the general-purpose agent", with a diff and Yes / Yes for this session / No. The un-allowed Bash command got a prompt the same way | the user's screen; transcripts |
+| Does the guard's `ask` surface (as `dt guard` uses for oracle files)? | **Yes**, as an ordinary permission prompt; headless it was a silent denial | session 1 |
+| Does the agent wait? | **Yes.** Each prompted call waited for the answer: 59 s (Write, allowed), 61 s (Bash, denied) | transcript timestamps |
+| Can the user keep working while a prompt is open? | **No.** The prompt takes the input; the main session can't be typed to until it is answered | the user |
+| Is the answer honoured? | Yes: a denial reached the agent as "Permission for this tool use was denied", and it reported `claim=denied` and went on; an allow wrote the file | session 2 |
+| Odd one | Session 1's Bash call ran in 1 s with no prompt; the cause is unknown | session 1 transcript |
+| Side note | The prompt's second option offered to allow edits "in this project's .claude folder" for `oracle/expected.json`: the worktree sits under `.claude/worktrees/`, so every write in it is treated as a `.claude/` edit. That fits the reviewers being denied `.claude/review.md` in the live build | the user's screen |
+
+**What this changes.** Interactively, nothing is silently denied: every un-allowed call from any of the parallel agents stops that agent and takes the main session's input until the user answers, so one missing allow rule stalls the driver too. Allow rules matter as much interactively as headless. A guard's `ask` does reach the user, but builders still escalate instead of asking: an `expected.json` change belongs to `test-planning`, not to a build agent.

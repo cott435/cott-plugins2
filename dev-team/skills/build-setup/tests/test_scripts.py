@@ -367,6 +367,11 @@ class SingleProject(unittest.TestCase):
             "test-skipped": ("tests/unit/data/test_skip.py",
                              '"""Skip."""\nimport pytest\n\n\n@pytest.mark.skip(reason="later")\n'
                              "def test_x() -> None:\n    assert True\n"),
+            "stub-pinned": ("tests/contracts/test_interface.py",
+                            '"""Interface."""\nimport pytest\n\nfrom tinyq.data.prices import first\n\n\n'
+                            "def test_stub_names_its_task() -> None:\n"
+                            '    with pytest.raises(NotImplementedError, match="M1-T05"):\n'
+                            "        first([1.0])\n"),
             "suppression": ("src/tinyq/data/cov.py",
                             '"""Cov."""\n\n\ndef f() -> int:  # pragma: no cover\n    """F."""\n    return 1\n'),
         }

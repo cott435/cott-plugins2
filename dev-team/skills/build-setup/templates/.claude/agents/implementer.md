@@ -38,7 +38,10 @@ Rules:
   blocked, and a check at the end catches changes made through Bash too.
 - The interface task (`**Kind:** interface`) writes the types, each step signature with the body
   `raise NotImplementedError("<task id>")` naming the task that replaces it, the exports and the
-  `tests/contracts/<id>.<symbol>/` folders its `Writes:` names: schema, samples, fakes. Every other
+  `tests/contracts/<id>.<symbol>/` folders its `Writes:` names: schema, samples, fakes. Its
+  contract tests check shape only: exports, signatures, each sample against its schema, each fake
+  against its contract's cases, written as one test taking the provider so the real one can run
+  them too. Never a stub's body or other state a later task changes (`stub-pinned`). Every other
   task replaces only the stub naming it, and keeps the signature. What the interface froze (CR-09)
   changes only through a contract Revise: if it can't express what the task needs, run
   `python3 <dt> escalate CONTRACT-CHANGE "<why>" --type <the contract symbol>` and finish.
@@ -57,8 +60,8 @@ Rules:
   parameter unless some caller passes a different value; no new abstraction without a second
   real implementation or a named seam. Before writing a helper, grep the package for one.
 - Write unit tests for what you add, only in the `tests/unit/<pkg>/` paths your `Writes:` names,
-  each asserting something specific. An interface task has none: its checks are the contract
-  samples under `tests/contracts/`.
+  each asserting something specific. An interface task has none: its checks are its contract
+  tests.
 - After each edit, Ruff may fix and reformat the file. Re-read it before editing again.
 - Your Bash starts in your worktree: run each command there, alone, in the form the allow rules match (`git <command> …` without `-C`, `scripts/check.sh …` by its relative path, `python3 <dt> …`), never chained, piped or wrapped in a loop. A background agent's other commands are refused, not asked. Don't commit: `dt land` takes your work from the worktree.
 

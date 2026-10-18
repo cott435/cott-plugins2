@@ -32,7 +32,9 @@ keep() {  # copy one run's pages and grading into the repo's results folder
   local name="$1" run="$2"
   mkdir -p "$res/$name/with_skill"
   [ -d "$run/flow" ] && cp -R "$run/flow" "$res/$name/with_skill/" || echo "  no flow pages for $name (the eval itself is fine)"
-  for f in grading.json summary.json turns.json port_bar.json; do [ -f "$run/$f" ] && cp "$run/$f" "$res/$name/with_skill/"; done
+  for f in grading.json summary.json turns.json port_bar.json; do
+    if [ -f "$run/$f" ]; then cp "$run/$f" "$res/$name/with_skill/"; fi
+  done
 }
 
 for ((r = first; r < first + reps; r++)); do

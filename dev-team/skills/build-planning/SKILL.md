@@ -25,7 +25,7 @@ The build plan says **in what order** the pipelines get built. Once a stage's pi
 
 ## Modes
 
-Run `dt status --skill build-planning` first: it prints the mode, progress, coverage, routing lists and `next ids`. Read the mode's file and only the references it names.
+Run `dt status --skill build-planning` first. Read the mode's file and only the references it names.
 
 | Mode | When | Do |
 |---|---|---|
@@ -41,6 +41,7 @@ A foreign plan's question: `references/examples-foreign.md`.
 ## Asking
 
 - **Interview one question at a time**, with a guess and a default, only on the user's decisions: the cut, what the milestone covers and defers, the exit, queued plans, a missing skill, a mode override. Infer the rest as ASSUMPTIONS. For a choice from a list, show it, then ask once.
+- **The user's words:** record them and honour yours (`requests_open`) per `../idea-refine/references/requests.md`.
 - **No live user:** open decisions go under Open questions; leave Draft.
 
 ## Review Gate (CRITICAL)
@@ -60,7 +61,7 @@ Then present:
 
 | The user says | Do | Then |
 |---|---|---|
-| An unambiguous yes | Set Status `Approved` and the date. Offer to commit the plan and roadmap; commit only on a yes | **Stop.** Point to `build-setup` (New on the first milestone, Extend at kickoff) |
+| An unambiguous yes | Set Status `Approved` and the date. Offer to commit plan and roadmap; commit only on a yes | **Stop.** Point to `build-setup` (New on the first milestone, Extend at kickoff) |
 | Yes, with a change | Make exactly that edit. Approve only if it adds, drops or reorders nothing (a re-cut stage is a reorder) | **Stop.** List what changed |
 | Changes, or a hedge ("looks fine I guess") on a drop, an override or the exit | Edit, keep Draft | Repeat the gate |
 

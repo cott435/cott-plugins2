@@ -13,7 +13,7 @@ It owns `docs/architecture.md`, each package's `contract.md` and, in a multi-pac
 
 `dt` means `python3 ../../scripts/dt.py`, relative to this skill's folder, run from the project root.
 
-**Preconditions:** an `Approved` spec (else ask). Read the brief's constraints, the spec in full, and in a codebase its structure, dependencies and ADRs. Read the `docs/references.md` entries for the milestone in scope (references waiting: `reference-intake` first).
+**Preconditions:** an `Approved` spec (else ask). Read the brief's constraints, the spec in full, and in a codebase its structure, dependencies and ADRs. Read the `docs/references.md` entries for the milestone in scope (references waiting: `reference-intake` first), and `docs/requests.md`, the user's own words: `requests_open` lists the ones the architecture must honour. Follow `../idea-refine/references/requests.md` for them and for every answer you get.
 
 ## Modes
 
@@ -23,7 +23,7 @@ Start with `dt status --skill architecture-design`. Take the mode, shape, gap ke
 |---|---|---|
 | **New** | No `docs/architecture.md` | `references/new.md` |
 | **Extend** | Uncovered or changed spec requirements | `references/extend.md` |
-| **Revise** | A technical change with no spec change, probe results to fold in (`probes_answered`, `probes_failed`), or a change another skill routed here (`routed_changes`) | `references/revise.md` |
+| **Revise** | A technical change with no spec change, probe results to fold in (`probes_answered`, `probes_failed`), a change another skill routed here (`routed_changes`), or the user's words the Approved architecture doesn't honour (`requests_open`) | `references/revise.md` |
 | **Grow** | A Grow trigger fires, or the user wants a split | `references/grow.md` |
 | **Sync** | Code and doc disagree, or code has no doc | `references/sync.md` |
 
@@ -36,7 +36,7 @@ Start with `dt status --skill architecture-design`. Take the mode, shape, gap ke
 Rerun `dt status`: `uncovered`, `changed_since` and `stale` empty, or each gap under Risks and open questions; `broken_fences` (move lines added after a closing fence inside it), `contracts_missing`, `legacy_layout` and `probes_failed` empty. `dt lint docs/` reports no errors. Check by hand that a superseded decision is cited only by its own line, its replacement and the Changelog, and that nothing Accepted contradicts a newer decision (search the counts, ranges and names changed).
 
 Then:
-1. Summarize: files, shape, components or packages, decisions needing attention, uncovered requirements.
+1. Summarize: files, shape, components or packages, decisions needing attention, uncovered requirements, the **Your words** line (requests honoured and changed).
 2. **ASSUMPTIONS** (names, types, signatures, dependency directions you chose), then open questions.
 3. Ask the user to approve or request changes. **STOP YOUR TURN.**
 

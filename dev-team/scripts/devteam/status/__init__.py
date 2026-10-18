@@ -1,8 +1,9 @@
 """`dt status`: what each skill needs before it starts. One module per skill; `common` holds the printer, the
 docs line, next IDs and the SessionStart summary; `packages` holds package ids, Grow triggers, contract
-freshness and drift. The CLI is `commands/status.py`."""
+freshness and drift. A skill that owns user requests (docs/requests.md) also gets `requests_open`. The CLI is `commands/status.py`."""
 from __future__ import annotations
 
+from .. import requests as rq
 from ..repo import Repo
 from .api_probe import api_probe
 from .architecture_design import architecture_design
@@ -26,6 +27,8 @@ def report(repo: Repo, skill: str | None) -> Report:
     r.add("skill", skill or "—")
     if skill:
         HANDLERS[skill](repo, r)
+        if rq.owner_of(skill):
+            r.add("requests_open", rq.open_for(repo, skill))
     else:
         r.mode("—")
         add_common(repo, r)

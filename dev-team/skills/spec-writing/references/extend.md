@@ -1,6 +1,6 @@
 # Extend mode: adding an idea to an existing spec
 
-Read when `dt status` reports `mode: extend`: `docs/spec.md` exists and an accepted idea file (`ideas_ready`) is the input. Read the spec fully, then `references/spec.md`.
+Read when `dt status` reports `mode: extend`: `docs/spec.md` exists and an accepted idea file (`ideas_ready`), a routed change (`routed_changes`) or the user's words the spec doesn't honour yet (`requests_open`) is the input. Read the spec fully, then `references/spec.md`.
 
 - A brief the idea edited must be `Accepted` too, like the idea itself.
 - **No idea file** (the user just describes a feature): route to `idea-refine`, unless the change is small and fully clear; then confirm and add it, noting "no idea file" in the Changelog row.

@@ -13,6 +13,7 @@ Turns a raw idea into a focused direction and writes it down for the user to acc
 - **`docs/ideas/<idea-slug>.md`**, *why this feature and how it fits*, with the context `spec-writing` needs. Ideas carry each addition's detail, so the brief doesn't grow.
 - **Roadmap stages** (`S<n>`, from `dt next-id S`): the stage rows and each `## S<n>` section's `**Outline:**` and `**Skills:**` lines. Stages live in `docs/roadmap.md`, never as brief goals.
 - **`docs/references.md`**: only the `**Milestones:**` field of entries the user assigns to a stage.
+- **`docs/requests.md`**, *what the user said*, verbatim: idea-refine starts it, recording each fact, constraint, tool, choice and answer as the user gives it, with `dt request add`. `references/requests.md` holds its rules; every planning skill follows them, because the brief compresses and later skills often run in a fresh session.
 
 **Never:** sizes or cuts a stage, or writes milestone rows and `## M<n>` sections (`build-planning`); writes a Status* cell (`dt roadmap`); writes requirements (`spec-writing`) or picks tools, APIs or datasets (`architecture-design`).
 

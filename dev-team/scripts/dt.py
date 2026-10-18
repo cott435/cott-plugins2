@@ -34,6 +34,7 @@ COMMANDS = {
     "archive": "archive",
     "finding": "finding",
     "route": "route",
+    "request": "request",
     "tick": "tick",
     "base": "base",
 }

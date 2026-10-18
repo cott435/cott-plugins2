@@ -1,6 +1,6 @@
 # Revise
 
-Read when `dt status --skill architecture-design` reports Revise: a technical change with no spec change, or probe results to fold in. It ends at the Review Gate in `../SKILL.md`, following `writing-rules.md`. Example: `examples-revise.md`.
+Read when `dt status --skill architecture-design` reports Revise: a technical change with no spec change, probe results to fold in, or open requests (`requests_open`: the user's words, honoured by a new or revised decision as `decisions.md` says). It ends at the Review Gate in `../SKILL.md`, following `writing-rules.md`. Example: `examples-revise.md`.
 
 1. Write a new decision whose Context explains what was learned ("the simulator is 40× too slow for QR-02 at 1M steps"). Then supersede the old decision if the new one reverses it, or revise it in place if the new one changes only part of it (`decisions.md`).
 2. Update every section and contract the change touches (tech stack, components, Overview; contracts per `contracts.md`), and run the Review Gate.

@@ -33,7 +33,7 @@ Right after an architecture Grow, the new packages show `new` while the old `pip
 
 ## Asking about workflows
 
-A pipeline exists because someone runs it, so never derive workflows from the component list. Show the numbered candidates in your message first (trigger, what it does, milestone), saying nothing is written until they confirm. Then one `AskUserQuestion`, the next stage's workflows recommended (up front, every stage's): 2–4 as one multi-select; more as "All of them" vs "The core set only (1, 2, 4)". Ask separately, one at a time with a guess and default, only what is genuinely unclear. Infer names, triggers, types, order and module split; list them under ASSUMPTIONS.
+A pipeline exists because someone runs it, so never derive workflows from the component list. Show the numbered candidates in your message first (trigger, what it does, milestone), saying nothing is written until they confirm. Then one `AskUserQuestion`, the next stage's workflows recommended (up front, every stage's): 2–4 as one multi-select; more as "All of them" vs "The core set only (1, 2, 4)". Ask separately, one at a time with a guess and default, only what is genuinely unclear. Infer names, triggers, types, order and module split; list them under ASSUMPTIONS. **The user's words:** record them and honour yours (`requests_open`) per `../idea-refine/references/requests.md`.
 
 ## Review Gate (CRITICAL)
 

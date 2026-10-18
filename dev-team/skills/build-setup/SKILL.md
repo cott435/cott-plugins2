@@ -45,4 +45,6 @@ Ask for approval and **stop the turn**.
 | A hedge on a loosening or exception ("fine I guess") | Not approval. Ask again about that item |
 | Changes | Edit, keep Draft, repeat the gate |
 
+**The user's words:** record them and honour yours (`requests_open`) per `../idea-refine/references/requests.md`.
+
 No live user: write everything, list the confirmations needed under Open questions, leave Draft.

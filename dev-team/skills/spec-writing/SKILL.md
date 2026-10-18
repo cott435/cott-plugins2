@@ -19,8 +19,9 @@ Run `python3 ../../scripts/dt.py status --skill spec-writing` first (path relati
 
 1. Read `docs/brief.md`.
 2. A `Draft` input: ask whether the user accepts it, and proceed only once they do (set it `Accepted`).
-3. In a codebase, ground requirements in existing behavior. Read `docs/references.md` summaries for behavior worth requiring (references waiting: `reference-intake` first); the spec states the behavior, never the reference, its file or its functions.
-4. In every round, check the installed skills (`dt status`'s `skills`, plus those in your context). A step one owns (a hypothesis test, a security review, a data workflow) names the skill in its requirement, with what it's given and what counts as a pass: "Each candidate feature is tested with the `<skill name>` skill on held-out weeks; it passes only if its lift is significant at 5% after correction." Never write your own version of its procedure.
+3. Read `docs/requests.md`, the user's own words. `requests_open` lists the ones the spec must honour; follow `../idea-refine/references/requests.md` for them and for every answer you get.
+4. In a codebase, ground requirements in existing behavior. Read `docs/references.md` summaries for behavior worth requiring (references waiting: `reference-intake` first); the spec states the behavior, never the reference, its file or its functions.
+5. In every round, check the installed skills (`dt status`'s `skills`, plus those in your context). A step one owns (a hypothesis test, a security review, a data workflow) names the skill in its requirement, with what it's given and what counts as a pass: "Each candidate feature is tested with the `<skill name>` skill on held-out weeks; it passes only if its lift is significant at 5% after correction." Never write your own version of its procedure.
 
 ## Modes
 
@@ -41,7 +42,7 @@ Run `python3 ../../scripts/dt.py status --skill spec-writing` first (path relati
 
 Run the hygiene check in `references/spec.md`, and the gate steps your mode file adds. Then:
 
-1. Summarize: feature and requirement counts, the goal → feature and stage → feature mappings, Open questions.
+1. Summarize: feature and requirement counts, the goal → feature and stage → feature mappings, the **Your words** line (requests honoured and changed), Open questions.
 2. Ask the user to approve or request changes.
 3. **STOP YOUR TURN.** Never start the architecture or code in the same turn, and never edit the spec and draft the architecture in one turn.
 

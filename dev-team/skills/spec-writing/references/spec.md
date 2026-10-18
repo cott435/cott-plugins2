@@ -69,8 +69,9 @@ Read before writing or extending `docs/spec.md`, and again for the hygiene check
 - **Every feature names one stage.** Its `**Stage:**` line holds only the ID of the roadmap stage that first builds it. `dt lint` fails a feature with no stage, or one naming no stage row.
 - **Requirement IDs are permanent.** `CODE-NN`, numbered within the feature, never reused or renumbered.
 - **Quality requirements only when measurable.** Leave out generic wishes ("should be secure"); keep checkable ones ("passwords are never shown in full"). Cost, licence and budget limits are `QR-` items ("data costs ≤ $50 a month"), never `DATA-` or feature requirements.
-- **No tech stack, libraries, vendors, schemas, endpoints, or file structure, even when the user names them.** Write the behavior the name stands for. The name itself belongs to `architecture-design`, which reads the idea file and the conversation.
-- **Describe the product as it is now, not how it got here.** Requirement text, scope lists and assumptions carry no change notes, provenance tags ("from the field-photo idea") or process notes ("numbers chosen for review"). History goes in one Changelog row per round, and in git.
+- **No tech stack, libraries, vendors, schemas, endpoints, or file structure, even when the user names them.** Write the behavior the name stands for. The name itself belongs to `architecture-design`, which reads it in `docs/requests.md`.
+- **Describe the product as it is now, not how it got here.** Requirement text, scope lists and assumptions carry no change notes, provenance tags ("from the field-photo idea", "UR-03") or process notes ("numbers chosen for review"). History goes in one Changelog row per round, and in git; which requirement honours which request goes in `docs/requests.md` (`dt request trace`).
+- **The user's words win over the brief's.** Where a `spec` request is more specific than the brief or idea file ("circular tank", "one predator"), the requirement says what the request says, or the user approves the change.
 
 **Data and ML projects — extra rules:**
 
@@ -83,5 +84,7 @@ Read before writing or extending `docs/spec.md`, and again for the hygiene check
 ## Hygiene check
 
 Run on everything above the Changelog before presenting a Draft.
+
+- **The user's words.** `dt request --open --owner spec` is empty, or each one left is a change you ask the user about.
 
 - **Implementation names.** Search for library, framework, vendor, dataset, file-format, database and model-type names, file and function names (a reference's included), including names the user, the brief or the idea file used. Rewrite each one as the behavior or guarantee it stands for: "within 10% of torchvision's ResNet-18" becomes "within 10% of an established reference implementation", and "NumPy only" becomes "written from basic array operations". The only exception is a source the brief makes a fixed constraint.

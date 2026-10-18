@@ -5,8 +5,9 @@ from .. import routes
 from ..repo import Repo
 from .common import Report, add_common, available_skills, fmt
 
-# Planning ID prefixes: a spec requirement must not use them (`RF` and `PB` collide with reference and probe entries).
-RESERVED_PREFIXES = ["AD", "CR", "EX", "PB", "PL", "RF", "TC"]
+# Planning ID prefixes: a spec requirement must not use them (`RF`, `PB` and `UR` collide with reference, probe and
+# request entries).
+RESERVED_PREFIXES = ["AD", "CR", "EX", "PB", "PL", "RF", "TC", "UR"]
 
 
 def spec_writing(repo: Repo, r: Report) -> None:

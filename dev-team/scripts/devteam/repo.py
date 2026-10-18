@@ -28,6 +28,7 @@ KINDS = [
     (r"docs/references\.md", "references"),
     (r"docs/probes\.md", "probes"),
     (r"docs/routes\.md", "routes"),
+    (r"docs/requests\.md", "requests"),
     (r"CONSTRAINTS\.md", "constraints"),
     (r"(AGENTS|CLAUDE)\.md", "agents"),
     (r"tasks/plan\.md", "plan"),
@@ -55,12 +56,13 @@ def package_of(rel: str) -> str | None:
 
 @dataclass
 class Definition:
-    """Where an ID is defined: a heading section, a bold-led requirement line, a table row or a retired line."""
+    """Where an ID is defined: a heading section, a bold-led requirement or request line, a table row or a retired
+    line."""
     id: str
     doc: "Doc"
     start: int            # 0-based first line
     end: int              # exclusive
-    how: str              # heading | requirement | table | retired | finding
+    how: str              # heading | requirement | request | table | retired | finding
     title: str = ""
     retired: bool = False
     retired_note: str = ""   # "Retired 2026-11-02: reason" or "Superseded by AD-07 · …"
@@ -136,6 +138,10 @@ class Doc:
             for b in md.bold_leads(self.lines, self.mask):
                 out.append(Definition(b.id, self, b.line, b.end, "requirement",
                                       retired=b.removed, retired_note="removed" if b.removed else ""))
+        if self.kind == "requests":
+            for b in md.bold_leads(self.lines, self.mask):
+                if b.id.startswith("UR-"):
+                    out.append(Definition(b.id, self, b.line, b.line + 1, "request"))
         if self.kind == "constraints":
             for b in md.bold_leads(self.lines, self.mask):
                 if b.id.startswith("CR-"):
@@ -231,6 +237,10 @@ class Repo:
     @property
     def references(self) -> Doc | None:
         return self.doc("docs/references.md")
+
+    @property
+    def requests(self) -> Doc | None:
+        return self.doc("docs/requests.md")
 
     @property
     def probes(self) -> Doc | None:

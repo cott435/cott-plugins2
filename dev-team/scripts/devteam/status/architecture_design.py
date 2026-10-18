@@ -6,6 +6,7 @@ import os
 from pathlib import Path
 
 from .. import probes as pb
+from .. import requests as rq
 from .. import routes
 from .. import specdocs
 from ..repo import Repo
@@ -66,8 +67,8 @@ def architecture_design(repo: Repo, r: Report) -> None:
     routed = routes.open_for(repo, "architecture-design")
     if arch is None:
         r.mode("new")
-    elif probe_state.answered or routed:
-        r.mode("revise")      # a probe's results, or a change routed here, before anything else (§4.4)
+    elif probe_state.answered or routed or rq.due(repo, "architecture"):
+        r.mode("revise")      # a probe's results, a change routed here or the user's words, before anything else
     else:
         r.mode("extend" if uncovered or changed_since or contracts_missing or legacy else "current")
     add_common(repo, r)

@@ -1,6 +1,6 @@
 # Ideation: understand, expand, converge
 
-Phases 1 and 2 of every run, New and Extend alike. The mode file says what to read before Phase 1 and what Phase 2 must also settle.
+Phases 1 and 2 of every run, New and Extend alike. The mode file says what to read before Phase 1 and what Phase 2 must also settle. Throughout, record the user's words as `requests.md` says: their first message, each answer, each direction they pick.
 
 ## Phase 1: Understand & expand
 

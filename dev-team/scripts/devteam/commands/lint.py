@@ -18,7 +18,8 @@ from pathlib import Path
 from .. import git, graph, md, model
 from .. import probes as pb
 from .. import references as refs
-from ..repo import Repo
+from .. import requests as rq
+from ..repo import Doc, Repo
 from ..status.common import available_skills
 from . import roadmap as roadmap_cmd
 
@@ -36,6 +37,7 @@ SEVERITY = {
     "probe-fields": "E", "probe-informs": "E", "probe-cite": "E", "probe-runner": "E", "probe-leak": "E",
     "probe-sample": "E", "probe-results": "E", "probe-stale": "W", "probe-large": "W",
     "boundaries": "E", "probe-open": "E", "milestone-depends": "E",
+    "request-format": "E", "request-trace": "E", "request-open": "E", "request-edit": "E", "request-ref": "E",
 }
 
 # Size budgets (planning-stage.md §3), in lines. Package docs are budgeted per unit (lines per unit × units +
@@ -510,13 +512,14 @@ def check_ref_large(ctx: Context):
 
 
 def check_ref_prefix(ctx: Context):
-    """`RF` is reserved for reference entries: a spec requirement must not use it."""
+    """`RF` and `UR` are reserved for reference and request entries: a spec requirement must not use them."""
     spec = ctx.repo.spec
     if spec is None:
         return
     for b in md.bold_leads(spec.lines, spec.mask):
-        if b.id.startswith("RF-"):
-            yield _p(spec, b.line, "ref-prefix", f"{b.id}: the RF prefix is reserved for docs/references.md")
+        for prefix, doc in (("RF", "docs/references.md"), ("UR", rq.PATH)):
+            if b.id.startswith(prefix + "-"):
+                yield _p(spec, b.line, "ref-prefix", f"{b.id}: the {prefix} prefix is reserved for {doc}")
 
 
 def check_roadmap_skill(ctx: Context):
@@ -590,6 +593,73 @@ def check_spec_stage(ctx: Context):
             yield _p(spec, at, "spec-stage", f"{f.code} Stage {cell!r}: not a stage ID (S<n>)")
         elif not f.stage:
             yield _p(spec, at, "spec-stage", f"{f.code} names no stage: add a **Stage:** line")
+
+
+# ---- request checks (design/requests.md) ----------------------------------------------------------
+
+def check_request_format(ctx: Context):
+    """A `- **UR-NN**` line that isn't `<owner> · "<words>" [<context>] · <skill> <date> → <trace>`."""
+    doc = ctx.repo.requests
+    for b in rq.parse(doc)[1] if doc else []:
+        yield _p(doc, b.line, "request-format", f"{b.id}: {b.message}")
+
+
+def check_request_trace(ctx: Context):
+    """A trace naming an undefined ID or request, or IDs (none retired) that no doc of the request's owner defines."""
+    doc = ctx.repo.requests
+    reqs = rq.parse(doc)[0] if doc else []
+    ids = {r.id for r in reqs}
+    for r in reqs:
+        if r.superseded_by and (r.superseded_by not in ids or r.superseded_by == r.id):
+            yield _p(doc, r.line, "request-trace", f"{r.id} is superseded by {r.superseded_by}: no such later request")
+        defs = {i: ctx.repo.lookup(i, archive=False) for i in r.honoured_by}
+        for i, d in defs.items():
+            if d is None:
+                yield _p(doc, r.line, "request-trace", f"{r.id} → {i}: {i} is not defined")
+        if defs and all(d is not None and not d.retired for d in defs.values()) and not rq.honouring(ctx.repo, r):
+            yield _p(doc, r.line, "request-trace",
+                     f"{r.id} ({r.owner}) is traced to no ID defined in {', '.join(rq.HONOUR_KINDS[r.owner])}")
+
+
+def check_request_open(ctx: Context):
+    """An Approved spec or architecture with a request of its own that nothing honours and the user didn't change."""
+    for owner, rel in rq.DUE_WHEN_APPROVED.items():
+        doc = ctx.repo.doc(rel)
+        for r in rq.due(ctx.repo, owner):
+            yield _p(doc, doc.header_line or 0, "request-open",
+                     f"{rq.label(r)} is neither honoured nor changed with the user's approval: "
+                     f"`dt request trace {r.id} <ID>`, or `dt request change {r.id}` once the user approves")
+
+
+def check_request_edit(ctx: Context):
+    """A request whose words, context, skill or date changed since HEAD, or that was deleted: only traces change."""
+    doc = ctx.repo.requests
+    if doc is None or not git.is_repo(ctx.repo.root):
+        return
+    head = git.show_head(ctx.repo.root, doc.rel)
+    if head is None:
+        return
+    now = {r.id: r for r in rq.parse(doc)[0]}
+    for old in rq.parse(Doc(ctx.repo.root, doc.rel, head))[0]:
+        new = now.get(old.id)
+        if new is None:
+            yield _p(doc, doc.header_line or 0, "request-edit",
+                     f"{old.id} is gone since HEAD: requests are never deleted (`dt request change` or `--replaces`)")
+        elif new.fixed != old.fixed:
+            yield _p(doc, new.line, "request-edit",
+                     f"{old.id} changed since HEAD: the user's words stay as heard; record new words with "
+                     f"`dt request add … --replaces {old.id}`")
+
+
+def check_request_ref(ctx: Context):
+    """A `UR-NN` named in any doc that docs/requests.md doesn't define."""
+    for doc in ctx.docs:
+        for i, line in enumerate(doc.lines):
+            if doc.mask[i] or "UR-" not in line:
+                continue
+            for id_ in dict.fromkeys(re.findall(rf"(?<![\w-])({rq.ID})(?![\w-])", line)):
+                if id_ not in ctx.repo.index:
+                    yield _p(doc, i, "request-ref", f"{id_} is not in {rq.PATH}")
 
 
 # ---- probe checks (design/probes.md §4, §5) --------------------------------------------------------
@@ -1296,7 +1366,7 @@ def check_header(ctx: Context):
         if doc.header_line is None:
             line = doc.title_line if doc.title_line is not None else 0
             yield _p(doc, line, "header", "no header line (`**Status:** … · **Last updated:** …` after the H1)")
-        elif doc.kind not in ("roadmap", "probes") and not doc.status:
+        elif doc.kind not in ("roadmap", "probes", "requests") and not doc.status:
             yield _p(doc, doc.header_line, "header", "no **Status:** in the header line")
 
 
@@ -1320,6 +1390,7 @@ CHECKS = [
     check_probe_fields, check_probe_informs, check_probe_cite, check_probe_runner, check_probe_leak,
     check_probe_sample, check_probe_results, check_probe_stale, check_probe_large,
     check_boundaries, check_probe_open, check_milestone_depends,
+    check_request_format, check_request_trace, check_request_open, check_request_edit, check_request_ref,
 ]
 
 

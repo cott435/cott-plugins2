@@ -21,6 +21,7 @@ Every skill stops after writing a Draft and waits for your review. Nothing moves
 |---|---|---|---|
 | `docs/brief.md` | **Why** the project exists: problem, users, ≤ 5 stage-neutral goals, constraints, not doing | `idea-refine` | ≤ 1 page |
 | `docs/ideas/<idea>.md` | **Why** an addition is worth making | `idea-refine` | 300-700 words |
+| `docs/requests.md` | **What you said**, verbatim (`UR-NN`): each fact, tool, choice and answer, traced to the requirement or decision that honours it, or to a change you approved | every planning skill, through `dt request` | One line per request |
 | `docs/roadmap.md` | **In what order**: stages (`S<n>`: outcomes the user agreed, with an outline and the skills they route to) and the milestones each is cut into (`M<n>`: build-sized vertical slices) | `idea-refine` adds stages, `build-planning` cuts them into milestone rows, `dt roadmap` writes Status | 2 tables + ≤ 6 lines per stage or milestone |
 | `references/` | Your reference code and notes: how something has been done before. Never imported, excluded from tooling | You | — |
 | `docs/references.md` | What each reference is for (`RF-NN`), its caveats, and the stage it serves | `reference-intake` | ≤ 8 lines per file |
@@ -47,6 +48,10 @@ The **brief** is the stable foundation. **Idea files** carry each addition, so t
 ## References and skills per stage
 
 Drop reference files (code or markdown) into `references/` whenever you have them: a dataset builder, a transform, notes. `dt status` reports new or changed files at session start, and `reference-intake` summarizes each one (`RF-NN`) and asks which stage it serves. Each roadmap stage also lists the project skills it routes to; a stage cut into several milestones divides them among its milestones. The planning skills carry both down to tasks: a task's `Read:` names `RF-02:build_targets`, and `dt context` gives the builder that function under a "reference, your call what to reuse" banner. `build-planning` checks that every stage reference and skill reaches a milestone, and every milestone's reaches a task. Design: [design/references.md](design/references.md).
+
+## Your words
+
+The brief compresses, and each skill may run in a fresh session, so what you said must live in a doc. Every planning skill records each fact, tool, choice and answer you give in `docs/requests.md`, word for word (`UR-NN`). The skill whose doc owns a request honours it and traces it (`UR-02 → AD-04`), or proposes a change that you approve, recorded with your words. Once the spec or architecture is Approved, `dt lint` fails it for any request of its own left open, and `dt next` sends the run back. Design: [design/requests.md](design/requests.md).
 
 ## IDs and section reads
 
@@ -185,4 +190,4 @@ Code tooling (`check.sh`, Ruff, mypy, import-linter, the agent role files and th
 | [`build-planning`](skills/build-planning/SKILL.md) | Plan | Roadmap milestone rows (each stage cut into slices), `tasks/plan.md` (tasks with `Writes:`, the dependency graph), `tasks/todo.md`, AGENTS.md doc map |
 | [`build-setup`](skills/build-setup/SKILL.md) | Bar | `CONSTRAINTS.md`, tool config, `scripts/`, `.claude/agents/` |
 
-Design notes: [design/planning-stage.md](design/planning-stage.md), [design/build-setup.md](design/build-setup.md), [design/interface-first-design.md](design/interface-first-design.md), [design/probes.md](design/probes.md).
+Design notes: [design/planning-stage.md](design/planning-stage.md), [design/build-setup.md](design/build-setup.md), [design/interface-first-design.md](design/interface-first-design.md), [design/probes.md](design/probes.md), [design/requests.md](design/requests.md).

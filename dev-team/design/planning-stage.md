@@ -593,7 +593,7 @@ Who may write what. `build-setup` turns the build-role rows into path guards. Pl
 | tester (build) | `tests/intent/**` | everything else |
 | implementer / solo (build) | `src/**`, `tests/unit/**` | protected paths (build-setup §4) |
 | reviewer (build) | nothing; the orchestrator records findings with `dt finding` | everything |
-| `dt` (mechanical) | `dt prebuild-clear` (removes pre-build sections when a spine task is checked), `dt archive`, `dt finding`, `dt roadmap`, `todo.md` checkboxes | — |
+| `dt` (mechanical) | `dt prebuild-clear` (removes pre-build sections when a spine task is checked), `dt archive`, `dt finding`, `dt roadmap`, `todo.md` checkboxes; `docs/requests.md`, which every planning skill writes only through `dt request` ([requests.md](requests.md)) | — |
 
 `dt` writes files itself rather than through Edit or Write, so the Edit/Write guards don't fire, and its mechanical edits don't reset an Approved doc to Draft.
 
@@ -610,6 +610,7 @@ One parser means every skill, hook and agent sees the same IDs, statuses and sec
 | `dt layout <pkg>` | spine task, reviewers, pipeline-design Sync | Real tree, each module annotated with its docstring's first line; flags entry functions whose calls don't match the step table |
 | `dt lint [paths]` | PostToolUse hook, checkpoints | Duplicate IDs; references to missing or retired IDs; size budgets; an Approved doc edited without going back to Draft; a leftover pre-build section; task sizing, `Depends on` and parallel-group rules; `Verify:` missing the smoke command; `todo.md`/`plan.md` ID mismatch; findings without a disposition; a foreign `tasks/plan.md` |
 | `dt roadmap` | build-planning, Advance | Rewrites the derived Status column |
+| `dt request` | every planning skill | Records the user's words as `UR-NN` lines and traces each to the IDs that honour it or an approved change ([requests.md](requests.md)) |
 | `dt guard <path>` | PreToolUse hook | Decides whether a write needs a human (below) |
 | `dt prebuild-clear <PL>` · `dt archive` · `dt finding <checkpoint> <severity> <text>` | spine task, Advance, orchestrator | The mechanical edits in the write matrix |
 

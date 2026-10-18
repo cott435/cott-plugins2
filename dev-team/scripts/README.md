@@ -29,6 +29,7 @@ scripts/
     probes.py              probes/PB-NN-*/ vs docs/probes.md: code hash, results.json shape, redaction scan,
                            the api-probe status lists and the build-planning gate
     routes.py              docs/routes.md: upstream changes routed to their owner's Revise (`dt route`)
+    requests.py            docs/requests.md: the user's words as UR lines, their traces, which are open or due
     git.py                 thin git helpers (commit dates, HEAD text, changed files); degrade outside git
     edit.py                byte-preserving, mode-keeping reads/writes; every file dt writes goes through it
     status/                `dt status` reports: common.py, packages.py, one module per skill
@@ -56,7 +57,7 @@ Commands never glob or open docs themselves; they ask `Repo` (doc map, IDs) and 
 
 ## Doc format (what the parser reads)
 
-- **Doc kinds** come from the path (`repo.KINDS`): brief, idea, roadmap, spec, architecture, package-architecture (`docs/packages/<pkg>/architecture.md`, legacy `docs/architecture/<pkg>.md`), contract, pipelines, tests, references (`docs/references.md`), probes (`docs/probes.md`), routes (`docs/routes.md`), constraints, agents, plan, todo, queued-plan, archived-plan. `tasks/archive/**` is read only for `next-id` and as a `section` fallback.
+- **Doc kinds** come from the path (`repo.KINDS`): brief, idea, roadmap, spec, architecture, package-architecture (`docs/packages/<pkg>/architecture.md`, legacy `docs/architecture/<pkg>.md`), contract, pipelines, tests, references (`docs/references.md`), probes (`docs/probes.md`), routes (`docs/routes.md`), requests (`docs/requests.md`), constraints, agents, plan, todo, queued-plan, archived-plan. `tasks/archive/**` is read only for `next-id` and as a `section` fallback.
 - **Header:** first non-blank line after the H1, `**Key:** value` pairs joined by ` · `. Unknown keys are kept.
 - **ID sections:** `## <ID>: <Title>` or `### <ID>: <Title>`, outside code fences. A section runs to the next heading of the same or higher level. ID forms: `PL-NN`, `TC-NN`, `AD-NN`, `CR-NN`, `S<n>`, `M<n>`, `M<n>-T<nn>`, `M<n>-R<nn>`, `<pkg>.<symbol>` (any `PREFIX-NN` works as a heading ID).
 - **Spec requirements:** bold-led lines `- **CODE-NN** …` plus their indented sub-bullets. Struck (`~~`) on the line = removed.
@@ -67,6 +68,7 @@ Commands never glob or open docs themselves; they ask `Repo` (doc map, IDs) and 
 - **Contract types:** a contract section titled `type` (`### <component>.<Type>: type`), or one with a `**Kind:** type` field. Its sample is its `**Sample:**` path, else the `**Fixtures:**` folder on its `- **Boundary:** … · **Fixtures:** tests/contracts/<component>.<Type>/ · **Cases:** …` line. A step table's `In → Out` cell names types by CamelCase name or `pkg.Name`; single capitals (`T`) and all-caps words aren't types.
 - **Findings:** list items `- M<n>-R<nn> <Severity> · <rule> · <text> → <disposition>` under a checkpoint's `**Findings:**`.
 - **Routes** (`docs/routes.md`, written only by `dt route`): checkbox items `- [ ] <owner skill> · <change> (from <skill>, YYYY-MM-DD)`; ticked when the owner's Revise is approved.
+- **Requests** (`docs/requests.md`, design/requests.md §3, written by `dt request`): `- **UR-NN** <owner> · "<the user's words>" [<context>] · <skill> YYYY-MM-DD → <trace>`. Owner is `spec`, `architecture`, `pipelines`, `tests`, `plan` or `constraints`; `[<context>]` and `→ <trace>` are optional. The trace is the IDs that honour it (`TANK-02, TANK-03`), `changed: <what instead> (approved "<the user's words>", <skill> YYYY-MM-DD)` or `superseded by UR-NN`. A request is **open** unless it is changed, superseded, or its trace names a live ID defined in its owner's docs (spec: spec.md; architecture: architecture docs and contracts; pipelines, tests, plan, constraints: theirs). Each line defines its UR ID; the header needs no Status.
 - **Ranges:** `STAT-01–STAT-04` and `STAT-01–04` expand to every ID in between.
 - **Pre-build sections:** any heading containing `(pre-build`.
 - **Reference entries** (`docs/references.md`, design/references.md §4): `### RF-NN: <Title>`, then `**File:** \`references/…\` · **Hash:** <8 hex> · **Kind:** code|doc · **Milestones:** S2, M4 | all | —` and bullet fields `- **Purpose:**`, `**Key parts:**`, `**In → Out:**`, `**Use for:**`, `**Caveats:**`. Retired entries are retired lines. "References for M<n>" are derived: entries whose `Milestones` names it (`all` serves every milestone; `—` none), plus the milestone section's `**References:**` line, or, with no such line, the entries assigned to its stage. There is no other list. A `Read:` item `RF-NN:<selector>` names the entry `RF-NN`.
@@ -112,7 +114,7 @@ With an active plan or not, the plain report (no `--skill`) and `build-planning`
 | `--skill` | Modes | Extra keys |
 |---|---|---|
 | `idea-refine` | new · extend | `brief_words`, `brief_goals` (count), `ideas` (path=status), `roadmap_rows` (`S<n> name [source]`: the stages; on a roadmap from before stages, its milestone rows), `references_unassigned` (RF entries with `Milestones: —`) |
-| `spec-writing` | blocked · new · extend | `ideas_ready` (Accepted ideas), `prefixes` (`highest→next` per prefix), `reserved_prefixes` (planning prefixes a requirement must not use: AD, CR, EX, PB, PL, RF, TC), `skills` |
+| `spec-writing` | blocked · new · extend | `ideas_ready` (Accepted ideas), `prefixes` (`highest→next` per prefix), `reserved_prefixes` (planning prefixes a requirement must not use: AD, CR, EX, PB, PL, RF, TC, UR), `skills` |
 | `architecture-design` | blocked · new · revise · extend · current | everything the old `arch-status.py` reported (`uncovered`, `changed_since`, `spec_rows_pending`, `stale`, `next_decision`, `package_docs`, `packages_found`, `skills`, `broken_fences`), plus `contracts_missing` (packages with no `contract.md`; `(no package id yet)` when no id can be found or inferred), `legacy_layout` (`docs/architecture/<pkg>.md` files to move), `grow_triggers`, `stale_contracts`, `probes_answered` (`PB-01 pass (AD-04)`, `PB-01 waived (AD-04)`: Answered or Waived probes whose decisions are still Proposed), `probes_failed` (`PB-01 (AD-04)`: Answered fail with a decision still Proposed; must be empty at its gate) |
 | `pipeline-design` | blocked · new · grow · revise · extend · sync · current (per package) | `packages` (pkg=mode), `uncovered_ids` (spec IDs covered by a component in scope but on no pipeline step or Covers, system pipelines included), `components_unowned` (components that own no step), `drift` (entry calls ≠ step table, from `dt layout`), `retired_refs` (`path:line ID`), `misplaced` (pipelines whose Entry lies in another package's source folder) |
 | `test-planning` | blocked · new · revise · extend · current (per package) | `packages` (pkg=mode), `pipelines_no_smoke`, `pipelines_no_golden`, `cases_no_source`, `cases_no_tolerance`, `fixtures_missing` (folder or `expected.json`), `fixtures_orphan` (`tests/fixtures/*/TC-NN/` no live case uses), `skills` |
@@ -123,13 +125,15 @@ With an active plan or not, the plain report (no `--skill`) and `build-planning`
 
 `routed_changes` (spec-writing, architecture-design, pipeline-design, test-planning): the skill's open items in `docs/routes.md`, `<change> (from <skill>)`.
 
+`requests_open` (spec-writing, architecture-design, pipeline-design, test-planning, build-planning, build-setup): the open requests the skill's doc owns, `UR-NN "<words>" [<context>]`.
+
 `skills` and `skills_available` list installed skills by name: the project's `.claude/skills/*/SKILL.md` plus `$CLAUDE_PLUGIN_ROOT/skills/*` when that is set, minus dev-team's own planning skills (reference-intake and api-probe included).
 
-`--summary` (SessionStart hook) prints at most 8 lines: active milestone and plan status, progress and next task, blocked tasks, queued plans, docs waiting for approval (Draft), a stale roadmap, `references: N waiting → reference-intake` when any reference file is unindexed, changed or missing, `probes: N waiting → api-probe` when results aren't recorded yet (`probes_results`) or a cited PB has no entry (`probes_unwritten`), and `dt: python3 <resolved path to dt.py>`. It prints nothing in a project with none of `docs/brief.md`, `docs/spec.md`, `docs/roadmap.md`, `tasks/plan.md`, never fails (an internal error prints one `dt status: error: …` line) and always exits 0.
+`--summary` (SessionStart hook) prints at most 8 lines: active milestone and plan status, progress and next task, blocked tasks, queued plans, docs waiting for approval (Draft), a stale roadmap, `references: N waiting → reference-intake` when any reference file is unindexed, changed or missing, `probes: N waiting → api-probe` when results aren't recorded yet (`probes_results`) or a cited PB has no entry (`probes_unwritten`), `requests: N not honoured → <skills>` when an Approved spec or architecture has open requests, and `dt: python3 <resolved path to dt.py>`. It prints nothing in a project with none of `docs/brief.md`, `docs/spec.md`, `docs/roadmap.md`, `tasks/plan.md`, never fails (an internal error prints one `dt status: error: …` line) and always exits 0.
 
 Mode rules:
 - **blocked** — idea-refine never; spec-writing: no brief; architecture-design: no spec (as arch-status.py; a Draft spec shows in `docs`); pipeline-design: architecture missing or not Approved; test-planning: no package has an Approved pipelines.md (a package whose pipelines.md isn't Approved is `pkg=blocked`); build-planning: the next milestone to plan has pipelines not all Approved, the next stage has spec IDs on no Approved pipeline, a Revise is open on the active milestone's docs, or (all-at-once) a brief stage is below Designed (below); build-setup: no active plan, or the plan is Draft.
-- **architecture-design** — `new`: no architecture.md; `revise`: `probes_answered` or `routed_changes` is non-empty (a probe's results, or a change routed here, go in first); `extend`: `uncovered`, `changed_since`, `contracts_missing` or `legacy_layout` non-empty (the last two migrate projects designed before contract.md and `docs/packages/`); else `current`.
+- **architecture-design** — `new`: no architecture.md; `revise`: `probes_answered` or `routed_changes` is non-empty, or the Approved architecture has open requests (a probe's results, a change routed here or the user's words go in first); `extend`: `uncovered`, `changed_since`, `contracts_missing` or `legacy_layout` non-empty (the last two migrate projects designed before contract.md and `docs/packages/`); else `current`.
 - **pipeline-design** (per package; the overall mode is the first of new, grow, revise, extend, sync present) — `new`: no pipelines.md; `grow`: `misplaced` lists one of its pipelines; `revise`: pipelines.md is Draft but Approved at git `HEAD` (or, overall, `routed_changes` is non-empty); `sync`: drift; `extend`: uncovered IDs or unowned components; else `current`.
 - **test-planning** (per package) — `new`: no tests.md; `revise`: tests.md Draft but Approved at `HEAD` (or, overall, `routed_changes` is non-empty); `extend`: a pipeline with no smoke command or no golden case; else `current`. A pipeline with `**Part of:** PL-NN` (a package's part of a system pipeline) needs no smoke or golden case of its own.
 - **build-planning** — first rule that holds: `foreign`: `tasks/plan.md` exists without a dev-team header (no `**Milestone:**`) and has unchecked tasks; never overwrite, ask. With an active plan: `advance` when every todo item is checked and the exit checkpoint is ticked (a finished milestone advances even while a Revise is open: that belongs to the next plan); `blocked` (`waiting for <doc> approval (Revise in progress)`) when a pipelines.md or tests.md of the milestone's packages is Draft, or a doc defining one of its pipelines (`draft_pipelines`) is; `extend` whenever `stage_to_cut` is set (the stage is cut first, rows only, even while the active milestone needs a replan or the next milestone waits for its plan); `replan` when a task is `Blocked`, `interfaces_changed` is non-empty, or `changed_since_plan` is: the packages' pipelines.md, tests.md or contract.md is Approved with a `Last updated` date later than the plan's (same-day changes aren't seen; a Replan bumps the plan's date); `extend` when the next milestone is Designed (one to queue); else `current`. A `new` or `extend` whose unit is a milestone becomes `blocked` (`waiting for PB-01`) while `probes_blocking` is non-empty; cutting a stage is unaffected. The milestone's packages are its roadmap Packages, its pipelines' packages and its tasks' Package. With no active plan (missing or between milestones): when no plan was ever written and every stage's Source is `brief` (all-at-once), `blocked` while any uncut stage is below Designed (`S2, S3 below Designed: … no pipelines.md for eval, ml; run pipeline-design`, naming the packages with no pipelines.md); `new` (no plan ever written, the first unit Designed) or `extend` when `stage_to_cut` is set; `extend` if a queued plan exists; otherwise for the next unit (`roadmap.next_unit`: in roadmap order, pre-stage milestones first, then each stage's milestones, or the stage itself while it has none; the first not yet Planned/Building/Done, or for a stage, not yet Split): `new` (no plan ever written) or `extend` for a Designed milestone, else `blocked` (`M2 pipelines not all Approved (…)`, or `S2 spec IDs on no Approved pipeline (PORT-03)`). No roadmap: `new` once any pipelines.md is Approved.
@@ -162,8 +166,9 @@ The next skill run, its mode and why, for `/dev-team:plan` and the eval driver. 
 1. **A Draft waits at its owner's gate** — any doc with Status `Draft` or `Proposed`; the owner by doc kind (brief and ideas: idea-refine, … constraints: build-setup, plan and queued plans: build-planning), earliest in planning order. Mode `gate`; the user answers or approves.
 2. **References waiting** (once the roadmap exists) → reference-intake; **probes waiting** (`probes_unwritten`, `probes_results`) → api-probe.
 3. **A routed change** (`dt route`) → its owner, owners in planning order; the owner's report gives the mode (`revise`, spec-writing's `extend`).
-4. **The first planning skill with work**, in order idea-refine, spec-writing, architecture-design, pipeline-design, test-planning, build-planning, build-setup. A skill reporting `blocked` or `current` has none, and also: idea-refine unless `new` or the roadmap is missing; spec-writing unless `new` or `ideas_ready`; pipeline-design's `extend` without `uncovered_ids` (an unowned component is a gap its gate may accept); test-planning's `extend` unless a pipeline has neither smoke nor golden case, and test-planning at all once a plan exists with no tests.md anywhere (the user skipped it) or with `--skip`; build-planning's `extend` with an active milestone and no `stage_to_cut` (a queued plan is the user's request). A blocked build-planning sends the run to api-probe (`probes_blocking`: mode `waiting`, the user runs the checks) or to pipeline-design when its reason says `run pipeline-design` (all-at-once: a stage below Designed), else stops there.
-5. Otherwise `done`: nothing left to plan.
+4. **A user request an Approved spec or architecture doesn't honour** (open, `request-open`) → spec-writing (`extend`), then architecture-design (`revise`).
+5. **The first planning skill with work**, in order idea-refine, spec-writing, architecture-design, pipeline-design, test-planning, build-planning, build-setup. A skill reporting `blocked` or `current` has none, and also: idea-refine unless `new` or the roadmap is missing; spec-writing unless `new` or `ideas_ready`; pipeline-design's `extend` without `uncovered_ids` (an unowned component is a gap its gate may accept); test-planning's `extend` unless a pipeline has neither smoke nor golden case, and test-planning at all once a plan exists with no tests.md anywhere (the user skipped it) or with `--skip`; build-planning's `extend` with an active milestone and no `stage_to_cut` (a queued plan is the user's request). A blocked build-planning sends the run to api-probe (`probes_blocking`: mode `waiting`, the user runs the checks) or to pipeline-design when its reason says `run pipeline-design` (all-at-once: a stage below Designed), else stops there.
+6. Otherwise `done`: nothing left to plan.
 
 ```
 next: pipeline-design (new)
@@ -179,9 +184,19 @@ run: /dev-team:pipeline-design
 
 Records a change another skill owns, found at a gate, for the owner's Revise: appends `- [ ] <owner> · <change> (from <skill>, <date>)` to `docs/routes.md` (created on first use). Owners: spec-writing, architecture-design, pipeline-design, test-planning. `--done <owner>` ticks every open item routed to it, when the user approves its Revise. With no arguments, lists the open items (`--json`: `[{skill, change, from, date}]`).
 
+### `dt request …`
+
+Records and traces the user's words in `docs/requests.md` (design/requests.md); the only writer of its lines.
+- `dt request add <owner> "<words>" --skill S [--about "<context>"] [--replaces UR-NN]` — appends the next UR with today's date (creating the doc on first use, titled from the brief) and prints its ID. `--about` says what the words answer when they don't say it themselves ("Go with A" → `--about "price source: A = Sharadar"`). `--replaces` marks the earlier request `superseded by` the new one.
+- `dt request trace UR-NN <ID>…` — adds IDs that honour it; each must be defined and at least one live in the owner's docs (else exit 2, nothing written). IDs traced earlier that are gone or retired drop out. Refused on a changed or superseded request.
+- `dt request change UR-NN "<what instead>" --approved "<the user's words>" --skill S` — records a change the user approved, with that approval.
+- `dt request [list] [--open] [--owner O] [--json]` — each request with its owner and trace (`· open` when nothing honours it); `--json`: `[{id, owner, words, about, skill, date, state, trace}]`, state `open | traced | changed | superseded`.
+
+Every write rewrites the header's `Last updated` and leaves every other line as it was.
+
 ### `dt next-id <prefix>…`
 
-`PL`, `TC`, `AD`, `CR`, `RF`, any spec prefix, `S` (stages), `M`, `M2-T`, `M2-R`. Counts retired IDs and the archive. Prints one ID per prefix.
+`PL`, `TC`, `AD`, `CR`, `RF`, `UR`, any spec prefix, `S` (stages), `M`, `M2-T`, `M2-R`. Counts retired IDs and the archive. Prints one ID per prefix.
 
 ### `dt section <ID>…`
 
@@ -296,11 +311,17 @@ Checks (code: severity):
   - `ref-file` E — an RF entry with no File, or whose file is missing
   - `ref-hash` W — an RF entry whose Hash isn't its file's current one (or has none)
   - `ref-large` W — a task reads an `RF-NN` whose file is over 300 lines with no selector (it would get only the outline)
-  - `ref-prefix` E — a spec requirement uses the reserved `RF-` prefix
+  - `ref-prefix` E — a spec requirement uses the reserved `RF-` or `UR-` prefix
   - `roadmap-skill` W — a roadmap stage's or milestone's own `**Skills:**` names a skill that isn't installed (same list as `skills_available`)
   - `spec-stage` E — once the roadmap has stages, a spec feature with no `**Stage:**` line (nor a stage heading grouping it), or one naming no stage row
   - `milestone-depends` E — a cycle in the roadmap milestones' Depends (IDs outside parentheses), once, at its first milestone's row
   - `roadmap-stage` E — once the roadmap has stages, a milestone row whose Stage cell names no stage row, isn't an `S<n>`, or is empty on a row with no Source of its own
+- Request checks (design/requests.md §5):
+  - `request-format` E — a `- **UR-NN**` line that isn't the request form, names an unknown owner, or whose trace is none of the three forms
+  - `request-trace` E — a trace naming an undefined ID or a request that doesn't exist, or IDs (none retired) of which none is defined in the owner's docs (a retired one is `retired-ref`)
+  - `request-open` E — an Approved spec.md or architecture.md with an open request of its owner (`spec`, `architecture`), at that doc's header line
+  - `request-edit` E (git) — a request whose words, context, skill or date differ from HEAD, or that is gone: only its trace changes
+  - `request-ref` E — a `UR-NN` in any doc that docs/requests.md doesn't define
 - Probe checks (design/probes.md §4–§5):
   - `probe-fields` E — a PB entry with no Folder, Question or Informs, no checks table, a check with an empty Pass cell, a Status that isn't Draft, Ready, Answered · pass|fail or Waived, or (past Draft) a missing folder
   - `probe-informs` E — an Informs ID (decision, requirement, contract symbol) that isn't defined

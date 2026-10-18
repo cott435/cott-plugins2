@@ -13,7 +13,7 @@ A golden case is an oracle: an input and the output the code must produce, recor
 
 ## Modes
 
-Start with `dt status --skill test-planning`: the mode per package, the gap keys (`pipelines_no_smoke`, `pipelines_no_golden`, `cases_no_source`, …) and `next ids`. Read the mode's file and nothing from the other modes.
+Start with `dt status --skill test-planning`: the mode per package, its gap keys and `next ids`. Read only the mode's file.
 
 | Mode | When | Do |
 |---|---|---|
@@ -28,7 +28,7 @@ Start with `dt status --skill test-planning`: the mode per package, the gap keys
 
 ## Asking
 
-One question at a time, with your guess and a default, and only about what only the user knows. Infer the rest (names, seeds, sizes, tolerances) as ASSUMPTIONS.
+One question at a time, with your guess and a default, and only about what only the user knows. Infer the rest (names, seeds, sizes, tolerances) as ASSUMPTIONS. **The user's words:** record them and honour yours (`requests_open`) per `../idea-refine/references/requests.md`.
 
 ## Rules
 

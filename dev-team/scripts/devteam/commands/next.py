@@ -1,5 +1,6 @@
 """Name the next skill run and its mode, and why: a Draft waiting for approval, references or probes waiting, a
-change routed to its owner, else the first planning skill with work to do.
+change routed to its owner, a user request its Approved doc doesn't honour, else the first planning skill with work
+to do.
 
 It reads the `dt status --skill` reports; their mode logic lives there. `/dev-team:plan` and the eval driver
 start each run from this answer.
@@ -10,6 +11,7 @@ import json
 
 from .. import probes as pb
 from .. import references as refs
+from .. import requests as rq
 from .. import routes
 from ..status import report
 
@@ -48,6 +50,10 @@ def decide(repo, skip=()) -> dict:
         changed = routes.open_for(repo, owner)
         if changed:
             return _from_report(repo, owner, f"routed to its owner: {'; '.join(changed)}")
+    for owner, skill in rq.OWNERS.items():
+        due = rq.due(repo, owner)
+        if due:
+            return _from_report(repo, skill, f"the user's words, not yet honoured: {'; '.join(map(rq.label, due))}")
     for skill in ORDER:
         if skill in skip:
             continue

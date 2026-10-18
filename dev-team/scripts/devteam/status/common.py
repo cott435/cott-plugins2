@@ -9,6 +9,7 @@ from pathlib import Path
 from .. import git, graph, md, model, specdocs
 from .. import probes as pb
 from .. import references as refs
+from .. import requests as rq
 from ..commands import roadmap as roadmap_cmd
 from ..repo import Doc, Repo
 
@@ -260,6 +261,9 @@ def summary(repo: Repo) -> list[str]:
     probes_waiting = pb.state(repo).waiting
     if probes_waiting:
         out.append(f"probes: {probes_waiting} waiting → api-probe")
+    due = {s: n for o, s in rq.OWNERS.items() if (n := len(rq.due(repo, o)))}
+    if due:
+        out.append(f"requests: {sum(due.values())} not honoured → {', '.join(due)}")
     dt = Path(__file__).resolve().parents[2] / "dt.py"
     out = out[:7]
     out.append(f"dt: python3 {dt}")

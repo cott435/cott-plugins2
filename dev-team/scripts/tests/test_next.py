@@ -97,6 +97,39 @@ class NextTest(NextCase):
         (self.root / "tasks/todo.md").unlink()
         self.assertEqual(self.next()["skill"], "test-planning")
 
+    LAB = {"pipelines": "## PL-06: Feature screen\n**Entry:** `src/lab/pipeline.py::run_screen` · **Trigger:** "
+                        "`python -m lab screen`\n**Covers:** PORT-02\n\n"
+                        "| # | Step | Owner | In → Out | Spine version | Covers |\n|---|---|---|---|---|---|\n"
+                        "| 1 | `screen` | screen | Returns → Screen | no screen | PORT-02 |\n",
+           "architecture": "| Component | Responsibility | Covers | Depends on |\n|---|---|---|---|\n"
+                           "| `screen` | Screen features | PORT-02 | — |\n",
+           "contract": "## screen\n\n### screen.Screen: type\n`class Screen: ranked: list[str]`\n"}
+
+    def add_lab(self):
+        """A `lab` package (PL-06, no tests.md) on a third milestone, M3."""
+        for name, body in self.LAB.items():
+            self.write(f"docs/packages/lab/{name}.md", f"# lab — {name.title()}\n\n**Package:** lab · **Status:** "
+                       f"Approved · **Last updated:** 2026-10-16\n\n{body}")
+        self.replace("docs/roadmap.md", "| quant | PL-03 | M1 | Designed |", "| quant | PL-03 | M1 | Designed |\n"
+                     "| M3 | Feature lab | ideas/classical-portfolios.md | lab | PL-06 | M2 | Designed |")
+        self.write("docs/roadmap.md", self.read("docs/roadmap.md") + "\n## M3: Feature lab\n**Exit:** A screen.\n")
+
+    def test_test_planning_covers_the_next_milestones_packages_only(self):
+        # A third milestone's package with no tests.md waits until that milestone is the next one to plan.
+        self.add_lab()
+        self.assertEqual(self.dt("lint", "docs/")[0], 0)
+        self.assertEqual(self.status("test-planning")["packages"]["lab"], "new")
+        d = self.next()
+        self.assertEqual((d["skill"], d["mode"], d["packages"]), ("test-planning", "extend", ["quant"]))
+        self.assertIn("for M1, M2 (optional)", d["reason"])
+        # M2 planned and queued: M3 is next, and its package is offered.
+        self.write("tasks/queued/M2-plan.md", (self.root / "tasks/plan.md").read_text(encoding="utf-8")
+                   .replace("# M1", "# M2", 1).replace("**Milestone:** M1", "**Milestone:** M2"))
+        d = self.next()
+        self.assertEqual((d["skill"], d["mode"]), ("test-planning", "new"))
+        self.assertIn("lab", d["packages"])
+        self.assertIn("for M1, M3 (optional)", d["reason"])
+
 
 class AllAtOnceTest(NextCase):
     def test_stage_below_designed_goes_to_pipeline_design(self):

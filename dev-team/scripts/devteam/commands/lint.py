@@ -6,7 +6,6 @@ problems located in the files asked for. Cross-doc checks always read the whole 
 """
 from __future__ import annotations
 
-import fnmatch
 import json
 import os
 import re
@@ -15,10 +14,11 @@ from dataclasses import dataclass
 from functools import cached_property
 from pathlib import Path
 
-from .. import git, graph, md, model
+from .. import git, graph, md, model, packet
 from .. import probes as pb
 from .. import references as refs
 from .. import requests as rq
+from .. import routes as rt
 from ..repo import Doc, Repo
 from ..status.common import available_skills
 from . import roadmap as roadmap_cmd
@@ -39,6 +39,9 @@ SEVERITY = {
     "boundaries": "E", "probe-open": "E", "milestone-depends": "E",
     "request-format": "E", "request-trace": "E", "request-open": "E", "request-edit": "E", "request-ref": "E",
     "request-number": "W", "request-cite": "W", "request-source": "W",
+    "packet-type-closure": "W", "parallel-step": "W", "milestone-lines": "E", "milestone-order": "E",
+    "exit-cases-in-scope": "E", "kind-title": "E", "covers-vs-deferred": "E", "closed-open-question": "W",
+    "process-narration": "W",
 }
 
 # Size budgets (planning-stage.md §3), in lines. Package docs are budgeted per unit (lines per unit × units +
@@ -574,6 +577,105 @@ def check_milestone_depends(ctx: Context):
                  "a build order goes in the milestone's section")
 
 
+EXIT_DUE = ("Designed", "Planned", "Building")
+
+
+def check_milestone_lines(ctx: Context):
+    """A Designed, Planned or Building milestone has an `**Exit:**` line; in a stage cut into more than one
+    milestone, each milestone section has `**Skills:**` and `**References:**` lines (build-planning cut.md)."""
+    roadmap = ctx.repo.roadmap
+    if roadmap is None or not ctx.in_scope(roadmap.rel):
+        return
+    ms = model.milestones(roadmap)
+    per_stage: dict[str, int] = {}
+    for m in ms:
+        if m.stage:
+            per_stage[m.stage] = per_stage.get(m.stage, 0) + 1
+    for m in ms:
+        at = m.section.line if m.section else (m.row_line or 0)
+        status = roadmap_cmd.milestone_status(ctx.repo, m)
+        if m.section is None and (status in EXIT_DUE or per_stage.get(m.stage, 0) > 1):
+            yield _p(roadmap, at, "milestone-lines", f"{m.id} ({status}) has no `## {m.id}: <name>` section")
+            continue
+        missing = []
+        if status in EXIT_DUE and "Exit" not in m.fields:
+            missing.append(f"**Exit:** line ({status})")
+        lines = [f"**{k}:**" for k in ("Skills", "References") if k not in m.fields]
+        if per_stage.get(m.stage, 0) > 1 and lines:
+            missing.append(f"{' or '.join(lines)} line ({m.stage} is cut into {per_stage[m.stage]} milestones)")
+        if missing:
+            yield _p(roadmap, at, "milestone-lines", f"{m.id} has no {'; no '.join(missing)}")
+
+
+def check_milestone_order(ctx: Context):
+    """Roadmap milestone IDs increase down the table (the build order), and each Depends names only lower IDs."""
+    roadmap = ctx.repo.roadmap
+    if roadmap is None or not ctx.in_scope(roadmap.rel):
+        return
+    rows = sorted((m for m in model.milestones(roadmap) if m.row_line is not None), key=lambda m: m.row_line)
+    high = None
+    for m in rows:
+        n = int(m.id[1:])
+        if high is not None and n < int(high.id[1:]):
+            yield _p(roadmap, m.row_line, "milestone-order",
+                     f"{m.id} comes after {high.id} in the table: rows run in build order, so renumber the "
+                     "milestones that have no plan yet")
+        elif high is None or n > int(high.id[1:]):
+            high = m
+        later = [d for d in m.depends if int(d[1:]) >= n]
+        if later:
+            yield _p(roadmap, m.row_line, "milestone-order",
+                     f"{m.id} depends on {', '.join(later)}, not an earlier milestone: renumber so a milestone "
+                     "comes after those it needs")
+
+
+def _milestone_plans(ctx: Context) -> dict[str, Doc]:
+    out = {}
+    for doc in ctx.plan_docs:
+        mid = model.milestone_of(doc)
+        if mid:
+            out.setdefault(mid, doc)
+    return out
+
+
+def check_exit_cases_in_scope(ctx: Context):
+    """Each TC a milestone's Exit or Outline names (in the roadmap section, or its plan's Scope Exit) is defined and
+    belongs to a pipeline in that milestone's Pipelines: a range with a gap, or a case of another milestone's
+    pipeline, promises an Exit the milestone can't show."""
+    roadmap = ctx.repo.roadmap
+    if roadmap is None:
+        return
+    cases = {tc.id: tc for d in ctx.repo.docs("tests") for tc in model.test_cases(d)}
+    plans = _milestone_plans(ctx)
+    for m in model.milestones(roadmap):
+        pls = set(m.pipelines or roadmap_cmd.milestone_pipelines(ctx.repo, m)[0])
+        places = []
+        if m.section is not None:
+            for key in ("Exit", "Outline"):
+                line = md.field_line(roadmap.lines, m.section.line + 1, m.section.end, key)
+                if line is not None:
+                    places.append((roadmap, line, md.split_fields(roadmap.lines[line]).get(key, "")))
+        plan = plans.get(m.id)
+        if plan is not None:
+            line = md.field_line(plan.lines, 0, len(plan.lines), "Exit")
+            if line is not None:
+                places.append((plan, line, md.split_fields(plan.lines[line]).get("Exit", "")))
+        for doc, line, text in places:
+            ids = [i for i in md.expand_refs(text) if i.startswith("TC-")]
+            gaps = [i for i in ids if i not in cases and not ctx.repo.is_retired(i)]
+            if gaps:
+                yield _p(doc, line, "exit-cases-in-scope",
+                         f"{m.id}'s Exit names {', '.join(gaps)}, which no tests.md defines (a gap in a range?)")
+            outside: dict[str, list[str]] = {}
+            for i in ids:
+                tc = cases.get(i)
+                if tc is not None and pls and tc.pipeline and tc.pipeline not in pls:
+                    outside.setdefault(tc.pipeline, []).append(i)
+            for pl, tcs in outside.items():
+                yield _p(doc, line, "exit-cases-in-scope",
+                         f"{m.id}'s Exit names {', '.join(tcs)} of {pl}, which isn't in {m.id}'s Pipelines")
+
+
 def check_spec_stage(ctx: Context):
     """Once the roadmap has stages, every spec feature names one that exists on its `**Stage:**` line (a feature
     grouped under a stage heading counts)."""
@@ -594,6 +696,71 @@ def check_spec_stage(ctx: Context):
             yield _p(spec, at, "spec-stage", f"{f.code} Stage {cell!r}: not a stage ID (S<n>)")
         elif not f.stage:
             yield _p(spec, at, "spec-stage", f"{f.code} names no stage: add a **Stage:** line")
+
+
+ROUTED_TO = re.compile(r"\brouted\s+to\s+`?([a-z]+(?:-[a-z]+)+)`?", re.IGNORECASE)
+
+
+def _open_question_bullets(doc):
+    """(line index, text) of each top-level bullet under a heading that mentions open questions."""
+    for h in doc.headings:
+        if "open question" not in h.text.lower():
+            continue
+        for i in range(h.line + 1, h.end):
+            if not doc.mask[i] and re.match(r"^[-*]\s", doc.lines[i]):
+                yield i, doc.lines[i]
+
+
+def check_closed_open_question(ctx: Context):
+    """An Open questions bullet that waits on a change routed to a skill (`routed to architecture-design`) when
+    docs/routes.md has no open change for that skill and a done one: the Revise landed, so the question is stale."""
+    items = rt.routes(ctx.repo)
+    closed = {r.skill for r in items if r.done} - {r.skill for r in items if not r.done}
+    if not closed:
+        return
+    for doc in ctx.scoped_docs:
+        for i, text in _open_question_bullets(doc):
+            skills = [s for s in ROUTED_TO.findall(text) if s in closed]
+            if skills:
+                yield _p(doc, i, "closed-open-question",
+                         f"routed to {', '.join(dict.fromkeys(skills))}, whose routed changes are all done "
+                         f"({rt.PATH}): drop the question or say what is still open")
+
+
+NARRATION = re.compile(
+    r"\brevised\s+\d{4}-\d{2}-\d{2}|\b(?:adopted|added|changed)\s+before\s+M\d+|\bbefore\s+M\d+\s+is\s+built\b"
+    r"|\b(?:confirmed|approved|agreed|decided|chosen)\s+by\s+the\s+user,?\s*(?:on\s+)?\d{4}-\d{2}-\d{2}"
+    r"|(?:TC-\d{2,}|golden|expected\s+values?)[^.;]{0,60}?\b(?:(?:don't|do\s+not|doesn't|does\s+not)\s+change"
+    r"|(?:are|stay|remain)\s+unchanged)\b|\bpreviously\b|\bas\s+of\s+\d{4}-\d{2}", re.IGNORECASE)
+# Docs where dates and the user's words are the content, and the plan's own `## Replan notes` log (replan.md).
+NARRATION_EXEMPT = ("requests", "routes", "todo")
+
+
+def check_process_narration(ctx: Context):
+    """History in a doc that states what holds: "revised 2026-10-18", "confirmed by the user, 2026-10-17", "adopted
+    before M1", "TC-01–TC-49 don't change", "previously", "as of 2026-10", or a `## Replan notes` section outside a
+    plan.
+    Changelog sections, code, `**Source:**` lines (a test case's provenance) and the plan's Replan notes are left
+    alone. A warning: the changelog holds the history."""
+    for doc in ctx.scoped_docs:
+        if doc.kind in NARRATION_EXEMPT:
+            continue
+        skip = _changelog_ranges(doc)
+        if doc.kind in ("plan", "queued-plan"):
+            skip += [(h.line, h.end) for h in doc.headings if h.text.lower().startswith("replan notes")]
+        else:
+            for h in doc.headings:
+                if h.text.lower().startswith("replan notes"):
+                    yield _p(doc, h.line, "process-narration",
+                             "a `## Replan notes` section outside a plan: the doc states what holds, the Changelog "
+                             "what changed")
+        for i, line in enumerate(doc.lines):
+            if doc.mask[i] or _inside(i, skip) or "**Source:**" in line:
+                continue
+            m = NARRATION.search(re.sub(r"`[^`]*`", "", line))
+            if m:
+                yield _p(doc, i, "process-narration",
+                         f"{m.group(0)!r} narrates history: state what holds now (the Changelog holds what changed)")
 
 
 # ---- request checks (design/requests.md) ----------------------------------------------------------
@@ -1034,27 +1201,9 @@ def check_milestone_size(ctx: Context):
                      "milestone where a later part needs an earlier part's outputs; never split independent tracks")
 
 
-def _norm(path: str) -> tuple[str, bool]:
-    """A Writes item → (path or folder prefix, is a folder). `dir/**`, `dir/*` and `dir/` claim the folder."""
-    p = path.strip().removeprefix("./")
-    for suffix in ("/**", "/*", "/"):
-        if p.endswith(suffix):
-            return p[: -len(suffix)] + "/", True
-    return p, False
-
-
-def _overlap(a: str, b: str) -> bool:
-    (pa, da), (pb, db) = _norm(a), _norm(b)
-    if pa == pb:
-        return True
-    if da and pb.startswith(pa) or db and pa.startswith(pb):
-        return True
-    return fnmatch.fnmatch(pa, pb) or fnmatch.fnmatch(pb, pa)
-
-
 def _interface_file(path: str, entries: dict[str, list[str]]) -> bool:
     """`__init__.py`, `types.py`, `__main__.py`, or a `pipeline.py` that isn't exactly one pipeline's Entry file."""
-    p, folder = _norm(path)
+    p, folder = model.norm_write(path)
     name = p.rsplit("/", 1)[-1]
     return not folder and (name in INTERFACE_FILES or name == "pipeline.py" and len(entries.get(p, [])) != 1)
 
@@ -1077,7 +1226,7 @@ def check_writes(ctx: Context):
                 wiring = a.kind == b.kind == "wiring"
                 if not wiring and (a.id in up[b.id] or b.id in up[a.id]):
                     continue
-                shared = [w for w in b.writes if any(_overlap(w, v) for v in a.writes)]
+                shared = [w for w in b.writes if any(model.writes_overlap(w, v) for v in a.writes)]
                 if not shared:
                     continue
                 sev = "" if "Writes" in a.fields and "Writes" in b.fields else "W"
@@ -1105,6 +1254,70 @@ def check_writes(ctx: Context):
             if entry and b.kind not in ENTRY_WRITERS:
                 yield _p(doc, line, "writes", f"{b.id} ({b.kind}) writes the shared file {', '.join(entry)}: only "
                          "an interface, wiring or system task may")
+
+
+KIND_WORDS = ("spine", "thicken")
+
+
+def check_kind_title(ctx: Context):
+    """A task title saying "spine" or "thicken" names its own Kind."""
+    for t in ctx.tasks:
+        words = set(re.findall(r"[a-z]+", md.strip_md(t.title).lower()))
+        for word in KIND_WORDS:
+            if word in words and t.kind and t.kind != word:
+                yield _p(t.doc, t.start, "kind-title", f"{t.id} title says {word!r} but its Kind is {t.kind}: retitle "
+                         "it or fix the Kind")
+
+
+def check_covers_vs_deferred(ctx: Context):
+    """A task or the plan's Scope covers an ID the Scope also defers (E), or a task covers an ID that another step's
+    Covers cell lists and its own step's doesn't (W): it claims a requirement another step delivers. `uncovered`
+    (dt status) checks that Covers and Deferred account for every ID."""
+    owners: dict[str, set[str]] = {}
+    for p in ctx.pipelines.values():
+        for st in p.steps:
+            for c in st.covers:
+                owners.setdefault(c, set()).add(f"{p.id}.{st.name}")
+    for doc in ctx.plan_docs:
+        scope = md.fields_in(doc.lines, 0, len(doc.lines))
+        deferred = set(md.expand_refs(scope.get("Deferred", "")))
+        line = md.field_line(doc.lines, 0, len(doc.lines), "Deferred")
+        both = [i for i in md.expand_refs(scope.get("Covers", "")) if i in deferred]
+        if both:
+            yield _p(doc, 0 if line is None else line, "covers-vs-deferred",
+                     f"Scope Covers and Deferred both list {', '.join(both)}: pick one")
+        for t in model.tasks(doc):
+            at = md.field_line(doc.lines, t.start, t.end, "Covers")
+            at = t.start if at is None else at
+            late = [i for i in t.covers if i in deferred]
+            if late:
+                yield _p(doc, at, "covers-vs-deferred", f"{t.id} covers {', '.join(late)}, which the plan's Scope "
+                         "defers: drop it from the task, or from Deferred")
+            if not re.fullmatch(r"PL-\d{2,}\.\w+", t.step) or not _step_of(ctx, t):
+                continue            # a step-less or unknown Step is `task-step`'s
+            stray = [i for i in t.covers if i not in late and owners.get(i) and t.step not in owners[i]]
+            if stray:
+                steps = sorted({s for i in stray for s in owners[i]})
+                named = ", ".join(steps[:3]) + (f" and {len(steps) - 3} more" if len(steps) > 3 else "")
+                yield Problem(doc.rel, at + 1, "covers-vs-deferred",
+                              f"{t.id} covers {', '.join(stray)}, which the Covers cells of {named} list, not "
+                              f"{t.step}'s: cover what the step delivers, or route the step table to pipeline-design",
+                              "W")
+
+
+def check_parallel_step(ctx: Context):
+    """Two thicken tasks on one step (`PL-NN.<name>`) with no `Depends on` path between them: the step is one
+    function, so each needs the file the other changes even when their Writes don't overlap."""
+    for doc in ctx.plan_docs:
+        tasks = model.tasks(doc)
+        up = {t.id: graph.ancestors(tasks, t.id) for t in tasks}
+        thicken = [t for t in tasks if t.kind == "thicken" and re.fullmatch(r"PL-\d{2,}\.\w+", t.step)]
+        for n, b in enumerate(thicken):
+            for a in thicken[:n]:
+                if a.step == b.step and a.id not in up[b.id] and b.id not in up[a.id]:
+                    yield _p(doc, b.start, "parallel-step",
+                             f"{b.id} and {a.id} both thicken {b.step} with no Depends on path between them: the "
+                             "step's code is one function, so order them (a `code` graph row) or fold one into the other")
 
 
 def _step_of(ctx: Context, t: model.Task) -> list[model.Step]:
@@ -1190,6 +1403,32 @@ def check_edges(ctx: Context):
                 elif e is None and not (dep in by_id and by_id[dep].kind == "interface"):
                     where = "no ## Dependency graph section" if section is None else "no graph row"
                     yield _p(doc, line, "edges", f"{t.id} depends on {dep} with {where} saying why (kind, `none: <reason>`)")
+
+
+def check_packet_type_closure(ctx: Context):
+    """A name contract signatures use (their code, and the `**Errors:**` bullet) that no contract section defines
+    and that isn't a library name, once per contract doc at its first use. `dt context` pulls every section a
+    packet's symbols name (`packet.contract`), so a name with no section is one no builder sees; a name defined
+    outside every section (a preamble alias) too, since no packet shows the preamble."""
+    types = packet.Types(ctx.repo)
+    outside = {}
+    for doc in ctx.repo.docs("contract"):
+        for name, line in packet.outside_sections(doc).items():
+            outside.setdefault(name, f"{doc.rel}:{line + 1}")
+    users: dict[tuple[str, str], list[model.Symbol]] = {}
+    for sym in types.symbols:
+        for name in types.unresolved(sym):
+            users.setdefault((sym.doc.rel, name), []).append(sym)
+    for (_, name), syms in users.items():
+        first, bare = syms[0], name.rsplit(".", 1)[-1]
+        by = ", ".join(s.id for s in syms[:3]) + (f" and {len(syms) - 3} more" if len(syms) > 3 else "")
+        section = f"`### {first.id.split('.')[0]}.{bare}: type`"
+        if name in outside:
+            why = f"is defined outside any section ({outside[name]}), so no packet shows it: give it a {section} section"
+        else:
+            why = (f"has no contract section, so no packet shows it: add a {section} section (or a `class {bare}(…)` "
+                   "line in one), or qualify a library type (`pd.DataFrame`)")
+        yield Problem(first.doc.rel, first.start + 1, "packet-type-closure", f"{name} (named by {by}) {why}")
 
 
 def check_step_io_types(ctx: Context):
@@ -1454,11 +1693,12 @@ CHECKS = [
     check_dup_id, check_missing_ref, check_retired_ref,
     check_budget, check_approved_edit, check_prebuild_left,
     check_task_fields, check_task_size, check_task_acceptance, check_task_title, check_task_step,
-    check_depends, check_milestone_size, check_writes, check_edges, check_deprecated, check_verify_smoke,
-    check_step_io_types, check_type_cases, check_task_ref,
+    check_depends, check_milestone_size, check_writes, check_parallel_step, check_edges, check_deprecated, check_verify_smoke,
+    check_step_io_types, check_packet_type_closure, check_type_cases, check_task_ref,
     check_todo_mismatch, check_finding_disposition, check_foreign_plan,
     check_ref_file, check_ref_hash, check_ref_large, check_ref_prefix, check_roadmap_skill, check_roadmap_stage,
-    check_spec_stage,
+    check_spec_stage, check_milestone_lines, check_milestone_order, check_exit_cases_in_scope,
+    check_kind_title, check_covers_vs_deferred, check_closed_open_question, check_process_narration,
     check_probe_fields, check_probe_informs, check_probe_cite, check_probe_runner, check_probe_leak,
     check_probe_sample, check_probe_results, check_probe_stale, check_probe_large,
     check_boundaries, check_probe_open, check_milestone_depends,

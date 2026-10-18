@@ -833,5 +833,208 @@ class Hook(LintCase):
         self.assertNotIn("decision", out)
 
 
+class PacketTypeClosure(LintCase):
+    """`packet-type-closure`: a name contract signatures use that no section defines (and no library does)."""
+    LOAD = "`def load_prices(universe: tuple[str, ...], start: date, end: date) -> Prices`"
+
+    def messages(self):
+        return [(p.path, p.line, p.severity, p.message) for p in self.problems() if p.code == "packet-type-closure"]
+
+    def test_undefined_name_is_reported_once_per_doc(self):
+        self.p.edit(CONTRACT, self.LOAD, self.LOAD.replace("tuple[str, ...]", "Universe"))
+        self.p.edit(CONTRACT, "`def min_variance(cov: Cov) -> Weights`", "`def min_variance(cov: Cov, u: Universe) -> Weights`")
+        self.assertEqual(self.messages(), [(CONTRACT, 19, "W", "Universe (named by data.load_prices, "
+                                            "portfolio.min_variance) has no contract section, so no packet shows it: "
+                                            "add a `### data.Universe: type` section (or a `class Universe(…)` line in "
+                                            "one), or qualify a library type (`pd.DataFrame`)")])
+
+    def test_preamble_alias_is_reported(self):
+        self.p.edit(CONTRACT, self.LOAD, self.LOAD.replace("tuple[str, ...]", "Universe"))
+        self.p.edit(CONTRACT, "## data\n", "`Universe = tuple[str, ...]` is used throughout.\n\n## data\n")
+        [(_, _, _, msg)] = self.messages()
+        self.assertIn("Universe (named by data.load_prices) is defined outside any section "
+                      "(docs/packages/quant/contract.md:5), so no packet shows it", msg)
+
+    def test_a_section_or_an_inline_definition_closes_it(self):
+        self.p.edit(CONTRACT, self.LOAD, self.LOAD.replace("tuple[str, ...]", "Universe"))
+        self.p.edit(CONTRACT, "### data.load_prices:", "### data.Universe: type\n`Universe = tuple[str, ...]`\n"
+                    "- **Used by:** PL-01\n\n### data.load_prices:")
+        self.assertEqual(self.messages(), [])
+        self.p.edit(CONTRACT, "### data.Universe: type\n`Universe = tuple[str, ...]`",
+                    "### data.Calendar: type\n`Calendar = tuple[date, ...]; class Universe(tuple)`")
+        self.assertEqual(self.messages(), [])
+
+    def test_library_names_strings_and_comments_are_not_types(self):
+        self.p.edit(CONTRACT, self.LOAD, "`def load_prices(universe: Sequence[str], start: date, end: date, *, "
+                    "path: Path, mode: Literal[\"Raw\", \"Adjusted\"] = \"Raw\", rng: np.random.Generator) -> Prices  "
+                    "# Prices is a DataFrame Wrapper`")
+        self.assertEqual(self.messages(), [])
+
+    def test_errors_bullet_counts_other_bullets_do_not(self):
+        self.p.edit(CONTRACT, "- **Errors:** `KeyError` for an unknown ticker", "- **Errors:** `UnknownTicker` for an unknown ticker")
+        self.p.edit(CONTRACT, "- **Invariants:** T×N; a name", "- **Invariants:** `Panel` T×N; a name")
+        self.assertEqual([m[3].split(" (")[0] for m in self.messages()], ["UnknownTicker"])
+
+
+class ParallelStep(LintCase):
+    """`parallel-step`: two thicken tasks on one step with no Depends on path between them."""
+
+    def messages(self):
+        return [(p.line, p.severity, p.message) for p in self.problems() if p.code == "parallel-step"]
+
+    def test_two_thickens_of_one_step_in_parallel(self):
+        self.p.edit(PLAN, "**Step:** PL-02.pca · **Kind:** thicken", "**Step:** PL-02.estimate_cov · **Kind:** thicken")
+        self.assertEqual(self.messages(), [(120, "W", "M1-T13 and M1-T12 both thicken PL-02.estimate_cov with no Depends "
+                                                      "on path between them: the step's code is one function, so order "
+                                                      "them (a `code` graph row) or fold one into the other")])
+
+    def test_ordered_thickens_are_fine(self):
+        self.p.edit(PLAN, "**Step:** PL-02.pca · **Kind:** thicken", "**Step:** PL-02.estimate_cov · **Kind:** thicken")
+        self.p.edit(PLAN, "**Depends on:** M1-T06 · **Writes:** src/quant/stats/pca.py",
+                    "**Depends on:** M1-T06, M1-T12 · **Writes:** src/quant/stats/pca.py")
+        self.assertEqual(self.messages(), [])
+
+
+class MilestoneChecks(LintCase):
+    """`milestone-lines` and `milestone-order` on the roadmap."""
+    ROADMAP = "docs/roadmap.md"
+    M2_ROW = "| M2 | Classical portfolios | ideas/classical-portfolios.md | quant | PL-03 | M1 | Designed |"
+
+    def messages(self, code):
+        return [(p.line, p.message) for p in self.problems() if p.code == code]
+
+    def staged(self, m2_section: str):
+        """The staged roadmap with S1 cut into M1 and M2 (Designed: PL-02's pipelines.md is Approved)."""
+        from test_roadmap import STAGED
+        text = STAGED.read_text(encoding="utf-8").replace(
+            "| — | Building |\n", "| — | Building |\n| M2 | S1 | Shrinkage | quant | PL-02 | M1 | Designed |\n")
+        self.p.write(self.ROADMAP, text.replace("**Plan:** [../tasks/plan.md](../tasks/plan.md)\n",
+                                                "**Skills:** data-science\n**References:** —\n"
+                                                "**Plan:** [../tasks/plan.md](../tasks/plan.md)\n\n" + m2_section))
+
+    def test_fixture_roadmap_is_clean(self):
+        self.assertEqual(self.messages("milestone-lines") + self.messages("milestone-order"), [])
+
+    def test_designed_milestone_without_exit(self):
+        self.p.edit(self.ROADMAP, "**Exit:** Min-var beats equal weight on out-of-sample variance.", "**Outline:** Min-var.")
+        self.assertEqual(self.messages("milestone-lines"), [(17, "M2 has no **Exit:** line (Designed)")])
+
+    def test_cut_stage_needs_skills_and_references(self):
+        self.staged("## M2: Shrinkage\n**Outline:** Shrinkage beats the sample estimate.\n")
+        self.assertEqual(self.messages("milestone-lines"), [
+            (31, "M2 has no **Exit:** line (Designed); no **Skills:** or **References:** line (S1 is cut into 2 "
+                 "milestones)")])
+
+    def test_cut_stage_with_every_line_is_clean(self):
+        self.staged("## M2: Shrinkage\n**Outline:** Shrinkage.\n**Skills:** —\n**References:** —\n**Exit:** TC-02 passes.\n")
+        self.assertEqual(self.messages("milestone-lines"), [])
+
+    def test_designed_milestone_without_a_section(self):
+        text = self.p.read(self.ROADMAP)
+        self.p.write(self.ROADMAP, text[:text.index("## M2:")])
+        self.assertEqual(self.messages("milestone-lines"), [(8, "M2 (Designed) has no `## M2: <name>` section")])
+
+    def test_rows_out_of_build_order(self):
+        row1 = "| M1 | Data + stats | brief | quant | PL-01, PL-02 | — | Building |"
+        self.p.edit(self.ROADMAP, row1 + "\n" + self.M2_ROW, self.M2_ROW.replace("| M1 |", "| — |") + "\n" + row1)
+        self.assertEqual(self.messages("milestone-order"), [
+            (8, "M1 comes after M2 in the table: rows run in build order, so renumber the milestones that have no "
+                "plan yet")])
+
+    def test_depends_on_a_later_milestone(self):
+        self.p.edit(self.ROADMAP, self.M2_ROW, self.M2_ROW.replace("| M1 |", "| M1, M3 (its prices) |")
+                    + "\n| M3 | Later | ideas/classical-portfolios.md | quant | PL-03 | — | Designed |")
+        self.assertEqual(self.messages("milestone-order"), [
+            (8, "M2 depends on M3, not an earlier milestone: renumber so a milestone comes after those it needs")])
+
+
+class ScopeAndTitleChecks(LintCase):
+    """`exit-cases-in-scope`, `kind-title` and `covers-vs-deferred`."""
+    ROADMAP = "docs/roadmap.md"
+
+    def messages(self, code):
+        return [(p.path, p.line, p.severity, p.message) for p in self.problems() if p.code == code]
+
+    def test_fixture_is_clean(self):
+        for code in ("exit-cases-in-scope", "kind-title", "covers-vs-deferred"):
+            self.assertEqual(self.messages(code), [])
+
+    def test_exit_range_with_a_gap(self):
+        self.p.edit(PLAN, "**Exit:** PCA and MP cleaning run on 10y of daily returns; TC-01–TC-03 pass.",
+                    "**Exit:** PCA and MP cleaning run on 10y of daily returns; TC-01–TC-05 pass.")
+        self.assertEqual(self.messages("exit-cases-in-scope"), [
+            (PLAN, 6, "E", "M1's Exit names TC-04, TC-05, which no tests.md defines (a gap in a range?)")])
+
+    def test_exit_case_of_another_milestones_pipeline(self):
+        self.p.edit(self.ROADMAP, "**Exit:** Min-var beats equal weight on out-of-sample variance.",
+                    "**Exit:** Min-var beats equal weight on out-of-sample variance; TC-02 still passes.")
+        self.assertEqual(self.messages("exit-cases-in-scope"), [
+            (self.ROADMAP, 18, "E", "M2's Exit names TC-02 of PL-02, which isn't in M2's Pipelines")])
+
+    def test_title_names_another_kind(self):
+        self.p.edit(PLAN, "### M1-T10: Delisting-aware universe", "### M1-T10: Delisting-aware universe spine")
+        self.assertEqual(self.messages("kind-title"), [
+            (PLAN, 92, "E", "M1-T10 title says 'spine' but its Kind is thicken: retitle it or fix the Kind")])
+
+    def test_title_naming_its_own_kind_is_fine(self):
+        self.p.edit(PLAN, "### M1-T10: Delisting-aware universe", "### M1-T10: Delisting-aware universe (thicken)")
+        self.assertEqual(self.messages("kind-title"), [])
+
+    def test_covers_a_deferred_id(self):
+        self.p.edit(PLAN, "**Deferred:** none", "**Deferred:** STAT-04 (to M2: the report waits for portfolios)")
+        self.assertEqual(self.messages("covers-vs-deferred"), [
+            (PLAN, 7, "E", "Scope Covers and Deferred both list STAT-04: pick one"),
+            (PLAN, 65, "E", "M1-T07 covers STAT-04, which the plan's Scope defers: drop it from the task, or from "
+                            "Deferred")])
+
+    def test_covers_another_steps_requirement(self):
+        self.p.edit(PLAN, "**Step:** PL-02.pca · **Kind:** thicken · **Covers:** STAT-01, QR-01",
+                    "**Step:** PL-02.pca · **Kind:** thicken · **Covers:** STAT-01, STAT-03, QR-01")
+        self.assertEqual(self.messages("covers-vs-deferred"), [
+            (PLAN, 121, "W", "M1-T13 covers STAT-03, which the Covers cells of PL-02.clean_eigen list, not "
+                             "PL-02.pca's: cover what the step delivers, or route the step table to pipeline-design")])
+
+
+class NarrationChecks(LintCase):
+    """`closed-open-question` and `process-narration`, both warnings."""
+    ROUTES = "docs/routes.md"
+    QUESTION = "- Should `clean_eigen` take T from Returns instead of a parameter? (assumed: parameter)"
+
+    def messages(self, code):
+        return [(p.path, p.line, p.message) for p in self.problems() if p.code == code]
+
+    def route(self, box: str):
+        self.p.write(self.ROUTES, "# Routed changes\n\nWritten by `dt route`.\n\n"
+                     f"- [{box}] architecture-design · stats: clean_eigen takes n_obs (from pipeline-design, 2026-10-16)\n")
+        self.p.edit(PIPES, self.QUESTION, self.QUESTION + " (routed to `architecture-design`)")
+
+    def test_question_routed_to_a_closed_revise(self):
+        self.route("x")
+        self.assertEqual(self.messages("closed-open-question"), [
+            (PIPES, 61, "routed to architecture-design, whose routed changes are all done (docs/routes.md): drop "
+                        "the question or say what is still open")])
+
+    def test_question_routed_to_an_open_revise(self):
+        self.route(" ")
+        self.assertEqual(self.messages("closed-open-question"), [])
+
+    def test_narration(self):
+        self.p.edit(ARCH, "- **Decision:** Parquet via pyarrow.",
+                    "- **Decision:** Parquet via pyarrow, revised 2026-10-18; TC-01–TC-03 don't change.")
+        self.p.edit(ARCH, "## Risks and open questions", "## Replan notes\n- moved\n\n## Risks and open questions")
+        self.assertEqual(self.messages("process-narration"), [
+            (ARCH, 44, "'revised 2026-10-18' narrates history: state what holds now (the Changelog holds what changed)"),
+            (ARCH, 48, "a `## Replan notes` section outside a plan: the doc states what holds, the Changelog what "
+                       "changed")])
+
+    def test_what_narration_leaves_alone(self):
+        self.p.edit(ARCH, "- **Consequences:** Binary files; needs pyarrow.",
+                    "- **Consequences:** Binary files; the stored values don't change on read; approved by the user "
+                    "before M1 merges.")
+        self.p.edit("docs/packages/quant/tests.md", "(given 2026-10-15)", "(confirmed by the user 2026-10-15)")
+        self.p.edit(PLAN, "## Replan notes\n", "## Replan notes\n- 2026-10-16: AD-03 adopted before M1 is built\n")
+        self.assertEqual(self.messages("process-narration"), [])
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -17,7 +17,7 @@
 - **Used by:** PL-01, PL-02
 
 ### data.load_prices: Point-in-time prices
-`def load_prices(universe: Universe, start: date, end: date) -> Prices`
+`def load_prices(universe: tuple[str, ...], start: date, end: date) -> Prices`
 - **Invariants:** T×N; a name appears only between its listing and delisting dates
 - **Errors:** `KeyError` for an unknown ticker; `ValueError` if start > end
 - **Boundary:** stats · **Fixtures:** tests/contracts/data.load_prices/ · **Cases:** a 2×2 panel
@@ -50,7 +50,7 @@
 - **Used by:** PL-02
 
 ### stats.estimate_cov: Covariance estimate
-`def estimate_cov(returns: Returns, *, method: CovMethod = "sample") -> Cov`
+`def estimate_cov(returns: Returns, *, method: Literal["sample", "shrunk"] = "sample") -> Cov`
 - **Invariants:** N×N for T×N input; symmetric; positive semi-definite
 - **Errors:** `ValueError` if T < 2 or the input contains NaN
 - **Used by:** PL-02, PL-03

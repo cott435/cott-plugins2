@@ -7,7 +7,7 @@ import re
 import sys
 from pathlib import Path
 
-from .. import code, md, model
+from .. import code, graph, md, model, packet
 from .. import outline as ol
 from .. import probes as pb
 from .. import references as refs
@@ -188,39 +188,19 @@ def _layout_block(repo, pkg: str) -> str:
     return f"## Layout (`dt layout {pkg}`)\n{folder}/\n" + "".join(tree_lines(code.source_tree(root)))
 
 
-def _task_steps(repo, task: model.Task) -> list[model.Step]:
-    """The steps a task touches: `PL-02.pca` → that step; `PL-02` (wiring, system) → every step of PL-02."""
-    pipelines = {p.id: p for p in model.all_pipelines(repo)}
-    out = []
-    for m in re.finditer(r"(PL-\d{2,})(?:\.(\w+))?", task.step):
-        p = pipelines.get(m.group(1))
-        if p is not None:
-            out += [s for s in p.steps if m.group(2) in (None, s.name)]
-    return out
+def interfaces(repo, task: model.Task, shown: set[str]) -> list[packet.Shown]:
+    """The frozen interfaces the packet adds to what `Read:` shows: the contract types the task's steps' `In → Out`
+    cells name, the contract symbols with a step's name (its signature), and every contract section those and the
+    Read symbols' signatures name, until closed (`packet.contract`)."""
+    return [s for s in packet.contract(repo, task, sorted(shown)) if s.symbol.id not in shown]
 
 
-def interfaces(repo, task: model.Task, shown: set[str]) -> list[model.Symbol]:
-    """The frozen interfaces the task's steps cross and that its `Read:` doesn't already show: the contract types
-    their `In → Out` cells name, and the contract symbols with a step's name (its signature)."""
-    types = model.contract_types(repo)
-    steps = _task_steps(repo, task)
-    out: dict[str, model.Symbol] = {}
-    for s in steps:
-        for name in s.in_types + s.out_types:
-            ty = model.resolve_type(types, name)
-            if ty is not None:
-                out.setdefault(ty.id, ty)
-    names = {s.name for s in steps}
-    for sym in model.all_symbols(repo):
-        if not sym.is_type and sym.name in names:
-            out.setdefault(sym.id, sym)
-    return [sym for i, sym in out.items() if i not in shown]
-
-
-def _interfaces_block(repo, syms: list[model.Symbol]) -> str:
+def _interfaces_block(repo, shown: list[packet.Shown]) -> str:
     parts = []
-    for sym in syms:
-        part = f"<!-- {sym.doc.rel}:{sym.start + 1} -->\n{sym.text}"
+    for s in shown:
+        sym = s.symbol
+        why = f" · {s.why}" if s.why.startswith("named by") else ""
+        part = f"<!-- {sym.doc.rel}:{sym.start + 1}{why} -->\n{sym.text}"
         if sym.sample:
             part += f"Sample: {sym.sample} ({'exists' if (repo.root / sym.sample).exists() else 'not written yet'})\n"
         parts.append(part)
@@ -228,11 +208,27 @@ def _interfaces_block(repo, syms: list[model.Symbol]) -> str:
 
 
 def _writes(repo, task: model.Task) -> list[dict]:
+    """Each Writes path: exists, a folder, and `from` — the tasks upstream of this one (`Depends on`, directly or
+    not) whose Writes name that exact path, so a builder extends their file instead of starting a new one (a
+    folder claim upstream, such as the interface task's stubs, doesn't count)."""
+    plan = model.tasks(task.doc)
+    up = graph.ancestors(plan, task.id)
     out = []
     for w in task.writes:
         folder = w.endswith(("/", "/*", "/**"))
-        out.append({"path": w, "exists": (repo.root / w.rstrip("*").rstrip("/")).exists(), "folder": folder})
+        prior = [t.id for t in plan if t.id in up and not folder
+                 and model.norm_write(w)[0] in {model.norm_write(v)[0] for v in t.writes}]
+        out.append({"path": w, "exists": (repo.root / w.rstrip("*").rstrip("/")).exists(), "folder": folder,
+                    "from": prior})
     return out
+
+
+def _write_state(w: dict) -> str:
+    if w["folder"]:
+        return "folder"
+    if w["exists"]:
+        return "exists"
+    return f"from {', '.join(w['from'])}" if w["from"] else "new"
 
 
 def run(args, repo) -> int:
@@ -289,7 +285,7 @@ def run(args, repo) -> int:
     writes = _writes(repo, task) if "Writes" in task.fields else []
     if writes:
         blocks.append("## Writes (edit only these files; the plan gives every other file to another task)\n" + "".join(
-            f"- {w['path']} ({'folder' if w['folder'] else 'exists' if w['exists'] else 'new'})\n" for w in writes))
+            f"- {w['path']} ({_write_state(w)})\n" for w in writes))
     elif files:
         blocks.append("## Files likely\n" + "".join(
             f"- {f['path']} ({'exists' if f['exists'] else 'new'})\n" for f in files))
@@ -308,8 +304,10 @@ def run(args, repo) -> int:
     if args.json:
         print(json.dumps({"task": task.id, "package": task.package, "mode": task.mode, "kind": task.kind,
                           "lines": lines, "read": reads,
-                          "interfaces": [{"id": s.id, "where": f"{s.doc.rel}:{s.start + 1}", "type": s.is_type,
-                                          "sample": s.sample} for s in syms],
+                          "interfaces": [{"id": s.symbol.id, "where": f"{s.symbol.doc.rel}:{s.symbol.start + 1}",
+                                          "type": s.symbol.is_type, "sample": s.symbol.sample,
+                                          "named_by": s.why.removeprefix("named by ") if s.why != "step" else None}
+                                         for s in syms],
                           "writes": writes, "files_likely": files, "text": text}, indent=2))
     else:
         print(text, end="")

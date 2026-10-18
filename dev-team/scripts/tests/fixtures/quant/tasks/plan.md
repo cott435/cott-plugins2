@@ -78,7 +78,7 @@
 - [ ] `python -m quant.data load --smoke` runs end to end on a synthetic CSV
 - [ ] PL-01 entry sketch replaced by a `dt layout` pointer
 **Verify:** `python -m quant.data load --smoke` · `scripts/check.sh gate`
-**Depends on:** M1-T02, M1-T03 · **Writes:** src/quant/data/pipeline.py, src/quant/data/__main__.py, tests/unit/quant/test_pl01_smoke.py
+**Depends on:** M1-T02, M1-T03 · **Writes:** src/quant/data/pipeline.py, tests/unit/quant/test_pl01_smoke.py
 
 ### M1-T09: Wire PL-02 on the load_prices fake
 **Package:** quant · **Step:** PL-02 · **Kind:** wiring · **Size:** S · **Mode:** solo
@@ -87,7 +87,7 @@
 - [ ] `python -m quant.stats cov-report --smoke` runs end to end on the data.load_prices fake
 - [ ] Pre-build sections replaced by a `dt layout` pointer
 **Verify:** `python -m quant.stats cov-report --smoke` · `scripts/check.sh gate`
-**Depends on:** M1-T04, M1-T05, M1-T06, M1-T07 · **Writes:** src/quant/stats/pipeline.py, src/quant/stats/__main__.py, tests/unit/quant/test_pl02_smoke.py
+**Depends on:** M1-T04, M1-T05, M1-T06, M1-T07 · **Writes:** src/quant/stats/pipeline.py, tests/unit/quant/test_pl02_smoke.py
 
 ### M1-T10: Delisting-aware universe
 **Package:** quant · **Step:** PL-01.apply_universe · **Kind:** thicken · **Covers:** DATA-02 · **Size:** S · **Mode:** split

@@ -235,6 +235,33 @@ def differences(repo: Repo, legacy_ok: bool = False) -> list[tuple[model.Milesto
     return out
 
 
+def depends_cycles(doc: Doc) -> list[list[str]]:
+    """Each cycle in the milestones' Depends (`Milestone.depends`) once, as its milestones in order."""
+    deps = {m.id: m.depends for m in model.milestones(doc)}
+    out, seen, state, stack = [], set(), {}, []
+
+    def visit(node: str) -> None:
+        state[node] = 1
+        stack.append(node)
+        for nxt in deps[node]:
+            if state.get(nxt) == 1 and frozenset(stack[stack.index(nxt):]) not in seen:
+                seen.add(frozenset(stack[stack.index(nxt):]))
+                out.append(stack[stack.index(nxt):])
+            elif nxt in deps and nxt not in state:
+                visit(nxt)
+        stack.pop()
+        state[node] = 2
+
+    for node in deps:
+        if node not in state:
+            visit(node)
+    return out
+
+
+def cycle_text(cycle: list[str]) -> str:
+    return "Depends cycle: " + " → ".join(cycle + [cycle[0]])
+
+
 # ---- writing ---------------------------------------------------------------------------------
 
 def _rewrite(lines: list[str], idx: int, changes: dict[int, str]) -> list[str]:
@@ -264,12 +291,15 @@ def run(args, repo) -> int:
     diffs = differences(repo, legacy_ok=args.check)
     for ms, current, derived in diffs:
         print(f"{ms.id}: {current or '—'} → {derived}")
-    if not diffs:
-        print("roadmap: ok")
-        return 0
-    if args.check:
-        print(f"roadmap: {len(diffs)} out of date (run dt roadmap)")
+    cycles = depends_cycles(doc)
+    for cycle in cycles:
+        print(f"{cycle_text(cycle)} (Depends lists only the milestones whose outputs are needed)")
+    if args.check and (diffs or cycles):
+        print(f"roadmap: {len(diffs)} out of date (run dt roadmap)" if diffs else "roadmap: Depends cycle")
         return 1
+    if not diffs:
+        print("roadmap: ok" if not cycles else "roadmap: statuses ok")
+        return 0
     lines = edit.read_lines(doc.path)
     for first, kind in (("stage", model.Stage), ("milestone", model.Milestone)):
         changes = {x.row_line: d for x, _, d in diffs if isinstance(x, kind)}

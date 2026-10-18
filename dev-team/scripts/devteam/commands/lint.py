@@ -20,6 +20,7 @@ from .. import probes as pb
 from .. import references as refs
 from ..repo import Repo
 from ..status.common import available_skills
+from . import roadmap as roadmap_cmd
 
 # code → severity (E fails the run, W doesn't)
 SEVERITY = {
@@ -34,6 +35,7 @@ SEVERITY = {
     "roadmap-stage": "E", "spec-stage": "E", "type-cases": "E", "task-ref": "E",
     "probe-fields": "E", "probe-informs": "E", "probe-cite": "E", "probe-runner": "E", "probe-leak": "E",
     "probe-sample": "E", "probe-results": "E", "probe-stale": "W", "probe-large": "W",
+    "boundaries": "E", "probe-open": "E", "milestone-depends": "E",
 }
 
 # Size budgets (planning-stage.md §3), in lines. Package docs are budgeted per unit (lines per unit × units +
@@ -43,6 +45,7 @@ UNIT_BUDGETS = {"contract": (8, 12, "symbol"), "pipelines": (35, 10, "pipeline")
 # Past these a package holds too much for one set of docs: consider a Grow.
 GROW_CEILINGS = {"contract": 200, "pipelines": 300, "tests": 300}
 ROADMAP_SECTION_MAX = 6
+BRIEF_WORDS, BRIEF_GOALS = 500, 5        # about one page; a new stage is not a new goal
 PROBE_ENTRY_MAX = 10          # a PB entry: ~8 lines, plus the checks table (header, separator, one line per check)
 AGENTS_DOC_MAP_MAX = 25
 
@@ -55,9 +58,11 @@ SIZE_FILES = {"XS": (1, 1), "S": (1, 2), "M": (3, 5)}     # source files a task 
 TRACK_MAX = 15        # the plan's critical path, in tasks
 REQUIRED_TASK_FIELDS = ("Package", "Step", "Size", "Mode", "Read", "Acceptance", "Verify")
 INTERFACE_FIRST_FIELDS = ("Kind", "Writes")    # also required once a plan is interface-first
-# Shared files: only an interface, wiring or system task may write them (interface-first-design.md §1.5).
-SHARED_NAMES = ("__init__.py", "types.py", "__main__.py")
-SHARED_WRITERS = ("interface", "wiring", "system")
+# Shared modules the interface task writes whole (interface-first-design.md §4.1), with any `pipeline.py` that isn't
+# one pipeline's own entry module (it re-exports the entries). A pipeline's entry module is its wiring task's (the
+# interface task writes its stub, a system task may swap a fake in it).
+INTERFACE_FILES = ("__init__.py", "types.py", "__main__.py")
+ENTRY_WRITERS = ("interface", "wiring", "system")
 
 # Fields and table columns whose IDs must resolve. `Depends on` is checked by `depends`.
 REF_FIELDS = {"Read", "Covers", "Step", "Pipeline", "Used by", "Part of", "References"}
@@ -268,6 +273,14 @@ def check_budget(ctx: Context):
             if len(doc.lines) > ceiling:
                 yield _p(doc, 0, "grow-size", f"{len(doc.lines)} lines, over the {ceiling}-line ceiling for one "
                          f"package's {doc.kind} doc: architecture-design should consider a Grow")
+        if doc.kind == "brief":
+            words, goals = len(doc.text.split()), model.goal_count(doc)
+            if words > BRIEF_WORDS:
+                yield _p(doc, 0, "budget", f"{words} words, budget {BRIEF_WORDS} (about one page)")
+            if goals > BRIEF_GOALS:
+                h = next(h for h in doc.headings if h.level == 2 and h.text.lower().startswith("goal"))
+                yield _p(doc, h.line, "budget", f"{goals} goals, at most {BRIEF_GOALS}: a new stage is not a new "
+                         "goal; ask the user which to merge")
         if doc.kind == "roadmap":
             for h in doc.headings:
                 if h.id and re.fullmatch(rf"{md.MILESTONE_ID}|{md.STAGE_ID}", h.id):
@@ -544,6 +557,19 @@ def check_roadmap_stage(ctx: Context):
 
 
 
+def check_milestone_depends(ctx: Context):
+    """A cycle in the roadmap's milestone Depends (IDs outside parentheses), reported once at its first row."""
+    roadmap = ctx.repo.roadmap
+    if roadmap is None:
+        return
+    rows = {m.id: m.row_line for m in model.milestones(roadmap)}
+    for cycle in roadmap_cmd.depends_cycles(roadmap):
+        line = rows.get(cycle[0])
+        yield _p(roadmap, 0 if line is None else line, "milestone-depends",
+                 f"{roadmap_cmd.cycle_text(cycle)}: Depends lists only the milestones whose outputs are needed; "
+                 "a build order goes in the milestone's section")
+
+
 def check_spec_stage(ctx: Context):
     """Once the roadmap has stages, every spec feature names one that exists on its `**Stage:**` line (a feature
     grouped under a stage heading counts)."""
@@ -618,6 +644,20 @@ def check_probe_cite(ctx: Context):
         elif ctx.repo.is_retired(c.probe):
             note = ctx.repo.lookup(c.probe).retired_note
             yield _p(c.doc, c.line, "probe-cite", f"{where} Probe: {c.probe} is retired ({note})")
+
+
+def check_probe_open(ctx: Context):
+    """A decision Accepted while its `**Probe:**` names an entry that isn't Answered or Waived: it stays Proposed
+    until the probe answers (architecture-design)."""
+    entries = {e.id: e for e in model.all_probes(ctx.repo)}
+    for c in model.probe_citations(ctx.repo):
+        e = entries.get(c.probe)
+        if not c.decision or e is None or not e.is_open:
+            continue
+        status = md.strip_md((model.decision_fields(ctx.repo, c.decision) or {}).get("Status", ""))
+        if status.lower().startswith("accepted"):
+            yield _p(c.doc, c.line, "probe-open", f"{c.decision} is Accepted while its probe {e.id} is "
+                     f"{e.state or 'unread'}: keep it Proposed until {e.id} is Answered or Waived")
 
 
 def check_probe_runner(ctx: Context):
@@ -870,37 +910,59 @@ def _overlap(a: str, b: str) -> bool:
     return fnmatch.fnmatch(pa, pb) or fnmatch.fnmatch(pb, pa)
 
 
-def _shared(path: str, entries: set[str]) -> bool:
+def _interface_file(path: str, entries: dict[str, list[str]]) -> bool:
+    """`__init__.py`, `types.py`, `__main__.py`, or a `pipeline.py` that isn't exactly one pipeline's Entry file."""
     p, folder = _norm(path)
-    return not folder and (p in entries or p.rsplit("/", 1)[-1] in SHARED_NAMES)
+    name = p.rsplit("/", 1)[-1]
+    return not folder and (name in INTERFACE_FILES or name == "pipeline.py" and len(entries.get(p, [])) != 1)
 
 
 def check_writes(ctx: Context):
     """`Writes:` is an exclusive claim. Two tasks with no `Depends on` path between them (in either direction)
-    must not write the same path, across the whole plan; a shared file (`__init__.py`, `types.py`, an entry
-    module) belongs to the interface, wiring or system task. A conflict only `Files likely` claims is a warning."""
-    entries = {p.entry_file for p in ctx.pipelines.values() if p.entry_file}
+    must not write the same path, across the whole plan, and two wiring tasks never write one file, path or not;
+    the shared modules (`__init__.py`, `types.py`, `__main__.py`, a re-exporting `pipeline.py`) belong to the
+    interface task, and a pipeline's entry module to an interface, wiring or system task. A conflict only `Files
+    likely` claims is a warning."""
+    entries: dict[str, list[str]] = {}
+    for p in ctx.pipelines.values():
+        if p.entry_file:
+            entries.setdefault(p.entry_file, []).append(p.id)
     for doc in ctx.plan_docs:
         tasks = model.tasks(doc)
         up = {t.id: graph.ancestors(tasks, t.id) for t in tasks}
         for n, b in enumerate(tasks):
             for a in tasks[:n]:
-                if a.id in up[b.id] or b.id in up[a.id]:
+                wiring = a.kind == b.kind == "wiring"
+                if not wiring and (a.id in up[b.id] or b.id in up[a.id]):
                     continue
                 shared = [w for w in b.writes if any(_overlap(w, v) for v in a.writes)]
-                if shared:
-                    sev = "" if "Writes" in a.fields and "Writes" in b.fields else "W"
+                if not shared:
+                    continue
+                sev = "" if "Writes" in a.fields and "Writes" in b.fields else "W"
+                if wiring:
+                    yield Problem(doc.rel, b.start + 1, "writes",
+                                  f"{b.id} and {a.id} are wiring tasks that both write {', '.join(shared)}: each "
+                                  "writes only its own pipeline's entry module and smoke test, and the interface "
+                                  "task writes `__main__.py` and any re-exporting `pipeline.py`", sev)
+                else:
                     yield Problem(doc.rel, b.start + 1, "writes",
                                   f"{b.id} and {a.id} both write {', '.join(shared)} with no Depends on path "
                                   "between them: move the shared part to the interface or wiring task, or "
                                   "order them (and give the edge a graph row)", sev)
-            if b.kind and b.kind not in SHARED_WRITERS:
-                owned = [w for w in b.writes if _shared(w, entries)]
-                if owned:
-                    line = md.field_line(doc.lines, b.start, b.end, "Writes")
-                    yield _p(doc, b.start if line is None else line, "writes",
-                             f"{b.id} ({b.kind}) writes the shared file {', '.join(owned)}: only an interface, "
-                             "wiring or system task may")
+            if not b.kind or b.kind == "interface":
+                continue
+            line = md.field_line(doc.lines, b.start, b.end, "Writes")
+            line = b.start if line is None else line
+            owned = [w for w in b.writes if _interface_file(w, entries)]
+            if owned:
+                why = "".join(f" ({p} is the entry of {', '.join(entries[p])}: give each pipeline its own entry "
+                              "module)" for p in owned if len(entries.get(p, [])) > 1)
+                yield _p(doc, line, "writes", f"{b.id} ({b.kind}) writes the shared file {', '.join(owned)}: only "
+                         f"the interface task may{why}")
+            entry = [w for w in b.writes if w in entries and w not in owned]
+            if entry and b.kind not in ENTRY_WRITERS:
+                yield _p(doc, line, "writes", f"{b.id} ({b.kind}) writes the shared file {', '.join(entry)}: only "
+                         "an interface, wiring or system task may")
 
 
 def _step_of(ctx: Context, t: model.Task) -> list[model.Step]:
@@ -1043,6 +1105,75 @@ def check_type_cases(ctx: Context):
                       f"{sym.id} crosses step owners ({why}) but names no case: add `**Cases:** <the payloads a "
                       f"sample must show>` to its `- **Boundary:** … · **Fixtures:** tests/contracts/{sym.id}/` "
                       "line", sev)
+
+
+REUSED_STEP = re.compile(r"\bPL-\d{2,}\s+as\s+built\b", re.IGNORECASE)
+
+
+def _owners(repo: Repo) -> set[str]:
+    """Every package and component the docs define: what a `Used by` names besides PL IDs."""
+    out = set(repo.packages()) | {d.package for d in repo.docs() if d.package}
+    for doc in repo.docs("architecture", "package-architecture"):
+        out |= {c.id.strip("`") for c in model.components(doc)}
+    return out
+
+
+def _other_pipelines(ctx: Context, sym: model.Symbol, used: list[str]) -> list[str]:
+    """The pipelines in a contract function's `Used by` that aren't its own. Its own are those whose entry it is
+    and those with a step of its name its component owns. Another is any other, once it has one; with none, a
+    pipeline that calls it through a reused step (`PL-01 as built`, or an Owner cell naming a PL)."""
+    component = sym.id.split(".")[0]
+    home, callers = set(), set()
+    for p in ctx.pipelines.values():
+        if p.entry_function == sym.name and (p.is_system or p.package == sym.package):
+            home.add(p.id)
+        for s in p.steps:
+            if s.name != sym.name:
+                continue
+            if REUSED_STEP.search(md.strip_md(s.spine)) or re.match(r"PL-\d", s.owner):
+                callers.add(p.id)
+            elif s.owner == component:
+                home.add(p.id)
+    return [i for i in used if i not in home and (home or i in callers)]
+
+
+def _used_by(value: str, own: set[str], owners: set[str]) -> tuple[list[str], list[str]]:
+    """(the packages and components a `Used by` value names other than `own`, the PL IDs it names)."""
+    names = [n for n in (md.strip_md(x).strip("`") for x in re.split(r"[;,·]", value)) if n in owners and n not in own]
+    return list(dict.fromkeys(names)), [i for i in md.expand_refs(value) if re.fullmatch(r"PL-\d{2,}", i)]
+
+
+def check_boundaries(ctx: Context):
+    """A contract function, or a pipeline, whose `Used by` names another package or component, or a pipeline it
+    is neither a step nor the entry of, has a `**Boundary:**` line, so the interface task freezes a fake for it
+    and the caller's wiring never waits on its code (interface-first-design.md §4.1). Types are `type-cases'."""
+    owners = _owners(ctx.repo)
+    for sym in model.all_symbols(ctx.repo):
+        if sym.is_type:
+            continue
+        bullets = md.bullet_fields(sym.doc.lines, sym.start + 1, sym.end)
+        if "Boundary" in sym.fields or "Boundary" in bullets:
+            continue
+        names, pls = _used_by(sym.fields.get("Used by") or bullets.get("Used by", ""),
+                              {sym.id.split(".")[0], sym.package}, owners)
+        outside = names + _other_pipelines(ctx, sym, pls)
+        if outside:
+            line = md.field_line(sym.doc.lines, sym.start + 1, sym.end, "Used by")
+            yield Problem(sym.doc.rel, (sym.start if line is None else line) + 1, "boundaries",
+                          f"{sym.id} is used by {', '.join(outside)} but has no **Boundary:** line: add `- "
+                          f"**Boundary:** <consumers> · **Fixtures:** tests/contracts/{sym.id}/ · **Cases:** …` "
+                          "so the interface task freezes its fake")
+    for p in ctx.pipelines.values():
+        if "Boundary" in p.fields:
+            continue
+        names, pls = _used_by(p.fields.get("Used by", ""), {p.package}, owners)
+        outside = names + [i for i in pls if i != p.id]
+        if outside:
+            line = md.field_line(p.doc.lines, p.start + 1, p.end, "Used by")
+            yield Problem(p.doc.rel, (p.start if line is None else line) + 1, "boundaries",
+                          f"{p.id}'s entry is used by {', '.join(outside)} but has no **Boundary:** line: add "
+                          "`**Boundary:** <consumers> · **Fixtures:** tests/contracts/<pkg.entry>/` so the "
+                          "interface task freezes its fake")
 
 
 BARE_TASK = re.compile(r"(?<![\w-])T\d{2,}\b")
@@ -1188,6 +1319,7 @@ CHECKS = [
     check_spec_stage,
     check_probe_fields, check_probe_informs, check_probe_cite, check_probe_runner, check_probe_leak,
     check_probe_sample, check_probe_results, check_probe_stale, check_probe_large,
+    check_boundaries, check_probe_open, check_milestone_depends,
 ]
 
 

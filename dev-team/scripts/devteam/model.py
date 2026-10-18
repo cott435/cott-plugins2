@@ -306,6 +306,12 @@ class Step:
         return parts[n] if len(parts) == 2 else (self.io if n == 1 else "")
 
     @property
+    def is_class(self) -> bool:
+        """A library class a factory step returns (Step cell `SingleCropSet`, interface-first-design.md §3): a step
+        with its own owner and spine that the entry function never calls."""
+        return self.name[:1].isupper()
+
+    @property
     def in_types(self) -> list[str]:
         """Type names on the In side of the `In → Out` cell (CamelCase or `pkg.Name`)."""
         return type_names(self._side(0))
@@ -468,6 +474,15 @@ def goals(doc: Doc) -> list[Goal]:
     return out
 
 
+def goal_count(doc: Doc) -> int:
+    """Items under the brief's `## Goals` heading: the numbered ones, else the bullets (`dt status` brief_goals)."""
+    h = next((h for h in doc.headings if h.level == 2 and h.text.lower().startswith("goal")), None)
+    if not h:
+        return 0
+    body = doc.lines[h.line + 1:h.end]
+    return len([x for x in body if re.match(r"^\d+[.)]\s", x)]) or len([x for x in body if re.match(r"^[-*]\s", x)])
+
+
 @dataclass
 class Requirement:
     id: str
@@ -597,7 +612,11 @@ class Milestone:
 
     @property
     def depends(self) -> list[str]:
-        return re.findall(r"\bM\d+\b", self.row.get("Depends", ""))
+        """The milestones its Depends cell names outside parentheses: `M4 (after M4, before M5)` is just M4."""
+        cell, prev = self.row.get("Depends", ""), None
+        while cell != prev:
+            prev, cell = cell, re.sub(r"\([^()]*\)", "", cell)
+        return re.findall(r"\bM\d+\b", cell.split("(")[0])
 
     @property
     def source(self) -> str:
@@ -1102,6 +1121,17 @@ def spine_pipeline(task: Task, system: set[str] | frozenset[str] = frozenset()) 
     return pl
 
 
+def spine_pipelines(task: Task, system: set[str] | frozenset[str] = frozenset()) -> list[str]:
+    """Every pipeline a task makes run end to end: `spine_pipeline`'s, and for a `Kind: system` task also each
+    system pipeline its Read or Reason names (one system task may run several on the real chain)."""
+    first = spine_pipeline(task, system)
+    out = [first] if first else []
+    if task.kind == "system":
+        named = re.findall(r"\bPL-\d{2,}\b", md.strip_md(f"{task.get('Read')} {task.get('Reason')}"))
+        out += [p for p in named if p in system]
+    return list(dict.fromkeys(out))
+
+
 def spine_done(repo: Repo) -> dict[str, bool]:
     """Pipeline ID → whether its spine task is checked in todo.md (active plan only)."""
     if not repo.plan:
@@ -1110,8 +1140,7 @@ def spine_done(repo: Repo) -> dict[str, bool]:
     system = system_pipeline_ids(repo)
     out: dict[str, bool] = {}
     for t in tasks(repo.plan):
-        pl = spine_pipeline(t, system)
-        if pl:
+        for pl in spine_pipelines(t, system):
             out[pl] = out.get(pl, False) or state.get(t.id, False)
     return out
 

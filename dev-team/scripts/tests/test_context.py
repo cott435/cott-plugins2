@@ -37,7 +37,6 @@ class ContextFixtureTest(unittest.TestCase):
                           "stats.clean_eigen"])
         self.assertEqual(data["kind"], "wiring")
         self.assertEqual(data["writes"], [{"path": "src/quant/stats/pipeline.py", "exists": False, "folder": False},
-                                          {"path": "src/quant/stats/__main__.py", "exists": False, "folder": False},
                                           {"path": "tests/unit/quant/test_pl02_smoke.py", "exists": False,
                                            "folder": False}])
 

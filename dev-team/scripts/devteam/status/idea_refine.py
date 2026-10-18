@@ -1,8 +1,6 @@
 """`dt status --skill idea-refine` (replaces idea-refine.sh): brief, ideas and roadmap stage rows."""
 from __future__ import annotations
 
-import re
-
 from .. import md, model
 from ..commands import roadmap as roadmap_cmd
 from ..repo import Repo
@@ -14,7 +12,7 @@ def idea_refine(repo: Repo, r: Report) -> None:
     r.mode("extend" if brief else "new")
     add_common(repo, r)
     r.add("brief_words", len(brief.text.split()) if brief else 0)
-    r.add("brief_goals", _goal_count(brief.lines, brief.headings) if brief else 0)
+    r.add("brief_goals", model.goal_count(brief) if brief else 0)
     r.add("ideas", {d.rel: doc_state(d) for d in sorted(repo.docs("idea"), key=lambda d: d.rel)})
     rows = []
     if repo.roadmap:
@@ -28,11 +26,3 @@ def idea_refine(repo: Repo, r: Report) -> None:
     r.add("roadmap_rows", rows, fmt([f"{x['id']} {x['name']} [{x['source'] or '—'}]" for x in rows]))
     r.add("references_unassigned", [e.id for e in model.all_references(repo) if not e.milestones])
 
-
-def _goal_count(lines: list[str], headings: list[md.Heading]) -> int:
-    """Numbered items under `## Goals` (bullets if none are numbered)."""
-    h = next((h for h in headings if h.level == 2 and h.text.lower().startswith("goal")), None)
-    if not h:
-        return 0
-    body = lines[h.line + 1:h.end]
-    return len([x for x in body if re.match(r"^\d+[.)]\s", x)]) or len([x for x in body if re.match(r"^[-*]\s", x)])

@@ -617,6 +617,17 @@ class FindingFromTest(BuildCase):
         self.assertEqual(status["findings"], {"Critical": 1, "Important": 1})
         self.assertEqual(status["reviews"][0]["critical_open"], [])
 
+    def test_the_file_decides_not_the_status_line(self):
+        """A3-RT r2, r3: the reviewer's line said `1 Critical` while its file filed the finding as Important. The
+        driver acts on what dt records from the file (loop.md), so nothing stops."""
+        self.fake_land("M1-T01")
+        path = self.ctl / "M1-T01.mini.md"
+        path.write_text("Important · correctness · `src/mini/summary.py:4::summarize` could be Critical: an empty "
+                        "list raises → return a zero summary\n", encoding="utf-8")
+        code, out = self.dt_json("finding", "--from", str(path))
+        self.assertEqual((code, out["outcome"], out["critical"]), (0, "passed", []))
+        self.assertEqual(self.ready()["holds"], [])
+
     def test_explicit_checkpoint_and_errors(self):
         self.fake_land("M1-T01")
         path = self.ctl / "findings.md"

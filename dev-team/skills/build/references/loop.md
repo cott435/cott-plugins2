@@ -42,7 +42,7 @@ Each completion arrives on its own, as the agent's last message. Act on its stat
 | Line | Run | Then |
 |---|---|---|
 | `DONE <task> <role>` or `STOPPED <task> <role>: …` | `dt land <task> --role <role>` | branch on the JSON below |
-| `REVIEW <checkpoint> <pkg>: …` | `dt finding --from <reviews>/<checkpoint>.<pkg>.md --checkpoint <checkpoint> --pkg <pkg>`, where `<reviews>` is `$(git rev-parse --git-common-dir)/dt-build/reviews` | a Critical count above 0 → `escalation.md`, Critical. No findings file (the reviewer couldn't write it) → `dt build release <checkpoint>.<pkg> reviewer` and dispatch again; a second time is a stop (`escalation.md`, harness) |
+| `REVIEW <checkpoint> <pkg>: …` | `dt finding --from <reviews>/<checkpoint>.<pkg>.md --checkpoint <checkpoint> --pkg <pkg>`, where `<reviews>` is `$(git rev-parse --git-common-dir)/dt-build/reviews` | the JSON's `outcome` `critical` → `escalation.md`, Critical. The line's counts are never read: the recorded file decides. No findings file (the reviewer couldn't write it) → `dt build release <checkpoint>.<pkg> reviewer` and dispatch again; a second time is a stop (`escalation.md`, harness) |
 | anything else | `dt land <task> --role <role> --harness` | the half goes back to `dt ready` |
 
 `dt land` prints `{landed, reject, kind, detail_file}`:

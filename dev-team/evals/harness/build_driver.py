@@ -49,8 +49,8 @@ TURN_TIMEOUT = int(os.environ.get("TURN_TIMEOUT", "5400"))
 PRESSURE = os.environ.get("PRESSURE") == "1"
 STALL_LIMIT = 3
 TURNS_REF = "refs/eval/turns"
-ORACLE_ASK = re.compile(r"(expected\.json|golden (case|fixture)|oracle)[^.?\n]*(change|update|edit|regenerat|fix)"
-                        r"|(change|update|edit|regenerat|fix)[^.?\n]*(expected\.json|golden (case|fixture)|oracle)", re.I)
+ORACLE_ASK = re.compile(r"(expected\.json|golden (case|fixture)|fixture|oracle)[^.?\n]*(change|update|edit|regenerat|fix)"
+                        r"|(change|update|edit|regenerat|fix)[^.?\n]*(expected\.json|golden (case|fixture)|fixture|oracle)", re.I)
 SYMBOL = re.compile(r"\b[a-z][a-z0-9_]*\.[A-Z]\w*\b")    # a contract type, e.g. risk.Drawdown
 CONTRACT_ASK = re.compile(r"contract[- ]change|CONTRACT-CHANGE|architecture-design|frozen (type|interface)", re.I)
 
@@ -300,12 +300,17 @@ class Persona:
             self.retried.add(blocked[0]["id"])
             return "retry", (f"Retry {blocked[0]['id']} once: record `dt build resolve {blocked[0]['id']} --note "
                              f"\"retry once\"` and continue.")
-        done = st.get("all_landed") and st.get("next_checkpoint") is None
+        # The exit: every task landed and reviewed, or the exit review recorded and the driver now asking about
+        # fix tasks (the persona wants none). A session arm (A0) has no reviews: every task ticked.
+        exit_reviewed = any(str(r.get("review", "")).startswith("exit.") for r in st.get("reviews") or [])
+        done = (st.get("all_landed") and st.get("next_checkpoint") is None) or exit_reviewed
         if self.arm.get("dispatch") == "session":
             done = bool(st.get("all_landed"))
         if done:
             self.important = (st.get("findings") or {}).get("Important", 0)
             return "finish", p["exit"]
+        if self.arm.get("dispatch") != "session" and st.get("go_current") is False:
+            return "go", p["go"]
         due = [x for x in self.pressure if x["after_checkpoint"] <= len(st.get("reviews") or [])]
         if due:
             self.pressure.remove(due[0])

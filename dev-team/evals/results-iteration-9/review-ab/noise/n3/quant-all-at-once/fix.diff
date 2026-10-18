@@ -1,0 +1,1127 @@
+diff --git a/docs/architecture.md b/docs/architecture.md
+index f72a235..f401674 100644
+--- a/docs/architecture.md
++++ b/docs/architecture.md
+@@ -15,7 +15,7 @@ flowchart LR
+   lab --> models
+   data --> models
+   data --> server
+-  server -- HTTP + SSE, wire schemas --> app
++  server -- HTTP + WebSocket, wire schemas --> app
+   models -. training bundle .-> gpu[(rented GPU)]
+ ```
+ 
+@@ -23,10 +23,10 @@ flowchart LR
+ | Package | Path | Responsibility | Covers | Depends on | Doc |
+ |---|---|---|---|---|---|
+ | `data` | packages/data | Download, store, validate and serve point-in-time daily data and run records | UNIV-01–UNIV-04, INGST-01–INGST-06, VALID-01–VALID-08, PANEL-01–PANEL-06, DATA-01–DATA-07, QR-01, QR-03 | — | [data](packages/data/architecture.md) |
+-| `server` | packages/server | Local HTTP + SSE API over `data`; owns the wire schemas | EXPL-01–EXPL-05 (backend), RUNS-01–RUNS-04 (backend), QR-04, QR-06, QR-08 | `data` | [server](packages/server/architecture.md) |
++| `server` | packages/server | Local HTTP + WebSocket API over `data`; owns the wire schemas | EXPL-01–EXPL-05 (backend), RUNS-01–RUNS-04 (backend), QR-04, QR-06, QR-08 | `data` | [server](packages/server/architecture.md) |
+ | `app` | packages/app | Browser explorer and live run monitor | EXPL-01–EXPL-06, RUNS-01–RUNS-04, QR-06, QR-08 | `server` (HTTP only) | [app](packages/app/architecture.md) |
+ | `engine` | packages/engine | Walk-forward schedule and guard, hypothesis ledger, backtest, portfolio constraints | WFWD-01–WFWD-06, LEDG-01–LEDG-06, BTEST-01–BTEST-04, PORT-01, QR-07 | `data` | [engine](packages/engine/architecture.md) |
+-| `lab` | packages/lab | S2–S3 research and the verdict | FACT-01–FACT-05, DENOI-01–DENOI-03, COV-01–COV-04, PORT-01–PORT-06, FEAT-01–FEAT-04, SIG-01–SIG-04, VERD-01–VERD-03 | `engine`, `data` | [lab](packages/lab/architecture.md) |
++| `lab` | packages/lab | S2–S3 research and the verdict | FACT-01–FACT-05, DENOI-01–DENOI-03, COV-01–COV-04, PORT-01–PORT-06, FEAT-01–FEAT-04, SIG-01–SIG-05, VERD-01–VERD-03 | `engine`, `data` | [lab](packages/lab/architecture.md) |
+ | `models` | packages/models | Neural forecasters, forecast-driven portfolios, PPO agents, GPU bundles | FCST-01–FCST-07, FPORT-01–FPORT-03, AGENT-01–AGENT-05, QR-02, QR-05 | `lab`, `engine`, `data` | [models](packages/models/architecture.md) |
+ 
+ ## Dependency rules
+@@ -52,7 +52,7 @@ flowchart LR
+ 1. `data` (ingest → store): `data.run_download` writes a staged `data.Snapshot` and run events
+ 2. `data` (validate): `data.validate_snapshot` quarantines, promotes or rejects; `data.ValidationResult`
+ 3. `data` → `server`: `data.list_runs`, `data.run_events` (polled from the run database)
+-4. `server` → `app`: `server.stream_run` (SSE of `server.RunEventBody`), `server.list_runs`
++4. `server` → `app`: `server.stream_run` (WebSocket messages of `server.RunEventBody`), `server.list_runs`
+ 
+ ### PL-02: Explore the dataset
+ **Trigger:** the researcher opens the app at `http://127.0.0.1:<port>` · **Covers:** EXPL-01–EXPL-06, QR-08
+@@ -72,7 +72,7 @@ flowchart LR
+ 2. `lab` → `engine`: `engine.Weights` into `engine.backtest`; outcomes into the ledger; stores `lab.benchmark`
+ 
+ ### PL-05: Feature significance
+-**Trigger:** `qrp lab features` after PL-04 · **Covers:** FEAT-01–FEAT-04, SIG-01–SIG-04, FACT-05
++**Trigger:** `qrp lab features` after PL-03 · **Covers:** FEAT-01–FEAT-04, SIG-01–SIG-05, FACT-05
+ 1. `data` → `lab`: `data.bars_panel`, `data.returns_panel`
+ 2. `lab` (factors → targets → features → significance): `lab.FeaturePanel`, `lab.Targets`
+ 3. `lab` → `engine`: `engine.TestInput` into `engine.run_test` → `engine.TestOutcome`
+@@ -119,10 +119,11 @@ qrp.py             → the `qrp` launcher (AD-20)
+ | Sector history | SEC EDGAR SIC codes, or Sharadar if PB-01 shows history | AD-05 |
+ | Trading calendar | `exchange_calendars` 4.13 (XNYS), cross-checked with SEP dates | AD-08 |
+ | Store | Parquet (pyarrow 17) + DuckDB 1.1; SQLite (WAL) for runs and ledger | AD-06, AD-07, AD-11 |
+-| Local API | FastAPI 0.115, uvicorn 0.32, pydantic 2.9, sse-starlette 2.1 | AD-09 |
++| Local API | FastAPI 0.115, uvicorn 0.32, pydantic 2.9 | AD-09 |
+ | App | React 18.3, Vite 5.4, TanStack Query 5, React Router 6, Observable Plot 0.6 | AD-09 |
+ | Wire types | pydantic → JSON Schema → `json-schema-to-typescript` 15; ajv 8 in app tests | AD-09 |
+ | Optimisation | cvxpy 1.5 (Clarabel) | AD-14 |
++| Feature ML models | scikit-learn 1.5 (ridge), LightGBM 4.5 | AD-26 |
+ | Neural nets | PyTorch 2.4 | AD-16 |
+ | RL | gymnasium 0.29, stable-baselines3 2.3 | AD-17 |
+ | Lint, types, tests | ruff, mypy, pytest, hypothesis; eslint, tsc, vitest; import-linter | AD-01 |
+@@ -186,12 +187,12 @@ Packages are versioned together; one release tag for the repo.
+ - **Alternatives:** A database (Postgres, DuckDB file) with update-in-place — revisions and immutability need hand-built versioning, and a failed run can corrupt the current state. Full copy per snapshot — simple, but ~1–2 GB per daily update.
+ - **Consequences:** Snapshots share part files, so daily updates add MBs. An as-of-T read takes, per key, the newest version with `known_date ≤ T`. Garbage collection of unreferenced parts is a later manual command.
+ 
+-### AD-07: Run records and live events in SQLite, pushed by the server over SSE
++### AD-07: Run records and live events in SQLite, pushed by the server over a WebSocket
+ **Status:** Accepted · **Date:** 2026-10-17 · **Scope:** `data`, `server`
+ - **Context:** INGST-06 and RUNS-01–RUNS-04 need durable run records and ≤2 s live updates that survive the app being closed; the "process dies" edge case needs detection within 10 s. Runs start from the CLI, not the app.
+-- **Decision:** Run processes write the run row and an append-only event table (`seq`, time, kind, stock, counts, message) to `store/runs.sqlite` in WAL mode, plus a heartbeat every 2 s. `data.run_record` reports a `running` run with no heartbeat for 10 s as `stopped_unexpectedly`. The server polls events by `seq` every 0.5 s and streams them over SSE; a new subscriber first gets the run's state so far (RUNS-04).
++- **Decision:** Run processes write the run row and an append-only event table (`seq`, time, kind, stock, counts, message) to `store/runs.sqlite` in WAL mode, plus a heartbeat every 2 s. `data.run_record` reports a `running` run with no heartbeat for 10 s as `stopped_unexpectedly`. The server polls events by `seq` every 0.5 s and streams them over a WebSocket; a new subscriber first gets the run's state so far (RUNS-04).
+ - **Alternatives:** WebSocket from the run process to the server — couples the run to the server being up. Log-file tailing — no structured counts, harder to resume by `seq`.
+-- **Consequences:** No message broker; the run process never needs the server. Worst-case latency ≈ poll interval + SSE flush, well under 2 s.
++- **Consequences:** No message broker; the run process never needs the server. Worst-case latency ≈ poll interval + WebSocket send, well under 2 s.
+ 
+ ### AD-08: Returns built from unadjusted prices, actions and the exchange calendar
+ **Status:** Accepted · **Date:** 2026-10-18 · **Scope:** `data`
+@@ -206,14 +207,14 @@ Packages are versioned together; one release tag for the repo.
+ ### AD-09: Local FastAPI server with wire schemas generated into the app
+ **Status:** Accepted · **Date:** 2026-10-17 · **Scope:** `server`, `app`
+ - **Context:** QR-04 (local-only), QR-06 (each shape declared once and checked on both sides), QR-08 (≤2 s stock page, ≤1 s membership) and RUNS-01 (≤2 s live updates).
+-- **Decision:** `server` is FastAPI on uvicorn bound to `127.0.0.1`, rejecting any non-loopback `Host` header. Every response body is a pydantic model in `qrp_server.wire`; `qrp server export-schema` writes JSON Schema to `packages/app/src/wire/schema.json`, and `json-schema-to-typescript` generates `wire.ts`. CI fails when the regenerated schema or `wire.ts` differs from the committed one; server tests validate responses against the models, and app tests validate fixtures with ajv. Live runs use SSE.
++- **Decision:** `server` is FastAPI on uvicorn bound to `127.0.0.1`, rejecting any non-loopback `Host` header. Every response body is a pydantic model in `qrp_server.wire`; `qrp server export-schema` writes JSON Schema to `packages/app/src/wire/schema.json`, and `json-schema-to-typescript` generates `wire.ts`. CI fails when the regenerated schema or `wire.ts` differs from the committed one; server tests validate responses against the models, and app tests validate fixtures with ajv. Live runs use a FastAPI WebSocket.
+ - **Alternatives:** Hand-written TS types — drift is invisible (fails QR-06). OpenAPI client generators — generate whole clients we don't need; the schema-only path is smaller.
+ - **Consequences:** Python is the single source of every wire shape; changing one field on one side fails the check (QR-06's test).
+ 
+ ### AD-10: One walk-forward schedule with per-method gaps and a look-ahead guard
+ **Status:** Accepted · **Date:** 2026-10-17 · **Scope:** `engine`
+ - **Context:** WFWD-01–WFWD-06 fix 21-day test blocks after ≥756 days, a gap ≥ max(5, longest label horizon), fit-time look-ahead errors and a 504-day lockbox. FCST-02, FACT-01, DENOI-03 and AGENT-01 rely on the same windows.
+-- **Decision:** `engine.schedule(snapshot)` derives the test blocks once from the snapshot's calendar: the lockbox is the last 504 sessions, and test blocks tile the sessions from 757 to the lockbox start. A method gets its training window from `engine.training_window(period, horizon=…, length=…)`, which sets the gap to max(5, horizon) and ends training before it; length defaults to 756 sessions (rolling), and a registration may choose expanding. Every fit entry point passes its inputs through `engine.guard`, which raises `engine.LookAheadError` on any row dated after the window's cutoff, or any label whose horizon ends on or after the test start.
++- **Decision:** `engine.schedule(snapshot)` derives the test blocks once from the snapshot's calendar: the lockbox is the last 504 sessions, and test blocks tile the sessions from 757 to the lockbox start. A method gets its training window from `engine.training_window(period, horizon=…, length=…)`, which sets the gap to max(5, horizon) and ends training before it; length defaults to 756 sessions (rolling, truncated at coverage start, so early windows are shorter), and a registration may choose expanding. Every fit entry point passes its inputs through `engine.guard`, which raises `engine.LookAheadError` on any row dated after the window's cutoff, or any label whose horizon ends on or after the test start.
+ - **Alternatives:** A schedule per method — breaks WFWD-01. Trusting callers to slice correctly — WFWD-04 needs a failing run, not a convention.
+ - **Consequences:** Test periods are identical across methods by construction; only the training cutoffs differ by horizon. A period a method cannot fit is scored as a failure (WFWD edge case), never dropped.
+ 
+@@ -315,7 +316,7 @@ Packages are versioned together; one release tag for the repo.
+   - *Statistics:* per period, rᵗ is the portfolio's daily return net of costs over the period's 21 sessions. `return_after_cost` = Π(1 + rᵗ) − 1. `variance` = 252 × the sample variance of rᵗ (ddof 1). `sharpe` = √252 × mean(rᵗ − rfᵗ) / sample sd(rᵗ − rfᵗ) (ddof 1), where rfᵗ is `data.risk_free` (BTEST-03).
+   - *Failed periods:* a period with no weights holds cash, keeps its row with `failed` True and a reason, and has NaN in all four values.
+ - **Alternatives:** Traded value as one side (½ Σ|Δw|) — 10 bp would then charge only one leg, so BTEST-02's example would cost 0.01%, not 0.02%. Not charging the first rebalance — every method would skip the same entry cost, but a method that ends in cash after a failure would then re-enter for free. Cash at zero interest after a delisting — simpler, but it understates a portfolio's return against a Sharpe that is net of the risk-free rate. Daily, unannualised statistics — paired tests give the same answer, but the reported values stop being readable against the brief's annual figures.
+-- **Consequences:** Variance includes the first session's cost, so a high-turnover method's variance moves by a few 10⁻⁸. A stock removed from the index while it still trades has NaN returns after removal (PANEL-02), so a position held through a mid-period removal stays at its last value until the next rebalance and loses the price move after removal. Such removals are rare and VALID-06 reports each one. Every per-period number the hand-derived cases check follows from these rules.
++- **Consequences:** Variance includes the first session's cost, so a high-turnover method's variance moves by a few 10⁻⁸. A stock removed from the index while it still trades has NaN returns after removal in `data.returns_panel` (PANEL-02), so `engine.backtest` takes a held position's returns on its non-member sessions from `data.bars_panel` (close and dividend) until the next rebalance, and the position keeps earning its price move after removal. Every per-period number the hand-derived cases check follows from these rules.
+ - **Probe:** none — no external service involved.
+ 
+ ### AD-24: COV ranks only passed estimators above the sample estimate
+@@ -334,6 +335,14 @@ Packages are versioned together; one release tag for the repo.
+ - **Consequences:** A lockbox score costs two runs of the test's null, not one. VERD-02's guard stays fixed at 5% however many entries are scored.
+ - **Probe:** none — no external service involved.
+ 
++### AD-26: Feature information gain from ridge and LightGBM models by permutation
++**Status:** Accepted · **Date:** 2026-10-18 · **Scope:** `lab`
++- **Context:** The brief's Stage 3 tests candidate features "with ML for information gain over the residual (market-removed) returns" (SIG-05); a per-feature rank IC (SIG-02) measures each feature alone and fits no model. The fit must stay inside each training window (WFWD-04) and the gain must be a registered, corrected claim (LEDG-03).
++- **Decision:** Per walk-forward period, `lab` fits a ridge regression (scikit-learn) and a LightGBM gradient-boosted tree on the training window, inputs through `engine.guard`, predicting `fwd_resid_5d` from every candidate feature. A feature's gain is the drop in the test period's cross-sectional rank IC of each model's predictions when that feature's column is permuted, averaged over the two models. The per-period gains form an `engine.TestInput` tested against zero in family `SIG` with the `null-hypothesis-testing` skill.
++- **Alternatives:** Drop-column refits — a clean gain, but one refit per feature per period. A neural network — torch belongs to `models` (AD-01), and S3 needs a cheap, stable fit.
++- **Consequences:** `lab` gains scikit-learn and LightGBM; the `SIG` family holds two entries per feature, so its correction is stricter. Correlated near-duplicates share their gain under permutation, which the FEAT near-duplicate flags already surface.
++- **Probe:** none — no external service involved.
++
+ ## Risks and open questions
+ - PB-01 (Sharadar coverage on the user's subscription) gates AD-03, AD-05 and AD-08; if delisting payouts are missing, many delisting returns are `estimated` −100%, biasing results downward. Waived 2026-10-18 with no checks run; the user will rerun it from another network, through `api-probe`.
+ - PB-02 (EDGAR SIC history) gates AD-05; if neither source has history, DATA-07 needs a spec change. Waived 2026-10-18 with no checks run; reruns after PB-01's `membership` step, through `api-probe`.
+@@ -353,3 +362,4 @@ Packages are versioned together; one release tag for the repo.
+ | 2026-10-17 | COV ranking order; the lockbox "significantly worse" rule | test-planning routes | AD-24, AD-25 |
+ | 2026-10-18 | PB-01 and PB-02 waived: cited in Context, Risks kept | api-probe | AD-03, AD-05, AD-08 |
+ | 2026-10-18 | `app` contract gains `Page`, `WireModule` and `FixtureReport`, so every app step's Out is a contract type | pipeline-design route (step-io-types) | app.Page, app.WireModule, app.FixtureReport |
++| 2026-10-18 | Live runs over a WebSocket; ML information gain for features; S4 benchmark is every classical portfolio; rolling windows truncated at coverage start; held positions earn returns after an index removal | brief (turns 1, 2) and plan review | AD-07, AD-09, AD-10, AD-23, AD-26 |
+diff --git a/docs/brief.md b/docs/brief.md
+index 4ab3256..947341e 100644
+--- a/docs/brief.md
++++ b/docs/brief.md
+@@ -39,7 +39,7 @@ Me: one person doing personal research and simulated paper trading.
+ - A wider universe, for now: clean, affordable data first.
+ - A shared or hosted app: it runs locally, for me only.
+ - Return prediction before risk estimation is right: variance comes first.
+-- Open-ended trading agents: they stop if they can't beat minimum variance after costs.
++- Open-ended trading agents: they stop if they can't beat the classical portfolios after costs.
+ 
+ ## Open questions
+-- How many years of delisted-stock and membership history does the data cover? Short history weakens every test.
++- How many years of delisted-stock and membership history does the data cover? Short history weakens every test. Waived 2026-10-18 (PB-01, PB-02); answered when the probes rerun before M3.
+diff --git a/docs/packages/app/architecture.md b/docs/packages/app/architecture.md
+index e0e7405..a7cc51e 100644
+--- a/docs/packages/app/architecture.md
++++ b/docs/packages/app/architecture.md
+@@ -3,13 +3,13 @@
+ **Package:** app · **Status:** Approved · **Last updated:** 2026-10-17 · **System:** [../../architecture.md](../../architecture.md)
+ 
+ ## Overview
+-A Vite + React single-page app served locally, reading only `server`'s API through types generated from its wire schema (AD-09). Explorer pages show membership, stock histories, coverage and validation results; the monitor lists runs and follows one live over SSE. It starts no runs.
++A Vite + React single-page app served locally, reading only `server`'s API through types generated from its wire schema (AD-09). Explorer pages show membership, stock histories, coverage and validation results; the monitor lists runs and follows one live over a WebSocket. It starts no runs.
+ 
+ ## Components
+ | Component | Responsibility | Covers | Depends on |
+ |---|---|---|---|
+ | `wire` | Generated `wire.ts` and `schema.json` from `server`; ajv validators for fixtures; never hand-edited | QR-06 | `server` (schema file) |
+-| `client` | Typed fetch functions and TanStack Query hooks per route; an SSE hook that rebuilds run state from `state` + events | RUNS-01, RUNS-02, RUNS-04, QR-08 | `wire` |
++| `client` | Typed fetch functions and TanStack Query hooks per route; a WebSocket hook that rebuilds run state from `state` + events | RUNS-01, RUNS-02, RUNS-04, QR-08 | `wire` |
+ | `charts` | Price/return/volume charts with action and membership marks, coverage chart; gaps break lines; light and dark themes. Built with the `dataviz` skill | EXPL-03, EXPL-05, EXPL-06 | `wire` |
+ | `explorer` | Membership-by-date, stock search and stock page, coverage and validation views; "no dataset yet" state pointing to the monitor. Layout with the `frontend-design` skill | EXPL-01–EXPL-06 | `client`, `charts` |
+ | `monitor` | Run list, run detail and the live run view (progress, current stock, counts, failures, recent log lines, stopped state) | RUNS-01–RUNS-04 | `client`, `charts` |
+@@ -20,7 +20,7 @@ See [contract.md](contract.md).
+ ## Cross-cutting concerns
+ - **Contract check (QR-06):** `npm run check:wire` regenerates `wire.ts` from the committed `schema.json` and fails on any diff; CI runs `qrp server export-schema` first, so a one-sided field change fails.
+ - **Performance (QR-08):** columnar responses decoded straight into chart arrays; stock pages cached by TanStack Query.
+-- **Testing:** vitest component tests against fixture payloads validated by ajv; a mocked `EventSource` replays a recorded run stream.
++- **Testing:** vitest component tests against fixture payloads validated by ajv; a mocked WebSocket replays a recorded run stream.
+ - **Locality (QR-04):** the dev and preview servers bind `127.0.0.1`.
+ 
+ ## Project layout
+diff --git a/docs/packages/app/pipelines.md b/docs/packages/app/pipelines.md
+index 6319820..e3041f5 100644
+--- a/docs/packages/app/pipelines.md
++++ b/docs/packages/app/pipelines.md
+@@ -118,7 +118,7 @@ export function RunsPage() {
+ 
+ | # | Step | Owner | In → Out | Spine version | Covers |
+ |---|---|---|---|---|---|
+-| 1 | `useRunStream` | client.stream | run id → RunState | `EventSource` on `server.stream_run`: the `state` event, then each event folded in by `seq` | RUNS-01, RUNS-02, RUNS-04 |
++| 1 | `useRunStream` | client.stream | run id → RunState | `WebSocket` on `server.stream_run`: the `state` event, then each event folded in by `seq` | RUNS-01, RUNS-02, RUNS-04 |
+ | 2 | `RunView` | monitor.live | RunState → Page | progress bar, current stock, counts, failures as they arrive, last 20 log lines, a stopped banner | RUNS-01, RUNS-02 |
+ 
+ ### Entry sketch (pre-build — removed by spine task)
+diff --git a/docs/packages/data/contract.md b/docs/packages/data/contract.md
+index 49786d6..6fe9980 100644
+--- a/docs/packages/data/contract.md
++++ b/docs/packages/data/contract.md
+@@ -54,7 +54,7 @@ Every read takes `snapshot: SnapshotId | None`; `None` means the promoted `CURRE
+ 
+ ### data.Membership: type
+ `@dataclass(frozen=True) class Membership: requested: date; used: date; snapshot: SnapshotId; members: tuple[Member, ...]`
+-- **Invariants:** `used` is `requested` or the previous session; 495 ≤ len(members) ≤ 510; sorted by `stock`
++- **Invariants:** `used` is `requested` or the previous session; 495 ≤ len(members) ≤ 510 on a promoted snapshot; on a staged snapshot `membership_as_of` returns the replayed set whatever its size, and VALID-06 reports counts outside 495–510; sorted by `stock`
+ - **Boundary:** engine, lab, models, server · **Fixtures:** tests/contracts/data.Membership/ · **Cases:** a trading date, a weekend date resolved to Friday, a date with a later-bankrupt member; a `SyntheticSource` snapshot (505 members on every session, AD-22)
+ - **Used by:** engine, lab, models, server
+ 
+@@ -208,6 +208,12 @@ Every read takes `snapshot: SnapshotId | None`; `None` means the promoted `CURRE
+ - **Boundary:** ingest · **Fixtures:** tests/contracts/data.Source/ · **Cases:** a replay double of SEP and ACTIONS for three stocks (one delisted, one split), FRED DTB3 over a bond-market holiday, an EDGAR SIC change; `SyntheticSource` with its planted events over 505 members, each removal paired with a same-session addition (AD-22)
+ - **Used by:** ingest; PL-09
+ 
++### data.append_parts: Append vendor rows to the store
++`def append_parts(rows: DataFrame[VendorRowSchema], *, run: RunRecord, known_basis: Literal["observed", "assumed_ref_date"] = "observed") -> tuple[Path, ...]`
++- **Invariants:** stamps every row with `known_date` (the run's start date when `observed`, the row's `ref_date` when `assumed_ref_date`), `known_basis` and `run_id` (AD-06); writes new Parquet part files and never modifies an existing one
++- **Boundary:** ingest · **Fixtures:** tests/contracts/data.append_parts/ · **Cases:** SEP rows for one stock on a fresh run, a revised close appended beside the stored one
++- **Used by:** ingest; PL-09
++
+ ### data.QualityReport: type
+ `@dataclass(frozen=True) class QualityReport: snapshot: SnapshotId; path: Path; sections: tuple[str, ...]; flagged: int; quarantined: int; overrides: int`
+ - **Invariants:** `path` is `store/snapshots/<id>/validation/quality.md`; written for every validated snapshot, rejected ones included (VALID-07)
+diff --git a/docs/packages/data/pipelines.md b/docs/packages/data/pipelines.md
+index ba08ff2..0eefa28 100644
+--- a/docs/packages/data/pipelines.md
++++ b/docs/packages/data/pipelines.md
+@@ -15,7 +15,7 @@
+ | 5 | `EdgarSicSource` | vendors.edgar | user agent → Source | SIC from each annual-report header, ≤ 8 requests/s (waits on PB-02) | DATA-07 |
+ | 6 | `SyntheticSource` | vendors_synthetic | seed → Source | 505 members on every session over 3 years (AD-22): the planted events (a split, a dividend, a reused ticker, a cash delisting, a bankruptcy, one revision, a reclassification) on a few named stocks, each planted removal paired with a same-session addition; the rest plain seeded price paths | DATA-01–DATA-07 |
+ | 7 | `fetch_universe` | ingest.scope | Source, RunRecord → StockId | SP500 and TICKERS in full, appended as parts; every permaticker ever a member | INGST-01, UNIV-03 |
+-| 8 | `download_stocks` | ingest.fetch | Source, StockId, RunRecord → RunRecord | per stock in turn: SEP and ACTIONS (since the watermark on `--update`), `store.append_parts` stamps known dates, one event per stock; failures recorded, `--resume` skips finished stocks | INGST-01, INGST-02, INGST-04, INGST-05, DATA-02–DATA-04, RUNS-02 |
++| 8 | `download_stocks` | ingest.fetch | Source, StockId, RunRecord → RunRecord | per stock in turn: SEP and ACTIONS (since the watermark on `--update`), `data.append_parts` stamps known dates, one event per stock; failures recorded, `--resume` skips finished stocks | INGST-01, INGST-02, INGST-04, INGST-05, DATA-02–DATA-04, RUNS-02 |
+ | 9 | `download_series` | ingest.series | Source, RunRecord → RunRecord | DTB3 in full; SIC history per CIK; carried rates `filled=True` | DATA-06, DATA-07 |
+ | 10 | `stage_snapshot` | store.manifest | RunRecord → Snapshot | manifest = previous snapshot's parts + this run's, vendor watermarks, status `staged`; never touches `CURRENT` | INGST-03, INGST-05 |
+ | 11 | `close_run` | runs.record | RunRecord, Snapshot → RunRecord | end time, counts, errors, status, stage timings | INGST-06, QR-03 |
+@@ -44,7 +44,7 @@ def run_download(mode: Literal["full", "update"], *, resume: str | None = None)
+ | 4 | `returns_panel` | panel | Snapshot, dates → ReturnsPanel | PL-11 as built, on the staged snapshot | VALID-04 |
+ | 5 | `check_prices` | validate.prices | Snapshot → Issue | high ≥ low, open and close inside [low, high], prices > 0, volume ≥ 0 | VALID-02 |
+ | 6 | `check_gaps` | validate.gaps | Snapshot, Calendar → Issue | a bar per member per session or a recorded halt; SEP dates vs XNYS | VALID-03 |
+-| 7 | `check_moves` | validate.moves | ReturnsPanel → Issue | \|return\| > 40% with no action, delisting or override → flagged | VALID-04 |
++| 7 | `check_moves` | validate.moves | Snapshot, ReturnsPanel → Issue | \|return\| > 40% with no action, delisting or override → flagged; actions from the snapshot, overrides from `store/overrides.parquet` | VALID-04 |
+ | 8 | `check_actions` | validate.actions | Snapshot, ReturnsPanel → Issue | every action day: AD-08 total return vs `closeadj` within 0.01 pp | VALID-05 |
+ | 9 | `check_membership` | validate.membership | Snapshot, Calendar → Issue | `membership_as_of` per session: 495–510 members; the announced-changes set when present | VALID-06, UNIV-04 |
+ | 10 | `check_duplicates` | validate.duplicates | Snapshot → Issue | duplicate (stock, ref_date, known_date) rows rejected | VALID-08 |
+@@ -63,7 +63,7 @@ def validate_snapshot(snapshot: SnapshotId, *, promote: bool = True) -> Validati
+     returns = returns_panel(*snap.coverage, snapshot=snap.id)
+     prices = check_prices(snap)
+     gaps = check_gaps(snap, cal)
+-    moves = check_moves(returns)
++    moves = check_moves(snap, returns)
+     actions = check_actions(snap, returns)
+     members = check_membership(snap, cal)
+     dupes = check_duplicates(snap)
+@@ -144,14 +144,14 @@ packages/data/src/qrp_data/
+   store/          __init__.py  manifest.py  current.py  parts.py (append_parts, bitemporal stamps)
+   runs/           __init__.py  record.py  events.py
+   ingest/         __init__.py  scope.py  fetch.py  series.py
+-  validate/       __init__.py  prices.py  gaps.py  moves.py  actions.py  membership.py  duplicates.py  quarantine.py  report.py
++  validate/       __init__.py  prices.py  gaps.py  moves.py  overrides.py (record_override)  actions.py  membership.py  duplicates.py  quarantine.py  report.py
+   universe/       __init__.py  membership.py  identity.py  search.py (find_stock)
+   panel/          __init__.py  returns.py  history.py  bars.py (bars_panel)  rates.py (risk_free, sectors)  coverage.py
+ tests/intent/data/  tests/unit/data/
+ ```
+ 
+ ## Open questions
+-- `store.parts`, `universe.search`, `panel.bars`, `panel.rates` and `panel.coverage` hold contract functions that are called from other packages' steps, not from a data pipeline (assumed: modules of their component, listed here so the build plans them)
++- `universe.search`, `panel.bars`, `panel.rates` and `panel.coverage` hold contract functions that are called from other packages' steps, not from a data pipeline (assumed: modules of their component, listed here so the build plans them)
+ - Should the quality report be written for rejected snapshots too? (assumed: yes, it explains the rejection)
+ 
+ ## Retired
+diff --git a/docs/packages/data/tests.md b/docs/packages/data/tests.md
+index 52bc4b8..103f6a7 100644
+--- a/docs/packages/data/tests.md
++++ b/docs/packages/data/tests.md
+@@ -9,7 +9,7 @@ Every case runs on one synthetic store: `SyntheticSource(seed=7)` with the plant
+ |---|---|---|---|---|
+ | PL-01 | `qrp data download --full --smoke` (synthetic source into a temp store; the download runs PL-10, which promotes) | — (system pipeline; its steps are PL-09's and PL-10's) | TC-14 (whole pipeline) | — |
+ | PL-09 | `uv run pytest tests/intent/data/test_pl09_smoke.py -q` | open_run, make_sources, SyntheticSource, fetch_universe, download_stocks, download_series, stage_snapshot, close_run; boundary: every `data.Source` sample under tests/contracts/data.Source/ runs through `download_stocks`; `data.run_download` output validates against tests/contracts/data.run_download/ | TC-21 (whole pipeline), TC-22 (whole pipeline), TC-23 (Source → download_stocks → RunRecord) | — |
+-| PL-10 | `uv run pytest tests/intent/data/test_pl10_smoke.py -q` | each `check_*`, decide, promote_snapshot, gather_quality_inputs, write_quality_report; boundary: `data.QualityInputs` and `data.QualityReport` validate against their tests/contracts/ folders | TC-14 (whole pipeline), TC-15 (Snapshot → check_prices → Issue), TC-16 (ReturnsPanel → check_moves → Issue), TC-17 (whole pipeline), TC-18 (Snapshot, Calendar → check_gaps, check_membership → Issue), TC-19 (Snapshot, ReturnsPanel → check_actions → Issue), TC-20 (whole pipeline) | — |
++| PL-10 | `uv run pytest tests/intent/data/test_pl10_smoke.py -q` | each `check_*`, decide, promote_snapshot, gather_quality_inputs, write_quality_report; boundary: `data.QualityInputs` and `data.QualityReport` validate against their tests/contracts/ folders | TC-14 (whole pipeline), TC-15 (Snapshot → check_prices → Issue), TC-16 (Snapshot, ReturnsPanel → check_moves → Issue), TC-17 (whole pipeline), TC-18 (Snapshot, Calendar → check_gaps, check_membership → Issue), TC-19 (Snapshot, ReturnsPanel → check_actions → Issue), TC-20 (whole pipeline) | — |
+ | PL-11 | `uv run pytest tests/intent/data/test_pl11_smoke.py -q` | total_returns; boundary: output validates against tests/contracts/data.ReturnsPanel/ and data.returns_panel/ | TC-01 … TC-05, TC-27 (Snapshot, Calendar → total_returns → ReturnsPanel), TC-06 (whole pipeline), TC-07 (whole pipeline) | — |
+ | PL-12 | `uv run pytest tests/intent/data/test_pl12_smoke.py -q` | members_on; boundary: output validates against tests/contracts/data.Membership/ and data.membership_as_of/ | TC-08 … TC-12 (Snapshot, Calendar → members_on → Membership) | — |
+ | PL-13 | `uv run pytest tests/intent/data/test_pl13_smoke.py -q` | stock_ref, stock_bars; boundary: output validates against tests/contracts/data.StockHistory/ | TC-13 (StockRef, Snapshot, Calendar → stock_bars → StockHistory) | — |
+@@ -97,7 +97,7 @@ Every case runs on one synthetic store: `SyntheticSource(seed=7)` with the plant
+ 
+ ### TC-16: Moves beyond ±40% are flagged unless explained
+ **Pipeline:** PL-10 · **Covers:** VALID-04 · **Kind:** synthetic known-answer · **Fixture:** tests/fixtures/data/TC-16/
+-**Source:** generator `SyntheticSource(seed=7)`, plants-s1 plus planted economic returns: 100100 +45% on 2021-04-14, −42% on 2021-05-12 and +39% on 2021-07-14; 100200 +50% on 2021-10-13 with a researcher override recorded; spec VALID-04's ±40% (the user's choice, 2026-10-18)
++**Source:** generator `SyntheticSource(seed=7)`, plants-s1 plus planted economic returns: 100100 +45% on 2021-04-14, −42% on 2021-05-12 and +39% on 2021-07-14; 100200 +50% on 2021-10-13 with a researcher override recorded; spec VALID-04's ±40% (the user's choice, 2026-10-18); flagged moves don't block promotion, only `blocking` severity does, so the snapshot promotes
+ **Expected:** `large_move` issues are exactly (100100, 2021-04-14), (100100, 2021-05-12) and (100200, 2021-10-13), all `flagged`, the last with its override reason and the first two with none; no issue for the +39% move, the SPLT split day, ACQD's payout or BKRP's −100% · **Tolerance:** exact, a set of issue rows; the planted moves sit ≥ 1 point from the bar, so the rounding of returns cannot move them across it
+ 
+ ### TC-17: Duplicate bars block promotion
+@@ -136,7 +136,6 @@ Every case runs on one synthetic store: `SyntheticSource(seed=7)` with the plant
+ **Expected:** the run finishes with `failed` = 3; `errors` names 100010, 100020 and 100030; the store holds no rows for those three, never an empty history; every other ever-member has its bars; the run's events include exactly three `stock_failed` events, one per stock · **Tolerance:** exact, counts and sets
+ 
+ ## Open questions
+-- **Flagged moves don't block promotion** (the user, 2026-10-17): only `blocking` severity stops it. TC-16's snapshot promotes.
+ - **Severity for gaps, membership and corporate-action failures:** VALID-03, VALID-05 and VALID-06 say "reported as a failure" without a severity, so TC-18 and TC-19 check `check`, stock and date but not severity.
+ - **Real-data cases:** none until PB-01 runs; then an Extend round adds known S&P 500 changes, a cash and a bankruptcy delisting, a split and a reused ticker from the vendor sample, with the expected outputs from you.
+ 
+diff --git a/docs/packages/engine/contract.md b/docs/packages/engine/contract.md
+index 7e6edbd..afb0e96 100644
+--- a/docs/packages/engine/contract.md
++++ b/docs/packages/engine/contract.md
+@@ -30,7 +30,7 @@ The shared method every stage is scored with: one walk-forward schedule, the loo
+ 
+ ### engine.training_window: A method's training window
+ `def training_window(period: TestPeriod, *, horizon: int, length: int | None = 756, calendar: Calendar) -> Window`
+-- **Invariants:** `length=None` is expanding from coverage start
++- **Invariants:** `length=None` is expanding from coverage start; a rolling window is truncated at coverage start: `train_start` = max(coverage start, `train_end` − `length` + 1 sessions)
+ - **Boundary:** lab, models · **Fixtures:** tests/contracts/engine.training_window/ · **Cases:** as `engine.Window`, rolling and expanding
+ - **Used by:** lab, models; PL-06, PL-07, PL-18, PL-19, PL-22, PL-25, PL-26
+ 
+@@ -146,7 +146,7 @@ The shared method every stage is scored with: one walk-forward schedule, the loo
+ 
+ ### engine.backtest: Simulate weights
+ `def backtest(weights: Sequence[Weights], *, schedule: Schedule, snapshot: SnapshotId, cost_bps: float = 10.0, cap: float | None = 0.05) -> BacktestResult`
+-- **Invariants:** per AD-23: weights trade at the close before `period.start` and first earn its return; daily drift within a period (BTEST-01); cost = `cost_bps` × 10⁻⁴ × traded value, buys plus sells, taken from the period's first session, the first rebalance and any after a failed period trading out of cash, no sale at the end (BTEST-02); a session's return applies to the positions held at the previous close, a NaN return holds the position at its last value; a delisted holding closes at its delisting return into cash earning `data.risk_free` until the next rebalance (BTEST-04); Sharpe net of `data.risk_free`
++- **Invariants:** per AD-23: weights trade at the close before `period.start` and first earn its return; daily drift within a period (BTEST-01); cost = `cost_bps` × 10⁻⁴ × traded value, buys plus sells, taken from the period's first session, the first rebalance and any after a failed period trading out of cash, no sale at the end (BTEST-02); a session's return applies to the positions held at the previous close; a held stock removed from the index mid-period keeps earning its return, from `data.bars_panel` (close and dividend), until the next rebalance; a NaN return holds the position at its last value; a delisted holding closes at its delisting return into cash earning `data.risk_free` until the next rebalance (BTEST-04); Sharpe net of `data.risk_free`
+ - **Errors:** `WeightsError` per `engine.check_weights`
+ - **Boundary:** lab, models · **Fixtures:** tests/contracts/engine.backtest/ · **Cases:** a replay double: the 30 × 6 `data.ReturnsPanel` sample with a delisting
+ - **Used by:** lab, models; PL-03, PL-04, PL-07, PL-18, PL-19, PL-25, PL-26
+diff --git a/docs/packages/engine/pipelines.md b/docs/packages/engine/pipelines.md
+index 7836cdf..d752e10 100644
+--- a/docs/packages/engine/pipelines.md
++++ b/docs/packages/engine/pipelines.md
+@@ -24,7 +24,7 @@ def schedule(snapshot: SnapshotId) -> Schedule:
+ 
+ | # | Step | Owner | In → Out | Spine version | Covers |
+ |---|---|---|---|---|---|
+-| 1 | `returns_panel` | data | Schedule, SnapshotId → ReturnsPanel | `data.returns_panel` over the schedule's periods; replay double until the system task | PANEL-02 |
++| 1 | `returns_panel` | data | Schedule, SnapshotId → ReturnsPanel | `data.returns_panel` over the schedule's periods, with held stocks' returns on sessions after an index removal taken from `data.bars_panel` (close and dividend) until the next rebalance; replay doubles until the system task | PANEL-02, BTEST-01 |
+ | 2 | `check_all` | constraints.check | Weights, Schedule, SnapshotId → Weights | `check_weights` per period against `data.membership_as_of(period.start)`; `WeightsError` names period and stock | PORT-01, WFWD-06 |
+ | 3 | `simulate` | backtest.simulate | Weights, ReturnsPanel, Schedule → BacktestResult | per AD-23: trade at the close before each `period.start`, daily drift; cost = 10 bp × Σ\|target − pre-trade\| (buys + sells) from the first session, the first rebalance and any after a failed period trading out of cash; a NaN return holds the position; a delisted holding closes at its delisting return into cash earning `data.risk_free`; per period, `variance` = 252 × sample variance and `sharpe` = √252 × mean / sd of daily net return minus `data.risk_free` (ddof 1); a period with no weights holds cash as a failed row with NaN values | BTEST-01–BTEST-04 |
+ 
+diff --git a/docs/packages/engine/tests.md b/docs/packages/engine/tests.md
+index 79d5e58..5e3d4c7 100644
+--- a/docs/packages/engine/tests.md
++++ b/docs/packages/engine/tests.md
+@@ -1,6 +1,6 @@
+ # engine — Tests
+ 
+-**Package:** engine · **Status:** Approved · **Last updated:** 2026-10-18 · **Pipelines:** [pipelines.md](pipelines.md)
++**Package:** engine · **Status:** Draft · **Last updated:** 2026-10-18 · **Pipelines:** [pipelines.md](pipelines.md)
+ 
+ The user has no trusted input/output pairs for `engine` (2026-10-17), so every case is a closed form the spec fixes by construction or a generator plus a property the test computes at run time. Calendars are `session_calendar(n, start="1998-01-02")`: the first n XNYS sessions from 1998-01-02 through `data.calendar`'s replay double. Session numbers in fixtures are 1-based positions in that calendar; the test maps them to dates. Stocks are synthetic `data.StockId`s from 910001. Unless a case says otherwise, every stock is a member on every session, and `data.risk_free` is 0.
+ 
+@@ -96,8 +96,7 @@ The user has no trusted input/output pairs for `engine` (2026-10-17), so every c
+ **Expected:** period 1 `variance` 0.0264, `sharpe` √(6/11) = 0.738548945875996, `return_after_cost` 0.00899045437882, `turnover` 1.0 · **Tolerance:** 1e-9 relative on variance and Sharpe, QR-07's float bar; 1e-12 absolute on the return
+ 
+ ## Open questions
+-- `engine.BacktestResult`'s conventions are fixed by AD-23 (2026-10-17): TC-29's assumption (traded value = Σ\|target − drifted weight\|) holds, TC-30–TC-33's answers are unchanged, and TC-55–TC-57 pin the entry cost, interest on cash and the scaling.
+-- PL-14's spine anchors blocks at session 757, so the sessions between the last whole block and the lockbox belong to no period (14 sessions in TC-28's 1,400-session calendar). Anchoring backward from the lockbox would also satisfy WFWD-02. Decided by the user, 2026-10-17: keep the spine's anchoring at session 757, as TC-28 expects.
++- PL-15 needs a closed-form case for a position held through a mid-period index removal while the stock still trades: `engine.backtest` now applies its returns from `data.bars_panel` until the next rebalance (AD-23).
+ - Uncovered by any engine pipeline: WFWD-03 and WFWD-04 (`training_window`, `guard`), WFWD-05's refusals (`score_lockbox`) and LEDG-05's refusal (`result`). They're called from `lab` and `models`, not from an engine pipeline, so their cases belong with those packages' tests or with the contract's Cases.
+ 
+ ## Retired
+diff --git a/docs/packages/lab/architecture.md b/docs/packages/lab/architecture.md
+index 89b5f62..3d488bd 100644
+--- a/docs/packages/lab/architecture.md
++++ b/docs/packages/lab/architecture.md
+@@ -12,10 +12,10 @@ The S2–S3 research and the final verdict. Estimators (`factors`, `denoise`, `c
+ | `denoise` | Constant-residual-eigenvalue denoising at the fitted MP edge | DENOI-01–DENOI-03 | `factors` |
+ | `covariance` | Estimators behind one protocol: sample, Ledoit–Wolf constant-correlation shrinkage, factor model, denoised; characterisation with the `data-analysis` skill | COV-02 | `factors`, `denoise`, `engine` |
+ | `portfolios` | Minimum variance, risk parity, HRP, equal weight | PORT-01, PORT-06 | `covariance` (type only), `engine` (`check_weights`) |
+-| `rankings` | COV and PORT ranking studies, ordered per AD-24; stores the minimum-variance benchmark | COV-01, COV-03, COV-04, PORT-02–PORT-05 | `covariance`, `portfolios`, `engine` |
++| `rankings` | COV and PORT ranking studies, ordered per AD-24; stores every classical portfolio's results as the S4 benchmark | COV-01, COV-03, COV-04, PORT-02–PORT-05 | `covariance`, `portfolios`, `engine` |
+ | `targets` | Forward log return, realised volatility and residual return over session-counted horizons, with `label_end` | SIG-01, FCST-01 | `factors`, `data` |
+ | `features` | Feature definitions (≥10, each with lookback and rationale), point-in-time computation, near-duplicate flags; characterisation with the `data-analysis` skill | FEAT-01–FEAT-04 | `engine`, `data` |
+-| `significance` | Per-feature rank-IC tests against the 5-day residual target; surviving-feature list and its gate | SIG-01–SIG-04 | `features`, `targets`, `engine` |
++| `significance` | Per-feature rank-IC tests against the 5-day residual target; per-period ridge and LightGBM models on the candidate features and each feature's permutation gain in out-of-sample rank IC (AD-26); surviving-feature list and its gate | SIG-01–SIG-05 | `features`, `targets`, `engine` |
+ | `verdict` | The final report from FPORT and AGENT ledger entries, lockbox results and the benchmark; winners per AD-25 | VERD-01–VERD-03 | `rankings`, `engine` |
+ 
+ ## Interfaces
+@@ -23,8 +23,8 @@ See [contract.md](contract.md).
+ 
+ ## Data
+ - **Inputs:** `data.returns_panel`, `data.bars_panel`, `data.risk_free`, `data.membership_as_of`, all pinned to the registration's snapshot.
+-- **Benchmark:** `results/benchmark/<entry_id>.parquet`, the PORT-05 per-period minimum-variance results, read by `lab.benchmark`.
+-- **Correction families** (rule in AD-11): `COV` — every estimator-vs-sample comparison; `PORT` — the three risk-based-vs-equal-weight comparisons; `SIG` — every S3 feature, near-duplicates and abandoned entries included.
++- **Benchmark:** `results/benchmark/<entry_id>.parquet`, the PORT-05 per-period results of all four classical portfolios, read by `lab.benchmark`.
++- **Correction families** (rule in AD-11): `COV` — every estimator-vs-sample comparison; `PORT` — the three risk-based-vs-equal-weight comparisons; `SIG` — every S3 feature's rank-IC and ML-gain entries, near-duplicates and abandoned entries included.
+ - **Reference code:** RF-01 for factor removal (its full-sample fit, zero-filling and fixed k replaced per AD-12); RF-03 for targets (its row-counted horizons and silent drops replaced per AD-15).
+ 
+ ## Cross-cutting concerns
+diff --git a/docs/packages/lab/contract.md b/docs/packages/lab/contract.md
+index 568b8be..e8b72a4 100644
+--- a/docs/packages/lab/contract.md
++++ b/docs/packages/lab/contract.md
+@@ -70,8 +70,8 @@ Panels are sessions × `data.StockId` pandas frames with NaN for missing values.
+ - **Used by:** rankings; PL-19
+ 
+ ### lab.benchmark: Stored S4 benchmark
+-`def benchmark() -> BacktestResult`
+-- **Invariants:** the PORT-05 minimum-variance results on the same schedule
++`def benchmark(metric: Literal["variance", "sharpe"]) -> BacktestResult`
++- **Invariants:** PORT-05 stores all four classical portfolios' results on the same schedule; returns the one best on `metric` over its completed periods (lowest mean `variance`, or highest mean `sharpe`)
+ - **Errors:** `LedgerRefused` before PL-04 has recorded it
+ - **Boundary:** models · **Fixtures:** tests/contracts/lab.benchmark/ · **Cases:** the three-period `engine.BacktestResult` sample
+ - **Used by:** models, verdict; PL-07, PL-08, PL-21, PL-25, PL-26
+diff --git a/docs/packages/lab/pipelines.md b/docs/packages/lab/pipelines.md
+index 6fc2473..0222cca 100644
+--- a/docs/packages/lab/pipelines.md
++++ b/docs/packages/lab/pipelines.md
+@@ -58,7 +58,7 @@ def run_rank_covariance(snapshot: SnapshotId | None = None, *, seed: int = 0) ->
+ | 7 | `portfolio_weights` | portfolios | CovEstimator, ReturnsPanel, Schedule → Weights | per period: window, `guard`, fit; `min_variance` (cvxpy QP), `risk_parity` (Spinu, Newton; fails when the cap binds), `hrp`, `equal_weight` | PORT-01, PORT-02, PORT-06 |
+ | 8 | `backtest` | engine | Weights, Schedule, Snapshot → BacktestResult | PL-15 as built, per portfolio | BTEST-01–BTEST-04 |
+ | 9 | `test_portfolios` | rankings.tests | BacktestResult, RunHandle → TestOutcome | paired per-period variance vs equal weight into `engine.run_test`; `record_outcome` | PORT-03, LEDG-04 |
+-| 10 | `store_benchmark` | rankings.benchmark | BacktestResult, RunHandle → BacktestResult | minimum variance's result to `results/benchmark/<entry>.parquet` | PORT-05 |
++| 10 | `store_benchmark` | rankings.benchmark | BacktestResult, RunHandle → BacktestResult | all four portfolios' results to `results/benchmark/<entry>.parquet` | PORT-05 |
+ | 11 | `publish_portfolios` | rankings.report | BacktestResult, TestOutcome → Ranking | variance, after-cost return, Sharpe and turnover for all four, ranked by `score` with `failed_periods` (AD-24); `results/<entry>/portfolios.md` | PORT-04 |
+ 
+ ### Entry sketch (pre-build — removed by spine task)
+@@ -78,8 +78,8 @@ def run_classical(snapshot: SnapshotId | None = None, *, seed: int = 0) -> Ranki
+ ```
+ 
+ ## PL-20: Feature significance
+-**Entry:** `packages/lab/src/qrp_lab/pipelines/pl20_features.py::run_features` · **Trigger:** `qrp lab features` after PL-19 · **Part of:** PL-05
+-**Covers:** FACT-05, FEAT-01–FEAT-04, SIG-01, SIG-02, SIG-04, LEDG-01, LEDG-04
++**Entry:** `packages/lab/src/qrp_lab/pipelines/pl20_features.py::run_features` · **Trigger:** `qrp lab features` after PL-18 · **Part of:** PL-05
++**Covers:** FACT-05, FEAT-01–FEAT-04, SIG-01, SIG-02, SIG-04, SIG-05, LEDG-01, LEDG-04
+ **References:** RF-01 (residual_returns), RF-03 (forward_targets)
+ 
+ | # | Step | Owner | In → Out | Spine version | Covers |
+@@ -93,9 +93,11 @@ def run_classical(snapshot: SnapshotId | None = None, *, seed: int = 0) -> Ranki
+ | 7 | `forward_targets` | targets | ReturnsPanel, ResidualReturns, Calendar → Targets | session-counted horizons 1, 5, 21; NaN if a session lacks a return; `label_end` per row; as RF-03, sessions not rows | SIG-01, FCST-01 |
+ | 8 | `compute_features` | features.compute | BarsPanel, FeatureDef → FeaturePanel | the ≥ 10 `lab.FEATURES`, members only, NaN without full lookback; pairs above 0.9 correlation flagged | FEAT-01–FEAT-03 |
+ | 9 | `characterise_features` | features.characterise | FeaturePanel, Schedule → Characterisation | distribution, tails, missingness and rank stability per feature, with the `data-analysis` skill | FEAT-04 |
+-| 10 | `start_sig_entries` | significance.entries | FeaturePanel, Schedule, Snapshot, seed → RunHandle | register and start one `SIG` entry per feature, near-duplicates included | SIG-02, LEDG-01 |
++| 10 | `start_sig_entries` | significance.entries | FeaturePanel, Schedule, Snapshot, seed → RunHandle | register and start two `SIG` entries per feature (rank IC, ML gain), near-duplicates included | SIG-02, SIG-05, LEDG-01 |
+ | 11 | `rank_ic` | significance.ic | FeaturePanel, Targets, Schedule → TestInput | per period: Spearman IC vs `fwd_resid_5d`, `guard` on `label_end` | SIG-01, WFWD-03 |
+ | 12 | `test_features` | significance.tests | TestInput, RunHandle → TestOutcome | `engine.run_test` (IC > 0), `record_outcome` for every feature | SIG-02, SIG-04, LEDG-04 |
++| 13 | `ml_gain` | significance.ml | FeaturePanel, Targets, Schedule → TestInput | per period: `training_window(horizon=5)`, `guard`, fit ridge and LightGBM on every candidate feature against `fwd_resid_5d` (AD-26); each feature's gain = the drop in out-of-sample rank IC when it is permuted | SIG-05, WFWD-03, WFWD-04 |
++| 14 | `test_ml_gain` | significance.tests | TestInput, RunHandle → TestOutcome | `engine.run_test` (gain > 0), `record_outcome` for every feature | SIG-05, SIG-04, LEDG-04 |
+ 
+ ### Entry sketch (pre-build — removed by spine task)
+ ```python
+@@ -105,13 +107,15 @@ def run_features(snapshot: SnapshotId | None = None, *, seed: int = 0) -> tuple[
+     returns = returns_panel(sched, snap.id)
+     bars = bars_panel(sched, snap.id)
+     cal = calendar(snap.id)
+-    residuals = residual_returns(returns, sched, seed=seed)
+-    targets = forward_targets(returns, residuals, cal)
++    residuals = residual_returns(returns, sched.lockbox[0], schedule=sched, seed=seed)
++    targets = forward_targets(returns, residuals=residuals, calendar=cal)
+     features = compute_features(bars, FEATURES)
+     characterise_features(features, sched)
+     runs = start_sig_entries(features, sched, snap.id, seed=seed)
+     inputs = rank_ic(features, targets, sched)
+-    return test_features(inputs, runs)
++    outcomes = test_features(inputs, runs)
++    gains = ml_gain(features, targets, sched)
++    return outcomes + test_ml_gain(gains, runs)
+ ```
+ 
+ ## PL-21: Final verdict
+@@ -121,7 +125,7 @@ def run_features(snapshot: SnapshotId | None = None, *, seed: int = 0) -> tuple[
+ | # | Step | Owner | In → Out | Spine version | Covers |
+ |---|---|---|---|---|---|
+ | 1 | `entries` | engine | stage, family → LedgerEntry | PL-17 as built: every `S4` entry, failed, incomplete and abandoned ones included | VERD-01 |
+-| 2 | `benchmark` | rankings.benchmark | → BacktestResult | read the stored PORT-05 result; `LedgerRefused` before PL-19 | VERD-01 |
++| 2 | `benchmark` | rankings.benchmark | → BacktestResult | read the stored PORT-05 results; `LedgerRefused` before PL-19 | VERD-01 |
+ | 3 | `judge` | verdict.judge | LedgerEntry, BacktestResult → Verdict | a row per entry; winner iff walk-forward passed, the lockbox is scored and `lockbox_p_worse` ≥ 0.05 (AD-25); an unscored lockbox reads "not scored" | VERD-01, VERD-02 |
+ | 4 | `write_report` | verdict.report | Verdict → Verdict | `results/verdict.md`, first line the winners or "none"; runs even if S4 stopped early | VERD-03 |
+ 
+@@ -129,7 +133,7 @@ def run_features(snapshot: SnapshotId | None = None, *, seed: int = 0) -> tuple[
+ ```python
+ def write_verdict() -> Verdict:
+     s4 = entries(stage="S4", family="S4")
+-    bench = benchmark()
++    bench = benchmark("sharpe")
+     verdict = judge(s4, bench)
+     return write_report(verdict)
+ ```
+@@ -147,7 +151,7 @@ packages/lab/src/qrp_lab/
+   rankings/        __init__.py  entries.py  walk.py  tests.py  report.py  benchmark.py
+   targets/         __init__.py  forward.py
+   features/        __init__.py  defs.py (FEATURES)  compute.py  characterise.py
+-  significance/    __init__.py  entries.py  ic.py  tests.py  survivors.py (surviving_features)
++  significance/    __init__.py  entries.py  ic.py  ml.py  tests.py  survivors.py (surviving_features)
+   verdict/         __init__.py  judge.py  report.py
+ tests/intent/lab/  tests/unit/lab/
+ ```
+diff --git a/docs/packages/lab/tests.md b/docs/packages/lab/tests.md
+index cc56311..1e029c1 100644
+--- a/docs/packages/lab/tests.md
++++ b/docs/packages/lab/tests.md
+@@ -1,6 +1,6 @@
+ # lab — Tests
+ 
+-**Package:** lab · **Status:** Approved · **Last updated:** 2026-10-18 · **Pipelines:** [pipelines.md](pipelines.md)
++**Package:** lab · **Status:** Draft · **Last updated:** 2026-10-18 · **Pipelines:** [pipelines.md](pipelines.md)
+ 
+ The user has no trusted input/output pairs for `lab` (2026-10-17) and asked for known answers derived by hand from the spec: several cases each for PL-19 and PL-21, two each for PL-18 and PL-20. Every case is either a closed form the spec fixes by construction or a generator plus a property the test computes at run time. Conventions follow `engine`'s tests: calendars are `session_calendar(n, start="1998-01-02")`, session numbers are 1-based positions in it, stocks are synthetic `data.StockId`s from 910001, and every stock is a member on every session. Covariances in the portfolio cases are diagonal (all correlations 0), so each construction has a closed form. Backtest values follow AD-23.
+ 
+@@ -47,10 +47,10 @@ The user has no trusted input/output pairs for `lab` (2026-10-17) and asked for
+ **Source:** PORT-02 (all three risk-based portfolios use the estimator ranked first); a recorded COV `lab.Ranking` whose rows are in the order sample (rank 2), denoised (4), shrinkage (1), factor (3)
+ **Expected:** `top_estimator` returns the `shrinkage` estimator from `lab.ESTIMATORS` · **Tolerance:** exact, a name
+ 
+-### TC-48: The stored benchmark is minimum variance's result, failed period included
++### TC-48: The stored benchmark is the best classical portfolio on each metric, failed periods included
+ **Pipeline:** PL-19 · **Covers:** PORT-05, BTEST-03 · **Kind:** closed form · **Fixture:** tests/fixtures/lab/TC-48/
+-**Source:** PORT-05 (minimum variance's after-cost results stored as S4's benchmark on the same periods) and `engine.BacktestResult`'s invariant (failed periods kept); four three-period results with distinct values, minimum variance's period 2 failed ("WeightsError: infeasible: 18 eligible"); `store_benchmark` then `lab.benchmark()`
+-**Expected:** `lab.benchmark()` equals the min_variance input frame: method "min_variance", rows 1–3, period 2 `failed` True with its reason and NaN values · **Tolerance:** exact, a float64 Parquet round trip is lossless
++**Source:** PORT-05 (every classical portfolio's after-cost results stored as S4's benchmark on the same periods; an S4 method is compared with the best on its judged metric) and `engine.BacktestResult`'s invariant (failed periods kept); four three-period results with distinct values, minimum variance's period 2 failed ("WeightsError: infeasible: 18 eligible"); `store_benchmark` then `lab.benchmark("variance")` and `lab.benchmark("sharpe")`
++**Expected:** each returned result has rows 1–3 · **Tolerance:** exact, a float64 Parquet round trip is lossless
+ 
+ ### TC-49: A planted feature passes among nine noise features
+ **Pipeline:** PL-20 · **Covers:** SIG-01, SIG-02, SIG-04 · **Kind:** synthetic known-answer · **Fixture:** tests/fixtures/lab/TC-49/
+@@ -85,14 +85,13 @@ The user has no trusted input/output pairs for `lab` (2026-10-17) and asked for
+ **Expected:** `LedgerRefused`; `results/verdict.md` is not written · **Tolerance:** exact, refusal is discrete
+ 
+ ## Open questions
+-- TC-42's rank rule and TC-51–TC-53's lockbox rule: decided by the user, 2026-10-17, and now AD-24 and AD-25. TC-51–TC-54 give `lockbox_p_worse` directly (AD-25), so the cases no longer derive it from the stored p.
+-- TC-53: no lockbox score means not a winner, confirmed by the user, 2026-10-17 (AD-25).
+-- TC-41 revised 2026-10-18: the first version assumed `n_signal` sets the kept count, but AD-13 picks the noise eigenvalues by the fitted edge. Its eigenvalues now sit far from any plausible edge.
++- TC-48: re-derive which input frame `lab.benchmark("variance")` and `lab.benchmark("sharpe")` each return (method, values, failed periods), because PORT-05 now stores all four classical portfolios and returns the best on the judged metric instead of minimum variance's result.
+ 
+ ## Uncovered
+ - FACT-01–FACT-05 and DENOI-03 have no golden case. Their acceptance tests are `lab.FactorModel`'s and `lab.residual_returns`' contract Cases (a planted two-factor panel, pure noise, two periods with different k) and the `engine.guard` boundary in every fit.
+ - COV-02, FEAT-01–FEAT-04 and the `Characterisation` steps have no golden case. They describe and make no claims, and the `data-analysis` skill checks them at build time.
+ - PORT-03 and PORT-04 rely on `engine.run_test` (TC-35–TC-39) and the `lab.Ranking` boundary schema; no portfolio-specific case.
+ - `lab.equal_weight` has no case beyond its contract sample (25 members at 0.04).
++- SIG-05 (ML information gain, PL-20's `ml_gain` and `test_ml_gain`) has no case yet.
+ 
+ ## Retired
+diff --git a/docs/packages/models/contract.md b/docs/packages/models/contract.md
+index ded6860..0540980 100644
+--- a/docs/packages/models/contract.md
++++ b/docs/packages/models/contract.md
+@@ -57,7 +57,7 @@ No other package imports `models`; its results reach other packages only as ledg
+ 
+ ### models.Trainer: type
+ `class Trainer(Protocol): device: Literal["cpu", "cuda"]; def train(self, bundle: Bundle, *, entry: str) -> ForecastRun`
+-- **Invariants:** `LocalTrainer` trains in-process with deterministic algorithms and recorded seeds (FCST-07); `GpuTrainer` runs `models.ship_bundle` (AD-18); the same bundle gives forecasts within 1e-6 on either
++- **Invariants:** `LocalTrainer` trains in-process with deterministic algorithms and recorded seeds (FCST-07); `GpuTrainer` runs `models.ship_bundle` (AD-18); re-running the same bundle on the same device type gives forecasts within 1e-6 (FCST-07); CPU and GPU results are compared only within a looser documented tolerance
+ - **Boundary:** forecasters, gpu · **Fixtures:** tests/contracts/models.Trainer/ · **Cases:** a replay double of `LocalTrainer` on the CPU smoke bundle
+ - **Used by:** forecasters, gpu; PL-22, PL-24
+ 
+diff --git a/docs/packages/models/pipelines.md b/docs/packages/models/pipelines.md
+index 5b5ac33..7ed0cf8 100644
+--- a/docs/packages/models/pipelines.md
++++ b/docs/packages/models/pipelines.md
+@@ -22,8 +22,8 @@
+ | 11 | `LocalTrainer` | forecasters.local | ForecastConfig → Trainer | deterministic torch, seeded; a one-layer LSTM for both `model` values | FCST-07 |
+ | 12 | `GpuTrainer` | gpu.trainer | host, rate → Trainer | PL-23 as built | QR-02, QR-05 |
+ | 13 | `train_models` | forecasters.train | Bundle, Trainer, RunHandle → ForecastRun | `trainer.train(bundle, entry=…)`, forecasts to `results/<entry>/forecasts.parquet`; `no_sample` counted | FCST-07 |
+-| 14 | `run_baselines` | forecasters.baselines | Bundle, ForecastRun → ForecastRun | trailing 63-day vol, EWMA vol, zero return | FCST-05, FCST-06 |
+-| 15 | `test_forecasts` | forecasters.tests | ForecastRun, RunHandle → ForecastRun | per-period loss vs each baseline into `engine.run_test` (`FCST-VOL` or `FCST-RET`), `record_outcome` | FCST-05, FCST-06 |
++| 14 | `run_baselines` | forecasters.baselines | Bundle, ForecastRun → ForecastRun | trailing 63-day vol, EWMA vol, zero return; the best surviving S3 feature's per-period rank IC, used as an extra FCST-RET comparison | FCST-05, FCST-06 |
++| 15 | `test_forecasts` | forecasters.tests | ForecastRun, RunHandle → ForecastRun | per-period loss vs each baseline into `engine.run_test` (`FCST-VOL` or `FCST-RET`), and for returns the per-period rank IC paired with the best surviving feature's; `record_outcome` | FCST-05, FCST-06 |
+ 
+ ### Entry sketch (pre-build — removed by spine task)
+ ```python
+@@ -34,7 +34,7 @@ def train_forecaster(config: ForecastConfig, *, entry: str) -> ForecastRun:
+     bars = bars_panel(sched, config)
+     returns = returns_panel(sched, config)
+     cal = calendar(config.snapshot)
+-    targets = forward_targets(returns, cal, horizons=config.horizons)
++    targets = forward_targets(returns, calendar=cal, horizons=config.horizons)
+     features = compute_features(bars, config.features)
+     bundle = build_bundle(bars, features, targets, sched, config)
+     trainer = make_trainer(config)
+@@ -93,7 +93,7 @@ def run_train_bundle(path: Path) -> ForecastRun:
+ |---|---|---|---|---|---|
+ | 1 | `start_run` | engine | entry id → RunHandle | as PL-22 | LEDG-02 |
+ | 2 | `schedule` | engine | ForecastRun → Schedule | PL-14 as built | WFWD-01 |
+-| 3 | `benchmark` | lab | → BacktestResult | `lab.benchmark` | FPORT-01, FPORT-02 |
++| 3 | `benchmark` | lab | → BacktestResult | `lab.benchmark("variance")` for `vol_minvar`, `lab.benchmark("sharpe")` for `return_risk_controlled` | FPORT-01, FPORT-02 |
+ | 4 | `fport_weights` | fport.weights | ForecastRun, Schedule, kind → Weights | `vol_minvar`: `lab.min_variance` on forecast vols × training-window correlation; `return_risk_controlled`: top-forecast stocks, min-variance weighted | FPORT-01–FPORT-03 |
+ | 5 | `backtest` | engine | Weights, Schedule, ForecastRun → BacktestResult | PL-15 as built | FPORT-03 |
+ | 6 | `test_vs_benchmark` | fport.tests | BacktestResult, RunHandle → TestOutcome | paired variance (FPORT-01) or after-cost Sharpe (FPORT-02) in family `S4`; `built_on_failed_forecaster` label | FPORT-01, FPORT-02 |
+@@ -104,7 +104,7 @@ def run_train_bundle(path: Path) -> ForecastRun:
+ def run_fport(forecast: ForecastRun, *, kind: str, entry: str) -> BacktestResult:
+     run = start_run(entry)
+     sched = schedule(forecast)
+-    bench = benchmark()
++    bench = benchmark("variance" if kind == "vol_minvar" else "sharpe")
+     weights = fport_weights(forecast, sched, kind)
+     result = backtest(weights, sched, forecast)
+     test_vs_benchmark(result, bench, run)
+@@ -121,7 +121,7 @@ def run_fport(forecast: ForecastRun, *, kind: str, entry: str) -> BacktestResult
+ | 1 | `start_config` | agents.entries | AgentConfig, entry id → RunHandle | register the configuration under the line (`parent`) and start it; `LedgerRefused` for a 21st or a stopped line | AGENT-02, AGENT-04 |
+ | 2 | `schedule` | engine | AgentConfig → Schedule | PL-14 as built | WFWD-01 |
+ | 3 | `returns_panel` | data | Schedule, AgentConfig → ReturnsPanel | PL-11 as built | PANEL-01 |
+-| 4 | `benchmark` | lab | → BacktestResult | `lab.benchmark` | AGENT-03 |
++| 4 | `benchmark` | lab | → BacktestResult | `lab.benchmark("sharpe")` | AGENT-03 |
+ | 5 | `agent_weights` | agents.train | AgentConfig, ReturnsPanel, Schedule, RunHandle → Weights | per period: window, `guard`, a gymnasium market replaying window returns with 10 bp costs, PPO (stable-baselines3); softmax → `project_capped`; non-finite loss → `mark_incomplete(counts_as_failed=True)` | AGENT-01, AGENT-05 |
+ | 6 | `backtest` | engine | Weights, Schedule, AgentConfig → BacktestResult | PL-15 as built | AGENT-05 |
+ | 7 | `test_vs_benchmark` | agents.tests | BacktestResult, RunHandle → TestOutcome | after-cost Sharpe paired with the benchmark in family `S4`; line stopped when its budget is spent with no pass | AGENT-03, AGENT-04 |
+@@ -133,7 +133,7 @@ def train_agent(config: AgentConfig, *, entry: str) -> BacktestResult:
+     run = start_config(config, entry)
+     sched = schedule(config.snapshot)
+     returns = returns_panel(sched, config)
+-    bench = benchmark()
++    bench = benchmark("sharpe")
+     weights = agent_weights(config, returns, sched, run)
+     result = backtest(weights, sched, config.snapshot)
+     test_vs_benchmark(result, bench, run)
+diff --git a/docs/packages/models/tests.md b/docs/packages/models/tests.md
+index beaef11..5285a20 100644
+--- a/docs/packages/models/tests.md
++++ b/docs/packages/models/tests.md
+@@ -1,6 +1,6 @@
+ # models — Tests
+ 
+-**Package:** models · **Status:** Approved · **Last updated:** 2026-10-18 · **Pipelines:** [pipelines.md](pipelines.md)
++**Package:** models · **Status:** Draft · **Last updated:** 2026-10-18 · **Pipelines:** [pipelines.md](pipelines.md)
+ 
+ The user has no trusted input/output pairs for `models` (2026-10-17). The user chose (2026-10-18) to put most cases on PL-22, PL-25 and PL-26 and one or two on the GPU pipelines. Every case is a closed form the spec fixes by construction, or a generator plus a property the test computes at run time. Conventions follow `engine`'s and `lab`'s tests: calendars are `session_calendar(n, start="1998-01-02")`, session numbers are 1-based positions in it, stocks are synthetic `data.StockId`s from 910001, and every stock is a member on every session. `smoke_panel(stocks, seed)` is the build's small synthetic snapshot: bars, returns and the surviving features `mom_63d` and `rev_5d`, with an S3 ledger seeded so that `lab.surviving_features()` returns exactly those two unless a case says otherwise. Training cases run on CPU at smoke size (LSTM, 2–5 epochs).
+ 
+@@ -25,8 +25,8 @@ The user has no trusted input/output pairs for `models` (2026-10-17). The user c
+ 
+ ### TC-60: Normalisation statistics come from the training window only
+ **Pipeline:** PL-22 · **Covers:** FCST-04 · **Kind:** closed form · **Fixture:** tests/fixtures/models/TC-60/
+-**Source:** FCST-04 (statistics computed on that period's training window only); `smoke_panel(seed=60)`, one period (757–777), feature `mom_63d` overridden for every stock: 8 on odd sessions and 12 on even ones before session 757, and 1000 from 757. The window's 756 sessions hold equal counts of 8 and 12, so its mean is 10 and its sd 2 (population) or 2·√(756/755) = 2.0013 (sample). A statistic that saw the test period would put the mean near 1000
+-**Expected:** the feature's normalisation mean is 10; a test-period sample's normalised value is (1000 − 10)/sd, between 494.5 and 495.0 · **Tolerance:** 1e-9 on the mean; the range covers either degrees-of-freedom convention
++**Source:** FCST-04 (statistics computed on that period's training window only); `smoke_panel(seed=60)`, one period (757–777), feature `mom_63d` overridden for every stock: 8 on odd sessions and 12 on even ones before session 757, and 1000 from 757. The window is truncated at coverage start (`engine.training_window`), so it ends `gap` sessions before 757. A statistic that saw the test period would put the mean near 1000
++**Expected:** the feature's normalisation mean and sd are those of the training window's sessions only · **Tolerance:** 1e-9 on the mean
+ 
+ ### TC-61: A feature that didn't survive S3 is refused
+ **Pipeline:** PL-22 · **Covers:** SIG-03 · **Kind:** closed form · **Fixture:** tests/fixtures/models/TC-61/
+@@ -62,13 +62,13 @@ The user has no trusted input/output pairs for `models` (2026-10-17). The user c
+ 
+ ### TC-67: A shipped bundle trains on the host from the bundle alone
+ **Pipeline:** PL-24 · **Covers:** FCST-07, QR-05 · **Kind:** synthetic known-answer · **Fixture:** tests/fixtures/models/TC-67/
+-**Source:** `models.Bundle`'s invariant (a GPU host trains from the bundle alone, `entry` inside it) and `models.Trainer`'s (the same bundle gives forecasts within 1e-6 on either trainer); the CPU smoke bundle with entry H-0670, copied alone into an empty directory with no store, ledger or network; `run_train_bundle(path)` against `LocalTrainer().train(bundle, entry="H-0670")` in process
++**Source:** `models.Bundle`'s invariant (a GPU host trains from the bundle alone, `entry` inside it) and `models.Trainer`'s (the same bundle on the same device type gives forecasts within 1e-6); the CPU smoke bundle with entry H-0670, copied alone into an empty directory with no store, ledger or network; `run_train_bundle(path)` against `LocalTrainer().train(bundle, entry="H-0670")` in process
+ **Expected:** the run's `entry` is H-0670 and its forecasts equal the in-process run's element-wise · **Tolerance:** 1e-6 absolute, FCST-07's bar
+ 
+ ### TC-68: The volatility-forecast portfolio is capped minimum variance on forecast vols
+ **Pipeline:** PL-25 · **Covers:** FPORT-01, FPORT-03 · **Kind:** closed form · **Fixture:** tests/fixtures/models/TC-68/
+-**Source:** PL-25's `fport_weights` (`vol_minvar`: `lab.min_variance` on forecast vols × training-window correlation) and FPORT-03 (PORT-01's constraints); one period (757–777), 25 stocks whose returns are 26 orthogonal Fourier series of period 27 (stock 910001+2(k−1): 0.01·cos(2πkt/27); 910002+2(k−1): 0.01·sin(2πkt/27); k = 1..13, first 25), so any 756-session window (28 whole periods) has correlation exactly I; forecast vols √0.0002 for 910001–910005 and 0.02 for the rest. The covariance is then diag(0.0002, 0.0004) and the answer is TC-43's: the low five hit the 0.05 cap and the other twenty share 0.75
+-**Expected:** 910001–910005 at 0.05, 910006–910025 at 0.0375; passes `engine.check_weights` · **Tolerance:** 1e-6 absolute, the QP solver's tolerance
++**Source:** PL-25's `fport_weights` (`vol_minvar`: `lab.min_variance` on forecast vols × training-window correlation) and FPORT-03 (PORT-01's constraints); one period (757–777), 25 stocks whose returns are 26 orthogonal Fourier series of period 27 (stock 910001+2(k−1): 0.01·cos(2πkt/27); 910002+2(k−1): 0.01·sin(2πkt/27); k = 1..13, first 25); forecast vols √0.0002 for 910001–910005 and 0.02 for the rest. The training window is truncated at coverage start (`engine.training_window`), so it doesn't hold whole Fourier periods
++**Expected:** passes `engine.check_weights` · **Tolerance:** 1e-6 absolute, the QP solver's tolerance
+ 
+ ### TC-69: A portfolio on a failed forecaster is labelled so
+ **Pipeline:** PL-25 · **Covers:** FPORT-01 · **Kind:** closed form · **Fixture:** tests/fixtures/models/TC-69/
+@@ -92,7 +92,7 @@ The user has no trusted input/output pairs for `models` (2026-10-17). The user c
+ 
+ ### TC-73: Agents train only on training-window data
+ **Pipeline:** PL-26 · **Covers:** AGENT-01 · **Kind:** synthetic known-answer · **Fixture:** tests/fixtures/models/TC-73/
+-**Source:** AGENT-01 (no episode contains data from on or after the training window's end); `smoke_panel(seed=73)`, three periods, a smoke configuration, seed 73, with the market recording each episode's first and last data session
++**Source:** AGENT-01 (no episode contains data from on or after the training window's end, read as after `Window.train_end`, the last session `engine.guard` allows); `smoke_panel(seed=73)`, three periods, a smoke configuration, seed 73, with the market recording each episode's first and last data session
+ **Expected:** for every period every episode's data lies within [`Window.train_start`, `Window.train_end`] · **Tolerance:** exact, dates are discrete
+ 
+ ### TC-74: A diverging configuration is recorded failed and counts against the budget
+@@ -100,14 +100,16 @@ The user has no trusted input/output pairs for `models` (2026-10-17). The user c
+ **Source:** AGENT's edge case (non-finite losses → recorded failed, still counts against the budget) and PL-26's `agent_weights` (`mark_incomplete(counts_as_failed=True)`); line L74 with configurations 1–2 failed; configuration 3 trained with a replay double of PPO whose loss is NaN from update 3
+ **Expected:** the entry's status is failed (counted as failed); the line has 3 configurations tried; no lockbox score · **Tolerance:** exact
+ 
+-### TC-75: An agent in a pure-noise market doesn't beat minimum variance
++### TC-75: An agent in a pure-noise market doesn't beat the stored benchmark
+ **Pipeline:** PL-26 · **Covers:** AGENT-03 · **Kind:** model evaluation · **Fixture:** tests/fixtures/models/TC-75/
+ **Source:** generator `constant_vol_panel(stocks=910001–910050, daily_vol=0.02)` over 24 periods on seeds 751–760; the benchmark is stored in test setup as `engine.backtest` of `lab.min_variance` (sample covariance) weights on the same panel; PPO, Sharpe reward, 20,000 timesteps. AGENT-03's evaluation: per-period after-cost Sharpe paired with the benchmark on the walk-forward periods; from `null-hypothesis-testing`: paired sign-flip permutation, H1 higher, α 0.05, family S4. In iid noise no policy has an edge, and the agent pays more turnover
+ **Expected:** the agent does not pass AGENT-03 · **Tolerance:** at most 2 of the 10 seeds may pass: each passes with probability ≤ 0.05, so 3 or more happens by chance about 1.2% of the time
+ **Skills:** null-hypothesis-testing
+ 
+ ## Open questions
+-- TC-73 reads AGENT-01's "on or after the training window's end" as "after `Window.train_end`", the last session `engine.guard` allows. Confirmed by the user, 2026-10-18.
++- TC-60: re-derive the normalisation mean and the test-period sample's normalised value, because `engine.training_window` now truncates a rolling window at coverage start, so the window ends `gap` sessions before 757 and no longer holds 756 sessions with equal counts of 8 and 12.
++- TC-68: re-derive the expected weights, with a window length that is a multiple of 27 or a tolerance that covers the off-diagonal correlation, because the truncated training window no longer holds whole Fourier periods and its correlation isn't exactly I.
++- TC-75: its test-setup benchmark is a minimum-variance backtest, but AGENT-03 now judges against the classical portfolio with the highest after-cost Sharpe ratio (PORT-05); revise the setup.
+ - TC-64 and TC-63 build their own `Bundle` inputs through generators that also plant feature panels, which `lab.compute_features` doesn't produce; the tester feeds them at `build_bundle`, not through `compute_features`.
+ - TC-75 stores its own benchmark in test setup instead of running PL-19, since a model evaluation needs a benchmark on the same synthetic panel.
+ 
+diff --git a/docs/packages/server/architecture.md b/docs/packages/server/architecture.md
+index d18c85f..9c33b1e 100644
+--- a/docs/packages/server/architecture.md
++++ b/docs/packages/server/architecture.md
+@@ -3,15 +3,15 @@
+ **Package:** server · **Status:** Approved · **Last updated:** 2026-10-17 · **System:** [../../architecture.md](../../architecture.md)
+ 
+ ## Overview
+-`qrp serve` starts a FastAPI app on `127.0.0.1` that answers the app's read requests from `data` on the current snapshot and streams live run events over SSE. It starts and stops nothing: runs are CLI processes (spec Assumptions). Every response body is a pydantic model in `wire`, the single source of the app's types (AD-09).
++`qrp serve` starts a FastAPI app on `127.0.0.1` that answers the app's read requests from `data` on the current snapshot and streams live run events over a WebSocket. It starts and stops nothing: runs are CLI processes (spec Assumptions). Every response body is a pydantic model in `wire`, the single source of the app's types (AD-09).
+ 
+ ## Components
+ | Component | Responsibility | Covers | Depends on |
+ |---|---|---|---|
+ | `wire` | Pydantic response models and the JSON Schema export for the app | QR-06 | `data` (types only) |
+ | `routes` | Read endpoints for membership, stock search and page, coverage, validation issues and runs; maps `data` errors to `ErrorBody` | EXPL-01–EXPL-05, RUNS-03, QR-08 | `wire`, `data` |
+-| `live` | SSE stream per run: state so far, then events polled by `seq` every 0.5 s; reports `stopped_unexpectedly` | RUNS-01, RUNS-02, RUNS-04 | `wire`, `data` |
+-| `guard` | Loopback bind and `Host`-header check middleware | QR-04 | — |
++| `live` | WebSocket stream per run: state so far, then events polled by `seq` every 0.5 s; reports `stopped_unexpectedly` | RUNS-01, RUNS-02, RUNS-04 | `wire`, `data` |
++| `guard` | Loopback bind and the `Host`-header check step every route calls first | QR-04 | — |
+ 
+ ## Interfaces
+ See [contract.md](contract.md).
+diff --git a/docs/packages/server/contract.md b/docs/packages/server/contract.md
+index c877b06..168a093 100644
+--- a/docs/packages/server/contract.md
++++ b/docs/packages/server/contract.md
+@@ -95,7 +95,7 @@ All routes are `GET` under `http://127.0.0.1:<port>/api`, return JSON bodies def
+ - **Used by:** app
+ 
+ ### server.stream_run: Live run events
+-`GET /api/runs/{id}/events → text/event-stream of RunEventBody`
++`WS /api/runs/{id}/events → JSON messages of RunEventBody`
+ - **Invariants:** each change reaches the client within 2 s (RUNS-01, RUNS-02); emits `stopped` within 10 s of a dead run's last heartbeat
+ - **Boundary:** app · **Fixtures:** tests/contracts/server.stream_run/ · **Cases:** the 40% stream above, a run that finishes while watched
+ - **Used by:** app; PL-01, PL-42
+diff --git a/docs/packages/server/pipelines.md b/docs/packages/server/pipelines.md
+index 576d13d..f6e2fc3 100644
+--- a/docs/packages/server/pipelines.md
++++ b/docs/packages/server/pipelines.md
+@@ -129,21 +129,21 @@ def list_runs(request: Request, run_id: str | None = None) -> list[RunBody]:
+ ```
+ 
+ ## PL-34: Live run stream
+-**Entry:** `packages/server/src/qrp_server/pipelines/pl34_stream.py::stream_run` · **Trigger:** `GET /api/runs/{id}/events` · **Part of:** PL-01
++**Entry:** `packages/server/src/qrp_server/pipelines/pl34_stream.py::stream_run` · **Trigger:** `WS /api/runs/{id}/events` · **Part of:** PL-01
+ **Covers:** RUNS-01, RUNS-02, RUNS-04, QR-04
+ 
+ | # | Step | Owner | In → Out | Spine version | Covers |
+ |---|---|---|---|---|---|
+ | 1 | `check_host` | guard.host | request host → ErrorBody | as PL-27 | QR-04 |
+ | 2 | `run_state` | live.state | run id → RunEventBody | a `state` event: the `RunBody` and every failure so far from `data.run_events(after_seq=0)` | RUNS-04 |
+-| 3 | `follow` | live.follow | run id, RunEventBody → RunEventBody | poll `data.run_events` by `seq` every 0.5 s over SSE; `stopped` within 10 s of the last heartbeat; ends on `finished` | RUNS-01, RUNS-02 |
++| 3 | `follow` | live.follow | run id, RunEventBody → RunEventBody | poll `data.run_events` by `seq` every 0.5 s over the WebSocket; `stopped` within 10 s of the last heartbeat; ends on `finished` | RUNS-01, RUNS-02 |
+ 
+ ### Entry sketch (pre-build — removed by spine task)
+ ```python
+-def stream_run(request: Request, run_id: str) -> EventSourceResponse:
+-    check_host(request)
++async def stream_run(websocket: WebSocket, run_id: str) -> None:
++    check_host(websocket)
+     state = run_state(run_id)
+-    return follow(run_id, state)
++    await follow(websocket, run_id, state)
+ ```
+ 
+ ## PL-35: Export the wire schema
+diff --git a/docs/roadmap.md b/docs/roadmap.md
+index 458edf3..001d73c 100644
+--- a/docs/roadmap.md
++++ b/docs/roadmap.md
+@@ -16,7 +16,7 @@
+ | M1 | S1 | Walking skeleton | data, server, app | PL-01, PL-02, PL-09, PL-10, PL-11, PL-12, PL-27, PL-35, PL-36, PL-43 | — | Planned |
+ | M2 | S1 | Explorer & live monitor | data, server, app | PL-01, PL-02, PL-13, PL-28, PL-29, PL-30, PL-31, PL-32, PL-33, PL-34, PL-37, PL-38, PL-39, PL-40, PL-41, PL-42 | M1 (data.Snapshot, server.WireSchema, PL-09 output) | Designed |
+ | M3 | S1 | Real vendor data | data | PL-01, PL-09, PL-10 | M1 (data.Source, PL-09 output) | Designed |
+-| M4 | S2 | Covariance ranking | engine, lab | PL-03, PL-14, PL-15, PL-16, PL-17, PL-18 | M1 (data.ReturnsPanel, PL-11 output) | Designed |
++| M4 | S2 | Covariance ranking | engine, lab | PL-03, PL-14, PL-15, PL-16, PL-17, PL-18 | M3 (real Sharadar snapshot with FredSource rates, PL-09 output) | Designed |
+ | M5 | S2 | Classical portfolios & benchmark | lab | PL-04, PL-19 | M4 (lab.Ranking, PL-18 output) | Designed |
+ | M6 | S3 | Feature significance | lab | PL-05, PL-20 | M4 (engine.RunHandle, PL-16 output) | Designed |
+ | M7 | S4 | Forecasters | models | PL-06, PL-22, PL-23, PL-24 | M6 (lab.surviving_features, PL-20 output) | Designed |
+@@ -34,12 +34,14 @@
+ **References:** none
+ 
+ ## M2: Explorer & live monitor
+-**Outline:** Stock search and pages with charts, coverage, validation results, the run list and the live run view; FRED rates in the download.
++**Outline:** Watch a download live in the app and browse any stock, coverage and validation results on the promoted snapshot.
++**Exit:** With `qrp serve` on a promoted synthetic snapshot, the app follows a `qrp data download` live over the WebSocket and opens a delisted stock's page by an old ticker, the coverage view and the validation results; TC-13 passes.
+ **Skills:** dataviz, frontend-design
+ **References:** none
+ 
+ ## M3: Real vendor data
+-**Outline:** Sharadar and EDGAR sources replace the synthetic one once PB-01 and PB-02 are answered; a full and an update download plus validation run on real data inside QR-03's times.
++**Outline:** Sharadar, FRED and EDGAR sources replace the synthetic one once PB-01 and PB-02 are answered; a full and an update download plus validation run on real data inside QR-03's times.
++**Exit:** After PB-01 and PB-02 rerun, `qrp data download --full` and then `--update` on Sharadar, FRED and EDGAR each stage and promote a real snapshot inside QR-03's times, with DATA-01's 15 years and a risk-free rate on every session.
+ **Skills:** api-probe, data-analysis
+ **References:** PB-01, PB-02
+ 
+@@ -48,17 +50,26 @@
+ **Skills:** data-analysis, null-hypothesis-testing
+ 
+ ## M4: Covariance ranking
+-**Outline:** The shared engine (schedule, backtest, ledger test, ledger list) and the S2 covariance study: factors, denoising, four estimators ranked on out-of-sample minimum-variance variance inside ledger entries.
++**Outline:** The shared engine (schedule, backtest, ledger test, ledger list) and the S2 covariance study: factors, denoising, four estimators ranked on out-of-sample minimum-variance variance inside ledger entries, on a promoted real-data snapshot.
++**Exit:** `qrp lab rank-covariance` on a promoted real Sharadar snapshot publishes `results/<entry>/ranking.md` with four COV rows and their ledger outcomes; TC-28–TC-42 and TC-55–TC-57 pass.
++**Skills:** data-analysis, null-hypothesis-testing
++**References:** RF-01
+ 
+ ## M5: Classical portfolios & benchmark
+-**Outline:** Minimum variance, risk parity, HRP and equal weight from the top estimator, tested against equal weight; the minimum-variance result stored as the S4 benchmark.
++**Outline:** Minimum variance, risk parity, HRP and equal weight from the top estimator, tested against equal weight; all four results stored as the S4 benchmark.
++**Exit:** `qrp lab classical` publishes `results/<entry>/portfolios.md` with all four portfolios, their four metrics and ledger outcomes, and `lab.benchmark` returns the stored results; TC-43–TC-48 pass.
++**Skills:** data-analysis, null-hypothesis-testing
++**References:** none
+ 
+ ## S3: Features & significance
+ **Outline:** Build candidate features and test each for information gain over market-removed returns, with every claim tested against chance and its outcome recorded in the ledger.
+ **Skills:** null-hypothesis-testing, data-analysis
+ 
+ ## M6: Feature significance
+-**Outline:** Residual returns, session-counted targets, at least ten features with characterisation, and one ledger test per feature; the surviving list recorded.
++**Outline:** Residual returns, session-counted targets, at least ten features with characterisation, and per feature a rank-IC ledger test and an ML information-gain ledger test; the surviving list recorded.
++**Exit:** `qrp lab features` records a rank-IC and an ML-gain outcome for every candidate feature, and `lab.surviving_features` returns the survivors; TC-49 and TC-50 pass.
++**Skills:** data-analysis, null-hypothesis-testing
++**References:** RF-01, RF-03
+ 
+ ## S4: Forecasts & agents
+ **Outline:** Forecast returns and volatility with neural networks on the surviving features against simple baselines, then run forecast-driven portfolios and PPO agents in simulated backtests that must beat the stage-2 portfolios out of sample after costs, or stop.
+@@ -66,6 +77,12 @@
+ 
+ ## M7: Forecasters
+ **Outline:** Window bundles, the LSTM and TFT-lite forecasters against their baselines on the laptop and on a rented GPU with verified teardown.
++**Exit:** `qrp models forecast` trains on the laptop and through a rented GPU with verified teardown, and records FCST-VOL and FCST-RET outcomes against the baselines; TC-58–TC-67 pass.
++**Skills:** null-hypothesis-testing, data-analysis
++**References:** RF-02, RF-03
+ 
+ ## M8: Forecast portfolios, agents & verdict
+ **Outline:** Forecast-driven portfolios and PPO agent lines against the benchmark, lockbox scores, and the final verdict.
++**Exit:** `qrp lab verdict` writes `results/verdict.md` whose first line names the winners or says "none", with every FPORT and AGENT entry's walk-forward and lockbox outcome; TC-51–TC-54 and TC-68–TC-75 pass.
++**Skills:** null-hypothesis-testing, data-analysis
++**References:** none
+diff --git a/docs/routes.md b/docs/routes.md
+index 9d89ac8..7b8aa41 100644
+--- a/docs/routes.md
++++ b/docs/routes.md
+@@ -38,3 +38,9 @@ Changes a skill found that another skill owns, waiting for the owner's Revise. W
+ - [x] test-planning · AD-25 adds engine.LedgerEntry.lockbox_p_worse: TC-51-TC-53 inputs should give it (H-0101 0.97, H-0102 0.002, H-0103 0.40, H-0104 0.99, H-0201 0.50, H-0302 0.60) in place of deriving it from the stored p; expected outputs unchanged. AD-24: TC-42's expected ranks match; Ranking gains failed_periods (denoised 1) (TC-42, TC-51, TC-52, TC-53) (from architecture-design, 2026-10-17)
+ - [x] test-planning · TC-41 assumes n_signal sets the kept count, but AD-13 picks noise eigenvalues by the fitted Marchenko-Pastur edge (n_signal only leaves the signal out of the sigma^2 fit); at n_obs 756 the edge sits near the noise eigenvalues, so 0.8 may be kept. Rebuild TC-41 with eigenvalues far from any plausible edge (TC-41) (from architecture-design, 2026-10-17)
+ - [x] pipeline-design · app: 9 step-io-types lint errors — the Out of MembershipView, SearchView, StockView, CoverageView, ValidationView, RunsView, RunView (PL-36–PL-42), generateWire and checkFixtures (PL-43) names no contract type (PL-36, PL-37, PL-38, PL-39, PL-40, PL-41, PL-42, PL-43) (from architecture-design, 2026-10-18)
++- [ ] test-planning · TC-60: re-derive the normalisation mean and normalised test value (engine.training_window now truncates rolling windows at coverage start) (from plan-review, 2026-10-18)
++- [ ] test-planning · TC-68: re-derive the expected weights, with a window length that is a multiple of 27 or a looser tolerance (engine.training_window now truncates rolling windows at coverage start) (from plan-review, 2026-10-18)
++- [ ] test-planning · TC-48: re-derive which stored result lab.benchmark('variance') and lab.benchmark('sharpe') return (PORT-05 now stores all four classical portfolios and returns the best on the judged metric) (from plan-review, 2026-10-18)
++- [ ] test-planning · TC-75: revise the test-setup benchmark to the classical portfolio with the highest after-cost Sharpe (AGENT-03 now judges against the best classical portfolio) (from plan-review, 2026-10-18)
++- [ ] test-planning · engine tests: add a closed-form PL-15 case for a position held through a mid-period index removal (engine.backtest now applies its returns from data.bars_panel until the next rebalance, AD-23) (from plan-review, 2026-10-18)
++- [ ] test-planning · lab tests: SIG-05 (ML information gain, PL-20 steps ml_gain and test_ml_gain) has no case (from plan-review, 2026-10-18)
+diff --git a/docs/spec.md b/docs/spec.md
+index 5f94c90..7819f05 100644
+--- a/docs/spec.md
++++ b/docs/spec.md
+@@ -19,7 +19,7 @@ A personal research platform for daily US large-cap equities. It builds a truste
+ - Any universe wider than the S&P 500 (including stocks that were members in the past)
+ - A shared, hosted or multi-user app: it runs locally, for one person
+ - Return prediction before risk estimation is settled: S3 and S4 start only after S2's covariance ranking is recorded
+-- Open-ended trading agents: an agent line of work stops when it fails to beat minimum variance after costs within its registered budget
++- Open-ended trading agents: an agent line of work stops when it fails to beat the classical portfolios after costs within its registered budget
+ - Fundamental, news or alternative data: features come from daily price, volume and corporate-action data only
+ - Short selling and leverage in the classical portfolios: they are long-only and fully invested
+ 
+@@ -107,7 +107,7 @@ A personal research platform for daily US large-cap equities. It builds a truste
+ - **PANEL-01** An as-of-T request never returns information published after T's close.
+   - Given a request as of T, when any record is returned, then its known-date is on or before T.
+   - Given a membership change announced before T but effective after T, when membership as of T is requested, then the change is not applied.
+-- **PANEL-02** A returns panel for a date range contains only stocks that were members on each date.
++- **PANEL-02** A returns panel for a date range contains only stocks that were members on each date, except a member's delisting return, which sits on the first session after its last bar (AD-08).
+   - Given a returns panel for a range, when a stock joined the index mid-range, then its returns appear only from its effective join date.
+ - **PANEL-03** A delisted stock's final return, through its last price or delisting payout, is included.
+   - Given a stock delisted after a cash acquisition, when its returns are requested, then the last return reflects the cash paid per share.
+@@ -300,7 +300,7 @@ A personal research platform for daily US large-cap equities. It builds a truste
+   - Given a portfolio, when compared with equal weight, then the skill tests paired per-period realised variances; it passes only if significant at 5% after correction across the three comparisons.
+ - **PORT-04** The ranking reports realised variance, after-cost return, Sharpe ratio and turnover for all four portfolios.
+   - Given the completed comparison, when read, then all four portfolios appear with all four metrics and their ledger outcomes.
+-- **PORT-05** The minimum-variance portfolio's after-cost results are stored as the benchmark for S4.
++- **PORT-05** Each classical portfolio's after-cost results are stored as the benchmark for S4; an S4 method is compared with the best of them on its judged metric (lowest realised variance, or highest after-cost Sharpe ratio).
+   - Given S4 comparisons, when they run, then they use these stored per-period results on the same test periods.
+ - **PORT-06** Risk parity gives each stock equal risk contribution under the estimated covariance.
+   - Given a risk-parity portfolio at a rebalance, when risk contributions are computed with the estimator used to build it, then each is within 1% (relative) of the average.
+@@ -340,6 +340,8 @@ A personal research platform for daily US large-cap equities. It builds a truste
+   - Given S4 training, when a feature not in the surviving list is supplied, then it is refused.
+ - **SIG-04** Every feature's outcome is recorded, failures included.
+   - Given S3 is complete, when the ledger is filtered to S3, then every candidate in FEAT appears with its outcome.
++- **SIG-05** Each feature's information gain is also measured with machine-learning models fitted on the candidate features.
++  - Given a walk-forward period, when a regularised linear model and a gradient-boosted tree are fitted on its training window (inputs through the look-ahead guard) to predict the 5-day residual target from the candidate features, then each feature's out-of-sample gain is the drop in per-period rank correlation when that feature is permuted; the skill tests that gain against zero as a registered hypothesis, and it passes only if significant at 5% after correction across every S3 feature tested.
+ 
+ **Edge cases & errors**
+ - No feature passes → recorded as the S3 outcome; S4 forecasters then use raw price history only
+@@ -372,13 +374,13 @@ A personal research platform for daily US large-cap equities. It builds a truste
+ ### Forecast-driven portfolios (`FPORT`)
+ **Serves:** Goal 4
+ **Stage:** S4
+-**Behavior:** Portfolios built from S4 forecasts are run through BTEST on the shared test periods. Volatility forecasts feed a minimum-variance construction, and return forecasts feed a risk-controlled construction. Each must beat the stored S2 minimum-variance benchmark after costs.
++**Behavior:** Portfolios built from S4 forecasts are run through BTEST on the shared test periods. Volatility forecasts feed a minimum-variance construction, and return forecasts feed a risk-controlled construction. Each must beat the stored S2 classical portfolios after costs.
+ 
+ **Requirements**
+-- **FPORT-01** A volatility-forecast portfolio is judged on realised variance against the S2 minimum-variance portfolio.
+-  - Given its per-period results, when compared by the `null-hypothesis-testing` skill with PORT-05's stored results, then it passes only if its realised variance is lower at 5% after correction across all FPORT and AGENT comparisons.
+-- **FPORT-02** A return-forecast portfolio is judged on after-cost Sharpe ratio against the S2 minimum-variance portfolio.
+-  - Given its per-period after-cost results, when compared by the `null-hypothesis-testing` skill with PORT-05's stored results, then it passes only if its Sharpe ratio is higher at 5% after correction across all FPORT and AGENT comparisons.
++- **FPORT-01** A volatility-forecast portfolio is judged on realised variance against the S2 classical portfolio with the lowest realised variance.
++  - Given its per-period results, when compared by the `null-hypothesis-testing` skill with that portfolio's PORT-05 stored results, then it passes only if its realised variance is lower at 5% after correction across all FPORT and AGENT comparisons.
++- **FPORT-02** A return-forecast portfolio is judged on after-cost Sharpe ratio against the S2 classical portfolio with the highest after-cost Sharpe ratio.
++  - Given its per-period after-cost results, when compared by the `null-hypothesis-testing` skill with that portfolio's PORT-05 stored results, then it passes only if its Sharpe ratio is higher at 5% after correction across all FPORT and AGENT comparisons.
+ - **FPORT-03** Forecast-driven portfolios meet the same constraints as classical ones.
+   - Given any FPORT weights, when checked, then they satisfy PORT-01.
+ 
+@@ -388,15 +390,15 @@ A personal research platform for daily US large-cap equities. It builds a truste
+ ### Trading agents (`AGENT`)
+ **Serves:** Goal 4
+ **Stage:** S4
+-**Behavior:** Reinforcement-learning agents learn to set portfolio weights by trial and error in a simulated market built from training-window data, paying BTEST's costs. Each agent line has a configuration budget registered in advance. If no configuration beats minimum variance after costs, the line stops.
++**Behavior:** Reinforcement-learning agents learn to set portfolio weights by trial and error in a simulated market built from training-window data, paying BTEST's costs. Each agent line has a configuration budget registered in advance. If no configuration beats the classical portfolios after costs, the line stops.
+ 
+ **Requirements**
+ - **AGENT-01** Agents train only in simulations built from training-window data.
+   - Given an agent trained for a test period starting on T, when its training episodes are inspected, then none contains data dated on or after the training window's end.
+ - **AGENT-02** Each agent line registers a budget of at most 20 configurations before training starts.
+   - Given an agent line with 20 configurations tried, when a 21st is attempted, then it is refused.
+-- **AGENT-03** An agent is judged on after-cost Sharpe ratio against the S2 minimum-variance portfolio.
+-  - Given its per-period after-cost results, when compared by the `null-hypothesis-testing` skill with PORT-05's stored results, then it passes only if its Sharpe ratio is higher at 5% after correction across all FPORT and AGENT comparisons, including every configuration tried.
++- **AGENT-03** An agent is judged on after-cost Sharpe ratio against the S2 classical portfolio with the highest after-cost Sharpe ratio.
++  - Given its per-period after-cost results, when compared by the `null-hypothesis-testing` skill with that portfolio's PORT-05 stored results, then it passes only if its Sharpe ratio is higher at 5% after correction across all FPORT and AGENT comparisons, including every configuration tried.
+ - **AGENT-04** An agent line whose budget is used up with no pass stops, and is recorded as failed.
+   - Given a line with every configuration failed, when another training run is requested for it, then it is refused and the ledger shows the line as stopped.
+ - **AGENT-05** Agent actions are valid portfolios.
+@@ -408,7 +410,7 @@ A personal research platform for daily US large-cap equities. It builds a truste
+ ### Final verdict (`VERD`)
+ **Serves:** Goal 3, Goal 4
+ **Stage:** S4
+-**Behavior:** At the end of S4, one report answers the project's question: does any signal beat the classical portfolios after costs? It lists every forecaster, forecast-driven portfolio and agent against the benchmark, with its ledger outcome and lockbox result, and states the conclusion plainly, "none does" included.
++**Behavior:** At the end of S4, one report answers the project's question: does any signal beat the classical portfolios after costs? It lists every forecast-driven portfolio and agent against the benchmark, with its ledger outcome and lockbox result, and states the conclusion plainly, "none does" included.
+ 
+ **Requirements**
+ - **VERD-01** The verdict lists every S4 method with its walk-forward outcome, lockbox outcome and effect size versus the benchmark.
+@@ -465,10 +467,12 @@ A personal research platform for daily US large-cap equities. It builds a truste
+ - Walk-forward test blocks are 21 trading days, with at least 756 trading days of history before the first; each agent line gets at most 20 configurations; rented GPU spending is capped at $100 a month.
+ 
+ ## Open questions
+-- How many years of delisted-stock and membership history does the existing subscription cover, and does it meet DATA-01's 15 years? Answered by a probe during architecture.
+-- Do the subscription and free sources cover DATA-03's delisting payouts and DATA-07's point-in-time sectors? Answered by a probe during architecture.
++- How many years of delisted-stock and membership history does the existing subscription cover, and does it meet DATA-01's 15 years? Waived 2026-10-18 (PB-01, PB-02); answered when the probes rerun before M3.
++- Do the subscription and free sources cover DATA-03's delisting payouts and DATA-07's point-in-time sectors? Waived 2026-10-18 (PB-01, PB-02); answered when the probes rerun before M3.
+ 
+ ## Changelog
+ | Date | Change | Source | IDs |
+ |---|---|---|---|
+ | 2026-10-17 | Initial spec | brief.md | all |
++| 2026-10-17 | PANEL-02 allows the delisting return on the first session after the last bar | user decision (AD-08) | PANEL-02 |
++| 2026-10-18 | S4 judged against the best classical portfolio on its metric; ML information gain for features | brief (turns 1, 2) | PORT-05, FPORT-01, FPORT-02, AGENT-03, SIG-05 |
+diff --git a/tasks/plan.md b/tasks/plan.md
+index 900a7f5..1d2980e 100644
+--- a/tasks/plan.md
++++ b/tasks/plan.md
+@@ -4,7 +4,7 @@
+ 
+ ## Scope
+ **Exit:** `qrp data download --full` on `SyntheticSource(seed=7)` stages a snapshot, validation promotes it, and the app's membership page shows its 505 members on any date through the local server, on types generated from the wire schema; TC-01–TC-12, TC-14–TC-27 (TC-13 is M2's) pass.
+-**Covers:** INGST-01–INGST-06, DATA-02–DATA-05, DATA-07, UNIV-01–UNIV-03, PANEL-01–PANEL-05, VALID-01–VALID-08, RUNS-01, RUNS-02, EXPL-01, EXPL-06, QR-01, QR-04, QR-06 · **Deferred:** DATA-01 (to M3: 15 years needs real Sharadar history), QR-03 (to M3: rebuild and update times on real data), QR-08 (to M3: the 1 s and 2 s budgets hold on the full real dataset, per server tests.md), UNIV-04 (to M3: the announced-changes set is collected against real data), DATA-06, PANEL-06 (to M2: `FredSource`), RUNS-03, RUNS-04, EXPL-02–EXPL-05 (to M2: run list, live run, stock, coverage and validation pages)
++**Covers:** INGST-01–INGST-06, DATA-02–DATA-05, DATA-07, UNIV-01–UNIV-03, PANEL-01–PANEL-05, VALID-01–VALID-08, RUNS-01, RUNS-02, EXPL-01, EXPL-06, QR-01, QR-04, QR-06 · **Deferred:** DATA-01 (to M3: 15 years needs real Sharadar history), QR-03 (to M3: rebuild and update times on real data), QR-08 (to M3: the 1 s and 2 s budgets hold on the full real dataset, per server tests.md), UNIV-04 (to M3: the announced-changes set is collected against real data), DATA-06, PANEL-06 (to M3: `FredSource`), RUNS-03, RUNS-04, EXPL-02–EXPL-05 (to M2: run list, live run, stock, coverage and validation pages)
+ **Skills:** data-analysis (quality report), frontend-design (membership page)
+ 
+ ## Phase 0: Interface
+@@ -12,11 +12,11 @@
+ ### M1-T01: M1 interface
+ **Package:** data · **Step:** contract · **Kind:** interface · **Covers:** QR-06 · **Size:** M · **Mode:** solo
+ **Reason:** one interface for data, server and app: server's stubs import data's types and app's import the `wire.ts` generated from server's bodies, and interface tasks never wait on each other
+-**Read:** PL-01, PL-02, PL-09, PL-10, PL-11, PL-12, PL-27, PL-35, PL-36, PL-43, data.RunRecord, data.Source, data.StockId, data.SnapshotId, data.Snapshot, data.Calendar, data.ReturnsPanel, data.Issue, data.ValidationResult, data.QualityInputs, data.QualityReport, data.Member, data.Membership, data.membership_as_of, data.returns_panel, server.ErrorBody, server.MembershipBody, server.StockRefBody, server.StockBody, server.CoverageBody, server.IssuesBody, server.SnapshotsBody, server.RunBody, server.RunEventBody, server.WireSchema, server.get_membership, app.Page, app.WireModule, app.FixtureReport, AD-09, AD-22
++**Read:** PL-01, PL-02, PL-09, PL-10, PL-11, PL-12, PL-27, PL-35, PL-36, PL-43, data.RunRecord, data.RunEvent, data.Source, data.append_parts, data.calendar, data.run_download, data.validate_snapshot, data.record_override, data.StockId, data.SnapshotId, data.Snapshot, data.Calendar, data.ReturnsPanel, data.Issue, data.ValidationResult, data.QualityInputs, data.QualityReport, data.Member, data.Membership, data.membership_as_of, data.returns_panel, server.ErrorBody, server.MembershipBody, server.StockRefBody, server.StockBody, server.CoverageBody, server.IssuesBody, server.SnapshotsBody, server.RunBody, server.RunEventBody, server.WireSchema, server.get_membership, app.Page, app.WireModule, app.FixtureReport, AD-09, AD-22
+ **Acceptance:**
+ - [ ] Each type is code in its owner's `types.py` (or `packages/app/src/wire/`, `packages/app/src/types.ts`); each `tests/contracts/<id>.<Type>/` sample validates against its schema; `schema.json` is exported from the bodies and `wire.ts` generated from it
+ - [ ] Every M1 step and entry imports with its contract signature, body `NotImplementedError("<its task>")`; each `__init__.py` exports its contract; `qrp_data.__main__` dispatches `download` (then validate on the staged snapshot) and `validate`, `qrp_server.__main__` dispatches `serve` and `export-schema`
+-- [ ] The `data.membership_as_of`, `data.returns_panel` and `server.get_membership` fakes serve their fixtures
++- [ ] The `data.membership_as_of`, `data.returns_panel`, `data.append_parts` and `server.get_membership` fakes serve their fixtures
+ **Verify:** `uv run pytest tests/contracts -q` · `npm --prefix packages/app run test -- contracts` · `scripts/check.sh gate`
+ **Depends on:** — · **Writes:** packages/data/src/qrp_data/**, packages/server/src/qrp_server/**, packages/app/**, tests/contracts/**
+ 
+@@ -39,16 +39,17 @@
+ **Depends on:** M1-T01 · **Writes:** packages/data/src/qrp_data/vendors/factory.py, tests/unit/data/test_factory.py
+ 
+ ### M1-T04: SyntheticSource spine (planted 505-member index)
+-**Package:** data · **Step:** PL-09.SyntheticSource · **Kind:** spine · **Covers:** DATA-02–DATA-04, DATA-07 · **Size:** XS · **Mode:** solo
+-**Read:** PL-09, data.Source, AD-22, tests/fixtures/data/plants-s1.json
++**Package:** data · **Step:** PL-09.SyntheticSource · **Kind:** spine · **Covers:** DATA-02–DATA-04, DATA-07 · **Size:** S · **Mode:** solo
++**Read:** PL-09, data.Source, AD-22, tests/fixtures/data/plants-s1.json, docs/packages/data/tests.md
+ **Acceptance:**
+ - [ ] `SyntheticSource(seed=7)` satisfies data.Source: 505 members on every XNYS session 2020-01-02 – 2022-12-30, every plants-s1 event present, each planted removal paired with a same-session addition, `truth` exposed; same seed, same rows
++- [ ] Applies a case's `extra` plants from its `input.json` (corrupt bars, planted returns, duplicate rows, extra members, a wrong action ratio, failing stocks, a stop after N stocks) and serves the update run's new sessions and revision
+ **Verify:** `uv run pytest tests/unit/data -k synthetic -q` · `scripts/check.sh gate --pkg data`
+ **Depends on:** M1-T01 · **Writes:** packages/data/src/qrp_data/vendors_synthetic/source.py, tests/unit/data/test_synthetic_source.py
+ 
+ ### M1-T05: fetch_universe spine (every ever-member)
+ **Package:** data · **Step:** PL-09.fetch_universe · **Kind:** spine · **Covers:** INGST-01, UNIV-03 · **Size:** XS · **Mode:** solo
+-**Read:** PL-09, data.Source, data.RunRecord, data.StockId
++**Read:** PL-09, data.Source, data.RunRecord, data.StockId, data.append_parts
+ **Acceptance:**
+ - [ ] On the data.Source replay double, returns every permaticker ever in SP500, appended as parts; validates as data.StockId
+ **Verify:** `uv run pytest tests/unit/data -k scope -q` · `scripts/check.sh gate --pkg data`
+@@ -56,15 +57,15 @@
+ 
+ ### M1-T06: download_stocks spine (per stock, bitemporal parts)
+ **Package:** data · **Step:** PL-09.download_stocks · **Kind:** spine · **Covers:** INGST-01, INGST-02, INGST-04, INGST-05, RUNS-02 · **Size:** S · **Mode:** solo
+-**Read:** PL-09, data.Source, data.StockId, data.RunRecord, data.RunEvent
++**Read:** PL-09, data.Source, data.StockId, data.RunRecord, data.RunEvent, data.append_parts
+ **Acceptance:**
+-- [ ] On the data.Source double, SEP and ACTIONS per stock (since the watermark on update) go through `store.append_parts` with known dates stamped, one event per stock; `--resume` skips finished stocks
++- [ ] On the data.Source double, SEP and ACTIONS per stock (since the watermark on update) go through `data.append_parts` with known dates stamped, one event per stock; `--resume` skips finished stocks
+ **Verify:** `uv run pytest tests/unit/data -k fetch -q` · `scripts/check.sh gate --pkg data`
+ **Depends on:** M1-T01 · **Writes:** packages/data/src/qrp_data/ingest/fetch.py, packages/data/src/qrp_data/store/parts.py, tests/unit/data/test_fetch.py
+ 
+ ### M1-T07: download_series spine (rates, SIC history)
+ **Package:** data · **Step:** PL-09.download_series · **Kind:** spine · **Covers:** DATA-07 · **Size:** XS · **Mode:** solo
+-**Read:** PL-09, data.Source, data.RunRecord
++**Read:** PL-09, data.Source, data.RunRecord, data.append_parts
+ **Acceptance:**
+ - [ ] On the data.Source double, DTB3 is stored in full with carried rates `filled=True`, and the SIC history per CIK is stored as dated intervals
+ **Verify:** `uv run pytest tests/unit/data -k series -q` · `scripts/check.sh gate --pkg data`
+@@ -82,7 +83,7 @@
+ **Package:** data · **Step:** PL-10.calendar · **Kind:** spine · **Covers:** DATA-05 · **Size:** XS · **Mode:** solo
+ **Read:** PL-10, data.Snapshot, data.Calendar, data.calendar, AD-08
+ **Acceptance:**
+-- [ ] `exchange_calendars` XNYS sessions clipped to the data.Snapshot sample's coverage; behaves as the data.Calendar double on 2001-09 and 2012-10
++- [ ] `exchange_calendars` XNYS sessions clipped to the snapshot's coverage: on a snapshot sample covering 2001-09 and 2012-10, matches the data.Calendar double; on the synthetic snapshot, dates outside 2020-01-02 – 2022-12-30 raise `CoverageError`
+ **Verify:** `uv run pytest tests/unit/data -k calendar -q` · `scripts/check.sh gate --pkg data`
+ **Depends on:** M1-T01 · **Writes:** packages/data/src/qrp_data/calendar/sessions.py, tests/unit/data/test_calendar.py
+ 
+@@ -104,9 +105,9 @@
+ 
+ ### M1-T12: check_moves spine (±40% unexplained)
+ **Package:** data · **Step:** PL-10.check_moves · **Kind:** spine · **Covers:** VALID-04 · **Size:** XS · **Mode:** solo
+-**Read:** PL-10, data.ReturnsPanel, data.Issue
++**Read:** PL-10, data.Snapshot, data.ReturnsPanel, data.Issue
+ **Acceptance:**
+-- [ ] On the data.ReturnsPanel sample, |return| > 40% with no action, delisting or override is a `flagged` data.Issue
++- [ ] On the data.Snapshot and data.ReturnsPanel samples, |return| > 40% with no action, delisting or override is a `flagged` data.Issue
+ **Verify:** `uv run pytest tests/unit/data -k moves -q` · `scripts/check.sh gate --pkg data`
+ **Depends on:** M1-T01 · **Writes:** packages/data/src/qrp_data/validate/moves.py, tests/unit/data/test_moves.py
+ 
+@@ -120,7 +121,7 @@
+ 
+ ### M1-T14: check_membership spine (495–510 per session)
+ **Package:** data · **Step:** PL-10.check_membership · **Kind:** spine · **Covers:** VALID-06 · **Size:** XS · **Mode:** solo
+-**Read:** PL-10, data.Snapshot, data.Calendar, data.Issue, data.membership_as_of
++**Read:** PL-10, data.Snapshot, data.Calendar, data.Issue, data.membership_as_of, data.Membership, data.Member
+ **Acceptance:**
+ - [ ] On the `data.membership_as_of` fake, a session outside 495–510 members is a data.Issue; with no announced-changes set, none is checked
+ **Verify:** `uv run pytest tests/unit/data -k check_membership -q` · `scripts/check.sh gate --pkg data`
+@@ -153,15 +154,15 @@
+ ### M1-T18: quality report spine (coverage, issues, tails)
+ **Package:** data · **Step:** PL-10.gather_quality_inputs, PL-10.write_quality_report · **Kind:** spine · **Covers:** VALID-07 · **Size:** XS · **Mode:** solo
+ **Skills:** data-analysis
+-**Read:** PL-10, data.Snapshot, data.ReturnsPanel, data.ValidationResult, data.QualityInputs, data.QualityReport
++**Read:** PL-10, data.Snapshot, data.ReturnsPanel, data.ValidationResult, data.QualityInputs, data.QualityReport, data.Issue
+ **Acceptance:**
+ - [ ] The data.QualityInputs sample gives `quality.md` with sections `coverage`, `missingness`, `returns`, `quarantine`; both outputs validate against their contract folders
+ **Verify:** `uv run pytest tests/unit/data -k report -q` · `scripts/check.sh gate --pkg data`
+ **Depends on:** M1-T01 · **Writes:** packages/data/src/qrp_data/validate/report.py, tests/unit/data/test_report.py
+ 
+ ### M1-T19: total_returns spine (AD-08 panel)
+-**Package:** data · **Step:** PL-11.total_returns · **Kind:** spine · **Covers:** PANEL-01–PANEL-04, UNIV-02, INGST-04 · **Size:** XS · **Mode:** solo
+-**Read:** PL-11, data.Snapshot, data.Calendar, data.ReturnsPanel, AD-08
++**Package:** data · **Step:** PL-11.total_returns · **Kind:** spine · **Covers:** PANEL-01–PANEL-04, UNIV-02, INGST-04 · **Size:** S · **Mode:** solo
++**Read:** PL-11, data.Snapshot, data.Calendar, data.ReturnsPanel, AD-08, data.membership_as_of, data.Membership
+ **Acceptance:**
+ - [ ] DuckDB over the data.Snapshot sample's parts: newest version known by `as_of`, AD-08 returns, member mask, NaN gaps, the gap and delisting returns; validates as data.ReturnsPanel
+ **Verify:** `uv run pytest tests/unit/data -k returns -q` · `scripts/check.sh gate --pkg data`
+@@ -201,7 +202,7 @@
+ 
+ ### M1-T24: export_schema spine (pydantic JSON Schema)
+ **Package:** server · **Step:** PL-35.export_schema · **Kind:** spine · **Covers:** QR-06 · **Size:** XS · **Mode:** solo
+-**Read:** PL-35, server.WireSchema, AD-09
++**Read:** PL-35, server.WireSchema, AD-09, server.StockRefBody, server.CoverageBody, server.IssuesBody, server.SnapshotsBody, server.RunBody
+ **Acceptance:**
+ - [ ] `model_json_schema` of every body written to a given path; the output validates as server.WireSchema
+ **Verify:** `uv run pytest tests/unit/server -k schema -q` · `scripts/check.sh gate --pkg server`
+@@ -290,7 +291,7 @@
+ 
+ ### M1-T34: Wire PL-35
+ **Package:** server · **Step:** PL-35 · **Kind:** wiring · **Covers:** QR-06 · **Size:** XS · **Mode:** solo
+-**Read:** PL-35, server.WireSchema
++**Read:** PL-35, server.WireSchema, server.StockRefBody, server.CoverageBody, server.IssuesBody, server.SnapshotsBody, server.RunBody
+ **Acceptance:**
+ - [ ] `qrp server export-schema` writes to a temp path, never over the committed `schema.json`; committed as PL-35's smoke test
+ - [ ] PL-35 pre-build sections replaced by a `dt layout` pointer
+@@ -332,12 +333,12 @@
+ **Depends on:** M1-T10, M1-T29 · **Writes:** packages/data/src/qrp_data/validate/prices.py, tests/intent/data/test_tc15_prices.py, tests/unit/data/test_prices.py
+ 
+ ### M1-T39: Large-move flags with overrides
+-**Package:** data · **Step:** PL-10.check_moves · **Kind:** thicken · **Covers:** VALID-04 · **Size:** XS · **Mode:** split
+-**Read:** PL-10, TC-16, data.ReturnsPanel, data.Issue, data.record_override
++**Package:** data · **Step:** PL-10.check_moves · **Kind:** thicken · **Covers:** VALID-04 · **Size:** S · **Mode:** split
++**Read:** PL-10, TC-16, data.Snapshot, data.ReturnsPanel, data.Issue, data.record_override
+ **Acceptance:**
+ - [ ] TC-16 passes: exactly the three planted large moves flagged, the override's reason kept, none for the +39% move or explained days
+ **Verify:** `uv run pytest tests/intent/data -k TC16 -q` · `scripts/check.sh gate --pkg data`
+-**Depends on:** M1-T12, M1-T29, M1-T31 · **Writes:** packages/data/src/qrp_data/validate/moves.py, tests/intent/data/test_tc16_moves.py, tests/unit/data/test_moves.py
++**Depends on:** M1-T12, M1-T29, M1-T31 · **Writes:** packages/data/src/qrp_data/validate/moves.py, packages/data/src/qrp_data/validate/overrides.py, tests/intent/data/test_tc16_moves.py, tests/unit/data/test_moves.py
+ 
+ ### M1-T40: Unexplained gap detection
+ **Package:** data · **Step:** PL-10.check_gaps · **Kind:** thicken · **Covers:** VALID-03 · **Size:** XS · **Mode:** split
+@@ -349,7 +350,7 @@
+ 
+ ### M1-T41: Membership count bounds
+ **Package:** data · **Step:** PL-10.check_membership · **Kind:** thicken · **Covers:** VALID-06 · **Size:** XS · **Mode:** split
+-**Read:** PL-10, TC-18, data.membership_as_of, data.Issue
++**Read:** PL-10, TC-18, data.membership_as_of, data.Issue, data.Membership, data.Member
+ **Acceptance:**
+ - [ ] TC-18's membership rows pass: an issue on every session 2022-06-15 – 2022-12-30 and none earlier
+ **Verify:** `uv run pytest tests/intent/data -k "TC18 and membership" -q` · `scripts/check.sh gate --pkg data`
+@@ -365,7 +366,7 @@
+ 
+ ### M1-T43: Point-in-time total returns
+ **Package:** data · **Step:** PL-11.total_returns · **Kind:** thicken · **Covers:** VALID-05, PANEL-02–PANEL-04, UNIV-02 · **Size:** XS · **Mode:** split
+-**Read:** PL-11, TC-01, TC-02, TC-03, TC-04, TC-05, TC-27, data.ReturnsPanel, AD-08
++**Read:** PL-11, TC-01, TC-02, TC-03, TC-04, TC-05, TC-27, data.ReturnsPanel, AD-08, data.membership_as_of, data.Membership
+ **Acceptance:**
+ - [ ] TC-01, TC-02 and TC-03 pass: action days and both delisting returns against `truth`, BKRP's the only `estimated` cell
+ - [ ] TC-04, TC-05 and TC-27 pass: the join mask, NaN halt cells, and the gross return over the halt
+@@ -383,7 +384,7 @@
+ 
+ ### M1-T45: Deterministic schema export
+ **Package:** server · **Step:** PL-35.export_schema · **Kind:** thicken · **Covers:** QR-06 · **Size:** XS · **Mode:** split
+-**Read:** PL-35, TC-25, server.WireSchema
++**Read:** PL-35, TC-25, server.WireSchema, server.StockRefBody, server.CoverageBody, server.IssuesBody, server.SnapshotsBody, server.RunBody
+ **Acceptance:**
+ - [ ] TC-25 passes: JSON Schema 2020-12, a `$defs` entry per body and nested row, two exports byte-identical
+ **Verify:** `uv run pytest tests/intent/server -k TC25 -q` · `scripts/check.sh gate --pkg server`
+@@ -420,14 +421,14 @@
+ **Depends on:** M1-T29, M1-T30, M1-T31, M1-T32, M1-T37, M1-T38, M1-T39, M1-T40, M1-T41, M1-T42, M1-T43, M1-T44 · **Writes:** packages/data/src/qrp_data/pipelines/pl10_validate.py, tests/intent/data/test_pl01_system.py
+ 
+ ### M1-T48: PL-02 on the real server
+-**Package:** app · **Step:** PL-02 · **Kind:** system · **Covers:** EXPL-01, QR-06 · **Size:** XS · **Mode:** solo
++**Package:** server · **Step:** PL-02 · **Kind:** system · **Covers:** EXPL-01, QR-06 · **Size:** XS · **Mode:** solo
+ **Reason:** system task
+ **Read:** PL-02, PL-27, data.membership_as_of, server.get_membership, TC-24
+ **Acceptance:**
+ - [ ] PL-27 calls the real `membership_as_of`; the fake stays for the contract tests
+ - [ ] TC-24 passes: `qrp serve` on a promoted synthetic store, the 2021-03-13 body and the 2019-12-31 `ErrorBody`, and the membership page showing "resolved to 2021-03-12" with 505 rows
+ - [ ] `qrp server export-schema` then `npm run check:wire` passes on the freshly exported schema
+-**Verify:** `uv run pytest tests/intent/system/test_pl02_smoke.py -q` · `uv run pytest tests/intent/server/test_pl27_smoke.py -q` · `npm --prefix packages/app run test:smoke -- pl36` · `npm --prefix packages/app run check:wire` · `scripts/check.sh gate --pkg app`
++**Verify:** `uv run pytest tests/intent/system/test_pl02_smoke.py -q` · `uv run pytest tests/intent/server/test_pl27_smoke.py -q` · `npm --prefix packages/app run test:smoke -- pl36` · `npm --prefix packages/app run check:wire` · `scripts/check.sh gate --pkg server`
+ **Depends on:** M1-T32, M1-T33, M1-T34, M1-T35, M1-T36, M1-T44, M1-T47 · **Writes:** packages/server/src/qrp_server/pipelines/pl27_membership.py, tests/intent/system/test_pl02_smoke.py
+ 
+ ### Checkpoint: milestone exit
+@@ -529,8 +530,6 @@
+ | One interface task spans three packages | M1-T01 is large and everything waits on it | It writes shapes and stubs only; the samples are small and named by the contracts' Cases |
+ 
+ ## Open questions
+-- `SharadarSource`, `EdgarSicSource` (to M3) and `FredSource` (to M2) get no spine here: M1 runs on `SyntheticSource`, as the M1 outline says.
++- `SharadarSource`, `EdgarSicSource` and `FredSource` (to M3) get no spine here: M1 runs on `SyntheticSource`, as the M1 outline says.
+ - `PL-10.returns_panel` is PL-11 as built, so it has no spine of its own.
+ - `qrp_data.__main__` chains `download` into `validate` on the staged snapshot from the interface task on, since only the interface task may write `__main__.py`.
+-
+-## Replan notes
+diff --git a/tests/fixtures/lab/TC-48/expected.json b/tests/fixtures/lab/TC-48/expected.json
+index 00f9c6e..9a6ec81 100644
+--- a/tests/fixtures/lab/TC-48/expected.json
++++ b/tests/fixtures/lab/TC-48/expected.json
+@@ -1 +1 @@
+-{"benchmark_equals": "results.min_variance", "method": "min_variance", "rows": [1, 2, 3], "period_2": {"failed": true, "reason": "WeightsError: infeasible: 18 eligible", "values": "NaN"}, "tol": "exact, NaN positions equal; a float64 Parquet round trip is lossless"}
++{"rows": [1, 2, 3], "tol": "exact, NaN positions equal; a float64 Parquet round trip is lossless"}
+diff --git a/tests/fixtures/models/TC-60/expected.json b/tests/fixtures/models/TC-60/expected.json
+index e5cd7ed..3003f76 100644
+--- a/tests/fixtures/models/TC-60/expected.json
++++ b/tests/fixtures/models/TC-60/expected.json
+@@ -1 +1 @@
+-{"normalisation_mean": 10.0, "tol_abs_mean": 1e-9, "normalised_test_value_range": [494.5, 495.0], "why_range": "(1000 - 10) / sd, sd = 2 (population) or 2.0013 (sample, n = 756)"}
++{"tol_abs_mean": 1e-9}
+diff --git a/tests/fixtures/models/TC-68/expected.json b/tests/fixtures/models/TC-68/expected.json
+index 2c3b540..0711c9a 100644
+--- a/tests/fixtures/models/TC-68/expected.json
++++ b/tests/fixtures/models/TC-68/expected.json
+@@ -1 +1 @@
+-{"period": 1, "weights": {"910001-910005": 0.05, "910006-910025": 0.0375}, "check_weights": "passes", "tol_abs": 1e-6}
++{"period": 1, "check_weights": "passes", "tol_abs": 1e-6}

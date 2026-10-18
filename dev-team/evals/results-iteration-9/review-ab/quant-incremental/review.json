@@ -1,0 +1,432 @@
+{
+ "defects": [
+  {
+   "id": "R01",
+   "class": "user_fact",
+   "severity": "high",
+   "file": "docs/architecture.md",
+   "quote": "| Secondary source | Yahoo via `yfinance` | AD-03 |",
+   "evidence": "Turn 2, the developer: 'I want yahooquery (free, unofficial Yahoo client) for a cross-check.' No doc mentions yahooquery. AD-03 decides 'sources.YahooSource calls `Ticker.history`' through yfinance. PB-03 only tried yfinance 1.7.0, 0.2.66 and 0.2.40, all of which failed, plus the chart endpoint. The developer never agreed to yfinance in their own words. Turns 19 and 20 only accept AD-03, and turn 8 adds a chart-endpoint test on top.",
+   "fix": "Make yahooquery the cross-check client everywhere. docs/architecture.md: the tech-stack row becomes 'Yahoo via `yahooquery`'; AD-03 Decision becomes '`sources.YahooSource` calls yahooquery's `Ticker(...).history(adj_ohlc=True)` \u2026', and AD-03 Context/Probe wording changes to match; the cost-table row becomes 'Yahoo via `yahooquery`'; the PB-03 risk line says AD-03 is revised toward yahooquery (with the chart endpoint as the fallback). docs/packages/qdata/architecture.md Data clients: '`yahooquery` \u2265 2.3'. docs/packages/qdata/pipelines.md PL-06 step 2, and the Open question ('Which client `sources.yahoo` uses, yahooquery or the chart endpoint, waits on PB-03'). docs/probes.md PB-03: title, Question and C1/C2/C5 test yahooquery, with yfinance results kept as history."
+  },
+  {
+   "id": "R02",
+   "class": "user_fact",
+   "severity": "high",
+   "file": "docs/architecture.md",
+   "quote": "| Backend API | FastAPI + uvicorn on 127.0.0.1, SSE for progress | AD-07 |",
+   "evidence": "Turn 1: 'a Python backend (HTTP and WebSocket)'. Turn 2: 'The WebSocket is for live progress of download/validation runs \u2026 (HTTP + WebSocket)'. AD-07 picks Server-Sent Events and lists 'WebSockets \u2014 two-way messaging isn't needed' as a rejected alternative. The developer stated the protocol in their own words and never withdrew it.",
+   "fix": "Use a WebSocket for run progress. docs/architecture.md: the Overview ('HTTP + Server-Sent Events API' \u2192 'HTTP + WebSocket API'), the mermaid label 'HTTP + SSE' \u2192 'HTTP + WebSocket', PL-01 step 3 ('`api.RunEvent` messages on WebSocket `/runs/{id}/ws`; on reconnect the client sends its last `seq` and the server resumes after it'), the tech-stack row ('FastAPI + uvicorn on 127.0.0.1, WebSocket for progress'), and AD-07 (Decision: WebSocket with seq-based resume; SSE moves to Alternatives). docs/packages/qserver/architecture.md Overview ('streams that progress over a WebSocket'). docs/packages/qserver/contract.md api.create_app ('GET /runs/{id}/events (SSE)' \u2192 'WS /runs/{id}/ws') and api.RunEvent invariant ('`seq` is the resume point'). docs/packages/qserver/pipelines.md PL-10 step 6. docs/packages/explorer/architecture.md (api component, Live progress). docs/packages/explorer/pipelines.md PL-14 step 3 ('WebSocket resuming from the last seq'). tasks/plan.md M1-T23 and M1-T34 acceptance ('resumes after the last `seq`' in place of `Last-Event-ID`)."
+  },
+  {
+   "id": "R03",
+   "class": "domain",
+   "severity": "high",
+   "file": "docs/packages/qfcst/tests.md",
+   "quote": "a Sharpe gap of 2.5 over a year is far above the detectable size for 252 days",
+   "evidence": "TC-72 plants annualised Sharpe 3.0 against 0.5 with correlation 0.6 over 252 sessions. Using the Jobson\u2013Korkie/Memmel variance, the daily Sharpe difference 0.157 has a standard error of about 0.057, so z \u2248 2.77. A one-sided Bonferroni threshold over 18 claims is also about 2.77. The planted claims therefore pass only about half the time, and all 5 must pass. At 80% power the detectable gap is about 3.3 annualised Sharpe, so the gap of 2.5 is below the detectable size, not far above it. A correct verdict implementation would often fail this golden case.",
+   "fix": "In TC-72 Source, change 'correlated 0.6' to 'correlated 0.9'. That gives z \u2248 5.4 and power near 1. Update tests/fixtures/qfcst/TC-72/input.json \"correlation\" to 0.9. Change the Tolerance text to: 'with correlation 0.9 the 2.5 Sharpe gap is about 5 standard errors over 252 days, well above the detectable size at the 18-claim corrected level'."
+  },
+  {
+   "id": "R04",
+   "class": "packet",
+   "severity": "high",
+   "file": "docs/packages/qserver/contract.md",
+   "quote": "def create_app(home: Path) -> FastAPI  # served on 127.0.0.1 only",
+   "evidence": "The PL-10 and PL-11 step tables give `create_app` as 'VersionedStore, Catalog, RunManager \u2192 App', and the PL-10 sketch calls `create_app(store, catalog, runs)`. The contract says `create_app(home: Path)`. M1-T02 must freeze a stub 'with its signature', and M1-T20, M1-T40 and M1-T41 get both versions in their packets.",
+   "fix": "Change the contract signature to `def create_app(store: VersionedStore, catalog: Catalog, runs: RunManager) -> FastAPI  # served on 127.0.0.1 only; routes added by the mount_* steps`, and add store.VersionedStore, store.Catalog and runs.RunManager to M1-T20's Read line in tasks/plan.md."
+  },
+  {
+   "id": "R05",
+   "class": "packet",
+   "severity": "high",
+   "file": "tasks/plan.md",
+   "quote": "**Read:** PL-09, PL-10, PL-11, runs.RunInfo, runs.ProgressEvent",
+   "evidence": "M1-T02 must write the code for RunInfo (`version: VersionId`), CompanyPage (`CompanyMsg` mirrors `qdata.query.Company`, `ActionMsg` mirrors `query.Actions`), CrossCheckView (mirrors `xcheck.Comparison`/`DayDiff`), FailureMessage (mirrors `checks.Failure`), CheckSummaryMessage (mirrors `checks.CheckSummary`/`CheckCounts`), VersionMessage (mirrors `store.DataVersion`), the 422 `QueryRefused` body, and PL-09/PL-10 stubs that take Catalog, VersionedStore, RunContext and CheckConfig. None of these qdata types is in its packet. Its Depends is '\u2014', yet it imports M1-T01's types; the plan's own Risks row admits 'qserver's and explorer's stubs import qdata's types'.",
+   "fix": "Add to M1-T02's Read line: core.VersionId, core.QueryRefused, core.RunContext, core.RunCancelled, store.DataVersion, store.VersionedStore, store.Catalog, query.Company, query.Actions, checks.Failure, checks.CheckSummary, checks.CheckConfig, xcheck.Comparison, sources.SourceError. Set M1-T02 '**Depends on:** M1-T01'."
+  },
+  {
+   "id": "R06",
+   "class": "packet",
+   "severity": "high",
+   "file": "tasks/plan.md",
+   "quote": "Reads `config/checks.toml` and `config/reference_delisted.toml` into a CheckConfig that validates; a missing file raises FileNotFoundError naming it",
+   "evidence": "PL-09's entry calls `load_check_config(Path(\"config\"))` on every run, including download runs. No M1 task lists `config/checks.toml` or `config/reference_delisted.toml` in its Writes (grep finds 'config/' only in this acceptance line). So the real-chain full download in M1-T45 hits FileNotFoundError. The reference list is the developer's own data (spec Assumptions) and doesn't exist yet.",
+   "fix": "docs/packages/qserver/pipelines.md PL-09 step 4: 'check runs only: read \u2026; other kinds pass no config', and the sketch becomes `config = load_check_config(Path(\"config\")) if run.kind == \"check\" else None`. tasks/plan.md M1-T18 acceptance adds 'download runs never read config'. M1-T18 Writes adds `config/checks.toml` (the provisional thresholds 0.50, 498, 505, 0.30)."
+  },
+  {
+   "id": "R07",
+   "class": "packet",
+   "severity": "medium",
+   "file": "tasks/plan.md",
+   "quote": "**Read:** PL-12, PL-14, PL-15, design.Theme, charts.ChartOptions, pages.RouteView, api.Schema",
+   "evidence": "M1-T03 must stub every PL-12/PL-14/PL-15 step 'with its signature', and those signatures use api.VersionMessage, SearchHit, CompanyPage, PriceSeries, CrossCheckView, UniverseDay, RunMessage, RunEvent and OpenApiDocument. None of them is in the packet. It must also build 'a fixture-backed fake of the qserver API' that serves the `tests/contracts/api.*` samples and needs `src/api/schema.ts`. M1-T02 writes all of these, but M1-T03 has 'Depends on: \u2014', and no file for the fake is in its Writes.",
+   "fix": "Set M1-T03 '**Depends on:** M1-T02'. Add api.VersionMessage, api.SearchHit, api.CompanyPage, api.PriceSeries, api.CrossCheckView, api.UniverseDay, api.RunMessage, api.RunEvent and api.OpenApiDocument to its Read line. Add the fake's path to its Writes (for example `packages/explorer/tests/fakes/qserver.ts`). Remove the first Risks row once the edges exist."
+  },
+  {
+   "id": "R08",
+   "class": "packet",
+   "severity": "medium",
+   "file": "tasks/plan.md",
+   "quote": "the route list matches `api.create_app` exactly, with no export route",
+   "evidence": "api.App says 'routes added by the mount_* steps', so M1-T20, which builds only `create_app` in app.py, can't produce the route list. The list also includes the four /studies routes, whose `mount_studies` is deferred to M5 (plan Deferred).",
+   "fix": "Change M1-T20's acceptance to: 'A request with a non-loopback `Host` gets 403 on an app with no routes mounted; app.py defines no export route'. Move the route-list check into M1-T40 as 'the mounted route list equals `api.create_app`'s M1 routes (every route except the /studies routes, deferred to M5)'."
+  },
+  {
+   "id": "R09",
+   "class": "packet",
+   "severity": "medium",
+   "file": "tasks/plan.md",
+   "quote": "`run_serve` starts on 127.0.0.1 over the qdata replay doubles; every route in `api.create_app` answers",
+   "evidence": "'Every route' includes /studies, which M1 can't serve (mount_studies is deferred to M5). M1-T40's packet carries the PL-10 sketch calling `mount_studies(app, StudyReader(home))` and lists `study.StudyReader` under 'Interfaces (frozen: build against these)', but qrisk doesn't exist until M4.",
+   "fix": "Change M1-T40's acceptance to '\u2026 every route in `api.create_app` except the /studies routes answers; the entry does not call `mount_studies` (M5) and imports nothing from qrisk'. Keep `study.StudyReader` out of M1-T40's packet."
+  },
+  {
+   "id": "R10",
+   "class": "packet",
+   "severity": "medium",
+   "file": "tasks/plan.md",
+   "quote": "`run_worker` claims a run, runs the `load.download` fake and finishes it succeeded",
+   "evidence": "M1-T39's packet carries the PL-09 sketch with `mark_books(run, ctx)` and lists `book.BookStatus` (qfcst, M9) as a frozen interface. The acceptance doesn't tell the builder to leave the call out, although the plan defers PAPER-02 to M9.",
+   "fix": "Append to M1-T39's acceptance: 'the entry does not call `mark_books` (M9) and imports nothing from qfcst'. Keep `book.BookStatus` out of M1-T39's packet."
+  },
+  {
+   "id": "R11",
+   "class": "packet",
+   "severity": "medium",
+   "file": "docs/packages/qserver/pipelines.md",
+   "quote": "| 4 | `mount_reads` | api.reads | App, VersionedStore \u2192 App |",
+   "evidence": "`CompanyPage.failures` comes from check results, and `CrossCheckView` (which mirrors `xcheck.Comparison`) comes from cross-check results. Both live in `store.Catalog` (AD-04), but mount_reads gets only App and VersionedStore. M1-T21's packet also lacks query.Company, query.Actions, query.Returns, store.DataVersion, checks.Failure and xcheck.Comparison, which these messages mirror.",
+   "fix": "Change the step's In to 'App, VersionedStore, Catalog \u2192 App' and the PL-10 sketch to `mount_reads(app, store, catalog)`. Add store.Catalog, store.DataVersion, query.Company, query.Actions, query.Returns, checks.Failure and xcheck.Comparison to M1-T21's Read line in tasks/plan.md."
+  },
+  {
+   "id": "R12",
+   "class": "packet",
+   "severity": "medium",
+   "file": "tasks/plan.md",
+   "quote": "**Read:** PL-09, PL-04, load.download, runs.RunInfo, core.RunContext",
+   "evidence": "`execute_run` must call `load.download(kind, store, source, ctx)` 'with the synthetic source' obtained from `open_primary`. M1-T19's packet has neither store.VersionedStore nor sources.PrimarySource.",
+   "fix": "Add store.VersionedStore and sources.PrimarySource to M1-T19's Read line."
+  },
+  {
+   "id": "R13",
+   "class": "packet",
+   "severity": "medium",
+   "file": "tasks/plan.md",
+   "quote": "checks.explain, xcheck.Comparison, xcheck.CrossCheckReport, xcheck.run_crosscheck",
+   "evidence": "M1-T01 must freeze `xcheck.run_crosscheck(reader, source: SecondarySource, catalog, ctx)` and the replay doubles, but `sources.SecondarySource` isn't on its Read line or in its packet.",
+   "fix": "Add sources.SecondarySource to M1-T01's Read line."
+  },
+  {
+   "id": "R14",
+   "class": "domain",
+   "severity": "medium",
+   "file": "docs/spec.md",
+   "quote": "Given a member with 200 trading days of history on R, when momentum is computed, then it has no value, and reversal, volatility and maximum return do.",
+   "evidence": "Features are computed only 'for every eligible member' (FEAT behaviour). STRUCT-02 makes a member eligible only with \u2265 252 of the 504 window days, and its own example says 'given one with 200 days, then it is not'. So a 200-day member is never in the window and gets no loadings or features. qfeat TC-30 (and tests/fixtures/qfeat/TC-30/input.json 'history_days': 200) expects idio_vol and beta to be present, which is impossible.",
+   "fix": "Change FEAT-09's example to 'Given an eligible member with no bar on any of the 30 sessions ending 252 sessions before R, when momentum is computed, then it has no value, and reversal, volatility and maximum return do.' Update TC-30's Source and Expected in docs/packages/qfeat/tests.md, and tests/fixtures/qfeat/TC-30/input.json, to the same eligible-with-gap member. Momentum and volume shock stay null in that case."
+  },
+  {
+   "id": "R15",
+   "class": "domain",
+   "severity": "medium",
+   "file": "docs/spec.md",
+   "quote": "given the same move on a 1-for-2 reverse-split day explained by the split, then none is",
+   "evidence": "A 1-for-2 reverse split doubles the unadjusted price (+100%). It can't explain a \u221260% move; a 5-for-2 forward split would.",
+   "fix": "Change to 'given the same \u221260% unadjusted move on a 5-for-2 split day explained by the split, then none is'."
+  },
+  {
+   "id": "R16",
+   "class": "domain",
+   "severity": "medium",
+   "file": "docs/spec.md",
+   "quote": "Given a split after date T, when adjusted prices are requested anchored at T, then prices up to T equal the unadjusted prices.",
+   "evidence": "AD-06 builds adjusted prices by compounding total returns, so any dividend before T makes earlier adjusted prices lower than the unadjusted ones. docs/architecture.md Risks already says: 'Spec PRICE-03's example \u2026 holds only when no dividend falls between those dates and T. The tests should use a split-only case, or the spec should say so.' It is still unresolved.",
+   "fix": "Change the example to 'Given a split after date T and no dividend on or before T, when adjusted prices are requested anchored at T, then prices up to T equal the unadjusted prices.' Then delete that Risks bullet from docs/architecture.md."
+  },
+  {
+   "id": "R17",
+   "class": "domain",
+   "severity": "medium",
+   "file": "docs/packages/qrisk/tests.md",
+   "quote": "at most 1 of the 20 seeds may reject, since the error rate is \u03b1 = 0.05",
+   "evidence": "Under a correct 5% test, the number of rejections in 20 seeds is Binomial(20, 0.05), and P(\u2265 2) = 1 \u2212 0.358 \u2212 0.377 \u2248 0.26. So a correct implementation fails this bound on roughly a quarter of seed sets. TC-19's Expected ('no seed's difference rejects H0') also contradicts its own Tolerance. qfeat TC-38 ('at most 1 of the 20 seeds has any claim pass'), qfcst TC-58 ('at most 1 of the 20 passes') and qfcst TC-72 ('at most 1 seed has any of the 18 claims pass') repeat the same flaw.",
+   "fix": "In TC-19 (qrisk), TC-38 (docs/packages/qfeat/tests.md), and TC-58 and TC-72 (docs/packages/qfcst/tests.md), set Expected and Tolerance to 'at most 3 of the 20 seeds reject (P(\u2265 4) \u2248 1.6% under a correct 5% test)'. Update the matching expected.json files."
+  },
+  {
+   "id": "R18",
+   "class": "stale",
+   "severity": "medium",
+   "file": "docs/spec.md",
+   "quote": "over the development dates from 2005.",
+   "evidence": "S4 never defines its development dates. FEVAL-01 and FPORT-05 say 'from 2005' with no end. QR-11 trains 'from 2005 to the data version's end'. qfcst TC-58 uses 191 dates, which is 2005-01 to 2020-11, S3's HOLD-01 development split. ErrorInputs and BacktestReport say 'development dates'.",
+   "fix": "Add a definition to FEVAL-01: 'S4's development dates are the rebalance dates from 2005-01-31 to the last rebalance date before registration'. Change TC-58's generator to the date count that follows from that definition, or, if the HOLD-01 split is meant, write 'to 2020-11-30 (HOLD-01)' in FEVAL-01, FPORT-05 and QR-11."
+  },
+  {
+   "id": "R19",
+   "class": "milestone",
+   "severity": "medium",
+   "file": "docs/roadmap.md",
+   "quote": "TC-47 to TC-60 and TC-69 pass",
+   "evidence": "M8 'backtests them with costs' through `engine.backtest`, which runs `engine.simulate` with next-open fills and 5 bp costs (PL-34 step 10). The only cost and fill known-answer cases, TC-61 (cost), TC-62 and TC-63 (fill-day and overnight returns) and TC-64 (exit), are filed under PL-40 and M9. M8's backtest would ship unchecked.",
+   "fix": "Change M8's Outline to 'TC-47 to TC-64 and TC-69 pass' and M9's to 'TC-65 to TC-68 and TC-70 to TC-73 pass'. In docs/packages/qfcst/tests.md, add TC-61\u2013TC-64 to the PL-34 row (engine.backtest uses engine.simulate)."
+  },
+  {
+   "id": "R20",
+   "class": "milestone",
+   "severity": "medium",
+   "file": "docs/packages/qfeat/pipelines.md",
+   "quote": "| 8 | `best_feature` | claims.ic | IcSeries \u2192 BestFeature | PL-29's, unchanged | FTEST-03 |",
+   "evidence": "PL-30 is in M6, but its step 8 reuses 'PL-29's' best_feature and its step 4 reuses 'PL-28's, unchanged' development step. PL-28 and PL-29 are built only in M7 (roadmap). M6's own Outline requires TC-35 (best_feature), which tests.md files under PL-29.",
+   "fix": "PL-30 step 4 Spine version: 'drop every holdout row (HOLD-02)'. PL-30 step 8: 'the candidate (not calibration) with the highest mean development IC'. PL-28 step 2 and PL-29 step 2 become 'PL-30's, unchanged', and PL-29 step 6 becomes 'PL-30's, unchanged'. In docs/packages/qfeat/tests.md, move TC-35 to the PL-30 row."
+  },
+  {
+   "id": "R21",
+   "class": "milestone",
+   "severity": "medium",
+   "file": "docs/packages/explorer/tests.md",
+   "quote": "| PL-02 | `pnpm --dir packages/explorer test pl02_system` |",
+   "evidence": "System pipeline PL-03 (Review and explain failures, architecture.md) is in M2's pipeline list, but no tests.md has a smoke or system row for it, unlike PL-01, PL-02 and PL-17. M2 can't prove PL-03 end to end.",
+   "fix": "Add a row: '| PL-03 | `pnpm --dir packages/explorer test pl03_system` | \u2014 (system: the checks and failure pages against a real `qserver` over a committed synthetic version with a check run) | \u2014 | \u2014 |'."
+  },
+  {
+   "id": "R22",
+   "class": "stale",
+   "severity": "medium",
+   "file": "docs/packages/qdata/pipelines.md",
+   "quote": "urllib datatables calls with cursor paging, as PB-01's probe",
+   "evidence": "AD-02's Decision says '`sources.SharadarSource` reads those four tables through the `nasdaq-data-link` client', and qdata/architecture.md lists '`nasdaq-data-link` \u2265 1.0.4'. PL-04 step 2 says stdlib urllib instead.",
+   "fix": "Pick one. Either change PL-04 step 2 to '`nasdaq-data-link` datatable calls with cursor paging; every page archived as a RawPage (AD-02)', or change AD-02's Decision and the qdata tech-stack row to stdlib urllib."
+  },
+  {
+   "id": "R23",
+   "class": "user_fact",
+   "severity": "medium",
+   "file": "docs/packages/qdata/tests.md",
+   "quote": "(assumed: none for M1)",
+   "evidence": "Turn 31, the developer: 'I'd like known-answer cases planned before any code.' M1 is about to be built with no golden cases for qdata, qserver or explorer, even though the spec gives exact known answers (PRICE-02 split and dividend days at 0%, UNIV-01 D\u22121/D, QUERY-01 K\u22121/K, QUERY-05 refusal).",
+   "fix": "Add golden cases for M1 to docs/packages/qdata/tests.md before build: PRICE-02 split day and dividend day (PL-08 read_returns), UNIV-01 add-on-D (read_universe), QUERY-01 late dividend (PitReader), QUERY-04 reused ticker (resolve_company), and PL-04 first-full-download stamping (AD-05). Put them in the Golden cases column and drop '(assumed: none for M1)'."
+  },
+  {
+   "id": "R24",
+   "class": "milestone",
+   "severity": "medium",
+   "file": "docs/roadmap.md",
+   "quote": "## M2: Checks and review",
+   "evidence": "Every designed milestone needs a checkable Exit line; M2 has only Outline, Skills and References.",
+   "fix": "Add '**Exit:** From the app, a check run with the cross-check completes on the synthetic version; filtering by one check and \"failed\" shows only those failures with the count; an explained failure stays explained on the next run and the summary counts update; PL-03, PL-05, PL-06 and PL-13 smoke tests pass.'"
+  },
+  {
+   "id": "R25",
+   "class": "milestone",
+   "severity": "medium",
+   "file": "docs/roadmap.md",
+   "quote": "## M3: Real sources and calibration",
+   "evidence": "No Exit line.",
+   "fix": "Add '**Exit:** PB-01, PB-02 and PB-03 are answered; a full Sharadar download commits a real version holding all 10 reference companies (CHECK-09 passes or each failure is explained); the CHECK-12 thresholds are approved by the user; the Yahoo cross-check covers \u2265 95% of current members; QR-01\u2013QR-03 are met on the user's machine.'"
+  },
+  {
+   "id": "R26",
+   "class": "milestone",
+   "severity": "medium",
+   "file": "docs/roadmap.md",
+   "quote": "## M4: Study skeleton",
+   "evidence": "No Exit line.",
+   "fix": "Add '**Exit:** `qrisk known-answers` passes; `qrisk study run` on M1's synthetic version writes a study folder with scorecard, tests and report; a forced SYNTH-04 failure stops the run with `known_answer_failed`; TC-01 to TC-21 pass.'"
+  },
+  {
+   "id": "R27",
+   "class": "milestone",
+   "severity": "medium",
+   "file": "docs/roadmap.md",
+   "quote": "## M5: Research pages and real-data study",
+   "evidence": "No Exit line.",
+   "fix": "Add '**Exit:** The spectrum and comparison pages show a chosen study through `qserver`; `qrisk study stability` exports the inputs and `qrisk study review` records the review; the study on the real full version finishes within 60 minutes with significance marks; TC-22 and the PL-17 system test pass.'"
+  },
+  {
+   "id": "R28",
+   "class": "milestone",
+   "severity": "medium",
+   "file": "docs/roadmap.md",
+   "quote": "## M6: Feature skeleton",
+   "evidence": "No Exit line.",
+   "fix": "Add '**Exit:** `qfeat check` passes; `qfeat panel` and `qfeat run --development` complete on M1's synthetic version with all 19 claims reported; TC-23 to TC-40 and TC-43 to TC-46 pass.'"
+  },
+  {
+   "id": "R29",
+   "class": "milestone",
+   "severity": "medium",
+   "file": "docs/roadmap.md",
+   "quote": "## M7: Registration and holdout on real data",
+   "evidence": "No Exit line.",
+   "fix": "Add '**Exit:** On the real full version, the FTEST-06 review is recorded, a feature list is registered, `qfeat run --holdout` completes once within 2 hours and a second request is refused; TC-41 and TC-42 pass.'"
+  },
+  {
+   "id": "R30",
+   "class": "milestone",
+   "severity": "medium",
+   "file": "docs/roadmap.md",
+   "quote": "## M8: Forecast skeleton",
+   "evidence": "No Exit line.",
+   "fix": "Add '**Exit:** `qfcst develop` on the synthetic version writes a development run with the 3 claims and an 8-portfolio backtest marked \"development, not a verdict\"; `qfcst register` writes a setup; the listed TCs pass.'"
+  },
+  {
+   "id": "R31",
+   "class": "milestone",
+   "severity": "medium",
+   "file": "docs/roadmap.md",
+   "quote": "## M9: Paper book",
+   "evidence": "No Exit line.",
+   "fix": "Add '**Exit:** After `qfcst book start`, synthetic refreshes in `qserver` mark the book as their last phase; `qfcst verdict` refuses at 11 months and runs once at 12, returning the recorded claims on a second call; the listed TCs pass.'"
+  },
+  {
+   "id": "R32",
+   "class": "milestone",
+   "severity": "medium",
+   "file": "docs/roadmap.md",
+   "quote": "## M10: Real-data development and book start",
+   "evidence": "No Exit line.",
+   "fix": "Add '**Exit:** On the real full version, `qfcst develop` finishes within 2 hours, the FEVAL-03 review is recorded, a setup is registered and its book started, and the next real refresh marks it within 2 minutes.'"
+  },
+  {
+   "id": "R33",
+   "class": "user_fact",
+   "severity": "low",
+   "file": "docs/architecture.md",
+   "quote": "| Sharadar (Nasdaq Data Link) | the user's existing subscription | $49 placeholder, **unverified**",
+   "evidence": "Turn 7: 'Sharadar costs $49/month... actually I'm not certain of the exact figure, so use the plan price from my Sharadar account as a placeholder and flag it as unverified.' The developer withdrew $49, but the table still uses it. The QR-01 risk line also builds a claim on it ('It leaves $1 of headroom').",
+   "fix": "Change the cell to 'plan price from the user's Sharadar account (placeholder, **unverified**)'. Change the Total to 'that price + $0 (unverified)'. Reword the QR-01 risk line to drop the '$1 of headroom' arithmetic until the price is confirmed (PB-01 C1)."
+  },
+  {
+   "id": "R34",
+   "class": "user_fact",
+   "severity": "low",
+   "file": "docs/roadmap.md",
+   "quote": "drive two long-only portfolios that run for 12 months in a simulated paper book beside S2's classical portfolios",
+   "evidence": "Turn 50, item 4: 'run the baseline-driven portfolios in the book too (16 claims)'. Spec FPORT-03 and PAPER-01 hold four forecast portfolios (neural and baseline) plus four comparisons. The S4 Outline mentions only the two neural ones.",
+   "fix": "Change to 'drive two long-only portfolio rules, run on the neural and on the baseline forecasts, that run for 12 months in a simulated paper book beside S2's classical portfolios'."
+  },
+  {
+   "id": "R35",
+   "class": "milestone",
+   "severity": "low",
+   "file": "docs/roadmap.md",
+   "quote": "**Skills:** \u2014",
+   "evidence": "M2 builds explorer's checks and failure pages (PL-13). QR-07 and the S1 stage route `frontend-design` to every view, and M1's page tasks carry it.",
+   "fix": "Set M2's line to '**Skills:** frontend-design'."
+  },
+  {
+   "id": "R36",
+   "class": "stale",
+   "severity": "low",
+   "file": "docs/spec.md",
+   "quote": "Answered by a probe during architecture; if not, membership needs another source within `QR-01`.",
+   "evidence": "PB-01 was waived until M3 (turn 17), and PB-02 C1 already answered the second question: 'no first-published column, as AD-05 assumes'. AD-05 is Accepted. The brief's Open question still says '(To check before the architecture relies on it.)', even though the architecture already relies on it.",
+   "fix": "Spec Open questions: first bullet ends 'PB-01, waived until M3, answers it before M3 is planned; if not, \u2026'. Delete the second bullet (answered: AD-05, PB-02 C1). docs/brief.md: change the parenthesis to '(PB-01, waived until M3.)'."
+  },
+  {
+   "id": "R37",
+   "class": "stale",
+   "severity": "low",
+   "file": "docs/architecture.md",
+   "quote": "| Import rules | `import-linter` (qdata, qserver), ESLint `no-restricted-imports` (explorer) | \u2014 |",
+   "evidence": "AD-18 and AD-22 add import-linter layers for qfeat and qfcst, and qfcst/architecture.md enforces 'import-linter forbids torch outside qfcst.model'. The table lists only qdata and qserver.",
+   "fix": "Change to '`import-linter` (qdata, qrisk, qfeat, qfcst, qserver)'."
+  },
+  {
+   "id": "R38",
+   "class": "domain",
+   "severity": "low",
+   "file": "docs/architecture.md",
+   "quote": "about 1,200 times (\u2248 295 dates \u00d7 3 estimates plus 4 subset portfolios)",
+   "evidence": "PORT-01 runs minvar for 3 full-set estimates plus 4 subset estimates per date: 296 \u00d7 7 \u2248 2,070 QPs. Read either way, the stated product isn't 1,200.",
+   "fix": "Change to 'about 2,100 times (\u2248 296 dates \u00d7 3 full-set estimates plus 4 subset estimates)'."
+  },
+  {
+   "id": "R39",
+   "class": "stale",
+   "severity": "low",
+   "file": "docs/ideas/residual-features.md",
+   "quote": "- Which model family: chosen in the architecture, but it should handle interactions and be trained walk-forward.",
+   "evidence": "Already answered: AD-19 picks LightGBM, and turn 40 says 'LightGBM is fine.'",
+   "fix": "Replace with '- Model family: resolved in AD-19 (LightGBM).'"
+  },
+  {
+   "id": "R40",
+   "class": "stale",
+   "severity": "low",
+   "file": "docs/packages/qfcst/contract.md",
+   "quote": "- **Used by:** the development run; PL-34; PL-34",
+   "evidence": "PL-34 is listed twice.",
+   "fix": "Change to '- **Used by:** the development run; PL-34'."
+  },
+  {
+   "id": "R41",
+   "class": "stale",
+   "severity": "low",
+   "file": "docs/packages/qfeat/contract.md",
+   "quote": "`def test_claims(ic: IcSeries, gains: pd.DataFrame, *, alpha: float = 0.05) -> list[Claim]`",
+   "evidence": "PL-25, PL-30 and PL-31 give the step's In as 'IcSeries, WalkForward \u2192 Claim' and call `test_claims(ic, fit)` with a WalkForward.",
+   "fix": "Change the signature to `def test_claims(ic: IcSeries, fit: WalkForward, *, alpha: float = 0.05) -> list[Claim]`, using `fit.gains`."
+  },
+  {
+   "id": "R42",
+   "class": "stale",
+   "severity": "low",
+   "file": "docs/packages/qfeat/contract.md",
+   "quote": "**Cases:** momentum chosen on 191 development dates",
+   "evidence": "BestFeature is chosen over the development dates (FTEST-03), and TC-43 counts 227 development dates. 191 is the number of model-prediction dates from 2005.",
+   "fix": "Change to 'momentum chosen on 227 development dates'."
+  },
+  {
+   "id": "R43",
+   "class": "stale",
+   "severity": "low",
+   "file": "docs/packages/qrisk/pipelines.md",
+   "quote": "- Three contract changes are routed to `architecture-design` Revise",
+   "evidence": "docs/routes.md ticks all of these items, and the contracts now contain RebalanceDates, StabilityInputs and Holding.role. 'dt lint reports them until the Revise lands' is stale. The same stale bullet is in docs/packages/qfeat/pipelines.md ('- Five contract changes are routed \u2026') and docs/packages/qfcst/pipelines.md ('- Six contract changes are routed \u2026').",
+   "fix": "Replace each of the three Open-questions bullets with '- None.'"
+  },
+  {
+   "id": "R44",
+   "class": "stale",
+   "severity": "low",
+   "file": "docs/probes.md",
+   "quote": "**Hash:** 74118cae \u00b7 **Status:** Waived \u00b7 2026-10-17 \u2014 Waive PB-01 and PB-03 until M3. \u00b7 **Milestones:** S1",
+   "evidence": "PB-01 and PB-03 are waived until M3, and roadmap M3's References line names them. Both still say 'Milestones: S1', while PB-02 says M3.",
+   "fix": "Set '**Milestones:** M3' on both PB-01 and PB-03."
+  },
+  {
+   "id": "R45",
+   "class": "stale",
+   "severity": "low",
+   "file": "tasks/plan.md",
+   "quote": "**Step:** PL-09.load_check_config \u00b7 **Kind:** spine \u00b7 **Covers:** CHECK-09",
+   "evidence": "The plan's Scope defers 'CHECK-09 (to M2 \u2026)' and 'DATA-01 (to M3 \u2026)', yet M1-T18 Covers CHECK-09, and M1-T04 and M1-T05 Cover DATA-01.",
+   "fix": "Set M1-T18's Covers to '\u2014', and drop DATA-01 from M1-T04's and M1-T05's Covers (M1-T04: '\u2014'; M1-T05: 'DATA-03, DATA-06')."
+  },
+  {
+   "id": "R46",
+   "class": "packet",
+   "severity": "low",
+   "file": "tasks/plan.md",
+   "quote": "**Read:** PL-08, query.Company, query.PitReader, QUERY-04",
+   "evidence": "M1-T13's acceptance says 'an unknown ticker raises QueryRefused', but core.QueryRefused isn't in its packet. Likewise M1-T22 (FailureMessage and CheckSummaryMessage mirror checks.Failure and checks.CheckSummary, which are absent) and M1-T23 (RunMessage and RunEvent mirror runs.RunInfo and runs.ProgressEvent, and the 409 uses runs.RunRefused, all absent).",
+   "fix": "Add core.QueryRefused to M1-T13's Read line; checks.Failure and checks.CheckSummary to M1-T22's; runs.RunInfo, runs.ProgressEvent and runs.RunRefused to M1-T23's."
+  },
+  {
+   "id": "R47",
+   "class": "stale",
+   "severity": "low",
+   "file": "tasks/plan.md",
+   "quote": "## Replan notes",
+   "evidence": "Process narration ('S2 cut into M4 and M5 \u2026 No task added, dropped or reordered') that a builder reading the final plan doesn't need. The facts it records are already in the Scope's Deferred line and in M1-T02's acceptance.",
+   "fix": "Delete the '## Replan notes' section and its three bullets."
+  }
+ ],
+ "checked": {
+  "user_messages": 58,
+  "docs": 37,
+  "packets": 46
+ }
+}

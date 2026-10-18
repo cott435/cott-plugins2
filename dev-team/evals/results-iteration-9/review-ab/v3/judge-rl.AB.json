@@ -1,0 +1,111 @@
+{
+ "winner": "A",
+ "reasoning": "Set A is the better plan. Both sets follow the same discipline (interface task, spines, wiring, system task) and both have detailed contracts. The difference is in RL depth and accuracy. A gives each stage a ladder that teaches its concept: tabular Q-learning, then DQN, then a CNN on the full grid, with ablations; REINFORCE against PPO, with a library PPO comparison; then fixed opponents, naive co-learning and opponent-pool self-play, with cross-play tables and ratings. A's numeric test cases check out where I recomputed them (GAE 1.3775, Q-update 0.009, swim vector (0.0144, 0.0192), catch distances), and it keeps truncation separate from termination for bootstrapping. B has strong ideas of its own: hand-derived check worlds that gate every training batch, a paired permutation test with Holm correction, and replay by re-simulation. But B's tests contradict its own spec in several places. The fish score is tested as 'hits per fish, lower is better' while the spec says mean steps survived, higher is better. One test expects hit fish to respawn although the spec says they leave the episode. Another expects '2 predators' when the spec has one. A timing test allows a 90-minute batch against a 60-minute requirement. B's milestone split also has a leftover-looking M2 that bundles finishing the DQN, replay, the reference check and the write-up, and task IDs run out of order (T13 after T15, T25/T26 before T24). A has weaknesses too: one huge 31-task milestone per stage, an M1 interface that freezes M2/M3 fields, step tables that list classes the entry function never calls, a boundary list in CONSTRAINTS that no longer matches the architecture, and a fish test that contradicts EVAL-07. On structure, B is somewhat more readable for a solo learner.",
+ "rubric": {
+  "A": {
+   "content": {
+    "rl_soundness": 5,
+    "stage_completeness": 5,
+    "internal_consistency": 3,
+    "right_sizing": 3,
+    "milestone_quality": 3,
+    "pipeline_clarity": 3,
+    "interface_quality": 4,
+    "dependency_graph_soundness": 4,
+    "task_buildability": 4
+   },
+   "structure": {
+    "organization": 4,
+    "readability_for_solo_learner": 3,
+    "ease_of_finding_next_build_step": 4,
+    "layout_sensibility": 4
+   },
+   "content_score": 3.8,
+   "structure_score": 3.8,
+   "overall_score": 7.6
+  },
+  "B": {
+   "content": {
+    "rl_soundness": 4,
+    "stage_completeness": 4,
+    "internal_consistency": 2,
+    "right_sizing": 3,
+    "milestone_quality": 3,
+    "pipeline_clarity": 4,
+    "interface_quality": 4,
+    "dependency_graph_soundness": 3,
+    "task_buildability": 3
+   },
+   "structure": {
+    "organization": 4,
+    "readability_for_solo_learner": 4,
+    "ease_of_finding_next_build_step": 4,
+    "layout_sensibility": 4
+   },
+   "content_score": 3.3,
+   "structure_score": 4.0,
+   "overall_score": 7.3
+  }
+ },
+ "output_quality": {
+  "A": {
+   "score": 8,
+   "strengths": [
+    "Each stage has a ladder that isolates one concept, with ablations (no memory, no target copy, no exploration) and a library reference at each stage",
+    "Closed-form golden cases cited to Sutton & Barto and Schulman et al.; the ones I recomputed are correct",
+    "Contract types are code shapes with invariants, fixtures and cases; truncation and termination are kept separate for bootstrapping",
+    "Self-play design is concrete: opponent pool with a latest share, 10 generations, cross-play table, ratings and a fixed panel"
+   ],
+   "weaknesses": [
+    "One 31-task milestone per stage; M1 freezes RunSettings and Env fields that only M2/M3 use",
+    "PL-01's step table lists 16 rows (environment and agent classes) that the entry function never calls, so it doesn't read as a call path",
+    "Stale bits: the 'deliberately revised core' framing against AD-09's batch-first-from-M1 decision, and a CONSTRAINTS boundary list that omits selfplay/evaluate dependencies",
+    "The Snake spine packet (M1-T13) leaves out the SNAKE requirement text and relies on the test cases alone"
+   ]
+  },
+  "B": {
+   "score": 7,
+   "strengths": [
+    "Check worlds with hand-derived best actions gate every training batch, a strong defence against silent RL bugs",
+    "The paired permutation test with Holm correction is fully specified; replay works by deterministic re-simulation, with side-by-side view and video",
+    "The brief and spec read naturally for a solo learner; the write-up feature supports explaining why it works",
+    "Opponent pool and pairing grid cover self-play; architecture boundaries match CONSTRAINTS"
+   ],
+   "weaknesses": [
+    "Tests contradict the spec on the fish score's metric and direction, on fish respawn, and on predator count",
+    "M2 bundles the DQN thicken, replay, reference check and write-up: a leftover-style milestone, and M1 has no replay",
+    "Task IDs out of order (T13 after T15; T25/T26 before T24); PL-03 wired on a fake and swapped later in the system task",
+    "No ablations; the spec never names the value-based vs policy-gradient methods (they appear only in AD-03); the predator-prey arena is a square rather than the tank"
+   ]
+  }
+ },
+ "unbuildable_tasks": {
+  "A": [
+   "M1-T13: the packet carries no SNAKE-01\u2013SNAKE-09 requirement text (start placement, food respawn), only the golden cases"
+  ],
+  "B": [
+   "M1-T09: the train_loop spine has to build Transitions from World.step results, but core.Step, core.WorldSpec and core.TeamSpec (needed to split agents by team) are missing from the packet; the run-folder layout under 'see Data' is not included either"
+  ]
+ },
+ "defects": {
+  "A": [
+   "tests.md TC-46: \"rungs 2 and 3 beat the scripted fish ... rung 4 vs the scripted fish is reported and labelled 'stretch'\" \u2014 contradicts spec EVAL-07 \"Every fish-tank rung (1\u20134) significantly beats the scripted fish\" and EVAL-05, which makes only Snake's full-grid claim a stretch",
+   "CONSTRAINTS.md Boundaries: \"`train` \u2192 core, runs, evaluate ... `viz` \u2192 runs\" \u2014 architecture has train depending on selfplay and viz on evaluate and selfplay; selfplay is missing entirely",
+   "roadmap.md S2 Outline: \"on a deliberately revised shared core\" \u2014 stale against AD-09, which makes the core batch-first in M1 ('Migrating after M1 is built' rejected)",
+   "roadmap.md M1 Exit: \"TC-01\u2013TC-25 and TC-28 pass\" vs plan M1-T31 \"TC-01\u2013TC-28 pass on the batch-first core\" \u2014 the exit lists differ",
+   "pipelines.md PL-01: steps 3\u201314 (`Snake`, `FishTank`, `ScriptedPredator`...) are classes the entry sketch never calls \u2014 not a call path",
+   "contract.md agents.returns_to_go / gae / clipped_objective: helper functions frozen as contract symbols only for tests"
+  ],
+  "B": [
+   "tests.md TC-07: \"Fish score is hits per fish ... direction `lower`\" \u2014 contradicts spec FISH-04 \"the score is the mean number of steps each fish survived (higher is better)\"",
+   "tests.md TC-08: \"after a hit the fish is \u2265 \u00bc tank width from the ball\" \u2014 contradicts FISH-03 \"the fish leaves the episode\"",
+   "tests.md TC-09: \"start with 6 prey, 2 predators, 10 pellets\" \u2014 spec PREY-01 has 1 predator",
+   "tests.md TC-24: \"the batch \u2264 90 minutes\" \u2014 contradicts QR-02 \"A batch of 5 runs ... finishes within 60 minutes\"",
+   "tests.md TC-25: \"metric hits per fish (lower is better)\" \u2014 same stale fish metric",
+   "spec.md: PREY-12 placed between PREY-09 and PREY-10 \u2014 out-of-order IDs",
+   "plan.md: \"### M1-T14 ... ### M1-T15 ... ### M1-T13\" and T25/T26 before T24 \u2014 build order reads confusingly against the IDs",
+   "plan.md M1-T13 Depends on M1-T15 \"none: `rule_for` returns the real snake rule\" \u2014 false serialization; a fake rule would do",
+   "context__M1-T25.md Writes: \"src/rllab/evaluate/final/summary.py (new)\" \u2014 M1-T17 already creates it"
+  ]
+ }
+}

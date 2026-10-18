@@ -1,0 +1,459 @@
+diff --git a/docs/architecture.md b/docs/architecture.md
+index 706deaf..b19c66b 100644
+--- a/docs/architecture.md
++++ b/docs/architecture.md
+@@ -14,7 +14,7 @@ flowchart LR
+   evaluate --> methods & runlog & worlds & baselines
+   replay --> methods & runlog & worlds & baselines
+   refcheck --> evaluate & train & worlds
+-  charts --> runlog & evaluate
++  charts --> runlog & baselines & evaluate
+   methods --> runlog
+   worlds & baselines & methods & runlog --> core
+ ```
+@@ -44,7 +44,7 @@ flowchart LR
+ | `methods` | Hand-written DQN and PPO learners behind `Learner`; rebuilds a frozen `Policy` from a checkpoint | CHECK-01, TRAIN-07 | `core`, `runlog` |
+ | `train` | One run over the step budget: per-team learners, checkpoints, in-training evaluations, invalid-number stop; batches across cores; the check-world gate | TRAIN-01–TRAIN-07, QR-01–QR-03, TRAIN edge cases | `core`, `worlds`, `baselines`, `methods`, `runlog` |
+ | `runlog` | Run folders: record, episode and evaluation logs, checkpoints, live progress, run lookup | LOG-01, LOG-02, LOG-06, TRAIN-03 (storage), TRAIN edge cases (overwrite, incomplete) | `core` |
+-| `charts` | Learning curves with range bands and baseline lines, extra measures, two-team curves, pairing heatmaps; follows the `dataviz` skill | LOG-03–LOG-05, PREY-10, PREY-09 (chart), LOG edge cases | `runlog`, `evaluate` |
++| `charts` | Learning curves with range bands and baseline lines, extra measures, two-team curves, pairing heatmaps; follows the `dataviz` skill | LOG-03–LOG-05, PREY-10, PREY-09 (chart), LOG edge cases | `runlog`, `baselines`, `evaluate` |
+ | `evaluate` | Final evaluation on the final seeds, paired permutation tests run with the `null-hypothesis-testing` skill, verdicts, summaries, fixed-opponent team evaluation, pairing grids, collapse flags | EVAL-03–EVAL-06, SNAKE-08, FISH-10, PREY-08, PREY-09, QR-05, EVAL and PREY edge cases | `core`, `worlds`, `baselines`, `methods`, `runlog` |
+ | `replay` | Opens replay sides, re-simulates checkpoints or baselines into a `Trace`; pygame viewer with pause, step, speeds, side by side and sight overlay, testable headless; MP4 export | REPLAY-01–REPLAY-08, QR-04, REPLAY edge cases | `core`, `worlds`, `baselines`, `methods`, `runlog` |
+ | `refcheck` | Trains and evaluates Stable-Baselines3 DQN/PPO on a world through a Gymnasium/VecEnv adapter, and compares with the hand-written summary | CHECK-02, CHECK-03, CHECK edge case | `core`, `worlds`, `train`, `evaluate`, `runlog` |
+@@ -64,7 +64,7 @@ No external datasets: every world is simulated. Generated data lives under `runs
+ Seeds come from three disjoint ranges (AD-05): training episode seeds drawn by the run's generator from [0, 10⁶), the 20 in-training evaluation seeds 1,000,000–1,000,019, and the 100 final seeds 2,000,000–2,000,099, shared by every run and baseline.
+ 
+ ## Cross-cutting concerns
+-- **Determinism (WORLD-02, TRAIN-02, REPLAY-02, FISH-11, PREY-11):** no global random state. Each episode seed spawns the world's and the policies' generators, and torch runs single-threaded with deterministic algorithms (AD-05). A committed digest of a short snake run's logs and final checkpoint is checked in CI. A later world that changes it fails the build (FISH-11, PREY-11), and so does a fish digest once S2 lands.
++- **Determinism (WORLD-02, TRAIN-02, REPLAY-02, FISH-11, PREY-11):** no global random state. Each episode seed spawns the world's and the policies' generators, and torch runs single-threaded with deterministic algorithms (AD-05). A committed digest of a short snake run's logs and final checkpoint is checked by a test in `scripts/check.sh full`; a later world that changes it fails that check (FISH-11, PREY-11), and so does a fish digest once S2 lands.
+ - **No outside RL code in training (CHECK-01):** import-linter forbids `stable_baselines3` and `gymnasium` outside `refcheck`, and a test asserts neither is in `sys.modules` after a training run (AD-08).
+ - **Speed (QR-01, QR-02, QR-04, QR-05):** world physics is NumPy over all agents at once, learners batch every team's observations into one forward pass, and evaluation spreads seeds over processes. `rllab` logs each run's wall time against the 60-minute budget, and a timing test plays a 1,000-step replay headless.
+ - **GPU (QR-03):** `device` is a run setting, `cpu` by default; a rented GPU run uses the same code, and its cost goes in the write-up by hand.
+@@ -123,7 +123,7 @@ tests/         → folders only; files are planned in pipelines.md
+ ### AD-06: Run folders of JSON, JSON Lines and torch checkpoints
+ **Status:** Accepted · **Date:** 2026-10-17 · **Scope:** system
+ - **Context:** LOG-01 and LOG-02 need a record and per-episode logs. LOG-06 needs them readable while the run writes, at most one evaluation point behind. A stopped run keeps its checkpoints and is marked incomplete. A run name that already exists is refused (TRAIN edge cases). REPLAY edge cases need a checkpoint to carry its world spec.
+-- **Decision:** One folder per run (see Data). Logs are append-only JSON Lines, flushed at every evaluation point; `run.json` is rewritten atomically (write, then rename) on each status change. A checkpoint is a `torch.save` dict of spec, method configs and state dicts, loaded with `weights_only=True`.
++- **Decision:** One folder per run, `runs/<world>/<variant>/<run-name>/`, holding `run.json` (record, config, status), `episodes.jsonl` (one line per training episode), `evals.jsonl` (one line per evaluation point) and `checkpoints/ckpt_<pct>.pt` (see Data). Logs are append-only JSON Lines, flushed at every evaluation point; `run.json` is rewritten atomically (write, then rename) on each status change. A checkpoint is a `torch.save` dict of spec, method configs and state dicts, loaded with `weights_only=True`.
+ - **Alternatives:** Parquet: fast to read but not appendable while a run is live. SQLite: one file for everything, but concurrent writers from parallel runs need care and the files are no longer readable by eye.
+ - **Consequences:** Charts and evaluation read whole JSONL files; at ~10⁴ episodes per run that is instant. A crashed process leaves `run.json` at `running`; `runlog` reports any `running` run with no live process as incomplete.
+ 
+@@ -145,7 +145,7 @@ tests/         → folders only; files are planned in pipelines.md
+ **Status:** Accepted · **Date:** 2026-10-17 · **Scope:** system
+ - **Context:** TRAIN-06 needs every learning method to learn a hand-derived best behaviour before it is used in a world. Bugs in RL are silent (brief), and methods change while a world is built.
+ - **Decision:** `train.run_check` trains each team method in a config on its check world: for DQN a 6-state corridor with two exits, left of state 0 (reward 0.8) and right of state 5 (reward 1.0), γ = 0.9, so the best action is left in states 0–1 and right in 2–5 and a learner biased to one action can't pass; for PPO a 1-D point that is rewarded for reaching a target, where the best push is the sign of the offset. It needs ≥ 95% agreement over every check-world state. `train.run_batch` runs the same check steps with the batch's method settings before starting any run and refuses the batch on failure. `rllab check <config>` runs it alone.
+-- **Alternatives:** A recorded pass per method version: saves seconds but goes stale silently when code changes. A test only: passes in CI but not for the settings actually used.
++- **Alternatives:** A recorded pass per method version: saves seconds but goes stale silently when code changes. A test only: passes in the test suite but not for the settings actually used.
+ - **Consequences:** Each batch spends under a minute on the check. A check-world settings override exists because a world's tuned settings (e.g. buffer size) may be too large for a 6-state world.
+ 
+ ### AD-10: Pipeline entries are the public API; `cli` only dispatches
+@@ -163,7 +163,7 @@ tests/         → folders only; files are planned in pipelines.md
+ - **Consequences:** The Grow triggers stay reported by `dt` and are answered by this decision. A new trigger (a part that runs on its own, a heavy new stack) reopens it.
+ 
+ ## Risks and open questions
+-- **Many-fish and predator-prey speed (QR-01, QR-02).** 8–10 agents, 1,000-step episodes and 21 × 20 evaluation episodes may not fit 60 minutes in Python. Mitigation: NumPy physics over all agents, evaluation in a worker process, and a timing check in the first fish build; QR-03's GPU route doesn't help a CPU-bound world loop.
++- **Many-fish and predator-prey speed (QR-01, QR-02).** 8 agents (plus 10 pellets in predator-prey), 1,000-step episodes and 21 × 20 evaluation episodes may not fit 60 minutes in Python. Mitigation: NumPy physics over all agents, evaluation in a worker process, and a timing check in the first fish build; QR-03's GPU route doesn't help a CPU-bound world loop.
+ - **5 parallel runs on mixed cores (QR-02).** Apple Silicon's efficiency cores run slower; 5 runs may not all land on performance cores. Measured in the first snake batch.
+ 
+ ## Changelog
+diff --git a/docs/packages/rllab/contract.md b/docs/packages/rllab/contract.md
+index 37ccc08..b859021 100644
+--- a/docs/packages/rllab/contract.md
++++ b/docs/packages/rllab/contract.md
+@@ -105,7 +105,7 @@ class World(Protocol):
+ 
+ ### worlds.make: World factory
+ `def make(world: str, variant: str = "default", **overrides: int | float) -> World`
+-- **Invariants:** worlds `snake` (`default`), `fish` (`one`, `many`, `local`), `prey` (`default`), `check-discrete`, `check-continuous`; `overrides` change only the spec's starting values (grid size, counts, step limits; spec Assumptions)
++- **Invariants:** worlds `snake` (`default`), `fish` (`one`, `many`, `local`), `prey` (`default`), `check-discrete`, `check-continuous`; `overrides` change only the spec's starting values (grid size, counts, step limits; spec Assumptions); the snake observation (SNAKE-06) is 10 floats: 0–2 danger straight, left, right (0/1), 3–6 one-hot heading (up, right, down, left), 7–8 the sign (−1, 0, 1) of the food's dx and dy from the head in grid coordinates, 9 length
+ - **Errors:** `ValueError` naming an unknown world, variant or override
+ - **Boundary:** baselines, train, evaluate, replay, refcheck · **Fixtures:** tests/contracts/worlds.make/ · **Cases:** a fake returning the recorded seed-42 snake double for `make("snake")`
+ - **Used by:** train, evaluate, replay, refcheck, baselines; PL-02, PL-08
+@@ -155,8 +155,8 @@ class World(Protocol):
+ ### methods.MethodConfig: type
+ `@dataclass(frozen=True) class MethodConfig: method: Literal["dqn", "ppo"]; settings: Settings`
+ - **Invariants:** `settings` holds only keys the method declares; missing keys take the method's defaults, written back in full to the run record
+-- **Boundary:** train, runlog, refcheck · **Fixtures:** tests/contracts/methods.MethodConfig/ · **Cases:** snake DQN defaults; PPO with one overridden learning rate
+-- **Used by:** train, runlog, refcheck; PL-01, PL-03
++- **Boundary:** train, refcheck · **Fixtures:** tests/contracts/methods.MethodConfig/ · **Cases:** snake DQN defaults; PPO with one overridden learning rate
++- **Used by:** train, refcheck; PL-01, PL-03
+ 
+ ### methods.Transition: type
+ `@dataclass(frozen=True) class Transition: obs: Array; actions: Array; rewards: Array; next_obs: Array; done: bool; truncated: bool; active: Array`
+@@ -196,8 +196,8 @@ class Learner(Protocol):
+ ### train.RunConfig: type
+ `@dataclass(frozen=True) class RunConfig: name: str; world: str; variant: str; methods: Mapping[str, MethodConfig]; seed: int; budget: int; check_settings: Mapping[str, Settings]; device: str = "cpu"`
+ - **Invariants:** `methods` has one entry per team (TRAIN-07); `budget` counts world steps, not agent steps; `check_settings` overrides settings for the check world only (AD-09)
+-- **Boundary:** runlog, refcheck, cli · **Fixtures:** tests/contracts/train.RunConfig/ · **Cases:** a snake config from `configs/snake-default.toml`; a predator-prey config with two methods
+-- **Used by:** runlog, refcheck, cli; PL-01, PL-02, PL-03, PL-09
++- **Boundary:** refcheck, cli · **Fixtures:** tests/contracts/train.RunConfig/ · **Cases:** a snake config from `configs/snake-default.toml`; a predator-prey config with two methods
++- **Used by:** refcheck, cli; PL-01, PL-02, PL-03, PL-09
+ 
+ ### train.load_run_configs: Config loader
+ `def load_run_configs(path: Path, seeds: Sequence[int]) -> list[RunConfig]`
+@@ -216,7 +216,7 @@ class Learner(Protocol):
+ `def run_train(config: RunConfig, root: Path) -> RunRecord`
+ - **Invariants:** exactly `budget` world steps (TRAIN-01); checkpoints at 0%, 10%, … 100% (TRAIN-03); evaluation of every team on `EVAL_SEEDS` at every 5% (TRAIN-04); same config on the same machine → identical logs and checkpoints (TRAIN-02)
+ - **Errors:** `RunExistsError` before any work if the run folder exists; `NonFiniteError` ends the run as `failed` with step and value, keeping the last good checkpoint; interruption marks it `incomplete`
+-- **Boundary:** PL-03 · **Fixtures:** tests/contracts/train.run_train/ · **Cases:** a fake writing the finished 3-checkpoint snake run folder
++- **Boundary:** PL-03 · **Fixtures:** tests/contracts/train.run_train/ · **Cases:** a fake writing the finished 11-checkpoint 2,000-step snake run folder
+ - **Used by:** train.run_batch; PL-02, PL-03
+ 
+ ### train.run_batch: Training batch
+@@ -235,9 +235,9 @@ class Learner(Protocol):
+ ## runlog
+ 
+ ### runlog.RunRecord: type
+-`@dataclass(frozen=True) class RunRecord: config: RunConfig; spec: WorldSpec; started: datetime; ended: datetime | None; status: Literal["running", "finished", "incomplete", "failed"]; failure: Failure | None; path: Path`
++`@dataclass(frozen=True) class RunRecord: config: Mapping[str, object]; spec: WorldSpec; started: datetime; ended: datetime | None; status: Literal["running", "finished", "incomplete", "failed"]; failure: Failure | None; path: Path`
+ `Failure(step: int, value: float, checkpoint: Path)`
+-- **Invariants:** every LOG-01 field present once the run ends; `config.methods` holds full settings, defaults included
++- **Invariants:** every LOG-01 field present once the run ends; `config` is the run's `train.RunConfig` as plain data (`dataclasses.asdict`), so `runlog` imports neither `train` nor `methods`; `config["methods"]` holds full settings, defaults included
+ - **Boundary:** train, evaluate, charts, refcheck, cli · **Fixtures:** tests/contracts/runlog.RunRecord/ · **Cases:** a finished snake run; a failed run with a NaN at step 41,200; an incomplete run
+ - **Used by:** train, evaluate, charts, refcheck, cli; PL-02, PL-03
+ 
+@@ -248,8 +248,8 @@ class Learner(Protocol):
+ - **Used by:** charts, evaluate, cli
+ 
+ ### runlog.Checkpoint: type
+-`@dataclass(frozen=True) class Checkpoint: run: str; pct: int; step: int; spec: WorldSpec; methods: Mapping[str, MethodConfig]; state: Mapping[str, dict[str, object]]; path: Path`
+-- **Invariants:** `pct` in {0, 10, …, 100}; `state` keyed by team; saved and loaded through `torch.save`/`torch.load(weights_only=True)`
++`@dataclass(frozen=True) class Checkpoint: run: str; pct: int; step: int; spec: WorldSpec; methods: Mapping[str, Mapping[str, object]]; state: Mapping[str, dict[str, object]]; path: Path`
++- **Invariants:** `pct` in {0, 10, …, 100}; `methods` and `state` keyed by team, each `methods` entry a `methods.MethodConfig` as plain data (`method`, `settings`); saved and loaded through `torch.save`/`torch.load(weights_only=True)`
+ - **Boundary:** methods, evaluate, replay · **Fixtures:** tests/contracts/runlog.Checkpoint/ · **Cases:** the 0% and 100% checkpoints of a short snake run
+ - **Used by:** methods, evaluate, replay; PL-07, PL-08
+ 
+@@ -262,20 +262,20 @@ class Run(Protocol):
+     def checkpoints(self) -> list[Checkpoint]: ...
+ ```
+ - **Invariants:** read-only view of one run folder; readable while the run writes (LOG-06)
+-- **Boundary:** charts, evaluate, replay, refcheck, cli · **Fixtures:** tests/contracts/runlog.Run/ · **Cases:** a replay double of a finished 3-checkpoint snake run folder
++- **Boundary:** charts, evaluate, replay, refcheck, cli · **Fixtures:** tests/contracts/runlog.Run/ · **Cases:** a replay double of a finished 11-checkpoint 2,000-step snake run folder
+ - **Used by:** charts, evaluate, replay, refcheck, cli; PL-05, PL-06, PL-12
+ 
+ ### runlog.RunWriter: Run folder writer
+ ```python
+ class RunWriter:
+-    def __init__(self, root: Path, config: RunConfig, spec: WorldSpec) -> None: ...
++    def __init__(self, root: Path, config: Mapping[str, object], spec: WorldSpec) -> None: ...   # RunConfig as plain data
+     def episode(self, result: EpisodeResult) -> None: ...
+     def eval(self, point: EvalPoint) -> None: ...      # flushes every log
+     def checkpoint(self, pct: int, step: int, state: Mapping[str, dict[str, object]]) -> Checkpoint: ...
+     def close(self, status: str, failure: Failure | None = None) -> RunRecord: ...
+ ```
+ - **Errors:** `RunExistsError` naming the path if `runs/<world>/<variant>/<name>` exists (TRAIN edge case)
+-- **Boundary:** train · **Fixtures:** tests/contracts/runlog.RunWriter/ · **Cases:** a replay double of the writes of a 3-checkpoint snake run
++- **Boundary:** train · **Fixtures:** tests/contracts/runlog.RunWriter/ · **Cases:** a replay double of the writes of an 11-checkpoint 2,000-step snake run
+ - **Used by:** train; PL-02
+ 
+ ### runlog.find_runs: Run lookup
+@@ -288,7 +288,7 @@ class RunWriter:
+ `def open_run(path: Path) -> Run`
+ - **Invariants:** any status, including `running`, `incomplete` and `failed`
+ - **Errors:** `FileNotFoundError` if no `run.json` is at `path`
+-- **Boundary:** replay, cli · **Fixtures:** tests/contracts/runlog.open_run/ · **Cases:** a fake returning the finished 3-checkpoint snake run double
++- **Boundary:** replay, cli · **Fixtures:** tests/contracts/runlog.open_run/ · **Cases:** a fake returning the finished 11-checkpoint 2,000-step snake run double
+ - **Used by:** replay, cli; PL-12
+ 
+ ### runlog.Progress: type
+diff --git a/docs/packages/rllab/pipelines.md b/docs/packages/rllab/pipelines.md
+index f8e12dd..f416e3f 100644
+--- a/docs/packages/rllab/pipelines.md
++++ b/docs/packages/rllab/pipelines.md
+@@ -248,7 +248,3 @@ src/rllab/
+               pipelines/pl04_watch.py … pl12_grid.py
+ tests/intent/rllab/  tests/unit/rllab/
+ ```
+-
+-## Open questions
+-- `cli` owns no step: `__main__.py` dispatches each trigger to its entry and prints the returned contract type (routed to architecture-design; assumed: `cli` stays as the dispatcher component)
+-- New contract types and functions these steps need are routed to architecture-design: `core.Output`, `baselines.BaselineMeans`, `replay.Session`, and the entry and loader functions listed at the gate (assumed: as written in each step row)
+diff --git a/docs/packages/rllab/tests.md b/docs/packages/rllab/tests.md
+index 9ee481b..467ff6b 100644
+--- a/docs/packages/rllab/tests.md
++++ b/docs/packages/rllab/tests.md
+@@ -104,7 +104,7 @@ Smoke runs use a 2,000-step budget, seeds 1–2 and the snake world unless the p
+ ### TC-17: Pure noise keeps both nulls
+ **Pipeline:** PL-06 · **Covers:** EVAL-04 · **Kind:** synthetic known-answer · **Fixture:** tests/fixtures/rllab/TC-17/
+ **Source:** generator `null_scores(runs=5, seeds=100, mean=8, sd=3)` with learned and baseline from one distribution, seeds 12–31; same test as the planted case
+-**Expected:** at most 1 of the 20 seeds rejects either null · **Tolerance:** family-wise α = 0.05 per seed after Holm, so about 1 in 20 seeds may reject by chance
++**Expected:** at most 4 of the 20 seeds reject either null · **Tolerance:** family-wise α = 0.05 per seed after Holm, so the rejection count is at most Binomial(20, 0.05) and P(≥5) ≈ 0.003 under a correct test
+ **Skills:** null-hypothesis-testing
+ 
+ ### TC-18: Lower-is-better scores test in the right direction
+@@ -141,7 +141,7 @@ Smoke runs use a 2,000-step budget, seeds 1–2 and the snake world unless the p
+ ### TC-24: Trained snake beats both baselines
+ **Pipeline:** PL-06 · **Covers:** SNAKE-08, EVAL-04, EVAL-05, QR-01, QR-02, QR-05 · **Kind:** model evaluation · **Fixture:** tests/fixtures/rllab/TC-24/
+ **Source:** spec model criteria SNAKE-08, EVAL-04, EVAL-05: metric mean food per episode; held-out seeds 2,000,000–2,000,099; baselines random and the SNAKE-07 rule; 5 runs, seeds 1–5, `configs/snake-default.toml`
+-**Expected:** `verdict.beats_baselines` true; each run ≤ 60 minutes, the batch ≤ 90 minutes, final evaluation ≤ 10 minutes · **Tolerance:** α = 0.05 after Holm (EVAL-04); every run above the rule mean (EVAL-05)
++**Expected:** `verdict.beats_baselines` true; each run ≤ 60 minutes, the batch ≤ 60 minutes, final evaluation ≤ 10 minutes · **Tolerance:** α = 0.05 after Holm (EVAL-04); every run above the rule mean (EVAL-05)
+ **Skills:** null-hypothesis-testing
+ 
+ ### TC-25: Trained fish beat both baselines in every variant
+diff --git a/docs/roadmap.md b/docs/roadmap.md
+index 933c980..d4060f8 100644
+--- a/docs/roadmap.md
++++ b/docs/roadmap.md
+@@ -11,9 +11,11 @@
+ | Milestone | Stage | Name | Packages | Pipelines | Depends | Status* |
+ |---|---|---|---|---|---|---|
+ | M1 | S1 | Train and evaluate a snake | rllab | PL-01–PL-06 | — | Planned |
+-| M2 | S1 | See, check and explain the snake | rllab | PL-02, PL-07–PL-11 | M1 (runlog.Run, runlog.Checkpoint, PL-02 output) | Designed |
+-| M3 | S2 | Fish tank | rllab | PL-01, PL-02, PL-05, PL-07, PL-09 | M1 (core.World, methods.Learner), M2 (refcheck.reference_check, replay.view) | Designed |
+-| M4 | S3 | Predator-prey | rllab | PL-02, PL-05, PL-06, PL-07, PL-12 | M3 (worlds.fish motion, methods.PPO) | Designed |
++| M2 | S1 | See, check and explain the snake | rllab | PL-02, PL-03, PL-04, PL-06, PL-07–PL-11 | M1 (runlog.Run, runlog.Checkpoint, PL-02 output) | Designed |
++| M3 | S2 | One fish | rllab | PL-01, PL-02, PL-03, PL-05, PL-06, PL-07, PL-09 | M1 (core.World, methods.Learner), M2 (refcheck.reference_check, replay.view) | Designed |
++| M5 | S2 | Many fish | rllab | PL-02, PL-03, PL-05, PL-06, PL-07, PL-09 | M3 (worlds.fish motion, methods.PPO) | Designed |
++| M6 | S2 | Local sight | rllab | PL-02, PL-03, PL-05, PL-06, PL-07, PL-08, PL-09 | M5 (fish many variant, PPO parameter sharing) | Designed |
++| M4 | S3 | Predator-prey | rllab | PL-02, PL-05, PL-06, PL-07, PL-12 | M6 (worlds.fish motion, methods.PPO) | Designed |
+ 
+ *Written by `dt roadmap` from doc statuses and todo checkboxes; never hand-edited.
+ 
+@@ -33,20 +35,32 @@
+ **Outline:** A snake trains in a batch of 5 seeds behind the method check, its progress is visible live, its learning curve is drawn against both baselines, and final evaluation gives a tested verdict.
+ **Skills:** null-hypothesis-testing, dataviz
+ **References:** —
+-**Exit:** `rllab batch`, `watch`, `chart` and `evaluate` run end to end on snake; every pipeline's smoke test and the snake golden cases (TC-01, TC-03–TC-06, TC-10–TC-22) pass.
++**Exit:** `rllab batch`, `watch`, `chart` and `evaluate` run end to end on snake; every pipeline's smoke test and the snake golden cases TC-01, TC-03 (check-discrete half), TC-04–TC-06, TC-10 (snake half), TC-11, TC-12 (snake), TC-13–TC-22 pass.
+ **Plan:** [../tasks/plan.md](../tasks/plan.md)
+ 
+ ## M2: See, check and explain the snake
+-**Outline:** The learner watches any snake checkpoint or baseline in the viewer and as video, runs the reference check, writes the snake write-up, and the trained snake clearly beats both baselines.
++**Outline:** The learner trains the full DQN (replay buffer, target network) on snake, sees it beat both baselines, follows a live run with `rllab watch --follow`, and watches and explains it in replays, video and the write-up, checked against SB3.
+ **Skills:** null-hypothesis-testing
+ **References:** —
+-**Exit:** TC-24 passes (snake beats both baselines within QR-01, QR-02, QR-05); TC-27–TC-32 pass; the snake write-up passes `rllab notes check`.
++**Exit:** TC-24 passes (snake beats both baselines within QR-01, QR-02, QR-05); TC-27–TC-32 pass; `rllab watch --follow` re-reads at each evaluation point; the snake write-up passes `rllab notes check`.
+ 
+-## M3: Fish tank
+-**Outline:** Fish in all three variants train with PPO, are watched with the sight overlay, and beat both baselines, while snake results reproduce unchanged.
++## M3: One fish
++**Outline:** One fish that sees everything trains with PPO behind the continuous check world, is watched in replays, and beats both baselines.
+ **Skills:** null-hypothesis-testing, dataviz
+ **References:** —
+-**Exit:** TC-02, TC-07, TC-08 and TC-25 pass; a snake run repeats its M2 results exactly (FISH-11).
++**Exit:** TC-02, TC-03 (check-continuous half), TC-08, TC-10 (one-fish half) and TC-12 (fish `one`) pass; TC-25 passes for variant `one`; `rllab replay` plays a trained one-fish checkpoint.
++
++## M5: Many fish
++**Outline:** 8 fish that see everything share one PPO learner (parameter sharing), train together in one tank, and beat both baselines.
++**Skills:** null-hypothesis-testing, dataviz
++**References:** —
++**Exit:** TC-07 and TC-12 (fish `many`) pass; TC-25 passes for variant `many`.
++
++## M6: Local sight
++**Outline:** Fish that see only nearby things (FISH-07) train and beat both baselines, are watched with the sight-radius overlay (REPLAY-08), while snake results reproduce unchanged.
++**Skills:** null-hypothesis-testing, dataviz
++**References:** —
++**Exit:** TC-12 (fish `local`) passes; TC-25 passes for variant `local`; the replay viewer and video toggle the sight-radius overlay; a snake run repeats its M2 results exactly (FISH-11).
+ 
+ ## M4: Predator-prey
+ **Outline:** Prey and predators train together, each team is evaluated against fixed opponents, collapses are flagged, and the pairing grid and two-team curves show the back-and-forth.
+diff --git a/docs/spec.md b/docs/spec.md
+index f01c8fb..20491a0 100644
+--- a/docs/spec.md
++++ b/docs/spec.md
+@@ -138,7 +138,7 @@ A set of small 2D reinforcement-learning worlds (Snake, Fish tank, Predator-prey
+   - Given any world, when its rule baseline is listed, then its one-sentence description is shown with it.
+ - **EVAL-03** Final evaluation plays every final checkpoint and both baselines on the same 100 seeds, none of which was used in training or in-training evaluation.
+   - Given 5 finished runs, when final evaluation is run, then 700 episodes are played (5 × 100 learned, 100 random, 100 rule-based), all on the same 100 held-out seeds.
+-- **EVAL-04** Whether the learned agent beats each baseline is tested with the `null-hypothesis-testing` skill. It is given: the hypothesis "the trained agent scores better than the baseline"; H0 = the learned agent's mean score is no better than the baseline's, H1 = it is better (in the world's score direction); the statistic = difference in mean episode score, learned (averaged over the runs, per seed) minus baseline; the null built by randomly swapping the learned and baseline labels within each held-out seed (paired permutation, 10,000 permutations); α = 0.05 with Holm correction across all baseline comparisons in that world (2 per variant); the EVAL-03 held-out episodes. The learned agent passes only if both nulls are rejected.
++- **EVAL-04** Whether the learned agent beats each baseline is tested with the `null-hypothesis-testing` skill. It is given: the hypothesis "the trained agent scores better than the baseline"; H0 = the learned agent's mean score is no better than the baseline's, H1 = it is better (in the world's score direction); the statistic = difference in mean episode score, learned (averaged over the runs, per seed) minus baseline; the null built by randomly swapping the learned and baseline labels within each held-out seed (paired permutation, 10,000 permutations); α = 0.05 with Holm correction across the 2 baseline comparisons of each variant and team; the EVAL-03 held-out episodes. The learned agent passes only if both nulls are rejected.
+   - Given final evaluation results for one variant, when tested, then a report shows, for each baseline, the mean scores, the difference, the corrected p-value and reject/keep.
+ - **EVAL-05** "Clearly beats" also needs every single run to beat the rule baseline: each run's final mean score is better than the rule-based baseline's mean score.
+   - Given 5 runs where 4 beat the rule baseline and 1 does not, when the verdict is made, then the world is marked "not yet beating the baselines" and names the failing run.
+@@ -277,9 +277,9 @@ A set of small 2D reinforcement-learning worlds (Snake, Fish tank, Predator-prey
+ ## Quality requirements
+ - **QR-01** A single training run of any world and variant finishes within 60 minutes on the learner's laptop (Apple Silicon, CPU only).
+   - Checked by the run's logged start and end times.
+-- **QR-02** A batch of 5 runs of one world and variant finishes within 90 minutes on the same laptop, running in parallel.
++- **QR-02** A batch of 5 runs of one world and variant finishes within 60 minutes on the same laptop, running in parallel.
+   - Checked by the batch's first start and last end time.
+-- **QR-03** Rented GPU time, if a world truly needs it, costs at most $10 per world, and is used only after a laptop run is shown to miss QR-01.
++- **QR-03** Rented GPU time, if a world truly needs it, costs at most $5 per world, and is used only after a laptop run is shown to miss QR-01.
+   - Checked against the rental bill, recorded in the world's write-up.
+ - **QR-04** The replay viewer plays at least 30 steps per second at 1× on the laptop, for every world.
+   - Checked by timing a 1,000-step replay.
+diff --git a/tasks/plan.md b/tasks/plan.md
+index f7f5621..8c54890 100644
+--- a/tasks/plan.md
++++ b/tasks/plan.md
+@@ -3,13 +3,13 @@
+ **Milestone:** M1 · **Status:** Approved · **Base:** 74e754d · **Last updated:** 2026-10-17 · **Roadmap:** [../docs/roadmap.md](../docs/roadmap.md)
+ 
+ ## Scope
+-**Exit:** A snake batch of 5 seeds trains behind the method check, `rllab watch`, `chart` and `evaluate` run on it, and every M1 smoke test plus TC-01, TC-03–TC-06, TC-10–TC-22 (snake parts) pass.
+-**Covers:** TRAIN-01–TRAIN-06, LOG-01–LOG-06, EVAL-01–EVAL-06, SNAKE-01–SNAKE-07, WORLD-01–WORLD-06, CHECK-01, QR-03 · **Deferred:** SNAKE-08, QR-01, QR-02, QR-05 (to M2: measured on the tuned DQN's 5-seed batch, TC-24); QR-06 (to M2: the offline cycle includes replay); FISH-01–FISH-11 (to M3: fish tank); PREY-01–PREY-08, PREY-10, PREY-11, WORLD-07 (to M4: predator-prey, the first two-team world)
++**Exit:** A snake batch of 5 seeds trains behind the method check, `rllab watch`, `chart` and `evaluate` run on it, and every M1 smoke test plus TC-01, TC-03 (check-discrete half), TC-04–TC-06, TC-10 (snake half), TC-11, TC-12 (snake), TC-13–TC-22 pass.
++**Covers:** TRAIN-01–TRAIN-06, TRAIN-07 (partly; one team), LOG-01–LOG-06, EVAL-01–EVAL-06, SNAKE-01–SNAKE-07, WORLD-01–WORLD-06, CHECK-01, QR-03 · **Deferred:** SNAKE-08, QR-01, QR-02, QR-05 (to M2: measured on the tuned DQN's 5-seed batch, TC-24); QR-06 (to M2: the offline cycle includes replay); REPLAY-01–REPLAY-07, QR-04, CHECK-02, CHECK-03, NOTES-01–NOTES-03 (to M2); REPLAY-08 (to M6: the sight overlay); FISH-01–FISH-11 (to M3, M5, M6: fish tank); PREY-01–PREY-11, WORLD-07 (to M4: predator-prey, the first two-team world)
+ **Skills:** null-hypothesis-testing (permutation test, final evaluation), dataviz (learning-curve chart)
+ ## Phase 0: Interface
+ 
+ ### M1-T01: M1 interface
+-**Package:** rllab · **Step:** contract · **Kind:** interface · **Covers:** — · **Size:** S · **Mode:** solo
++**Package:** rllab · **Step:** contract · **Kind:** interface · **Covers:** — · **Size:** M · **Mode:** solo
+ **Skills:** —
+ **Read:** PL-01, PL-02, PL-03, PL-04, PL-05, PL-06, PL-08, core.ActionSpace, core.TeamSpec, core.WorldSpec, core.Step, core.EpisodeResult, core.DrawState, core.Frame, core.Episode, core.World, core.Policy, core.play_episode, core.EVAL_SEEDS, core.FINAL_SEEDS, core.Output, worlds.make, worlds.CheckWorld, baselines.RandomPolicy, baselines.RulePolicy, baselines.rule_for, baselines.BaselineMeans, baselines.baseline_means, methods.MethodConfig, methods.Transition, methods.Learner, methods.make_learner, methods.load_policy, train.RunConfig, train.load_run_configs, train.run_check, train.run_train, train.run_batch, train.CheckResult, runlog.RunRecord, runlog.EvalPoint, runlog.Checkpoint, runlog.Run, runlog.RunWriter, runlog.find_runs, runlog.open_run, runlog.Progress, runlog.progress, charts.learning_curve, evaluate.Comparison, evaluate.compare, evaluate.Summary, evaluate.final_evaluation, cli.main
+ **Acceptance:**
+@@ -34,7 +34,7 @@
+ **Package:** rllab · **Step:** PL-01.check_plan · **Kind:** spine · **Covers:** TRAIN-06 · **Size:** XS · **Mode:** solo
+ **Skills:** —
+ **Reason:** one module holds four steps: PL-01.train_checks, PL-01.score_checks and PL-03.require_pass share it
+-**Read:** PL-01, PL-03, train.CheckResult, worlds.CheckWorld, methods.MethodConfig, methods.Learner
++**Read:** PL-01, PL-03, train.CheckResult, train.run_batch, worlds.CheckWorld, worlds.make, methods.MethodConfig, methods.Learner, methods.make_learner, core.Policy, core.WorldSpec
+ **Acceptance:**
+ - [ ] On the `methods.Learner` replay double and the `worlds.CheckWorld` double, `check_plan`, `train_checks`, `score_checks` and `require_pass` return schema-valid output; `require_pass` raises `CheckFailedError` on the failing `CheckResult` sample
+ **Verify:** `pytest tests/unit/rllab -k check` · `scripts/check.sh gate`
+@@ -64,7 +64,7 @@
+ **Package:** rllab · **Step:** PL-02.Snake · **Kind:** thicken · **Covers:** SNAKE-01–SNAKE-06, WORLD-01–WORLD-06 · **Size:** XS · **Mode:** split
+ **Skills:** —
+ **Reason:** fold: spine is the whole behavior
+-**Read:** PL-02, TC-06, TC-10, TC-12, SNAKE-01, SNAKE-02, SNAKE-03, SNAKE-04, SNAKE-05, SNAKE-06, core.World, core.Step, core.DrawState, core.EpisodeResult
++**Read:** PL-02, TC-06, TC-10, TC-12, SNAKE-01, SNAKE-02, SNAKE-03, SNAKE-04, SNAKE-05, SNAKE-06, worlds.make, core.World, core.Step, core.DrawState, core.EpisodeResult
+ **Acceptance:**
+ - [ ] TC-06 passes
+ - [ ] TC-10's snake half passes
+@@ -85,7 +85,7 @@
+ **Package:** rllab · **Step:** PL-02.DQN · **Kind:** spine · **Covers:** CHECK-01 · **Size:** S · **Mode:** solo
+ **Skills:** —
+ **Reason:** also builds the methods factory (`make_learner`, `load_policy`) the DQN class sits behind
+-**Read:** PL-02, AD-02, AD-03, methods.Learner, methods.Transition, methods.MethodConfig, methods.make_learner, methods.load_policy, runlog.Checkpoint
++**Read:** PL-02, AD-02, AD-03, methods.Learner, methods.Transition, methods.MethodConfig, methods.make_learner, methods.load_policy, runlog.Checkpoint, core.ActionSpace, core.Policy
+ **Acceptance:**
+ - [ ] `DQN` satisfies `methods.Learner` on the snake `Transition` sample: ε-greedy `act`, one-step Q update in `observe`, greedy frozen `policy()`, no replay buffer or target net
+ - [ ] `make_learner` builds it for `dqn` and rejects a `Box` action space; `load_policy` rebuilds an identical policy from the `Checkpoint` sample and raises `SpecMismatchError` on a changed spec
+@@ -96,7 +96,7 @@
+ **Package:** rllab · **Step:** PL-02.train_loop · **Kind:** spine · **Covers:** TRAIN-01–TRAIN-04, LOG-01, LOG-02, QR-03 · **Size:** S · **Mode:** solo
+ **Skills:** —
+ **Reason:** also builds `runlog.RunWriter`, the contract class train_loop writes the run folder through
+-**Read:** PL-02, AD-05, AD-06, train.run_train, runlog.RunWriter, runlog.RunRecord, runlog.EvalPoint, core.play_episode, core.EVAL_SEEDS, methods.Learner
++**Read:** PL-02, AD-05, AD-06, train.run_train, runlog.RunWriter, runlog.RunRecord, runlog.EvalPoint, runlog.Checkpoint, core.play_episode, core.EVAL_SEEDS, core.EpisodeResult, core.Episode, core.Policy, core.Step, core.WorldSpec, methods.Learner, methods.Transition
+ **Acceptance:**
+ - [ ] On the `core.World` and `methods.Learner` doubles with a 2,000-step budget: exactly 2,000 world steps, checkpoints at every 10%, 21 evaluation points on `EVAL_SEEDS`, all written through `RunWriter`
+ - [ ] `RunWriter` refuses an existing run name with `RunExistsError` before writing; `run.json` is replaced atomically on each status change
+@@ -116,7 +116,7 @@
+ **Package:** rllab · **Step:** PL-04.progress · **Kind:** thicken · **Covers:** LOG-06 · **Size:** XS · **Mode:** split
+ **Skills:** —
+ **Reason:** fold: spine is the whole behavior
+-**Read:** PL-04, TC-14, runlog.progress, runlog.Progress
++**Read:** PL-04, AD-06, TC-14, runlog.progress, runlog.Progress, runlog.EvalPoint
+ **Acceptance:**
+ - [ ] TC-14 passes
+ - [ ] A missing run path raises `FileNotFoundError`
+@@ -124,9 +124,9 @@
+ **Depends on:** M1-T01 · **Writes:** src/rllab/runlog/progress.py, tests/intent/rllab/test_progress.py, tests/unit/rllab/test_progress.py
+ 
+ ### M1-T12: find_runs spine (glob finished runs)
+-**Package:** rllab · **Step:** PL-05.find_runs · **Kind:** spine · **Covers:** TRAIN-01 · **Size:** XS · **Mode:** solo
++**Package:** rllab · **Step:** PL-05.find_runs · **Kind:** spine · **Covers:** LOG-03 · **Size:** XS · **Mode:** solo
+ **Skills:** —
+-**Read:** PL-05, PL-12, runlog.find_runs, runlog.open_run, runlog.Run, runlog.RunRecord
++**Read:** PL-05, PL-12, AD-06, runlog.find_runs, runlog.open_run, runlog.Run, runlog.RunRecord, runlog.EvalPoint, runlog.Checkpoint, core.EpisodeResult
+ **Acceptance:**
+ - [ ] On TC-15's hand-built folders, `find_runs` returns finished runs plus those named in `include`, and `open_run` opens any status; a `running` run with no live process reads as `incomplete`
+ **Verify:** `pytest tests/unit/rllab -k find_runs` · `scripts/check.sh gate`
+@@ -135,7 +135,7 @@
+ ### M1-T13: baseline_means spine (20 evaluation seeds)
+ **Package:** rllab · **Step:** PL-05.baseline_means · **Kind:** spine · **Covers:** EVAL-02 · **Size:** XS · **Mode:** solo
+ **Skills:** —
+-**Read:** PL-05, baselines.baseline_means, baselines.BaselineMeans, baselines.rule_for, baselines.RulePolicy, core.play_episode, core.EVAL_SEEDS
++**Read:** PL-05, baselines.baseline_means, baselines.BaselineMeans, baselines.rule_for, baselines.RulePolicy, baselines.RandomPolicy, worlds.make, core.World, core.WorldSpec, core.TeamSpec, core.Episode, core.Policy, core.play_episode, core.EVAL_SEEDS
+ **Acceptance:**
+ - [ ] On the `core.World` double, `baseline_means` plays random and rule per team on the 20 `EVAL_SEEDS` and returns a schema-valid `BaselineMeans`; `rule_for` returns the snake rule with its one-sentence `description` and raises `KeyError` for an unknown world
+ **Verify:** `pytest tests/unit/rllab -k baseline_means` · `scripts/check.sh gate`
+@@ -153,35 +153,37 @@
+ ### M1-T15: SnakeRule spine (shorter axis toward food)
+ **Package:** rllab · **Step:** PL-05.SnakeRule · **Kind:** spine · **Covers:** SNAKE-07, EVAL-02 · **Size:** XS · **Mode:** solo
+ **Skills:** —
+-**Read:** PL-05, SNAKE-07, SNAKE-06, baselines.RulePolicy, core.Policy
++**Read:** PL-05, SNAKE-07, SNAKE-06, worlds.make, baselines.RulePolicy, core.Policy
+ **Acceptance:**
+ - [ ] Given the food to the right and a free cell to the right, when the rule acts, then it moves right; when that move would end the episode next step, it takes a move that doesn't; `description` is one sentence (EVAL-02)
+ **Verify:** `pytest tests/unit/rllab -k snakerule` · `scripts/check.sh gate`
+ **Depends on:** M1-T01 · **Writes:** src/rllab/baselines/snake.py, tests/unit/rllab/test_snake_rule.py
+ 
+ ### M1-T16: learning_curve spine (mean line, band, baseline lines)
+-**Package:** rllab · **Step:** PL-05.learning_curve · **Kind:** spine · **Covers:** LOG-03, LOG-05 · **Size:** XS · **Mode:** solo
++**Package:** rllab · **Step:** PL-05.learning_curve · **Kind:** spine · **Covers:** LOG-03, LOG-05 · **Size:** M · **Mode:** solo
+ **Skills:** dataviz
+-**Read:** PL-05, LOG-03, LOG-05, charts.learning_curve, runlog.Run, baselines.BaselineMeans, core.Output
++**Read:** PL-05, LOG-03, LOG-05, charts.learning_curve, runlog.Run, runlog.EvalPoint, runlog.RunRecord, baselines.BaselineMeans, core.Output, core.WorldSpec, core.TeamSpec
+ **Acceptance:**
+ - [ ] On the `runlog.Run` double ×5 and the `BaselineMeans` sample, `learning_curve` writes a PNG and SVG with one mean line, one min–max band and two baseline lines per team, axes labelled with the score name and "environment steps"; `measure=` draws a declared measure the same way; returns a `core.Output` of kind `chart`
++- [ ] `curve.py` calls the settings check in `check.py` and the style in `style.py`, both stubs (accept any runs; matplotlib defaults) that M1-T28 and M1-T29 fill in
+ **Verify:** `pytest tests/unit/rllab -k learning_curve` · `scripts/check.sh gate`
+-**Depends on:** M1-T01 · **Writes:** src/rllab/charts/curve.py, tests/unit/rllab/test_curve.py
++**Depends on:** M1-T01 · **Writes:** src/rllab/charts/curve.py, src/rllab/charts/check.py, src/rllab/charts/style.py, tests/unit/rllab/test_curve.py
+ 
+ ### M1-T17: final_evaluation spine (serial play on the final seeds)
+-**Package:** rllab · **Step:** PL-06.final_evaluation · **Kind:** spine · **Covers:** EVAL-03, EVAL-06 · **Size:** S · **Mode:** solo
++**Package:** rllab · **Step:** PL-06.final_evaluation · **Kind:** spine · **Covers:** EVAL-03, EVAL-06 · **Size:** M · **Mode:** solo
+ **Skills:** null-hypothesis-testing
+-**Read:** PL-06, EVAL-03, EVAL-06, evaluate.final_evaluation, evaluate.Summary, runlog.Run, core.play_episode, core.FINAL_SEEDS, methods.load_policy, baselines.RandomPolicy, baselines.rule_for
++**Read:** PL-06, EVAL-03, EVAL-06, evaluate.final_evaluation, evaluate.Summary, evaluate.Comparison, runlog.Run, runlog.RunRecord, runlog.EvalPoint, runlog.Checkpoint, worlds.make, core.World, core.WorldSpec, core.TeamSpec, core.Episode, core.play_episode, core.FINAL_SEEDS, methods.load_policy, baselines.RandomPolicy, baselines.rule_for
+ **Acceptance:**
+-- [ ] On the `runlog.Run` double ×5, `final_evaluation` plays each final checkpoint and both baselines on `FINAL_SEEDS` serially and writes `summary.json` with every EVAL-06 field, one schema-valid `Summary` per team; `compare` and `verdict` stay the stubs their thicken tasks name
++- [ ] On the `runlog.Run` double ×5, `final_evaluation` plays each final checkpoint and both baselines on `FINAL_SEEDS` serially and writes `summary.json` with every EVAL-06 field, one schema-valid `Summary` per team
++- [ ] `summary.py` calls `compare` with Holm in `stats.py` and the verdict in `verdict.py`, both stubs that M1-T25 and M1-T26 fill in
+ **Verify:** `pytest tests/unit/rllab -k final_evaluation` · `scripts/check.sh gate`
+-**Depends on:** M1-T01 · **Writes:** src/rllab/evaluate/final/play.py, src/rllab/evaluate/final/summary.py, tests/unit/rllab/test_final.py
++**Depends on:** M1-T01 · **Writes:** src/rllab/evaluate/final/play.py, src/rllab/evaluate/final/summary.py, src/rllab/evaluate/final/stats.py, src/rllab/evaluate/final/verdict.py, tests/unit/rllab/test_final.py
+ 
+ ### M1-T18: play_episode spine (the one episode loop)
+ **Package:** rllab · **Step:** PL-08.play_episode · **Kind:** spine · **Covers:** WORLD-02 · **Size:** XS · **Mode:** solo
+ **Skills:** —
+ **Reason:** M1's training evaluations and final evaluation play through it; PL-08 itself is wired in M2
+-**Read:** PL-08, AD-05, core.play_episode, core.World, core.Policy, core.Episode, core.Frame
++**Read:** PL-08, AD-05, core.play_episode, core.World, core.Policy, core.Episode, core.Frame, core.EpisodeResult, core.DrawState, core.Step
+ **Acceptance:**
+ - [ ] On the recorded seed-42 snake double and the snake rule double, `play_episode` replays the recording exactly; the seed spawns the world's and policies' generators so the same inputs give an equal `Episode`; `trace=True` keeps `length + 1` frames
+ **Verify:** `pytest tests/unit/rllab -k play_episode` · `scripts/check.sh gate`
+@@ -282,7 +284,7 @@
+ ### M1-T28: Mixed-settings chart refusal
+ **Package:** rllab · **Step:** PL-05.learning_curve · **Kind:** thicken · **Covers:** LOG-03 · **Size:** XS · **Mode:** split
+ **Skills:** —
+-**Read:** PL-05, TC-15, charts.learning_curve
++**Read:** PL-05, TC-15, charts.learning_curve, runlog.EvalPoint, runlog.RunRecord, core.WorldSpec, core.TeamSpec
+ **Acceptance:**
+ - [ ] TC-15 passes
+ **Verify:** `pytest tests/intent/rllab tests/unit/rllab -k mixed` · `scripts/check.sh gate`
+@@ -291,7 +293,7 @@
+ ### M1-T29: Chart style per the dataviz skill
+ **Package:** rllab · **Step:** PL-05.learning_curve · **Kind:** thicken · **Covers:** LOG-04 · **Size:** XS · **Mode:** split
+ **Skills:** dataviz
+-**Read:** PL-05, LOG-04, charts.learning_curve
++**Read:** PL-05, LOG-04, charts.learning_curve, runlog.EvalPoint, runlog.RunRecord, core.WorldSpec, core.TeamSpec
+ **Acceptance:**
+ - [ ] Given any learning-curve chart, when it is reviewed against the `dataviz` skill, then it passes that skill's checks (LOG-04)
+ **Verify:** `pytest tests/intent/rllab tests/unit/rllab -k style` · `scripts/check.sh gate`
+@@ -316,7 +318,7 @@
+ - [ ] PL-03 calls the real `run_train`; the fake stays for the contract tests
+ - [ ] Every M1 smoke command passes; TC-13, TC-21 and TC-22 pass on real snake runs
+ **Verify:** `rllab check --smoke` · `rllab train --smoke` · `rllab batch --smoke` · `rllab watch --smoke` · `rllab chart --smoke` · `rllab evaluate --smoke` · `scripts/check.sh gate`
+-**Depends on:** M1-T19, M1-T20, M1-T21, M1-T22, M1-T23, M1-T24, M1-T25, M1-T26, M1-T27, M1-T28, M1-T29 · **Writes:** src/rllab/train/pipelines/pl03_batch.py
++**Depends on:** M1-T19, M1-T20, M1-T21, M1-T22, M1-T23, M1-T24, M1-T25, M1-T26, M1-T27, M1-T28, M1-T29 · **Writes:** src/rllab/train/pipelines/pl03_batch.py, tests/intent/rllab/test_batch.py, tests/intent/rllab/test_final_eval.py
+ 
+ ### Checkpoint: milestone exit
+ - [ ] Every pipeline in the milestone runs end to end (smoke commands)
+diff --git a/tasks/todo.md b/tasks/todo.md
+index 68f31fe..261cd9e 100644
+--- a/tasks/todo.md
++++ b/tasks/todo.md
+@@ -1,6 +1,6 @@
+ # M1: Train and evaluate a snake — Todo
+ 
+-- [ ] M1-T01 M1 interface (rllab, S, solo)
++- [ ] M1-T01 M1 interface (rllab, M, solo)
+ - [ ] M1-T02 load_run_configs spine (TOML with method defaults) (rllab, XS, solo)
+ - [ ] M1-T03 Check steps spine (plan, train, score, require pass) (rllab, XS, solo)
+ - [ ] M1-T04 CheckDiscrete two-exit corridor (rllab, XS, split)
+@@ -15,8 +15,8 @@
+ - [ ] M1-T13 baseline_means spine (20 evaluation seeds) (rllab, XS, solo)
+ - [ ] M1-T14 RandomPolicy spine (uniform draws) (rllab, XS, solo)
+ - [ ] M1-T15 SnakeRule spine (shorter axis toward food) (rllab, XS, solo)
+-- [ ] M1-T16 learning_curve spine (mean line, band, baseline lines) (rllab, XS, solo)
+-- [ ] M1-T17 final_evaluation spine (serial play on the final seeds) (rllab, S, solo)
++- [ ] M1-T16 learning_curve spine (mean line, band, baseline lines) (rllab, M, solo)
++- [ ] M1-T17 final_evaluation spine (serial play on the final seeds) (rllab, M, solo)
+ - [ ] M1-T18 play_episode spine (the one episode loop) (rllab, XS, solo)
+ - [ ] M1-T19 Wire PL-01 (rllab, XS, solo)
+ - [ ] M1-T20 Wire PL-02 (rllab, XS, solo)

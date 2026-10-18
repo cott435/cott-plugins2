@@ -1,0 +1,116 @@
+{
+ "winner": "B",
+ "reasoning": "The two sets are near-identical in skeleton: the same brief, spec, architecture, the same 12 pipelines, the same 30-task M1 plan and the same dependency graph. B comes out ahead because of a number of concrete fixes and better-supplied packets. In B's contract, runlog types carry the config as plain data (`RunRecord.config: Mapping[str, object]`, Checkpoint methods as plain data). This respects the generated boundary `runlog \u2192 core`, which A breaks by typing `config: RunConfig` and `methods: Mapping[str, MethodConfig]`. B's fixtures say an \"11-checkpoint 2,000-step\" run folder, while A's still say \"3-checkpoint\", which no longer fits TRAIN-03's 11 checkpoints. B pins the 10-float snake observation layout. B's TC-17 tolerance is statistically sound (at most 4 of 20, P(\u22655)\u22480.003), where A's \"at most 1 of the 20 seeds\" fails roughly a quarter of the time under a correct test. B's spine tasks create the stub modules that thicken tasks later fill (stats.py, verdict.py, check.py, style.py). In A, the spine tells the builder to call \"the stubs their thicken tasks name\", but no task writes those files. B's packets include the types a spine actually touches (Transition, Checkpoint, Comparison, WorldSpec/TeamSpec, worlds.make); A's T09 and T17 packets leave them out. B's Scope lists every deferred requirement (REPLAY, CHECK-02/03, NOTES), and B drops stale routed open questions from pipelines.md. B also splits the fish stage along real dependency lines (one fish \u2192 many \u2192 local sight), each milestone with checkable Exits, and lists PL-03 and PL-06 so fish runs can be batched and evaluated. A's single M3 lumps all three variants together and leaves out PL-06 even though its Exit needs TC-25. B's weak point is that its milestone IDs run out of order (M5 and M6 sit before M4), which reads confusingly. B also mislabels stats.py and verdict.py as \"(new)\" in the T25/T26 packets after T17 has created them. Both sets share a few flaws: a 5-step World replay double driving a 2,000-step loop test, charts importing baselines and core in breach of the boundary list, and a stale contract Retired section.",
+ "rubric": {
+  "A": {
+   "content": {
+    "rl_soundness": 4,
+    "stage_completeness": 4,
+    "internal_consistency": 3,
+    "right_sizing": 4,
+    "milestone_quality": 3,
+    "pipeline_clarity": 4,
+    "interface_quality": 3,
+    "dependency_graph_soundness": 4,
+    "task_buildability": 3
+   },
+   "structure": {
+    "organization": 4,
+    "readability_for_solo_learner": 4,
+    "ease_of_finding_next_build_step": 4,
+    "layout_sensibility": 4
+   },
+   "content_score": 3.6,
+   "structure_score": 4.0,
+   "overall_score": 7.6
+  },
+  "B": {
+   "content": {
+    "rl_soundness": 5,
+    "stage_completeness": 5,
+    "internal_consistency": 4,
+    "right_sizing": 4,
+    "milestone_quality": 4,
+    "pipeline_clarity": 4,
+    "interface_quality": 4,
+    "dependency_graph_soundness": 4,
+    "task_buildability": 4
+   },
+   "structure": {
+    "organization": 4,
+    "readability_for_solo_learner": 4,
+    "ease_of_finding_next_build_step": 4,
+    "layout_sensibility": 4
+   },
+   "content_score": 4.2,
+   "structure_score": 4.0,
+   "overall_score": 8.2
+  }
+ },
+ "output_quality": {
+  "A": {
+   "score": 7,
+   "strengths": [
+    "Clear 12-pipeline design with entry sketches; the spine baselines are real (online Q-learning, REINFORCE), not mocks",
+    "Solid statistics design (paired permutation, Holm) and a well-chosen two-exit DQN check world",
+    "Dependency graph explains every edge, and spines all start from the interface task"
+   ],
+   "weaknesses": [
+    "runlog contract types embed train/methods types, which breaks the runlog\u2192core boundary",
+    "Fixtures still describe a '3-checkpoint' run folder after the switch to 11 checkpoints",
+    "TC-17 tolerance 'at most 1 of the 20' makes a correct test flaky",
+    "Spine tasks point at stubs (compare, verdict, chart check/style) that no task creates",
+    "Fish stage is one large milestone, and its Pipelines column leaves out PL-06/PL-03",
+    "Several spine packets leave out types they need (Transition, Checkpoint, Comparison, WorldSpec)"
+   ]
+  },
+  "B": {
+   "score": 8,
+   "strengths": [
+    "Contract keeps runlog free of train/methods imports by storing configs as plain data",
+    "Fish stage split into one-fish \u2192 many \u2192 local-sight milestones, each with checkable Exits and the right pipelines",
+    "Spines create the stub files their thicken tasks fill, so the call path exists from the spine onward",
+    "Richer packets (T09, T17) contain every type the step touches; snake observation layout pinned",
+    "Statistically sound TC-17 tolerance; complete Deferred list in Scope; stale routed open questions removed"
+   ],
+   "weaknesses": [
+    "Milestone IDs run M1, M2, M3, M5, M6, M4, which reads confusingly",
+    "T25/T26 packets label stats.py/verdict.py '(new)' though T17 creates them",
+    "Same 5-step World double used for a 2,000-step loop test; charts imports baselines/core against the boundary list",
+    "Planned layout leaves out charts/check.py, style.py and evaluate/final/stats.py, verdict.py that the plan writes"
+   ]
+  }
+ },
+ "unbuildable_tasks": {
+  "A": [
+   "M1-T09: packet omits methods.Transition, runlog.Checkpoint, core.Step/EpisodeResult/Policy; the loop must build Transitions and checkpoints",
+   "M1-T17: packet omits evaluate.Comparison (a Summary field), runlog.RunRecord/Checkpoint and worlds.make; acceptance says compare/verdict 'stay the stubs' but no task writes stats.py/verdict.py before T25/T26",
+   "M1-T16: packet omits runlog.EvalPoint/RunRecord and core.TeamSpec needed for per-team score names; it would have to call check/style modules that don't exist yet"
+  ],
+  "B": [
+   "M1-T09: acceptance needs 2,000 world steps on a core.World double that records only a 5-step episode (shared flaw)"
+  ]
+ },
+ "defects": {
+  "A": [
+   "final__packages__rllab__contract.md: \"class RunRecord: config: RunConfig\" \u2014 runlog importing train breaks the boundary \"`runlog` \u2192 core\"",
+   "final__packages__rllab__contract.md: \"a replay double of a finished 3-checkpoint snake run folder\" \u2014 doesn't match TRAIN-03's 11 checkpoints",
+   "final__packages__rllab__tests.md: TC-17 \"at most 1 of the 20 seeds rejects either null\" \u2014 fails about 26% of the time under a correct \u03b1=0.05 test",
+   "final__tasks__plan.md M1-T17: \"`compare` and `verdict` stay the stubs their thicken tasks name\" \u2014 no task writes stats.py/verdict.py stubs; T25 marks stats.py as new",
+   "final__roadmap.md M3: \"Pipelines: PL-01, PL-02, PL-05, PL-07, PL-09\" \u2014 Exit needs TC-25 (PL-06) and 5-seed batches (PL-03)",
+   "final__roadmap.md M3: \"Fish in all three variants train with PPO...\" \u2014 one lopsided milestone covering three dependent variants",
+   "final__tasks__plan.md Scope: Deferred list leaves out REPLAY-01\u2013REPLAY-08, CHECK-02/03, NOTES-01\u201303",
+   "final__packages__rllab__pipelines.md Open questions: \"routed to architecture-design ... (assumed: as written)\" \u2014 stale; routes.md shows these as resolved",
+   "final__architecture.md Risks: \"8\u201310 agents\" \u2014 predator-prey has 8 agents (6+2)",
+   "final__tasks__plan.md M1-T12: \"Covers: TRAIN-01\" for find_runs \u2014 the step covers LOG-03"
+  ],
+  "B": [
+   "final__roadmap.md: milestone order \"M3 \u2026 M5 \u2026 M6 \u2026 M4\" \u2014 IDs read out of build order",
+   "context__M1-T25.md: \"src/rllab/evaluate/final/stats.py (new)\" \u2014 M1-T17 already creates it as a stub",
+   "final__packages__rllab__pipelines.md Planned layout: \"charts/ curve.py heatmap.py\" \u2014 leaves out check.py and style.py, which M1-T16/T28/T29 write",
+   "final__packages__rllab__contract.md core.World: \"a replay double of a recorded 5-step snake episode\" \u2014 used for a 2,000-step train_loop acceptance",
+   "final__CONSTRAINTS.md: \"`charts` \u2192 runlog, evaluate\" \u2014 learning_curve takes baselines.BaselineMeans and returns core.Output",
+   "final__packages__rllab__contract.md: \"## Retired\" section keeps superseded symbols in the live contract"
+  ]
+ }
+}

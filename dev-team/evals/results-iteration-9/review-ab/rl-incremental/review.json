@@ -1,0 +1,423 @@
+{
+ "defects": [
+  {
+   "id": "R01",
+   "class": "user_fact",
+   "severity": "high",
+   "file": "docs/spec.md",
+   "quote": "- **EVAL-07** The full-view clipped rungs (2 and 3) each significantly beat the scripted fish",
+   "evidence": "Turn 19, in the developer's own words: \"Survival time beats random and the scripted swim-away fish, PPO beats REINFORCE...\". The idea doc also says \"Every rung beats the random and scripted fish on survival time.\" The spec only requires rungs 2 and 3 to beat the scripted fish. Rung 1 (REINFORCE) has no scripted bar, and rung 4 is only a stretch target (EVAL-05: \"whether the limited-view school beats the scripted fish\"). TC-46 repeats the narrower bar. Turn 21's \"all five defaults are fine\" approves defaults; it does not restate this in the developer's words.",
+   "fix": "Either widen EVAL-07 to \"Every fish-tank rung (1\u20134) significantly beats the scripted fish...\", drop the fish half of EVAL-05, and change TC-46's bullets to \"each of the four rungs beats the scripted fish\". Or, if the narrower bar is wanted, put it to the developer as an explicit change before building M2. Keep EVAL-07's ID either way."
+  },
+  {
+   "id": "R02",
+   "class": "packet",
+   "severity": "high",
+   "file": "tasks/plan.md",
+   "quote": "**Depends on:** \u2014 \u00b7 **Writes:** src/rllab/__init__.py, src/rllab/core/**, src/rllab/envs/**",
+   "evidence": "M1-T01's acceptance asks that \"Every step, contract function and entry function imports with its contract signature\". PL-01 in its packet has steps FishTank, PredatorPrey, ReinforceAgent, PPOAgent, ScriptedPredator, ScriptedPrey, RandomSwimmer and OpponentPool (selfplay.pool). The frozen train.train contract also references `selfplay.OpponentPool`. But T01's Writes has no src/rllab/selfplay/**, and its Read line has none of those contract sections. Later packets still treat them as frozen interfaces that already exist: M1-T21's packet lists envs.FishTank, envs.PredatorPrey, agents.PPOAgent, selfplay.OpponentPool and others, and M1-T23's lists baselines.ScriptedFish and others.",
+   "fix": "Add src/rllab/selfplay/** to M1-T01's Writes. Add to its Read line: envs.FishTank, envs.TANK_FULL_FIELDS, envs.TANK_LIMITED_FIELDS, envs.PredatorPrey, envs.PREY_FIELDS, envs.PREDATOR_FIELDS, baselines.RandomSwimmer, baselines.ScriptedFish, baselines.ScriptedPredator, baselines.ScriptedPrey, agents.ReinforceAgent, agents.PPOAgent, selfplay.OpponentPool, AD-12, AD-14. Alternatively, state in T01's acceptance that only M1 types are stubbed, and remove the M2/M3 sections from the M1-T21/T23 interface lists."
+  },
+  {
+   "id": "R03",
+   "class": "packet",
+   "severity": "high",
+   "file": "tasks/plan.md",
+   "quote": "**Read:** PL-01, train.train, core.Env, core.Agent, core.RunSettings, runs.RunWriter, runs.CurvePoint, evaluate.evaluate",
+   "evidence": "The M1-T06 train spine must build \"one batch-first `Transition` per learning team\", read `env.step` results, address `SOLO`, and create its run folder. Its packet has no core.Transition, core.StepResult, core.TeamSpec, core.SOLO, runs.create_run (the only way to get a RunWriter) or runs.GameRecording (for \"5 recorded games\"). train.train's frozen invariants also cite `selfplay.OpponentPool`, which isn't in the packet.",
+   "fix": "Change M1-T06's Read to: PL-01, train.train, core.Env, core.StepResult, core.Transition, core.TeamSpec, core.SOLO, core.Agent, core.RunSettings, runs.create_run, runs.RunWriter, runs.CurvePoint, runs.GameRecording, evaluate.evaluate, selfplay.OpponentPool."
+  },
+  {
+   "id": "R04",
+   "class": "milestone",
+   "severity": "high",
+   "file": "docs/roadmap.md",
+   "quote": "## M2: Fish tank ladder",
+   "evidence": "M2 and M3 are Designed milestones, but each has only an **Outline:** line, with no **Exit:** line. M1 has \"**Exit:** All five smoke commands run; TC-01\u2013TC-25...\". There is no checkable exit for the fish-tank or predator-prey milestone.",
+   "fix": "Add an Exit under M2, e.g. \"**Exit:** All five smoke commands run on the tank; TC-29\u2013TC-45, TC-48 and TC-49 pass; the real 5-seed rung runs pass TC-46 and TC-47 within QR-04, QR-05 and QR-07\". Add one under M3: \"**Exit:** All six smoke commands run; TC-50\u2013TC-66, TC-70 and TC-71 pass; the real 5-seed rung runs pass TC-67, TC-68 and TC-69 within QR-04, QR-05 and QR-07\"."
+  },
+  {
+   "id": "R05",
+   "class": "packet",
+   "severity": "medium",
+   "file": "docs/packages/rllab/contract.md",
+   "quote": "`@dataclass(frozen=True) class Chart: path: Path; groups: tuple[str, ...]; baselines: tuple[str, ...]`",
+   "evidence": "TC-70 builds \"two `viz.Chart` samples (rung 2 labelled \"reported\", rung 3 unlabelled)\" and expects \"rung 2's entry carries the label \"reported\"\" in report.md. EVAL-11 requires that label. But Chart has no label field, and run_claims gets only `charts: Sequence[Chart]`, so the report can't know which chart is \"reported\". `plot_crossplay` takes `label` but has nowhere to return it.",
+   "fix": "Add `label: str = \"\"` to viz.Chart, with the invariant \"`label` is the text printed on the figure (EVAL-11), empty for curve charts\". State that plot_crossplay sets it and that run_claims prints it beside each linked chart."
+  },
+  {
+   "id": "R06",
+   "class": "packet",
+   "severity": "medium",
+   "file": "docs/packages/rllab/pipelines.md",
+   "quote": "claims = run_claims(scores, specs, charts=targets.crossplay, out=out)",
+   "evidence": "PL-04 step 1 reads \"PL-06's cross-play chart paths\" from TOML (turn 33: \"PL-04 cites PL-06's charts by path\"). But contract run_claims takes `charts: Sequence[Chart]`, and Chart needs groups and baselines, which a path doesn't carry. The entry sketch passes paths where Chart objects are expected.",
+   "fix": "Pick one of two options. (a) Change run_claims' keyword to `charts: Sequence[Path] = ()` and say so in the contract, the routes note and TC-70. (b) Make PL-04 step 1's Out say it builds `viz.Chart` values from the TOML entries (path plus label), and add that to load_report_spec's spine version."
+  },
+  {
+   "id": "R07",
+   "class": "milestone",
+   "severity": "medium",
+   "file": "docs/roadmap.md",
+   "quote": "| M2 | S2 | Fish tank ladder | rllab | PL-01, PL-02, PL-03, PL-04, PL-05 |",
+   "evidence": "Turns 23 and 35 asked to \"cut S2 into milestone rows\" and \"cutting S3 into milestone rows\". Each stage got one milestone that is the whole stage: four rungs, school, limited view, reference, replay. M3 likewise covers all three rungs, cross-play and the reference. Neither first milestone is a walking skeleton. (Turn 24 approved the row, so this is a shape issue, not a lost wish.)",
+   "fix": "Split each stage along its dependency line. S2: M2 = one-fish tank with REINFORCE and PPO plus the reference (rungs 1\u20132, TC-29\u2013TC-43, TC-47); a following milestone adds the school and limited view (rungs 3\u20134, TC-44, TC-46, TC-48, TC-49). S3: rung 1 plus the reference first, then rungs 2\u20133 with PL-06. Give each new milestone an Outline, an Exit, a **Skills:** null-hypothesis-testing line and a **References:** line. If the developer prefers one milestone per stage, record that in their words."
+  },
+  {
+   "id": "R08",
+   "class": "stale",
+   "severity": "medium",
+   "file": "docs/packages/rllab/tests.md",
+   "quote": "rewards `[1, 1]`, values `[0.5, 0.5]`, the second step terminal",
+   "evidence": "Contract agents.gae says: \"`values` has one more entry than `rewards` (the bootstrap value after the last step)\" and raises \"`ValueError` if the lengths don't match\". TC-42 passes two values for two rewards, so the golden case hits the contract's own error.",
+   "fix": "Change TC-42's Expected to \"rewards `[1, 1]`, values `[0.5, 0.5, 0.0]` (the last is the unused bootstrap after the terminal step), the second step terminal, \u03b3 = 0.9, \u03bb = 0.95 \u2192 advantages `[1.3775, 0.5]`\". The numbers are unchanged."
+  },
+  {
+   "id": "R09",
+   "class": "domain",
+   "severity": "medium",
+   "file": "docs/packages/rllab/contract.md",
+   "quote": "`\u03b4_t = r_t + gamma \u00b7 V(s_{t+1}) \u00b7 (1 \u2212 terminated_t) \u2212 V(s_t)`, `A_t = \u03b4_t + gamma \u00b7 lam \u00b7 (1 \u2212 terminated_t) \u00b7 A_{t+1}`",
+   "evidence": "PPO rollouts are `rollout_steps` = 2048 agent-steps, and tank games are truncated at 1,000 steps. A rollout therefore crosses truncated game ends. gae only knows `terminated`, so across a truncation it chains A_{t+1} from the next game's first step and bootstraps from the next game's first value instead of the truncated state's value. That is wrong GAE. AD-03 promises that \"learning targets bootstrap correctly on truncation\".",
+   "fix": "Add a `truncated: np.ndarray` argument, or state that PPOAgent calls gae once per game segment with that segment's own bootstrap value. Add the invariant: \"at a truncated step, \u03b4 uses V(s_T) of the truncated state and A_{t+1} is not carried across\". Add a TC-42 case with a truncation in mid-rollout."
+  },
+  {
+   "id": "R10",
+   "class": "domain",
+   "severity": "medium",
+   "file": "docs/architecture.md",
+   "quote": "The hand-written PPO and the reference differ only in code, not settings",
+   "evidence": "AD-10 gives the reference a \"Box action `(2,)` in [\u22121, 1]\". Stable-Baselines3 PPO clips each sampled action to the Box bounds per axis before `env.step`. AD-11 says the hand-written agent's \"Actions are sampled unclipped; the tank shortens them\". The two policies therefore send different swim vectors for the same sample: (2, 0.5) becomes direction (0.89, 0.45) for the reference and (0.97, 0.24) for the hand-written agent. A REF-02 gap could come from action handling rather than code. AD-15's predator reference has the same problem.",
+   "fix": "In AD-10/AD-11 choose one action pipeline for both. Either the adapter's Box is unbounded (low=-inf, high=inf) so the tank alone shortens, or the hand-written agent applies the same per-axis clip to [\u22121, 1] before the tank. Record the choice in AD-11's Consequences and in M2's reference-mapping test."
+  },
+  {
+   "id": "R11",
+   "class": "domain",
+   "severity": "medium",
+   "file": "docs/packages/rllab/contract.md",
+   "quote": "each player's scores are pooled across its 5 training seeds",
+   "evidence": "EVAL-01 and run_claims pool 1,000 games (5 training seeds \u00d7 200) and test them as independent samples (TC-21: \"games pooled across seeds\"). For agent-vs-agent claims (PPO vs REINFORCE, hand-written vs reference, rung 3 vs rung 2), the main variance is between training seeds. Pooling games treats 5 runs as 1,000 replicates, so \"significant\" overstates the evidence about the learning algorithm.",
+   "fix": "In run_claims (and the EVAL-01/EVAL-08/EVAL-10/REF-03 wording), have the skill test at the training-seed level for comparisons between learners (e.g. a permutation or hierarchical test over the 5 per-seed means, or a test that respects seed blocks). Or state explicitly that the claims are conditional on these 5 trained runs. Add a known-answer case where the between-seed variance dominates."
+  },
+  {
+   "id": "R12",
+   "class": "domain",
+   "severity": "medium",
+   "file": "docs/packages/rllab/contract.md",
+   "quote": "The correction covers every spec in one call.",
+   "evidence": "For `not_worse` claims a pass means the \"worse\" test is not significant (compare.Claim). Applying a family-wide multiplicity correction to those tests raises their corrected p-values. So the more claims a report holds, the easier EVAL-03 and REF-03 pass. The correction is anti-conservative for exactly the claims it is meant to guard.",
+   "fix": "State in run_claims and compare.Claim that the multiplicity correction applies only to `greater` claims. `not_worse` claims are tested uncorrected at \u03b1, or corrected in the conservative direction, e.g. Bonferroni-tightened, which makes the worse-test easier to reject. Add a TC-23 variant with many claims in the family."
+  },
+  {
+   "id": "R13",
+   "class": "domain",
+   "severity": "medium",
+   "file": "docs/architecture.md",
+   "quote": "Its hidden layers, learning rate, discount, batch size, memory size, target interval and exploration schedule are mapped one-to-one",
+   "evidence": "The hand-written DQN waits `learn_start` = 1,000 transitions (AgentParams). Stable-Baselines3 DQN's `learning_starts` has a different library default, and AD-04's mapping list omits it. This is exactly the hidden-default risk the plan names (\"A hidden library default skews the reference match\").",
+   "fix": "Add \"learn_start \u2192 learning_starts\" to AD-04's Decision list and to M1-T29's acceptance mapping list."
+  },
+  {
+   "id": "R14",
+   "class": "stale",
+   "severity": "medium",
+   "file": "docs/packages/rllab/contract.md",
+   "quote": "`reinforce` and `ppo` only with the tank;",
+   "evidence": "The same invariant says \"For `predprey`, `view` is `limited`, `agent` is `ppo` or `reference`\". SELF-01 and AD-14 train both predator-prey teams with PPO. The first clause would make load_settings reject every predator-prey learning run.",
+   "fix": "Change to \"`reinforce` only with the tank; `ppo` with the tank or `predprey`;\"."
+  },
+  {
+   "id": "R15",
+   "class": "stale",
+   "severity": "medium",
+   "file": "docs/packages/rllab/contract.md",
+   "quote": "food: tuple[int, int]) -> tuple[np.ndarray, dict[str, int]]: ...",
+   "evidence": "AD-13 made observations team maps: core.Env.reset returns `tuple[dict[str, np.ndarray], dict[str, float]]`, and PredatorPrey.reset_to returns `dict[str, np.ndarray]`. Snake.reset_to (and FishTank.reset_to: \"-> tuple[np.ndarray, dict[str, float]]\") still return a bare array and, for Snake, an int info dict. The routes entry has the same pre-teams signature.",
+   "fix": "Change both Snake.reset_to and FishTank.reset_to to return `tuple[dict[str, np.ndarray], dict[str, float]]`, the same as `reset`, keyed by `SOLO`."
+  },
+  {
+   "id": "R16",
+   "class": "stale",
+   "severity": "medium",
+   "file": "docs/packages/rllab/contract.md",
+   "quote": "`eval <run | random | scripted>\u2026 [--env snake|tank|predprey] [--team T]`",
+   "evidence": "PL-03's trigger has `[--vs scripted|random|<run folder>] [--seed S]`, and PL-06's has `crossplay <run folder> [--label reported]`. M1's smoke commands use `--seed 0 --smoke` and `--smoke` on every subcommand (tests.md Strategy, M1-T21\u2013T25). lab.main lists none of `--vs`, `--seed`, `--label` or `--smoke`, so M1-T01 builds a parser that rejects the smoke commands.",
+   "fix": "Rewrite lab.main's subcommands as: `train <settings.toml> [--seeds 0-4] [--smoke]`, `eval <run | random | scripted>\u2026 [--env snake|tank|predprey] [--team T] [--vs scripted|random|<run>] [--seed S] [--smoke]`, `replay <run> [--game N | --new --seed S | --pair <predator gen> <prey gen>] [--smoke]`, `crossplay <run> [--label reported] [--smoke]`, `report <report.toml> [--smoke]`. Say what `--smoke` does (e.g. a tiny step budget and headless output)."
+  },
+  {
+   "id": "R17",
+   "class": "packet",
+   "severity": "medium",
+   "file": "tasks/plan.md",
+   "quote": "**Depends on:** M1-T05 \u00b7 **Writes:** src/rllab/agents/dqn/networks.py",
+   "evidence": "M1-T27's acceptance needs \"a non-3-D `obs_shape` raises `ValueError`\". That is contract DQNAgent's constructor error, which lives in agents/dqn/agent.py. It also needs \"the agent receives only the grid view\". agent.py isn't in T27's Writes. M1-T26 writes agents/dqn/agent.py, and T26 and T27 can run in parallel (both depend only on M1-T05).",
+   "fix": "Add src/rllab/agents/dqn/agent.py to M1-T27's Writes and make M1-T27 depend on M1-T26 (add the row to the Dependency graph). Or narrow T27's acceptance to a `networks.build(net, obs_shape)` that raises the ValueError itself, and say so in contract agents.DQNAgent."
+  },
+  {
+   "id": "R18",
+   "class": "packet",
+   "severity": "medium",
+   "file": "tasks/plan.md",
+   "quote": "**Step:** PL-01.DQNAgent \u00b7 **Kind:** spine \u00b7 **Covers:** AGENT-03, AGENT-06, QR-06 \u00b7 **Size:** XS",
+   "evidence": "M1-T05 builds the whole DQN agent at XS: \"learns after `learn_start` from random batches of its memory, with a 128\u00d7128 MLP, a hard target refresh, Huber loss and gradient clip 10, on CPU in one thread\". That is a full agent with memory and target network. M1-T13 is also XS: \"**Step:** PL-01.Snake \u00b7 **Kind:** thicken \u00b7 **Covers:** SNAKE-01\u2013SNAKE-09 \u00b7 **Size:** XS\", covering the full Snake rules, both views, reset_to and 10 golden cases.",
+   "fix": "Set M1-T05 to Size M and M1-T13 to Size S (or M) in plan.md and todo.md."
+  },
+  {
+   "id": "R19",
+   "class": "packet",
+   "severity": "medium",
+   "file": "tasks/plan.md",
+   "quote": "**Read:** PL-04, compare.run_claims, compare.ClaimSpec, compare.Claim, evaluate.ScoreSet, TC-21, TC-22, TC-23, TC-24",
+   "evidence": "M1-T19 implements run_claims, whose signature has `charts: Sequence[Chart] = ()` (the replan note says it \"has the `charts` keyword from the frozen contract\"). viz.Chart isn't in its packet.",
+   "fix": "Add viz.Chart to M1-T19's Read line."
+  },
+  {
+   "id": "R20",
+   "class": "packet",
+   "severity": "medium",
+   "file": "tasks/plan.md",
+   "quote": "**Read:** PL-05, runs.create_run, runs.RunWriter, runs.open_run, runs.RunRecord, runs.CurvePoint, runs.GameRecording, AD-06",
+   "evidence": "M1-T03 must write `settings.json` and read it back so that RunRecord.settings \"round-trips... unchanged\". RunWriter.save_checkpoint takes a `core.Agent` with default `team: str = SOLO`. core.RunSettings (and its nested Rewards, Exploration, AgentParams), core.Agent and core.SOLO aren't in the packet.",
+   "fix": "Add core.RunSettings, core.Rewards, core.Exploration, core.AgentParams, core.Agent and core.SOLO to M1-T03's Read line."
+  },
+  {
+   "id": "R21",
+   "class": "packet",
+   "severity": "medium",
+   "file": "tasks/plan.md",
+   "quote": "**Read:** PL-01, core.RunSettings, core.Env, core.TeamSpec, core.SOLO, core.Agent, envs.Snake, envs.Corridor, agents.TabularAgent, agents.DQNAgent",
+   "evidence": "make_agent sizes agents \"from the team's `TeamSpec`\", whose `actions` field is a core.ActionSpace (n actions). It constructs TabularAgent and DQNAgent with AgentParams and Exploration, and RunSettings.agent can be `random` or `scripted`. core.ActionSpace, core.AgentParams, core.Exploration, core.Rewards, baselines.RandomPlayer and baselines.ScriptedPlayer aren't in the M1-T04 packet.",
+   "fix": "Add core.ActionSpace, core.Rewards, core.Exploration, core.AgentParams, baselines.RandomPlayer and baselines.ScriptedPlayer to M1-T04's Read line."
+  },
+  {
+   "id": "R22",
+   "class": "packet",
+   "severity": "medium",
+   "file": "tasks/plan.md",
+   "quote": "**Read:** PL-03, PL-04, runs.open_run, runs.RunRecord, evaluate.evaluate, evaluate.ScoreSet, core.Agent, core.RunSettings",
+   "evidence": "M1-T09's acceptance turns \"`random`/`scripted` into baselines on default Snake compact settings\", and the entry sketch uses `team: str = SOLO`. The packet lacks baselines.RandomPlayer, baselines.ScriptedPlayer, core.SOLO and core.Env (make_env's output).",
+   "fix": "Add baselines.RandomPlayer, baselines.ScriptedPlayer, core.SOLO and core.Env to M1-T09's Read line."
+  },
+  {
+   "id": "R23",
+   "class": "packet",
+   "severity": "medium",
+   "file": "tasks/plan.md",
+   "quote": "**Read:** PL-02, reference.train_reference, core.RunSettings, core.Env, runs.RunWriter, evaluate.evaluate, AD-03, AD-04",
+   "evidence": "M1-T07 must wrap Snake's compact view in a gymnasium adapter (needs envs.Snake, core.StepResult, core.TeamSpec, core.ActionSpace, core.SOLO). It must also start a run folder, which needs runs.create_run, the only constructor of a RunWriter. None of these are in its packet.",
+   "fix": "Add envs.Snake, core.StepResult, core.TeamSpec, core.ActionSpace, core.SOLO and runs.create_run to M1-T07's Read line."
+  },
+  {
+   "id": "R24",
+   "class": "packet",
+   "severity": "medium",
+   "file": "tasks/plan.md",
+   "quote": "**Read:** PL-01, envs.Snake, envs.COMPACT_FIELDS, core.Env, core.StepResult, core.Rewards, TC-01",
+   "evidence": "Snake must declare `teams: Mapping[str, TeamSpec]` with one team `SOLO` and a discrete ActionSpace of 3. core.TeamSpec, core.ActionSpace and core.SOLO aren't in the M1-T13 packet. M1-T14 (\"**Read:** PL-01, envs.Corridor, core.Env, core.StepResult, core.Rewards, TC-11\") has the same gap.",
+   "fix": "Add core.TeamSpec, core.ActionSpace and core.SOLO to the Read lines of M1-T13 and M1-T14."
+  },
+  {
+   "id": "R25",
+   "class": "packet",
+   "severity": "medium",
+   "file": "tasks/plan.md",
+   "quote": "`with_seed` swaps only the seed",
+   "evidence": "M1-T02's acceptance and every entry sketch (`settings = with_seed(settings, seed)`) use `with_seed`. Turn 8 approved it as \"a small helper\". No contract section defines its signature or owner, so M1-T01 can't stub it and the M1-T02 packet has no signature.",
+   "fix": "Add a contract section `core.with_seed: Swap the seed` with `def with_seed(settings: RunSettings, seed: int) -> RunSettings`, invariant \"returns a copy with only `seed` changed; `ValueError` outside [0, 1_000_000)\", Used by lab; PL-01, PL-02. Add core.with_seed to the Read lines of M1-T01 and M1-T02."
+  },
+  {
+   "id": "R26",
+   "class": "stale",
+   "severity": "medium",
+   "file": "docs/brief.md",
+   "quote": "3. Every trained agent clearly beats both a random player and a simple scripted player",
+   "evidence": "Turn 4 set the bars: \"compact-view DQN beats random, not worse than scripted, and significantly beats scripted on at least one rung... Full-grid DQN... beating scripted is a stretch.\" The spec (EVAL-03, EVAL-04, EVAL-05) follows turn 4. The brief's Goal 3 and its success line (\"a learning curve that rises above both baselines\") still state the older bar. roadmap.md's S1 Outline does too (\"agents on Snake that beat random and scripted baselines\").",
+   "fix": "Brief Goal 3: \"Every trained agent clearly beats a random player, and each environment's ladder matches or beats a simple scripted player, measured over many games rather than judged by eye.\" Make the matching edits to the brief's first success bullet and to the roadmap S1 Outline (\"...that beat the random baseline and match or beat the scripted one...\")."
+  },
+  {
+   "id": "R27",
+   "class": "stale",
+   "severity": "medium",
+   "file": "docs/spec.md",
+   "quote": "Given a seed and an action sequence recorded before the revision",
+   "evidence": "AD-09 and AD-13 were adopted before any code exists (\"M1's plan is approved but no code exists yet\"), so no Snake game was ever \"recorded before the revision\". CORE-06's check can't be run as worded. AD-09 already says CORE-06 \"is met by M1's golden cases passing on the new interface, with their expected values unchanged\".",
+   "fix": "Reword CORE-06: \"Snake and the corridor keep the behaviour their golden cases fix, on the shared interface that carries teams, several agents and continuous actions.\" Example: \"Given TC-01\u2013TC-28, when they run on the revised core, then every expected value holds unchanged.\""
+  },
+  {
+   "id": "R28",
+   "class": "stale",
+   "severity": "low",
+   "file": "docs/architecture.md",
+   "quote": "### AD-09: A batch-first environment interface over agents, adopted before M1 is built",
+   "evidence": "This is process narration a reader of the final docs doesn't need. It appears in AD-09's title, its Decision (\"M1 adopts this interface before it is built: a Replan of its interface task...\") and its Consequences (\"`pipeline-design`, `test-planning` and `build-planning` revisit M1's types and plan before the build starts\"). AD-13 has the same: title \", adopted before M1 is built\", Decision \"M1 adopts this before it's built: a Replan of its interface task\", Context \"M1 is approved but not yet built\".",
+   "fix": "Retitle as \"AD-09: A batch-first environment interface over agents\" and \"AD-13: Teams in the core\". Delete the Replan and revisit sentences and the \"M1 is approved but not yet built\" / \"M1's plan is approved but no code exists yet\" clauses."
+  },
+  {
+   "id": "R29",
+   "class": "stale",
+   "severity": "low",
+   "file": "docs/architecture.md",
+   "quote": "the expected values of TC-01\u2013TC-49 don't change",
+   "evidence": "The risk row \"The teams revision ripples into M1 (AD-13)... they're revised and re-approved before `/build`\" is replan narration. The revision is done and the docs already reflect it.",
+   "fix": "Delete the \"The teams revision ripples into M1 (AD-13)\" risk bullet."
+  },
+  {
+   "id": "R30",
+   "class": "stale",
+   "severity": "low",
+   "file": "tasks/plan.md",
+   "quote": "## Replan notes",
+   "evidence": "Both notes (\"AD-09 adopted before the build...\", \"AD-13 adopted before the build...\") narrate process. Their content is already in the task text. The builder doesn't need them.",
+   "fix": "Delete the Replan notes section, or keep only the heading if the plan tool requires it."
+  },
+  {
+   "id": "R31",
+   "class": "stale",
+   "severity": "low",
+   "file": "docs/architecture.md",
+   "quote": "All five are commands of one command line over the same run folders",
+   "evidence": "pipelines.md now has six pipelines (PL-06 Cross-play), and lab.main has a sixth subcommand, `crossplay`.",
+   "fix": "Change to \"All six are commands of one command line over the same run folders\", and \"five or more pipelines\" to \"six pipelines\"."
+  },
+  {
+   "id": "R32",
+   "class": "stale",
+   "severity": "low",
+   "file": "docs/brief.md",
+   "quote": "Can the hardest rung of Snake (learning from the whole grid rather than a compact view) train within an hour",
+   "evidence": "Answered in turn 4 (\"Full-grid DQN required to train within 60 min and beat random\") and recorded as QR-03 (\"on the laptop or on rented hardware within QR-05\"), with AD-05's fallback.",
+   "fix": "Replace the Open questions body with \"None; the full-grid timing is settled by QR-03 and AD-05.\""
+  },
+  {
+   "id": "R33",
+   "class": "stale",
+   "severity": "low",
+   "file": "docs/spec.md",
+   "quote": "- **EVAL-04** At least one agent significantly beats the scripted player",
+   "evidence": "This is a Snake-only requirement (turn 4: \"significantly beats scripted on at least one rung\"; its example is Snake's three agents). Now that EVAL lists fish-tank and predator-prey claims, the unqualified \"agent\" reads as applying to every environment.",
+   "fix": "Change to \"**EVAL-04** At least one Snake agent significantly beats the scripted player\". Also change EVAL-03 to \"The compact-view neural Snake agent...\"."
+  },
+  {
+   "id": "R34",
+   "class": "stale",
+   "severity": "low",
+   "file": "docs/spec.md",
+   "quote": "showing the board (Snake's grid, the corridor, or the tank with the ball and every fish, caught fish marked)",
+   "evidence": "Turn 27 asked to \"watch the two sides adapt to each other in replay\", and contract viz.Replay draws \"the predator, the prey and the pellets\". REPLAY-01 still lists only Snake, the corridor and the fish tank.",
+   "fix": "Change to \"showing the board (Snake's grid, the corridor, the fish tank with the ball and every fish, or the predator-prey tank with the predator, prey and pellets; caught animals marked)\"."
+  },
+  {
+   "id": "R35",
+   "class": "stale",
+   "severity": "low",
+   "file": "docs/spec.md",
+   "quote": "Agents act with moves relative to their heading (straight, left, right), not with compass directions.",
+   "evidence": "This is true only for Snake. Fish, predator and prey act with continuous 2-D swim vectors (FISH-02, HUNT-02).",
+   "fix": "Change to \"Snake agents act with moves relative to their heading (straight, left, right), not with compass directions.\""
+  },
+  {
+   "id": "R36",
+   "class": "stale",
+   "severity": "low",
+   "file": "docs/spec.md",
+   "quote": "then game, view, fish count, rewards, steps and seeds match",
+   "evidence": "REF-01's rule now covers \"agent counts, opponent\" and predator-prey (the rung-1 predator against scripted prey). Its example still names only the fish-tank fields.",
+   "fix": "Change to \"then game, view, agent counts, opponent, rewards, steps and seeds match\"."
+  },
+  {
+   "id": "R37",
+   "class": "stale",
+   "severity": "low",
+   "file": "docs/packages/rllab/contract.md",
+   "quote": "(food eaten, or mean survival steps per fish)",
+   "evidence": "evaluate.ScoreSet also carries predator-prey scores: catches per game for the predator, mean reward per prey for the prey (HUNT-08, spec Assumptions).",
+   "fix": "Change to \"(food eaten; mean survival steps per fish; catches per game for the predator; mean reward per prey for the prey)\"."
+  },
+  {
+   "id": "R38",
+   "class": "stale",
+   "severity": "low",
+   "file": "docs/packages/rllab/pipelines.md",
+   "quote": "wall stop, catches, 1,000-step cap, full view (AD-12) | FISH-01\u2013FISH-09 |",
+   "evidence": "PL-01's Covers lists FISH-01\u2013FISH-10, but no PL-01 step covers FISH-10 (the limited view), and the step names only the full view. Contract envs.FishTank has both views.",
+   "fix": "Change the FishTank step to \"... 1,000-step cap, full and limited views (AD-12) | FISH-01\u2013FISH-10 |\"."
+  },
+  {
+   "id": "R39",
+   "class": "stale",
+   "severity": "low",
+   "file": "docs/packages/rllab/pipelines.md",
+   "quote": "| `RandomSwimmer` | baselines.random_swimmer | n_fish, seed \u2192 Agent |",
+   "evidence": "Contract baselines.RandomSwimmer is `__init__(self, n_agents: int, *, seed: int)`, and PL-01 step 14 says \"n_agents, seed\". PL-03 step 4 says n_fish.",
+   "fix": "Change PL-03 step 4's In to \"n_agents, seed \u2192 Agent\"."
+  },
+  {
+   "id": "R40",
+   "class": "stale",
+   "severity": "low",
+   "file": "docs/packages/rllab/tests.md",
+   "quote": "core.settings, envs.snake, envs.corridor, lab.build, agents.tabular, agents.dqn, train.loop",
+   "evidence": "The PL-01 Strategy row's golden cases now include tank, policy-gradient, predator-prey and pool cases (TC-29\u2013TC-66), but its step unit-test list is still the Snake-only one. The PL-03 row likewise lists only baselines.random and baselines.scripted, though it has TC-39, TC-40, TC-59\u2013TC-61.",
+   "fix": "Append envs.tank, envs.predprey, agents.reinforce, agents.ppo, selfplay.pool to the PL-01 row's unit tests. Append baselines.random_swimmer, baselines.scripted_fish, baselines.scripted_predator, baselines.scripted_prey to the PL-03 row's."
+  },
+  {
+   "id": "R41",
+   "class": "stale",
+   "severity": "low",
+   "file": "docs/packages/rllab/contract.md",
+   "quote": "the ppo defaults (`lr=3e-4, gamma=0.99, hidden=64`)",
+   "evidence": "AgentParams' dataclass default is `hidden: int = 128`, so `hidden=64` isn't a default. AD-11 requires two 64-unit layers for PPO, so a settings file that omits `hidden` gets 128.",
+   "fix": "Change the case to \"the ppo settings (`lr=3e-4, gamma=0.99, hidden=64`, set explicitly)\". Add to the invariants: \"policy-gradient settings files set `hidden = 64` (AD-11)\"."
+  },
+  {
+   "id": "R42",
+   "class": "domain",
+   "severity": "low",
+   "file": "docs/packages/rllab/tests.md",
+   "quote": "8 pellets are present again from step 21",
+   "evidence": "Pellets and prey use different respawn counting. In TC-51 a pellet eaten at step 1 is back at step 21 (absent for steps 2\u201320, 19 steps), though HUNT-03 says \"20 steps later\". In TC-52 a prey caught at step 11 is back at step 62 (absent for steps 12\u201361, the full 50). A builder writing one shared respawn timer can't satisfy both.",
+   "fix": "Pick one convention and apply it to both. If absence is counted as in TC-52, change TC-51 to \"8 pellets are present again from step 22\". Otherwise change TC-52 to \"stays done through step 60, and from step 61...\". State the convention once in HUNT-03 and HUNT-04."
+  },
+  {
+   "id": "R43",
+   "class": "user_fact",
+   "severity": "low",
+   "file": "docs/spec.md",
+   "quote": "- A fish-tank rung with 8 fixed swim directions played by a value learner.",
+   "evidence": "Turn 19: \"Your lean (1 + 3 + 4, with variation 2 optional) is fine.\" The idea doc lists this rung as \"An optional rung 0 (8 fixed directions, played by the S1 value learner)\". The spec moves it from optional to out of scope, a change the developer didn't make in their own words.",
+   "fix": "Ask the developer whether it should stay an optional rung (e.g. an optional, unscored PG rung 0 settings file) or be dropped. Then either remove this out-of-scope line or record the drop in the spec changelog as the developer's decision."
+  },
+  {
+   "id": "R44",
+   "class": "stale",
+   "severity": "low",
+   "file": "docs/roadmap.md",
+   "quote": "the real 5-seed runs pass TC-15, TC-16, TC-26 and TC-27",
+   "evidence": "TC-15 isn't a real 5-seed run. It is a synthetic 2,000-step corridor determinism case (\"steps 2,000... seed 0, trained twice\") that M1-T21 checks. plan.md's Exit has the same wording: \"the real 5-seed ladder and reference runs pass TC-15, TC-16, TC-26 and TC-27\".",
+   "fix": "In both roadmap.md M1 Exit and plan.md Scope Exit, move TC-15 into the synthetic list: \"TC-01\u2013TC-25 and TC-28 pass (including TC-15); the real 5-seed runs pass TC-16, TC-26 and TC-27 within QR-01\u2013QR-05\"."
+  },
+  {
+   "id": "R45",
+   "class": "packet",
+   "severity": "low",
+   "file": "tasks/plan.md",
+   "quote": "**Read:** PL-01, PL-02, PL-04, TC-16, TC-26, TC-27, QR-01",
+   "evidence": "M1-T31's acceptance runs \"All five smoke commands\" and requires \"TC-01\u2013TC-28 pass\" (CORE-06). Its packet has neither PL-03 nor PL-05 (the eval and replay triggers), nor the TC-01\u2013TC-28 sections.",
+   "fix": "Add PL-03, PL-05 and CORE-06 to M1-T31's Read line, or reword the acceptance to \"the five smoke commands listed under Verify\"."
+  },
+  {
+   "id": "R46",
+   "class": "domain",
+   "severity": "low",
+   "file": "docs/spec.md",
+   "quote": "clips the policy's change to within 0.2 of its previous probability ratio",
+   "evidence": "PPO clips the new-to-old probability ratio to [1 \u2212 0.2, 1 + 0.2], i.e. within 0.2 of 1. It doesn't clip against a \"previous probability ratio\". The example and TC-43 use the correct form.",
+   "fix": "Change to \"...with an objective that clips the new-to-old probability ratio to between 0.8 and 1.2\"."
+  }
+ ],
+ "checked": {
+  "user_messages": 36,
+  "docs": 13,
+  "packets": 31
+ }
+}

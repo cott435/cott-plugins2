@@ -11,7 +11,7 @@ A pipeline is one workflow the user runs: an entry function reading as calls to 
 
 **Not for:** components or technologies (`architecture-design`), golden cases (`test-planning`), tasks (`build-planning`), code or contract changes. A change another skill owns (a contract type, a spec ID) is recorded for its Revise, never made here: `dt route architecture-design "<change>" --from pipeline-design` (or `spec-writing`), and listed at the gate.
 
-`dt` means `python3 ../../scripts/dt.py`, relative to this skill's folder, run from the project root.
+`dt` means `python3 ../../scripts/dt.py`, relative to this skill's folder, run from the project root; write it out each call, never as a shell variable.
 
 ## Modes
 

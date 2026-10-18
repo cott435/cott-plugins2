@@ -15,7 +15,7 @@ The brief (`docs/brief.md`) says **why** the project exists; idea files (`docs/i
 
 ## Preconditions
 
-Run `python3 ../../scripts/dt.py status --skill spec-writing` first (path relative to this skill's folder, run from the project root). It reports the mode, brief and spec status, `ideas_ready` (Accepted ideas waiting), `skills`, and `prefixes` (the next free requirement ID per prefix; use those, never count by hand).
+Run `python3 ../../scripts/dt.py status --skill spec-writing` first (path relative to this skill's folder, run from the project root; write it out each call, never as a shell variable). It reports the mode, brief and spec status, `ideas_ready` (Accepted ideas waiting), `skills`, and `prefixes` (the next free requirement ID per prefix; use those, never count by hand).
 
 1. Read `docs/brief.md`.
 2. A `Draft` input: ask whether the user accepts it, and proceed only once they do (set it `Accepted`).

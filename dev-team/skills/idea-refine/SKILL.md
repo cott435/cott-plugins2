@@ -19,7 +19,7 @@ Turns a raw idea into a focused direction and writes it down for the user to acc
 
 **Not for:** a user unsure what they want at all (`interview-me` if available); an accepted brief or idea that needs requirements (`spec-writing`); bug fixes or small changes with obvious requirements.
 
-`dt` means `python3 ../../scripts/dt.py`, relative to this skill's folder, run from the project root.
+`dt` means `python3 ../../scripts/dt.py`, relative to this skill's folder, run from the project root; write it out each call, never as a shell variable.
 
 ## Picking a mode
 

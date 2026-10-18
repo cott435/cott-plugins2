@@ -9,7 +9,7 @@ The build plan says **in what order** the pipelines get built. Once a stage's pi
 
 **Not for:** plans from agent-skills' `/plan` (foreign); pipelines, oracles or the quality bar (`pipeline-design`, `test-planning`, `build-setup`); building tasks. A fix their docs need (a `tests.md` smoke command, a contract type) goes to `dt route <owner> "<change>" --from build-planning`.
 
-`dt` means `python3 ../../scripts/dt.py`, relative to this skill's folder, run from the project root. IDs, coverage and lint come from `dt`, never by hand. Templates: `examples.md`.
+`dt` means `python3 ../../scripts/dt.py`, relative to this skill's folder, run from the project root; write it out each call, never as a shell variable. IDs, coverage and lint come from `dt`, never by hand. Templates: `examples.md`.
 
 ## Documents and IDs
 
@@ -21,7 +21,7 @@ The build plan says **in what order** the pipelines get built. Once a stage's pi
 
 - No roadmap stage for the work: route to `idea-refine`.
 - **References waiting:** route to `reference-intake`.
-- **Probes open:** `probes_blocking` (`PB-01 → service, ledger.BankTxn (M1)`) blocks New and Extend for that milestone: name the probe and route to `api-probe`. Cutting stages into milestone rows (`cut.md` steps 1–2) still runs. While blocked, offer one queued plan at most, never one per milestone. Only the user waives a probe (`api-probe`), never on a headless run.
+- **Probes open:** `probes_blocking` (`PB-01 → service, ledger.BankTxn (M1)`) blocks New and Extend for that milestone: name the probe and route to `api-probe`. Cutting stages into milestone rows (`cut.md` steps 1–2) still runs. While blocked, offer one queued plan at most. Only the user waives a probe (`api-probe`), never on a headless run.
 
 ## Modes
 
@@ -50,10 +50,10 @@ Before presenting the Draft:
 - `dt lint tasks/ docs/roadmap.md AGENTS.md` is clean.
 - `dt status --skill build-planning`: `uncovered`, `no_spine`, `mode_violations`, `boundaries_unfrozen`, `references_unrouted`, `skills_unrouted` and `stage_unrouted` empty, or each item explained on its task or under Open questions; `skills_missing` listed for the user. `dt ready` lists only the interface task(s).
 - `dt context` resolves for every task, under 2,000 lines; a contract symbol that doesn't resolve is routed (Not for).
-- Every plan header field is set; `tasks/plan.md` is ≤ ~400 lines.
+- Every plan header field is set.
 
 Then present:
-1. **What was written:** files; any cut (milestones, pipelines, the dependency lines); scope, exit, phases with task counts, critical path and widest wave, checkpoints.
+1. **What was written:** files; any cut (milestones, pipelines, dependency lines); scope, exit, phases with task counts, critical path and widest wave, checkpoints.
 2. **ASSUMPTIONS:** the cut, interfaces frozen, every unmitigated edge with its reason, folds, sizes, modes and overrides, skill and reference routing, `Read:` choices.
 3. **Open questions:** missing skills, overrides to confirm, anything Deferred, routed fixes.
 4. **Uncovered:** each Deferred ID with its target.

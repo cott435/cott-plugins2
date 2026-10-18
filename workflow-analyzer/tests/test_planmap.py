@@ -295,6 +295,69 @@ class GoalsToBuild(unittest.TestCase):
         self.assertRegex(t2, r'id="n-G1".*?served by</td><td><a href="#n-DATA">DATA</a>, <a href="#n-STAT">STAT</a>')
 
 
+def tied_lanes() -> dict:
+    """Iteration 8's R6, R7, R8 and F1 in one milestone: two lanes of five tie for the critical path,
+    T03 and T04 interchangeable in the first; each lane ends in two wiring tasks that write one
+    pipeline.py; T12 is a split task behind a spine, so its tester shares a wave with T11."""
+    tasks = [("T01", "interface", "", [], []), ("T02", "interface", "", [], []),
+             ("T03", "thicken", "split", ["T01"], ["a/x.py"]), ("T04", "thicken", "split", ["T01"], ["a/y.py"]),
+             ("T05", "thicken", "split", ["T02"], ["b/x.py"]),
+             ("T06", "wiring", "", ["T03", "T04"], ["a/pipeline.py", "tests/test_t06.py"]),
+             ("T07", "wiring", "", ["T06"], ["a/pipeline.py", "a/__main__.py"]),
+             ("T08", "wiring", "", ["T05"], ["b/pipeline.py"]), ("T09", "wiring", "", ["T08"], ["b/pipeline.py"]),
+             ("T10", "system", "", ["T07", "T09"], ["b/pipeline.py"]),
+             ("T11", "spine", "", ["T01"], ["c/z.py"]), ("T12", "thicken", "split", ["T11"], ["c/w.py"])]
+    nodes = [n("M1", "milestone", None, "Tied")]
+    edges = []
+    for tid, kind, mode, deps, writes in tasks:
+        node = n(f"M1-{tid}", "task", "M1", f"task {tid}", {"kind": kind, "mode": mode or "solo"})
+        node["expects"] = {"writes": writes}
+        nodes.append(node)
+        edges += [{"from": f"M1-{tid}", "to": f"M1-{d}", "kind": "depends"} for d in deps]
+    edges += [{"from": f"M1-{a}", "to": f"M1-{b}", "kind": k, "reason": r} for a, b, k, r in [
+        ("T07", "T06", "file", "both write a/pipeline.py"), ("T06", "T03", "order", "integration: the smoke runs it"),
+        ("T03", "T04", "order", "the fixture T04 writes"), ("T08", "T05", "order", "")]]
+    return {"schema": "plan-map/2", "producer": "test", "snapshots": [
+        {"turn": 1, "skill": "build-planning", "nodes": nodes, "edges": edges}]}
+
+
+class TiedLanes(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.out, _ = render(tied_lanes())
+        cls.g = planmap.Graph(planmap.load(cls.out).final, "M1")
+        cls.page = (cls.out / "plan" / "M1.html").read_text(encoding="utf-8")
+
+    def test_file_and_integration_come_before_order(self):
+        self.assertEqual(self.g.metrics()["unmitigated"], {"integration": 1, "shared file": 1,
+                                                           "side-effect order": 1, "order, no reason": 1})
+
+    def test_every_tied_lane_is_drawn(self):
+        lanes = [[[planmap.short(t, "M1") for t in alt] for alt in lane] for lane in self.g.cp_lanes]
+        self.assertEqual(lanes, [[["T01"], ["T03", "T04"], ["T06"], ["T07"], ["T10"]],
+                                 [["T02"], ["T05"], ["T08"], ["T09"], ["T10"]]])
+        self.assertEqual(self.g.cp_paths, 3)
+        self.assertEqual(self.g.cp, ["M1-T01", "M1-T03", "M1-T06", "M1-T07", "M1-T10"])
+        bold = {k[0] for k in self.g.cp_segments}
+        self.assertEqual(bold, {f"M1-T{i:02d}" for i in range(1, 11)})
+        self.assertIn("critical paths (2 lanes tie) T01 → (T03 | T04) → T06 → T07 → T10; "
+                      "T02 → T05 → T08 → T09 → T10", self.page)
+        self.assertIn("2 lanes tie", self.page)
+        self.assertEqual(len(re.findall(r'<path [^>]*class="e cp', self.page)), len(self.g.cp_pairs))
+
+    def test_the_widest_wave_counts_boxes_and_whole_tasks(self):
+        m = self.g.metrics()
+        self.assertEqual((m["widest"], m["widest_tasks"]), (5, 4))
+        self.assertIn("5 boxes<i>(4 whole tasks)</i>", self.page)
+
+    def test_shared_entry_edges_are_marked(self):
+        self.assertEqual(self.g.entry_pairs, {("M1-T07", "M1-T06"): ["a/pipeline.py"],
+                                              ("M1-T09", "M1-T08"): ["b/pipeline.py"]})
+        self.assertEqual(self.page.count(">entry</text>"), 2)
+        self.assertIn("2 wiring → wiring edges through a shared entry module, 2 on the critical path", self.page)
+        self.assertIn("shared file · shared entry module", self.page)
+
+
 class WithARun(unittest.TestCase):
     def test_axis_and_skills_come_from_the_run(self):
         index = {"title": "a run", "project": "/p", "turns": [

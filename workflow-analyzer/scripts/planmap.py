@@ -36,8 +36,9 @@ Pages, all static HTML and inline SVG with no scripts, written into `<out>/plan/
               each node's expectations.
   M<n>.html   one milestone's build: columns are waves, lanes are task kinds; interface tasks
               are diamonds whose "unblocks" edges are dashed; a split task is two segments,
-              tester then implementer, and the tester waits only on interface tasks; the
-              critical path is thick. Waves are the longest path to each segment; a barycenter
+              tester then implementer, and the tester waits only on interface tasks; every
+              tied critical path is thick; an edge between two wiring tasks that write one entry
+              module is orange. Waves are the longest path to each segment; a barycenter
               pass orders each cell. Metrics (waves of segments and of whole tasks; data and
               call edges mitigated; unmitigated rows by why they stay), the producer's own
               numbers beside them, and a thumbnail per turn that changed the graph.
@@ -69,6 +70,7 @@ KIND_COLOR = {"interface": "c6", "spine": "c0", "wiring": "c2", "thicken": "c1",
 GRAPH_KINDS = ("data", "call", "file", "code", "contract-change", "order")
 SIZE_W = {"XS": 1, "S": 2, "M": 4, "L": 8, "XL": 16}
 CP_CAP = 15
+ENTRY_NAMES = ("__main__.py", "pipeline.py")  # a file by these names is a pipeline entry module
 PLURAL = {"goal": "Goals", "feature": "Features", "requirement": "Requirements", "stage": "Stages", "milestone": "Milestones", "task": "Tasks", "pipeline": "Pipelines",
           "step": "Steps", "test": "Tests", "type": "Types", "symbol": "Symbols"}
 TITLED = {"goal", "stage", "feature", "milestone", "pipeline"}  # levels whose ledger chips carry the title
@@ -359,6 +361,8 @@ class Graph:
                     self.external.append(e)
         self.graph_edges = [e for e in s.edges if e["kind"] in GRAPH_KINDS and e["from"] in ids and e["to"] in ids]
         self.interface_first = any(k == "interface" for k in self.kind.values())
+        self.entry_pairs = {(t, d): f for t in sorted(ids, key=natural) for d in self.deps[t]
+                            if (f := self.shared_entry(t, d))}
         self.cycles: list[tuple[str, str]] = []
         self._segments()
         self._layers()
@@ -434,9 +438,15 @@ class Graph:
         self.waves = [sorted((k for k in layer if layer[k] == w), key=lambda k: natural(k[0])) for w in range(self.n_waves)]
 
     def _critical_path(self) -> None:
-        """A longest path. Ties go to the producer's own critical path, then to an edge between
-        two tasks over one inside a split task, then to the heavier size, then to the id."""
-        self.cp_segments: list[tuple[str, str]] = []
+        """Every longest path, drawn: `cp_segments` and `cp_pairs` are the segments and edges on
+        any of them, `cp_lanes` the paths as task chains, tied ones merged where they differ in one
+        task. `cp` is one of them, named in the metrics. Ties for it go to the producer's own
+        critical path, then to an edge between two tasks over one inside a split task, then to the
+        heavier size, then to the id."""
+        self.cp_segments: set[tuple[str, str]] = set()
+        self.cp_pairs: set = set()
+        self.cp_lanes: list[list[list[str]]] = []
+        self.cp_paths = 0
         self.cp: list[str] = []
         if not self.layer:
             return
@@ -457,9 +467,56 @@ class Graph:
             cur = max(cands, key=lambda p, c=cur: key(p, c))
             path.append(cur)
         path.reverse()
-        self.cp_segments = path
         self.cp = list(dict.fromkeys(k[0] for k in path))
-        self.cp_pairs = set(zip(path, path[1:]))
+        # height: the longest run of segments after k; k is on a longest path when layer + height = top
+        height: dict = {}
+        for k in sorted(self.layer, key=lambda k: -self.layer[k]):
+            height[k] = max((height[s] + 1 for s in self.succs[k]), default=0)
+        self.cp_segments = {k for k in self.layer if self.layer[k] + height[k] == top}
+        self.cp_pairs = {(p, k) for k in self.cp_segments for p in self.preds[k]
+                         if p in self.cp_segments and self.layer[p] + 1 + height[k] == top}
+        self._cp_lanes(path)
+
+    def _cp_lanes(self, primary: list[tuple[str, str]], cap: int = 200) -> None:
+        """The longest paths as task chains, the primary first. Chains of one length that differ in
+        a single task merge into one lane with alternatives there. Past `cap` paths only the
+        primary is listed; `cp_paths` still counts them all."""
+        into: dict = {}
+        for p, k in self.cp_pairs:
+            into.setdefault(k, []).append(p)
+        count: dict = {}
+        for k in sorted(self.cp_segments, key=lambda k: self.layer[k]):
+            count[k] = sum(count[p] for p in into.get(k, [])) or 1
+        ends = [k for k in self.cp_segments if self.layer[k] == self.n_waves - 1]
+        self.cp_paths = sum(count[k] for k in ends)
+
+        def tasks(path) -> tuple[str, ...]:
+            return tuple(dict.fromkeys(k[0] for k in path))
+
+        first = tasks(primary)
+        if self.cp_paths > cap:
+            self.cp_lanes = [[[t] for t in first]]
+            return
+        paths: list[list] = [[k] for k in self.cp_segments if self.layer[k] == 0]
+        for _ in range(self.n_waves - 1):
+            paths = [p + [k] for p in paths for k in self.succs[p[-1]] if (p[-1], k) in self.cp_pairs]
+        chains = sorted({tasks(p) for p in paths}, key=lambda c: (c != first, [natural(t) for t in c]))
+        lanes = [[{t} for t in c] for c in chains]
+        merged = True
+        while merged:
+            merged = False
+            for i in range(len(lanes)):
+                for j in range(i + 1, len(lanes)):
+                    a, b = lanes[i], lanes[j]
+                    diff = [x for x in range(len(a)) if a[x] != b[x]] if len(a) == len(b) else []
+                    if len(diff) == 1:
+                        a[diff[0]] |= b[diff[0]]
+                        del lanes[j]
+                        merged = True
+                        break
+                if merged:
+                    break
+        self.cp_lanes = [[sorted(s, key=natural) for s in lane] for lane in lanes]
 
     def _task_waves(self) -> None:
         """Waves of whole tasks, the way a producer counts them, to set beside its numbers."""
@@ -520,9 +577,19 @@ class Graph:
         w = self.snap.nodes[t]["expects"].get("writes") or []
         return [str(x) for x in w] if isinstance(w, list) else [str(w)]
 
+    def shared_entry(self, a: str, b: str) -> list[str]:
+        """The entry modules (`__main__.py`, `pipeline.py`) two wiring tasks both write: an edge
+        between them only serializes the two."""
+        if self.kind.get(a) != "wiring" or self.kind.get(b) != "wiring":
+            return []
+        return sorted({x for x in self.writes(a) if x.rsplit("/", 1)[-1] in ENTRY_NAMES
+                       and write_overlap([x], self.writes(b))})
+
     def reason_class(self, e: dict) -> str:
         """Why an unmitigated dependency-graph row stays, read from its structure (the kinds of
-        its two tasks, their steps and Writes), not its wording. "" for a mitigated row."""
+        its two tasks, their steps and Writes), not its wording. "" for a mitigated row. A file
+        row and integration are tested before a generic order, in step with dev-team's
+        `dtrun.unmitigated_class`: the design writes integration rows as `order`."""
         if e["mitigated_by"]:
             return ""
         a, b, kind = e["from"], e["to"], e["kind"]
@@ -531,18 +598,20 @@ class Graph:
             return "data or call, not mitigated"
         if kind == "contract-change":
             return "contract change"
-        if kind == "order":
-            return "side-effect order" if e["reason"] else "order, no reason"
-        if ka in ("wiring", "system"):
-            return "integration"
+        if kind == "order" and not e["reason"]:
+            return "order, no reason"
         if kind == "file":
             return "shared file"
+        if ka in ("wiring", "system"):
+            return "integration"
         if kind == "code" and ka in ("spine", "thicken") and kb in ("spine", "thicken"):
             sa = self.snap.nodes[a]["attrs"].get("step")
             sb = self.snap.nodes[b]["attrs"].get("step")
             if (sa and sa == sb) or write_overlap(self.writes(a), self.writes(b)):
                 return "same module"
             return "across steps"
+        if kind == "order":
+            return "side-effect order"
         return "other"
 
     def metrics(self) -> dict:
@@ -555,7 +624,7 @@ class Graph:
             if c:
                 why[c] = why.get(c, 0) + 1
         return {"tasks": len(self.tasks), "cp": len(self.cp), "waves": self.n_waves, "width": width,
-                "task_waves": len(self.task_waves),
+                "task_waves": len(self.task_waves), "widest_tasks": max(map(len, self.task_waves), default=0),
                 "widest": max(width, default=0), "parallelism": len(self.tasks) / len(self.cp) if self.cp else 0.0,
                 "edges": len(self.graph_edges), "mitigated": len(mitigated),
                 "dc": len(dc), "dc_mitigated": sum(1 for e in dc if e["mitigated_by"]),
@@ -570,7 +639,7 @@ REASON_TIP = {
     "integration": "a wiring or system task waits on what it wires or runs",
     "same module": "a code edge between spine or thicken tasks of the same step, or whose Writes overlap",
     "shared file": "a file edge: the two tasks write the same file",
-    "side-effect order": "an order edge with a reason",
+    "side-effect order": "an order edge with a reason that is neither shared file nor integration",
     "contract change": "a contract-change edge",
     "across steps": "a code edge between spine or thicken tasks of different steps: it serializes them",
     "data or call, not mitigated": "an interface could have frozen this boundary",
@@ -627,6 +696,8 @@ svg.mg .nmeta{fill:var(--muted);font-size:10px}svg.mg .head{fill:var(--fg);font-
 svg.mg .lanel{fill:var(--fg);font-size:12px;font-weight:700}
 svg .e{fill:none;stroke:var(--muted);stroke-width:1.2;opacity:.75}svg .e.unb{stroke-dasharray:5 4;opacity:.4}
 svg .e.cp{stroke:var(--fg);stroke-width:3;opacity:1}svg .e.sp{stroke:var(--muted);stroke-width:2;opacity:.9}
+svg .e.ent{stroke:var(--warn);opacity:1}svg .e.ent:not(.cp){stroke-width:2}svg .arrowent{fill:var(--warn)}
+svg.mg .entl{fill:var(--warn);font-size:9px;font-weight:700}
 svg .arrowhead{fill:var(--muted)}svg .arrowcp{fill:var(--fg)}svg a:hover .nb{stroke:var(--fg)}
 .thumbs{display:flex;flex-wrap:wrap;gap:10px}.thumb{border:1px solid var(--line);border-radius:6px;padding:4px 6px;
 background:var(--box);font-size:11.5px;color:var(--muted);text-decoration:none}.thumb.cur{border-color:var(--fg)}
@@ -889,12 +960,12 @@ def milestone_rows(plan: Plan) -> str:
                     f'<td>{esc(node.get("status") or "—")}</td><td>T{s.turn:02d}</td><td>{m["tasks"]}</td>'
                     f'<td class="{"bad" if m["cp"] > CP_CAP else ""}">{m["cp"]}</td>'
                     f'<td>{m["waves"]} ({m["task_waves"]})</td>'
-                    f'<td>{m["widest"]}</td><td>{m["parallelism"]:.1f}</td>'
+                    f'<td>{m["widest"]} ({m["widest_tasks"]})</td><td>{m["parallelism"]:.1f}</td>'
                     f'<td>{mitigated}</td></tr>')
     if not rows:
         return "<p>No milestone has tasks yet.</p>"
     return ('<table><tr><th>Milestone</th><th>Title</th><th>Status</th><th>As of</th><th>Tasks</th><th>Critical path</th>'
-            '<th>Waves of boxes (of whole tasks)</th><th>Widest wave</th><th>Parallelism</th>'
+            '<th>Waves of boxes (of whole tasks)</th><th>Widest wave, boxes (whole tasks)</th><th>Parallelism</th>'
             '<th>Data and call edges mitigated</th></tr>' + "".join(rows) + "</table>")
 
 
@@ -1483,7 +1554,7 @@ def node_tip(g: Graph, t: str, half: str) -> str:
     return (f"{t} · {n['title']}" + (f" ({what})" if what else "")
             + f"\n{' · '.join(str(a[x]) for x in ('kind', 'size', 'mode') if a.get(x)) or 'no kind'}"
             + (f" · {n['status']}" if n["status"] else "")
-            + f"\ndepends on: {deps}\nwrites: {writes}" + ("\non the critical path" if t in g.cp else ""))
+            + f"\ndepends on: {deps}\nwrites: {writes}" + ("\non the critical path" if any(k[0] == t for k in g.cp_segments) else ""))
 
 
 def graph_svg(g: Graph, turn: int) -> str:
@@ -1516,23 +1587,30 @@ def graph_svg(g: Graph, turn: int) -> str:
                    f'<text x="{x + CW / 2}" y="16" text-anchor="middle" class="head">W{w}</text>'
                    f'<text x="{x + CW / 2}" y="30" text-anchor="middle">{len(g.waves[w])} agent'
                    f'{"" if len(g.waves[w]) == 1 else "s"}</text>')
-    edges = []
+    edges, labels = [], []
     for k, ps in g.preds.items():
         for p in ps:
             x1, y1 = xy(p)
             x2, y2 = xy(k)
             ax, ay, bx, by = x1 + NW, y1 + NH / 2, x2, y2 + NH / 2
-            cp = (p, k) in getattr(g, "cp_pairs", set())
+            cp = (p, k) in g.cp_pairs
             inside = p[0] == k[0]
             unb = g.kind.get(p[0]) == "interface"
-            cls = "e" + (" cp" if cp else " sp" if inside else " unb" if unb else "")
+            ent = g.entry_pairs.get((k[0], p[0])) if not inside else None
+            cls = "e" + (" cp" if cp else " sp" if inside else " unb" if unb else "") + (" ent" if ent else "")
             dx = max(30, (bx - ax) / 2)
             what = ("tester then implementer" if inside
                     else f"{k[0]}'s tester waits on the interface {p[0]}" if k[1] == "test"
                     else f"{k[0]} depends on {p[0]}" + (" (unblocked by the interface)" if unb else ""))
-            edges.append((cp, f'<path d="M{ax:.1f},{ay:.1f} C{ax + dx:.1f},{ay:.1f} {bx - dx:.1f},{by:.1f} {bx:.1f},{by:.1f}" '
-                              f'class="{cls}" marker-end="url(#{"acp" if cp else "a"})"><title>{esc(what)}</title></path>'))
-    out += [e for cp, e in edges if not cp] + [e for cp, e in edges if cp]
+            if ent:
+                what += f"; both write {', '.join(ent)}: a shared entry module serializes two wiring tasks"
+            mark = "aent" if ent else "acp" if cp else "a"
+            if ent:  # by the arrowhead, over the boxes: the gap between two waves is narrow and edges cross
+                labels.append(f'<text x="{bx - 15:.1f}" y="{by - 6:.1f}" text-anchor="middle" '
+                              f'class="entl"><title>{esc(what)}</title>entry</text>')
+            edges.append((cp or bool(ent), f'<path d="M{ax:.1f},{ay:.1f} C{ax + dx:.1f},{ay:.1f} {bx - dx:.1f},{by:.1f} {bx:.1f},{by:.1f}" '
+                                           f'class="{cls}" marker-end="url(#{mark})"><title>{esc(what)}</title></path>'))
+    out += [e for top, e in edges if not top] + [e for top, e in edges if top]
     for k in place:
         t, half = k
         x, y = xy(k)
@@ -1565,10 +1643,13 @@ def graph_svg(g: Graph, turn: int) -> str:
                     + f'<text x="{x + 11}" y="{y + 46}" class="nmeta">{esc(meta)}</text>')
         tick = f'<text x="{x + NW - 6}" y="{y + 15}" text-anchor="end" class="done">✓</text>' if done else ""
         out.append(f'<a href="{tpage(turn)}#{anchor(t)}"><g><title>{esc(tip)}</title>{shape}{text}{tick}</g></a>')
+    out += labels
     defs = ('<defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">'
             '<path d="M0,0 L10,5 L0,10 z" class="arrowhead"/></marker>'
             '<marker id="acp" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto">'
-            '<path d="M0,0 L10,5 L0,10 z" class="arrowcp"/></marker></defs>')
+            '<path d="M0,0 L10,5 L0,10 z" class="arrowcp"/></marker>'
+            '<marker id="aent" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto">'
+            '<path d="M0,0 L10,5 L0,10 z" class="arrowent"/></marker></defs>')
     return (f'<svg class="mg" xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" '
             f'viewBox="0 0 {width} {height}" role="img" aria-label="Build waves of {esc(g.mid)}">{defs}{"".join(out)}</svg>')
 
@@ -1591,8 +1672,10 @@ def thumb_svg(g: Graph, tw: int = 168, th: int = 86) -> str:
     for k, ps in g.preds.items():
         for p in ps:
             (x1, y1), (x2, y2) = xy(p), xy(k)
-            cp = (p, k) in getattr(g, "cp_pairs", set())
-            out.append(f'<line x1="{x1:.1f}" y1="{y1:.1f}" x2="{x2:.1f}" y2="{y2:.1f}" class="e{" cp" if cp else ""}"/>')
+            cp = (p, k) in g.cp_pairs
+            ent = p[0] != k[0] and (k[0], p[0]) in g.entry_pairs
+            out.append(f'<line x1="{x1:.1f}" y1="{y1:.1f}" x2="{x2:.1f}" y2="{y2:.1f}" '
+                       f'class="e{" cp" if cp else ""}{" ent" if ent else ""}"/>')
     for k in place:
         x, y = xy(k)
         r = min(4.0, rh / 2.4, cw / 5)
@@ -1608,10 +1691,11 @@ def write_milestone(plan: Plan, mid: str, d: Path) -> Path:
     node = plan.ever.get(mid) or {"title": "", "status": "", "expects": {}}
     theirs = s.builds.get(mid) or {}
     tiles = [(str(m["tasks"]), "tasks", ""),
-             (str(m["cp"]), "critical path (tasks)", f'<i class="{"bad" if m["cp"] > CP_CAP else "ok"}">cap {CP_CAP}</i>'),
+             (str(m["cp"]), "critical path (tasks)", f'<i class="{"bad" if m["cp"] > CP_CAP else "ok"}">cap {CP_CAP}</i>'
+              + (f" <i>· {len(g.cp_lanes)} lanes tie</i>" if len(g.cp_lanes) > 1 else "")),
              (str(m["waves"]), "waves of boxes (tester and implementer apart)",
               f"<i>whole tasks: {m['task_waves']}</i>"),
-             (str(m["widest"]), "agents in the widest wave", ""),
+             (f"{m['widest']} boxes", "agents in the widest wave", f"<i>({m['widest_tasks']} whole tasks)</i>"),
              (f"{m['parallelism']:.1f}", "parallelism (tasks ÷ critical path)", ""),
              (f"{m['dc_mitigated']}/{m['dc']}" if m["dc"] else "—", "data and call edges mitigated",
               f"<i>{m['dc_mitigated'] / m['dc']:.0%}</i>" if m["dc"] else "")]
@@ -1634,6 +1718,15 @@ def write_milestone(plan: Plan, mid: str, d: Path) -> Path:
                         f"Recomputed here from <code>depends</code> edges: critical path {len(g.cp)}, "
                         f"{len(g.task_waves)} waves of whole tasks ({esc(' | '.join(', '.join(w) for w in g.task_waves))}).")
                      + "</p>")
+    if g.entry_pairs:
+        by_files: dict[tuple, list[str]] = {}
+        for (t, dep), f in g.entry_pairs.items():
+            by_files.setdefault(tuple(f), []).append(f"{short(dep, mid)} → {short(t, mid)}")
+        on_cp = sum(1 for t, dep in g.entry_pairs if any(p[0] == dep and k[0] == t for p, k in g.cp_pairs))
+        groups = "; ".join(f'{esc(", ".join(f))}: {esc(", ".join(e))}' for f, e in by_files.items())
+        notes.append(f'<p class="warnp">{len(g.entry_pairs)} wiring → wiring edge{"" if len(g.entry_pairs) == 1 else "s"} '
+                     f'through a shared entry module, {on_cp} on the critical path. Both tasks write {groups}. '
+                     f'Each only serializes two wiring tasks; drawn in orange on the map.</p>')
     if g.cycles:
         notes.append(f'<p class="bad">Cycle in depends: dropped {esc(", ".join(f"{a} → {b}" for a, b in g.cycles))} to draw it.</p>')
     if not g.interface_first and any(g.split.values()):
@@ -1645,7 +1738,8 @@ def write_milestone(plan: Plan, mid: str, d: Path) -> Path:
     edge_rows = "".join(
         f"<tr><td>{esc(e['from'])}</td><td>{esc(e['to'])}</td><td>{esc(e['kind'])}</td>"
         f"<td class=\"{'ok' if e['mitigated_by'] else ''}\">{esc(e['mitigated_by'] or ('none: ' + e['reason'] if e['reason'] else 'none'))}</td>"
-        f"<td class=\"{'warnp' if g.reason_class(e) in REASON_FLAG else ''}\">{esc(g.reason_class(e) or '—')}</td>"
+        f"<td class=\"{'warnp' if g.reason_class(e) in REASON_FLAG or g.shared_entry(e['from'], e['to']) else ''}\">"
+        f"{esc(g.reason_class(e) or '—')}{' · shared entry module' if g.shared_entry(e['from'], e['to']) else ''}</td>"
         f"<td>{'yes' if e['to'] in g.deps.get(e['from'], []) else 'no'}</td></tr>"
         for e in sorted(g.graph_edges, key=lambda e: (natural(e["from"]), natural(e["to"]))))
     ext = "".join(f"<li>{esc(e['from'])} → {esc(e['to'])}</li>" for e in g.external)
@@ -1665,10 +1759,11 @@ def write_milestone(plan: Plan, mid: str, d: Path) -> Path:
     nav = back_nav(plan)
     nav.append(f'<a href="{tpage(plan.page_for(s.turn).turn) if plan.page_for(s.turn) else "#"}">the plan as of T{s.turn:02d}</a>')
     nav += [f'<a href="{mpage(o)}">{esc(o)}</a>' for o in plan.milestones() if o != mid]
-    cp = " → ".join(short(t, mid) for t in g.cp)
+    cp = "; ".join(" → ".join(short(alt[0], mid) if len(alt) == 1 else "(" + " | ".join(short(t, mid) for t in alt) + ")"
+                              for alt in lane) for lane in g.cp_lanes)
     body = f"""<h1>{esc(mid)} · {esc(node['title'])} · build view</h1>
 <div class="sub">as of T{s.turn:02d}{' · ' + esc(s.skill) if s.skill else ''} · {esc(node.get('status') or 'no status')}
- · critical path {esc(cp or '—')}</div>
+ · critical path{f"s ({len(g.cp_lanes)} lanes tie)" if len(g.cp_lanes) > 1 else ""} {esc(cp or '—')}</div>
 {charts.tiles(tiles)}
 {''.join(notes)}
 <h2>Waves</h2>
@@ -1676,7 +1771,9 @@ def write_milestone(plan: Plan, mid: str, d: Path) -> Path:
 on. Rows are task kinds. <span class="c6 sw" style="transform:rotate(45deg)"></span>An interface task is a diamond;
 dashed edges are what it unblocks. Solid edges are other <code>depends</code>; a split task is two boxes, the tester
 (dashed border) then the implementer. A tester waits only on the interface: the interface tasks among its task's
-ancestors, else all of the milestone's. Waves count boxes, so a split task can take two. The critical path is the thick line and the bold boxes; ✓ is done. Edges
+ancestors, else all of the milestone's. Waves count boxes, so a split task can take two. The critical path is the thick
+line and the bold boxes, every tied one drawn (in the line above, a lane's alternatives are in brackets); ✓ is done. An
+orange edge marked "entry" joins two wiring tasks that write the same entry module (<code>__main__.py</code> or <code>pipeline.py</code>). Edges
 an interface mitigates do not order the tasks and are listed below, not drawn. Hover a box for its dependencies and
 writes; click it for the task on the turn's page.</p>
 <div class="scroll">{graph_svg(g, plan.page_for(s.turn).turn if plan.page_for(s.turn) else s.turn)}</div>

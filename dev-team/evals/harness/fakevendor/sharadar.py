@@ -2,7 +2,10 @@
 
 Paths: Sharadar's own API (`/v1.0/data/<stocks|tickers|actions|sp500>`, `format=json|csv`) and the Nasdaq Data
 Link datatables (`/api/v3/datatables/SHARADAR/<SEP|TICKERS|ACTIONS|SP500>.json`) route by table name, so any base
-URL prefix works. Both need an `api_key` parameter. Filters: `ticker` (comma list), `permaticker`, `action`,
+URL prefix works. Both need the key, as an `api_key` parameter or an `X-Api-Token` header (what the official
+`nasdaq-data-link` SDK sends) or `X-Api-Key`. Errors are Nasdaq Data Link's `{"quandl_error": {"code", "message"}}`:
+QEAx01 (400) for a missing or wrong key, QEPx04 (403) for a SHARADAR table outside the plan's four, QECx02 (404) for
+a path that names no table. Filters: `ticker` (comma list), `permaticker`, `action`,
 `isdelisted`, `date`, `date.gte|gt|lte|lt`, `from`/`to`, `qopts.columns`. Pages hold 10,000 rows (`cursor` /
 `qopts.cursor_id`). Bulk: `years=full&status=true` or `qopts.export=true` gives the file size without the file.
 
@@ -260,8 +263,16 @@ def new_state():
     return {}
 
 
+KEY_HEADERS = ("x-api-token", "x-api-key")
+
+
 def key_of(req):
-    return req["params"].get("api_key") or req["headers"].get("X-Api-Key") or req["headers"].get("x-api-key") or ""
+    headers = {k.lower(): v for k, v in req["headers"].items()}
+    return req["params"].get("api_key") or next((headers[h] for h in KEY_HEADERS if headers.get(h)), "")
+
+
+def _error(status, code, message):
+    return status, "application/json", json.dumps({"quandl_error": {"code": code, "message": message}})
 
 
 def _table_name(path):
@@ -278,10 +289,17 @@ def handle(req, state):
     ndl = "datatables" in path.lower()
     table = _table_name(path)
     note = {"table": table, "style": "ndl" if ndl else "sharadar"}
-    if not key_of(req):
-        return 403, "application/json", json.dumps({"error": {"code": "missing_api_key", "message": "api_key is required"}}), note
+    key, expect = key_of(req), req.get("expect_key")
+    if not key or expect is not None and key != expect:
+        return (*_error(400, "QEAx01", "We could not recognize your API key. Please make sure you have entered it "
+                        "correctly."), note)
     if not table:
-        return 404, "application/json", json.dumps({"error": {"code": "not_found", "message": f"no table at {path}"}}), note
+        other = re.search(r"/SHARADAR/([A-Za-z0-9_]+)", path, re.I)
+        if other:
+            note["table"] = other.group(1).upper()
+            return (*_error(403, "QEPx04", "You do not have permission to view this dataset. Please subscribe to "
+                            "this database to get access."), note)
+        return (*_error(404, "QECx02", f"You have submitted an incorrect Quandl code: no table at {path}."), note)
     cols = COLUMNS[table]
     if p.get("status", "").lower() == "true" or p.get("qopts.export", "").lower() == "true":
         n = {"sep": 5_100_000, "tickers": 40, "actions": 2_400, "sp500": 1_000}[table]

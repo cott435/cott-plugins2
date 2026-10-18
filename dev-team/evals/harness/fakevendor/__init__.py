@@ -44,7 +44,8 @@ class _Handler(BaseHTTPRequestHandler):
                 body = json.loads(raw)
             except ValueError:
                 body = {k: v[-1] for k, v in urllib.parse.parse_qs(raw.decode(errors="ignore")).items()}
-        req = {"method": method, "path": url.path, "params": params, "body": body, "headers": dict(self.headers)}
+        req = {"method": method, "path": url.path, "params": params, "body": body, "headers": dict(self.headers),
+               "expect_key": self.expect_key}
         code, ctype, payload, note = self.vendor.handle(req, self.state)
         headers = note.pop("_headers", {}) if isinstance(note, dict) else {}
         key = self.vendor.key_of(req)

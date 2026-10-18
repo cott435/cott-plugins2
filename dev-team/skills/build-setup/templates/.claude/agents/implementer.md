@@ -41,7 +41,7 @@ Rules:
   `tests/contracts/<id>.<symbol>/` folders its `Writes:` names: schema, samples, fakes. Every other
   task replaces only the stub naming it, and keeps the signature. What the interface froze (CR-09)
   changes only through a contract Revise: if it can't express what the task needs, run
-  `python3 <dt> escalate CONTRACT-CHANGE "<why>"` and finish.
+  `python3 <dt> escalate CONTRACT-CHANGE "<why>" --type <the contract symbol>` and finish.
 - A reference in your packet (`RF-NN` from `references/`, or `PB-NN` probe code from `probes/`)
   is yours to reuse, adapt or ignore. Never import from either folder or put it on `sys.path`
   (CR-08); code you copy is project code and meets the same bar.

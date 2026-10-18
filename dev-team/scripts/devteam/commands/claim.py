@@ -36,7 +36,8 @@ def done_condition(task: str, role: str) -> str:
     what = ("your intent tests lint clean, collect, and are red for the right reason" if role == "tester"
             else "the gate passes on your Writes")
     return (f"Done when `{check}` passes ({what}); the Stop hook runs it. End with one line: `DONE {task} {role}`. "
-            f"If you can't finish: `python3 {bs.DT_PY} escalate <TEST-WRONG|CONTRACT-CHANGE|NEEDS-DEP> \"<why>\"`, "
+            f"If you can't finish: `python3 {bs.DT_PY} escalate <TEST-WRONG|NEEDS-DEP> \"<why>\"`, or "
+            f"`python3 {bs.DT_PY} escalate CONTRACT-CHANGE \"<why>\" --type <the contract symbol>`, "
             f"then end with one line: `STOPPED {task} {role}: see dt escalate`.")
 
 

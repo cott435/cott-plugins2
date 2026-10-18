@@ -6,8 +6,10 @@ landing commit); a tester half when its tests branch `dt/<task>-tests` exists.
 
 Holds, in the order they are reported:
 - **critical** — a recorded review has a Critical finding not yet resolved: nothing is released.
-- **escalation** — an unresolved NEEDS-DEP or CONTRACT-CHANGE escalation: nothing is released.
+- **escalation** — an unresolved NEEDS-DEP escalation, or a CONTRACT-CHANGE naming no type: nothing is released.
 - **barrier** — a `(barrier)` checkpoint whose reviews haven't all passed: no half of a task after it in the plan.
+- **contract** — an unresolved CONTRACT-CHANGE naming a contract type (`dt escalate CONTRACT-CHANGE --type`): no
+  half of a task that reads that type, nor of a task depending on the escalating one, directly or not.
 - **blocked** — a half rejected twice, three harness failures in a row, or a TEST-WRONG escalation unresolved.
 - **risk** — a task marked `**Risk:** external` with no `dt build resolve <task>`.
 """
@@ -22,7 +24,11 @@ from . import graph, md, model
 from .commands.roadmap import active_plan
 
 DEFAULT_CAP = 6
-GLOBAL_ESCALATIONS = ("NEEDS-DEP", "CONTRACT-CHANGE")
+
+
+def holds_all(esc: dict) -> bool:
+    """An escalation that holds every half: NEEDS-DEP, or a CONTRACT-CHANGE that names no type."""
+    return esc.get("kind") == "NEEDS-DEP" or (esc.get("kind") == "CONTRACT-CHANGE" and not esc.get("type"))
 
 
 def half_id(task: str, role: str) -> str:
@@ -126,9 +132,22 @@ class Build:
         if crit:
             out.append(f"critical: {', '.join(crit)} unresolved (dt build resolve <finding>)")
         for e in self.escalations.values():
-            if e.get("kind") in GLOBAL_ESCALATIONS:
+            if holds_all(e):
                 out.append(f"escalation: {e['claim']} {e['kind']}: {e.get('why', '')}")
         return out
+
+    def contract_hold(self, task: model.Task) -> str:
+        """Why a CONTRACT-CHANGE naming a type holds this task: it reads the type, or depends on the task that
+        escalated. "" when none does."""
+        for e in self.escalations.values():
+            if e.get("kind") != "CONTRACT-CHANGE" or not e.get("type") or e.get("task") == task.id:
+                continue
+            reads = {md.strip_md(r) for r in task.read}
+            if e["type"] in reads:
+                return f"escalation: {e['claim']} CONTRACT-CHANGE on {e['type']}, which {task.id} reads"
+            if e.get("task") in graph.ancestors(self.tasks, task.id):
+                return f"escalation: {e['claim']} CONTRACT-CHANGE on {e['type']}; {task.id} depends on {e['task']}"
+        return ""
 
     def review_passed(self, phase: Phase, pkg: str) -> bool:
         r = self.reviews.get(f"{phase.key}.{pkg}")
@@ -153,7 +172,7 @@ class Build:
     def blocked_why(self, task: model.Task, role: str) -> str:
         hid = half_id(task.id, role)
         esc = self.escalations.get(hid)
-        if esc and esc.get("kind") not in GLOBAL_ESCALATIONS:
+        if esc and not holds_all(esc):
             return f"escalated {esc['kind']}: {esc.get('why', '')}"
         rej = self.rejects.get(hid) or {}
         if rej.get("count", 0) >= 2:
@@ -202,7 +221,7 @@ class Build:
             elif (ph := self.barrier_for(t)) is not None:
                 why = f"barrier: checkpoint after {ph.key} not passed"
             else:
-                why = self.blocked_why(t, role)
+                why = self.blocked_why(t, role) or self.contract_hold(t)
             if why:
                 held.append({"id": t.id, "role": role, "why": why})
             else:

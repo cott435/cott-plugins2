@@ -15,7 +15,8 @@ Under `dt-build/land.lock`, with a clean main checkout, from the claim record:
 4. Implementer, solo: `git merge --squash` into the current branch (conflict → reset, reject `conflict`); the
    main checkout's `refs/worktree/checks-base` set to the pre-merge HEAD (for an implementer, plus the task's tests,
    which the half doesn't own), `scripts/check.sh gate --pkg <pkg>` on the merged tree, rerun once on failure (a pass
-   records an Important flaky finding; a second failure resets → reject `integration`); then one commit with the
+   records an Important flaky finding; a second failure resets → reject `integration`), with the role's Writes in the
+   main checkout's `.claude/.task_writes` meanwhile (a re-freeze's frozen contract folders); then one commit with the
    trailer `Dt-Landed: <task> <role>`, the todo.md tick and, for a task that builds a pipeline, `dt prebuild-clear`.
 5. Every outcome: a log event, the claim released, the worktree removed; its branch deleted after a landing.
 """
@@ -227,6 +228,18 @@ class Lander:
         return bs.out(self.root, "commit-tree", mt.stdout.split()[0], "-p", pre,
                       input=f"dt: {self.task.id} tests on {pre[:12]} (gate base)\n")
 
+    @contextlib.contextmanager
+    def claimed_writes(self):
+        """The role's Writes in the main checkout's `.claude/.task_writes` while its gate runs, as `dt claim` wrote
+        them in the worktree: `check.sh` opens a frozen contract folder a re-freeze task's Writes name (CR-09)."""
+        path = self.root / ".claude" / ".task_writes"
+        path.parent.mkdir(exist_ok=True)
+        path.write_text("".join(f"{w}\n" for w in bs.role_writes(self.task, self.role)), encoding="utf-8")
+        try:
+            yield
+        finally:
+            path.unlink(missing_ok=True)
+
     def reset(self, pre: str) -> None:
         bs.git(self.root, "reset", "-q", "--hard", "HEAD", check=False)
         bs.git(self.root, "update-ref", "refs/worktree/checks-base", pre, check=False)
@@ -241,19 +254,20 @@ class Lander:
         base = self.tests_on(pre) if self.role == "implementer" else pre
         bs.git(self.root, "update-ref", "refs/worktree/checks-base", base)
         args = ["gate", "--pkg", self.task.package]
-        rc, output = run_check(self.root, *args)
-        self.note(f"integration: scripts/check.sh {' '.join(args)} on the merged tree (rc {rc})", output)
         flaky = False
-        if rc != 0:
+        with self.claimed_writes():
             rc, output = run_check(self.root, *args)
-            self.note(f"integration rerun (rc {rc})", output)
+            self.note(f"integration: scripts/check.sh {' '.join(args)} on the merged tree (rc {rc})", output)
             if rc != 0:
-                self.reset(pre)
-                tasks = self.build_tasks()
-                deps = sorted(t.id for t in tasks if self.task.id in graph.ancestors(tasks, t.id))
-                return self.reject("integration", "the merged tree fails the gate twice; dependents: "
-                                   + (", ".join(deps) or "none"))
-            flaky = True
+                rc, output = run_check(self.root, *args)
+                self.note(f"integration rerun (rc {rc})", output)
+                flaky = rc == 0
+        if rc != 0:
+            self.reset(pre)
+            tasks = self.build_tasks()
+            deps = sorted(t.id for t in tasks if self.task.id in graph.ancestors(tasks, t.id))
+            return self.reject("integration", "the merged tree fails the gate twice; dependents: "
+                               + (", ".join(deps) or "none"))
         self.finish_docs(flaky)
         bs.git(self.root, "add", "-A")
         bs.git(self.root, "commit", "-q", "--no-verify", "-F", "-", input=self.message())

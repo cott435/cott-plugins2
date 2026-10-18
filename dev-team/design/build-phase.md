@@ -176,9 +176,9 @@ Run by the driver, in the main checkout. It takes a lock in `dt-build/` first, s
 
 Output: one JSON object `{"landed": bool, "reject": "writes|gate|escalated|conflict|integration|harness|null", "kind": "<escalation kind or null>", "detail_file": "<path>"}`. `harness` means the agent ended without a status line or on an API error: re-dispatched without counting toward a block.
 
-### 6.4 `dt escalate <kind> "<why>"` (new)
+### 6.4 `dt escalate <kind> "<why>" [--type <symbol>]` (new)
 
-Run by an agent that can't finish: `TEST-WRONG` (implementer: an intent test is wrong), `CONTRACT-CHANGE` (tester or implementer: the interface can't express what the task needs), `NEEDS-DEP` (a dependency isn't declared). It writes `escalations/<claim>.json`. `stop_gate.sh` lets an agent with an escalation record stop without passing its gate; without this, the gate blocks it three times and the escalation arrives as `GATE FAILED`.
+Run by an agent that can't finish: `TEST-WRONG` (implementer: an intent test is wrong), `CONTRACT-CHANGE --type <contract symbol>` (tester or implementer: the interface can't express what the task needs; the symbol is the one that falls short), `NEEDS-DEP` (a dependency isn't declared). It writes `escalations/<claim>.json`. A `CONTRACT-CHANGE` holds the halves of tasks whose `Read:` names the symbol and of the escalating task's dependents (every half when no symbol is given); a `NEEDS-DEP` holds every half. `stop_gate.sh` lets an agent with an escalation record stop without passing its gate; without this, the gate blocks it three times and the escalation arrives as `GATE FAILED`.
 
 ### 6.5 `dt build start | status | resolve | release` (new)
 

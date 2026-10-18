@@ -39,8 +39,8 @@ Rules:
 - Test only symbols a frozen interface declares: the types, signatures and samples in your packet,
   which the milestone's interface task wrote. They import now, even if their body is still
   `raise NotImplementedError("<task>")`. If the task needs a symbol, field or case the interface
-  can't express, don't guess or write around it: run `python3 <dt> escalate CONTRACT-CHANGE "<why>"`
-  and finish.
+  can't express, don't guess or write around it: run
+  `python3 <dt> escalate CONTRACT-CHANGE "<why>" --type <the contract symbol>` and finish.
 - Build inputs from the contract samples (`tests/contracts/<id>.<Type>/`) and golden fixtures, never
   from another step's code. The samples are shapes, not answers.
 - Golden cases load their inputs and expected values from `tests/fixtures/<pkg>/TC-NN/`. Never

@@ -371,6 +371,42 @@ class LandTest(BuildCase):
         self.assertEqual(ready["rows"], [])                                        # NEEDS-DEP drains everything
         self.assertTrue(ready["holds"][0].startswith("escalation: M1-T03.tester NEEDS-DEP"))
 
+    def test_contract_change_holds_readers_and_dependents_of_its_type(self):
+        self.to_phase1()
+        self.assertEqual(self.reserve(), [("M1-T02", "solo"), ("M1-T03", "tester")])
+        wt = self.worktree("t03")
+        self.assertEqual(self.claim("M1-T03", "tester", wt)[0], 0)
+        self.assertEqual(self.dt("escalate", "CONTRACT-CHANGE", "x", "--type", "core.Nope", root=wt)[0], 2)
+        self.assertEqual(self.dt("escalate", "NEEDS-DEP", "x", "--type", "core.Summary", root=wt)[0], 2)
+        code, _, _ = self.dt("escalate", "CONTRACT-CHANGE", "summarize can't take a window", "--type",
+                             "core.summarize", root=wt)
+        self.assertEqual(code, 0)
+        self.assertEqual(self.land("M1-T03", "tester")["kind"], "CONTRACT-CHANGE")
+        self.dt("build", "release", "M1-T02", "solo")
+        ready = self.ready()
+        held = {(h["id"], h["role"]): h["why"] for h in ready["held"]}
+        self.assertEqual((ready["rows"], ready["holds"]), ([], []))            # held by type, not globally
+        self.assertEqual(held[("M1-T02", "solo")],
+                         "escalation: M1-T03.tester CONTRACT-CHANGE on core.summarize, which M1-T02 reads")
+        self.assertTrue(held[("M1-T03", "tester")].startswith("escalated CONTRACT-CHANGE"))
+        self.dt("build", "resolve", "M1-T03")
+        self.assertEqual({(r["id"], r["role"]) for r in self.ready()["rows"]},
+                         {("M1-T02", "solo"), ("M1-T03", "tester")})
+
+    def test_contract_change_holds_the_escalating_tasks_dependents(self):
+        self.to_phase1()
+        self.reserve()
+        wt = self.worktree("t02")
+        self.assertEqual(self.claim("M1-T02", "solo", wt)[0], 0)
+        self.dt("escalate", "CONTRACT-CHANGE", "Numbers needs a unit", "--type", "core.Numbers", root=wt)
+        self.land("M1-T02", "solo")
+        self.dt("build", "release", "M1-T03", "tester")
+        held = {(h["id"], h["role"]): h["why"] for h in self.ready()["held"]}
+        self.assertEqual(held[("M1-T03", "tester")],                          # M1-T03 doesn't read core.Numbers
+                         "escalation: M1-T02.solo CONTRACT-CHANGE on core.Numbers; M1-T03 depends on M1-T02")
+        code, out = self.dt_json("build", "status")
+        self.assertEqual([b["id"] for b in out["blocked"]], ["M1-T02"])        # the hold isn't a block
+
     def test_integration_reject_resets(self):
         self.to_phase1()
         pre = self.head()

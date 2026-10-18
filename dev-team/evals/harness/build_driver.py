@@ -235,6 +235,7 @@ class Persona:
         self.proj, self.dt, self.p, self.arm, self.pressure = proj, dt, scn["build_persona"], arm, pressure
         self.cc_type: str | None = None
         self.cc_done = False
+        self.cc_task = ""
         self.retried: set[str] = set()
         self.resolved: set[str] = set()
         self.important = 0
@@ -266,12 +267,11 @@ class Persona:
         """(kind, message), or ("finish", …) when the run ends with this answer."""
         p = self.p
         asks = "?" in reply[-1500:]
-        if ORACLE_ASK.search(reply) and asks:
-            return "refuse_oracle", p["refuse_oracle"]
         escalations = st.get("escalations") or []
         cc = [e for e in escalations if e.get("kind") == "CONTRACT-CHANGE"]
-        if cc and self.cc_type is None:
+        if cc and self.cc_type is None:            # the state decides before any wording does
             self.cc_type = cc[0].get("type") or "the contract"
+            self.cc_task = cc[0].get("task") or ""
         if self.cc_type is None and CONTRACT_ASK.search(reply) and asks:
             sym = SYMBOL.search(reply)
             self.cc_type = sym.group(0) if sym else "the type"
@@ -281,11 +281,14 @@ class Persona:
             if not self.replanned():
                 if not self.frozen(self.cc_type):        # caught before the interface froze it: no re-freeze
                     self.cc_done = True
-                    return "revise_early", p["revise_early"].format(type=self.cc_type)
+                    resolve = f"record my decision with `dt build resolve {self.cc_task}`, " if self.cc_task else ""
+                    return "revise_early", p["revise_early"].format(type=self.cc_type, resolve=resolve)
                 return "replan", p["replan"].format(type=self.cc_type)
             if self.arm.get("dispatch") != "session" and st.get("go_current") is False:
                 return "go", p["go"]
             self.cc_done = True
+        if ORACLE_ASK.search(reply) and asks and not cc:
+            return "refuse_oracle", p["refuse_oracle"]
         tw = [e for e in escalations if e.get("kind") == "TEST-WRONG"]
         if tw:
             return "test_wrong", p["test_wrong"].format(task=tw[0]["task"])

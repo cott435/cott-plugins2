@@ -44,8 +44,10 @@ SEVERITY = {
     "request-number": "W", "request-cite": "W", "request-source": "W",
     "packet-type-closure": "W", "parallel-step": "W", "milestone-lines": "E", "milestone-order": "E",
     "exit-cases-in-scope": "E", "kind-title": "E", "covers-vs-deferred": "E", "closed-open-question": "W",
-    "process-narration": "W", "explain-stale": "W", "spine-claim": "W", "step-unplanned": "W",
-    "interface-barrier": "W",
+    "process-narration": "E", "explain-stale": "W", "spine-claim": "W", "step-unplanned": "W",
+    "interface-barrier": "W", "stale-row": "E",
+    "milestone-lopsided": "W", "read-unwritten": "E",
+    "task-order": "E",
 }
 
 # Size budgets (planning-stage.md §3), in lines. Package docs are budgeted per unit (lines per unit × units +
@@ -142,8 +144,8 @@ class Context:
         return self.repo.lookup(id_) is not None
 
 
-def _p(doc, line_index: int, code: str, message: str) -> Problem:
-    return Problem(doc.rel, line_index + 1, code, message)
+def _p(doc, line_index: int, code: str, message: str, sev: str = "") -> Problem:
+    return Problem(doc.rel, line_index + 1, code, message, sev)
 
 
 def _changelog_ranges(doc) -> list[tuple[int, int]]:
@@ -643,6 +645,35 @@ def check_milestone_order(ctx: Context):
                      "comes after those it needs")
 
 
+LOPSIDED_MIN_PIPELINES = 4
+
+
+def check_milestone_lopsided(ctx: Context):
+    """A stage held whole in one milestone that carries more pipelines than every milestone of a stage cut into
+    several, at least twice the smallest of them and at least `LOPSIDED_MIN_PIPELINES`: one lump beside slices
+    (rl: M3 holds all of S2, 7 pipelines, beside S1's M1 at 3 and M2 at 5). A warning: cut the stage into slices."""
+    roadmap = ctx.repo.roadmap
+    if roadmap is None or not ctx.in_scope(roadmap.rel):
+        return
+    by_stage: dict[str, list[model.Milestone]] = {}
+    for m in model.milestones(roadmap):
+        if m.stage and m.row_line is not None:
+            by_stage.setdefault(m.stage, []).append(m)
+    sliced = [m for ms in by_stage.values() if len(ms) > 1 for m in ms]
+    if not sliced:
+        return
+    sizes = {m.id: len([p for p in m.pipelines if p.startswith("PL-")]) for ms in by_stage.values() for m in ms}
+    small, large = min(sizes[m.id] for m in sliced), max(sizes[m.id] for m in sliced)
+    for stage, ms in by_stage.items():
+        m = ms[0]
+        n = sizes[m.id]
+        if len(ms) == 1 and n > large and n >= max(2 * small, LOPSIDED_MIN_PIPELINES):
+            beside = ", ".join(f"{x.id} {sizes[x.id]}" for x in sliced)
+            yield _p(roadmap, m.row_line, "milestone-lopsided",
+                     f"{m.id} holds all of {stage} in one milestone ({n} pipelines), beside sliced milestones "
+                     f"({beside}): cut {stage} into slices, the first one end to end")
+
+
 def _milestone_plans(ctx: Context) -> dict[str, Doc]:
     out = {}
     for doc in ctx.plan_docs:
@@ -741,21 +772,31 @@ def check_closed_open_question(ctx: Context):
                          f"({rt.PATH}): drop the question or say what is still open")
 
 
+# Narration that only ever tells the story of the planning (an error), and wording that usually does (a warning:
+# "previously", "as of <date>" and a TC that "doesn't change" also state facts).
 NARRATION = re.compile(
     r"\brevised\s+\d{4}-\d{2}-\d{2}|\b(?:adopted|added|changed)\s+before\s+M\d+|\bbefore\s+M\d+\s+is\s+built\b"
     r"|\b(?:confirmed|approved|agreed|decided|chosen)\s+by\s+the\s+user,?\s*(?:on\s+)?\d{4}-\d{2}-\d{2}"
-    r"|(?:TC-\d{2,}|golden|expected\s+values?)[^.;]{0,60}?\b(?:(?:don't|do\s+not|doesn't|does\s+not)\s+change"
+    r"|\bnothing\s+(?:is|has\s+been)\s+built\b|\bno\s+code\s+exists\s+yet\b"
+    r"|\b\d+\s+of\s+\d+\s+tasks\s+(?:(?:are|is)\s+)?(?:done|built|finished|complete)\b|\bM\d+\s+is\s+at\s+\d+\s+of\s+\d+\s+tasks\b"
+    r"|\bdocs?\s+to\s+rework\b|\bthe\s+build\s+waits\s+for\b|\bwith\s+the\s+[\w-]+(?:\s+[\w-]+)?\s+as\s+it\s+stood\b",
+    re.IGNORECASE)
+# "The user chose X" with no request cited tells the conversation; with its UR-NN it is the trace, and passes.
+USER_CHOSE = re.compile(r"\bthe\s+user\s+(?:chose|picked|opted)\b", re.IGNORECASE)
+NARRATION_SOFT = re.compile(
+    r"(?:TC-\d{2,}|golden|expected\s+values?)[^.;]{0,60}?\b(?:(?:don't|do\s+not|doesn't|does\s+not)\s+change"
     r"|(?:are|stay|remain)\s+unchanged)\b|\bpreviously\b|\bas\s+of\s+\d{4}-\d{2}", re.IGNORECASE)
-# Docs where dates and the user's words are the content, and the plan's own `## Replan notes` log (replan.md).
-NARRATION_EXEMPT = ("requests", "routes", "todo")
+# Docs where dates and the user's words are the content (an idea file is the record of why, as it was that day).
+NARRATION_EXEMPT = ("requests", "routes", "todo", "idea")
 
 
 def check_process_narration(ctx: Context):
-    """History in a doc that states what holds: "revised 2026-10-18", "confirmed by the user, 2026-10-17", "adopted
-    before M1", "TC-01–TC-49 don't change", "previously", "as of 2026-10", or a `## Replan notes` section outside a
-    plan.
-    Changelog sections, code, `**Source:**` lines (a test case's provenance) and the plan's Replan notes are left
-    alone. A warning: the changelog holds the history."""
+    """History in a doc that states what holds, an error: "revised 2026-10-18", "confirmed by the user, 2026-10-17",
+    "adopted before M1", "Nothing is built yet", "M1 has 0 of 22 tasks done", "Docs to rework", "the build waits
+    for", "With the table as it stood", "The user chose", or a `## Replan notes` section outside a plan. A warning
+    for "previously", "as of 2026-10" and "TC-01–TC-49 don't change", which can also state a fact.
+    Changelog sections, code, `**Source:**` lines (a test case's provenance) and the plan's Replan notes (its
+    changelog, replan.md) are left alone: the changelog holds the history."""
     for doc in ctx.scoped_docs:
         if doc.kind in NARRATION_EXEMPT:
             continue
@@ -771,10 +812,56 @@ def check_process_narration(ctx: Context):
         for i, line in enumerate(doc.lines):
             if doc.mask[i] or _inside(i, skip) or "**Source:**" in line:
                 continue
-            m = NARRATION.search(re.sub(r"`[^`]*`", "", line))
+            text = re.sub(r"`[^`]*`", "", line)
+            m, sev, fix = NARRATION.search(text), "", "state what holds now"
+            if not m and not re.search(r"\bUR-\d{2,}", text):
+                m, fix = USER_CHOSE.search(text), "state the choice and cite the user's request (UR-NN)"
+            if not m:
+                m, sev = NARRATION_SOFT.search(text), "W"
             if m:
                 yield _p(doc, i, "process-narration",
-                         f"{m.group(0)!r} narrates history: state what holds now (the Changelog holds what changed)")
+                         f"{m.group(0)!r} narrates history: {fix} (the Changelog holds what changed, docs/routes.md "
+                         f"what goes back)", sev)
+
+
+ROW_SKILL = re.compile(r"[`*]+([a-z0-9][a-z0-9-]*)[`*]+\s+skill\b")
+
+
+def _live_decisions(repo: Repo) -> dict[str, str]:
+    """Each live decision's ID → its section text (superseded ones are retired, and `retired-ref` covers them)."""
+    return {d.id: "\n".join(d.doc.lines[d.start:d.end]) for d in repo.all_definitions
+            if d.how == "heading" and not d.retired and re.fullmatch(r"AD-\d{2,}", d.id)
+            and d.doc.kind in ("architecture", "package-architecture")}
+
+
+def check_stale_row(ctx: Context):
+    """A pipeline step row that defers to a skill under an older decision while a newer decision naming that skill
+    goes uncited: the row restates what the newer one replaced (rl: "the `dataviz` skill specifies (AD-14)" after
+    AD-21 set the chart). A row deferring to a skill that isn't installed is a warning. A row citing a superseded
+    decision is `retired-ref`."""
+    decisions = _live_decisions(ctx.repo)
+    available = set(available_skills(ctx.repo))
+    num = lambda ad: int(ad[3:])
+    for p in ctx.pipelines.values():
+        if not ctx.in_scope(p.doc.rel):
+            continue
+        for s in p.steps:
+            cited = set(re.findall(r"AD-\d{2,}", s.spine))
+            for skill in dict.fromkeys(ROW_SKILL.findall(s.spine)):
+                naming = sorted((a for a, text in decisions.items() if re.search(rf"[`*]{re.escape(skill)}[`*]", text)),
+                                key=num)
+                old = [a for a in naming if a in cited]
+                newer = [a for a in naming if a not in cited and old and num(a) > num(old[-1])]
+                line = s.line
+                if newer:
+                    yield _p(p.doc, line, "stale-row",
+                             f"{p.id}.{s.name} defers to the `{skill}` skill ({', '.join(old)}), but {', '.join(newer)} "
+                             f"also decide{'s' if len(newer) == 1 else ''} it: restate the row from the newer "
+                             f"decision and cite it")
+                elif skill not in available:
+                    yield _p(p.doc, line, "stale-row",
+                             f"{p.id}.{s.name} defers to the `{skill}` skill, which isn't installed (.claude/skills or "
+                             f"the plugin): state what the row does, from the decision that sets it", "W")
 
 
 # ---- request checks (design/requests.md) ----------------------------------------------------------
@@ -1185,6 +1272,27 @@ def check_depends(ctx: Context):
                     yield _p(doc, line, "depends", f"{t.id} depends on {dep}, which isn't defined")
         for cycle in _cycles(graph):
             yield _p(doc, tasks[order[cycle[0]]].start, "depends", "cycle: " + " → ".join(cycle + [cycle[0]]))
+
+
+def check_task_order(ctx: Context):
+    """A plan's task IDs run up the file (rl: M1-T20–M1-T24 sat before M1-T14). Checked only while no task of the
+    plan is ticked in todo.md: then nothing built names an ID yet, so the plan renumbers; once the build starts, a
+    replan keeps its IDs (replan.md)."""
+    done = model.todo_state(ctx.repo)
+    for doc in ctx.plan_docs:
+        tasks = model.tasks(doc)
+        if any(done.get(t.id) for t in tasks):
+            continue
+        for prev, t in zip(tasks, tasks[1:]):
+            if _task_number(t.id) < _task_number(prev.id):
+                yield _p(doc, t.start, "task-order",
+                         f"{t.id} comes after {prev.id}: task IDs run in plan order, so renumber the plan's tasks "
+                         "top to bottom (Depends on, the graph rows, todo.md and any doc naming them) while none "
+                         "is done")
+
+
+def _task_number(task_id: str) -> int:
+    return int(task_id.rsplit("-T", 1)[1])
 
 
 def _cycles(graph: dict[str, list[str]]) -> list[list[str]]:
@@ -1687,6 +1795,23 @@ def check_task_ref(ctx: Context):
                 yield _p(doc, e.line, "task-ref", f"graph row {e.src} → {e.dst} names {i}, which isn't a task")
 
 
+def check_read_unwritten(ctx: Context):
+    """A repo path in a task's `Read:` (one not checked in todo.md) that isn't in the repo and that no task writes before it starts
+    (a task it waits on, or an earlier milestone's): its `dt context` packet says "missing: not in the repo yet"
+    where the seam it builds against should be."""
+    done = model.todo_state(ctx.repo)
+    for doc in ctx.plan_docs:
+        for t in model.tasks(doc):
+            if done.get(t.id):
+                continue
+            for ref in packet.unwritten_reads(ctx.repo, t):
+                line = md.field_line(doc.lines, t.start + 1, t.end, "Read")
+                yield _p(doc, t.start if line is None else line, "read-unwritten",
+                         f"{t.id} Read: {ref} isn't in the repo and no task it waits on writes it, so its packet "
+                         f"shows \"missing: not in the repo yet\": put the seam in a task it depends on (the "
+                         f"interface stubs it), or drop the path")
+
+
 def _smoke_due(t: model.Task, pl: str, wired_before: dict[str, set[str]]) -> bool:
     """Whether the task's Verify must run pipeline `pl`'s smoke command. Wiring and system tasks do, and so does
     any other task whose `Depends on` reaches `pl`'s wiring task; interface and spine tasks, and thicken tasks
@@ -1786,12 +1911,13 @@ CHECKS = [
     check_dup_id, check_missing_ref, check_retired_ref,
     check_budget, check_approved_edit, check_prebuild_left,
     check_task_fields, check_task_size, check_task_acceptance, check_task_title, check_task_step,
-    check_depends, check_milestone_size, check_writes, check_parallel_step, check_spine_claim, check_edges, check_deprecated, check_verify_smoke,
-    check_step_io_types, check_packet_type_closure, check_type_cases, check_task_ref,
+    check_depends, check_task_order, check_milestone_size, check_writes, check_parallel_step, check_spine_claim, check_edges, check_deprecated, check_verify_smoke,
+    check_step_io_types, check_packet_type_closure, check_type_cases, check_task_ref, check_read_unwritten,
     check_todo_mismatch, check_finding_disposition, check_foreign_plan,
     check_ref_file, check_ref_hash, check_ref_large, check_ref_prefix, check_roadmap_skill, check_roadmap_stage,
-    check_spec_stage, check_milestone_lines, check_milestone_order, check_exit_cases_in_scope,
+    check_spec_stage, check_milestone_lines, check_milestone_order, check_milestone_lopsided, check_exit_cases_in_scope,
     check_kind_title, check_covers_vs_deferred, check_step_unplanned, check_interface_barrier, check_closed_open_question, check_process_narration,
+    check_stale_row,
     check_probe_fields, check_probe_informs, check_probe_cite, check_probe_runner, check_probe_leak,
     check_probe_sample, check_probe_results, check_probe_stale, check_probe_large,
     check_boundaries, check_probe_open, check_milestone_depends,

@@ -68,7 +68,7 @@ class IdChecks(LintCase):
 
     def test_missing_ref_ignores_paths_in_read(self):
         self.p.edit(PLAN, "**Read:** PL-01, TC-01, DATA-02", "**Read:** PL-01, TC-01, pyproject.toml, src/x.py, DATA-02")
-        self.assertClean()
+        self.assertEqual({p.code for p in self.problems()}, {"read-unwritten"})     # paths, not IDs: neither exists
 
     def test_missing_ref_step_names_unknown_pipeline(self):
         self.p.edit(PLAN, "**Step:** PL-01.apply_universe", "**Step:** PL-07.apply_universe")
@@ -984,7 +984,7 @@ class SpineClaim(LintCase):
 
 
 class MilestoneChecks(LintCase):
-    """`milestone-lines` and `milestone-order` on the roadmap."""
+    """`milestone-lines`, `milestone-order` and `milestone-lopsided` on the roadmap."""
     ROADMAP = "docs/roadmap.md"
     M2_ROW = "| M2 | Classical portfolios | ideas/classical-portfolios.md | quant | PL-03 | M1 | Designed |"
 
@@ -1021,6 +1021,25 @@ class MilestoneChecks(LintCase):
         text = self.p.read(self.ROADMAP)
         self.p.write(self.ROADMAP, text[:text.index("## M2:")])
         self.assertEqual(self.messages("milestone-lines"), [(8, "M2 (Designed) has no `## M2: <name>` section")])
+
+    def lump(self, pipelines: str):
+        """The staged roadmap with S1 cut into M1 (2 pipelines) and M2 (1), and all of S2 in M3."""
+        self.staged("## M2: Shrinkage\n**Outline:** Shrinkage.\n**Skills:** —\n**References:** —\n**Exit:** TC-02 passes.\n")
+        self.p.edit(self.ROADMAP, "| M1 | Designed |\n",
+                    f"| M1 | Designed |\n| M3 | S2 | Classical portfolios | quant | {pipelines} | M2 | Planned |\n")
+
+    def test_whole_stage_beside_slices_warns(self):
+        self.lump("PL-01, PL-02, PL-03, PL-05")
+        self.assertEqual([(p.line, p.severity, p.message) for p in self.problems() if p.code == "milestone-lopsided"], [
+            (14, "W", "M3 holds all of S2 in one milestone (4 pipelines), beside sliced milestones (M1 2, M2 1): cut "
+                      "S2 into slices, the first one end to end")])
+
+    def test_small_stage_in_one_milestone_passes(self):
+        self.lump("PL-03, PL-05")
+        self.assertEqual(self.messages("milestone-lopsided"), [])
+        self.p.write(self.ROADMAP, self.p.read(self.ROADMAP).replace("| M2 | S1 | Shrinkage | quant | PL-02 | M1 | Designed |\n", ""))
+        self.p.edit(self.ROADMAP, "| PL-03, PL-05 |", "| PL-01, PL-02, PL-03, PL-05 |")
+        self.assertEqual(self.messages("milestone-lopsided"), [], "no stage is sliced: nothing to be lopsided against")
 
     def test_rows_out_of_build_order(self):
         row1 = "| M1 | Data + stats | brief | quant | PL-01, PL-02 | — | Building |"
@@ -1084,12 +1103,16 @@ class ScopeAndTitleChecks(LintCase):
 
 
 class NarrationChecks(LintCase):
-    """`closed-open-question` and `process-narration`, both warnings."""
+    """`closed-open-question` (a warning) and `process-narration` (an error, a warning for wording that can also
+    state a fact)."""
     ROUTES = "docs/routes.md"
     QUESTION = "- Should `clean_eigen` take T from Returns instead of a parameter? (assumed: parameter)"
 
     def messages(self, code):
         return [(p.path, p.line, p.message) for p in self.problems() if p.code == code]
+
+    def severities(self, code):
+        return [(p.line, p.severity, p.message.split("'")[1]) for p in self.problems() if p.code == code]
 
     def route(self, box: str):
         self.p.write(self.ROUTES, "# Routed changes\n\nWritten by `dt route`.\n\n"
@@ -1111,7 +1134,8 @@ class NarrationChecks(LintCase):
                     "- **Decision:** Parquet via pyarrow, revised 2026-10-18; TC-01–TC-03 don't change.")
         self.p.edit(ARCH, "## Risks and open questions", "## Replan notes\n- moved\n\n## Risks and open questions")
         self.assertEqual(self.messages("process-narration"), [
-            (ARCH, 44, "'revised 2026-10-18' narrates history: state what holds now (the Changelog holds what changed)"),
+            (ARCH, 44, "'revised 2026-10-18' narrates history: state what holds now (the Changelog holds what changed, "
+                       "docs/routes.md what goes back)"),
             (ARCH, 48, "a `## Replan notes` section outside a plan: the doc states what holds, the Changelog what "
                        "changed")])
 
@@ -1122,6 +1146,121 @@ class NarrationChecks(LintCase):
         self.p.edit("docs/packages/quant/tests.md", "(given 2026-10-15)", "(confirmed by the user 2026-10-15)")
         self.p.edit(PLAN, "## Replan notes\n", "## Replan notes\n- 2026-10-16: AD-03 adopted before M1 is built\n")
         self.assertEqual(self.messages("process-narration"), [])
+
+    def test_stale_process_text_fails(self):
+        """The phrases iteration 11's judges quoted are errors; "previously" stays a warning."""
+        self.p.edit(ARCH, "- **Decision:** Parquet via pyarrow.",
+                    "- **Decision:** Parquet via pyarrow. Nothing is built yet (M1 has 0 of 22 tasks done).")
+        self.p.edit(ARCH, "- **Consequences:** Binary files; needs pyarrow.",
+                    "- **Consequences:** Binary files. Docs to rework: the build waits for pipeline-design.")
+        self.p.edit(ARCH, "## Risks and open questions",
+                    "With the table as it stood, M1-T03 would fail CR-04. The user chose to add it.\n"
+                    "The format was previously CSV.\n\n## Risks and open questions")
+        self.assertEqual(self.severities("process-narration"), [
+            (44, "E", "Nothing is built"), (46, "E", "Docs to rework"), (48, "E", "With the table as it stood"),
+            (49, "W", "previously")])
+        self.assertEqual([p.code for p in self.problems() if p.severity == "E"], ["process-narration"] * 3)
+
+    def test_user_choice_with_its_request_passes(self):
+        self.p.edit(ARCH, "- **Decision:** Parquet via pyarrow.",
+                    "- **Decision:** Parquet via pyarrow; the user chose it (UR-04).")
+        self.assertEqual(self.messages("process-narration"), [])
+        self.p.edit(ARCH, "the user chose it (UR-04)", "the user chose it")
+        self.assertEqual(self.severities("process-narration"), [(44, "E", "the user chose")])
+
+    def test_changelog_rows_and_ideas_are_exempt(self):
+        self.p.edit(ARCH, "## Risks and open questions",
+                    "## Changelog\n- 2026-10-18: Docs to rework; nothing is built yet\n\n## Risks and open questions")
+        self.p.write("docs/ideas/x.md", "# Idea: x\n\n**Status:** Specced · **Last updated:** 2026-10-18\n\n"
+                     "Nothing is built yet, and the user chose the parquet store.\n")
+        self.assertEqual(self.messages("process-narration"), [])
+
+
+class StaleRowChecks(LintCase):
+    """`stale-row`: a step row deferring to a skill under an older decision a newer one replaced."""
+    ROW = "| 4 | `pca` | stats | Cov → Factors | full eigendecomposition | STAT-01 |"
+
+    def messages(self):
+        return [(p.line, p.severity, p.message) for p in self.problems() if p.code == "stale-row"]
+
+    def defer(self, cite: str, skill: str = "data-science"):
+        self.p.edit(PIPES, self.ROW, self.ROW.replace("full eigendecomposition",
+                                                     f"as the `{skill}` skill specifies ({cite})"))
+
+    def decide(self, ad: str, text: str):
+        self.p.edit(ARCH, "## Risks and open questions",
+                    f"### {ad}: Factors by eigendecomposition\n**Status:** Accepted · **Date:** 2026-10-16 · "
+                    f"**Scope:** stats\n- **Decision:** {text}\n\n## Risks and open questions")
+
+    def test_row_under_an_older_decision_fails(self):
+        self.p.edit(ARCH, "- **Decision:** Parquet via pyarrow.",
+                    "- **Decision:** Parquet via pyarrow; factors follow the `data-science` skill.")
+        self.decide("AD-04", "`numpy.linalg.eigh`, descending; the `data-science` skill names no method.")
+        self.defer("AD-03")
+        self.assertEqual(self.messages(), [
+            (25, "E", "PL-02.pca defers to the `data-science` skill (AD-03), but AD-04 also decides it: restate the "
+                      "row from the newer decision and cite it")])
+
+    def test_row_citing_the_newest_decision_passes(self):
+        self.decide("AD-04", "`numpy.linalg.eigh`, as the `data-science` skill's PCA recipe has it.")
+        self.defer("AD-04")
+        self.assertEqual(self.messages(), [])
+
+    def test_skill_not_installed_warns(self):
+        self.defer("AD-03", skill="dataviz")
+        patch = mock.patch.dict("os.environ")
+        patch.start().pop("CLAUDE_PLUGIN_ROOT", None)
+        self.addCleanup(patch.stop)
+        self.assertEqual(self.messages(), [
+            (25, "W", "PL-02.pca defers to the `dataviz` skill, which isn't installed (.claude/skills or the "
+                      "plugin): state what the row does, from the decision that sets it")])
+
+
+class ReadUnwrittenChecks(LintCase):
+    """`read-unwritten`: a Read: path no task writes before the task starts."""
+    READ = "**Read:** PL-01, TC-01, DATA-02, data.Prices"
+
+    def messages(self):
+        return [(p.line, p.message) for p in self.problems() if p.code == "read-unwritten"]
+
+    def test_path_nobody_writes_fails(self):
+        self.p.edit(PLAN, self.READ, self.READ + ", src/quant/data/seams.py, src/quant/viz/seams.py")
+        self.assertEqual(self.messages(), [
+            (98, "M1-T10 Read: src/quant/viz/seams.py isn't in the repo and no task it waits on writes it, so its "
+                 "packet shows \"missing: not in the repo yet\": put the seam in a task it depends on (the interface "
+                 "stubs it), or drop the path")])     # data/seams.py: M1-T01 (data/**) writes it, upstream of M1-T10
+
+    def test_a_done_task_or_a_file_in_the_repo_passes(self):
+        self.p.edit(PLAN, self.READ, self.READ + ", src/quant/data/steps.py")
+        self.assertEqual(self.messages(), [])
+        self.p.edit(PLAN, ", src/quant/data/steps.py", ", src/quant/viz/seams.py")
+        self.p.edit(TODO, "- [ ] M1-T10", "- [x] M1-T10")
+        self.assertEqual(self.messages(), [])
+
+
+class TaskOrderChecks(LintCase):
+    """`task-order`: task IDs run in plan order while no task is ticked."""
+    def swap(self):
+        self.p.edit(PLAN, "### M1-T11: Marchenko–Pastur cleaning", "### M1-T1x: Marchenko–Pastur cleaning")
+        self.p.edit(PLAN, "### M1-T12: Shrinkage covariance", "### M1-T11: Shrinkage covariance")
+        self.p.edit(PLAN, "### M1-T1x: Marchenko–Pastur cleaning", "### M1-T12: Marchenko–Pastur cleaning")
+
+    def messages(self):
+        return [(p.line, p.message) for p in self.problems() if p.code == "task-order"]
+
+    def test_ids_out_of_order_before_the_build_fail(self):
+        self.p.edit(TODO, "- [x] M1-T01", "- [ ] M1-T01")
+        self.swap()
+        self.assertEqual(self.messages(), [
+            (114, "M1-T11 comes after M1-T12: task IDs run in plan order, so renumber the plan's tasks top to bottom "
+                  "(Depends on, the graph rows, todo.md and any doc naming them) while none is done")])
+
+    def test_in_order_or_once_the_build_started_passes(self):
+        self.p.edit(TODO, "- [x] M1-T01", "- [ ] M1-T01")
+        self.assertEqual(self.messages(), [])
+        self.p.edit(TODO, "- [ ] M1-T01", "- [x] M1-T01")
+        self.swap()
+        self.assertEqual(self.messages(), [], "M1-T01 is ticked: a replan keeps its IDs")
 
 
 if __name__ == "__main__":

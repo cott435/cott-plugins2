@@ -12,7 +12,7 @@ A probe answers what the docs can't settle about an outside service: whether *th
 **Never:**
 - edits another doc: results reach the design through architecture-design Revise, and a requirement that can't be met goes to spec-writing on the user's word;
 - reads, greps, cats or sources a `.env` file or anything in `out/`;
-- runs a check whose runner is `user`, or asks for a key or a pasted output;
+- runs a check whose runner is `user`, a long one included (`references/safety.md`: the agent's finish in a few minutes), or asks for a key or a pasted output;
 - writes into `evidence/` by hand: only the scripts write it;
 - writes project code, touches `src/`, `tests/` or `pyproject.toml`, or lets anything import from `probes/`.
 

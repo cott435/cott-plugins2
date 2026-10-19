@@ -5,7 +5,7 @@ description: Cuts each roadmap stage into build-sized milestones once its pipeli
 
 # Build Planning
 
-Once a stage's pipelines are approved, this skill cuts it into milestones (`M<n>`), vertical slices each runnable end to end, then plans one milestone at a time in `tasks/plan.md` and `tasks/todo.md`: small tasks, many built at once.
+This skill cuts each stage with approved pipelines into milestones (`M<n>`), vertical slices each runnable end to end, then plans one milestone at a time in `tasks/plan.md` and `tasks/todo.md`: small tasks, many built at once.
 
 **Not for:** plans from agent-skills' `/plan` (foreign); pipelines, oracles or the quality bar (`pipeline-design`, `test-planning`, `build-setup`); building tasks. A fix their docs need goes to `dt route <owner> "<change>" --from build-planning`.
 
@@ -21,7 +21,7 @@ Once a stage's pipelines are approved, this skill cuts it into milestones (`M<n>
 
 - No roadmap stage for the work: route to `idea-refine`.
 - **References waiting:** route to `reference-intake`.
-- **Probes:** a milestone is planned only once `probes_blocking` is empty and a `PB-NN` sample backs the record type of each external source its pipelines read (`docs/probes.md`, decisions' `**Probe:**` lines). Else name the probe, or the source's type, and go on to `api-probe`. Cutting stages into rows (`cut.md` steps 1–2) still runs; one queued plan at most. Only the user waives a probe, never on a headless run.
+- **Probes:** a milestone is planned only once `probes_blocking` is empty and a `PB-NN` sample backs the record type of each external source its pipelines read (`docs/probes.md`). A few records make a sample; a batch over every member is the user's step (`../api-probe/references/safety.md`). Else name the probe, or the source's type, and go to `api-probe`. Cutting rows (`cut.md` steps 1–2) still runs; one queued plan at most. Waivers are api-probe's.
 
 ## Modes
 

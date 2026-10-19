@@ -31,7 +31,7 @@ Draft, with the checks table. Each check's Pass comes from the requirement it in
 
 ## 5. Run the agent's checks
 
-`env -i PATH="$PATH" python3 probes/PB-NN-<slug>/public.py`, then fill those rows' Result. A scan hit means the allow-list is wrong: fix the script and run again, without opening `out/`. Never run `probe.py`, not even with a dry-run flag.
+`env -i PATH="$PATH" python3 probes/PB-NN-<slug>/public.py`, then fill those rows' Result. A scan hit means the allow-list is wrong: fix the script and run again, without opening `out/`. Never run `probe.py`, not even with a dry-run flag, nor a `public.py` step the README gives the user.
 
 ## 6. Gate
 

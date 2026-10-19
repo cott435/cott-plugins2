@@ -126,6 +126,7 @@ python3 evals/harness/probe_skill.py run ../../dev-team-workspace/probe-skill/ru
   - `AGENT_MODEL` (default `claude-opus-5-5`), `USER_MODEL` (default `sonnet`)
   - `COST_CAP_USD` (per run, default none)
   - `MAX_TURNS`
+  - `TURN_TIMEOUT_S` (default 1800): an agent turn running longer is killed, marked `timed_out` in `turns.json`, and the run goes on
   - `PLUGIN_SRC`, or `SKILLS_SRC` to overlay an older skill snapshot for an A/B run
   - `PERMISSION_PROMPTS=0` to leave the oracle prompts unanswered
 - **Prerequisites:** `claude`, `python3` ≥ 3.9, `uv` and `jq`. build-setup stops without `uv` and `jq`. It also runs `uv lock`/`uv sync`, so it needs network access.

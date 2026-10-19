@@ -6,11 +6,11 @@ The agent never sees a secret, and the script redacts, never the agent. Every mo
 
 | Runner | Allowed when | Examples |
 |---|---|---|
-| **agent** | The check reads no credential, or only one the vendor publishes for everyone, and touches nothing of the user's | Public docs and pricing pages (WebFetch); keyless endpoints; a weather API's published `demo` key on its sample city |
-| **user** | The check needs any key the user holds, sandbox keys included; or the user's accounts; or it spends something | Plaid sandbox or production; a paid subscription's API |
+| **agent** | The check reads no credential, or only one the vendor publishes for everyone, touches nothing of the user's, and finishes in a few minutes: a sample, never every member | Public docs and pricing pages (WebFetch); keyless endpoints on 10 symbols; a weather API's published `demo` key on its sample city |
+| **user** | The check needs any key the user holds, sandbox keys included; or the user's accounts; or it spends something; or it runs longer than a few minutes | Plaid sandbox or production; a paid subscription's API; a keyless batch paced over 500 symbols (80 minutes) |
 | **user (manual)** | Only a person can see the answer | A Dashboard's plan page; the licence terms for the user's plan |
 
-- The agent's checks go in `public.py` and the user's in `probe.py`. `public.py` contains no `os.environ`, `environ`, `getenv`, `load_env`, `dotenv` or `.env`, docstrings included (`probe-runner` lint), so "the agent may run this" can be checked without trusting the agent. Run it with an empty environment: `env -i PATH="$PATH" python3 probes/PB-NN-<slug>/public.py`.
+- The agent's checks go in `public.py` and the user's in `probe.py`. A keyless check too long for the agent stays in `public.py` as a user step, its README line giving its time and spend. `public.py` contains no `os.environ`, `environ`, `getenv`, `load_env`, `dotenv` or `.env`, docstrings included (`probe-runner` lint), so "the agent may run this" can be checked without trusting the agent. Run it with an empty environment: `env -i PATH="$PATH" python3 probes/PB-NN-<slug>/public.py`.
 - Sandbox keys stay with the user. One rule, "any key → the user runs it", can be checked.
 - The user runs their checks when they can, on their own time. When they're done they say "ran it". They paste nothing: Record reads `evidence/results.json`.
 

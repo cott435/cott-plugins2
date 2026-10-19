@@ -13,7 +13,9 @@ from .types import VolSeries
 from .vol import rolling_vol
 
 
-def vol_series(path: str | Path, *, window: int = 20, tickers: Sequence[str] | None = None) -> VolSeries:
+def vol_series(
+    path: str | Path, *, window: int = 20, tickers: Sequence[str] | None = None
+) -> VolSeries:
     """Annualized rolling volatility of every ticker in a prices CSV."""
     prices = mdata.load_prices(path, tickers)
     returns = log_returns(prices)

@@ -192,7 +192,9 @@ def next_task(items: list[model.TodoItem], tasks: dict[str, model.Task]) -> mode
 
 def add_graph(repo: Repo, r: Report) -> None:
     """The active plan's derived build graph (interface-first-design.md §6.3): `critical_path`, `waves`, `width`,
-    `parallelism` (tasks ÷ critical path), and `graph_warning` when most waves have width 1. Empty without a plan."""
+    `parallelism` (tasks ÷ critical path), and `graph_warning` when most waves have width 1; `critical_path_halves`,
+    the chain of halves the build dispatches (build-phase.md §13), and `file_edges_on_path`, the `file` edges on the
+    critical path, each a planning choice. Empty without a plan."""
     active = roadmap_cmd.active_plan(repo)
     tasks = model.tasks(active) if active else []
     m = graph.metrics(tasks)
@@ -201,6 +203,14 @@ def add_graph(repo: Repo, r: Report) -> None:
     r.add("width", m["width"])
     r.add("parallelism", m["parallelism"])
     r.add("graph_warning", graph.serial_warning(tasks) or None)
+    halves = graph.critical_path_halves(tasks)
+    r.add("critical_path_halves", halves, " → ".join(halves) or "none")
+    on_path = set(zip(m["critical_path"][1:], m["critical_path"][:-1]))       # (task, the task it waits on)
+    file_edges = [f"{e.src} → {e.dst} ({e.reason or e.mitigated_by or 'no reason'})"
+                  for e in (model.graph_edges(active) if active else []) if e.kind == "file" and (e.src, e.dst) in on_path]
+    r.add("file_edges_on_path", file_edges,
+          "; ".join(file_edges) + " (each is a planning choice: move the shared part to the interface or wiring task)"
+          if file_edges else "none")
 
 
 def plan_base(plan: Doc | None) -> str:

@@ -471,8 +471,9 @@ class InterfaceFirstChecks(LintCase):
         self.assertEqual(self.messages("task-size"), [])
 
     def test_writes_conflict_without_a_path(self):
-        self.p.edit(PLAN, "**Writes:** src/quant/stats/pca.py, tests/intent/quant/test_pca.py",
-                    "**Writes:** src/quant/stats/pca.py, src/quant/stats/report.py, tests/intent/quant/test_pca.py")
+        self.p.edit(PLAN, "**Writes:** src/quant/stats/pca.py, tests/unit/quant/test_pca.py, tests/intent/quant/test_pca.py",
+                    "**Writes:** src/quant/stats/pca.py, src/quant/stats/report.py, tests/unit/quant/test_pca.py, "
+                    "tests/intent/quant/test_pca.py")
         found = [(p.severity, p.message) for p in self.problems() if p.code == "writes"]
         self.assertEqual(found, [("E", "M1-T13 and M1-T07 both write src/quant/stats/report.py with no Depends on "
                                        "path between them: move the shared part to the interface or wiring task, or "
@@ -501,9 +502,27 @@ class InterfaceFirstChecks(LintCase):
         self.assertIn("M1-T05 (spine) writes the shared file src/quant/stats/types.py: only the interface task may",
                       self.messages("writes"))
 
+    def test_writes_unit(self):
+        self.p.edit(PLAN, "**Writes:** src/quant/stats/pca.py, tests/unit/quant/test_pca.py, tests/intent/quant/test_pca.py",
+                    "**Writes:** src/quant/stats/pca.py, tests/intent/quant/test_pca.py")
+        self.p.edit(PLAN, "**Writes:** src/quant/stats/report.py, tests/unit/quant/test_report.py",
+                    "**Writes:** src/quant/stats/report.py")
+        self.assertEqual(self.messages("writes-unit"), [
+            "M1-T07 Writes name no tests/unit/ path: its solo half writes unit tests (tests/unit/quant/)",
+            "M1-T13 Writes name no tests/unit/ path: its implementer half writes unit tests (tests/unit/quant/)"])
+
+    def test_call_edge_to_a_contract_symbol_needs_a_fake(self):
+        row = "| M1-T14 system | M1-T12 shrinkage | order | none: the golden cases run end to end on the finished steps |"
+        self.p.edit(PLAN, row, "| M1-T14 system | M1-T12 shrinkage | call | none: `stats.estimate_cov` has no fake |")
+        self.assertEqual(self.messages("call-fake"), [
+            "M1-T14 waits on M1-T12 to call stats.estimate_cov, a contract symbol with no fake: have the interface "
+            "task freeze its fake and mitigate the edge, or give `none: integration: <what runs the real chain>`"])
+        self.p.edit(PLAN, "none: `stats.estimate_cov` has no fake", "none: integration: the smoke runs the real chain")
+        self.assertEqual(self.messages("call-fake"), [])
+
     def test_entry_module_belongs_to_wiring(self):
-        self.p.edit(PLAN, "**Writes:** src/quant/stats/pca.py, tests/intent/quant/test_pca.py",
-                    "**Writes:** src/quant/stats/pipeline.py")
+        self.p.edit(PLAN, "**Writes:** src/quant/stats/pca.py, tests/unit/quant/test_pca.py, tests/intent/quant/test_pca.py",
+                    "**Writes:** src/quant/stats/pipeline.py, tests/unit/quant/test_pca.py")
         self.assertIn("M1-T13 (thicken) writes the shared file src/quant/stats/pipeline.py: only an interface, wiring "
                       "or system task may", self.messages("writes"))
 
@@ -782,6 +801,31 @@ class FormatChecks(LintCase):
     def test_contract_heading_check_is_contract_only(self):
         self.p.edit(ARCH, "## Interfaces", "### stats.a / stats.b: Two\n\n## Interfaces")
         self.assertNotIn((ARCH, "contract-heading"), self.found())
+
+    def test_contract_args_over_the_default_limits(self):
+        """rl9: `evaluate` with 7 arguments couldn't be frozen under max-args 5. `self` and `*args` don't count."""
+        self.p.edit(CONTRACT, "`def clean_eigen(cov: Cov, *, n_obs: int) -> Cov`",
+                    "`def clean_eigen(cov: Cov, a: int, b: int, c: int, d: int, *, n_obs: int) -> Cov`")
+        self.p.edit(CONTRACT, "`def min_variance(cov: Cov) -> Weights`",
+                    "`class Opt: def __init__(self, cov: Cov, a: int, *args: int, b: int, c: int, d: int) -> None`")
+        found = [p.message for p in self.problems() if p.code == "contract-args"]
+        self.assertEqual(found, ["stats.clean_eigen: `clean_eigen` takes 6 arguments (max-args 5) and 5 positional "
+                                 "(max-positional-args 4), past the bar's limit: group arguments into a type or "
+                                 "make them keyword-only"])
+
+    def test_contract_args_reads_the_bar(self):
+        self.p.path("pyproject.toml").write_text("[tool.ruff.lint.pylint]\nmax-args = 2\nmax-positional-args = 1\n")
+        found = [p.message.split(":")[0] for p in self.problems() if p.code == "contract-args"]
+        self.assertEqual(found, ["data.load_prices"])
+
+    def test_contract_depends(self):
+        """rl9: `compare.run_claims` took a `viz.Chart`, but compare didn't depend on viz."""
+        self.p.edit(CONTRACT, "`def load_prices(universe: tuple[str, ...], start: date, end: date) -> Prices`",
+                    "`def load_prices(universe: tuple[str, ...], start: date, end: date, cov: Cov) -> Prices`")
+        self.p.edit(CONTRACT, "`def min_variance(cov: Cov) -> Weights`",
+                    "`def min_variance(cov: Cov, prices: data.Prices) -> Weights`")
+        found = [p.message.split(",")[0] for p in self.problems() if p.code == "contract-depends"]
+        self.assertEqual(found, ["data.load_prices names stats.Cov"])
 
     def test_roadmap_and_todo_need_no_status(self):
         self.assertNotIn(("docs/roadmap.md", "header"), self.found())

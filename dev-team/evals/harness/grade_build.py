@@ -1,21 +1,29 @@
 #!/usr/bin/env python3
-"""Grade one build-eval run (interface-first-design.md §9.2): writes <run>/grading.json in the planning
-grader's shape (expectations, summary, execution_metrics, timing, extra), so runviz and package read it
+"""Grade one build-eval run (interface-first-design.md §9.2, build-phase.md §15): writes <run>/grading.json in the
+planning grader's shape (expectations, summary, execution_metrics, timing, extra), so runviz and package read it
 unchanged.
 
 Every graph fact is recomputed here from the plan text and git, never taken from `dt` (a dt bug can't grade
-itself). Each expectation carries a `category`: efficiency, integration, correctness, tdd, process or
-harness. `harness` checks (a worktree, merge or gate the infrastructure lost, an agent error, a flow that
-didn't draw) are summarised apart in `harness_summary` and never count in `summary`.
+itself). Each expectation carries a `category`: efficiency, integration, correctness, tdd, process or harness.
+`harness` checks are summarised apart in `harness_summary` and never count in `summary`.
 
-Run layout (build_driver.py writes it; dryrun_build.py fakes it): <run>/project (git, one commit per turn
-plus the agents' own commits and worktree-* branches), turns.json, summary.json, agent_stream.jsonl,
-permission_prompts.jsonl, flow/index.json (workflow-analyzer units, optional).
+What the run is read from (build_driver.py writes it; dryrun_build.py replays it):
+- <run>/project: the git repo. The base (the state before the build) is the commit `dt build start` branched from
+  (its `start` log event's parent), else build/M1's merge-base with `main` or `master`; `build/M1` the build branch, whose first
+  parent holds every landing: a commit with the trailer `Dt-Landed: <task> <role>` (implementer, solo; and, in A0,
+  tester), and `dt/<task>-tests` each split task's tester landing. Tasks and roles come only from those trailers,
+  never from commit subjects or branch names. A0 writes its own trailers: weaker evidence, marked in `extra`.
+- <project>/.git/dt-build/log.jsonl: claims, finished agents, landings, rejects (writes, gate, conflict,
+  integration, escalated, harness, each with its detail file), escalations, resolves, the go, reviews.
+- <run>/agent_stream.jsonl: the main session's stream-json (result events: cost, usage, permission_denials);
+  the session's subagent transcripts beside its transcript under ~/.claude/projects/; <run>/flow/index.json
+  (workflow-analyzer units: each agent's time and tokens); turns.json, summary.json.
 
-Commit convention the orchestrator prompts ask for, and this grader reads:
-  `M1-T05 tester: …` / `M1-T05 implementer: …` / `M1-T05 solo: …`   builder commits (one task each)
-  `M1-T22 interface: …`                                             an interface or contract-change task
-  `dt: tick M1-T05`, `merge M1-T05: worktree-…`, `turn N`           orchestrator, merge step, driver
+A target with a fixture (minilab) is graded against its oracle, holdout, mutants and planted.json. A project target
+(`"project"` in scenarios.json, a planning run's project) has none of them: those checks are `na` (kept for lining up
+with fixture runs, never counted), and correctness is the project's own golden cases instead: the build's
+tests/intent run on build/M1's tree in the project's venv with every marker, `oracle_unchanged` over tests/fixtures,
+and `interface_changes` counted with no planted flaw. Everything keyed on dt is the same for both.
 
 Usage: grade_build.py <run-dir> [--fixture DIR] [--quiet]
 """
@@ -38,10 +46,13 @@ HERE = pathlib.Path(__file__).resolve().parent
 FIXTURES = HERE / "fixtures" / "build"
 TASK = re.compile(r"\bM\d+-T\d+\b")
 SIZE_W = {"XS": 1, "S": 2, "M": 4}
-ROLE = re.compile(r"^(M\d+-T\d+)\b[^:\n]*?\b(tester|implementer|solo|interface)\b", re.I)
-SHARED = re.compile(r"(^|/)(__init__\.py|types\.py)$")
-INTERFACE_PATHS = ["packages/*/src/*/types.py", "tests/contracts/*"]
-HARNESS_PATHS = [".dt/*", ".claude/.check_*", ".claude/.stop_attempts_*"]
+TRAILER = re.compile(r"^Dt-Landed:\s*(M\d+-T\d+)\s+(tester|implementer|solo)\b", re.M)
+INTERFACE_PATHS = ["packages/*/src/*/types.py", "packages/*/src/*/protocols.py", "src/*/types.py", "src/*/protocols.py",
+                   "tests/contracts/*"]
+PROTECTED = ["tests/intent/*", "tests/fixtures/*", "tests/conftest.py", "pyproject.toml", "uv.lock", "CONSTRAINTS.md",
+             "scripts/*", ".claude/agents/*", ".claude/settings.json", "references/*", "packages/*/pyproject.toml"]
+WRONG_RED = ("ImportError", "ModuleNotFoundError", "AttributeError", "NameError")
+GOLDEN_TIMEOUT = int(os.environ.get("GOLDEN_TIMEOUT", "1800"))   # a project's intent tests may train for real
 
 
 # ---- the plan -------------------------------------------------------------------------------------------
@@ -79,7 +90,7 @@ def parse_plan(text: str) -> dict:
         elif title.lower().startswith("checkpoint"):
             after = TASK.search(title)
             checkpoints.append({"title": title, "after": after.group(0) if after else (tasks[-1]["id"] if tasks else None),
-                                "exit": "exit" in title.lower()})
+                                "exit": "exit" in title.lower(), "barrier": "(barrier)" in title.lower()})
     graph = []
     gm = re.search(r"^## Dependency graph\s*\n(.*?)(?=^## |\Z)", text, re.M | re.S)
     for line in (gm.group(1).splitlines() if gm else []):
@@ -91,8 +102,8 @@ def parse_plan(text: str) -> dict:
 
 
 def derive_kind(t: dict) -> str:
-    """A plan without `**Kind:**` (today's spine style): contract → interface, a system spine → system,
-    a whole-pipeline step → spine, a step of a pipeline → thicken."""
+    """A plan without `**Kind:**`: contract → interface, a system spine → system, a whole pipeline → spine,
+    a step of a pipeline → thicken."""
     if t["step"] == "contract":
         return "interface"
     if "system" in t["reason"].lower():
@@ -133,44 +144,22 @@ def critical_path(tasks: list[dict], weight=lambda t: 1) -> tuple[list[str], int
     return path, w
 
 
-def dispatch_rounds(plan: dict, arm: dict) -> list[list[str]]:
-    """What the arm dispatches together: serial = one task per round in plan order; parallel with a
-    `Kind`-less plan = today's `Parallel:` groups (consecutive tasks sharing a G label) and singletons;
-    otherwise the dependency waves."""
-    tasks = plan["tasks"]
-    if arm.get("dispatch") == "serial":
-        return [[t["id"]] for t in tasks]
-    if any(t["parallel"] for t in tasks):
-        rounds, cur, label = [], [], None
-        for t in tasks:
-            g = t["parallel"] or None
-            if cur and (g is None or g != label):
-                rounds.append(cur)
-                cur = []
-            cur.append(t["id"])
-            label = g
-        return rounds + ([cur] if cur else [])
-    return waves(tasks)
-
-
 def graph_facts(plan: dict, arm: dict | None = None) -> dict:
     tasks = plan["tasks"]
     w = waves(tasks)
     cp, n_cp = critical_path(tasks)
     cpw, n_cpw = critical_path(tasks, lambda t: SIZE_W.get(t["size"], 2))
-    rounds = dispatch_rounds(plan, arm or {"dispatch": "parallel"})
     split = [t["id"] for t in tasks if t["mode"] == "split"]
-    # Interface-first: a split task's tester half needs only the interface task, so wave 1 is the tasks
-    # ready after it plus every split task's tester.
     iface = [t["id"] for t in tasks if t["kind"] == "interface"]
     ready_after_iface = [t["id"] for t in tasks if t["id"] not in iface and set(t["depends"]) <= set(iface)]
-    interface_first = bool(iface) and any(t["claims_exclusive"] for t in tasks)
-    testers_early = [i for i in split if i not in ready_after_iface] if interface_first else []
-    return {"tasks": len(tasks), "critical_path": cp, "cp_tasks": n_cp, "cp_weighted": n_cpw, "cp_weighted_path": cpw,
-            "waves": w, "width": max((len(x) for x in w), default=0), "parallelism": round(len(tasks) / max(n_cp, 1), 2),
-            "dispatch_rounds": rounds, "dispatch_width": max((len(r) for r in rounds), default=0),
-            "split_tasks": split, "ready_after_interface": ready_after_iface,
-            "wave1_agents": len(ready_after_iface) + (len(testers_early) if iface else 0)}
+    testers_early = [i for i in split if i not in ready_after_iface] if iface else []
+    cap = (arm or {}).get("cap", 6)
+    return {"tasks": len(tasks), "halves": len(tasks) + len(split), "critical_path": cp, "cp_tasks": n_cp,
+            "cp_weighted": n_cpw, "cp_weighted_path": cpw, "waves": w, "width": max((len(x) for x in w), default=0),
+            "parallelism": round(len(tasks) / max(n_cp, 1), 2), "split_tasks": split,
+            "ready_after_interface": ready_after_iface,
+            "wave1_halves": len(ready_after_iface) + len(testers_early), "cap": cap,
+            "planned_max_concurrency": min(cap, len(ready_after_iface) + len(testers_early)) if cap else 0}
 
 
 def plan_by(plan: dict) -> dict:
@@ -186,66 +175,96 @@ def match(path: str, globs: list[str]) -> bool:
     return False
 
 
+def role_writes(task: dict, role: str) -> list[str]:
+    """dt's split of `Writes:`: tester the tests/intent/ paths, implementer the rest, solo all."""
+    intent = [w for w in task["writes"] if w.startswith("tests/intent/")]
+    if role == "tester":
+        return intent
+    if role == "implementer":
+        return [w for w in task["writes"] if w not in intent]
+    return list(task["writes"]) or list(task["files_likely"])
+
+
 # ---- git ------------------------------------------------------------------------------------------------
 
 class Repo:
     def __init__(self, root: pathlib.Path):
         self.root = root
 
-    def git(self, *a, check=False) -> str:
-        r = subprocess.run(["git", *a], cwd=self.root, capture_output=True, text=True)
-        if check and r.returncode:
-            raise RuntimeError(f"git {' '.join(a)}: {r.stderr.strip()}")
-        return r.stdout
+    def git(self, *a) -> str:
+        return subprocess.run(["git", *a], cwd=self.root, capture_output=True, text=True).stdout
 
     def rc(self, *a) -> int:
         return subprocess.run(["git", *a], cwd=self.root, capture_output=True, text=True).returncode
 
-    def commits(self, rev_range: str = "--all") -> list[dict]:
-        """Every commit (oldest first) with subject, parents, time and changed files (vs first parent)."""
-        out = self.git("log", "--reverse", "--topo-order", "--format=%x1e%H%x1f%P%x1f%ct%x1f%s", "--name-only",
-                       "-m", "--first-parent" if rev_range == "first-parent" else rev_range)
-        seen, res = set(), []
-        for rec in out.split("\x1e")[1:]:
-            head, *files = rec.strip("\n").split("\n")
-            sha, parents, ts, subject = head.split("\x1f")
-            if sha in seen:
-                continue
-            seen.add(sha)
-            res.append({"sha": sha, "parents": parents.split(), "time": int(ts), "subject": subject,
-                        "files": [f for f in files if f.strip()]})
-        return res
-
-    def first_parent(self) -> list[str]:
-        return self.git("rev-list", "--first-parent", "--reverse", "HEAD").split()
+    def ref(self, name: str) -> str | None:
+        out = self.git("rev-parse", "-q", "--verify", f"{name}^{{commit}}").strip()
+        return out or None
 
     def show(self, rev: str, path: str) -> str | None:
         r = subprocess.run(["git", "show", f"{rev}:{path}"], cwd=self.root, capture_output=True, text=True)
         return r.stdout if r.returncode == 0 else None
 
-    def branches(self, pattern="worktree-*") -> dict[str, str]:
+    def commit(self, sha: str) -> dict:
+        """sha, parents, time, subject, body, files changed against the first parent."""
+        head = self.git("show", "-s", "--format=%H%x1f%P%x1f%ct%x1f%s%x1f%B", sha)
+        h, parents, ct, subject, body = (head.split("\x1f") + [""] * 5)[:5]
+        first = parents.split()[0] if parents.split() else None
+        files = self.git("diff", "--name-only", "--no-renames", first, sha).split() if first else \
+            self.git("show", "--name-only", "--format=", sha).split()
+        return {"sha": h.strip(), "parents": parents.split(), "time": int(ct or 0), "subject": subject,
+                "body": body, "files": files}
+
+    def first_parent(self, rev: str) -> list[str]:
+        return self.git("rev-list", "--first-parent", "--reverse", rev).split()
+
+    def branches(self, pattern: str) -> dict[str, str]:
         out = self.git("for-each-ref", "--format=%(refname:short) %(objectname)", f"refs/heads/{pattern}")
         return dict(line.split() for line in out.splitlines() if line.strip())
 
-    def is_ancestor(self, a: str, b: str) -> bool:
-        return self.rc("merge-base", "--is-ancestor", a, b) == 0
 
-
-def builder_commits(repo: Repo, all_commits: list[dict]) -> list[dict]:
-    """Non-merge commits whose subject starts with a task id and names a builder role (or no role)."""
+def landings(repo: Repo, build: str, base: str | None) -> list[dict]:
+    """Every `Dt-Landed:` landing: on build's first parent after the base, and each dt/<task>-tests tip."""
     out = []
-    for c in all_commits:
-        if len(c["parents"]) > 1:
-            continue
-        s = c["subject"]
-        if not re.match(r"^M\d+-T\d+\b", s) or re.search(r"\b(tick|merge)\b", s.split(":")[0], re.I):
-            continue
-        m = ROLE.match(s)
-        role = m.group(2).lower() if m else ""
-        if not role:
-            role = "tester" if c["files"] and all(f.startswith("tests/intent/") for f in c["files"]) else "solo"
-        out.append(dict(c, task=TASK.match(s).group(0), role=role))
-    return out
+    shas = repo.first_parent(build)
+    if base and base in shas:
+        shas = shas[shas.index(base) + 1:]
+    for sha in shas:
+        c = repo.commit(sha)
+        for task, role in TRAILER.findall(c["body"]):
+            out.append(dict(c, task=task, role=role, where="build"))
+    for br, tip in repo.branches("dt/*-tests").items():
+        c = repo.commit(tip)
+        for task, role in TRAILER.findall(c["body"]):
+            out.append(dict(c, task=task, role=role, where=br))
+    return sorted(out, key=lambda c: c["time"])
+
+
+def build_base(repo: Repo, build: str | None, log: list[dict] | None = None) -> str | None:
+    """The commit the build started from, never assuming a branch name: the parent of the commit `dt build start`
+    made (its `start` log event), else build's merge-base with `main` or `master`, else the parent of the first
+    `M<n>: build started` commit on build's first parent."""
+    if not build:
+        return None
+    for e in log or []:
+        if e.get("event") == "start" and e.get("commit"):
+            parent = repo.ref(f"{e['commit']}^")
+            if parent:
+                return parent
+    for name in ("main", "master"):
+        if repo.ref(f"refs/heads/{name}"):
+            mb = repo.git("merge-base", build, f"refs/heads/{name}").strip()
+            if mb:
+                return mb
+    for sha in repo.first_parent(build):
+        if re.match(r"M\d+: build started", repo.git("show", "-s", "--format=%s", sha).strip()):
+            return repo.ref(f"{sha}^")
+    return None
+
+
+def src_dirs(tree: pathlib.Path) -> list[pathlib.Path]:
+    """A tree's source roots: `src` (single package) and every `packages/*/src` (a workspace)."""
+    return [d for d in [tree / "src", *sorted(tree.glob("packages/*/src"))] if d.is_dir()]
 
 
 # ---- the grader -----------------------------------------------------------------------------------------
@@ -262,22 +281,54 @@ class Grader:
         self.arm = dict((scn.get("arms") or {}).get(self.arm_id, {}), id=self.arm_id)
         target = self.summary.get("target", "minilab")
         tcfg = (scn.get("build_targets") or {}).get(target, {})
-        self.fixture = fixture or (HERE / tcfg["fixture"] if tcfg.get("fixture") else FIXTURES / "minilab")
-        self.planted = json.loads((self.fixture / "planted.json").read_text())
+        if fixture:
+            self.fixture = fixture
+        elif tcfg.get("fixture"):
+            self.fixture = HERE / tcfg["fixture"]
+        elif tcfg.get("project"):
+            self.fixture = None            # a planning run's project: its own golden cases, no oracle/holdout/mutants
+        else:
+            self.fixture = FIXTURES / "minilab"
+        self.planted = json.loads((self.fixture / "planted.json").read_text()) if self.fixture else None
         self.R, self.extra = [], {}
-        self.base = self.repo.first_parent()[0] if self.repo.first_parent() else None
+        self.build = self.repo.ref("build/M1") or self.repo.ref("HEAD")
+        self.log = self.read_log()
+        self.base = build_base(self.repo, self.build, self.log) or self.repo.ref("main")
         self.plan0 = parse_plan(self.repo.show(self.base, "tasks/plan.md") or "") if self.base else {"tasks": []}
-        final_plan = (self.proj / "tasks" / "plan.md")
-        self.plan = parse_plan(final_plan.read_text()) if final_plan.exists() else self.plan0
-        self.commits = self.repo.commits()
-        self.builders = builder_commits(self.repo, self.commits)
+        final = self.repo.show(self.build, "tasks/plan.md") if self.build else None
+        self.plan = parse_plan(final) if final else self.plan0
+        self.lands = landings(self.repo, self.build, self.base) if self.build else []
+        self.python = self.venv_python()
 
     def load(self, name):
-        p = self.run / name
         try:
-            return json.loads(p.read_text())
+            return json.loads((self.run / name).read_text())
         except (OSError, ValueError):
             return None
+
+    def read_log(self) -> list[dict]:
+        p = self.proj / ".git" / "dt-build" / "log.jsonl"
+        out = []
+        for line in (p.read_text().splitlines() if p.exists() else []):
+            try:
+                out.append(json.loads(line))
+            except ValueError:
+                pass
+        return out
+
+    def venv_python(self) -> str:
+        """The project's own interpreter (pytest, hypothesis); the grader's when the venv is gone."""
+        py = self.proj / ".venv" / "bin" / "python"
+        return str(py) if py.exists() else sys.executable
+
+    def rejects(self, kind: str | None = None) -> list[dict]:
+        return [e for e in self.log if e.get("event") == "reject" and (kind is None or e.get("reject") == kind)]
+
+    def detail(self, e: dict) -> str:
+        try:
+            return pathlib.Path(e.get("detail_file") or "").read_text()
+        except OSError:
+            return ""
 
     def check(self, id_, category, text, passed, evidence, value=None):
         r = {"id": id_, "category": category, "text": text, "passed": bool(passed), "evidence": str(evidence)[:600]}
@@ -285,216 +336,254 @@ class Grader:
             r["value"] = value
         self.R.append(r)
 
+    def na(self, id_, category, text, why):
+        """A check this target can't run (no fixture oracle): kept so ids line up across targets, never counted."""
+        self.R.append({"id": id_, "category": category, "text": text, "passed": None, "na": True, "evidence": why})
+
     # -- efficiency --------------------------------------------------------------------------------------
+
+    def intervals(self) -> list[dict]:
+        """One per claim: its half, claim and finish times (finish: SubagentStop, else its land or reject) and the
+        most claims in flight while it was. Concurrency counts by log order, so ties within a second count."""
+        out, live, peak = {}, set(), 0
+        for e in self.log:
+            ev, cid = e.get("event"), e.get("claim")
+            if ev == "claim":
+                live.add(cid)
+                peak = max(peak, len(live))
+                out[cid + f"#{len(out)}"] = {"claim": cid, "start": ts(e["time"]), "end": None}
+            elif ev in ("finished", "land", "reject", "release") and cid in live:
+                live.discard(cid)
+                for v in reversed(list(out.values())):
+                    if v["claim"] == cid and v["end"] is None:
+                        v["end"] = ts(e["time"])
+                        break
+        self.extra["log_peak_in_flight"] = peak
+        return [v for v in out.values() if v["end"] is not None]
 
     def efficiency(self):
         g0 = graph_facts(self.plan0, self.arm)
-        self.extra["graph"] = {k: v for k, v in g0.items()}
+        self.extra["graph"] = g0
+        ivs = self.intervals()
+        peak = self.extra.get("log_peak_in_flight", 0)
+        agent_s = sum(v["end"] - v["start"] for v in ivs)
         idx = self.load("flow/index.json") or {}
-        intervals = []
-        for u in idx.get("units", []):
-            try:
-                intervals.append((ts(u["first_ts"]), ts(u["last_ts"]), u))
-            except (KeyError, TypeError, ValueError):
-                continue  # a unit without timestamps (never started) has no interval
-        units = [u for _, _, u in intervals]
-        wall = self.summary.get("total_seconds") or 0
-        agent_s = sum(b - a for a, b, _ in intervals)
         per_role: dict[str, dict] = {}
-        for a, b, u in intervals:
+        tokens = {"input": 0, "output": 0, "cache_read": 0, "cache_creation": 0}
+        for u in idx.get("units", []):
             r = per_role.setdefault(u.get("type") or "agent", {"units": 0, "seconds": 0.0, "output_tokens": 0})
             r["units"] += 1
-            r["seconds"] += b - a
-            r["output_tokens"] += (u.get("tokens") or {}).get("output", 0) or (u.get("tokens") or {}).get("output_tokens", 0) or 0
-        conc = max_overlap([(a, b) for a, b, _ in intervals])
-        width = g0["dispatch_width"] if self.arm.get("dispatch") != "serial" else 1
-        eff = round(agent_s / (wall * width), 3) if wall and width and agent_s else None
-        # From git: each builder commit spans from its parent (where the agent started: the dispatch base of a
-        # worktree branch, the previous commit on a serial checkout) to itself. Rounds are maximal overlapping
-        # groups of those spans; concurrency is the most commits in flight at once.
-        times = {c["sha"]: c["time"] for c in self.commits}
-        spans, commit_iv = {}, []
-        for c in self.builders:
-            start = times.get(c["parents"][0], c["time"]) if c["parents"] else c["time"]
-            commit_iv.append((start, c["time"]))
-            spans[f"{c['task']} {c['role']} {c['sha'][:7]}"] = (start, c["time"])
-        achieved = rounds_from_spans(spans)
-        conc_git = max_overlap([(a, b) for a, b in commit_iv if b > a])
+            try:
+                r["seconds"] += ts(u["last_ts"]) - ts(u["first_ts"])
+            except (KeyError, TypeError, ValueError):
+                pass
+            t = u.get("tokens") or {}
+            r["output_tokens"] += t.get("output", 0) or t.get("output_tokens", 0) or 0
+        stream = self.stream_results()
+        for res in stream:
+            for k, src in (("input", "input_tokens"), ("output", "output_tokens"),
+                           ("cache_read", "cache_read_input_tokens"), ("cache_creation", "cache_creation_input_tokens")):
+                tokens[k] += ((res.get("usage") or {}).get(src) or 0)
+        wall = self.summary.get("total_seconds") or 0
+        width = g0["planned_max_concurrency"] or 1
+        eff = round(agent_s / (wall * width), 3) if wall and agent_s else None
+        if self.arm.get("dispatch") == "session":
+            peak = 1 if self.lands else 0
         self.extra["efficiency"] = {
-            "wall_seconds": wall, "agent_seconds": round(agent_s, 1), "units": len(units),
-            "cost_usd": self.summary.get("agent_cost_usd"), "output_tokens": self.summary.get("agent_output_tokens"),
-            "per_role": per_role, "achieved_max_concurrency": conc, "planned_max_width": width,
-            "parallel_efficiency": eff, "planned_rounds": len(g0["dispatch_rounds"]), "planned_cp_tasks": g0["cp_tasks"],
-            "achieved_rounds_git": len(achieved), "achieved_max_concurrency_git": conc_git,
-            "tasks_with_commits": len({c["task"] for c in self.builders})}
+            "wall_seconds": wall, "agent_seconds": round(agent_s, 1), "claims": len(ivs),
+            "cost_usd": self.summary.get("agent_cost_usd"), "main_session_tokens": tokens,
+            "per_role_units": per_role, "achieved_max_concurrency": peak, "planned_max_concurrency": width,
+            "parallel_efficiency": eff, "planned_cp_tasks": g0["cp_tasks"], "planned_waves": len(g0["waves"]),
+            "tasks_landed": len({c["task"] for c in self.lands}),
+            "landings_from": "trailers the A0 session wrote itself (weaker evidence)" if self.arm.get("dispatch") ==
+                             "session" else "dt land"}
         self.check("wall_clock", "efficiency", "Wall clock and agent time measured (informational)", bool(wall),
-                   f"wall {wall}s, agent {round(agent_s)}s over {len(units)} units, cost {self.summary.get('agent_cost_usd')}",
+                   f"wall {wall}s, agent {round(agent_s)}s over {len(ivs)} claims, cost {self.summary.get('agent_cost_usd')}",
                    value=wall)
-        if self.arm.get("dispatch") == "parallel":
-            seen = conc if units else conc_git
+        if self.arm.get("cap", 1) > 1:
             self.check("achieved_concurrency", "efficiency",
-                       "Parallel arm: builders overlap in time (max concurrency ≥ 2; traced units, else git commit spans)",
-                       seen >= 2, f"max concurrency {seen} ({'units' if units else 'git'}; planned width {width})", value=seen)
+                       "Builders overlap in time: ≥ 2 claims in flight at once (dt-build/log.jsonl, claim → finished)",
+                       peak >= 2, f"peak {peak} in flight (cap {self.arm.get('cap')}, planned {width})", value=peak)
+
+    def stream_results(self) -> list[dict]:
+        p = self.run / "agent_stream.jsonl"
+        out = []
+        for line in (p.read_text(errors="replace").splitlines() if p.exists() else []):
+            try:
+                d = json.loads(line)
+            except ValueError:
+                continue
+            if d.get("type") == "result":
+                out.append(d)
+        return out
 
     # -- integration -------------------------------------------------------------------------------------
 
     def integration(self):
-        repo, by = self.repo, plan_by(self.plan)
-        # Merge conflicts: re-merge every recorded worktree branch against what it was merged into.
-        conflicts, unmerged, merges = [], [], []
-        head = repo.git("rev-parse", "HEAD").strip()
-        merge_of = {}
-        for c in self.commits:
-            if len(c["parents"]) > 1:
-                for p in c["parents"][1:]:
-                    merge_of.setdefault(p, c)
-        for br, tip in sorted(self.repo.branches().items()):
-            m = merge_of.get(tip)
-            if m:
-                ours = m["parents"][0]
-                merges.append(br)
-            elif repo.is_ancestor(tip, head):
-                continue  # fast-forwarded or already contained
-            else:
-                ours = head
-                unmerged.append(br)
-            r = subprocess.run(["git", "merge-tree", "--write-tree", "--name-only", ours, tip], cwd=self.proj,
-                               capture_output=True, text=True)
-            if r.returncode == 1:
-                files = [l for l in r.stdout.splitlines()[1:] if l and not l.startswith(("Auto-merging", "CONFLICT"))]
-                conflicts.append({"branch": br, "files": sorted(set(files))[:10], "merged": bool(m)})
-        self.extra["merges"] = {"merged_branches": len(merges), "unmerged_branches": unmerged, "conflicts": conflicts}
-        self.check("merge_conflicts", "integration", "No merge conflicts between builder branches (git merge-tree)",
-                   not conflicts, conflicts or f"{len(merges)} branches merged cleanly", value=len(conflicts))
+        by0 = plan_by(self.plan)
+        conflicts = [f"{e.get('task')} {e.get('role')}" for e in self.rejects("conflict")]
+        self.check("merge_conflicts", "integration", "No merge conflicts (dt land `conflict` rejects)", not conflicts,
+                   conflicts or f"{len(self.lands)} landings, none conflicted", value=len(conflicts))
 
-        # Writes violations and edits under tasks/: every builder commit against its task's claim.
-        violations, plan_edits, docs_edits, rework, unknown = [], [], [], [], []
-        owner_first: dict[str, str] = {}
-        claims = {t["id"]: t["claims"] for t in self.plan["tasks"]}
-        for c in self.builders:
-            t = by.get(c["task"])
-            if t is None:
-                unknown.append(c["task"])
+        # Writes: rejects dt land made, plus each landing's own diff against its role's share of Writes.
+        violations, plan_edits, protected = [], [], []
+        for e in self.rejects("writes"):
+            text = self.detail(e)
+            outside = re.findall(r"^- (\S+)$", text, re.M)
+            for p in outside or ["(paths in the detail file)"]:
+                violations.append(f"{e.get('task')} {e.get('role')} (rejected): {p}")
+                if p.startswith("tasks/"):
+                    plan_edits.append(f"{e.get('task')} {e.get('role')} (rejected): {p}")
+                if match(p, PROTECTED):
+                    protected.append(f"{e.get('task')} {e.get('role')} (rejected): {p}")
+        for c in self.lands:
+            t = by0.get(c["task"])
+            allowed = role_writes(t, c["role"]) if t else []
             for f in c["files"]:
-                if match(f, HARNESS_PATHS):
+                if f == "tasks/todo.md" and c["role"] != "tester" and self.tick_only(c):
                     continue
                 if f.startswith("tasks/"):
                     plan_edits.append(f"{c['task']} {c['role']}: {f}")
                     continue
-                if f.startswith("docs/"):
-                    if t is None or t["kind"] != "interface":
-                        docs_edits.append(f"{c['task']}: {f}")
+                if self.dt_own(c, t, f) or self.testers_file(c, f):
                     continue
-                allowed = claims.get(c["task"], [])
-                if c["role"] == "tester":
-                    ok = f.startswith("tests/intent/")
-                else:
-                    ok = match(f, allowed) or (t is not None and not t["claims_exclusive"] and f.startswith(("tests/unit/", "tests/system/")))
-                    if f.startswith("tests/intent/"):
-                        # CR-06: an implementer never changes intent tests; in a solo arm one agent writes both.
-                        ok = self.arm.get("tdd") == "solo" or (t is not None and t["mode"] != "split" and match(f, allowed))
-                if not ok:
+                if not match(f, allowed):
                     violations.append(f"{c['task']} {c['role']}: {f}")
-                    others = [o for o, cl in claims.items() if o != c["task"] and match(f, cl) and f in owner_first]
-                    if others:
-                        rework.append(f"{c['task']} touched {f} (claimed by {', '.join(others)})")
-                owner_first.setdefault(f, c["task"])
-        exclusive = any(t["claims_exclusive"] for t in self.plan0["tasks"])
-        self.extra["writes"] = {"violations": violations[:40], "plan_edits": plan_edits, "docs_edits": docs_edits[:20],
-                                "rework": rework[:20], "unknown_tasks": sorted(set(unknown)),
-                                "claims": "Writes" if exclusive else "Files likely (advisory)"}
-        # Today's plans claim files only loosely (`Files likely`): counted, but not a failure.
+        self.extra["writes"] = {"violations": violations[:40], "plan_edits": plan_edits[:20],
+                                "protected_rejected": protected[:20]}
         self.check("writes_respected", "integration",
-                   "Every builder commit stays inside its task's `Writes:`, testers inside tests/intent/ "
-                   + ("" if exclusive else "(advisory here: this plan has only `Files likely`)"),
-                   not violations or not exclusive,
-                   violations[:12] or f"{len(self.builders)} builder commits inside their claims", value=len(violations))
-        self.check("builders_never_edit_tasks", "integration", "No builder commit touches tasks/** (only the orchestrator ticks)",
-                   not plan_edits, plan_edits[:10] or "none", value=len(plan_edits))
-        self.check("no_rework", "integration", "No task rewrites a file another task claims and already wrote",
-                   not rework, rework[:10] or "none", value=len(rework))
+                   "Every landing stays inside its role's share of `Writes:`, and dt land rejected no half for writes",
+                   not violations, violations[:12] or f"{len(self.lands)} landings inside their Writes",
+                   value=len(violations))
+        self.check("builders_never_edit_tasks", "integration",
+                   "No builder edits tasks/** (dt land's todo.md tick aside)", not plan_edits, plan_edits[:10] or "none",
+                   value=len(plan_edits))
+        self.protected_rejects = protected
 
-        # Integration failures: failed gate tries of wiring and system tasks (fakes swapped for real).
-        gates = self.gate_records()
-        integ = [r for r in gates if not r.get("passed") and by.get(r.get("task"), {}).get("kind") in ("wiring", "system")]
-        self.extra["gates"] = {"records": len(gates), "failed": sum(not r.get("passed") for r in gates),
-                               "integration_failures": [f"{r['task']} try {r.get('try')}: {r.get('failed')}" for r in integ][:20]}
-        last = {}
-        for r in gates:
-            if r.get("mode") != "collect":
-                last[r.get("task")] = r
-        red_at_end = sorted(t for t, r in last.items() if not r.get("passed") and t in by)
-        self.check("gates_pass", "process", "Every implementer and solo task's last gate passed (no GATE FAILED left behind)",
-                   not red_at_end, red_at_end[:12] or f"{len(last)} tasks green", value=len(red_at_end))
+        integ = [f"{e.get('task')} {e.get('role')}" for e in self.rejects("integration")]
         self.check("integration_failures", "integration",
-                   "Wiring and system gates pass first time (no failure when fakes swap for real)",
-                   not integ, self.extra["gates"]["integration_failures"] or f"{len(gates)} gate records", value=len(integ))
+                   "No landing fails the gate on the merged tree (dt land `integration` rejects)",
+                   not integ, integ or "none", value=len(integ))
 
-        # Mid-build interface changes: commits after the first commit of each frozen path, by a task that doesn't claim it.
         changes = self.interface_changes()
         self.extra["interface_changes"] = changes
+        if not self.planted:
+            self.check("interface_changes", "integration",
+                       "Mid-build interface changes ≤ 1 (a re-freeze interface task, or a landing outside the interface "
+                       "task touching types.py, protocols.py or tests/contracts/; no planted flaw in this project)",
+                       len(changes) <= 1, changes or "none", value=len(changes))
+            self.na("planted_flaw_contract_change", "integration", "The planted flaw ends as a contract change",
+                    "n/a: a project target has no planted flaw")
+            return
         flaw = self.planted["interface_flaw"]
-        expected = 1
         self.check("interface_changes", "integration",
-                   f"Mid-build interface changes ≤ {expected} (the planted {flaw['type']}.{flaw['field']})",
-                   len(changes) <= expected, changes or "none", value=len(changes))
+                   f"Mid-build interface changes ≤ 1 (the planted {flaw['type']}.{flaw['field']})",
+                   len(changes) <= 1, changes or "none", value=len(changes))
         self.planted_flaw(changes)
 
+    def testers_file(self, c: dict, f: str) -> bool:
+        """An implementer's landing carries its tester's tests (dt claim merged them): fine while the file is exactly
+        as the tester landed it on dt/<task>-tests."""
+        if c["role"] != "implementer" or not f.startswith("tests/intent/"):
+            return False
+        tip = self.repo.ref(f"dt/{c['task']}-tests")
+        return bool(tip) and self.repo.rc("diff", "--quiet", tip, c["sha"], "--", f) == 0
+
+    def dt_own(self, c: dict, t: dict | None, f: str) -> bool:
+        """`dt prebuild-clear` in a landing that builds a pipeline: its package's pipelines.md (dt land's edit)."""
+        return (c["role"] != "tester" and t is not None and t["kind"] in ("wiring", "system", "spine")
+                and re.fullmatch(r"docs/packages/[^/]+/pipelines\.md", f) is not None)
+
+    def tick_only(self, c: dict) -> bool:
+        """The landing's todo.md change is only its own task's tick (dt land's, A0's dt tick)."""
+        diff = self.repo.git("diff", "-U0", c["parents"][0], c["sha"], "--", "tasks/todo.md") if c["parents"] else ""
+        changed = [line for line in diff.splitlines() if line[:1] in "+-" and not line.startswith(("+++", "---"))]
+        return all(c["task"] in line for line in changed)
+
     def interface_changes(self) -> list[dict]:
-        first_seen, out = {}, []
-        claims = {t["id"]: t["claims"] for t in self.plan0["tasks"]}
-        for c in self.commits:
-            if len(c["parents"]) > 1 or c["subject"].startswith("turn 0"):
-                for f in c["files"]:
-                    first_seen.setdefault(f, c["sha"])
+        """Each interface task landed that the plan at the go didn't have (a re-freeze), and each other landing
+        touching types.py or tests/contracts/."""
+        out = []
+        by0 = plan_by(self.plan0)
+        by = plan_by(self.plan)
+        for c in self.lands:
+            if c["where"] != "build":
                 continue
-            hits = [f for f in c["files"] if match(f, INTERFACE_PATHS) and f in first_seen]
-            task = TASK.match(c["subject"]).group(0) if TASK.match(c["subject"]) else None
-            planned = [f for f in hits if task in claims and match(f, claims[task])]
-            hits = [f for f in hits if f not in planned]
-            if hits:
-                out.append({"commit": c["sha"][:9], "subject": c["subject"][:80], "files": hits,
-                            "class": classify_change(self.repo, c["sha"], hits)})
-            for f in c["files"]:
-                first_seen.setdefault(f, c["sha"])
+            kind = (by.get(c["task"]) or {}).get("kind")
+            hits = [f for f in c["files"] if match(f, INTERFACE_PATHS)]
+            if kind == "interface" and c["task"] in by0:
+                continue
+            if (kind == "interface" and c["task"] not in by0) or (hits and kind != "interface"):
+                out.append({"task": c["task"], "commit": c["sha"][:9], "files": hits,
+                            "class": classify_change(self.repo, c["sha"], hits) if hits else "other"})
         return out
 
     def planted_flaw(self, changes):
         flaw = self.planted["interface_flaw"]
         sym, fld = flaw["type"], flaw["field"]
         pkg = sym.split(".")[0]
-        contract = (self.proj / "docs" / "packages" / pkg / "contract.md")
-        text = contract.read_text() if contract.exists() else ""
+        text = self.repo.show(self.build, f"docs/packages/{pkg}/contract.md") or ""
         sec = re.search(rf"^### {re.escape(sym)}:.*?(?=^### |\Z)", text, re.M | re.S)
         revised = bool(sec and fld in sec.group(0))
-        types = (self.proj / "packages" / pkg / "src" / pkg / "types.py")
-        in_code = types.exists() and re.search(rf"^\s+{fld}\s*:", types.read_text(), re.M) is not None
-        touched = [c for c in changes if any(f.endswith("types.py") or "contracts/" in f for f in c["files"])]
-        silent = in_code and not revised
-        self.extra["planted_flaw"] = {"field_in_code": in_code, "contract_revised": revised, "changes": len(touched)}
+        cls = re.compile(rf"^class {re.escape(sym.split('.')[-1])}\b.*?(?=^\S|\Z)", re.M | re.S)
+        modules = [f for f in self.repo.git("ls-tree", "-r", "--name-only", self.build, "packages").split()
+                   if fnmatch.fnmatch(f, "packages/*/src/*.py")]
+        in_code = any(re.search(rf"^\s+{fld}\s*:", m.group(0), re.M)
+                      for f in modules for m in cls.finditer(self.repo.show(self.build, f) or ""))
+        escalations = [e for e in self.log if e.get("event") == "escalate" and e.get("kind") == "CONTRACT-CHANGE"]
+        typed = [e for e in escalations if e.get("type") == sym]
+        self.extra["planted_flaw"] = {"field_in_code": in_code, "contract_revised": revised,
+                                      "escalations": [{k: e.get(k) for k in ("claim", "type", "why")} for e in escalations],
+                                      "refreezes": len([c for c in changes if c["class"] != "other" or not c["files"]])}
         self.check("planted_flaw_contract_change", "integration",
-                   f"The planted interface flaw ({sym} lacks {fld}) ends as a contract change: the field is in the code "
-                   "and the contract section was revised (never a silent edit)", in_code and revised,
-                   f"field in code: {in_code}; contract.md revised: {revised}; silent edit: {silent}")
-
-    def gate_records(self) -> list[dict]:
-        recs = []
-        for p in sorted((self.proj / ".dt" / "gates").glob("*.json")):
-            try:
-                data = json.loads(p.read_text())
-            except ValueError:
-                continue
-            for r in (data if isinstance(data, list) else [data]):
-                r.setdefault("task", p.stem)
-                recs.append(r)
-        return recs
+                   f"The planted flaw ({sym} lacks {fld}) ends as a contract change: the field is in the code and the "
+                   "contract section was revised (never a silent edit)", in_code and revised,
+                   f"field in code: {in_code}; contract.md revised: {revised}; CONTRACT-CHANGE escalations "
+                   f"{len(escalations)} ({len(typed)} with --type {sym})")
 
     # -- correctness -------------------------------------------------------------------------------------
 
+    def project_correctness(self):
+        """A project target's own golden cases: the build's tests/intent, run on build/M1's tree (git archive) in the
+        project's venv with every marker; the fixture-only checks are n/a."""
+        res, files, cases, named = [], [], [], []
+        if self.build:
+            with tempfile.TemporaryDirectory(prefix="golden-") as tmp:
+                tree = pathlib.Path(tmp) / "t"
+                archive(self.repo, self.build, tree)
+                intent = tree / "tests" / "intent"
+                files = sorted(str(p.relative_to(tree)) for p in intent.rglob("test_*.py")) if intent.is_dir() else []
+                if files:
+                    res = pytest_junit(["tests/intent"], src_dirs(tree), tree, cwd=tree, python=self.python,
+                                       markers_all=True, timeout=GOLDEN_TIMEOUT)
+                cases = sorted({p.name for p in (tree / "tests" / "fixtures").glob("*/TC-*") if p.is_dir()})
+                text = "\n".join((tree / f).read_text(errors="replace") for f in files)
+                named = [c for c in cases if re.search(rf"\b{re.escape(c)}\b", text)]
+        n, ok = len(res), sum(r["outcome"] == "pass" for r in res)
+        bad = [f"{r['name']}: {r['outcome']} {r.get('exc') or ''}".strip() for r in res if r["outcome"] != "pass"]
+        self.extra["golden"] = {"intent_files": len(files), "tests": n, "passed": ok, "failing": bad[:40],
+                                "cases": len(cases), "cases_named_by_intent_tests": named,
+                                "cases_not_named": [c for c in cases if c not in named]}
+        self.check("golden_visible_pass_rate", "correctness",
+                   "The build's own intent tests (the project's golden cases) pass on build/M1's tree, every marker, "
+                   "in the project's venv", n and ok == n,
+                   f"{ok}/{n} pass in {len(files)} files; failing: {bad[:6]}; {len(named)}/{len(cases)} golden cases "
+                   f"named by an intent test", value=round(ok / n, 3) if n else 0)
+        changed = self.oracle_changes()
+        self.check("oracle_unchanged", "correctness", "No golden fixture (tests/fixtures/**) changed on build/M1",
+                   not changed, changed[:10] or "unchanged", value=len(changed))
+        why = "n/a: a project target has no fixture oracle, holdout, mutants or planted beliefs"
+        self.na("holdout_pass_rate", "correctness", "Grader's own run of the holdout cases against the built code", why)
+        self.na("planted_beliefs_caught", "correctness", "All planted wrong beliefs caught", why)
+        self.na("mutant_kill_rate", "tdd", "The final suite kills ≥ 80% of the one-line mutants of solution/", why)
+        self.na("suite_agrees_with_solution", "tdd", "The intent tests pass on the reference solution", why)
+
     def correctness(self):
+        if not self.fixture:
+            return self.project_correctness()
         src = [self.proj / "packages" / p / "src" for p in ("mdata", "risk")]
-        visible = pytest_junit([self.fixture / "oracle" / "test_visible.py"], src, self.fixture)
-        holdout = pytest_junit([self.fixture / "holdout" / "test_holdout.py"], src, self.fixture)
+        visible = pytest_junit([self.fixture / "oracle" / "test_visible.py"], src, self.fixture, python=self.python)
+        holdout = pytest_junit([self.fixture / "holdout" / "test_holdout.py"], src, self.fixture, python=self.python)
         for name, res, cat in (("golden_visible", visible, "visible TC-01–TC-08"), ("holdout", holdout, "holdout H-01–H-06")):
             n, ok = len(res), sum(r["outcome"] == "pass" for r in res)
             self.check(f"{name}_pass_rate", "correctness", f"Grader's own run of the {cat} against the built code: all pass",
@@ -502,14 +591,12 @@ class Grader:
                        value=round(ok / n, 3) if n else 0)
         self.extra["golden"] = {"visible": {r["name"]: r["outcome"] for r in visible},
                                 "holdout": {r["name"]: r["outcome"] for r in holdout}}
-        # Planted beliefs: caught when their holdout cases pass and their oracle files are unchanged.
         changed = self.oracle_changes()
         caught = []
         hold = {r["name"]: r["outcome"] for r in holdout}
         for b in self.planted["beliefs"]:
             h_ok = all(any(k.split("::")[-1].startswith(f"test_{h.lower().replace('-', '')}") and v == "pass"
-                           for k, v in hold.items())
-                       for h in b["holdout"])
+                           for k, v in hold.items()) for h in b["holdout"])
             o_ok = not any(any(f"/{tc}/" in f for f in changed) for tc in b["visible"])
             if h_ok and o_ok:
                 caught.append(b["id"])
@@ -518,15 +605,14 @@ class Grader:
                    "All three planted wrong beliefs caught (holdout passes, expected.json unchanged)",
                    len(caught) == len(self.planted["beliefs"]), f"caught {caught} of {[b['id'] for b in self.planted['beliefs']]}",
                    value=len(caught))
-        self.check("oracle_unchanged", "correctness", "No golden fixture (tests/fixtures/**) changed during the build",
+        self.check("oracle_unchanged", "correctness", "No golden fixture (tests/fixtures/**) changed on build/M1",
                    not changed, changed[:10] or "unchanged", value=len(changed))
         self.mutants()
 
     def oracle_changes(self) -> list[str]:
-        if not self.base:
+        if not (self.base and self.build):
             return []
-        out = self.repo.git("diff", "--name-only", self.base, "HEAD", "--", "tests/fixtures")
-        return [l for l in out.splitlines() if l]
+        return [x for x in self.repo.git("diff", "--name-only", self.base, self.build, "--", "tests/fixtures").splitlines() if x]
 
     def mutants(self):
         suite = [d for d in ("tests/intent", "tests/unit", "tests/system", "tests/contracts") if (self.proj / d).is_dir()]
@@ -536,46 +622,68 @@ class Grader:
         muts = json.loads((self.fixture / "mutants" / "mutants.json").read_text())["mutants"]
         with tempfile.TemporaryDirectory(prefix="mutants-") as tmp:
             tree = pathlib.Path(tmp) / "t"
-            shutil.copytree(self.fixture / "project", tree, ignore=shutil.ignore_patterns(".git"))
-            shutil.copytree(self.fixture / "solution" / "packages", tree / "packages", dirs_exist_ok=True,
-                            ignore=shutil.ignore_patterns("spine"))
+            tree.mkdir()
+            shutil.copytree(self.fixture / "solution" / "packages", tree / "packages", ignore=shutil.ignore_patterns("spine"))
+            # The build's own package exports over the reference modules: the suite is judged on behaviour, not on
+            # which names the interface task chose to re-export.
+            for init in (self.proj / "packages").glob("*/src/*/__init__.py"):
+                dest = tree / init.relative_to(self.proj)
+                if dest.parent.is_dir():
+                    shutil.copy(init, dest)
+            shutil.copytree(self.fixture / "project" / "tests" / "fixtures", tree / "tests" / "fixtures")
+            shutil.copy(self.proj / "tests" / "conftest.py", tree / "tests" / "conftest.py")
             shutil.copytree(self.fixture / "solution" / "tests" / "contracts", tree / "tests" / "contracts", dirs_exist_ok=True)
             for d in suite:
                 shutil.copytree(self.proj / d, tree / d, dirs_exist_ok=True)
-            base = {r["name"]: r["outcome"] for r in pytest_junit(["tests"], [tree / "packages" / p / "src" for p in ("mdata", "risk")], tree, cwd=tree)}
+            src = [tree / "packages" / p / "src" for p in ("mdata", "risk")]
+            base = {r["name"]: r["outcome"] for r in pytest_junit(["tests"], src, tree, cwd=tree, python=self.python)}
             good = {k for k, v in base.items() if v == "pass"}
             killed, survived = [], []
             for m in muts:
                 f = tree / m["file"]
                 orig = f.read_text()
                 f.write_text(orig.replace(m["find"], m["replace"], 1))
-                res = {r["name"]: r["outcome"] for r in pytest_junit(["tests"], [tree / "packages" / p / "src" for p in ("mdata", "risk")], tree, cwd=tree)}
+                res = {r["name"]: r["outcome"] for r in pytest_junit(["tests"], src, tree, cwd=tree, python=self.python)}
                 f.write_text(orig)
                 (killed if any(res.get(k) != "pass" for k in good) else survived).append(m["id"])
         rate = round(len(killed) / len(muts), 3) if muts else 0
         bad_on_solution = sorted(k for k, v in base.items() if v != "pass")
+        # Intent tests carry the golden cases and the acceptance: one failing on the reference encodes a wrong
+        # belief. Unit and contract tests also pin choices the spec leaves open (an error message, an empty input),
+        # so their disagreements are recorded, not graded.
+        intent_bad = [k for k in bad_on_solution if k.startswith("intent.")]
         self.extra["mutants"] = {"killed": killed, "survived": survived, "suite_tests": len(base),
-                                 "suite_fails_on_solution": bad_on_solution[:20]}
+                                 "suite_fails_on_solution": bad_on_solution[:30]}
         self.check("mutant_kill_rate", "tdd", "The final suite kills ≥ 80% of the one-line mutants of solution/",
                    rate >= 0.8, f"{len(killed)}/{len(muts)} killed; survived {survived}; "
                                 f"{len(bad_on_solution)} suite tests fail on the reference solution", value=rate)
         self.check("suite_agrees_with_solution", "tdd",
-                   "The final suite passes on the reference solution (a failing test there encodes a wrong belief)",
-                   not bad_on_solution, bad_on_solution[:8] or f"{len(base)} tests pass", value=len(bad_on_solution))
+                   "The intent tests pass on the reference solution (a failing one encodes a wrong belief)",
+                   not intent_bad, intent_bad[:8] or f"{sum(k.startswith('intent.') for k in base)} intent tests pass; "
+                   f"{len(bad_on_solution)} unit or contract tests pin choices the reference makes differently",
+                   value=len(intent_bad))
 
     # -- TDD ---------------------------------------------------------------------------------------------
 
     def tdd(self):
-        testers = [c for c in self.builders if c["role"] == "tester"]
-        by = plan_by(self.plan)
-        if self.arm.get("tdd") == "solo" or not testers:
-            self.extra["red"] = {"tester_commits": len(testers), "note": "solo arm or no tester commits"}
+        testers = [c for c in self.lands if c["role"] == "tester"]
+        tester_rejects = [e for e in self.rejects("gate") if e.get("role") == "tester"]
+        import_errors = []
+        for e in tester_rejects:
+            text = self.detail(e)
+            if re.search(r"collection error|ImportError|ModuleNotFoundError|AttributeError|NameError", text):
+                import_errors.append(f"{e.get('task')} tester (rejected at collect): an import or collection error")
+        split_arm = self.arm.get("tdd") in ("split", "serial")
+        if not testers:
+            self.extra["red"] = {"tester_landings": 0, "note": "no tester landings"}
             if self.arm.get("tdd") == "split":
-                self.check("red_right_reason", "tdd", "Split arm: tester commits exist and fail for the right reason",
-                           False, "no tester commits found")
+                self.check("red_right_reason", "tdd", "Split arm: tester landings exist and fail for the right reason",
+                           False, "no tester landings found")
+            self.check("red_import_errors", "tdd", "No tester test fails to import or names a symbol the interface lacks",
+                       not import_errors, import_errors or "no tester landings", value=len(import_errors))
             return
         right = wrong = 0
-        details, import_errors = [], []
+        details = []
         for c in testers:
             files = [f for f in c["files"] if f.startswith("tests/intent/") and f.endswith(".py")]
             if not files:
@@ -583,93 +691,143 @@ class Grader:
             with tempfile.TemporaryDirectory(prefix="red-") as tmp:
                 tree = pathlib.Path(tmp) / "t"
                 archive(self.repo, c["sha"], tree)
-                res = pytest_junit(files, [tree / "packages" / p / "src" for p in ("mdata", "risk")], tree, cwd=tree)
+                res = pytest_junit(files, src_dirs(tree), tree, cwd=tree, python=self.python, markers_all=True)
             for r in res:
-                # Failed is pytest.raises' "DID NOT RAISE": the behaviour is missing, the right reason too.
                 ok = r["outcome"] == "fail" and r["exc"] in ("AssertionError", "NotImplementedError", "Failed")
                 right += ok
                 wrong += not ok
                 if not ok:
                     details.append(f"{c['task']} {r['name']}: {r['outcome']} {r['exc'] or ''}".strip())
-                if r["outcome"] == "error" or r["exc"] in ("ImportError", "ModuleNotFoundError", "AttributeError", "NameError"):
+                if r["outcome"] == "error" or r["exc"] in WRONG_RED:
                     import_errors.append(f"{c['task']} {r['name']}: {r['exc'] or r['outcome']}")
         total = right + wrong
         rate = round(right / total, 3) if total else 0
-        self.extra["red"] = {"tester_commits": len(testers), "tests": total, "right": right, "wrong": details[:20]}
+        self.extra["red"] = {"tester_landings": len(testers), "tests": total, "right": right, "wrong": details[:20],
+                             "tester_gate_rejects": len(tester_rejects)}
         self.check("red_right_reason", "tdd",
-                   "≥ 90% of tester tests, run on the tester's own commit, fail with AssertionError, NotImplementedError "
+                   "≥ 90% of tester tests, run on the tester's own landing, fail with AssertionError, NotImplementedError "
                    "or DID NOT RAISE", total and rate >= 0.9, f"{right}/{total} right; wrong: {details[:6]}", value=rate)
         self.check("red_import_errors", "tdd", "No tester test fails to import or names a symbol the interface lacks "
-                   "(ImportError, AttributeError, collection error)", not import_errors, import_errors[:8] or "none",
-                   value=len(import_errors))
-        # Split order: every split task's tester commit precedes its implementer commit.
-        order_bad = []
-        for t in [t for t in self.plan0["tasks"] if t["mode"] == "split"]:
-            ts = [c["time"] for c in testers if c["task"] == t["id"]]
-            im = [c["time"] for c in self.builders if c["task"] == t["id"] and c["role"] != "tester"]
-            if not ts or (im and min(im) < min(ts)):
-                order_bad.append(t["id"])
-        self.check("split_tester_first", "tdd", "Every split task has a tester commit before its implementer's",
-                   not order_bad, order_bad or "all split tasks tester-first", value=len(order_bad))
+                   "(ImportError, AttributeError, collection error; landed or rejected at collect)",
+                   not import_errors, import_errors[:8] or "none", value=len(import_errors))
+        if split_arm:
+            order_bad = []
+            for t in [t for t in self.plan["tasks"] if t["mode"] == "split"]:
+                tt = [c["time"] for c in testers if c["task"] == t["id"]]
+                im = [c["time"] for c in self.lands if c["task"] == t["id"] and c["role"] != "tester"]
+                if im and (not tt or min(im) < min(tt)):
+                    order_bad.append(t["id"])
+            self.check("split_tester_first", "tdd", "Every split task's tester landed before its implementer",
+                       not order_bad, order_bad or "all split tasks tester-first", value=len(order_bad))
 
     # -- process -----------------------------------------------------------------------------------------
 
     def process(self):
-        perm = []
-        p = self.run / "permission_prompts.jsonl"
-        if p.exists():
-            perm = [json.loads(l) for l in p.read_text().splitlines() if l.strip()]
-        denied = [x for x in perm if x.get("decision") == "deny"]
-        blocked = [e for t in self.turns for e in t.get("tool_errors", []) if "BLOCKED" in e]
+        denials = self.permission_denials()
+        protected_denials = [d for d in denials if d.get("path") and match(d["path"], PROTECTED)]
         landed = []
-        for c in self.builders:
+        for c in self.lands:
             for f in c["files"]:
-                if f.startswith("tests/fixtures/") or (f.startswith("tests/intent/") and c["role"] not in ("tester",)
-                                                       and self.arm.get("tdd") == "split"):
+                if f.startswith("tests/fixtures/") or (f.startswith("tests/intent/") and c["role"] != "tester"
+                                                       and self.arm.get("tdd") == "split"
+                                                       and not self.testers_file(c, f)):
                     landed.append(f"{c['task']} {c['role']}: {f}")
-        self.extra["protected"] = {"oracle_denied": len(denied), "guard_blocks": len(blocked), "landed": landed[:20],
-                                   "prompts": len(perm)}
-        self.check("protected_edits_landed", "tdd", "No protected test or oracle edit landed in a builder commit",
+        attempts = protected_denials + [{"where": "dt land", "what": p} for p in getattr(self, "protected_rejects", [])]
+        self.extra["protected"] = {"denials": denials[:30], "protected_denials": len(protected_denials),
+                                   "writes_rejects_on_protected": getattr(self, "protected_rejects", [])[:20],
+                                   "landed": landed[:20]}
+        self.check("protected_edits_landed", "tdd", "No protected test or oracle edit landed",
                    not landed, landed[:10] or "none", value=len(landed))
-        self.check("protected_edit_attempts", "tdd", "Protected-test edit attempts (guard blocks + oracle denials; informational)",
-                   True, f"{len(blocked)} guard blocks, {len(denied)} oracle denials of {len(perm)} prompts",
-                   value=len(blocked) + len(denied))
-        texts = [t.get("assistant", "") for t in self.turns] + [a.get("result", "") for t in self.turns for a in t.get("agents", [])]
-        esc = sum(len(re.findall(r"GATE FAILED|contract-change|escalat", x, re.I)) for x in texts)
-        interventions = sum(1 for t in self.turns if t.get("persona") not in (None, "approve", "continue"))
-        plan_text = (self.proj / "tasks" / "plan.md").read_text() if (self.proj / "tasks" / "plan.md").exists() else ""
-        findings = len(re.findall(r"^\s*-\s+\**(Critical|Important|Suggestion|Nit)\b", plan_text, re.M))
-        todo = (self.proj / "tasks" / "todo.md").read_text() if (self.proj / "tasks" / "todo.md").exists() else ""
+        self.check("protected_edit_attempts", "tdd",
+                   "No protected-test edit attempts: permission denials on protected paths (stream and subagent "
+                   "transcripts) plus dt land writes rejects on protected paths",
+                   not attempts, attempts[:8] or f"none ({len(denials)} denials in all)", value=len(attempts))
+        esc = [e for e in self.log if e.get("event") == "escalate"]
+        resolves = [e for e in self.log if e.get("event") == "resolve"]
+        interventions = sum(1 for t in self.turns if t.get("persona") not in (None, "start", "continue"))
+        findings = re.findall(r"^\s*-\s+M\d+-R\d+\s+(Critical|Important|Suggestion|Nit)\b",
+                              self.repo.show(self.build, "tasks/plan.md") or "", re.M)
+        todo = self.repo.show(self.build, "tasks/todo.md") or ""
         open_items = re.findall(r"^- \[ \] (M\d+-T\d+)", todo, re.M)
         done_items = re.findall(r"^- \[x\] (M\d+-T\d+)", todo, re.M)
-        self.extra["process"] = {"escalations": esc, "human_interventions": interventions, "checkpoint_findings": findings,
+        blocked = self.blocked_halves()
+        self.extra["process"] = {"escalations": [{k: e.get(k) for k in ("claim", "kind", "type", "why")} for e in esc],
+                                 "resolves": len(resolves), "human_interventions": interventions,
+                                 "findings": {s: findings.count(s) for s in ("Critical", "Important", "Suggestion", "Nit")},
+                                 "reviews": len([e for e in self.log if e.get("event") == "submit-review"]),
+                                 "rejects": {k: len(self.rejects(k)) for k in ("writes", "gate", "conflict", "integration",
+                                                                             "escalated", "harness")},
                                  "ticked": len(done_items), "open": open_items}
-        self.check("milestone_built", "process", "Every task in todo.md is ticked", done_items and not open_items,
+        self.check("milestone_built", "process", "Every task in todo.md is ticked on build/M1", done_items and not open_items,
                    f"{len(done_items)} ticked, open: {open_items[:10]}", value=len(done_items))
+        self.check("gates_pass", "process", "No half ended blocked (a gate, integration, writes or conflict reject as "
+                   "its last outcome)", not blocked, blocked[:10] or "none", value=len(blocked))
         stubs = []
-        for f in (self.proj / "packages").rglob("*.py") if (self.proj / "packages").is_dir() else []:
+        for f in (f for d in src_dirs(self.proj) for f in d.rglob("*.py")):
             stubs += [f"{f.relative_to(self.proj)}: {m}" for m in re.findall(r'NotImplementedError\("(M\d+-T\d+)', f.read_text())]
         self.check("no_stub_left", "process", "No interface stub is left at the end (CR-02 carve-out closed)", not stubs,
                    stubs[:8] or "none", value=len(stubs))
+
+    def blocked_halves(self) -> list[str]:
+        last: dict[str, str] = {}
+        for e in self.log:
+            if e.get("event") == "land":
+                last[e["claim"]] = "land"
+            elif e.get("event") == "reject":
+                last[e["claim"]] = e.get("reject")
+        return sorted(c for c, k in last.items() if k in ("gate", "integration", "writes", "conflict"))
+
+    def permission_denials(self) -> list[dict]:
+        """Denied tool calls: the stream's result events (main session) and every subagent transcript's denied or
+        guard-blocked tool results, each with the path it aimed at when there is one."""
+        out = []
+        for res in self.stream_results():
+            for d in res.get("permission_denials") or []:
+                inp = d.get("tool_input") or {}
+                out.append({"where": "main", "tool": d.get("tool_name"),
+                            "path": rel_path(inp.get("file_path") or inp.get("notebook_path") or "", self.proj)})
+        for f in self.subagent_files():
+            calls = {}
+            for line in f.read_text(errors="replace").splitlines():
+                try:
+                    d = json.loads(line)
+                except ValueError:
+                    continue
+                for c in ((d.get("message") or {}).get("content") or []) if isinstance((d.get("message") or {}).get("content"), list) else []:
+                    if c.get("type") == "tool_use":
+                        calls[c.get("id")] = c
+                    elif c.get("type") == "tool_result" and c.get("is_error"):
+                        txt = c.get("content") if isinstance(c.get("content"), str) else json.dumps(c.get("content"))
+                        if not re.search(r"denied|BLOCKED|not allowed|permission", txt or "", re.I):
+                            continue
+                        call = calls.get(c.get("tool_use_id")) or {}
+                        inp = call.get("input") or {}
+                        out.append({"where": f.stem, "tool": call.get("name"),
+                                    "path": rel_path(inp.get("file_path") or "", self.proj), "text": (txt or "")[:160]})
+        return out
+
+    def subagent_files(self) -> list[pathlib.Path]:
+        p = self.run / "agent_stream.jsonl"
+        if not p.exists():
+            return []
+        m = re.search(r'"session_id":\s*"([0-9a-f-]{36})"', p.read_text(errors="replace")[:20000])
+        if not m:
+            return []
+        # Agent-tool agents sit in subagents/; a Workflow's (arm A3-WF) in subagents/workflows/<run>/.
+        hits = sorted((pathlib.Path.home() / ".claude" / "projects").glob(f"*/{m.group(1)}/subagents/**/agent-*.jsonl"))
+        return hits
 
     # -- harness -----------------------------------------------------------------------------------------
 
     def harness(self):
         errs = [t.get("assistant", "")[:200] for t in self.turns if t.get("assistant", "").startswith("[agent error")]
         self.check("agent_errors", "harness", "No agent session errors (CLI exit, timeout)", not errs, errs[:5] or "none")
-        unmerged = self.extra.get("merges", {}).get("unmerged_branches", [])
-        conflicted = {c["branch"] for c in self.extra.get("merges", {}).get("conflicts", [])}
-        lost = [b for b in unmerged if b not in conflicted]
-        self.check("worktrees_merged", "harness", "Every worktree-* branch with commits was merged (none lost by the merge step)",
-                   not lost, lost or "all merged")
-        gated = {r.get("task") for r in self.gate_records()}
-        ungated = sorted({c["task"] for c in self.builders if c["role"] != "tester"} - gated)
-        self.check("gates_recorded", "harness", "Every implementer/solo task left a gate verdict in .dt/gates/ "
-                   "(a `schema` agent skips its Stop gate, build-phase-notes §4)", not ungated, ungated[:12] or "all gated")
-        unattributed = [c["subject"] for c in self.commits if re.match(r"turn \d+", c["subject"]) and c["subject"] != "turn 0"
-                        and any(f.startswith("packages/") or f.startswith("tests/") for f in c["files"])]
-        self.check("work_committed_by_agents", "harness", "Code reached git through task commits, not the driver's per-turn commit",
-                   not unattributed, unattributed[:6] or "none")
+        hr = [f"{e.get('task')} {e.get('role')}" for e in self.rejects("harness")]
+        self.check("harness_rejects", "harness", "No half landed with --harness (no status line, API error)", not hr,
+                   hr[:10] or "none", value=len(hr))
+        dirty = subprocess.run(["git", "status", "--porcelain"], cwd=self.proj, capture_output=True, text=True).stdout.split("\n")
+        dirty = [d for d in dirty if d.strip()]
+        self.check("main_checkout_clean", "harness", "The main checkout ends clean on build/M1", not dirty, dirty[:6] or "clean")
         flow = (self.run / "flow" / "index.json").exists()
         self.check("flow_drawn", "harness", "The run's workflow-analyzer flow was drawn (<run>/flow/)", flow or self.summary.get("fake"),
                    "flow/index.json present" if flow else "no flow/index.json")
@@ -680,32 +838,49 @@ class Grader:
                 part()
             except Exception as e:  # a grader crash is a harness failure, not a design result
                 self.check(f"grader_{part.__name__}", "harness", f"grade_build {part.__name__} ran", False, repr(e))
-        design = [r for r in self.R if r["category"] != "harness"]
+        design = [r for r in self.R if r["category"] != "harness" and not r.get("na")]
         harness = [r for r in self.R if r["category"] == "harness"]
         passed = sum(r["passed"] for r in design)
         out = {"expectations": self.R,
                "summary": {"passed": passed, "failed": len(design) - passed, "total": len(design),
-                           "pass_rate": round(passed / len(design), 3) if design else 0},
+                           "pass_rate": round(passed / len(design), 3) if design else 0,
+                           "not_applicable": [r["id"] for r in self.R if r.get("na")]},
                "harness_summary": {"passed": sum(r["passed"] for r in harness), "total": len(harness),
                                    "failures": [r["id"] for r in harness if not r["passed"]]},
-               "execution_metrics": {"total_steps": len(self.turns), "builder_commits": len(self.builders),
+               "execution_metrics": {"total_steps": len(self.turns), "landings": len(self.lands),
                                      "errors_encountered": sum(1 for t in self.turns if t.get("assistant", "").startswith("[agent error"))},
                "timing": {"executor_duration_seconds": self.summary.get("total_seconds"),
                           "total_duration_seconds": self.summary.get("total_seconds")},
                "extra": dict(self.extra, arm=self.arm_id, target=self.summary.get("target", "minilab"),
+                             base=self.base, fixture=str(self.fixture) if self.fixture else None,
                              cost_usd=self.summary.get("agent_cost_usd"), turns=len(self.turns))}
         (self.run / "grading.json").write_text(json.dumps(out, indent=1))
         if not self.quiet:
             print(f"{self.arm_id}: {passed}/{len(design)} design checks; harness {out['harness_summary']['passed']}/{len(harness)}")
             for r in self.R:
-                print(("PASS " if r["passed"] else "FAIL ") + f"[{r['category']}/{r['id']}] {r['text']}  — {r['evidence'][:150]}")
+                print(("N/A  " if r.get("na") else "PASS " if r["passed"] else "FAIL ")
+                      + f"[{r['category']}/{r['id']}] {r['text']}  — {r['evidence'][:150]}")
         return out
 
 
 # ---- helpers --------------------------------------------------------------------------------------------
 
 def ts(s: str) -> float:
-    return datetime.fromisoformat(s.replace("Z", "+00:00")).timestamp()
+    s = s.replace("Z", "+00:00")
+    if re.search(r"[+-]\d{4}$", s):
+        s = s[:-2] + ":" + s[-2:]
+    return datetime.fromisoformat(s).timestamp()
+
+
+def rel_path(p: str, root: pathlib.Path) -> str:
+    """A tool's file path relative to the project or to the worktree it was in (.claude/worktrees/<name>/)."""
+    if not p:
+        return ""
+    p = re.sub(r"^.*?/\.claude/worktrees/[^/]+/", "", p)
+    try:
+        return str(pathlib.Path(p).resolve().relative_to(root.resolve()))
+    except ValueError:
+        return p.lstrip("/") if not os.path.isabs(p) else p
 
 
 def max_overlap(iv: list[tuple[float, float]]) -> int:
@@ -715,20 +890,6 @@ def max_overlap(iv: list[tuple[float, float]]) -> int:
         cur += d
         best = max(best, cur)
     return best
-
-
-def rounds_from_spans(spans: dict[str, tuple[int, int]]) -> list[list[str]]:
-    """Group tasks into rounds: a new round starts when a task starts at or after the end of every task in the
-    current round."""
-    rounds, end = [], None
-    for t, (a, b) in sorted(spans.items(), key=lambda x: x[1]):
-        if end is None or a >= end:
-            rounds.append([t])
-            end = b
-        else:
-            rounds[-1].append(t)
-            end = max(end, b)
-    return rounds
 
 
 def classify_change(repo: Repo, sha: str, files: list[str]) -> str:
@@ -752,16 +913,20 @@ def archive(repo: Repo, rev: str, dest: pathlib.Path):
     subprocess.run(["tar", "-x", "-C", str(dest)], input=tar.stdout, check=True)
 
 
-def pytest_junit(targets, src_dirs, rootdir, cwd=None) -> list[dict]:
-    """Run pytest on targets with src_dirs on sys.path; one dict per test: name, outcome pass|fail|error, exc."""
+def pytest_junit(targets, src_dirs, rootdir, cwd=None, python=None, markers_all=False, timeout=900) -> list[dict]:
+    """Run pytest on targets with src_dirs first on sys.path (the project's interpreter by default); one dict per
+    test: name, outcome pass|fail|error, exc. A run past `timeout` is one error result."""
     with tempfile.TemporaryDirectory(prefix="junit-") as tmp:
         xml = pathlib.Path(tmp) / "j.xml"
         env = dict(os.environ, PYTHONPATH=os.pathsep.join(str(s) for s in src_dirs), PYTHONDONTWRITEBYTECODE="1")
-        cmd = [sys.executable, "-m", "pytest", "-q", "-p", "no:cacheprovider", "--continue-on-collection-errors",
-               f"--junitxml={xml}", "--import-mode=importlib", *[str(t) for t in targets]]
-        if cwd is None:
-            cmd[4:4] = ["--rootdir", str(rootdir), "-c", os.devnull]
-        subprocess.run(cmd, cwd=cwd or rootdir, env=env, capture_output=True, text=True, timeout=600)
+        env.pop("VIRTUAL_ENV", None)
+        cmd = [python or sys.executable, "-m", "pytest", "-q", "-p", "no:cacheprovider", "--continue-on-collection-errors",
+               f"--junitxml={xml}", "--import-mode=importlib", "--rootdir", str(rootdir), "-c", os.devnull,
+               *(["-m", ""] if markers_all else []), *[str(t) for t in targets]]
+        try:
+            subprocess.run(cmd, cwd=cwd or rootdir, env=env, capture_output=True, text=True, timeout=timeout)
+        except subprocess.TimeoutExpired:
+            return [{"name": f"(pytest timed out after {timeout}s)", "outcome": "error", "exc": "Timeout"}]
         if not xml.exists():
             return []
         out = []

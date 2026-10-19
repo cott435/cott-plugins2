@@ -1,0 +1,603 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1"><title>U13 implementer</title>
+<style>
+:root{--bg:#fbfbfa;--fg:#1d1d1f;--muted:#6b6b70;--line:#d9d9de;--box:#fff;--rowp:#eef3fb;--band:#fff4d6;
+--ok:#2e7d32;--bad:#c62828;--warn:#b26a00;--idle:#6b6b70}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#17171a;--fg:#ececf0;--muted:#9a9aa3;
+--line:#34343a;--box:#222227;--rowp:#1d2433;--band:#3a3015;--ok:#6fcf73;--bad:#ff6b6b;--warn:#f0b35a;--idle:#9a9aa3}}
+:root[data-theme="dark"]{--bg:#17171a;--fg:#ececf0;--muted:#9a9aa3;--line:#34343a;--box:#222227;--rowp:#1d2433;
+--band:#3a3015;--ok:#6fcf73;--bad:#ff6b6b;--warn:#f0b35a;--idle:#9a9aa3}
+body{margin:0;padding:16px;background:var(--bg);color:var(--fg);font:14px/1.45 -apple-system,system-ui,sans-serif}
+h1{font-size:18px;margin:0 0 4px}h2{font-size:15px;margin:22px 0 8px}.sub{color:var(--muted)}
+table{border-collapse:collapse;margin:4px 0 8px}td,th{border-bottom:1px solid var(--line);padding:4px 10px;text-align:left;
+vertical-align:top}th{color:var(--muted);font-weight:600}.chips span{display:inline-block;margin:0 4px 2px 0}
+.legend span{margin-right:14px;white-space:nowrap}.sw{display:inline-block;width:10px;height:10px;border-radius:2px;
+margin-right:4px;vertical-align:-1px}.scroll{overflow:auto;max-height:88vh;border:1px solid var(--line);border-radius:8px}
+.chart{display:grid;width:max-content}.chart>div{line-height:0}.corner{position:sticky;top:0;left:0;z-index:3}
+.colhead{position:sticky;top:0;z-index:2}.rowhead{position:sticky;left:0;z-index:2}
+svg.bg{background:var(--bg)}.colhead svg{border-bottom:1px solid var(--line)}.rowhead svg{border-right:1px solid var(--line)}
+.ok{color:var(--ok);fill:var(--ok)}.bad{color:var(--bad);fill:var(--bad)}.warn{color:var(--warn);fill:var(--warn)}
+.idle{color:var(--idle);fill:var(--idle)}
+svg text{fill:var(--fg);font-family:-apple-system,system-ui,sans-serif}
+.box{fill:var(--box);stroke:var(--line)}.unit:hover .box{stroke:var(--fg)}
+.role{font-size:12px;font-weight:600}.uid,.wmeta,.lmeta,.meta{font-size:10px;fill:var(--muted)}
+.sub{font-size:10.5px;fill:var(--muted)}.badge{font-size:11px;font-weight:600}
+.meta.bad{fill:var(--bad);font-weight:600}.lane{font-size:13px;font-weight:700}.wave{font-size:13px;font-weight:700}
+.par{fill:#4e79a7}.ser{fill:var(--muted)}.rowp{fill:var(--rowp)}.rows{fill:transparent}.band{fill:var(--band)}
+.bandt{font-size:11.5px}.grid{stroke:var(--line)}.link{stroke:var(--muted);stroke-width:1.2;opacity:.55}
+.arrowhead{fill:var(--muted)}.marks{font-size:10.5px}.audit{stroke:var(--box);stroke-width:2}.auditn{font-size:10px;font-weight:700;fill:#fff}
+a{color:inherit}svg a .box{cursor:pointer}
+
+:root{--c0:#2a78d6;--c1:#eb6834;--c2:#1baf7a;--c3:#eda100;--c4:#e87ba4;--c5:#008300;--c6:#6250d6;--c7:#e34948;
+--cx:#8a8985;--main:#52514e;--read:#dcdbd5;--readfg:#1d1d1f}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--c0:#3987e5;--c1:#d95926;--c2:#199e70;
+--c3:#c98500;--c4:#d55181;--c5:#008300;--c6:#9085e9;--c7:#e66767;--cx:#77766f;--main:#c3c2b7;--read:#3b3b40;
+--readfg:#ececf0}}
+:root[data-theme="dark"]{--c0:#3987e5;--c1:#d95926;--c2:#199e70;--c3:#c98500;--c4:#d55181;--c5:#008300;
+--c6:#9085e9;--c7:#e66767;--cx:#77766f;--main:#c3c2b7;--read:#3b3b40;--readfg:#ececf0}
+.c0{fill:var(--c0);background:var(--c0)}.c1{fill:var(--c1);background:var(--c1)}.c2{fill:var(--c2);background:var(--c2)}
+.c3{fill:var(--c3);background:var(--c3)}.c4{fill:var(--c4);background:var(--c4)}.c5{fill:var(--c5);background:var(--c5)}
+.c6{fill:var(--c6);background:var(--c6)}.c7{fill:var(--c7);background:var(--c7)}.cx{fill:var(--cx);background:var(--cx)}
+.cmain{fill:var(--main)}.sc0{stroke:var(--c0)}.sc1{stroke:var(--c1)}.sc2{stroke:var(--c2)}
+.tl text,.sm text,.lc text{font-size:10.5px;fill:var(--muted)}.tl .lbl-in,.sm .lbl-in{fill:#fff;font-size:10.5px;font-weight:600}
+.tl .rowl,.sm .rowl,.lc .rowl{fill:var(--fg);font-size:11.5px;font-weight:600}.tl .band{fill:var(--rowp)}
+.tl .brk{stroke:var(--muted);stroke-dasharray:2 3}.tl a:hover rect,.sm a:hover rect{stroke:var(--fg);stroke-width:1.5}
+.axis{stroke:var(--line)}.sm .val{fill:var(--fg);font-weight:600}.lc path.ln{fill:none;stroke-width:2}
+.lc circle{stroke:var(--bg);stroke-width:2}.lc .end{font-weight:600;fill:var(--fg)}
+.tiles{display:flex;flex-wrap:wrap;gap:10px;margin:12px 0}.tile{border:1px solid var(--line);border-radius:8px;
+padding:8px 12px;min-width:110px;background:var(--box)}.tile b{display:block;font-size:20px;line-height:1.2}
+.tile span{font-size:12px;color:var(--muted)}.tile i{font-style:normal;font-size:12px;margin-left:6px}
+.fm{border-collapse:separate;border-spacing:2px}.fm td,.fm th{border:0;padding:0;text-align:center;font-size:11px}
+.fm th{padding:0 2px;font-weight:600}.fm td.f,.fm th.f{text-align:left;padding-right:10px;white-space:nowrap;
+position:sticky;left:0;background:var(--bg);font:11.5px ui-monospace,Menlo,monospace;
+max-width:380px;overflow:hidden;text-overflow:ellipsis}
+.fm td.cell{min-width:22px;height:20px;border-radius:3px}.fm td.fw{background:var(--c0);color:#fff;font-weight:700}
+.fm td.fe{background:var(--c1);color:#fff;font-weight:700}.fm td.fr{background:var(--read);color:var(--readfg)}
+.fm td.n{color:var(--muted);padding:0 6px}.fm tr.grp td{text-align:left;padding-top:8px;color:var(--muted);
+font-weight:600}
+.key{display:inline-block;min-width:18px;text-align:center;border-radius:3px;font-size:11px;margin-right:4px}
+.bar{display:inline-block;height:9px;border-radius:2px;vertical-align:0}
+
+pre{white-space:pre-wrap;word-break:break-word;background:var(--box);border:1px solid var(--line);border-radius:6px;
+padding:8px 10px;margin:4px 0;font:12px/1.45 ui-monospace,SFMono-Regular,Menlo,monospace;max-width:100%;overflow:auto}
+.step{border-top:1px solid var(--line);padding:6px 0}.step:target{background:var(--rowp)}
+.sid{font:12px ui-monospace,Menlo,monospace;color:var(--muted);margin-right:8px}.kind{font-weight:600;margin-right:8px}
+.err{color:var(--bad);font-weight:600}.hook{color:var(--bad);margin:4px 0 0 16px}.lbl{font-size:12px;color:var(--muted);margin-top:6px}
+details summary{cursor:pointer;color:var(--muted);font-size:12px}.head td:first-child{color:var(--muted)}
+.top{font-size:13px}.narr{list-style:none;padding-left:0}.narr li{margin:3px 0}
+</style></head>
+<body>
+<p class="top"><a href="../flow.html">← the run's flow chart</a></p>
+
+<h1>U13 · implementer · M1-T08 implementer</h1>
+<table class="head"><tr><td>Type</td><td>implementer</td></tr><tr><td>Description</td><td>M1-T08 implementer</td></tr><tr><td>Spawned by</td><td>driver at D52</td></tr><tr><td>Turn</td><td><a href="../turns/T02.html">T02</a></td></tr><tr><td>Model</td><td>claude-opus-5-5</td></tr><tr><td>Start</td><td>2026-10-18 17:45:45 UTC</td></tr><tr><td>Duration</td><td>1 min</td></tr><tr><td>Tool calls</td><td>12</td></tr><tr><td>Errors</td><td>0</td></tr><tr><td>Hook blocks</td><td>0</td></tr><tr><td>Tokens</td><td>3.6k out · 16.7k new in · 108k cached in · peak context 21.3k</td></tr><tr><td>Skills invoked</td><td>none</td></tr><tr><td>Files written or edited</td><td>.claude/worktrees/agent-a94ea534df8427a4d/packages/risk/src/risk/returns.py, .claude/worktrees/agent-a94ea534df8427a4d/tests/unit/risk/test_returns.py</td></tr><tr><td>Definition</td><td>none</td></tr><tr><td>Steps</td><td>14</td></tr><tr><td>Finished</td><td>yes</td></tr></table>
+
+
+<h2>Prompt</h2>
+<pre>You are the implementer for M1-T08. Run `python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A2-r3/with_skill/plugin/dev-team/scripts/dt.py claim M1-T08 --role implementer`, then read the packet it names.</pre>
+<h2>Files</h2>
+<table><tr><th>Op</th><th>File</th><th>Calls</th><th>By</th><th>Via</th><th>Steps</th></tr><tr><td>write</td><td><code>.claude/worktrees/agent-a94ea534df8427a4d/packages/risk/src/risk/returns.py</code></td><td>1</td><td>U13</td><td>Write</td><td><a href="#11">U13.S11</a></td></tr><tr><td>write</td><td><code>.claude/worktrees/agent-a94ea534df8427a4d/tests/unit/risk/test_returns.py</code></td><td>1</td><td>U13</td><td>Write</td><td><a href="#12">U13.S12</a></td></tr><tr><td>read</td><td><code>.claude/worktrees/agent-a94ea534df8427a4d/.claude/packet.md</code></td><td>1</td><td>U13</td><td>Read</td><td><a href="#3">U13.S3</a></td></tr><tr><td>read</td><td><code>.claude/worktrees/agent-a94ea534df8427a4d/CONSTRAINTS.md</code></td><td>1</td><td>U13</td><td>Read</td><td><a href="#4">U13.S4</a></td></tr><tr><td>read</td><td><code>.claude/worktrees/agent-a94ea534df8427a4d/packages/risk/src/risk/returns.py</code></td><td>1</td><td>U13</td><td>Read</td><td><a href="#5">U13.S5</a></td></tr><tr><td>read</td><td><code>.claude/worktrees/agent-a94ea534df8427a4d/tests/intent/risk/test_returns.py</code></td><td>1</td><td>U13</td><td>Read</td><td><a href="#9">U13.S9</a></td></tr><tr><td>read</td><td><code>.claude/worktrees/agent-a94ea534df8427a4d/tests/unit/risk/test_returns.py</code></td><td>1</td><td>U13</td><td>Read</td><td><a href="#6">U13.S6</a></td></tr></table>
+<h2>Steps</h2>
+<div class="step" id="S1"><span class="sid">U13.S1</span><span class="kind">user</span>You are the implementer for M1-T08. Run `python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A2-r3/with_skill/plugin/dev-team/scripts/dt.py claim M1-T08 --role implementer`, then read the packet it names.<details><summary>full text</summary><pre>You are the implementer for M1-T08. Run `python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A2-r3/with_skill/plugin/dev-team/scripts/dt.py claim M1-T08 --role implementer`, then read the packet it names.</pre></details></div><div class="step" id="S2"><span class="sid">U13.S2</span><span class="kind">Bash</span>python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A2-r3/with_skill/plugin/dev-team/scripts/dt.py claim M1-T08 --role implementer<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A2-r3/with_skill/plugin/dev-team/scripts/dt.py claim M1-T08 --role implementer&quot;,
+  &quot;description&quot;: &quot;Claim task M1-T08 as implementer&quot;
+}</pre><div class="lbl">output</div><pre>packet: /Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A2-r3/with_skill/project/.claude/worktrees/agent-a94ea534df8427a4d/.claude/packet.md (84 lines; read it in full)
+task: M1-T08 Log returns · role implementer · package risk · kind thicken
+writes: packages/risk/src/risk/returns.py, tests/unit/risk/test_returns.py
+done: Done when `scripts/check.sh gate` passes (the gate passes on your Writes); the Stop hook runs it. End with one line: `DONE M1-T08 implementer`. If you can&#x27;t finish: `python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A2-r3/with_skill/plugin/dev-team/scripts/dt.py escalate &lt;TEST-WRONG|NEEDS-DEP&gt; &quot;&lt;why&gt;&quot;`, or `python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A2-r3/with_skill/plugin/dev-team/scripts/dt.py escalate CONTRACT-CHANGE &quot;&lt;why&gt;&quot; --type &lt;the contract symbol&gt;`, then end with one line: `STOPPED M1-T08 implementer: see dt escalate`.</pre></details></div><div class="step" id="S3"><span class="sid">U13.S3</span><span class="kind">Read</span>/Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A2-r3/with_skill/project/.claude/worktrees/agent-a94ea534df8427a4d/.claude/packet.md<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A2-r3/with_skill/project/.claude/worktrees/agent-a94ea534df8427a4d/.claude/packet.md&quot;
+}</pre><div class="lbl">output</div><pre>1	# Packet: M1-T08 implementer
+2	You are the implementer for M1-T08. Your edit boundary is your Writes below (`.claude/.task_writes`); the guard blocks everything else.
+3	
+4	Done when `scripts/check.sh gate` passes (the gate passes on your Writes); the Stop hook runs it. End with one line: `DONE M1-T08 implementer`. If you can&#x27;t finish: `python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A2-r3/with_skill/plugin/dev-team/scripts/dt.py escalate &lt;TEST-WRONG|NEEDS-DEP&gt; &quot;&lt;why&gt;&quot;`, or `python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A2-r3/with_skill/plugin/dev-team/scripts/dt.py escalate CONTRACT-CHANGE &quot;&lt;why&gt;&quot; --type &lt;the contract symbol&gt;`, then end with one line: `STOPPED M1-T08 implementer: see dt escalate`.
+5	
+6	# Context for M1-T08: package risk · mode split · kind thicken
+7	Read only what is below, plus CONSTRAINTS.md and the files you edit. Your task is the last section.
+8	
+9	&lt;!-- docs/packages/risk/pipelines.md:5 --&gt;
+10	## PL-02: Volatility
+11	**Entry:** `packages/risk/src/risk/vol_pipeline.py::vol_series` · **Trigger:** called from Python (`risk.vol_series`)
+12	**Covers:** RISK-01–RISK-03
+13	
+14	| # | Step | Owner | In → Out | Spine version | Covers |
+15	|---|---|---|---|---|---|
+16	| 1 | `load_prices` | mdata | path → Prices | PL-01 as built | DATA-01 |
+17	| 2 | `log_returns` | risk.returns | Prices → Returns | simple returns | RISK-01 |
+18	| 3 | `rolling_vol` | risk.vol | Returns → VolSeries | expanding stdev of earlier returns | RISK-02 |
+19	| 4 | `annualize` | risk.annualize | VolSeries → VolSeries | daily values pass through | RISK-03 |
+20	
+21	### Entry sketch (pre-build — removed by spine task)
+22	```python
+23	def vol_series(path, *, window=20, tickers=None) -&gt; VolSeries:
+24	    prices = load_prices(path, tickers)
+25	    returns = log_returns(prices)
+26	    vol = rolling_vol(returns, window)
+27	    return annualize(vol)
+28	```
+29	
+30	&lt;!-- docs/packages/risk/tests.md:11 --&gt;
+31	### TC-04: Geometric closes
+32	**Pipeline:** PL-02 · **Covers:** RISK-01 · **Kind:** synthetic known-answer · **Fixture:** tests/fixtures/risk/TC-04/
+33	**Source:** closes 100·1.01^t and 50·0.98^t; closed form r = ln(1.01), ln(0.98)
+34	**Expected:** every return equals the closed form · **Tolerance:** 1e-12 absolute
+35	
+36	&lt;!-- docs/spec.md:25 --&gt;
+37	- **RISK-01** Daily returns are log returns.
+38	  - Given closes, when returns are computed, then r_t = ln(close_t / close_t−1), dated t.
+39	
+40	&lt;!-- docs/packages/risk/contract.md:50 --&gt;
+41	### risk.log_returns: Log returns
+42	`def log_returns(prices: Prices) -&gt; Returns`
+43	- **Errors:** `ValueError` with fewer than two dates
+44	- **Used by:** PL-02
+45	
+46	## Layout (`dt layout risk`)
+47	packages/risk/src/risk/
+48	  __init__.py — risk: returns, volatility and the report, over mdata&#x27;s prices.
+49	  annualize.py — PL-02 step 4: annualized volatility.
+50	  returns.py — PL-02 step 2: returns from prices.
+51	  types.py — The risk contract types: returns, volatility, the summary, the drawdown and the report.
+52	  vol.py — PL-02 step 3: rolling volatility from earlier returns.
+53	  vol_pipeline.py — PL-02: annualized rolling volatility of a prices CSV.
+54	
+55	## Interfaces (frozen: build against these, never change them)
+56	&lt;!-- docs/packages/mdata/contract.md:13 --&gt;
+57	### mdata.Prices: Aligned daily closes
+58	**Kind:** type · **Sample:** `tests/contracts/mdata.Prices/sample.json` · **Cases:** two tickers over six aligned dates
+59	`@dataclass(frozen=True) class Prices: dates: tuple[str, ...]; tickers: tuple[str, ...]; closes: Mapping[str, tuple[float, ...]]`
+60	- **Invariants:** dates ascending; tickers sorted; every ticker has one positive close per date
+61	- **Used by:** PL-01, PL-02
+62	Sample: tests/contracts/mdata.Prices/sample.json (exists)
+63	
+64	&lt;!-- docs/packages/risk/contract.md:7 --&gt;
+65	### risk.Returns: Daily log returns
+66	**Kind:** type · **Sample:** `tests/contracts/risk.Returns/sample.json` · **Cases:** two tickers&#x27; log returns over five dates
+67	`@dataclass(frozen=True) class Returns: base_date: str; dates: tuple[str, ...]; tickers: tuple[str, ...]; values: Mapping[str, tuple[float, ...]]`
+68	- **Invariants:** `dates` are the prices&#x27; dates after the first, which is `base_date`; one value per date and ticker
+69	- **Used by:** PL-02, PL-03
+70	Sample: tests/contracts/risk.Returns/sample.json (exists)
+71	
+72	## Writes (edit only these files; the plan gives every other file to another task)
+73	- packages/risk/src/risk/returns.py (exists)
+74	- tests/unit/risk/test_returns.py (exists)
+75	
+76	&lt;!-- tasks/plan.md:94 --&gt;
+77	### M1-T08: Log returns
+78	**Package:** risk · **Step:** PL-02.log_returns · **Kind:** thicken · **Covers:** RISK-01 · **Size:** S · **Mode:** split
+79	**Read:** PL-02, TC-04, RISK-01, risk.log_returns
+80	**Acceptance:**
+81	- [ ] TC-04 passes within 1e-12
+82	- [ ] PL-02 smoke test still passes
+83	**Verify:** `pytest tests/intent/risk tests/unit/risk -k returns` · `pytest tests/unit/risk/test_pl02_smoke.py` · `scripts/check.sh gate --pkg risk`
+84	**Depends on:** M1-T03 · **Writes:** packages/risk/src/risk/returns.py, tests/unit/risk/test_returns.py, tests/intent/risk/test_returns.py
+85	</pre></details></div><div class="step" id="S4"><span class="sid">U13.S4</span><span class="kind">Read</span>/Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A2-r3/with_skill/project/.claude/worktrees/agent-a94ea534df8427a4d/CONSTRAINTS.md<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A2-r3/with_skill/project/.claude/worktrees/agent-a94ea534df8427a4d/CONSTRAINTS.md&quot;
+}</pre><div class="lbl">output</div><pre>1	# Constraints
+2	**Status:** Approved · **Last reviewed:** 2026-10-17 by @connor · **Ratcheted:** —
+3	
+4	The standing quality bar. `pyproject.toml` and `scripts/check.sh` enforce it; every number here names its config key, and `dt status` fails if the two disagree. Only `build-setup` changes this file, with the user: tightening is routine, loosening needs an explicit yes.
+5	
+6	## Floor
+7	- **CR-01** No new suppressions. Ruff runs with `--ignore-noqa` in gate and full, so a Ruff exception is a `per-file-ignores` entry in protected config with a row in Exceptions. `# type: ignore`, `pyright:` comments and `pragma: no cover` are caught by `floor_guard.sh` on the diff
+8	- **CR-02** No stubs: `raise NotImplementedError` outside abstract methods, `pass`-only bodies, bare `except: pass`. One carve-out: the interface task&#x27;s step signatures, whose body is only `raise NotImplementedError(&quot;&lt;task id&gt;&quot;)` naming the open task that replaces it. `check.sh gate` fails on one naming a task that isn&#x27;t open in `tasks/todo.md`; `check.sh full --exit` (the milestone exit) fails on any
+9	- **CR-03** No skipped, deleted or assertion-free tests, unless a row in Exceptions names the test file
+10	- **CR-04** No secrets in source
+11	- **CR-05** Oracle files (`tests/fixtures/**/expected.json`) change only with the user&#x27;s approval
+12	- **CR-06** The implementer never changes `tests/intent/**`
+13	- **CR-07** This file, `pyproject.toml` tool config, `scripts/` and `.claude/agents/` are not weakened to make a change pass
+14	- **CR-08** Nothing imports from `references/` or `probes/`, or adds either to `sys.path` (or `PYTHONPATH`, pytest `pythonpath`). References and probe scripts are outside the tooling, so imported code would bypass the bar; `floor_guard.sh` checks the diff for both. Code copied from either is project code and meets the same bar
+15	- **CR-09** A frozen interface (`tests/contracts/&lt;id&gt;.&lt;symbol&gt;/`: schema, samples, fake; and the types, signatures and exports the interface task wrote) is frozen once it exists at the task&#x27;s base. Only the interface task freezing it (`**Kind:** interface`) writes a new folder, and no other task&#x27;s `Writes:` names its `types.py` or `__init__.py`; a frozen interface changes only through `architecture-design` Revise, never to make a test pass
+16	
+17	## Readability
+18	- **CR-10** One entry function per pipeline; it reads top to bottom as its named steps (reviewer + `dt layout`)
+19	- **CR-11** No registries, plugin dispatch or config-driven wiring without an AD
+20	- **CR-12** New abstraction only with a second real implementation or a named seam
+21	
+22	
+23	## Enforced with numbers
+24	| ID | Dimension | Rule | Checked by | Config key | Runs at |
+25	|---|---|---|---|---|---|
+26	| CR-20 | Lint | zero errors; standing per-file-ignores only for `tests/**` and `__init__.py` | ruff | `tool.ruff.lint.select` | edit, gate |
+27	| CR-21 | Complexity | ≤ 10 per function | ruff C901 | `tool.ruff.lint.mccabe.max-complexity` | gate |
+28	| CR-22 | Size | ≤ 500 lines/module, ≤ 60/function | check_size.py | `tool.size_limits` | edit, gate |
+29	| CR-23 | Types | zero errors, strict | mypy | `tool.mypy.strict` | gate |
+30	| CR-24 | Boundaries | import contracts hold | import-linter | `tool.importlinter.contracts` | gate |
+31	| CR-25 | Dependencies | none missing or unused | deptry | `tool.deptry` | gate |
+32	| CR-26 | Deps security | nothing known-vulnerable | pip-audit | — | full, CI nightly |
+33	
+34	
+35	## Measured, not yet enforced
+36	| ID | Metric | Today | Direction |
+37	|---|---|---|---|
+38	| CR-40 | Coverage (branch) | 0% (`tool.coverage.report.fail_under`, raised by Ratchet) | must not fall |
+39	| CR-41 | vulture findings at `min_confidence = 60` (`scripts/vulture_whitelist.py`) | 0 | must not grow by `full --exit` (earlier `full` runs report) |
+40	| CR-42 | Duplicate blocks of ≥ 8 similar source lines (pylint `duplicate-code`, `[tool.pylint.similarities]` in pyproject.toml) | 0 | must not grow |
+41	
+42	## Boundaries (generated from architecture — do not edit)
+43	- `mdata` imports nothing first-party · `risk` → `mdata.types`, `mdata.load_prices`
+44	
+45	## Roles and protected paths
+46	| Role | May edit | May not edit | Stop gate |
+47	|---|---|---|---|
+48	| tester | `tests/intent/**`, within the task&#x27;s `Writes:` | everything else; reads no source | `check.sh collect` (lint, collect, red for the right reason) |
+49	| implementer / solo | `src/**`, `tests/unit/**`, within the task&#x27;s `Writes:`; an interface task also the `tests/contracts/&lt;id&gt;.&lt;symbol&gt;/` its `Writes:` names | the protected list; `tasks/` | `check.sh gate` + protected-path diff against the worktree&#x27;s base |
+50	| reviewer | its worktree, for the mutation check, and its findings file; nothing lands (the orchestrator records findings with `dt finding`) | everything else | runs `check.sh full` by hand |
+51	
+52	**Protected list** (`PROTECTED` in `scripts/check.sh`; `path_guard.sh deny --protected` reads the same list): `tests/intent/**`, `tests/fixtures/**`, `tests/conftest.py`, `pyproject.toml`, `uv.lock`, `CONSTRAINTS.md`, `scripts/**`, `.claude/agents/**`, `.claude/settings.json`, `references/**`, `probes/**`, `tests/contracts/**`, `packages/*/pyproject.toml`. `tests/contracts/**` covers the contract folders that exist at the task&#x27;s base (CR-09). **`Writes:`**: `dt claim`, in the builder&#x27;s worktree, writes the role&#x27;s share of the task&#x27;s `Writes:` to `.claude/.task_writes` and sets the worktree&#x27;s base (`refs/worktree/checks-base`); `path_guard.sh writes` blocks edits outside the list, and a tester&#x27;s or implementer&#x27;s edits before the claim. Only the orchestrator writes `tasks/` (`dt land`, `dt finding`).
+53	
+54	**Worktree links:** —
+55	
+56	## Review
+57	Run by the reviewer agent over what it is given (base, package, tasks, paths): the interface review after Phase 0, a phase review per package at each checkpoint, and the milestone exit. `dt land` already checked each landing&#x27;s `Writes:`, protected paths and gates; review judges what tools can&#x27;t.
+58	
+59	**Interface** (after Phase 0): the code is the contract, no more and no less.
+60	1. Types match `contract.md`: fields, types, invariants. Nothing a step&#x27;s In → Out needs is missing; no helper is frozen.
+61	2. Signatures match the step tables, in their owner modules. Each stub names the open task that owns its step; no logic beyond types and validation.
+62	3. One sample per case the contract names, valid and realistically shaped, never carrying a TC&#x27;s expected value. Replay doubles replay an interaction the Protocol allows; fakes serve their fixtures.
+63	4. `__init__.py` exports exactly the contract; each `Mitigated by` in the plan&#x27;s dependency graph exists; each split task&#x27;s tester can write its tests from the frozen interface and its `Read:`.
+64	
+65	**Each phase**, per package, tests before code:
+66	1. **Interfaces followed** (CR-09): no frozen type, signature or contract folder changed outside a Revise. Consumers use the declared types: no dict for a dataclass, no reaching into a provider&#x27;s internals, no local redefinition. A stub is replaced only by the task it names; no cross-package import outside the contract; spine tests run on samples and doubles, not another step&#x27;s code.
+67	2. **Tests prove something:** each intent test asserts its TC case or acceptance bullet, loading expected values and tolerances from fixtures; none is assertion-free or weakened; Hypothesis runs the `ci` profile. Unit tests are specific, never computing the expected value with the code under test or testing only a mock. **Mutation check** (`.claude/agents/reviewer.md`): per acceptance bullet, the smallest change that should break it; a mutation no test catches is a finding.
+68	3. **Correct to the spec:** each acceptance bullet truly met, not special-cased to the sample; the error paths the requirement names; seeding and determinism; numerical edge cases.
+69	4. **Simple** (CR-11, CR-12, CR-42): no abstraction with one implementation outside the contract or an AD; no forwarding wrapper, one-method class, or class where a function does; no parameter, flag or config key every caller sets the same; no `try/except` that only re-raises or swallows, no checks the types already guarantee; no loop the library already provides. No near-copies within or across the phase&#x27;s tasks: one concept is one function in its owner module (tests may repeat for readability). Each finding names the simpler form, with the same tests passing.
+70	5. **Pipelines** (CR-10): entry functions read as their step tables (`dt layout`); step owners respected; spine baselines still selectable.
+71	6. **The bar** (CR-07): diff this file, `pyproject.toml`, `scripts/` and `.claude/agents/` against the milestone&#x27;s Base. Any loosening is Critical; new exceptions need an owner and expiry.
+72	7. **Hidden and parallel risks:** where a real provider could act differently from its double (flagged for the system phase); fixed output paths, global state, test-order dependence.
+73	8. **The rest:** readability, security, performance where a QR sets a number; reused reference or probe code has its Caveats handled and fits the contract; `dt lint` clean, pre-build sections replaced by `dt layout` pointers.
+74	
+75	**Milestone exit**, over the whole diff, adds: the Scope&#x27;s Exit holds; every Covers ID has a test; `check.sh full --exit` finds no stub; system tests use real providers; the same sample through a real provider and its double agrees; deferred requirements untouched; pip-audit ran.
+76	
+77	**Severity:** Critical: a frozen interface changed, a weakened test, an intent test that misses a mutation changing its TC&#x27;s expected output, a wrong answer, a loosened bar, a security hole, lost data; it stops the build. Important: a consumer bypassing a type, any other surviving mutation, an unneeded abstraction, a duplicate across tasks. Suggestion and Nit: local. Findings go under the checkpoint block in `tasks/plan.md` (`dt finding`), each with a fix task or a reason.
+78	
+79	## Done
+80	agent-skills `references/definition-of-done.md`, tailored once:
+81	- **Correctness and Quality:** checked per task by the gate.
+82	- **Integration and Documentation:** checked at each checkpoint.
+83	- **The full list:** checked at milestone exit.
+84	
+85	## Exceptions
+86	| ID | Rule | Path | Reason | Owner | Expires |
+87	|---|---|---|---|---|---|
+88	
+89	</pre></details></div><div class="step" id="S5"><span class="sid">U13.S5</span><span class="kind">Read</span>/Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A2-r3/with_skill/project/.claude/worktrees/agent-a94ea534df8427a4d/packages/risk/src/risk/returns.py<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A2-r3/with_skill/project/.claude/worktrees/agent-a94ea534df8427a4d/packages/risk/src/risk/returns.py&quot;
+}</pre><div class="lbl">output</div><pre>1	&quot;&quot;&quot;PL-02 step 2: returns from prices.&quot;&quot;&quot;
+2	
+3	from __future__ import annotations
+4	
+5	from itertools import pairwise
+6	
+7	from mdata.types import Prices
+8	from risk.types import Returns
+9	
+10	
+11	def log_returns(prices: Prices) -&gt; Returns:
+12	    &quot;&quot;&quot;Each ticker&#x27;s return from one date to the next (spine: simple returns).&quot;&quot;&quot;
+13	    if len(prices.dates) &lt; 2:
+14	        raise ValueError(&quot;returns need at least two dates&quot;)
+15	    values = {
+16	        ticker: tuple(now / before - 1 for before, now in pairwise(closes))
+17	        for ticker, closes in prices.closes.items()
+18	    }
+19	    return Returns(
+20	        base_date=prices.dates[0], dates=prices.dates[1:], tickers=prices.tickers, values=values
+21	    )
+22	</pre></details></div><div class="step" id="S6"><span class="sid">U13.S6</span><span class="kind">Read</span>/Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A2-r3/with_skill/project/.claude/worktrees/agent-a94ea534df8427a4d/tests/unit/risk/test_returns.py<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A2-r3/with_skill/project/.claude/worktrees/agent-a94ea534df8427a4d/tests/unit/risk/test_returns.py&quot;
+}</pre><div class="lbl">output</div><pre>1	&quot;&quot;&quot;risk.returns.log_returns at its spine version (simple returns), and the Returns type.&quot;&quot;&quot;
+2	
+3	from __future__ import annotations
+4	
+5	import pytest
+6	
+7	from mdata import Prices
+8	from risk.returns import log_returns
+9	from risk.types import Returns
+10	
+11	
+12	def prices(dates: list[str], closes: dict[str, list[float]]) -&gt; Prices:
+13	    return Prices(
+14	        dates=tuple(dates),
+15	        tickers=tuple(sorted(closes)),
+16	        closes={ticker: tuple(series) for ticker, series in closes.items()},
+17	    )
+18	
+19	
+20	def test_returns_follow_the_dates_after_the_first():
+21	    result = log_returns(
+22	        prices([&quot;2024-01-02&quot;, &quot;2024-01-03&quot;, &quot;2024-01-04&quot;], {&quot;A&quot;: [100.0, 110.0, 99.0]})
+23	    )
+24	    assert result.base_date == &quot;2024-01-02&quot;
+25	    assert result.dates == (&quot;2024-01-03&quot;, &quot;2024-01-04&quot;)
+26	    assert result.tickers == (&quot;A&quot;,)
+27	    assert result.values[&quot;A&quot;] == pytest.approx((0.1, -0.1))
+28	
+29	
+30	def test_each_ticker_gets_its_own_series():
+31	    result = log_returns(prices([&quot;2024-01-02&quot;, &quot;2024-01-03&quot;], {&quot;A&quot;: [10.0, 20.0], &quot;B&quot;: [4.0, 3.0]}))
+32	    assert result.values[&quot;A&quot;] == pytest.approx((1.0,))
+33	    assert result.values[&quot;B&quot;] == pytest.approx((-0.25,))
+34	
+35	
+36	def test_fewer_than_two_dates_is_a_value_error():
+37	    with pytest.raises(ValueError, match=&quot;two dates&quot;):
+38	        log_returns(prices([&quot;2024-01-02&quot;], {&quot;A&quot;: [100.0]}))
+39	
+40	
+41	def test_returns_sample_builds_two_tickers_over_five_dates(contract_sample):
+42	    payload = contract_sample(&quot;risk.Returns&quot;)
+43	    returns = Returns(
+44	        base_date=payload[&quot;base_date&quot;],
+45	        dates=tuple(payload[&quot;dates&quot;]),
+46	        tickers=tuple(payload[&quot;tickers&quot;]),
+47	        values={ticker: tuple(series) for ticker, series in payload[&quot;values&quot;].items()},
+48	    )
+49	    assert returns.tickers == (&quot;AAA&quot;, &quot;BBB&quot;)
+50	    assert len(returns.dates) == 5
+51	    assert all(len(returns.values[t]) == 5 for t in returns.tickers)
+52	
+53	
+54	@pytest.mark.parametrize(
+55	    (&quot;change&quot;, &quot;message&quot;),
+56	    [
+57	        ({&quot;base_date&quot;: &quot;2024-01-03&quot;}, &quot;after base_date&quot;),
+58	        ({&quot;dates&quot;: (&quot;2024-01-04&quot;, &quot;2024-01-03&quot;)}, &quot;ascending&quot;),
+59	        ({&quot;tickers&quot;: (&quot;B&quot;, &quot;A&quot;)}, &quot;sorted&quot;),
+60	        ({&quot;tickers&quot;: (&quot;A&quot;,)}, &quot;one series per ticker&quot;),
+61	        ({&quot;values&quot;: {&quot;A&quot;: (0.1,), &quot;B&quot;: (0.1, 0.2)}}, &quot;one return per date&quot;),
+62	    ],
+63	)
+64	def test_returns_rejects_broken_invariants(change, message):
+65	    fields = {
+66	        &quot;base_date&quot;: &quot;2024-01-02&quot;,
+67	        &quot;dates&quot;: (&quot;2024-01-03&quot;, &quot;2024-01-04&quot;),
+68	        &quot;tickers&quot;: (&quot;A&quot;, &quot;B&quot;),
+69	        &quot;values&quot;: {&quot;A&quot;: (0.1, 0.2), &quot;B&quot;: (0.3, 0.4)},
+70	    }
+71	    with pytest.raises(ValueError, match=message):
+72	        Returns(**{**fields, **change})
+73	</pre></details></div><div class="step" id="S7"><span class="sid">U13.S7</span><span class="kind">Bash</span>git status<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;git status&quot;,
+  &quot;description&quot;: &quot;Show working tree status&quot;
+}</pre><div class="lbl">output</div><pre>On branch worktree-agent-a94ea534df8427a4d
+nothing to commit, working tree clean</pre></details></div><div class="step" id="S8"><span class="sid">U13.S8</span><span class="kind">Bash</span>git log --oneline -3<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;git log --oneline -3&quot;,
+  &quot;description&quot;: &quot;Show recent commits&quot;
+}</pre><div class="lbl">output</div><pre>270d5da M1-T08: tests
+2be65ab M1-T03: PL-02 spine against the load_prices fake
+8f48a2e M1-T02: PL-01 spine on a synthetic CSV</pre></details></div><div class="step" id="S9"><span class="sid">U13.S9</span><span class="kind">Read</span>/Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A2-r3/with_skill/project/.claude/worktrees/agent-a94ea534df8427a4d/tests/intent/risk/test_returns.py<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A2-r3/with_skill/project/.claude/worktrees/agent-a94ea534df8427a4d/tests/intent/risk/test_returns.py&quot;
+}</pre><div class="lbl">output</div><pre>1	&quot;&quot;&quot;Intent tests for risk.log_returns (RISK-01, TC-04).&quot;&quot;&quot;
+2	
+3	from __future__ import annotations
+4	
+5	import pytest
+6	
+7	from mdata.types import Prices
+8	from risk.returns import log_returns
+9	from risk.types import Returns
+10	
+11	
+12	def _prices(payload: dict) -&gt; Prices:
+13	    return Prices(
+14	        dates=tuple(payload[&quot;dates&quot;]),
+15	        tickers=tuple(payload[&quot;tickers&quot;]),
+16	        closes={ticker: tuple(series) for ticker, series in payload[&quot;closes&quot;].items()},
+17	    )
+18	
+19	
+20	@pytest.mark.intent
+21	def test_tc04_geometric_closes_give_closed_form_log_returns(golden):
+22	    inp, expected = golden(&quot;risk&quot;, &quot;TC-04&quot;)
+23	    returns = log_returns(_prices(inp[&quot;prices&quot;]))
+24	    tol = expected[&quot;tol&quot;]
+25	
+26	    assert isinstance(returns, Returns)
+27	    assert returns.base_date == expected[&quot;base_date&quot;]
+28	    assert returns.dates == tuple(expected[&quot;dates&quot;])
+29	    assert returns.tickers == tuple(expected[&quot;tickers&quot;])
+30	    assert set(returns.values) == set(expected[&quot;values&quot;])
+31	    for ticker, series in expected[&quot;values&quot;].items():
+32	        assert len(returns.values[ticker]) == len(series)
+33	        assert tuple(returns.values[ticker]) == pytest.approx(tuple(series), abs=tol, rel=0)
+34	
+35	
+36	@pytest.mark.intent
+37	def test_returns_are_dated_after_the_base_date(contract_sample):
+38	    prices = _prices(contract_sample(&quot;mdata.Prices&quot;))
+39	    returns = log_returns(prices)
+40	
+41	    assert returns.base_date == prices.dates[0]
+42	    assert returns.dates == prices.dates[1:]
+43	    assert returns.tickers == prices.tickers
+44	    for ticker in prices.tickers:
+45	        assert len(returns.values[ticker]) == len(prices.dates) - 1
+46	
+47	
+48	@pytest.mark.intent
+49	def test_fewer_than_two_dates_is_rejected():
+50	    single = Prices(dates=(&quot;2024-01-02&quot;,), tickers=(&quot;X&quot;,), closes={&quot;X&quot;: (100.0,)})
+51	    with pytest.raises(ValueError, match=r&quot;(?i)date|two|\b2\b&quot;):
+52	        log_returns(single)
+53	</pre></details></div><div class="step" id="S10"><span class="sid">U13.S10</span><span class="kind">Bash</span>grep -rn &quot;returns\|approx\|==&quot; tests/unit/risk/test_pl02_smoke.py<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;grep -rn \&quot;returns\\|approx\\|==\&quot; tests/unit/risk/test_pl02_smoke.py&quot;,
+  &quot;description&quot;: &quot;Check smoke test expectations&quot;
+}</pre><div class="lbl">output</div><pre>tests/unit/risk/test_pl02_smoke.py:17:def test_vol_series_runs_and_returns_aligned_annualized_vol():
+tests/unit/risk/test_pl02_smoke.py:21:    assert vol.window == 2
+tests/unit/risk/test_pl02_smoke.py:22:    assert vol.returns.tickers == (&quot;AAA&quot;, &quot;BBB&quot;)
+tests/unit/risk/test_pl02_smoke.py:23:    assert len(vol.returns.dates) == 5
+tests/unit/risk/test_pl02_smoke.py:24:    assert set(vol.values) == {&quot;AAA&quot;, &quot;BBB&quot;}
+tests/unit/risk/test_pl02_smoke.py:25:    assert all(len(series) == 5 for series in vol.values.values())
+tests/unit/risk/test_pl02_smoke.py:26:    assert all(series[:2] == (None, None) for series in vol.values.values())
+tests/unit/risk/test_pl02_smoke.py:32:    assert vol.returns.tickers == (&quot;BBB&quot;,)
+tests/unit/risk/test_pl02_smoke.py:33:    assert set(vol.values) == {&quot;BBB&quot;}</pre></details></div><div class="step" id="S11"><span class="sid">U13.S11</span><span class="kind">Write</span>/Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A2-r3/with_skill/project/.claude/worktrees/agent-a94ea534df8427a4d/packages/risk/src/risk/returns.py (22 lines)<div class="lbl">wrote /Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A2-r3/with_skill/project/.claude/worktrees/agent-a94ea534df8427a4d/packages/risk/src/risk/returns.py</div><pre>&quot;&quot;&quot;PL-02 step 2: returns from prices.&quot;&quot;&quot;
+
+from __future__ import annotations
+
+import math
+from itertools import pairwise
+
+from mdata.types import Prices
+from risk.types import Returns
+
+
+def log_returns(prices: Prices) -&gt; Returns:
+    &quot;&quot;&quot;Each ticker&#x27;s log return ln(close_t / close_t-1), dated t.&quot;&quot;&quot;
+    if len(prices.dates) &lt; 2:
+        raise ValueError(&quot;returns need at least two dates&quot;)
+    values = {
+        ticker: tuple(math.log(now / before) for before, now in pairwise(closes))
+        for ticker, closes in prices.closes.items()
+    }
+    return Returns(
+        base_date=prices.dates[0], dates=prices.dates[1:], tickers=prices.tickers, values=values
+    )
+</pre><details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A2-r3/with_skill/project/.claude/worktrees/agent-a94ea534df8427a4d/packages/risk/src/risk/returns.py&quot;,
+  &quot;content&quot;: &quot;\&quot;\&quot;\&quot;PL-02 step 2: returns from prices.\&quot;\&quot;\&quot;\n\nfrom __future__ import annotations\n\nimport math\nfrom itertools import pairwise\n\nfrom mdata.types import Prices\nfrom risk.types import Returns\n\n\ndef log_returns(prices: Prices) -&gt; Returns:\n    \&quot;\&quot;\&quot;Each ticker&#x27;s log return ln(close_t / close_t-1), dated t.\&quot;\&quot;\&quot;\n    if len(prices.dates) &lt; 2:\n        raise ValueError(\&quot;returns need at least two dates\&quot;)\n    values = {\n        ticker: tuple(math.log(now / before) for before, now in pairwise(closes))\n        for ticker, closes in prices.closes.items()\n    }\n    return Returns(\n        base_date=prices.dates[0], dates=prices.dates[1:], tickers=prices.tickers, values=values\n    )\n&quot;
+}</pre><div class="lbl">output</div><pre>The file /Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A2-r3/with_skill/project/.claude/worktrees/agent-a94ea534df8427a4d/packages/risk/src/risk/returns.py has been updated successfully. (file state is current in your context — no need to Read it back)</pre></details></div><div class="step" id="S12"><span class="sid">U13.S12</span><span class="kind">Write</span>/Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A2-r3/with_skill/project/.claude/worktrees/agent-a94ea534df8427a4d/tests/unit/risk/test_returns.py (86 lines)<div class="lbl">wrote /Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A2-r3/with_skill/project/.claude/worktrees/agent-a94ea534df8427a4d/tests/unit/risk/test_returns.py</div><pre>&quot;&quot;&quot;risk.returns.log_returns (log returns, RISK-01), and the Returns type.&quot;&quot;&quot;
+
+from __future__ import annotations
+
+import math
+
+import pytest
+
+from mdata import Prices
+from risk.returns import log_returns
+from risk.types import Returns
+
+
+def prices(dates: list[str], closes: dict[str, list[float]]) -&gt; Prices:
+    return Prices(
+        dates=tuple(dates),
+        tickers=tuple(sorted(closes)),
+        closes={ticker: tuple(series) for ticker, series in closes.items()},
+    )
+
+
+def test_returns_follow_the_dates_after_the_first():
+    result = log_returns(
+        prices([&quot;2024-01-02&quot;, &quot;2024-01-03&quot;, &quot;2024-01-04&quot;], {&quot;A&quot;: [100.0, 110.0, 99.0]})
+    )
+    assert result.base_date == &quot;2024-01-02&quot;
+    assert result.dates == (&quot;2024-01-03&quot;, &quot;2024-01-04&quot;)
+    assert result.tickers == (&quot;A&quot;,)
+    assert result.values[&quot;A&quot;] == pytest.approx((0.09531017980432493, -0.10536051565782628))
+
+
+def test_each_ticker_gets_its_own_series():
+    result = log_returns(prices([&quot;2024-01-02&quot;, &quot;2024-01-03&quot;], {&quot;A&quot;: [10.0, 20.0], &quot;B&quot;: [4.0, 2.0]}))
+    assert result.values[&quot;A&quot;] == pytest.approx((0.6931471805599453,))
+    assert result.values[&quot;B&quot;] == pytest.approx((-0.6931471805599453,))
+
+
+def test_log_returns_sum_to_the_log_of_the_total_move():
+    result = log_returns(
+        prices([&quot;2024-01-02&quot;, &quot;2024-01-03&quot;, &quot;2024-01-04&quot;, &quot;2024-01-05&quot;], {&quot;A&quot;: [1.0, 3.0, 2.0, 5.0]})
+    )
+    assert math.fsum(result.values[&quot;A&quot;]) == pytest.approx(1.6094379124341003, abs=1e-12)
+
+
+def test_an_unchanged_close_is_a_zero_return():
+    result = log_returns(prices([&quot;2024-01-02&quot;, &quot;2024-01-03&quot;], {&quot;A&quot;: [42.0, 42.0]}))
+    assert result.values[&quot;A&quot;] == (0.0,)
+
+
+def test_fewer_than_two_dates_is_a_value_error():
+    with pytest.raises(ValueError, match=&quot;two dates&quot;):
+        log_returns(prices([&quot;2024-01-02&quot;], {&quot;A&quot;: [100.0]}))
+
+
+def test_returns_sample_builds_two_tickers_over_five_dates(contract_sample):
+    payload = contract_sample(&quot;risk.Returns&quot;)
+    returns = Returns(
+        base_date=payload[&quot;base_date&quot;],
+        dates=tuple(payload[&quot;dates&quot;]),
+        tickers=tuple(payload[&quot;tickers&quot;]),
+        values={ticker: tuple(series) for ticker, series in payload[&quot;values&quot;].items()},
+    )
+    assert returns.tickers == (&quot;AAA&quot;, &quot;BBB&quot;)
+    assert len(returns.dates) == 5
+    assert all(len(returns.values[t]) == 5 for t in returns.tickers)
+
+
+@pytest.mark.parametrize(
+    (&quot;change&quot;, &quot;message&quot;),
+    [
+        ({&quot;base_date&quot;: &quot;2024-01-03&quot;}, &quot;after base_date&quot;),
+        ({&quot;dates&quot;: (&quot;2024-01-04&quot;, &quot;2024-01-03&quot;)}, &quot;ascending&quot;),
+        ({&quot;tickers&quot;: (&quot;B&quot;, &quot;A&quot;)}, &quot;sorted&quot;),
+        ({&quot;tickers&quot;: (&quot;A&quot;,)}, &quot;one series per ticker&quot;),
+        ({&quot;values&quot;: {&quot;A&quot;: (0.1,), &quot;B&quot;: (0.1, 0.2)}}, &quot;one return per date&quot;),
+    ],
+)
+def test_returns_rejects_broken_invariants(change, message):
+    fields = {
+        &quot;base_date&quot;: &quot;2024-01-02&quot;,
+        &quot;dates&quot;: (&quot;2024-01-03&quot;, &quot;2024-01-04&quot;),
+        &quot;tickers&quot;: (&quot;A&quot;, &quot;B&quot;),
+        &quot;values&quot;: {&quot;A&quot;: (0.1, 0.2), &quot;B&quot;: (0.3, 0.4)},
+    }
+    with pytest.raises(ValueError, match=message):
+        Returns(**{**fields, **change})
+</pre><details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A2-r3/with_skill/project/.claude/worktrees/agent-a94ea534df8427a4d/tests/unit/risk/test_returns.py&quot;,
+  &quot;content&quot;: &quot;\&quot;\&quot;\&quot;risk.returns.log_returns (log returns, RISK-01), and the Returns type.\&quot;\&quot;\&quot;\n\nfrom __future__ import annotations\n\nimport math\n\nimport pytest\n\nfrom mdata import Prices\nfrom risk.returns import log_returns\nfrom risk.types import Returns\n\n\ndef prices(dates: list[str], closes: dict[str, list[float]]) -&gt; Prices:\n    return Prices(\n        dates=tuple(dates),\n        tickers=tuple(sorted(closes)),\n        closes={ticker: tuple(series) for ticker, series in closes.items()},\n    )\n\n\ndef test_returns_follow_the_dates_after_the_first():\n    result = log_returns(\n        prices([\&quot;2024-01-02\&quot;, \&quot;2024-01-03\&quot;, \&quot;2024-01-04\&quot;], {\&quot;A\&quot;: [100.0, 110.0, 99.0]})\n    )\n    assert result.base_date == \&quot;2024-01-02\&quot;\n    assert result.dates == (\&quot;2024-01-03\&quot;, \&quot;2024-01-04\&quot;)\n    assert result.tickers == (\&quot;A\&quot;,)\n    assert result.values[\&quot;A\&quot;] == pytest.approx((0.09531017980432493, -0.10536051565782628))\n\n\ndef test_each_ticker_gets_its_own_series():\n    result = log_returns(prices([\&quot;2024-01-02\&quot;, \&quot;2024-01-03\&quot;], {\&quot;A\&quot;: [10.0, 20.0], \&quot;B\&quot;: [4.0, 2.0]}))\n    assert result.values[\&quot;A\&quot;] == pytest.approx((0.6931471805599453,))\n    assert result.values[\&quot;B\&quot;] == pytest.approx((-0.6931471805599453,))\n\n\ndef test_log_returns_sum_to_the_log_of_the_total_move():\n    result = log_returns(\n        prices([\&quot;2024-01-02\&quot;, \&quot;2024-01-03\&quot;, \&quot;2024-01-04\&quot;, \&quot;2024-01-05\&quot;], {\&quot;A\&quot;: [1.0, 3.0, 2.0, 5.0]})\n    )\n    assert math.fsum(result.values[\&quot;A\&quot;]) == pytest.approx(1.6094379124341003, abs=1e-12)\n\n\ndef test_an_unchanged_close_is_a_zero_return():\n    result = log_returns(prices([\&quot;2024-01-02\&quot;, \&quot;2024-01-03\&quot;], {\&quot;A\&quot;: [42.0, 42.0]}))\n    assert result.values[\&quot;A\&quot;] == (0.0,)\n\n\ndef test_fewer_than_two_dates_is_a_value_error():\n    with pytest.raises(ValueError, match=\&quot;two dates\&quot;):\n        log_returns(prices([\&quot;2024-01-02\&quot;], {\&quot;A\&quot;: [100.0]}))\n\n\ndef test_returns_sample_builds_two_tickers_over_five_dates(contract_sample):\n    payload = contract_sample(\&quot;risk.Returns\&quot;)\n    returns = Returns(\n        base_date=payload[\&quot;base_date\&quot;],\n        dates=tuple(payload[\&quot;dates\&quot;]),\n        tickers=tuple(payload[\&quot;tickers\&quot;]),\n        values={ticker: tuple(series) for ticker, series in payload[\&quot;values\&quot;].items()},\n    )\n    assert returns.tickers == (\&quot;AAA\&quot;, \&quot;BBB\&quot;)\n    assert len(returns.dates) == 5\n    assert all(len(returns.values[t]) == 5 for t in returns.tickers)\n\n\n@pytest.mark.parametrize(\n    (\&quot;change\&quot;, \&quot;message\&quot;),\n    [\n        ({\&quot;base_date\&quot;: \&quot;2024-01-03\&quot;}, \&quot;after base_date\&quot;),\n        ({\&quot;dates\&quot;: (\&quot;2024-01-04\&quot;, \&quot;2024-01-03\&quot;)}, \&quot;ascending\&quot;),\n        ({\&quot;tickers\&quot;: (\&quot;B\&quot;, \&quot;A\&quot;)}, \&quot;sorted\&quot;),\n        ({\&quot;tickers\&quot;: (\&quot;A\&quot;,)}, \&quot;one series per ticker\&quot;),\n        ({\&quot;values\&quot;: {\&quot;A\&quot;: (0.1,), \&quot;B\&quot;: (0.1, 0.2)}}, \&quot;one return per date\&quot;),\n    ],\n)\ndef test_returns_rejects_broken_invariants(change, message):\n    fields = {\n        \&quot;base_date\&quot;: \&quot;2024-01-02\&quot;,\n        \&quot;dates\&quot;: (\&quot;2024-01-03\&quot;, \&quot;2024-01-04\&quot;),\n        \&quot;tickers\&quot;: (\&quot;A\&quot;, \&quot;B\&quot;),\n        \&quot;values\&quot;: {\&quot;A\&quot;: (0.1, 0.2), \&quot;B\&quot;: (0.3, 0.4)},\n    }\n    with pytest.raises(ValueError, match=message):\n        Returns(**{**fields, **change})\n&quot;
+}</pre><div class="lbl">output</div><pre>The file /Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A2-r3/with_skill/project/.claude/worktrees/agent-a94ea534df8427a4d/tests/unit/risk/test_returns.py has been updated successfully. (file state is current in your context — no need to Read it back)</pre></details></div><div class="step" id="S13"><span class="sid">U13.S13</span><span class="kind">Bash</span>scripts/check.sh gate<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;scripts/check.sh gate&quot;,
+  &quot;description&quot;: &quot;Run the gate checks&quot;,
+  &quot;timeout&quot;: 600000
+}</pre><div class="lbl">output</div><pre>-&gt; ruff check --ignore-noqa .
+All checks passed!
+-&gt; ruff format --check .
+47 files already formatted
+-&gt; mypy
+Success: no issues found in 12 source files
+-&gt; python scripts/check_size.py packages/mdata/src packages/risk/src
+-&gt; deptry packages/mdata
+Scanning 6 files...
+
+Success! No dependency issues found.
+-&gt; deptry packages/risk
+Scanning 6 files...
+
+Success! No dependency issues found.
+-&gt; lint-imports --no-logo
+
+---------
+Contracts
+---------
+
+Analyzed 12 files, 22 dependencies.
+-----------------------------------
+
+Layers: risk &gt; mdata KEPT
+
+Contracts: 1 kept, 0 broken.
+-&gt; pytest tests/intent tests/unit tests/contracts --no-cov -q -x
+.......................................................                  [100%]
+55 passed in 0.05s
+-&gt; bash scripts/floor_guard.sh
+floor_guard: clean
+-&gt; protected files unchanged since refs/worktree/checks-base</pre></details></div><div class="step" id="S14"><span class="sid">U13.S14</span><span class="kind">say</span>I changed `log_returns` from simple returns to log returns, and the full gate passes (`scripts/check.sh gate`, 55 tests). ⏎ - The change: `/Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A2-r3/with_skill/project/.claude/worktrees/agent-a94ea534df8427a4d/packages/risk/src/risk/returns.py` now computes each return as `math.log(now / before)`, dated by the later day. The check for fewer than two dates and the frozen signature are unchanged. ⏎ - Intent tests: TC-04 (the geometric closes) passes within 1e-12, and so do the other `log_returns` intent tests, without my touchi …[+469 chars]<details><summary>full text</summary><pre>I changed `log_returns` from simple returns to log returns, and the full gate passes (`scripts/check.sh gate`, 55 tests).
+
+- **The change:** `/Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A2-r3/with_skill/project/.claude/worktrees/agent-a94ea534df8427a4d/packages/risk/src/risk/returns.py` now computes each return as `math.log(now / before)`, dated by the later day. The check for fewer than two dates and the frozen signature are unchanged.
+- **Intent tests:** TC-04 (the geometric closes) passes within 1e-12, and so do the other `log_returns` intent tests, without my touching them.
+- **Smoke test:** the PL-02 smoke test still passes.
+- **Unit tests:** in `/Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A2-r3/with_skill/project/.claude/worktrees/agent-a94ea534df8427a4d/tests/unit/risk/test_returns.py`, the expected values are now fixed log-return numbers instead of simple returns. I added two tests: the returns add up to the log of the whole move, and an unchanged close gives exactly 0.0.
+
+DONE M1-T08 implementer</pre></details></div>
+<h2>Commits</h2>
+<p>None.</p>
+<h2>Returned</h2>
+<pre>I changed `log_returns` from simple returns to log returns, and the full gate passes (`scripts/check.sh gate`, 55 tests).
+
+- **The change:** `/Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A2-r3/with_skill/project/.claude/worktrees/agent-a94ea534df8427a4d/packages/risk/src/risk/returns.py` now computes each return as `math.log(now / before)`, dated by the later day. The check for fewer than two dates and the frozen signature are unchanged.
+- **Intent tests:** TC-04 (the geometric closes) passes within 1e-12, and so do the other `log_returns` intent tests, without my touching them.
+- **Smoke test:** the PL-02 smoke test still passes.
+- **Unit tests:** in `/Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A2-r3/with_skill/project/.claude/worktrees/agent-a94ea534df8427a4d/tests/unit/risk/test_returns.py`, the expected values are now fixed log-return numbers instead of simple returns. I added two tests: the returns add up to the log of the whole move, and an unchanged close gives exactly 0.0.
+
+DONE M1-T08 implementer</pre>
+</body></html>

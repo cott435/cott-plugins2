@@ -1,5 +1,6 @@
 """Print a task's whole builder context packet: its Read: sections and files, the package layout, the frozen
-interfaces its steps cross, its Writes: (or Files likely), then the task."""
+interfaces its steps cross, for a system task the fakes whose cases it runs on the real providers, its Writes: (or
+Files likely), then the task."""
 from __future__ import annotations
 
 import json
@@ -7,7 +8,8 @@ import re
 import sys
 from pathlib import Path
 
-from .. import code, graph, md, model, packet
+from .. import code, graph, md, model
+from .. import packet as pk
 from .. import outline as ol
 from .. import probes as pb
 from .. import references as refs
@@ -15,7 +17,7 @@ from .layout import tree_lines
 
 BUDGET = 2000          # lines; agent-skills context-engineering target for one builder
 PLAN_KINDS = ("plan", "queued-plan")
-LANGS = packet.LANGS
+LANGS = pk.LANGS
 
 
 def add_arguments(parser):
@@ -43,7 +45,7 @@ def _file_block(repo, rel: str, task: model.Task) -> tuple[str, bool]:
     try:
         text = path.read_text(encoding="utf-8")
     except (OSError, UnicodeDecodeError):
-        by = packet.writers_before(repo, task, rel)
+        by = pk.writers_before(repo, task, rel)
         if by:
             verb = "writes" if len(by) == 1 else "write"
             return f"### {rel}\n(not in the repo yet: {', '.join(by)} {verb} it before this task starts)\n", False
@@ -209,14 +211,14 @@ def _section(task: model.Task, d) -> tuple[str, str | None]:
     return "\n".join(out).rstrip() + "\n", f"{len(keep)} of {len(rows)}"
 
 
-def interfaces(repo, task: model.Task, shown: set[str]) -> list[packet.Shown]:
+def interfaces(repo, task: model.Task, shown: set[str]) -> list[pk.Shown]:
     """The frozen interfaces the packet adds to what `Read:` shows: the contract types the task's steps' `In → Out`
     cells name, the contract symbols with a step's name (its signature), and every contract section those and the
     Read symbols' signatures name, until closed (`packet.contract`)."""
-    return [s for s in packet.contract(repo, task, sorted(shown)) if s.symbol.id not in shown]
+    return [s for s in pk.contract(repo, task, sorted(shown)) if s.symbol.id not in shown]
 
 
-def _interfaces_block(repo, shown: list[packet.Shown]) -> str:
+def _interfaces_block(repo, shown: list[pk.Shown]) -> str:
     parts = []
     for s in shown:
         sym = s.symbol
@@ -226,6 +228,28 @@ def _interfaces_block(repo, shown: list[packet.Shown]) -> str:
             part += f"Sample: {sym.sample} ({'exists' if (repo.root / sym.sample).exists() else 'not written yet'})\n"
         parts.append(part)
     return "## Interfaces (frozen: build against these, never change them)\n" + "\n".join(parts)
+
+
+def conformance(repo, task: model.Task, syms: list[pk.Shown]) -> list[tuple[str, list[str]]]:
+    """For a system task, which runs real providers where fakes stood: each contract symbol it reads or crosses
+    whose `tests/contracts/<id>/` folder holds a fake, with that folder's files. Their cases run on the real one."""
+    if task.kind != "system":
+        return []
+    ids = dict.fromkeys([pk.read_ref(r) for r in task.read] + [s.symbol.id for s in syms])
+    out = []
+    for sid in ids:
+        folder = repo.root / "tests" / "contracts" / sid
+        if re.fullmatch(md.SYMBOL_ID, sid) and any(folder.glob("fake*.py")):
+            out.append((sid, sorted(f.name for f in folder.iterdir() if f.is_file())))
+    return out
+
+
+def _conformance_block(found: list[tuple[str, list[str]]]) -> str:
+    rows = "".join(f"- {sid}: tests/contracts/{sid}/ ({', '.join(files)})\n" for sid, files in found)
+    return ("## Conformance (each fake's contract cases, run on the real provider)\n"
+            "Run every case a folder's contract tests give its fake on the real provider too, in a test your "
+            "Writes: name. A case the real one fails: fix it if your Writes: hold the code, else "
+            "`dt escalate CONTRACT-CHANGE \"<the case, fake vs real>\" --type <symbol>`.\n" + rows)
 
 
 def _writes(repo, task: model.Task) -> list[dict]:
@@ -252,19 +276,26 @@ def _write_state(w: dict) -> str:
     return f"from {', '.join(w['from'])}" if w["from"] else "new"
 
 
-def run(args, repo) -> int:
-    task = _find_task(repo, args.task)
-    if task is None:
-        print(f"dt context: task {args.task} not found in tasks/plan.md or tasks/queued/", file=sys.stderr)
-        return 1
+SOURCE_PREFIXES = ("src/",)
 
+
+def is_source(rel: str) -> bool:
+    """A path under a source folder (`src/`, `packages/<pkg>/src/`): never shown to a tester."""
+    rel = rel.removeprefix("./")
+    return rel.startswith(SOURCE_PREFIXES) or bool(re.match(r"packages/[^/]+/src/", rel))
+
+
+def packet(repo, task, writes: list[str] | None = None, tester: bool = False) -> dict:
+    """The task's packet: `{text, lines, reads, interfaces, writes, files_likely, problems}`. `writes` narrows the
+    Writes block to a half's share; `tester` leaves out source files and the package layout (build-phase.md
+    §3.4: a tester never sees `src/`)."""
     blocks: list[str] = []
     reads: list[dict] = []
     problems: list[str] = []
     entries = {e.id: e for e in model.all_references(repo) + model.all_probes(repo)}
     shown: set[str] = set()
     for raw in task.read:
-        ref = packet.read_ref(raw)
+        ref = pk.read_ref(raw)
         rid, selector = model.split_ref(ref)
         if rid in entries:
             entry = entries[rid]
@@ -286,29 +317,33 @@ def run(args, repo) -> int:
             reads.append({"ref": ref, "kind": "id", "where": d.where, "retired": d.retired,
                           **({"rows": rows} if rows else {})})
             blocks.append(f"<!-- {d.where} -->\n{text}")
-        elif packet.looks_like_path(repo, ref):
+        elif pk.looks_like_path(repo, ref):
+            if tester and is_source(ref):
+                reads.append({"ref": ref, "kind": "file", "exists": (repo.root / ref).exists(), "shown": "withheld"})
+                continue
             block, exists = _file_block(repo, ref, task)
             reads.append({"ref": ref, "kind": "file", "exists": exists})
             blocks.append(block)
         else:
             problems.append(f"Read: {ref} is not defined in any doc")
-    if problems:
-        for p in problems:
-            print(f"dt context: {task.id}: {p}", file=sys.stderr)
-        return 1
 
-    layout = _layout_block(repo, task.package)
+    layout = "" if tester else _layout_block(repo, task.package)
     if layout:
         blocks.append(layout)
     shown_ids = {r["ref"] for r in reads if r["kind"] == "id"}
     syms = interfaces(repo, task, shown_ids)
     if syms:
         blocks.append(_interfaces_block(repo, syms))
+    found = [] if tester else conformance(repo, task, syms)
+    if found:
+        blocks.append(_conformance_block(found))
     files = [{"path": f, "exists": (repo.root / f).exists()} for f in task.files_likely]
-    writes = _writes(repo, task) if "Writes" in task.fields else []
-    if writes:
+    out_writes = _writes(repo, task) if "Writes" in task.fields else []
+    if writes is not None:
+        out_writes = [w for w in out_writes if w["path"] in writes]
+    if out_writes:
         blocks.append("## Writes (edit only these files; the plan gives every other file to another task)\n" + "".join(
-            f"- {w['path']} ({_write_state(w)})\n" for w in writes))
+            f"- {w['path']} ({_write_state(w)})\n" for w in out_writes))
     elif files:
         blocks.append("## Files likely\n" + "".join(
             f"- {f['path']} ({'exists' if f['exists'] else 'new'})\n" for f in files))
@@ -319,19 +354,33 @@ def run(args, repo) -> int:
                 "Read only what is below, plus CONSTRAINTS.md and the files you edit. "
                 "Your task is the last section.\n")
     text = "\n".join([preamble] + blocks)
-    lines = text.count("\n")
+    return {"text": text, "lines": text.count("\n"), "reads": reads, "interfaces": syms, "writes": out_writes,
+            "files_likely": files, "problems": problems}
+
+
+def run(args, repo) -> int:
+    task = _find_task(repo, args.task)
+    if task is None:
+        print(f"dt context: task {args.task} not found in tasks/plan.md or tasks/queued/", file=sys.stderr)
+        return 1
+    p = packet(repo, task)
+    if p["problems"]:
+        for problem in p["problems"]:
+            print(f"dt context: {task.id}: {problem}", file=sys.stderr)
+        return 1
+    text, lines, syms = p["text"], p["lines"], p["interfaces"]
     if lines > BUDGET:
         print(f"dt context: {task.id} packet is {lines} lines (budget {BUDGET}); split the task or trim its Read:",
               file=sys.stderr)
 
     if args.json:
         print(json.dumps({"task": task.id, "package": task.package, "mode": task.mode, "kind": task.kind,
-                          "lines": lines, "read": reads,
+                          "lines": lines, "read": p["reads"],
                           "interfaces": [{"id": s.symbol.id, "where": f"{s.symbol.doc.rel}:{s.symbol.start + 1}",
                                           "type": s.symbol.is_type, "sample": s.symbol.sample,
                                           "named_by": s.why.removeprefix("named by ") if s.why != "step" else None}
                                          for s in syms],
-                          "writes": writes, "files_likely": files, "text": text}, indent=2))
+                          "writes": p["writes"], "files_likely": p["files_likely"], "text": text}, indent=2))
     else:
         print(text, end="")
     return 0

@@ -1,0 +1,812 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1"><title>U56 implementer</title>
+<style>
+:root{--bg:#fbfbfa;--fg:#1d1d1f;--muted:#6b6b70;--line:#d9d9de;--box:#fff;--rowp:#eef3fb;--band:#fff4d6;
+--ok:#2e7d32;--bad:#c62828;--warn:#b26a00;--idle:#6b6b70}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#17171a;--fg:#ececf0;--muted:#9a9aa3;
+--line:#34343a;--box:#222227;--rowp:#1d2433;--band:#3a3015;--ok:#6fcf73;--bad:#ff6b6b;--warn:#f0b35a;--idle:#9a9aa3}}
+:root[data-theme="dark"]{--bg:#17171a;--fg:#ececf0;--muted:#9a9aa3;--line:#34343a;--box:#222227;--rowp:#1d2433;
+--band:#3a3015;--ok:#6fcf73;--bad:#ff6b6b;--warn:#f0b35a;--idle:#9a9aa3}
+body{margin:0;padding:16px;background:var(--bg);color:var(--fg);font:14px/1.45 -apple-system,system-ui,sans-serif}
+h1{font-size:18px;margin:0 0 4px}h2{font-size:15px;margin:22px 0 8px}.sub{color:var(--muted)}
+table{border-collapse:collapse;margin:4px 0 8px}td,th{border-bottom:1px solid var(--line);padding:4px 10px;text-align:left;
+vertical-align:top}th{color:var(--muted);font-weight:600}.chips span{display:inline-block;margin:0 4px 2px 0}
+.legend span{margin-right:14px;white-space:nowrap}.sw{display:inline-block;width:10px;height:10px;border-radius:2px;
+margin-right:4px;vertical-align:-1px}.scroll{overflow:auto;max-height:88vh;border:1px solid var(--line);border-radius:8px}
+.chart{display:grid;width:max-content}.chart>div{line-height:0}.corner{position:sticky;top:0;left:0;z-index:3}
+.colhead{position:sticky;top:0;z-index:2}.rowhead{position:sticky;left:0;z-index:2}
+svg.bg{background:var(--bg)}.colhead svg{border-bottom:1px solid var(--line)}.rowhead svg{border-right:1px solid var(--line)}
+.ok{color:var(--ok);fill:var(--ok)}.bad{color:var(--bad);fill:var(--bad)}.warn{color:var(--warn);fill:var(--warn)}
+.idle{color:var(--idle);fill:var(--idle)}
+svg text{fill:var(--fg);font-family:-apple-system,system-ui,sans-serif}
+.box{fill:var(--box);stroke:var(--line)}.unit:hover .box{stroke:var(--fg)}
+.role{font-size:12px;font-weight:600}.uid,.wmeta,.lmeta,.meta{font-size:10px;fill:var(--muted)}
+.sub{font-size:10.5px;fill:var(--muted)}.badge{font-size:11px;font-weight:600}
+.meta.bad{fill:var(--bad);font-weight:600}.lane{font-size:13px;font-weight:700}.wave{font-size:13px;font-weight:700}
+.par{fill:#4e79a7}.ser{fill:var(--muted)}.rowp{fill:var(--rowp)}.rows{fill:transparent}.band{fill:var(--band)}
+.bandt{font-size:11.5px}.grid{stroke:var(--line)}.link{stroke:var(--muted);stroke-width:1.2;opacity:.55}
+.arrowhead{fill:var(--muted)}.marks{font-size:10.5px}.audit{stroke:var(--box);stroke-width:2}.auditn{font-size:10px;font-weight:700;fill:#fff}
+a{color:inherit}svg a .box{cursor:pointer}
+
+:root{--c0:#2a78d6;--c1:#eb6834;--c2:#1baf7a;--c3:#eda100;--c4:#e87ba4;--c5:#008300;--c6:#6250d6;--c7:#e34948;
+--cx:#8a8985;--main:#52514e;--read:#dcdbd5;--readfg:#1d1d1f}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--c0:#3987e5;--c1:#d95926;--c2:#199e70;
+--c3:#c98500;--c4:#d55181;--c5:#008300;--c6:#9085e9;--c7:#e66767;--cx:#77766f;--main:#c3c2b7;--read:#3b3b40;
+--readfg:#ececf0}}
+:root[data-theme="dark"]{--c0:#3987e5;--c1:#d95926;--c2:#199e70;--c3:#c98500;--c4:#d55181;--c5:#008300;
+--c6:#9085e9;--c7:#e66767;--cx:#77766f;--main:#c3c2b7;--read:#3b3b40;--readfg:#ececf0}
+.c0{fill:var(--c0);background:var(--c0)}.c1{fill:var(--c1);background:var(--c1)}.c2{fill:var(--c2);background:var(--c2)}
+.c3{fill:var(--c3);background:var(--c3)}.c4{fill:var(--c4);background:var(--c4)}.c5{fill:var(--c5);background:var(--c5)}
+.c6{fill:var(--c6);background:var(--c6)}.c7{fill:var(--c7);background:var(--c7)}.cx{fill:var(--cx);background:var(--cx)}
+.cmain{fill:var(--main)}.sc0{stroke:var(--c0)}.sc1{stroke:var(--c1)}.sc2{stroke:var(--c2)}
+.tl text,.sm text,.lc text{font-size:10.5px;fill:var(--muted)}.tl .lbl-in,.sm .lbl-in{fill:#fff;font-size:10.5px;font-weight:600}
+.tl .rowl,.sm .rowl,.lc .rowl{fill:var(--fg);font-size:11.5px;font-weight:600}.tl .band{fill:var(--rowp)}
+.tl .brk{stroke:var(--muted);stroke-dasharray:2 3}.tl a:hover rect,.sm a:hover rect{stroke:var(--fg);stroke-width:1.5}
+.axis{stroke:var(--line)}.sm .val{fill:var(--fg);font-weight:600}.lc path.ln{fill:none;stroke-width:2}
+.lc circle{stroke:var(--bg);stroke-width:2}.lc .end{font-weight:600;fill:var(--fg)}
+.tiles{display:flex;flex-wrap:wrap;gap:10px;margin:12px 0}.tile{border:1px solid var(--line);border-radius:8px;
+padding:8px 12px;min-width:110px;background:var(--box)}.tile b{display:block;font-size:20px;line-height:1.2}
+.tile span{font-size:12px;color:var(--muted)}.tile i{font-style:normal;font-size:12px;margin-left:6px}
+.fm{border-collapse:separate;border-spacing:2px}.fm td,.fm th{border:0;padding:0;text-align:center;font-size:11px}
+.fm th{padding:0 2px;font-weight:600}.fm td.f,.fm th.f{text-align:left;padding-right:10px;white-space:nowrap;
+position:sticky;left:0;background:var(--bg);font:11.5px ui-monospace,Menlo,monospace;
+max-width:380px;overflow:hidden;text-overflow:ellipsis}
+.fm td.cell{min-width:22px;height:20px;border-radius:3px}.fm td.fw{background:var(--c0);color:#fff;font-weight:700}
+.fm td.fe{background:var(--c1);color:#fff;font-weight:700}.fm td.fr{background:var(--read);color:var(--readfg)}
+.fm td.n{color:var(--muted);padding:0 6px}.fm tr.grp td{text-align:left;padding-top:8px;color:var(--muted);
+font-weight:600}
+.key{display:inline-block;min-width:18px;text-align:center;border-radius:3px;font-size:11px;margin-right:4px}
+.bar{display:inline-block;height:9px;border-radius:2px;vertical-align:0}
+
+pre{white-space:pre-wrap;word-break:break-word;background:var(--box);border:1px solid var(--line);border-radius:6px;
+padding:8px 10px;margin:4px 0;font:12px/1.45 ui-monospace,SFMono-Regular,Menlo,monospace;max-width:100%;overflow:auto}
+.step{border-top:1px solid var(--line);padding:6px 0}.step:target{background:var(--rowp)}
+.sid{font:12px ui-monospace,Menlo,monospace;color:var(--muted);margin-right:8px}.kind{font-weight:600;margin-right:8px}
+.err{color:var(--bad);font-weight:600}.hook{color:var(--bad);margin:4px 0 0 16px}.lbl{font-size:12px;color:var(--muted);margin-top:6px}
+details summary{cursor:pointer;color:var(--muted);font-size:12px}.head td:first-child{color:var(--muted)}
+.top{font-size:13px}.narr{list-style:none;padding-left:0}.narr li{margin:3px 0}
+</style></head>
+<body>
+<p class="top"><a href="../flow.html">← the run's flow chart</a></p>
+
+<h1>U56 · implementer · M1-T27 implementer</h1>
+<table class="head"><tr><td>Type</td><td>implementer</td></tr><tr><td>Description</td><td>M1-T27 implementer</td></tr><tr><td>Spawned by</td><td>driver at D458</td></tr><tr><td>Turn</td><td><a href="../turns/T17.html">T17</a></td></tr><tr><td>Model</td><td>claude-opus-5-5</td></tr><tr><td>Start</td><td>2026-10-19 06:14:39 UTC</td></tr><tr><td>Duration</td><td>1 min</td></tr><tr><td>Tool calls</td><td>10</td></tr><tr><td>Errors</td><td>0</td></tr><tr><td>Hook blocks</td><td>0</td></tr><tr><td>Tokens</td><td>3.1k out · 24.2k new in · 123k cached in · peak context 28.9k</td></tr><tr><td>Skills invoked</td><td>none</td></tr><tr><td>Files written or edited</td><td>.claude/worktrees/agent-a9204d1460a5981fa/src/rllab/agents/dqn/networks.py, .claude/worktrees/agent-a9204d1460a5981fa/tests/unit/rllab/test_networks.py</td></tr><tr><td>Definition</td><td>none</td></tr><tr><td>Steps</td><td>12</td></tr><tr><td>Finished</td><td>yes</td></tr></table>
+
+
+<h2>Prompt</h2>
+<pre>You are the implementer for M1-T27. Run `python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/plugin/dev-team/scripts/dt.py claim M1-T27 --role implementer`, then read the packet it names.</pre>
+<h2>Files</h2>
+<table><tr><th>Op</th><th>File</th><th>Calls</th><th>By</th><th>Via</th><th>Steps</th></tr><tr><td>write</td><td><code>.claude/worktrees/agent-a9204d1460a5981fa/src/rllab/agents/dqn/networks.py</code></td><td>1</td><td>U56</td><td>Write</td><td><a href="#9">U56.S9</a></td></tr><tr><td>write</td><td><code>.claude/worktrees/agent-a9204d1460a5981fa/tests/unit/rllab/test_networks.py</code></td><td>1</td><td>U56</td><td>Write</td><td><a href="#10">U56.S10</a></td></tr><tr><td>read</td><td><code>.claude/worktrees/agent-a9204d1460a5981fa/.claude/packet.md</code></td><td>1</td><td>U56</td><td>Read</td><td><a href="#4">U56.S4</a></td></tr><tr><td>read</td><td><code>.claude/worktrees/agent-a9204d1460a5981fa/CONSTRAINTS.md</code></td><td>1</td><td>U56</td><td>Read</td><td><a href="#3">U56.S3</a></td></tr><tr><td>read</td><td><code>.claude/worktrees/agent-a9204d1460a5981fa/src/rllab/agents/dqn/agent.py</code></td><td>1</td><td>U56</td><td>Read</td><td><a href="#7">U56.S7</a></td></tr><tr><td>read</td><td><code>.claude/worktrees/agent-a9204d1460a5981fa/src/rllab/agents/dqn/networks.py</code></td><td>1</td><td>U56</td><td>Read</td><td><a href="#5">U56.S5</a></td></tr><tr><td>read</td><td><code>.claude/worktrees/agent-a9204d1460a5981fa/tests/intent/rllab/test_cnn.py</code></td><td>1</td><td>U56</td><td>Read</td><td><a href="#6">U56.S6</a></td></tr></table>
+<h2>Steps</h2>
+<div class="step" id="S1"><span class="sid">U56.S1</span><span class="kind">user</span>You are the implementer for M1-T27. Run `python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/plugin/dev-team/scripts/dt.py claim M1-T27 --role implementer`, then read the packet it names.<details><summary>full text</summary><pre>You are the implementer for M1-T27. Run `python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/plugin/dev-team/scripts/dt.py claim M1-T27 --role implementer`, then read the packet it names.</pre></details></div><div class="step" id="S2"><span class="sid">U56.S2</span><span class="kind">Bash</span>python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/plugin/dev-team/scripts/dt.py claim M1-T27 --role implementer<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/plugin/dev-team/scripts/dt.py claim M1-T27 --role implementer&quot;,
+  &quot;description&quot;: &quot;Claim task M1-T27 as implementer&quot;
+}</pre><div class="lbl">output</div><pre>packet: /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/project/.claude/worktrees/agent-a9204d1460a5981fa/.claude/packet.md (191 lines; read it in full)
+task: M1-T27 Full-grid convolutional network · role implementer · package rllab · kind thicken
+writes: src/rllab/agents/dqn/networks.py, tests/unit/rllab/test_networks.py
+done: Done when `scripts/check.sh gate` passes (the gate passes on your Writes); the Stop hook runs it. End with one line: `DONE M1-T27 implementer`. If you can&#x27;t finish: `python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/plugin/dev-team/scripts/dt.py escalate &lt;TEST-WRONG|NEEDS-DEP&gt; &quot;&lt;why&gt;&quot;`, or `python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/plugin/dev-team/scripts/dt.py escalate CONTRACT-CHANGE &quot;&lt;why&gt;&quot; --type &lt;the contract symbol&gt;`, then end with one line: `STOPPED M1-T27 implementer: see dt escalate`.</pre></details></div><div class="step" id="S3"><span class="sid">U56.S3</span><span class="kind">Read</span>/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/project/.claude/worktrees/agent-a9204d1460a5981fa/CONSTRAINTS.md<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/project/.claude/worktrees/agent-a9204d1460a5981fa/CONSTRAINTS.md&quot;
+}</pre><div class="lbl">output</div><pre>1	# Constraints
+2	**Status:** Approved · **Last reviewed:** 2026-10-19 by @connorott · **Ratcheted:** —
+3	
+4	The standing quality bar. `pyproject.toml` and `scripts/check.sh` enforce it; every number here names its config key, and `dt status` fails if the two disagree. Only `build-setup` changes this file, with the user: tightening is routine, loosening needs an explicit yes.
+5	
+6	## Floor
+7	- **CR-01** No new suppressions. Ruff runs with `--ignore-noqa` in gate and full, so a Ruff exception is a `per-file-ignores` entry in protected config with a row in Exceptions. `floor_guard.sh` catches the other suppressions on the diff
+8	- **CR-02** No stubs: `raise NotImplementedError` outside abstract methods, `pass`-only bodies, bare `except: pass`. One carve-out: the interface task&#x27;s step signatures, whose body is only `raise NotImplementedError(&quot;&lt;task id&gt;&quot;)` naming the open task that replaces it. `check.sh gate` fails on one naming a task that isn&#x27;t open in `tasks/todo.md`, and on a test that expects one (`stub-pinned`); `check.sh full --exit` fails on any
+9	- **CR-03** No skipped, deleted or assertion-free tests, unless a row in Exceptions names the test file
+10	- **CR-04** No secrets in source
+11	- **CR-05** Oracle files (`tests/fixtures/**/expected.json`) change only with the user&#x27;s approval
+12	- **CR-06** The implementer never changes `tests/intent/**`
+13	- **CR-07** This file, `pyproject.toml` tool config, `scripts/` and `.claude/agents/` are not weakened to make a change pass
+14	- **CR-08** Nothing imports from `references/` or `probes/`, or adds either to `sys.path` (or `PYTHONPATH`, pytest `pythonpath`). `floor_guard.sh` checks the diff for both. Code copied from either is project code and meets the same bar
+15	- **CR-09** A frozen interface (`tests/contracts/&lt;id&gt;.&lt;symbol&gt;/`: schema, samples, fake; and the types, signatures and exports the interface task wrote) is frozen once it exists at the task&#x27;s base. Only the interface task freezing it (`**Kind:** interface`) writes a new folder, and no other task&#x27;s `Writes:` names its `types.py` or `__init__.py`; a frozen interface changes only through `architecture-design` Revise, never to make a test pass
+16	
+17	## Readability
+18	- **CR-10** One entry function per pipeline; it reads top to bottom as its named steps (reviewer + `dt layout`)
+19	- **CR-11** No registries, plugin dispatch or config-driven wiring without an AD
+20	- **CR-12** New abstraction only with a second real implementation or a named seam
+21	
+22	
+23	## Enforced with numbers
+24	| ID | Dimension | Rule | Checked by | Config key | Runs at |
+25	|---|---|---|---|---|---|
+26	| CR-20 | Lint | zero errors; standing per-file-ignores only for `tests/**` and `__init__.py` | ruff | `tool.ruff.lint.select` | edit, gate |
+27	| CR-21 | Complexity | ≤ 10 per function | ruff C901 | `tool.ruff.lint.mccabe.max-complexity` | gate |
+28	| CR-22 | Size | ≤ 500 lines/module, ≤ 60/function | check_size.py | `tool.size_limits` | edit, gate |
+29	| CR-23 | Types | zero errors, strict | mypy | `tool.mypy.strict` | gate |
+30	| CR-24 | Boundaries | import contracts hold | import-linter | `tool.importlinter.contracts` | gate |
+31	| CR-25 | Dependencies | none missing or unused | deptry | `tool.deptry` | gate |
+32	| CR-26 | Deps security | nothing known-vulnerable | pip-audit | — | full, CI nightly |
+33	| CR-27 | Reproducibility | same settings and seed give the same run (RUN-03, AD-08) | pytest `-m repro` | `tool.pytest.ini_options.markers` | gate |
+34	
+35	## Measured, not yet enforced
+36	| ID | Metric | Today | Direction |
+37	|---|---|---|---|
+38	| CR-40 | Coverage (branch) | — (no code) (`tool.coverage.report.fail_under`, raised by Ratchet) | must not fall |
+39	| CR-41 | vulture findings at `min_confidence = 60` (`scripts/vulture_whitelist.py`) | 0 | must not grow by `full --exit` (earlier `full` runs report) |
+40	| CR-42 | Duplicate blocks of ≥ 8 similar source lines (pylint `duplicate-code`, `[tool.pylint.similarities]` in pyproject.toml) | 0 | must not grow |
+41	
+42	## Boundaries (generated from architecture — do not edit)
+43	- `rllab.core` imports nothing first-party · `envs`, `agents`, `runs` → core · `evaluate` → core, runs · `baselines` → core, envs · `train` → core, runs, evaluate · `reference` → core, envs, runs, evaluate · `compare` → evaluate · `viz` → runs · `lab` → all
+44	- Only `rllab.reference` imports `stable_baselines3` or `gymnasium`; only `rllab.agents` imports `torch`
+45	
+46	## Roles and protected paths
+47	| Role | May edit | May not edit | Stop gate |
+48	|---|---|---|---|
+49	| tester | `tests/intent/**`, within the task&#x27;s `Writes:` | everything else; reads no source | `check.sh collect` (lint, collect, red for the right reason) |
+50	| implementer / solo | `src/**`, `tests/unit/**`, within the task&#x27;s `Writes:`; an interface task also the `tests/contracts/&lt;id&gt;.&lt;symbol&gt;/` its `Writes:` names | the protected list; `tasks/` | `check.sh gate` + protected-path diff against the worktree&#x27;s base |
+51	| reviewer | its worktree, for the mutation check, and its findings file; nothing lands (the orchestrator records findings with `dt finding`) | everything else | runs `check.sh full` by hand |
+52	
+53	**Protected list** (`PROTECTED` in `scripts/check.sh`; `path_guard.sh deny --protected` reads the same list): `tests/intent/**`, `tests/fixtures/**`, `tests/conftest.py`, `pyproject.toml`, `uv.lock`, `CONSTRAINTS.md`, `scripts/**`, `.claude/agents/**`, `.claude/settings.json`, `references/**`, `probes/**`, `tests/contracts/**`. `tests/contracts/**` covers the contract folders that exist at the task&#x27;s base (CR-09). **`Writes:`**: `dt claim` writes the role&#x27;s share of the task&#x27;s `Writes:` to `.claude/.task_writes` and sets the worktree&#x27;s base; `path_guard.sh writes` blocks edits outside it, and builder edits before the claim. Only the orchestrator writes `tasks/` (`dt land`, `dt finding`).
+54	
+55	**Worktree links:** none
+56	
+57	## Review
+58	Run by the reviewer agent: the interface review after Phase 0, a phase review per package at each checkpoint, and the milestone exit. `dt land` already checked each landing&#x27;s `Writes:`, protected paths and gates; review judges what tools can&#x27;t.
+59	
+60	**Interface** (after Phase 0): the code is the contract, no more and no less.
+61	1. Types match `contract.md`: fields, types, invariants. Nothing a step&#x27;s In → Out needs is missing; no helper is frozen.
+62	2. Signatures match the step tables, in their owner modules. Each stub names the open task that owns its step; no logic beyond types and validation.
+63	3. One sample per case the contract names, valid and realistic, never holding a TC&#x27;s expected value. Replay doubles replay an interaction the Protocol allows. Each fake passes its contract&#x27;s cases; anything it does beyond echoing a fixture (filtering, ordering, an error) is a case the real provider must pass too. Contract tests check shape only, never a stub or other state a later task changes.
+64	4. `__init__.py` exports exactly the contract; each `Mitigated by` in the plan&#x27;s dependency graph exists; each split task&#x27;s tester can write its tests from the frozen interface and its `Read:`.
+65	
+66	**Each phase**, per package, tests before code:
+67	1. **Interfaces followed** (CR-09): no frozen type, signature or contract folder changed outside a Revise. Consumers use the declared types: no dict for a dataclass, no reaching into a provider&#x27;s internals, no local redefinition. A stub is replaced only by the task it names; no cross-package import outside the contract; spine tests run on samples and doubles, not another step&#x27;s code.
+68	2. **Tests prove something:** each intent test asserts its TC case or acceptance bullet, loading expected values and tolerances from fixtures; none is assertion-free or weakened; Hypothesis runs the `ci` profile. Unit tests are specific, never computing the expected value with the code under test or testing only a mock. **Mutation check** (`.claude/agents/reviewer.md`): per acceptance bullet, the smallest change that should break it; a mutation no test catches is a finding.
+69	3. **Correct to the spec:** each acceptance bullet truly met, not special-cased to the sample; the error paths the requirement names; seeding and determinism; numerical edge cases.
+70	4. **Simple** (CR-11, CR-12, CR-42): no abstraction with one implementation outside the contract or an AD; no forwarding wrapper, one-method class, or class where a function does; no parameter, flag or config key every caller sets the same; no `try/except` that only re-raises or swallows, no checks the types already guarantee; no loop the library already provides. No near-copies within or across the phase&#x27;s tasks: one concept is one function in its owner module (tests may repeat for readability). Each finding names the simpler form, with the same tests passing.
+71	5. **Pipelines** (CR-10): entry functions read as their step tables (`dt layout`); step owners respected; spine baselines still selectable.
+72	6. **The bar** (CR-07): diff this file, `pyproject.toml`, `scripts/` and `.claude/agents/` against the milestone&#x27;s Base. Any loosening is Critical; new exceptions need an owner and expiry.
+73	7. **Hidden and parallel risks:** where a real provider could act differently from its double; fixed output paths, global state, test-order dependence.
+74	8. **The rest:** readability, security, performance where a QR sets a number; reused reference or probe code has its Caveats handled and fits the contract; `dt lint` clean, pre-build sections replaced by `dt layout` pointers.
+75	
+76	**Milestone exit**, over the whole diff, adds: the Scope&#x27;s Exit holds; every Covers ID has a test; `check.sh full --exit` finds no stub; system tests use real providers; the same sample through a real provider and its double agrees; deferred requirements untouched; pip-audit ran.
+77	
+78	**Severity:** Critical: a frozen interface changed, a contract test pinning a transient state, a weakened test, an intent test that misses a mutation changing its TC&#x27;s expected output, a wrong answer, a loosened bar, a security hole, lost data; it stops the build. Important: a consumer bypassing a type, any other surviving mutation, an unneeded abstraction, a duplicate across tasks. Suggestion and Nit: local. Findings go under the checkpoint block in `tasks/plan.md` (`dt finding`), each with a fix task or a reason.
+79	
+80	## Done
+81	agent-skills `references/definition-of-done.md`, tailored once:
+82	- **Correctness and Quality:** checked per task by the gate.
+83	- **Integration and Documentation:** checked at each checkpoint.
+84	- **The full list:** checked at milestone exit.
+85	
+86	## Exceptions
+87	| ID | Rule | Path | Reason | Owner | Expires |
+88	|---|---|---|---|---|---|
+89	| EX-01 | CR-25 DEP002 | `numpy`, `torch`, `matplotlib`, `stable-baselines3`, `gymnasium` | M1 dependencies, declared before the code imports them | @connorott | M1 exit |
+90	| EX-02 | CR-24 layers | `rllab.compare` → `rllab.viz` | `compare.run_claims` takes `charts: Sequence[viz.Chart]` (contract); the sibling layers forbid it (M1-T01 escalation) | @connorott | M1 exit |
+91	</pre></details></div><div class="step" id="S4"><span class="sid">U56.S4</span><span class="kind">Read</span>/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/project/.claude/worktrees/agent-a9204d1460a5981fa/.claude/packet.md<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/project/.claude/worktrees/agent-a9204d1460a5981fa/.claude/packet.md&quot;
+}</pre><div class="lbl">output</div><pre>1	# Packet: M1-T27 implementer
+2	You are the implementer for M1-T27. Your edit boundary is your Writes below (`.claude/.task_writes`); the guard blocks everything else.
+3	
+4	Done when `scripts/check.sh gate` passes (the gate passes on your Writes); the Stop hook runs it. End with one line: `DONE M1-T27 implementer`. If you can&#x27;t finish: `python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/plugin/dev-team/scripts/dt.py escalate &lt;TEST-WRONG|NEEDS-DEP&gt; &quot;&lt;why&gt;&quot;`, or `python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/plugin/dev-team/scripts/dt.py escalate CONTRACT-CHANGE &quot;&lt;why&gt;&quot; --type &lt;the contract symbol&gt;`, then end with one line: `STOPPED M1-T27 implementer: see dt escalate`.
+5	
+6	# Context for M1-T27: package rllab · mode split · kind thicken
+7	Read only what is below, plus CONSTRAINTS.md and the files you edit. Your task is the last section.
+8	
+9	&lt;!-- docs/packages/rllab/pipelines.md:5 --&gt;
+10	## PL-01: Train a run
+11	**Entry:** `src/rllab/lab/pipelines/pl01_train.py::run_train` · **Trigger:** `python -m rllab.lab train &lt;settings.toml&gt; --seeds 0-4`
+12	**Covers:** SNAKE-01–SNAKE-09, FISH-01–FISH-10, HUNT-01–HUNT-09, CORE-01–CORE-07, AGENT-01–AGENT-06, PG-01–PG-05, SELF-01–SELF-04, BASE-06–BASE-08, ABL-01–ABL-03, RUN-01–RUN-04, DATA-02, QR-01–QR-03, QR-05–QR-07
+13	
+14	| # | Step | Owner | In → Out | Spine version | Covers |
+15	|---|---|---|---|---|---|
+16	| 1 | `load_settings` | core.settings | path → RunSettings | TOML into the frozen dataclasses; unknown names raise `ValueError` naming the key | RUN-01 |
+17	| 2 | `make_env` | lab.build | RunSettings → Env | `if` on `settings.env`: Snake, Corridor, FishTank (with `n_agents` fish) or PredatorPrey, returned as a zero-argument factory | CORE-01, DATA-02 |
+18	| 3 | `Snake` | envs.snake | view, Rewards → Env | full rules on 10×10, compact and grid views | SNAKE-01–SNAKE-09 |
+19	| 4 | `Corridor` | envs.corridor | length, Rewards → Env | 10 cells, one-hot position, 50-step cap | CORE-03 |
+20	| 5 | `FishTank` | envs.tank | view, n_fish, Rewards → Env | vectorised ball reflection, shortened swim vectors, wall stop, catches, 1,000-step cap, full view (AD-12) | FISH-01–FISH-09 |
+21	| 6 | `PredatorPrey` | envs.predprey | Rewards → Env | the tank&#x27;s movement functions (AD-16) plus pellets, catches, 50-step prey respawns, both teams&#x27; limited views, 1,000-step cap | HUNT-01–HUNT-09 |
+22	| 7 | `make_agent` | lab.build | RunSettings, Env → Agent | one agent per team of `env.teams`: learners from `settings.agent` (tabular, dqn, reinforce or ppo) sized from the team&#x27;s `TeamSpec`, other teams scripted or random per `settings.opponents`; ablation switches from `settings.ablation` | ABL-01–ABL-03, PG-05, HUNT-07, SELF-02 |
+23	| 8 | `TabularAgent` | agents.tabular | AgentParams, Exploration → Agent | dict of NumPy rows keyed on observation bytes; linear exploration decay | AGENT-01, AGENT-02, AGENT-06, ABL-03 |
+24	| 9 | `DQNAgent` | agents.dqn | AgentParams, Exploration → Agent | 128×128 MLP, uniform memory, hard target refresh, Huber loss, gradient clip 10 | AGENT-02–AGENT-06, ABL-01, ABL-02 |
+25	| 10 | `ReinforceAgent` | agents.reinforce | ActionSpace, AgentParams → Agent | Gaussian 64×64 Tanh policy with a learned log-std; one update per `games_per_update` games on normalised returns-to-go (AD-11) | PG-01, PG-02, AGENT-06 |
+26	| 11 | `PPOAgent` | agents.ppo | ActionSpace, AgentParams → Agent | the same policy plus a 64×64 value net; GAE, clipped objective, `epochs` passes over minibatches, one instance for every fish (AD-11) | PG-01, PG-03, PG-04, AGENT-06, SELF-01 |
+27	| 12 | `ScriptedPredator` | baselines.scripted_predator | () → Agent | length-1 vector toward the nearest visible prey, else toward the centre | BASE-06 |
+28	| 13 | `ScriptedPrey` | baselines.scripted_prey | () → Agent | flee within 0.3, else toward the nearest visible pellet, else still | BASE-07 |
+29	| 14 | `RandomSwimmer` | baselines.random_swimmer | n_agents, seed → Agent | uniform over the unit disc, for either team | BASE-08 |
+30	| 15 | `train` | train.loop | Env, Agent, RunSettings → RunRecord | batch-first step loop over every team, building one Transition per learning team and calling its `learn` after each step; each learner&#x27;s generation every tenth of the run (SELF-04); `evaluate.evaluate` every `eval_every` into a CurvePoint; progress line every 30 s; checkpoints and 5 recorded games at the end | CORE-02, CORE-07, RUN-02–RUN-04, SELF-01, SELF-04, QR-01–QR-03, QR-07 |
+31	| 16 | `OpponentPool` | selfplay.pool | Agent, latest_share, seed → OpponentPool | always the latest policy (rung 2&#x27;s behaviour) | SELF-03 |
+32	
+33	### Entry sketch (pre-build — removed by spine task)
+34	```python
+35	def run_train(settings_path: Path, seed: int) -&gt; RunRecord:
+36	    settings = load_settings(settings_path)
+37	    settings = with_seed(settings, seed)
+38	    make = make_env(settings)
+39	    agents = make_agent(settings, make())
+40	    return train(make, agents, settings)
+41	```
+42	
+43	&lt;!-- docs/packages/rllab/contract.md:239 --&gt;
+44	### agents.DQNAgent: Neural value learner
+45	```python
+46	class DQNAgent(Agent):
+47	    def __init__(self, team: TeamSpec, params: AgentParams, exploration: Exploration, *, seed: int, ablation: Literal[&quot;none&quot;, &quot;no_memory&quot;, &quot;no_target&quot;] = &quot;none&quot;) -&gt; None: ...
+48	    def online_state(self) -&gt; dict[str, torch.Tensor]: ...
+49	    def target_state(self) -&gt; dict[str, torch.Tensor]: ...
+50	```
+51	- **Inspection:** `online_state()` and `target_state()` return detached copies of the online and target networks&#x27; state dicts. With `ablation=&quot;no_target&quot;`, `target_state()` equals `online_state()` after every update. The checkpoint holds both, under the keys `online` and `target`.
+52	- **Invariants:** single-agent (batches of 1). The network&#x27;s input is `team.obs_shape` and its outputs `team.actions.n`. AGENT-03–AGENT-05 and AD-05. With `ablation=&quot;no_memory&quot;`, each update uses only the latest transition (ABL-01). With `ablation=&quot;no_target&quot;`, targets come from the online network (ABL-02). `ablation` takes `RunSettings.ablation`&#x27;s DQN values. No updates happen before `learn_start` transitions. The checkpoint is a PyTorch file holding both state dicts (see Inspection).
+53	- **Errors:** `ValueError` if `team.n_agents != 1`, `team.actions.kind != &quot;discrete&quot;`, or `net=&quot;cnn&quot;` and `team.obs_shape` is not 3-D
+54	- **Boundary:** lab · **Fixtures:** tests/contracts/agents.DQNAgent/ · **Cases:** a replay double of 5 act/learn calls on the compact view after `learn_start`
+55	- **Used by:** lab; PL-01, PL-03
+56	
+57	&lt;!-- docs/packages/rllab/contract.md:106 --&gt;
+58	### envs.Snake: Snake game
+59	```python
+60	class Snake(Env):
+61	    teams: Mapping[str, TeamSpec]
+62	    board: Literal[&quot;grid&quot;]
+63	    def __init__(self, *, view: Literal[&quot;compact&quot;, &quot;grid&quot;], rewards: Rewards = Rewards(), size: int = 10) -&gt; None: ...
+64	    def reset_to(self, body: Sequence[tuple[int, int]], heading: Literal[&quot;up&quot;, &quot;right&quot;, &quot;down&quot;, &quot;left&quot;], food: tuple[int, int]) -&gt; tuple[np.ndarray, dict[str, int]]: ...
+65	```
+66	- **Invariants:** SNAKE-01–SNAKE-09. `reset_to` starts a game from a given board (cells are `(row, col)`, row 0 at the top, body head first), with score 0 and the step count at 0; later food is seeded as after `reset`. One team, `SOLO`, of 1 agent; `board == &quot;grid&quot;`. `__init__` sets `teams` and `board` as instance attributes, so `Snake` is concrete under `core.Env`. Actions: discrete 3, 0 straight, 1 turn left, 2 turn right. The compact observation has per-agent shape `(11,)`, laid out as `COMPACT_FIELDS`. The grid observation has per-agent shape `(3, size, size)`: head, body and food channels. Filling the board ends the game with `terminated=True` and no death reward.
+67	- **Errors:** as `core.Env`; `reset_to` raises `ValueError` if the body is not contiguous, leaves the grid, or the food is on the snake
+68	- **Boundary:** lab, reference, baselines · **Fixtures:** tests/contracts/envs.Snake/ · **Cases:** a recorded compact-view game ending at a wall; a recorded grid-view game eating twice then hitting itself
+69	- **Used by:** lab, reference, baselines; PL-01, PL-03
+70	
+71	&lt;!-- docs/architecture.md:114 --&gt;
+72	### AD-05: An MLP for the compact view, a small CNN for the full grid
+73	**Status:** Accepted · **Date:** 2026-10-17 · **Scope:** `agents`
+74	- **Context:** AGENT-03 takes an 11-value compact view. AGENT-05 takes the full grid. QR-02 and QR-03 give each 60 CPU minutes.
+75	- **Decision:** Compact view: two hidden layers of 128 units, the same shape the reference uses. Full grid: two 3×3 convolution layers (16 and 32 channels) and one 128-unit hidden layer, over a 3×10×10 head/body/food grid.
+76	- **Alternatives:** An MLP on the flattened grid — cheaper per step but slower to learn spatial patterns. It stays the fallback if the CNN misses QR-03.
+77	- **Consequences:** The network is chosen in settings (`net = &quot;mlp&quot;` or `&quot;cnn&quot;`), so the fallback is a settings change, not a code change.
+78	
+79	## Layout (`dt layout rllab`)
+80	src/rllab/
+81	  __init__.py — rllab: a reinforcement-learning lab for Snake and the fish tank.
+82	  agents/
+83	    __init__.py — The learning agents.
+84	    tabular.py — The table-based value learner (AGENT-01, AGENT-02, ABL-03).
+85	    dqn/
+86	      __init__.py — The neural value learner.
+87	      agent.py — The neural value learner (AGENT-03 to AGENT-05, ABL-01, ABL-02).
+88	      networks.py — The value networks: one output per action from a flattened observation (AD-05).
+89	  baselines/
+90	    __init__.py — The baseline players.
+91	    random.py — The random baseline (BASE-01).
+92	    scripted.py — The scripted baseline on the compact view (BASE-02).
+93	  compare/
+94	    __init__.py — Claims between players, tested and reported.
+95	    claims.py — Tested claims over pooled scores, and the report (PL-04 step 4).
+96	    types.py — A claim to test between two players, and its tested result.
+97	  core/
+98	    __init__.py — The core: environment and agent interfaces, and run settings.
+99	    protocols.py — The two interfaces every environment and every player implements (AD-03, AD-09, AD-13).
+100	    settings.py — Run settings from TOML (PL-01 step 1).
+101	    types.py — The core&#x27;s data types: teams, actions, steps, transitions and run settings (AD-09, AD-13).
+102	  envs/
+103	    __init__.py — The environments: Snake and the corridor.
+104	    corridor.py — A 1-D corridor with the goal at its far end (CORE-03).
+105	    snake.py — Snake on a square grid, one agent, compact or grid view (SNAKE-01 to SNAKE-09).
+106	    types.py — Observation layouts shared with the players that read them.
+107	  evaluate/
+108	    __init__.py — Held-out greedy evaluation.
+109	    protocol.py — Greedy evaluation on held-out seeds (EVAL-01, DATA-01, AGENT-07).
+110	    types.py — What one evaluation asks for and what it returns.
+111	  lab/
+112	    __init__.py — The lab: the command line and the pipelines it runs.
+113	    __main__.py — `python -m rllab.lab`: dispatch `train`, `eval`, `replay` and `report`.
+114	    build.py — The environment and the agents a run&#x27;s settings name (PL-01 steps 2 and 7).
+115	    cli.py — The command line: `python -m rllab.lab &lt;train | eval | replay | report&gt; ...`.
+116	    players.py — Players from run folders or baseline names, scored or opened (PL-03 step 1, PL-04 steps 2-3).
+117	    printing.py — One line of scores (PL-03 step 11).
+118	    replay.py — The game a replay shows (PL-05 step 2).
+119	    report_spec.py — A report&#x27;s TOML: players, claims and chart groups (PL-04 step 1).
+120	    types.py — What a report names: its players, baselines and chart groups (PL-04).
+121	    pipelines/
+122	      __init__.py — One entry function per pipeline.
+123	      pl01_train.py — PL-01: train a run.
+124	      pl02_train_reference.py — PL-02: train the reference.
+125	      pl03_evaluate.py — PL-03: evaluate.
+126	      pl04_report.py — PL-04: report.
+127	      pl05_replay.py — PL-05: replay.
+128	  reference/
+129	    __init__.py — The reference: a library agent trained and played on the lab&#x27;s environments.
+130	    player.py — A trained library model as an Agent (REF-01).
+131	    train/
+132	      __init__.py — The library agent&#x27;s training through the gymnasium adapter (AD-03, AD-04).
+133	      adapter.py — The one-learner gymnasium adapter over one team of a `core.Env` (AD-03).
+134	      mapping.py — The run settings as the library DQN&#x27;s parameters, mapped one-to-one (AD-04).
+135	  runs/
+136	    __init__.py — Run folders: settings, curve, checkpoints and recorded games.
+137	    store.py — One folder per run: create it, write it as the run goes, read it back (AD-06).
+138	    types.py — What a run folder holds: its curve, its recorded games and the run itself (AD-06).
+139	  train/
+140	    __init__.py — The training loop.
+141	    loop.py — The training loop over every team (PL-01 step 15).
+142	  viz/
+143	    __init__.py — Charts and the replay window.
+144	    curves.py — Learning curves with baseline lines (PL-04 step 5).
+145	    replay.py — The interactive replay window (REPLAY-01, REPLAY-02).
+146	    types.py — A written chart and what it draws.
+147	
+148	## Interfaces (frozen: build against these, never change them)
+149	&lt;!-- docs/packages/rllab/contract.md:91 --&gt;
+150	### core.AgentParams: type
+151	`@dataclass(frozen=True) class AgentParams: lr: float; gamma: float; batch_size: int = 64; memory_size: int = 50_000; target_every: int = 1_000; learn_start: int = 1_000; hidden: int = 128; net: Literal[&quot;mlp&quot;, &quot;cnn&quot;] = &quot;mlp&quot;; rollout_steps: int = 2048; epochs: int = 10; clip: float = 0.2; gae_lambda: float = 0.95; games_per_update: int = 10`
+152	- **Invariants:** `0 &lt; gamma ≤ 1`. The table-based agent reads only `lr` (its step size) and `gamma`. Policy-gradient agents read `lr`, `gamma`, `hidden` and `batch_size`; PPO also `rollout_steps`, `epochs`, `clip`, `gae_lambda`; REINFORCE also `games_per_update` (AD-11).
+153	- **Boundary:** agents, reference · **Fixtures:** tests/contracts/core.AgentParams/ · **Cases:** the dqn-compact defaults; tabular `lr=0.1, gamma=0.9`; the ppo defaults (`lr=3e-4, gamma=0.99, hidden=64`)
+154	- **Used by:** agents, reference; PL-01, PL-02
+155	Sample: tests/contracts/core.AgentParams/ (exists)
+156	
+157	&lt;!-- docs/packages/rllab/contract.md:85 --&gt;
+158	### core.Exploration: type
+159	`@dataclass(frozen=True) class Exploration: start: float = 1.0; end: float = 0.05; decay_steps: int = 50_000`
+160	- **Invariants:** `0 ≤ end ≤ start ≤ 1`. The rate falls linearly to `end` at `decay_steps`, then stays there (AGENT-02).
+161	- **Boundary:** agents, reference · **Fixtures:** tests/contracts/core.Exploration/ · **Cases:** defaults; no decay (`start == end`)
+162	- **Used by:** agents, reference; PL-01, PL-02
+163	Sample: tests/contracts/core.Exploration/ (exists)
+164	
+165	&lt;!-- docs/packages/rllab/contract.md:51 --&gt;
+166	### core.Agent: type
+167	```python
+168	class Agent(Protocol):
+169	    def act(self, obs: np.ndarray, *, explore: bool) -&gt; np.ndarray: ...
+170	    def learn(self, t: Transition) -&gt; None: ...
+171	    def save(self, path: Path) -&gt; None: ...
+172	    def load(self, path: Path) -&gt; None: ...
+173	```
+174	- **Invariants:** one agent acts for one team: `act` takes that team&#x27;s `(n_agents, *obs_shape)` and returns one action per agent, shaped by the team&#x27;s `ActionSpace`. `explore=False` never samples or takes a random action (AGENT-07): value learners take the best-valued action and policy learners the policy&#x27;s mean. Players that don&#x27;t learn make `learn` a no-op. `save` then `load` gives the same `act` outputs.
+175	- **Boundary:** train, evaluate, lab · **Fixtures:** tests/contracts/core.Agent/ · **Cases:** a replay double recording 5 act/learn calls of a tabular agent
+176	- **Used by:** agents, baselines, reference (providers); train, evaluate, lab; PL-01, PL-03, PL-04, PL-05
+177	Sample: tests/contracts/core.Agent/ (exists)
+178	
+179	## Writes (edit only these files; the plan gives every other file to another task)
+180	- src/rllab/agents/dqn/networks.py (exists)
+181	- tests/unit/rllab/test_networks.py (new)
+182	
+183	&lt;!-- tasks/plan.md:313 --&gt;
+184	### M1-T27: Full-grid convolutional network
+185	**Package:** rllab · **Step:** PL-01.DQNAgent · **Kind:** thicken · **Covers:** AGENT-05 · **Size:** XS · **Mode:** split
+186	**Read:** PL-01, agents.DQNAgent, envs.Snake, AD-05
+187	**Acceptance:**
+188	- [ ] Given `net=&quot;cnn&quot;` and a `(3,10,10)` observation, when the agent acts, then it returns one of 3 actions from two 3×3 convolutions (16, 32) and a 128-unit layer; a non-3-D `team.obs_shape` raises `ValueError`
+189	- [ ] Given a full-grid run, when training starts, then the agent receives only the grid view (AGENT-05)
+190	**Verify:** `pytest tests/intent/rllab tests/unit/rllab -k cnn` · `scripts/check.sh gate`
+191	**Depends on:** M1-T05, M1-T32 · **Writes:** src/rllab/agents/dqn/networks.py, tests/intent/rllab/test_cnn.py, tests/unit/rllab/test_networks.py
+192	</pre></details></div><div class="step" id="S5"><span class="sid">U56.S5</span><span class="kind">Read</span>/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/project/.claude/worktrees/agent-a9204d1460a5981fa/src/rllab/agents/dqn/networks.py<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/project/.claude/worktrees/agent-a9204d1460a5981fa/src/rllab/agents/dqn/networks.py&quot;
+}</pre><div class="lbl">output</div><pre>1	&quot;&quot;&quot;The value networks: one output per action from a flattened observation (AD-05).&quot;&quot;&quot;
+2	
+3	import math
+4	
+5	from torch import nn
+6	
+7	from rllab.core import AgentParams
+8	
+9	
+10	def build_net(obs_shape: tuple[int, ...], n_actions: int, params: AgentParams) -&gt; nn.Module:
+11	    &quot;&quot;&quot;Two hidden ReLU layers of `params.hidden` units over the flattened observation.
+12	
+13	    AD-05&#x27;s MLP; until the convolutional network lands it also serves `net=&quot;cnn&quot;`,
+14	    as AD-05&#x27;s named fallback (an MLP on the flattened grid).
+15	    &quot;&quot;&quot;
+16	    return nn.Sequential(
+17	        nn.Flatten(),
+18	        nn.Linear(math.prod(obs_shape), params.hidden),
+19	        nn.ReLU(),
+20	        nn.Linear(params.hidden, params.hidden),
+21	        nn.ReLU(),
+22	        nn.Linear(params.hidden, n_actions),
+23	    )
+24	</pre></details></div><div class="step" id="S6"><span class="sid">U56.S6</span><span class="kind">Read</span>/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/project/.claude/worktrees/agent-a9204d1460a5981fa/tests/intent/rllab/test_cnn.py<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/project/.claude/worktrees/agent-a9204d1460a5981fa/tests/intent/rllab/test_cnn.py&quot;
+}</pre><div class="lbl">output</div><pre>1	&quot;&quot;&quot;M1-T27 intent: the full-grid DQN network (AGENT-05, AD-05).&quot;&quot;&quot;
+2	
+3	import numpy as np
+4	import pytest
+5	
+6	from rllab.agents import DQNAgent
+7	from rllab.core import SOLO, ActionSpace, AgentParams, Exploration, Rewards, TeamSpec
+8	from rllab.envs import Snake
+9	
+10	GRID_TEAM = TeamSpec(1, (3, 10, 10), ActionSpace(&quot;discrete&quot;, n=3))
+11	CNN = AgentParams(lr=0.001, gamma=0.99, net=&quot;cnn&quot;)
+12	
+13	
+14	def _agent(team: TeamSpec = GRID_TEAM, params: AgentParams = CNN) -&gt; DQNAgent:
+15	    return DQNAgent(team, params, Exploration(), seed=0)
+16	
+17	
+18	def _weight_shapes(agent: DQNAgent) -&gt; list[tuple[int, ...]]:
+19	    &quot;&quot;&quot;The online network&#x27;s weight shapes, in layer order.&quot;&quot;&quot;
+20	    state = agent.online_state()
+21	    return [tuple(t.shape) for name, t in state.items() if name.endswith(&quot;weight&quot;)]
+22	
+23	
+24	def _grid_obs() -&gt; np.ndarray:
+25	    env = Snake(view=&quot;grid&quot;, rewards=Rewards(), size=10)
+26	    env.reset(0)
+27	    obs, _ = env.reset_to([(5, 5), (5, 4), (5, 3)], &quot;right&quot;, (2, 7))
+28	    return np.asarray(obs, dtype=np.float32).reshape(1, 3, 10, 10)
+29	
+30	
+31	@pytest.mark.intent
+32	def test_cnn_acts_on_a_grid_observation_with_one_of_three_actions():
+33	    agent = _agent()
+34	    obs = np.zeros((1, 3, 10, 10), dtype=np.float32)
+35	    obs[0, 0, 5, 5] = 1.0
+36	    obs[0, 1, 5, 4] = 1.0
+37	    obs[0, 2, 2, 7] = 1.0
+38	    action = np.asarray(agent.act(obs, explore=False))
+39	    assert action.shape == (1,)
+40	    assert int(action[0]) in {0, 1, 2}
+41	
+42	
+43	@pytest.mark.intent
+44	def test_cnn_has_two_3x3_convolutions_of_16_and_32_channels():
+45	    shapes = _weight_shapes(_agent())
+46	    convs = [s for s in shapes if len(s) == 4]
+47	    assert convs == [(16, 3, 3, 3), (32, 16, 3, 3)]
+48	
+49	
+50	@pytest.mark.intent
+51	def test_cnn_has_one_128_unit_hidden_layer_then_three_outputs():
+52	    shapes = _weight_shapes(_agent())
+53	    linears = [s for s in shapes if len(s) == 2]
+54	    assert len(linears) == 2
+55	    assert linears[0][0] == 128
+56	    assert linears[1] == (3, 128)
+57	
+58	
+59	@pytest.mark.intent
+60	def test_cnn_greedy_action_is_deterministic():
+61	    agent = _agent()
+62	    obs = _grid_obs()
+63	    first = np.asarray(agent.act(obs, explore=False))
+64	    second = np.asarray(agent.act(obs, explore=False))
+65	    assert first.shape == (1,)
+66	    np.testing.assert_array_equal(first, second)
+67	
+68	
+69	@pytest.mark.intent
+70	@pytest.mark.parametrize(&quot;obs_shape&quot;, [(11,), (10, 10), (1, 3, 10, 10)])
+71	def test_cnn_rejects_a_team_whose_observation_is_not_3d(obs_shape):
+72	    team = TeamSpec(1, obs_shape, ActionSpace(&quot;discrete&quot;, n=3))
+73	    with pytest.raises(ValueError, match=r&quot;(?i)cnn|3-?d|obs_shape|shape&quot;):
+74	        _agent(team)
+75	
+76	
+77	@pytest.mark.intent
+78	def test_full_grid_snake_gives_the_agent_only_the_grid_view():
+79	    env = Snake(view=&quot;grid&quot;, rewards=Rewards(), size=10)
+80	    team = env.teams[SOLO]
+81	    assert team == GRID_TEAM
+82	    agent = _agent(team)
+83	    obs = _grid_obs()
+84	    assert obs.shape == (1, *team.obs_shape)
+85	    action = np.asarray(agent.act(obs, explore=True))
+86	    assert action.shape == (1,)
+87	    assert int(action[0]) in {0, 1, 2}
+88	    assert _weight_shapes(agent)[0] == (16, 3, 3, 3)
+89	</pre></details></div><div class="step" id="S7"><span class="sid">U56.S7</span><span class="kind">Read</span>/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/project/.claude/worktrees/agent-a9204d1460a5981fa/src/rllab/agents/dqn/agent.py<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/project/.claude/worktrees/agent-a9204d1460a5981fa/src/rllab/agents/dqn/agent.py&quot;
+}</pre><div class="lbl">output</div><pre>1	&quot;&quot;&quot;The neural value learner (AGENT-03 to AGENT-05, ABL-01, ABL-02).&quot;&quot;&quot;
+2	
+3	import copy
+4	from pathlib import Path
+5	from typing import Literal
+6	
+7	import numpy as np
+8	import torch
+9	from torch import nn
+10	
+11	from rllab.agents.dqn.networks import build_net
+12	from rllab.core import Agent, AgentParams, Exploration, TeamSpec, Transition
+13	
+14	GRAD_CLIP = 10.0
+15	&quot;&quot;&quot;Largest gradient norm per update.&quot;&quot;&quot;
+16	
+17	
+18	def exploration_rate(exploration: Exploration, steps: int) -&gt; float:
+19	    &quot;&quot;&quot;The rate after `steps` steps: linear from `start` to `end` at `decay_steps`, then flat.&quot;&quot;&quot;
+20	    if exploration.decay_steps &lt;= 0:
+21	        return exploration.end
+22	    fraction = min(1.0, steps / exploration.decay_steps)
+23	    return exploration.start + (exploration.end - exploration.start) * fraction
+24	
+25	
+26	def _check_team(team: TeamSpec, params: AgentParams) -&gt; None:
+27	    if team.n_agents != 1:
+28	        raise ValueError(f&quot;DQNAgent plays one agent, got n_agents={team.n_agents}&quot;)
+29	    if team.actions.kind != &quot;discrete&quot;:
+30	        raise ValueError(f&quot;DQNAgent needs discrete actions, got {team.actions.kind!r}&quot;)
+31	    if params.net == &quot;cnn&quot; and len(team.obs_shape) != 3:
+32	        raise ValueError(f&#x27;net=&quot;cnn&quot; needs a 3-D obs_shape, got {team.obs_shape}&#x27;)
+33	
+34	
+35	class DQNAgent(Agent):
+36	    &quot;&quot;&quot;A value network sized from `team`, with a replay memory and a target copy.
+37	
+38	    `ablation=&quot;no_memory&quot;` updates on the latest transition only (ABL-01); `&quot;no_target&quot;` makes
+39	    the target the online network itself, so targets come from the online network (ABL-02).
+40	    &quot;&quot;&quot;
+41	
+42	    def __init__(
+43	        self,
+44	        team: TeamSpec,
+45	        params: AgentParams,
+46	        exploration: Exploration,
+47	        *,
+48	        seed: int,
+49	        ablation: Literal[&quot;none&quot;, &quot;no_memory&quot;, &quot;no_target&quot;] = &quot;none&quot;,
+50	    ) -&gt; None:
+51	        _check_team(team, params)
+52	        torch.set_num_threads(1)
+53	        torch.use_deterministic_algorithms(True)
+54	        self._params = params
+55	        self._exploration = exploration
+56	        self._n_actions = team.actions.n
+57	        self._rng = np.random.default_rng(seed)
+58	        with torch.random.fork_rng():
+59	            torch.manual_seed(seed)
+60	            self._online = build_net(team.obs_shape, team.actions.n, params)
+61	        self._no_memory = ablation == &quot;no_memory&quot;
+62	        self._target = self._online if ablation == &quot;no_target&quot; else copy.deepcopy(self._online)
+63	        self._optimizer = torch.optim.Adam(self._online.parameters(), lr=params.lr)
+64	        size = params.memory_size
+65	        self._obs = np.zeros((size, *team.obs_shape), dtype=np.float32)
+66	        self._next_obs = np.zeros((size, *team.obs_shape), dtype=np.float32)
+67	        self._actions = np.zeros(size, dtype=np.int64)
+68	        self._rewards = np.zeros(size, dtype=np.float32)
+69	        self._terminated = np.zeros(size, dtype=np.float32)
+70	        self._stored = 0
+71	        self._updates = 0
+72	
+73	    def act(self, obs: np.ndarray, *, explore: bool) -&gt; np.ndarray:
+74	        &quot;&quot;&quot;Greedy over the online network&#x27;s values; with `explore`, random at the current rate.&quot;&quot;&quot;
+75	        if explore and self._rng.random() &lt; exploration_rate(self._exploration, self._stored):
+76	            return self._rng.integers(0, self._n_actions, size=1, dtype=np.int64)
+77	        with torch.no_grad():
+78	            values: torch.Tensor = self._online(torch.as_tensor(obs, dtype=torch.float32))
+79	        return values.argmax(dim=1).numpy().astype(np.int64)
+80	
+81	    def learn(self, t: Transition) -&gt; None:
+82	        &quot;&quot;&quot;Remember the step; from `learn_start` on, one update on a random batch of memory.
+83	
+84	        With `no_memory` the batch is the latest transition alone.
+85	        &quot;&quot;&quot;
+86	        if not t.active[0]:
+87	            return
+88	        self._remember(t)
+89	        if self._stored &gt;= self._params.learn_start:
+90	            self._update(self._batch_rows())
+91	
+92	    def online_state(self) -&gt; dict[str, torch.Tensor]:
+93	        &quot;&quot;&quot;A detached copy of the online network&#x27;s state dict.&quot;&quot;&quot;
+94	        return _detached(self._online)
+95	
+96	    def target_state(self) -&gt; dict[str, torch.Tensor]:
+97	        &quot;&quot;&quot;A detached copy of the target network&#x27;s state dict.&quot;&quot;&quot;
+98	        return _detached(self._target)
+99	
+100	    def save(self, path: Path) -&gt; None:
+101	        &quot;&quot;&quot;Write both networks&#x27; state dicts, under `online` and `target`.&quot;&quot;&quot;
+102	        torch.save({&quot;online&quot;: self.online_state(), &quot;target&quot;: self.target_state()}, path)
+103	
+104	    def load(self, path: Path) -&gt; None:
+105	        &quot;&quot;&quot;Read a checkpoint written by `save` into the online and target networks.&quot;&quot;&quot;
+106	        checkpoint = torch.load(path, weights_only=True)
+107	        self._online.load_state_dict(checkpoint[&quot;online&quot;])
+108	        self._target.load_state_dict(checkpoint[&quot;target&quot;])
+109	
+110	    def _batch_rows(self) -&gt; np.ndarray:
+111	        if self._no_memory:
+112	            return np.array([(self._stored - 1) % self._params.memory_size])
+113	        filled = min(self._stored, self._params.memory_size)
+114	        return self._rng.integers(0, filled, size=self._params.batch_size)
+115	
+116	    def _remember(self, t: Transition) -&gt; None:
+117	        slot = self._stored % self._params.memory_size
+118	        self._obs[slot] = t.obs[0]
+119	        self._next_obs[slot] = t.next_obs[0]
+120	        self._actions[slot] = t.actions[0]
+121	        self._rewards[slot] = t.reward[0]
+122	        self._terminated[slot] = t.terminated[0]
+123	        self._stored += 1
+124	
+125	    def _update(self, rows: np.ndarray) -&gt; None:
+126	        obs = torch.as_tensor(self._obs[rows])
+127	        next_obs = torch.as_tensor(self._next_obs[rows])
+128	        actions = torch.as_tensor(self._actions[rows])
+129	        rewards = torch.as_tensor(self._rewards[rows])
+130	        terminated = torch.as_tensor(self._terminated[rows])
+131	        with torch.no_grad():
+132	            next_values: torch.Tensor = self._target(next_obs)
+133	            targets = (
+134	                rewards + self._params.gamma * (1.0 - terminated) * next_values.max(dim=1).values
+135	            )
+136	        values: torch.Tensor = self._online(obs)
+137	        chosen = values.gather(1, actions.unsqueeze(1)).squeeze(1)
+138	        loss = nn.functional.smooth_l1_loss(chosen, targets)
+139	        self._optimizer.zero_grad()
+140	        torch.autograd.backward(loss)
+141	        nn.utils.clip_grad_norm_(self._online.parameters(), GRAD_CLIP)
+142	        self._optimizer.step()
+143	        self._updates += 1
+144	        if self._updates % self._params.target_every == 0:
+145	            self._target.load_state_dict(self._online.state_dict())
+146	
+147	
+148	def _detached(net: nn.Module) -&gt; dict[str, torch.Tensor]:
+149	    return {name: tensor.detach().clone() for name, tensor in net.state_dict().items()}
+150	</pre></details></div><div class="step" id="S8"><span class="sid">U56.S8</span><span class="kind">Bash</span>ls /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/project/.claude/worktrees/agent-a9204d1460a5981fa/tests/unit/rllab<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;ls /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/project/.claude/worktrees/agent-a9204d1460a5981fa/tests/unit/rllab&quot;,
+  &quot;description&quot;: &quot;List existing unit tests&quot;
+}</pre><div class="lbl">output</div><pre>test_build.py
+test_claims.py
+test_corridor.py
+test_curves.py
+test_dqn.py
+test_evaluate.py
+test_pick_game.py
+test_pl03_smoke.py
+test_pl04_smoke.py
+test_players.py
+test_random_player.py
+test_reference_player.py
+test_replay_viewer.py
+test_report_spec.py
+test_scripted.py
+test_settings.py
+test_snake.py
+test_store.py
+test_tabular.py
+test_train_loop.py
+test_train_reference.py</pre></details></div><div class="step" id="S9"><span class="sid">U56.S9</span><span class="kind">Write</span>/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/project/.claude/worktrees/agent-a9204d1460a5981fa/src/rllab/agents/dqn/networks.py (44 lines)<div class="lbl">wrote /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/project/.claude/worktrees/agent-a9204d1460a5981fa/src/rllab/agents/dqn/networks.py</div><pre>&quot;&quot;&quot;The value networks: one output per action from a flattened observation (AD-05).&quot;&quot;&quot;
+
+import math
+
+from torch import nn
+
+from rllab.core import AgentParams
+
+
+def build_net(obs_shape: tuple[int, ...], n_actions: int, params: AgentParams) -&gt; nn.Module:
+    &quot;&quot;&quot;AD-05&#x27;s network for `params.net`: the compact-view MLP or the full-grid CNN.&quot;&quot;&quot;
+    if params.net == &quot;cnn&quot;:
+        return _cnn(obs_shape, n_actions, params.hidden)
+    return _mlp(obs_shape, n_actions, params.hidden)
+
+
+def _mlp(obs_shape: tuple[int, ...], n_actions: int, hidden: int) -&gt; nn.Module:
+    &quot;&quot;&quot;Two hidden ReLU layers of `hidden` units over the flattened observation.&quot;&quot;&quot;
+    return nn.Sequential(
+        nn.Flatten(),
+        nn.Linear(math.prod(obs_shape), hidden),
+        nn.ReLU(),
+        nn.Linear(hidden, hidden),
+        nn.ReLU(),
+        nn.Linear(hidden, n_actions),
+    )
+
+
+def _cnn(obs_shape: tuple[int, ...], n_actions: int, hidden: int) -&gt; nn.Module:
+    &quot;&quot;&quot;Two padded 3x3 ReLU convolutions (16, 32 channels), then one hidden layer of `hidden` units.
+
+    `obs_shape` is `(channels, height, width)`; padding keeps the height and width.
+    &quot;&quot;&quot;
+    channels, height, width = obs_shape
+    return nn.Sequential(
+        nn.Conv2d(channels, 16, kernel_size=3, padding=1),
+        nn.ReLU(),
+        nn.Conv2d(16, 32, kernel_size=3, padding=1),
+        nn.ReLU(),
+        nn.Flatten(),
+        nn.Linear(32 * height * width, hidden),
+        nn.ReLU(),
+        nn.Linear(hidden, n_actions),
+    )
+</pre><details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/project/.claude/worktrees/agent-a9204d1460a5981fa/src/rllab/agents/dqn/networks.py&quot;,
+  &quot;content&quot;: &quot;\&quot;\&quot;\&quot;The value networks: one output per action from a flattened observation (AD-05).\&quot;\&quot;\&quot;\n\nimport math\n\nfrom torch import nn\n\nfrom rllab.core import AgentParams\n\n\ndef build_net(obs_shape: tuple[int, ...], n_actions: int, params: AgentParams) -&gt; nn.Module:\n    \&quot;\&quot;\&quot;AD-05&#x27;s network for `params.net`: the compact-view MLP or the full-grid CNN.\&quot;\&quot;\&quot;\n    if params.net == \&quot;cnn\&quot;:\n        return _cnn(obs_shape, n_actions, params.hidden)\n    return _mlp(obs_shape, n_actions, params.hidden)\n\n\ndef _mlp(obs_shape: tuple[int, ...], n_actions: int, hidden: int) -&gt; nn.Module:\n    \&quot;\&quot;\&quot;Two hidden ReLU layers of `hidden` units over the flattened observation.\&quot;\&quot;\&quot;\n    return nn.Sequential(\n        nn.Flatten(),\n        nn.Linear(math.prod(obs_shape), hidden),\n        nn.ReLU(),\n        nn.Linear(hidden, hidden),\n        nn.ReLU(),\n        nn.Linear(hidden, n_actions),\n    )\n\n\ndef _cnn(obs_shape: tuple[int, ...], n_actions: int, hidden: int) -&gt; nn.Module:\n    \&quot;\&quot;\&quot;Two padded 3x3 ReLU convolutions (16, 32 channels), then one hidden layer of `hidden` units.\n\n    `obs_shape` is `(channels, height, width)`; padding keeps the height and width.\n    \&quot;\&quot;\&quot;\n    channels, height, width = obs_shape\n    return nn.Sequential(\n        nn.Conv2d(channels, 16, kernel_size=3, padding=1),\n        nn.ReLU(),\n        nn.Conv2d(16, 32, kernel_size=3, padding=1),\n        nn.ReLU(),\n        nn.Flatten(),\n        nn.Linear(32 * height * width, hidden),\n        nn.ReLU(),\n        nn.Linear(hidden, n_actions),\n    )\n&quot;
+}</pre><div class="lbl">output</div><pre>The file /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/project/.claude/worktrees/agent-a9204d1460a5981fa/src/rllab/agents/dqn/networks.py has been updated successfully. (file state is current in your context — no need to Read it back)</pre></details></div><div class="step" id="S10"><span class="sid">U56.S10</span><span class="kind">Write</span>/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/project/.claude/worktrees/agent-a9204d1460a5981fa/tests/unit/rllab/test_networks.py (47 lines)<div class="lbl">wrote /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/project/.claude/worktrees/agent-a9204d1460a5981fa/tests/unit/rllab/test_networks.py</div><pre>&quot;&quot;&quot;Unit tests for the DQN value networks (AD-05).&quot;&quot;&quot;
+
+import torch
+from torch import nn
+
+from rllab.agents.dqn.networks import build_net
+from rllab.core import AgentParams
+
+MLP = AgentParams(lr=0.001, gamma=0.99)
+CNN = AgentParams(lr=0.001, gamma=0.99, net=&quot;cnn&quot;)
+
+
+def _layers(net: nn.Module, kind: type[nn.Module]) -&gt; list[nn.Module]:
+    return [m for m in net.modules() if isinstance(m, kind)]
+
+
+def test_cnn_gives_one_value_per_action_for_each_grid_in_the_batch():
+    net = build_net((3, 10, 10), 3, CNN)
+    values = net(torch.zeros(4, 3, 10, 10))
+    assert tuple(values.shape) == (4, 3)
+
+
+def test_cnn_keeps_the_grid_size_so_its_hidden_layer_reads_32_channels_per_cell():
+    net = build_net((3, 6, 8), 5, CNN)
+    first, second = _layers(net, nn.Linear)
+    assert (first.in_features, first.out_features) == (32 * 6 * 8, 128)
+    assert (second.in_features, second.out_features) == (128, 5)
+    assert tuple(net(torch.zeros(2, 3, 6, 8)).shape) == (2, 5)
+
+
+def test_cnn_takes_its_input_channels_from_the_observation():
+    net = build_net((4, 5, 5), 3, CNN)
+    convs = _layers(net, nn.Conv2d)
+    assert [tuple(c.weight.shape) for c in convs] == [(16, 4, 3, 3), (32, 16, 3, 3)]
+
+
+def test_cnn_hidden_width_follows_params_hidden():
+    params = AgentParams(lr=0.001, gamma=0.99, net=&quot;cnn&quot;, hidden=64)
+    first, _ = _layers(build_net((3, 10, 10), 3, params), nn.Linear)
+    assert first.out_features == 64
+
+
+def test_mlp_has_no_convolutions_and_two_hidden_layers():
+    net = build_net((11,), 3, MLP)
+    assert _layers(net, nn.Conv2d) == []
+    shapes = [(m.in_features, m.out_features) for m in _layers(net, nn.Linear)]
+    assert shapes == [(11, 128), (128, 128), (128, 3)]
+</pre><details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/project/.claude/worktrees/agent-a9204d1460a5981fa/tests/unit/rllab/test_networks.py&quot;,
+  &quot;content&quot;: &quot;\&quot;\&quot;\&quot;Unit tests for the DQN value networks (AD-05).\&quot;\&quot;\&quot;\n\nimport torch\nfrom torch import nn\n\nfrom rllab.agents.dqn.networks import build_net\nfrom rllab.core import AgentParams\n\nMLP = AgentParams(lr=0.001, gamma=0.99)\nCNN = AgentParams(lr=0.001, gamma=0.99, net=\&quot;cnn\&quot;)\n\n\ndef _layers(net: nn.Module, kind: type[nn.Module]) -&gt; list[nn.Module]:\n    return [m for m in net.modules() if isinstance(m, kind)]\n\n\ndef test_cnn_gives_one_value_per_action_for_each_grid_in_the_batch():\n    net = build_net((3, 10, 10), 3, CNN)\n    values = net(torch.zeros(4, 3, 10, 10))\n    assert tuple(values.shape) == (4, 3)\n\n\ndef test_cnn_keeps_the_grid_size_so_its_hidden_layer_reads_32_channels_per_cell():\n    net = build_net((3, 6, 8), 5, CNN)\n    first, second = _layers(net, nn.Linear)\n    assert (first.in_features, first.out_features) == (32 * 6 * 8, 128)\n    assert (second.in_features, second.out_features) == (128, 5)\n    assert tuple(net(torch.zeros(2, 3, 6, 8)).shape) == (2, 5)\n\n\ndef test_cnn_takes_its_input_channels_from_the_observation():\n    net = build_net((4, 5, 5), 3, CNN)\n    convs = _layers(net, nn.Conv2d)\n    assert [tuple(c.weight.shape) for c in convs] == [(16, 4, 3, 3), (32, 16, 3, 3)]\n\n\ndef test_cnn_hidden_width_follows_params_hidden():\n    params = AgentParams(lr=0.001, gamma=0.99, net=\&quot;cnn\&quot;, hidden=64)\n    first, _ = _layers(build_net((3, 10, 10), 3, params), nn.Linear)\n    assert first.out_features == 64\n\n\ndef test_mlp_has_no_convolutions_and_two_hidden_layers():\n    net = build_net((11,), 3, MLP)\n    assert _layers(net, nn.Conv2d) == []\n    shapes = [(m.in_features, m.out_features) for m in _layers(net, nn.Linear)]\n    assert shapes == [(11, 128), (128, 128), (128, 3)]\n&quot;
+}</pre><div class="lbl">output</div><pre>File created successfully at: /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/project/.claude/worktrees/agent-a9204d1460a5981fa/tests/unit/rllab/test_networks.py (file state is current in your context — no need to Read it back)</pre></details></div><div class="step" id="S11"><span class="sid">U56.S11</span><span class="kind">Bash</span>scripts/check.sh gate<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;scripts/check.sh gate&quot;,
+  &quot;description&quot;: &quot;Run the gate checks&quot;,
+  &quot;timeout&quot;: 600000
+}</pre><div class="lbl">output</div><pre>-&gt; ruff check --ignore-noqa .
+All checks passed!
+-&gt; ruff format --check .
+151 files already formatted
+-&gt; mypy
+Success: no issues found in 52 source files
+-&gt; python scripts/check_size.py src
+-&gt; deptry . --no-ansi
+Scanning 56 files...
+
+Success! No dependency issues found.
+-&gt; lint-imports --no-logo
+
+---------
+Contracts
+---------
+
+Analyzed 73 files, 199 dependencies.
+------------------------------------
+
+Layers: lab &gt; train | reference | compare | viz | baselines &gt; evaluate | envs | 
+agents &gt; runs &gt; core KEPT (1 ignored import)
+Hand-written code stays free of the reference library (AGENT-06, AD-04) KEPT
+Only agents imports PyTorch (AD-02) KEPT
+envs → core only KEPT
+agents → core only KEPT
+baselines → core, envs KEPT
+train → core, runs, evaluate KEPT
+reference → core, envs, runs, evaluate KEPT
+compare → evaluate KEPT
+viz → runs, evaluate KEPT
+
+Contracts: 10 kept, 0 broken.
+-&gt; pytest tests/intent tests/unit tests/contracts --no-cov -q -x
+........................................................................ [ 12%]
+........................................................................ [ 25%]
+........................................................................ [ 37%]
+........................................................................ [ 50%]
+........................................................................ [ 63%]
+........................................................................ [ 75%]
+........................................................................ [ 88%]
+...................................................................      [100%]
+571 passed in 18.81s
+-&gt; bash scripts/floor_guard.sh
+floor_guard: clean
+-&gt; protected files unchanged since refs/worktree/checks-base</pre></details></div><div class="step" id="S12"><span class="sid">U56.S12</span><span class="kind">say</span>DONE M1-T27 implementer<details><summary>full text</summary><pre>DONE M1-T27 implementer</pre></details></div>
+<h2>Commits</h2>
+<p>None.</p>
+<h2>Returned</h2>
+<pre>DONE M1-T27 implementer</pre>
+</body></html>

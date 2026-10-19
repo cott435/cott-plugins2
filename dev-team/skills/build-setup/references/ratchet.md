@@ -10,7 +10,7 @@ Read when `dt status --skill build-setup` reports `ratchet`: at Advance, after t
 4. Offer once to promote a measured metric to enforced.
 5. Set `**Ratcheted:** M<n>` in the header.
 6. At the Review Gate, `expired_exceptions` must be empty too.
-7. After approval and the commit offer, hand back to `build-planning` Advance, whose next step is `dt archive`. Never run `dt base` and never say `/build` is next: the next milestone isn't planned yet.
+7. After approval and the commit offer, hand back to `build-planning` Advance, whose next step is `dt archive`. Never run `dt base` and never say the `build` skill is next: the next milestone isn't planned yet.
 
 ## Example: M1 exit
 

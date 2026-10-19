@@ -1,6 +1,7 @@
 """M1 calendar thicken · TC-02 (DATA-03), TC-03 (DATA-04)."""
 
 import pytest
+
 from mdata.calendar import align_calendar
 from mdata.types import GapError, RawRow
 

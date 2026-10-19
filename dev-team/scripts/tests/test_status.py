@@ -388,6 +388,15 @@ class BuildPlanningTest(Base):
             self.assertEqual(d["critical_path"][-1], "M1-T14")
             self.assertEqual([len(w) for w in d["waves"]], [1, 6, 6, 1])
             self.assertEqual((d["width"], d["parallelism"], d["graph_warning"]), (6, 3.5, None))
+            self.assertEqual(d["critical_path_halves"],
+                             ["M1-T01.solo", "M1-T10.tester", "M1-T10.implementer", "M1-T14.solo"])
+            self.assertEqual(d["file_edges_on_path"], [])
+
+    def test_file_edge_on_the_critical_path(self):
+        self.edit("tasks/plan.md", "| M1-T14 system | M1-T08 wire PL-01 | code |", "| M1-T14 system | M1-T08 wire PL-01 | file |")
+        d = self.status("build-planning")
+        self.assertEqual(d["critical_path"], ["M1-T01", "M1-T02", "M1-T08", "M1-T14"])
+        self.assertEqual(d["file_edges_on_path"], ["M1-T14 → M1-T08 (swaps the fake for the real PL-01)"])
 
     def test_graph_warning_when_mostly_serial(self):
         prev = {"data/universe.py": "M1-T02", "stats/cov.py": "M1-T03", "stats/rmt.py": "M1-T04",
@@ -416,8 +425,9 @@ class BuildPlanningTest(Base):
         d = self.status("build-planning")
         self.assertEqual(d["mode"], "replan")
         self.assertEqual(d["blocked_tasks"], ["M1-T10 (waiting on PL-01 Revise)"])
-        self.assertEqual(d["mode_violations"], ["M1-T06: split, expected solo (spine)",
-                                                "M1-T11: solo, expected split (covers behaviour)"])
+        self.assertEqual(d["mode_violations"],
+                         ["M1-T06: split, expected solo (no TC, Given/When/Then or model criterion in its acceptance)",
+                          "M1-T11: solo, expected split (acceptance names TC-02)"])
         self.assertEqual(d["skills_missing"], ["rmt-tools"])
         self.assertEqual(d["no_spine"], ["PL-02"])          # no wiring task builds PL-02 now
         self.assertEqual(d["uncovered"], ["STAT-03"])
@@ -502,7 +512,7 @@ class BuildPlanningLegacyTest(Base):
         d = self.status("build-planning")
         self.assertEqual(d["mode"], "replan")
         self.assertEqual(d["blocked_tasks"], ["M1-T03 (waiting on PL-02 Revise)"])
-        self.assertEqual(d["mode_violations"], ["M1-T04: solo, expected split (covers behaviour)"])
+        self.assertEqual(d["mode_violations"], ["M1-T04: solo, expected split (acceptance names TC-02)"])
         self.assertEqual(d["skills_missing"], ["rmt-tools"])
         self.assertEqual(d["no_spine"], ["PL-02"])
         self.assertEqual(d["uncovered"], ["STAT-03"])
@@ -529,7 +539,32 @@ class BuildPlanningLegacyTest(Base):
 class BuildPlanningModesTest(Base):
     def test_reason_overrides_mode_rule(self):
         self.edit("tasks/plan.md", "**Size:** XS · **Mode:** split", "**Size:** XS · **Mode:** solo\n**Reason:** doc-only")
+        self.assertEqual(self.status("build-planning")["mode_violations"],          # only a `mode:` Reason counts
+                         ["M1-T13: solo, expected split (acceptance names TC-03)"])
+        self.edit("tasks/plan.md", "**Reason:** doc-only", "**Reason:** mode: doc-only")
         self.assertEqual(self.status("build-planning")["mode_violations"], [])
+
+    def test_split_rule_follows_the_oracle(self):
+        # A spine whose acceptance names a TC is split, whatever its Kind; so is any task writing tests/intent/.
+        self.edit("tasks/plan.md", "- [ ] `pca` turns the stats.Cov sample into a valid stats.Factors, largest first",
+                  "- [ ] `pca` passes TC-03 on the stats.Cov sample")
+        self.edit("tasks/plan.md", "**Writes:** src/quant/stats/report.py, tests/unit/quant/test_report.py",
+                  "**Writes:** src/quant/stats/report.py, tests/intent/quant/test_report.py")
+        self.edit("tasks/plan.md", "- [ ] `estimate_cov` returns the sample covariance",
+                  "- [ ] Given returns, when estimate_cov runs, then it returns the sample covariance")
+        self.assertEqual(self.status("build-planning")["mode_violations"],
+                         ["M1-T04: solo, expected split (acceptance has a Given/When/Then)",
+                          "M1-T06: solo, expected split (acceptance names TC-03)",
+                          "M1-T07: solo, expected split (writes tests/intent/quant/test_report.py, which only a "
+                          "tester may)"])
+
+    def test_model_criterion_splits(self):
+        self.edit("docs/packages/quant/tests.md", "**Kind:** synthetic known-answer · **Fixture:** tests/fixtures/quant/TC-03/",
+                  "**Kind:** model evaluation · **Fixture:** tests/fixtures/quant/TC-03/")
+        self.edit("tasks/plan.md", "- [ ] `pca` turns the stats.Cov sample into a valid stats.Factors, largest first",
+                  "- [ ] STAT-01 holds on the stats.Cov sample")
+        self.assertEqual(self.status("build-planning")["mode_violations"],
+                         ["M1-T06: solo, expected split (acceptance names model criterion STAT-01)"])
 
     def test_blocked_while_revise_in_progress(self):
         self.edit("docs/packages/quant/pipelines.md", "**Status:** Approved", "**Status:** Draft")

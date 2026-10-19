@@ -95,7 +95,7 @@
 - [ ] TC-01 passes
 - [ ] PL-01 smoke test still passes
 **Verify:** `pytest tests/intent/quant -k universe` · `python -m quant.data load --smoke` · `scripts/check.sh gate`
-**Depends on:** M1-T03 · **Writes:** src/quant/data/universe.py, tests/intent/quant/test_universe.py
+**Depends on:** M1-T03 · **Writes:** src/quant/data/universe.py, tests/intent/quant/test_universe.py, tests/unit/quant/test_universe.py
 
 ### M1-T11: Marchenko–Pastur cleaning
 **Package:** quant · **Step:** PL-02.clean_eigen · **Kind:** thicken · **Covers:** STAT-03 · **Size:** S · **Mode:** split
@@ -105,7 +105,7 @@
 - [ ] TC-02 passes within tolerance; the no-cleaning baseline stays selectable
 - [ ] PL-02 smoke test still passes
 **Verify:** `pytest tests/intent/quant -k rmt` · `python -m quant.stats cov-report --smoke` · `scripts/check.sh gate`
-**Depends on:** M1-T05 · **Writes:** src/quant/stats/rmt.py, tests/intent/quant/test_rmt.py
+**Depends on:** M1-T05 · **Writes:** src/quant/stats/rmt.py, tests/intent/quant/test_rmt.py, tests/unit/quant/test_rmt.py
 
 ### M1-T12: Shrinkage covariance
 **Package:** quant · **Step:** PL-02.estimate_cov · **Kind:** thicken · **Covers:** STAT-02, QR-02 · **Size:** S · **Mode:** split
@@ -115,7 +115,7 @@
 - [ ] Shrinkage estimate is positive definite on TC-02's input; sample covariance stays selectable
 - [ ] PL-02 smoke test still passes
 **Verify:** `pytest tests/intent/quant -k cov` · `python -m quant.stats cov-report --smoke` · `scripts/check.sh gate`
-**Depends on:** M1-T04 · **Writes:** src/quant/stats/cov.py, tests/intent/quant/test_cov.py
+**Depends on:** M1-T04 · **Writes:** src/quant/stats/cov.py, tests/intent/quant/test_cov.py, tests/unit/quant/test_cov.py
 
 ### M1-T13: Planted-factor PCA check
 **Package:** quant · **Step:** PL-02.pca · **Kind:** thicken · **Covers:** STAT-01, QR-01 · **Size:** XS · **Mode:** split
@@ -124,7 +124,7 @@
 **Acceptance:**
 - [ ] TC-03 passes with a fixed seed
 **Verify:** `pytest tests/intent/quant -k pca` · `python -m quant.stats cov-report --smoke` · `scripts/check.sh gate`
-**Depends on:** M1-T06 · **Writes:** src/quant/stats/pca.py, tests/intent/quant/test_pca.py
+**Depends on:** M1-T06 · **Writes:** src/quant/stats/pca.py, tests/intent/quant/test_pca.py, tests/unit/quant/test_pca.py
 
 ### Checkpoint after M1-T13
 - [ ] Every pipeline in the milestone runs end to end (smoke commands)
@@ -135,13 +135,12 @@
 ## Phase 3: System
 
 ### M1-T14: PL-02 on the real PL-01
-**Package:** quant · **Step:** PL-02 · **Kind:** system · **Covers:** STAT-04 · **Size:** S · **Mode:** solo
-**Reason:** wiring only; TC-01–TC-03 are the thicken tasks' outcomes
+**Package:** quant · **Step:** PL-02 · **Kind:** system · **Covers:** STAT-04 · **Size:** S · **Mode:** split
 **Read:** PL-01, PL-02, data.load_prices
 **Acceptance:**
 - [ ] PL-02 calls the real `load_prices`; both smoke commands pass; TC-01–TC-03 pass
 **Verify:** `python -m quant.data load --smoke` · `python -m quant.stats cov-report --smoke` · `scripts/check.sh gate`
-**Depends on:** M1-T08, M1-T09, M1-T10, M1-T11, M1-T12, M1-T13 · **Writes:** src/quant/stats/pipeline.py, tests/unit/quant/test_system_smoke.py
+**Depends on:** M1-T08, M1-T09, M1-T10, M1-T11, M1-T12, M1-T13 · **Writes:** src/quant/stats/pipeline.py, tests/intent/quant/test_system.py, tests/unit/quant/test_system_smoke.py
 
 ### Checkpoint: milestone exit
 - [ ] Every pipeline in the milestone runs end to end (smoke commands)

@@ -6,6 +6,8 @@ problems located in the files asked for. Cross-doc checks always read the whole 
 """
 from __future__ import annotations
 
+import ast
+import fnmatch
 import json
 import math
 import os
@@ -25,18 +27,20 @@ from ..status.common import available_skills
 from ..status.build_planning import steps_unplanned
 from ..status.packages import shape_kept
 from . import roadmap as roadmap_cmd
+from ..status.tomlread import load_toml
 
 # code → severity (E fails the run, W doesn't)
 SEVERITY = {
     "dup-id": "E", "missing-ref": "E", "retired-ref": "E", "budget": "W", "grow-size": "W", "approved-edit": "W",
     "prebuild-left": "E", "task-size": "E", "task-acceptance": "E", "task-title": "E", "task-fields": "E",
     "task-step": "W", "depends": "E", "milestone-size": "E", "writes": "E", "edges": "E", "deprecated": "W",
-    "step-io-types": "E", "verify-smoke": "E", "todo-mismatch": "E",
+    "step-io-types": "E", "verify-smoke": "E", "todo-mismatch": "E", "writes-unit": "E", "call-fake": "E",
     "finding-disposition": "E", "foreign-plan": "W", "broken-fence": "E", "header": "E",
     "unreadable": "E", "internal": "W", "pipeline-fields": "E", "spine-mock": "W", "contract-heading": "E",
     "fixture-size": "W",                # missing fixture files are reported as E
     "ref-file": "E", "ref-hash": "W", "ref-large": "W", "ref-prefix": "E", "roadmap-skill": "W",
-    "roadmap-stage": "E", "spec-stage": "E", "type-cases": "E", "task-ref": "E",
+    "roadmap-stage": "E", "spec-stage": "E", "type-cases": "E", "task-ref": "E", "contract-args": "E",
+    "contract-depends": "E",
     "probe-fields": "E", "probe-informs": "E", "probe-cite": "E", "probe-runner": "E", "probe-leak": "E",
     "probe-sample": "E", "probe-results": "E", "probe-stale": "W", "probe-large": "W",
     "boundaries": "E", "probe-open": "E", "milestone-depends": "E",
@@ -1626,6 +1630,51 @@ def check_packet_type_closure(ctx: Context):
         yield Problem(first.doc.rel, first.start + 1, "packet-type-closure", f"{name} (named by {by}) {why}")
 
 
+def check_writes_unit(ctx: Context):
+    """Every implementer and solo half writes unit tests (implementer.md), so a task's `Writes:` outside
+    `tests/intent/` name a `tests/unit/` path. An interface task is exempt."""
+    for doc in ctx.plan_docs:
+        if not model.is_interface_first(doc):
+            continue
+        for t in model.tasks(doc):
+            if t.kind == "interface" or "Writes" not in t.fields:
+                continue
+            share = [w for w in t.writes if not w.startswith("tests/intent/")]
+            if not any(w.startswith("tests/unit/") for w in share):
+                line = md.field_line(doc.lines, t.start, t.end, "Writes")
+                half = "implementer" if t.mode == "split" else "solo"
+                yield _p(doc, t.start if line is None else line, "writes-unit",
+                         f"{t.id} Writes name no tests/unit/ path: its {half} half writes unit tests "
+                         f"(tests/unit/{t.package or '<pkg>'}/)")
+
+
+def check_call_fake(ctx: Context):
+    """A `call` edge marked `none` whose callee is a contract symbol no interface task freezes: freeze its fake in
+    the interface task and mitigate the edge, so both sides start at once, or give the reason
+    `none: integration: <what runs the real chain>`. (A callee the interface already freezes is `edges`'.)"""
+    symbols = {s.id for s in model.all_symbols(ctx.repo)}
+    for doc in ctx.plan_docs:
+        if not model.is_interface_first(doc):
+            continue
+        tasks = model.tasks(doc)
+        by_id = {t.id: t for t in tasks}
+        produced = model.frozen_symbols(tasks)
+        for e in model.graph_edges(doc):
+            if e.kind != "call" or e.mitigated or not e.src or not e.dst:
+                continue
+            if re.match(r"integration\s*:", e.reason, re.IGNORECASE):
+                continue
+            callees = set(re.findall(rf"(?<![\w.]){md.SYMBOL_ID}", md.strip_md(e.reason)))
+            if e.src in by_id and e.dst in by_id:
+                callees |= _callees(ctx, by_id[e.src], by_id[e.dst])
+            hit = sorted((callees & symbols) - produced)
+            if hit:
+                yield _p(doc, e.line, "call-fake",
+                         f"{e.src} waits on {e.dst} to call {', '.join(hit)}, a contract symbol with no fake: have the "
+                         "interface task freeze its fake and mitigate the edge, or give `none: integration: <what "
+                         "runs the real chain>`")
+
+
 def check_step_io_types(ctx: Context):
     """Every type a package step's `In → Out` cell names is a contract type section, and every step's Out names
     one: the boundaries an interface task freezes (entry arguments on the In side may stay plain). A project with
@@ -1756,6 +1805,121 @@ def check_boundaries(ctx: Context):
                           f"{p.id}'s entry is used by {', '.join(outside)} but has no **Boundary:** line: add "
                           "`**Boundary:** <consumers> · **Fixtures:** tests/contracts/<pkg.entry>/` so the "
                           "interface task freezes its fake")
+
+
+# The bar's argument limits when pyproject.toml doesn't set them: build-setup's template values.
+ARG_LIMITS = {"max-args": 5, "max-positional-args": 4}
+DEF_START = re.compile(r"\bdef\s+\w+\s*\(")
+NAME = re.compile(r"\b[A-Za-z_][\w.]*")
+
+
+def _signature_code(sym: model.Symbol) -> str:
+    """A contract section's code before its first bullet: its inline code spans and fenced lines, comments cut."""
+    out = []
+    for i in range(sym.start + 1, sym.end):
+        line = sym.doc.lines[i]
+        if not sym.doc.mask[i] and line.lstrip().startswith("- **"):
+            break
+        if sym.doc.mask[i]:
+            out.append("" if line.lstrip().startswith(("```", "~~~")) else line)
+        else:
+            out += re.findall(r"`([^`]+)`", line)
+    return " ".join(re.sub(r"#.*", "", c) for c in out)
+
+
+def _defs(code: str) -> list[ast.FunctionDef]:
+    """Each `def name(…) -> …` in the code, parsed alone (one-line class bodies aren't valid Python)."""
+    out = []
+    for m in DEF_START.finditer(code):
+        depth, i = 1, m.end()
+        while i < len(code) and depth:
+            depth += {"(": 1, ")": -1}.get(code[i], 0)
+            i += 1
+        ret = re.match(r"\s*->\s*(.+?)(?=\s*(?:;|$|\bdef\b|\bclass\b))", code[i:])
+        try:
+            node = ast.parse(code[m.start():i] + (f" -> {ret.group(1)}" if ret else "") + ": ...").body[0]
+        except SyntaxError:
+            continue
+        if isinstance(node, ast.FunctionDef):
+            out.append(node)
+    return out
+
+
+def _arg_counts(fn: ast.FunctionDef) -> tuple[int, int]:
+    """(arguments, positional ones) as Ruff's PLR0913 and PLR0917 count them: `self`/`cls`, `*args` and
+    `**kwargs` left out."""
+    pos = fn.args.posonlyargs + fn.args.args
+    if pos and pos[0].arg in ("self", "cls"):
+        pos = pos[1:]
+    return len(pos) + len(fn.args.kwonlyargs), len(pos)
+
+
+def _arg_limits(repo: Repo) -> dict[str, int]:
+    path = repo.root / "pyproject.toml"
+    try:
+        tool = load_toml(path).get("tool", {}) if path.is_file() else {}
+    except Exception:
+        tool = {}
+    ruff = tool.get("ruff", {})
+    pylint = {**ruff.get("pylint", {}), **ruff.get("lint", {}).get("pylint", {})}
+    return {k: int(pylint.get(k, v)) for k, v in ARG_LIMITS.items()}
+
+
+def check_contract_args(ctx: Context):
+    """A contract signature with more arguments, or more positional ones, than the bar allows (Ruff's PLR0913 and
+    PLR0917, limits from pyproject.toml else build-setup's 5 and 4). The interface task can't freeze it."""
+    limits = _arg_limits(ctx.repo)
+    for sym in model.all_symbols(ctx.repo):
+        for fn in _defs(_signature_code(sym)):
+            n, pos = _arg_counts(fn)
+            over = [f"{n} arguments (max-args {limits['max-args']})"] if n > limits["max-args"] else []
+            if pos > limits["max-positional-args"]:
+                over.append(f"{pos} positional (max-positional-args {limits['max-positional-args']})")
+            if over:
+                yield Problem(sym.doc.rel, sym.start + 1, "contract-args",
+                              f"{sym.id}: `{fn.name}` takes {' and '.join(over)}, past the bar's limit: group "
+                              "arguments into a type or make them keyword-only")
+
+
+def _reachable(deps: dict[str, list[str]], start: str) -> set[str]:
+    seen, todo = set(), list(deps.get(start, []))
+    while todo:
+        c = todo.pop()
+        if c not in seen:
+            seen.add(c)
+            todo += deps.get(c, [])
+    return seen
+
+
+def check_contract_depends(ctx: Context):
+    """A contract symbol whose signature or fields name another component's (or package's) type when its own
+    doesn't depend on that one, directly or not, in the architecture's Components or Packages table. The bar's
+    import layers come from that table, so the interface task couldn't import the type."""
+    deps: dict[str, list[str]] = {}
+    for doc in ctx.repo.docs("architecture", "package-architecture"):
+        for c in model.components(doc):
+            deps.setdefault(c.id, c.depends_on)
+    if not deps:
+        return
+    syms = model.all_symbols(ctx.repo)
+    types = model.contract_types(ctx.repo)
+    own_names = {(s.id.split(".")[0], s.name) for s in syms if s.is_type}
+    for sym in syms:
+        owner = sym.id.split(".")[0]
+        if owner not in deps:
+            continue
+        named = set()
+        for name in NAME.findall(_signature_code(sym)):
+            if (owner, name.rsplit(".", 1)[-1]) in own_names and "." not in name:
+                continue
+            ty = model.resolve_type(types, name)
+            other = ty.id.split(".")[0] if ty else owner
+            if other != owner and other in deps and other not in _reachable(deps, owner):
+                named.add(ty.id)
+        for tid in sorted(named):
+            yield Problem(sym.doc.rel, sym.start + 1, "contract-depends",
+                          f"{sym.id} names {tid}, but {owner} doesn't depend on {tid.split('.')[0]}: move the "
+                          "type down, or add the dependency to the components table")
 
 
 BARE_TASK = re.compile(r"(?<![\w-])T\d{2,}\b")
@@ -1911,8 +2075,10 @@ CHECKS = [
     check_dup_id, check_missing_ref, check_retired_ref,
     check_budget, check_approved_edit, check_prebuild_left,
     check_task_fields, check_task_size, check_task_acceptance, check_task_title, check_task_step,
-    check_depends, check_task_order, check_milestone_size, check_writes, check_parallel_step, check_spine_claim, check_edges, check_deprecated, check_verify_smoke,
-    check_step_io_types, check_packet_type_closure, check_type_cases, check_task_ref, check_read_unwritten,
+    check_depends, check_task_order, check_milestone_size, check_writes, check_parallel_step, check_spine_claim, check_edges,
+    check_writes_unit, check_call_fake, check_deprecated, check_verify_smoke,
+    check_step_io_types, check_packet_type_closure, check_type_cases, check_contract_args, check_contract_depends,
+    check_task_ref, check_read_unwritten,
     check_todo_mismatch, check_finding_disposition, check_foreign_plan,
     check_ref_file, check_ref_hash, check_ref_large, check_ref_prefix, check_roadmap_skill, check_roadmap_stage,
     check_spec_stage, check_milestone_lines, check_milestone_order, check_milestone_lopsided, check_exit_cases_in_scope,

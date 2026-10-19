@@ -1,22 +1,27 @@
 #!/usr/bin/env python3
-"""Build-eval dry run, no model calls: check the minilab fixture, replay a good build of it from solution/
-for every arm, grade each replay, then replay five bad builds and check the grader catches each one.
+"""Build-eval dry run, no model calls: check the minilab fixture against build-setup's real bar, replay a good
+build of it from solution/ for every arm through the real `dt`, grade each replay, then replay five bad builds and
+check each defect is caught.
 
-A replay does what the arm's orchestrator would: per round, one builder job per task half (tester,
-implementer, solo), each on its own `worktree-*` branch for parallel arms (merged in plan order by the
-"merge step") or straight on the main checkout for serial arms; every job commits as `M1-Tnn <role>: …` and
-runs the fixture's real `scripts/check.sh` (collect or gate), which writes `.dt/gates/<task>.json`; after
-each round the orchestrator ticks the finished tasks; checkpoints split the rounds into segments, one
-driver turn each. The planted interface flaw is handled the designed way: before the drawdown task's tester
-the orchestrator replans (`dt: replan`) and a new interface task re-freezes risk.Drawdown with the field.
+A replay does what the arm's driver and agents would (build-phase.md §5–§7). For a build-skill arm:
+`dt build start M1`, then rounds of `dt ready --reserve --cap N`; for each builder row a git worktree under
+.claude/worktrees/ (the Agent tool's), `dt claim` in it, the half's files from solution/ written there and put
+through `scripts/check.sh fast` (the post-edit hook), the claim marked finished (`dt build mark-finished`, the
+SubagentStop hook); then `dt land` for each, in reservation order. Review rows get an empty findings file through
+`dt build submit-review` and `dt finding --from`. The planted interface flaw goes the designed way: the drawdown
+thicken's first half runs `dt escalate CONTRACT-CHANGE --type risk.Drawdown`, the rest drains, then
+architecture-design Revise of the contract section and a build-planning Replan adding a re-freeze interface task
+(both committed on build/M1), `dt build resolve` and `dt build go`. A0 does the same work in one checkout, in plan
+order, with `dt context`, `scripts/check.sh collect|gate`, `dt tick` and a commit with a `Dt-Landed:` trailer.
 
-fake_claude.py (FAKE_MODE=build) calls `Replayer.run_segment` once per agent turn, so build_driver.py's loop
-runs for free.
+fake_claude.py (FAKE_MODE=build) drives a `Replay` one driver turn at a time, so build_driver.py's loop runs for
+free.
 
 Usage:
   dryrun_build.py [out-dir]          fixture checks, every arm's good replay, the bad replays
   dryrun_build.py --fixture-only     only the fixture checks
   dryrun_build.py --arm A3 [out]     one good replay (graded)
+  dryrun_build.py --bad NAME [out]   one bad replay (graded)
 """
 from __future__ import annotations
 
@@ -30,24 +35,36 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
 
 HERE = pathlib.Path(__file__).resolve().parent
-sys.path.insert(0, str(HERE))
-import grade_build  # noqa: E402
-
 FIX = HERE / "fixtures" / "build" / "minilab"
+sys.path.insert(0, str(HERE))
+sys.path.insert(0, str(FIX / "scripts"))
+import grade_build  # noqa: E402
+import make_live  # noqa: E402
+
 SOL = FIX / "solution"
 REPLAY = json.loads((FIX / "replay.json").read_text())
+PLANTED = json.loads((FIX / "planted.json").read_text())
 SCN = json.loads((HERE / "scenarios.json").read_text())
-START = 1792227600  # 2026-10-17 09:00 UTC: the replay's clock
-JOB_SECONDS = 120
+DT = make_live.PLUGIN / "scripts" / "dt.py"
+FLAW = PLANTED["interface_flaw"]
+# bad replay → the grader check that must fail on it
 BADS = {
     "merge_conflict": "merge_conflicts",
-    "tester_edits_oracle": "protected_edits_landed",
+    "tester_edits_oracle": "protected_edit_attempts",
     "implementer_edits_types": "writes_respected",
     "branch_touches_tasks": "builders_never_edit_tasks",
     "importerror_red": "red_import_errors",
 }
+BAD_STEP = {"merge_conflict": "PL-02.rolling_vol", "tester_edits_oracle": "PL-02.rolling_vol",
+            "implementer_edits_types": "PL-02.rolling_vol", "branch_touches_tasks": "PL-02.log_returns",
+            "importerror_red": "PL-02.log_returns"}
+
+
+class ReplayError(RuntimeError):
+    pass
 
 
 # ---- file contents --------------------------------------------------------------------------------------
@@ -57,33 +74,38 @@ def sol(rel: str) -> str:
 
 
 def stub_module(src: str, task: str) -> str:
-    """The interface task's version of a step or entry module: signatures and docstrings kept, every
-    top-level function body replaced by `raise NotImplementedError("<task>")` (CR-02's carve-out)."""
+    """The interface task's version of a step or entry module: signatures and docstrings kept, every top-level
+    function body replaced by `raise NotImplementedError("<task>")` (CR-02's carve-out). Imports the bodies used
+    are dropped by `check.sh fast` (ruff --fix), as the post-edit hook would."""
     tree = ast.parse(src)
     for node in tree.body:
         if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
             doc = ast.get_docstring(node)
             raise_ = ast.parse(f"raise NotImplementedError({task!r})").body[0]
             node.body = ([ast.Expr(ast.Constant(doc))] if doc else []) + [raise_]
-    return ast.unparse(tree) + "\n"
+    head = ast.get_docstring(tree)
+    return ast.unparse(tree) + "\n" if head else ast.unparse(tree) + "\n"
 
 
 def interface_version(rel: str, text: str) -> str:
     """Before the contract change: types without the planted field, samples without it."""
-    flaw = json.loads((FIX / "planted.json").read_text())["interface_flaw"]["field"]
     if rel.endswith("types.py"):
-        return "".join(l for l in text.splitlines(True) if "# contract-change" not in l)
-    if rel.endswith("sample.json") and flaw in text:
+        return "".join(line for line in text.splitlines(True) if "# contract-change" not in line)
+    if rel.endswith("sample.json") and FLAW["field"] in text:
         data = json.loads(text)
-        strip = lambda d: {k: v for k, v in d.items() if k != flaw}
+
+        def strip(d):
+            return {k: v for k, v in d.items() if k != FLAW["field"]}
         data = strip(data) if "rows" not in data else dict(data, rows=[strip(r) for r in data["rows"]])
         return json.dumps(data, indent=1) + "\n"
     return text
 
 
 def variant(spec: str) -> tuple[str, str]:
-    """`path@spine` / `path@interface` / `path` → (path, content)."""
+    """`path@spine` / `path@interface` / `path@stub:<task>` / `path` → (path, content)."""
     rel, _, how = spec.partition("@")
+    if how.startswith("stub:"):
+        return rel, stub_module(sol(rel), how.split(":", 1)[1])
     if how == "spine":
         return rel, (SOL / "spine" / rel).read_text()
     if how == "interface":
@@ -96,61 +118,104 @@ def solution_files(prefix: str) -> list[str]:
     return sorted(str(p.relative_to(SOL)) for p in base.rglob("*") if p.is_file() and "__pycache__" not in p.parts)
 
 
-# ---- jobs -----------------------------------------------------------------------------------------------
-
-class Job:
-    def __init__(self, task: str, role: str, title: str, files: dict[str, str | None], kind: str = ""):
-        self.task, self.role, self.title, self.files, self.kind = task, role, title, files, kind
-
-    @property
-    def check_mode(self) -> str:
-        return "collect" if self.role == "tester" else "gate"
-
-    def __repr__(self):
-        return f"{self.task}:{self.role}"
+def intent_of_golden(rel: str) -> str:
+    """tests/unit/risk/test_vol_golden.py (a solo thicken's golden tests) → tests/intent/risk/test_vol.py."""
+    return rel.replace("tests/unit/", "tests/intent/", 1).removesuffix("_golden.py") + ".py"
 
 
-class Replayer:
-    def __init__(self, proj: pathlib.Path, arm_id: str, bad: str | None = None, quiet: bool = True):
-        self.proj, self.arm_id, self.bad, self.quiet = proj, arm_id, bad, quiet
+# ---- the replay -----------------------------------------------------------------------------------------
+
+class Replay:
+    """A good (or one-defect) build of minilab in <run>/project, through the real dt."""
+
+    def __init__(self, run: pathlib.Path, arm_id: str, bad: str | None = None, dt: pathlib.Path = DT):
+        self.run, self.arm_id, self.bad, self.dt_py = run, arm_id, bad, dt
+        self.proj = run / "project"
         self.arm = SCN["arms"][arm_id]
-        self.variant = "plan-" + self.arm["plan"]
-        self.state_path = proj / ".git" / "replay_state.json"
-        # The schedule comes from the plan as it was at turn 0: a replan mid-build must not reshuffle it.
-        root = self.git("rev-list", "--max-parents=0", "HEAD").stdout.split()[0]
-        self.plan = grade_build.parse_plan(self.git("show", f"{root}:tasks/plan.md").stdout)
-        self.by = grade_build.plan_by(self.plan)
-        self.cc = REPLAY["contract_change"]
-        # The task that needs the missing field: the split (thicken) task of the flawed step, not its spine.
-        self.flaw_task = next((t["id"] for t in self.plan["tasks"] if t["step"] == self.cc["before_step"]
-                               and t["mode"] == "split"), None)
-        self.cc_id = "M1-T%02d" % (max(int(t["id"].split("T")[1]) for t in self.plan["tasks"]) + 1)
-        self.log: list[str] = []
+        self.cap = 16 if bad == "merge_conflict" else self.arm.get("cap", 6)
+        self.problems: list[str] = []          # anything a good replay must not see
+        self.events: list[str] = []            # what happened, for the fake CLI's stream
+        self.n = 0
+        self.stopped = False                   # a bad replay stops once its defect is handled
+        self.state_path = self.proj / ".git" / "replay_state.json"
 
-    # -- state (fake_claude runs one segment per process) --
+    # -- processes --
+
+    def sh(self, *cmd, cwd=None, check=True, input=None) -> subprocess.CompletedProcess:
+        env = dict(os.environ, NO_COLOR="1", PYTHONDONTWRITEBYTECODE="1")
+        env.pop("VIRTUAL_ENV", None)
+        r = subprocess.run(cmd, cwd=cwd or self.proj, capture_output=True, text=True, input=input, env=env)
+        if check and r.returncode:
+            raise ReplayError(f"{' '.join(map(str, cmd))} (exit {r.returncode}):\n{(r.stdout + r.stderr)[-2000:]}")
+        return r
+
+    def git(self, *a, cwd=None, check=True):
+        return self.sh("git", *a, cwd=cwd, check=check)
+
+    def dt(self, *a, cwd=None, check=True, input=None):
+        root = cwd or self.proj
+        return self.sh(sys.executable, str(self.dt_py), "--root", str(root), *a, cwd=root, check=check, input=input)
+
+    def dtj(self, *a, cwd=None, check=True):
+        r = self.dt(*a, cwd=cwd, check=check)
+        try:
+            return json.loads(r.stdout)
+        except ValueError as e:
+            raise ReplayError(f"dt {' '.join(a)}: not JSON: {r.stdout[-500:]} {r.stderr[-500:]}") from e
+
+    # -- state, for the fake CLI (one process per driver turn) --
 
     def state(self) -> dict:
         try:
             return json.loads(self.state_path.read_text())
         except (OSError, ValueError):
-            return {"segment": 0, "clock": START, "events": []}
+            return {"phase": "build", "turn": 0}
 
-    def save(self, st: dict):
+    def save(self, st: dict) -> None:
         self.state_path.write_text(json.dumps(st))
 
-    # -- what each task half writes --
+    # -- the plan --
 
-    def stub_owner(self, rel: str) -> str:
-        for t in self.plan["tasks"]:
+    def plan(self) -> dict:
+        return grade_build.parse_plan((self.proj / "tasks" / "plan.md").read_text())
+
+    def task(self, tid: str) -> dict:
+        return grade_build.plan_by(self.plan())[tid]
+
+    def flaw_task(self) -> str | None:
+        """The drawdown thicken: the first task that needs the planted field."""
+        return next((t["id"] for t in self.plan()["tasks"] if t["step"] == "PL-03.max_drawdown"
+                     and t["kind"] == "thicken"), None)
+
+    def cc_task(self) -> str | None:
+        """The re-freeze task, once the Replan added it."""
+        return next((t["id"] for t in self.plan()["tasks"] if t["title"] == REPLAY["contract_change"]["task_title"]),
+                    None)
+
+    def done(self) -> set[str]:
+        return set(re.findall(r"^- \[x\] (M\d+-T\d+)", (self.proj / "tasks" / "todo.md").read_text(), re.M))
+
+    # -- what each half writes --
+
+    def stub_owner(self, rel: str, plan: dict) -> str:
+        for t in plan["tasks"]:
             if t["kind"] != "interface" and rel in t["writes"]:
                 return t["id"]
-        return self.plan["tasks"][0]["id"]
+        return plan["tasks"][0]["id"]
 
-    def files_of(self, t: dict, role: str) -> dict[str, str | None]:
-        if self.variant == "plan-spine":
-            m = REPLAY["plan-spine"][t["id"]]
-            specs = m.get("tester", []) if role == "tester" else m["files"] + (m.get("tester", []) if role == "solo" and t["mode"] == "split" else [])
-            return dict(variant(s) for s in specs)
+    def files_of(self, tid: str, role: str) -> dict:
+        plan = self.plan()
+        t = grade_build.plan_by(plan)[tid]
+        if tid == self.cc_task():                       # the re-freeze: the solution's types and samples
+            return {rel: sol(rel) for rel in REPLAY["contract_change"]["files"]}
+        if self.arm["plan"] == "spine":
+            m = REPLAY["plan-spine"][tid]
+            specs = m.get("tester", []) if role == "tester" else m["files"] + (m.get("tester", []) if role == "solo" else [])
+            out = dict(variant(s) for s in specs)
+            if role != "tester":                        # the unit tests the converted Writes name
+                out.update({w: sol(w) for w in t["writes"] if w not in out and w.startswith("tests/unit/")
+                            and (SOL / w).exists()})
+            return out
         out = {}
         for w in t["writes"]:
             if w.endswith("/**"):
@@ -158,308 +223,292 @@ class Replayer:
                     out[rel] = interface_version(rel, sol(rel))
                 continue
             intent = w.startswith("tests/intent/")
-            if role == "tester" and not intent or role == "implementer" and intent:
+            if (role == "tester" and not intent) or (role == "implementer" and intent):
                 continue
             if t["kind"] == "interface":
                 text = sol(w)
-                out[w] = interface_version(w, text) if w.endswith(("types.py", "__init__.py")) else stub_module(text, self.stub_owner(w))
+                out[w] = (interface_version(w, text) if w.endswith(("types.py", "__init__.py"))
+                          else stub_module(text, self.stub_owner(w, plan)))
+            elif w.endswith("_golden.py"):
+                out[w] = sol(intent_of_golden(w))
             elif t["kind"] == "spine" and (SOL / "spine" / w).exists():
                 out[w] = (SOL / "spine" / w).read_text()
-            else:
+            elif (SOL / w).exists():
                 out[w] = sol(w)
-        if role == "solo" and t["mode"] == "split":
-            # One builder, Mode overridden: tests/intent/ is protected from it (CR-06), so the golden-case tests
-            # go into the task's own unit-test file.
-            unit = next((w for w in t["writes"] if w.startswith("tests/unit/")), None)
-            for w in [w for w in list(out) if w.startswith("tests/intent/")]:
-                text = out.pop(w)
-                if unit:
-                    out[unit] = out.get(unit, sol(unit)) + "\n\n" + text
+            else:
+                self.problems.append(f"{tid} {role}: no solution file for {w}")
         return out
 
-    def jobs_of(self, tid: str, roles: list[str]) -> list[Job]:
-        t = self.by[tid]
-        return [self.mutate(Job(tid, r, t["title"], self.files_of(t, r), t["kind"])) for r in roles]
-
-    def roles(self, t: dict) -> list[str]:
-        if t["mode"] == "split" and self.arm.get("tdd") == "split":
-            return ["tester", "implementer"]
-        return ["solo"]
-
-    # -- the five bad replays: one defect each, on top of the good A3 replay --
-
-    def mutate(self, job: Job) -> Job:
-        """A file value may be a function of the checkout it lands in, applied when the job runs."""
-        b, f = self.bad, job.files
-        step = self.by.get(job.task, {}).get("step", "")
-        if b == "merge_conflict" and job.role == "solo" and step in ("PL-02.log_returns", "PL-02.rolling_vol"):
-            init, tag = "packages/risk/src/risk/__init__.py", job.task
-            f[init] = lambda root: (root / init).read_text() + f"# touched by {tag}\n"
-        if b == "tester_edits_oracle" and job.role == "tester" and step == "PL-02.rolling_vol":
+    def defect(self, tid: str, role: str, files: dict) -> bool:
+        """Apply this bad replay's defect to the half, if it is the one; True when it was applied."""
+        b = self.bad
+        if not b or self.task(tid)["step"] != BAD_STEP[b]:
+            return False
+        kind = self.task(tid)["kind"]
+        if b == "merge_conflict" and kind == "spine":
+            rel = "packages/risk/src/risk/returns.py"     # the plan gave this task returns.py too (setup)
+            files[rel] = (SOL / "spine" / rel).read_text().replace('"""', '"""Rolling vol reads these. ', 1)
+            return True
+        if b == "tester_edits_oracle" and role == "tester":
             rel = "tests/fixtures/risk/TC-05/expected.json"
-            exp = json.loads((FIX / "project" / rel).read_text())
+            exp = json.loads((self.proj / rel).read_text())
             exp["values"]["X"][-1] = 0.03
-            f[rel] = json.dumps(exp, indent=1) + "\n"
-        if b == "implementer_edits_types" and job.role == "implementer" and step == "PL-02.rolling_vol":
+            files[rel] = json.dumps(exp, indent=1) + "\n"
+            return True
+        if b == "implementer_edits_types" and role == "implementer":
             rel = "packages/risk/src/risk/types.py"
-            vals = "    values: Mapping[str, tuple[float | None, ...]]  # None until `window` earlier returns exist\n"
-            f[rel] = lambda root: (root / rel).read_text().replace(vals, vals + "    min_periods: int = 0\n", 1)
-        if b == "branch_touches_tasks" and job.role == "solo" and step == "PL-02.log_returns":
-            tag = job.task
-            f["tasks/todo.md"] = lambda root: (root / "tasks" / "todo.md").read_text().replace(f"- [ ] {tag} ", f"- [x] {tag} ", 1)
-        if b == "importerror_red" and job.role == "tester" and step == "PL-02.log_returns":
-            rel = next(k for k in f if k.startswith("tests/intent/"))
-            f[rel] = f[rel].replace("from risk.returns import log_returns", "from risk.returns import log_return")
-        return job
+            text = (self.proj / rel).read_text()
+            files[rel] = text.replace("    window: int\n", "    window: int\n    min_periods: int = 0\n", 1)
+            return True
+        if b == "branch_touches_tasks" and role == "solo" and kind == "spine":
+            files["tasks/todo.md"] = (self.proj / "tasks" / "todo.md").read_text().replace(
+                f"- [ ] {tid} ", f"- [x] {tid} ", 1)
+            return True
+        if b == "importerror_red" and role == "tester":
+            rel = next(k for k in files if k.startswith("tests/intent/"))
+            files[rel] = files[rel].replace("from risk.returns import log_returns", "from risk.returns import log_return")
+            return True
+        return False
 
-    # -- the schedule: rounds of jobs, by arm --
-
-    def rounds(self) -> list[list]:
-        tasks = self.plan["tasks"]
-        out: list[list] = []
-        cc = lambda: out.append(["contract-change"])
-        if self.arm["dispatch"] == "serial":
-            for t in tasks:
-                if t["id"] == self.flaw_task:
-                    cc()
-                for r in self.roles(t):
-                    out.append(self.jobs_of(t["id"], [r]))
-            return out
-        groups = grade_build.dispatch_rounds(self.plan, self.arm)
-        interface_first = any(t["kind"] == "interface" and t["claims_exclusive"] for t in tasks)
-        early_testers = interface_first and self.arm.get("tdd") == "split"
-        done_testers: set[str] = set()
-        for gi, group in enumerate(groups):
-            flaw_here = self.flaw_task in group
-            if early_testers and gi == 1:
-                # Wave 1: every spine, and every split task's tester against the frozen interface, except the
-                # flaw task's: its tester finds the missing field and escalates (the contract change, below).
-                testers = [t["id"] for t in tasks if t["mode"] == "split" and t["id"] != self.flaw_task]
-                out.append([j for tid in group for j in self.jobs_of(tid, self.roles(self.by[tid]) if self.by[tid]["mode"] != "split" else [])]
-                           + [j for tid in testers for j in self.jobs_of(tid, ["tester"])])
-                done_testers |= set(testers)
-                continue
-            if flaw_here or (early_testers and self.flaw_task and gi == 2):
-                cc()
-            first, second = [], []
-            for tid in group:
-                t = self.by[tid]
-                roles = self.roles(t)
-                if roles == ["tester", "implementer"]:
-                    if tid in done_testers:
-                        (second if tid == self.flaw_task else first).extend(self.jobs_of(tid, ["implementer"]))
-                    elif early_testers:
-                        first.extend(self.jobs_of(tid, ["tester"]))
-                        second.extend(self.jobs_of(tid, ["implementer"]))
-                    else:
-                        first.extend(self.jobs_of(tid, ["tester"]))
-                        second.extend(self.jobs_of(tid, ["implementer"]))
-                else:
-                    first.extend(self.jobs_of(tid, roles))
-            out += [r for r in (first, second) if r]
-        return out
-
-    # -- execution --
-
-    def git(self, *a, cwd=None, env=None, check=True):
-        r = subprocess.run(["git", *a], cwd=cwd or self.proj, capture_output=True, text=True, env=env)
-        if check and r.returncode:
-            raise RuntimeError(f"git {' '.join(a)}: {r.stderr.strip()}")
-        return r
-
-    def commit(self, msg: str, when: int, cwd=None, paths=None):
-        env = dict(os.environ, GIT_AUTHOR_DATE=f"@{when} +0000", GIT_COMMITTER_DATE=f"@{when} +0000")
-        self.git("add", "-A", *(paths or []), cwd=cwd)
-        self.git("-c", "user.email=e@e", "-c", "user.name=eval", "commit", "-q", "--allow-empty", "--no-verify",
-                 "-m", msg, cwd=cwd, env=env)
-
-    def write(self, root: pathlib.Path, files: dict[str, str | None]):
+    def write(self, root: pathlib.Path, files: dict) -> None:
         for rel, text in files.items():
             p = root / rel
-            if callable(text):
-                text = text(root)
-            if text is None:
-                p.unlink(missing_ok=True)
-                continue
             p.parent.mkdir(parents=True, exist_ok=True)
             p.write_text(text)
+        py = [rel for rel in files if rel.endswith(".py")]
+        if py:
+            self.sh("bash", "scripts/check.sh", "fast", *py, cwd=root, check=False)   # the post-edit hook
 
-    def check(self, job: Job, cwd: pathlib.Path) -> bool:
-        r = subprocess.run(["bash", "scripts/check.sh", job.check_mode, "--task", job.task], cwd=cwd,
-                           capture_output=True, text=True, env=dict(os.environ, PYTHONDONTWRITEBYTECODE="1"))
-        if r.returncode and not self.bad:
-            self.log.append(f"{job} {job.check_mode} FAILED:\n{r.stderr[-1500:]}")
-        return r.returncode == 0
+    # -- one builder half in its worktree --
 
-    def run_job_here(self, job: Job, when: int):
-        self.git("update-ref", "refs/checks/base", "HEAD")   # the orchestrator, before each builder
-        self.write(self.proj, job.files)
-        self.commit(f"{job.task} {job.role}: {job.title}", when)
-        self.check(job, self.proj)
+    def start_half(self, row: dict) -> dict:
+        self.n += 1
+        tid, role = row["id"], row["role"]
+        name = f"agent-{tid.lower()}-{role}-{self.n}"
+        wt = self.proj / ".claude" / "worktrees" / name
+        self.git("worktree", "add", "-q", "-b", f"worktree-{name}", str(wt), "HEAD")
+        r = self.dt("claim", tid, "--role", role, cwd=wt, check=False)
+        if r.returncode:
+            self.problems.append(f"dt claim {tid} {role}: {r.stderr.strip()[-300:]}")
+        return {"id": tid, "role": role, "wt": wt, "claimed": r.returncode == 0}
 
-    def run_round(self, jobs: list, st: dict) -> list[str]:
-        """One round; returns the events (for the fake CLI's stream)."""
-        t0 = st["clock"]
-        if jobs == ["contract-change"]:
-            self.contract_change(t0)
-            st["clock"] = t0 + JOB_SECONDS
-            return [f"contract-change {self.cc_id}"]
-        if self.arm["dispatch"] == "serial":
-            for j in jobs:
-                self.run_job_here(j, t0 + JOB_SECONDS)
-            st["clock"] = t0 + JOB_SECONDS + 10
-            return [f"{j} on main" for j in jobs]
-        base = self.git("rev-parse", "HEAD").stdout.strip()
-        # refs/ are shared by every worktree, so one base serves the whole wave: the commit it dispatches from.
-        self.git("update-ref", "refs/checks/base", base)
-        branches = []
-        for k, j in enumerate(jobs):
-            name = f"{j.task.lower()}-{j.role}-{st['segment']}{k}"
-            wt = self.proj / ".claude" / "worktrees" / name
-            self.git("worktree", "add", "-q", "-b", f"worktree-{name}", str(wt), base)
-            self.write(wt, j.files)
-            self.commit(f"{j.task} {j.role}: {j.title}", t0 + JOB_SECONDS + k, cwd=wt)
-            self.check(j, wt)
-            branches.append((j, f"worktree-{name}", wt))
-        events = []
-        for k, (j, br, wt) in enumerate(branches):   # the merge step, in plan order
-            when = t0 + JOB_SECONDS + 30 + k
-            env = dict(os.environ, GIT_AUTHOR_DATE=f"@{when} +0000", GIT_COMMITTER_DATE=f"@{when} +0000")
-            r = self.git("-c", "user.email=e@e", "-c", "user.name=merge", "merge", "--no-ff", "-q", "-m",
-                         f"merge {j.task}: {br}", br, env=env, check=False)
-            if r.returncode:
-                self.git("merge", "--abort", check=False)
-                events.append(f"{br} conflict")
-                if not self.bad:
-                    self.log.append(f"merge conflict on {br}: {r.stdout[-400:]}")
-            else:
-                events.append(f"{br} merged")
-            self.git("worktree", "remove", "--force", str(wt))
-        st["clock"] = t0 + JOB_SECONDS + 60
-        return events
+    def work_half(self, h: dict) -> None:
+        tid, role, wt = h["id"], h["role"], h["wt"]
+        first_half = role in ("tester", "solo")
+        if tid == self.flaw_task() and first_half and not self.cc_task():
+            self.dt("escalate", "CONTRACT-CHANGE", f"{FLAW['type']} has no {FLAW['field']}; {FLAW['surfaces_at']} needs it",
+                    "--type", FLAW["type"], cwd=wt)
+            h["status"] = f"STOPPED {tid} {role}: see dt escalate"
+        else:
+            files = self.files_of(tid, role)
+            h["defect"] = self.defect(tid, role, files)
+            self.write(wt, files)
+            h["status"] = f"DONE {tid} {role}"
+        agent = "tester" if role == "tester" else "implementer"
+        self.dt("build", "mark-finished", input=json.dumps({"cwd": str(wt), "agent_type": agent}))
 
-    def contract_change(self, when: int):
-        """architecture-design Revise of the planted type, then a new interface task re-freezing it."""
-        cc, tid = self.cc, self.cc_id
+    def land_half(self, h: dict) -> dict:
+        res = self.dtj("land", h["id"], "--role", h["role"], check=False)
+        what = "landed" if res.get("landed") else f"reject {res.get('reject')}" + (f" {res['kind']}" if res.get("kind") else "")
+        self.events.append(f"{h['id']} {h['role']}: {what}")
+        expected = res.get("reject") == "escalated" and res.get("kind") == "CONTRACT-CHANGE"
+        if not res.get("landed") and not expected and not self.bad:
+            detail = pathlib.Path(res["detail_file"]).read_text()[-1500:] if res.get("detail_file") else res
+            self.problems.append(f"{h['id']} {h['role']}: {what}\n{detail}")
+        if h.get("defect"):
+            self.stopped = True
+        return res
+
+    def review(self, row: dict) -> None:
+        rid = row["id"]
+        f = self.run / "reviews" / f"{rid}.md"
+        f.parent.mkdir(parents=True, exist_ok=True)
+        f.write_text("No findings.\n")
+        self.dtj("build", "submit-review", rid, str(f))
+        common = pathlib.Path(self.git("rev-parse", "--path-format=absolute", "--git-common-dir").stdout.strip())
+        self.dtj("finding", "--from", str(common / "dt-build" / "reviews" / f"{rid}.md"),
+                 "--checkpoint", row["checkpoint"], "--pkg", row["pkg"])
+        self.events.append(f"REVIEW {row['checkpoint']} {row['pkg']}: 0 findings, 0 Critical")
+
+    # -- the planted flaw: Revise, Replan, resolve, go --
+
+    def contract_change(self, escalated: str | None) -> None:
+        cc = REPLAY["contract_change"]
         doc = self.proj / cc["contract_doc"]
-        plan, todo = self.proj / "tasks" / "plan.md", self.proj / "tasks" / "todo.md"
-        writes = cc["files"] + [cc["contract_doc"]]
-        block = (f"### {tid}: {cc['task_title']}\n**Package:** risk · **Step:** contract · **Kind:** interface · "
-                 f"**Size:** S · **Mode:** solo\n**Reason:** contract-change: risk.Drawdown misses trough_date (RISK-05, TC-08)\n"
-                 f"**Read:** risk.Drawdown, RISK-05, TC-08\n**Acceptance:**\n- [ ] risk.Drawdown carries trough_date; "
-                 f"its samples and the contract section say so\n**Verify:** `pytest tests/contracts` · `scripts/check.sh gate`\n"
-                 f"**Depends on:** — · **Writes:** {', '.join(writes)}\n\n")
-        text = plan.read_text()
-        anchor = f"### {self.flaw_task}:"
-        plan.write_text(text.replace(anchor, block + anchor, 1))
-        todo.write_text(todo.read_text().rstrip("\n") + f"\n- [ ] {tid} {cc['task_title']} (risk, S, solo)\n")
-        self.commit(f"dt: replan: add {tid} (contract-change before {self.flaw_task})", when)
         doc.write_text(doc.read_text().replace(cc["doc_find"], cc["doc_replace"], 1))
-        files = {rel: sol(rel) for rel in cc["files"]}
-        job = Job(tid, "interface", f"contract-change: {cc['task_title']}", files, "interface")
-        # A re-freeze writes contracts frozen at the base (CR-09), so it runs in the main session, not as an
-        # implementer: commit, then gate with the new freeze as the base.
-        self.write(self.proj, job.files)
-        self.commit(f"{job.task} {job.role}: {job.title}", when + JOB_SECONDS // 2)
-        self.git("update-ref", "refs/checks/base", "HEAD")
-        self.check(job, self.proj)
-        self.tick([tid], when + JOB_SECONDS - 1)
-
-    def tick(self, ids: list[str], when: int):
+        self.commit(f"architecture-design: Revise {FLAW['type']} (contract-change from {escalated or 'the build'})")
+        plan = self.plan()
+        new = "M1-T%02d" % (max(int(t["id"].split("T")[1]) for t in plan["tasks"]) + 1)
+        flaw = self.flaw_task()
+        writes = ["packages/risk/src/risk/types.py", "tests/contracts/risk.Drawdown/**", "tests/contracts/risk.Report/**"]
+        block = (f"### {new}: {cc['task_title']}\n**Package:** risk · **Step:** contract · **Kind:** interface · "
+                 f"**Size:** S · **Mode:** solo\n**Read:** {FLAW['type']}, RISK-05, TC-08\n**Acceptance:**\n"
+                 f"- [ ] `{FLAW['type']}` carries `{FLAW['field']}`; its samples and the Report sample show it\n"
+                 f"**Verify:** `pytest tests/contracts` · `scripts/check.sh gate`\n"
+                 f"**Depends on:** — · **Writes:** {', '.join(writes)}\n\n")
+        path = self.proj / "tasks" / "plan.md"
+        text = path.read_text().replace(f"### {flaw}:", block + f"### {flaw}:", 1)
+        done = self.done()
+        for t in plan["tasks"]:
+            if t["id"] in done or not (t["id"] == flaw or FLAW["type"] in t["read"]):
+                continue
+            head = text.index(f"### {t['id']}:")
+            m = re.compile(r"\*\*Depends on:\*\* ([^·\n]*)").search(text, head)
+            deps = m.group(1).strip()
+            text = text[:m.start(1)] + (new if deps in ("—", "-", "") else f"{deps}, {new}") + " " + text[m.end(1):]
+        path.write_text(text)
         todo = self.proj / "tasks" / "todo.md"
-        text = todo.read_text()
-        for i in ids:
-            text = re.sub(rf"^- \[ \] {i}\b", f"- [x] {i}", text, flags=re.M)
-        todo.write_text(text)
-        self.commit(f"dt: tick {', '.join(ids)}", when, paths=["tasks/todo.md"])
+        todo.write_text(todo.read_text().rstrip("\n") + f"\n- [ ] {new} {cc['task_title']} (risk, S, solo)\n")
+        self.commit(f"M1: Replan adds {new}, re-freezing {FLAW['type']} before {flaw}")
+        if escalated:
+            self.dtj("build", "resolve", escalated, "--note", "Yes: change the contract.")
+            self.dtj("build", "go", "--note", "Go.")
+        self.events.append(f"contract-change: Revise {FLAW['type']}, Replan adds {new}")
 
-    def done(self) -> set[str]:
-        return set(re.findall(r"^- \[x\] (M\d+-T\d+)", (self.proj / "tasks" / "todo.md").read_text(), re.M))
+    def commit(self, msg: str, root=None) -> None:
+        self.git("add", "-A", cwd=root)
+        self.git("-c", "user.email=d@d", "-c", "user.name=driver", "commit", "-q", "--no-verify", "-m", msg, cwd=root)
 
-    def segments(self) -> list[list]:
-        """Rounds grouped into checkpoint segments: a segment ends once every task up to the next checkpoint
-        is finished (its last job ran)."""
-        rounds = self.rounds()
-        order = [t["id"] for t in self.plan["tasks"]]
-        stops = [order.index(c["after"]) for c in self.plan["checkpoints"] if c["after"] in order]
-        finished, segs, cur, si = set(), [], [], 0
-        last_job = {}
-        for i, r in enumerate(rounds):
-            for j in r:
-                if isinstance(j, Job):
-                    last_job[j.task] = i
-        for i, r in enumerate(rounds):
-            cur.append(r)
-            finished |= {t for t, k in last_job.items() if k == i}
-            while si < len(stops) and set(order[:stops[si] + 1]) <= finished:
-                si += 1
-                if cur:
-                    segs.append(cur)
-                    cur = []
-        return segs + ([cur] if cur else [])
+    # -- the build-skill loop --
 
-    def run_segment(self, n: int | None = None) -> dict:
+    def loop(self) -> str:
+        """Dispatch and land until a stop: `contract-change` (the escalation drained, the user's yes needed),
+        `exit` (every task landed and the exit review recorded), `stuck` or `defect` (a bad replay's)."""
+        while not self.stopped:
+            ready = self.dtj("ready", "--reserve", "--cap", str(self.cap), "--json")
+            rows = ready["rows"]
+            if not rows:
+                if ready["all_landed"]:
+                    return "exit"
+                esc = [h for h in ready["held"] if h["why"].startswith("escalation:") or "CONTRACT-CHANGE" in h["why"]]
+                if esc:
+                    return "contract-change"
+                self.problems.append(f"nothing ready, not all landed: holds {ready['holds']}, held {ready['held'][:6]}")
+                return "stuck"
+            for r in [r for r in rows if r["role"] == "reviewer"]:
+                self.review(r)
+            halves = [self.start_half(r) for r in rows if r["role"] != "reviewer"]
+            for h in halves:
+                if h["claimed"]:
+                    self.work_half(h)
+            for h in halves:
+                self.land_half(h)
+                if self.stopped:
+                    break
+        return "defect"
+
+    def escalated_task(self) -> str | None:
+        common = pathlib.Path(self.git("rev-parse", "--path-format=absolute", "--git-common-dir").stdout.strip())
+        for f in sorted((common / "dt-build" / "escalations").glob("*.json")):
+            e = json.loads(f.read_text())
+            if e.get("kind") == "CONTRACT-CHANGE":
+                return e["task"]
+        return None
+
+    # -- A0: one session, plan order, no subagents --
+
+    def serial_session(self) -> str:
+        self.dt("build", "start", "M1")
+        while True:
+            done = self.done()
+            todo = [t for t in self.plan()["tasks"] if t["id"] not in done]
+            if not todo:
+                return "exit"
+            t = todo[0]
+            if t["id"] == self.flaw_task() and not self.cc_task():
+                self.events.append(f"{t['id']}: {FLAW['type']} has no {FLAW['field']}; asking")
+                self.contract_change(None)
+                continue
+            self.serial_task(t)
+
+    def serial_task(self, t: dict) -> None:
+        tid, pkg = t["id"], t["package"]
+        self.dt("context", tid)
+        base = lambda: self.git("update-ref", "refs/worktree/checks-base", "HEAD")  # noqa: E731
+        base()
+        roles = ["tester", "implementer"] if t["mode"] == "split" else ["solo"]
+        for role in roles:
+            files = self.files_of(tid, role)
+            self.write(self.proj, files)
+            claim = self.proj / ".claude" / ".task_writes"
+            if tid == self.cc_task():                   # a re-freeze names the frozen folders it writes
+                claim.write_text("".join(f"{w}\n" for w in t["writes"]))
+            mode = ["collect"] if role == "tester" else ["gate", "--pkg", pkg]
+            r = self.sh("bash", "scripts/check.sh", *mode, check=False)
+            claim.unlink(missing_ok=True)
+            if r.returncode:
+                self.problems.append(f"{tid} {role}: check.sh {' '.join(mode)} failed:\n{r.stderr[-1500:]}")
+            if role != "tester":
+                self.dt("tick", tid)
+            msg = f"{tid}: {'tests' if role == 'tester' else t['title']}\n\nDt-Landed: {tid} {role}\n"
+            self.commit(msg)
+            base()
+            self.events.append(f"{tid} {role}: committed")
+
+    # -- driving --
+
+    def setup(self) -> None:
+        """A live minilab with the arm's plan (and a bad replay's plan change), as build_driver.py makes it."""
+        if self.proj.exists():
+            shutil.rmtree(self.proj)
+        make_live.make(self.proj, self.arm["plan"], self.dt_py.parents[1])
+        if self.bad == "merge_conflict":           # a lint gap: two spines both claim returns.py
+            path = self.proj / "tasks" / "plan.md"
+            text = path.read_text()
+            m = re.search(r"(### M1-T\d+: rolling_vol spine.*?\*\*Writes:\*\* )", text, re.S)
+            path.write_text(text[:m.end()] + "packages/risk/src/risk/returns.py, " + text[m.end():])
+            self.commit("M1: (bad replay) the rolling_vol spine also writes returns.py")
+
+    def turn(self) -> str:
+        """One driver turn: until the next stop, picking up after the previous one. Returns the stop."""
         st = self.state()
-        segs = self.segments()
-        n = st["segment"] if n is None else n
-        if n >= len(segs):
-            return {"segment": n, "segments": len(segs), "events": [], "done": True}
-        events = []
-        for r in segs[n]:
-            st["segment"] = n
-            events += self.run_round(r, st)
-            finished = [j.task for j in r if isinstance(j, Job) and j.role in ("implementer", "solo")]
-            if finished:
-                self.tick(sorted(set(finished)), st["clock"])
-                st["clock"] += 10
-        st["segment"] = n + 1
+        st["turn"] += 1
+        if self.arm["dispatch"] == "session":
+            stop = self.serial_session()
+        else:
+            if st["phase"] == "build" and st["turn"] == 1:
+                self.dt("build", "start", "M1")
+            if st["phase"] == "contract-change":
+                self.contract_change(self.escalated_task())
+            stop = self.loop()
+        st["phase"] = stop
         self.save(st)
-        return {"segment": n, "segments": len(segs), "events": events, "done": n + 1 >= len(segs)}
+        return stop
 
+    def replay(self) -> str:
+        """Setup and every turn, as the persona answers: yes to the contract change, then to the exit."""
+        t0 = time.time()
+        self.setup()
+        stops = []
+        while True:
+            stop = self.turn()
+            stops.append(stop)
+            if stop != "contract-change" or len(stops) > 3:
+                break
+        if stop == "exit" and self.arm["dispatch"] != "session":
+            self.check_exit()
+        turns = [{"turn": i + 1, "user": "Build M1. Go." if i == 0 else "Yes: change the contract.",
+                  "assistant": f"(replayed) stop: {s}", "persona": "start" if i == 0 else "contract_change",
+                  "tools": [], "skills": [], "seconds": 0, "usage": {}, "tool_errors": [], "agents": []}
+                 for i, s in enumerate(stops)]
+        (self.run / "turns.json").write_text(json.dumps(turns, indent=1))
+        (self.run / "summary.json").write_text(json.dumps({
+            "arm": self.arm_id, "target": "minilab", "plan": self.arm["plan"], "turns": len(turns), "fake": True,
+            "total_seconds": round(time.time() - t0, 1), "finished": stop == "exit", "stop_reason": stop,
+            "bad": self.bad, "events": self.events[-60:]}, indent=1))
+        return stop
 
-# ---- a replay run folder ---------------------------------------------------------------------------------
-
-def setup_project(proj: pathlib.Path, arm_id: str):
-    """The fixture at "planning done" plus the arm's plan, as a git repo with one commit, `turn 0`."""
-    if proj.exists():
-        shutil.rmtree(proj)
-    shutil.copytree(FIX / "project", proj)
-    shutil.copytree(FIX / ("plan-" + SCN["arms"][arm_id]["plan"]) / "tasks", proj / "tasks")
-    subprocess.run(["git", "init", "-q", "-b", "main"], cwd=proj, check=True)
-    env = dict(os.environ, GIT_AUTHOR_DATE=f"@{START - 60} +0000", GIT_COMMITTER_DATE=f"@{START - 60} +0000")
-    subprocess.run(["git", "add", "-A"], cwd=proj, check=True)
-    subprocess.run(["git", "-c", "user.email=e@e", "-c", "user.name=eval", "commit", "-q", "-m", "turn 0"], cwd=proj, env=env, check=True)
-
-
-def replay(run: pathlib.Path, arm_id: str, bad: str | None = None) -> Replayer:
-    run.mkdir(parents=True, exist_ok=True)
-    proj = run / "project"
-    setup_project(proj, arm_id)
-    rp = Replayer(proj, arm_id, bad)
-    turns, n = [], 0
-    while True:
-        res = rp.run_segment()
-        if res["events"] or not res["done"]:
-            n += 1
-            turns.append({"turn": n, "user": "Build M1." if n == 1 else "Checkpoint approved. Continue.",
-                          "assistant": f"(replayed) segment {res['segment'] + 1}/{res['segments']}: " + "; ".join(res["events"][:30]),
-                          "persona": "start" if n == 1 else "approve", "tools": [], "skills": [], "seconds": 0,
-                          "usage": {}, "tool_errors": [], "agents": []})
-        if res["done"]:
-            break
-    st = rp.state()
-    (run / "turns.json").write_text(json.dumps(turns, indent=1))
-    (run / "summary.json").write_text(json.dumps({"arm": arm_id, "target": "minilab", "turns": len(turns), "fake": True,
-                                                  "total_seconds": st["clock"] - START, "finished": True,
-                                                  "stop_reason": "dry run", "bad": bad}, indent=1))
-    return rp
+    def check_exit(self) -> None:
+        status = self.dtj("build", "status")
+        if status["progress"].split("/")[0] != status["progress"].split("/")[1]:
+            self.problems.append(f"exit with {status['progress']} landed")
 
 
 # ---- fixture checks -------------------------------------------------------------------------------------
 
 def fixture_checks() -> list[str]:
     problems = []
-    for script in ("oracle/make_cases.py", "scripts/gen_plan_interface.py"):
+    for script in ("oracle/make_cases.py", "scripts/gen_plans.py"):
         r = subprocess.run([sys.executable, str(FIX / script), "--check"], capture_output=True, text=True)
         if r.returncode:
             problems.append(f"{script} --check: {r.stdout.strip()[-300:]}")
@@ -485,15 +534,35 @@ def fixture_checks() -> list[str]:
             f.write_text(orig)
             if res and all(r["outcome"] == "pass" for r in res):
                 problems.append(f"{m['id']} survives every visible and holdout case")
-        # The reference suite on the reference solution, and the interface tree's contract tests.
-        tree = t / "full"
-        shutil.copytree(FIX / "project", tree)
-        shutil.copytree(SOL / "packages", tree / "packages")
-        shutil.copytree(SOL / "tests", tree / "tests", dirs_exist_ok=True)
-        res = grade_build.pytest_junit(["tests"], [tree / "packages" / p / "src" for p in ("mdata", "risk")], tree, cwd=tree)
-        bad = [r["name"] for r in res if r["outcome"] != "pass"]
-        if not res or bad:
-            problems.append(f"solution's own suite fails: {bad[:6]}")
+    problems += real_bar_checks()
+    return problems
+
+
+def real_bar_checks() -> list[str]:
+    """build-setup's real bar on a live minilab: solution/ passes `check.sh full --exit` (its own suite included),
+    solution/spine/ over it passes `check.sh full` with the unit and contract tests (the intent and system tests
+    need the thickened steps), and every plan variant lints clean."""
+    problems = []
+    with tempfile.TemporaryDirectory(prefix="minilab-bar-") as tmp:
+        live = pathlib.Path(tmp) / "live"
+        make_live.make(live, "interface")
+        for plan in make_live.PLANS:
+            shutil.copytree(FIX / f"plan-{plan}" / "tasks", live / "tasks", dirs_exist_ok=True)
+            r = subprocess.run([sys.executable, str(DT), "--root", str(live), "lint"], capture_output=True, text=True)
+            errs = [line for line in r.stdout.splitlines() if re.search(r":\d+: \S+ ", line)]
+            if errs:
+                problems.append(f"dt lint plan-{plan}: " + "; ".join(errs[:4]))
+        shutil.copytree(FIX / "plan-interface" / "tasks", live / "tasks", dirs_exist_ok=True)
+        for spine, mode in ((False, ["full", "--exit"]), (True, ["full"])):
+            make_live.render_solution(live, spine=spine)
+            if spine:                                   # a spine passes its unit and contract tests, not the TCs
+                for d in ("tests/intent", "tests/system"):
+                    shutil.rmtree(live / d, ignore_errors=True)
+            r = subprocess.run(["bash", "scripts/check.sh", *mode], cwd=live, capture_output=True, text=True,
+                               env={k: v for k, v in os.environ.items() if k != "VIRTUAL_ENV"})
+            if r.returncode:
+                failed = [line for line in r.stderr.splitlines() if line.startswith("FAILED")]
+                problems.append(f"solution{'/spine' if spine else ''} fails check.sh {' '.join(mode)}: {failed}")
     return problems
 
 
@@ -504,7 +573,46 @@ def grade(run: pathlib.Path) -> dict:
 
 
 def failed(g: dict) -> list[str]:
-    return [r["id"] for r in g["expectations"] if not r["passed"] and r["category"] != "harness"]
+    return [r["id"] for r in g["expectations"] if not r.get("na") and not r["passed"] and r["category"] != "harness"]
+
+
+def good(out: pathlib.Path, arm: str) -> bool:
+    run = out / "minilab" / arm / "replay"
+    rp = Replay(run, arm)
+    try:
+        stop = rp.replay()
+    except ReplayError as e:
+        print(f"{arm} good replay: ERROR {e}")
+        return False
+    g = grade(run)
+    bad = failed(g)
+    hf = g["harness_summary"]["failures"]
+    gf = g["extra"].get("graph", {})
+    print(f"{arm} good replay: stop {stop}; {g['summary']['passed']}/{g['summary']['total']} design checks"
+          f"{' — FAILED ' + str(bad) if bad else ''}{' — harness ' + str(hf) if hf else ''}  "
+          f"({gf.get('tasks')} tasks, width {gf.get('width')}, concurrency "
+          f"{g['extra'].get('efficiency', {}).get('achieved_max_concurrency')}, "
+          f"mutants killed {len(g['extra'].get('mutants', {}).get('killed', []))})")
+    for line in rp.problems:
+        print("   replay: " + line[:800])
+    return stop == "exit" and not bad and not rp.problems
+
+
+def bad_replay(out: pathlib.Path, name: str) -> bool:
+    run = out / "minilab" / "A3" / f"bad-{name}"
+    rp = Replay(run, "A3", bad=name)
+    try:
+        stop = rp.replay()
+    except ReplayError as e:
+        print(f"bad replay {name}: ERROR {e}")
+        return False
+    g = grade(run)
+    check = BADS[name]
+    hit = [r for r in g["expectations"] if r["id"] == check]
+    caught = stop == "defect" and bool(hit) and not hit[0]["passed"]
+    print(f"bad replay {name}: {'caught by ' + check if caught else 'NOT CAUGHT (' + check + ')'}"
+          f" — {hit[0]['evidence'][:160] if hit else 'no such check'}; stop {stop}")
+    return caught
 
 
 def main():
@@ -512,39 +620,28 @@ def main():
     ap.add_argument("out", nargs="?")
     ap.add_argument("--fixture-only", action="store_true")
     ap.add_argument("--arm")
+    ap.add_argument("--bad", choices=list(BADS))
     a = ap.parse_args()
-    probs = fixture_checks()
-    print("fixture: " + ("ok (cases match the oracle, plan generator in sync, solution passes 8 visible + 6 holdout "
-                         "cases and its own suite, every mutant killed)" if not probs else "\n  ".join(["PROBLEMS"] + probs)))
-    if a.fixture_only:
-        sys.exit(1 if probs else 0)
+    if not (a.arm or a.bad):
+        probs = fixture_checks()
+        print("fixture: " + ("ok (cases match the oracle, plans in sync and lint-clean, solution passes 8 visible + "
+                             "6 holdout cases, every mutant killed, the real bar passes on solution/ and its spine)"
+                             if not probs else "\n  ".join(["PROBLEMS"] + probs)))
+        if a.fixture_only:
+            sys.exit(1 if probs else 0)
+        ok = not probs
+    else:
+        ok = True
     out = pathlib.Path(a.out or tempfile.mkdtemp(prefix="dt-dryrun-build-")).resolve()
-    arms = [a.arm] if a.arm else list(SCN["arms"])
-    ok = not probs
-    for arm in arms:
-        run = out / "minilab" / arm / "replay"
-        rp = replay(run, arm)
-        g = grade(run)
-        bad = failed(g)
-        hf = g["harness_summary"]["failures"]
-        gf = g["extra"].get("graph", {})
-        print(f"{arm} good replay: {g['summary']['passed']}/{g['summary']['total']} design checks"
-              f"{' — FAILED ' + str(bad) if bad else ''}{' — harness ' + str(hf) if hf else ''}  "
-              f"({gf.get('tasks')} tasks, {len(gf.get('dispatch_rounds', []))} dispatch rounds, width {gf.get('dispatch_width')}, "
-              f"mutants killed {len(g['extra'].get('mutants', {}).get('killed', []))})")
-        for line in rp.log:
-            print("   replay: " + line[:600])
-        ok &= not bad and not hf and not rp.log
-    if not a.arm:
-        for bad_name, check_id in BADS.items():
-            run = out / "minilab" / "A3" / f"bad-{bad_name}"
-            replay(run, "A3", bad=bad_name)
-            g = grade(run)
-            hit = [r for r in g["expectations"] if r["id"] == check_id]
-            caught = bool(hit) and not hit[0]["passed"]
-            print(f"bad replay {bad_name}: {'caught by ' + check_id if caught else 'NOT CAUGHT (' + check_id + ')'}"
-                  f"; all failing: {failed(g)}")
-            ok &= caught
+    if a.bad:
+        ok &= bad_replay(out, a.bad)
+    else:
+        arms = [a.arm] if a.arm else [k for k, v in SCN["arms"].items() if v.get("replay", True)]
+        for arm in arms:
+            ok &= good(out, arm)
+        if not a.arm:
+            for name in BADS:
+                ok &= bad_replay(out, name)
     print(f"runs: {out}")
     sys.exit(0 if ok else 1)
 

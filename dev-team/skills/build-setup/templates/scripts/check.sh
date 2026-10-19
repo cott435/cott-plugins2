@@ -5,20 +5,25 @@
 #
 #   scripts/check.sh fast FILE...        per edit, instant               (PostToolUse: tester, implementer)
 #   scripts/check.sh collect             tester's finish gate            (Stop: tester)
-#   scripts/check.sh gate [--pkg ID]     implementer's finish gate       (Stop: implementer and solo)
+#   scripts/check.sh gate [--pkg ID]     implementer's finish gate       (Stop: implementer and solo; dt land)
 #   scripts/check.sh full [--pkg ID]     checkpoints, CI                 (reviewer)
 #   scripts/check.sh full --exit         the milestone exit: also no interface stub left
 #   scripts/check.sh protected           print the protected-path globs  (path_guard.sh deny --protected)
 #
+# The base is refs/worktree/checks-base, one per worktree (dt claim sets it in a builder's worktree,
+# dt land in the main checkout), else HEAD.
+#
 # tests/contracts/** in the protected list means the boundary contracts frozen at the base (CR-09);
-# a contract folder new since the base belongs to the interface task freezing it, which may write it.
+# a contract folder new since the base belongs to the interface task freezing it, which may write it,
+# and so does a frozen folder the task's .claude/.task_writes names (a re-freeze interface task).
 #
 # collect runs the intent tests changed since the base and fails unless they are red for the right
 # reason (scripts/red_check.py): AssertionError or an interface stub's NotImplementedError, never
 # an ImportError or AttributeError.
 #
 # --pkg ID runs the tests of package ID and of every package that depends on it (multi-package:
-# deptry too). Lint, types, size and boundaries always cover the whole repo; they take seconds.
+# deptry too); gate and full also run tests/contracts, whole, when it exists. Lint, types, size
+# and boundaries always cover the whole repo; they take seconds.
 # FILE paths are absolute or relative to the project root.
 # Prints every failure (it does not stop at the first) and exits 1 if any step failed.
 set -u
@@ -35,7 +40,14 @@ TYPE_GATE="{{type_gate}}"          # mypy | pyright: the type checker that gates
 
 # A package (or, in a single package, a component) and every package that depends on it,
 # from the architecture's dependency rules.
+# One package: its own id (a task's Package, which dt claim passes) scopes to every test.
+own_package() {
+  awk -F'"' '/^\[project\]/ { p = 1; next } /^\[/ { p = 0 } p && /^name *=/ { gsub("-", "_", $2); print $2; exit }' \
+    pyproject.toml 2>/dev/null
+}
+
 pkg_scope() {
+  if [ -z "$PACKAGES_DIR" ] && [ "$1" = "$(own_package)" ]; then return 0; fi
   case "$1" in
 {{pkg_scope_cases}}
     *) return 1 ;;
@@ -81,6 +93,13 @@ run() {
   uv run --frozen --quiet "$@" || { rc=1; failed+=("$*"); }
 }
 
+# A measured check that fails only at the milestone exit: it prints its findings, and the reviewer
+# records them, but a mid-milestone run passes.
+report() {
+  echo "-> $* (reported; fails only with --exit)" >&2
+  uv run --frozen --quiet "$@" || echo "(reported, not failing: $*)" >&2
+}
+
 # pytest exits 5 when it collects nothing. That is fine for gate and full on a project with no
 # tests yet; collect calls pytest through run() so an empty tests/intent fails.
 run_tests() {
@@ -91,22 +110,35 @@ run_tests() {
   [ "$status" -eq 0 ] || { rc=1; failed+=("pytest $*"); }
 }
 
-# The commit this task started from, recorded by the orchestrator with
-# `git update-ref refs/checks/base HEAD`. Without it, HEAD, which misses changes already committed.
+# The commit this task started from: refs/worktree/checks-base, set per worktree by `dt claim` (and
+# by `dt land` in the main checkout). Without it, HEAD, which misses changes already committed.
+BASE_REF="refs/worktree/checks-base"
 base_commit() {
-  git rev-parse -q --verify refs/checks/base 2>/dev/null || git rev-parse -q --verify HEAD 2>/dev/null
+  git rev-parse -q --verify "$BASE_REF" 2>/dev/null || git rev-parse -q --verify HEAD 2>/dev/null
 }
 
 # A boundary contract is frozen once its folder exists at the base (CR-09): each folder under
 # tests/contracts/ at the base, and any file directly in it. A folder new since the base is the
-# interface task freezing it, so that task may write it; the next task's base freezes it.
+# interface task freezing it, so that task may write it; the next task's base freezes it. A frozen
+# folder the task's .claude/.task_writes names (from its Writes:, by dt claim) is a re-freeze
+# interface task's, so it is open to that task; dt land checks the Writes: against the plan.
 CONTRACTS_GLOB="tests/contracts/**"
+claimed_contract() {
+  local line
+  [ -s .claude/.task_writes ] || return 1
+  while IFS= read -r line; do
+    line="${line%%[[:space:]]}"
+    line="${line%/}"; line="${line%/\*\*}"
+    [ "$line" = "$1" ] && return 0
+  done <.claude/.task_writes
+  return 1
+}
 frozen_contracts() {
   local base meta path
   base=$(base_commit) || return 0
   git ls-tree "$base" -- tests/contracts/ 2>/dev/null | while IFS=$'\t' read -r meta path; do
     case "$meta" in
-      *" tree "*) echo "$path/**" ;;
+      *" tree "*) claimed_contract "$path" || echo "$path/**" ;;
       *) echo "$path" ;;
     esac
   done
@@ -124,7 +156,7 @@ protected_globs() {
 unchanged_since_base() {
   local label="$1" base new
   shift
-  echo "-> $label unchanged since $(git rev-parse -q --verify refs/checks/base >/dev/null 2>&1 && echo refs/checks/base || echo HEAD)" >&2
+  echo "-> $label unchanged since $(git rev-parse -q --verify "$BASE_REF" >/dev/null 2>&1 && echo "$BASE_REF" || echo HEAD)" >&2
   if ! base=$(base_commit); then
     echo "no commit to compare against: commit the tester's work first" >&2
     rc=1; failed+=("$label: no commit"); return
@@ -153,7 +185,7 @@ changed_intent_tests() {
     while IFS= read -r f; do case "${f##*/}" in test_*|*_test.py) echo "$f" ;; esac; done
 }
 
-# Test directories for this run: all of them, or the --pkg scope.
+# Test directories for this run: all of them, or the --pkg scope; tests/contracts always whole.
 test_dirs() {
   local scope="" d p
   [ -n "$pkg" ] && scope=$(pkg_scope "$pkg")
@@ -164,6 +196,7 @@ test_dirs() {
       for p in $scope; do [ -d "$d/$p" ] && echo "$d/$p"; done
     fi
   done
+  [ -d tests/contracts ] && echo tests/contracts
 }
 
 # deptry checks what each package imports against what it declares.
@@ -234,7 +267,8 @@ case "$mode" in
     static_checks
     other_parts
     if [ "$TYPE_GATE" = mypy ]; then run pyright; else run mypy; fi
-    run vulture
+    # CR-41: the interface task's stubs and fields stay unused until later tasks use them.
+    if [ ${#exit_check[@]} -gt 0 ]; then run vulture; else report vulture; fi
     run pylint --disable=all --enable=duplicate-code --recursive=y --score=n --fail-under=10 "${SRC_DIRS[@]}"   # CR-42
     run typos
     run pip-audit --skip-editable   # the external opinion: a vulnerability database (CR-26)

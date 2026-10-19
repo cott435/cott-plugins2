@@ -190,5 +190,6 @@ Code tooling (`check.sh`, Ruff, mypy, import-linter, the agent role files and th
 | [`test-planning`](skills/test-planning/SKILL.md) | Plan (optional) | `docs/packages/*/tests.md`, `tests/fixtures/**` |
 | [`build-planning`](skills/build-planning/SKILL.md) | Plan | Roadmap milestone rows (each stage cut into slices), `tasks/plan.md` (tasks with `Writes:`, the dependency graph), `tasks/todo.md`, AGENTS.md doc map |
 | [`build-setup`](skills/build-setup/SKILL.md) | Bar | `CONSTRAINTS.md`, tool config, `scripts/`, `.claude/agents/` |
+| [`build`](skills/build/SKILL.md) | Build | The milestone built by parallel agents on `build/M<n>`: landings through `dt land`, findings through `dt finding`, the merge after your yes |
 
 Design notes: [design/planning-stage.md](design/planning-stage.md), [design/build-setup.md](design/build-setup.md), [design/interface-first-design.md](design/interface-first-design.md), [design/probes.md](design/probes.md), [design/requests.md](design/requests.md).

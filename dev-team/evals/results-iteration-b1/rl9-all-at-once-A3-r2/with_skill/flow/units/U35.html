@@ -1,0 +1,675 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1"><title>U35 implementer</title>
+<style>
+:root{--bg:#fbfbfa;--fg:#1d1d1f;--muted:#6b6b70;--line:#d9d9de;--box:#fff;--rowp:#eef3fb;--band:#fff4d6;
+--ok:#2e7d32;--bad:#c62828;--warn:#b26a00;--idle:#6b6b70}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#17171a;--fg:#ececf0;--muted:#9a9aa3;
+--line:#34343a;--box:#222227;--rowp:#1d2433;--band:#3a3015;--ok:#6fcf73;--bad:#ff6b6b;--warn:#f0b35a;--idle:#9a9aa3}}
+:root[data-theme="dark"]{--bg:#17171a;--fg:#ececf0;--muted:#9a9aa3;--line:#34343a;--box:#222227;--rowp:#1d2433;
+--band:#3a3015;--ok:#6fcf73;--bad:#ff6b6b;--warn:#f0b35a;--idle:#9a9aa3}
+body{margin:0;padding:16px;background:var(--bg);color:var(--fg);font:14px/1.45 -apple-system,system-ui,sans-serif}
+h1{font-size:18px;margin:0 0 4px}h2{font-size:15px;margin:22px 0 8px}.sub{color:var(--muted)}
+table{border-collapse:collapse;margin:4px 0 8px}td,th{border-bottom:1px solid var(--line);padding:4px 10px;text-align:left;
+vertical-align:top}th{color:var(--muted);font-weight:600}.chips span{display:inline-block;margin:0 4px 2px 0}
+.legend span{margin-right:14px;white-space:nowrap}.sw{display:inline-block;width:10px;height:10px;border-radius:2px;
+margin-right:4px;vertical-align:-1px}.scroll{overflow:auto;max-height:88vh;border:1px solid var(--line);border-radius:8px}
+.chart{display:grid;width:max-content}.chart>div{line-height:0}.corner{position:sticky;top:0;left:0;z-index:3}
+.colhead{position:sticky;top:0;z-index:2}.rowhead{position:sticky;left:0;z-index:2}
+svg.bg{background:var(--bg)}.colhead svg{border-bottom:1px solid var(--line)}.rowhead svg{border-right:1px solid var(--line)}
+.ok{color:var(--ok);fill:var(--ok)}.bad{color:var(--bad);fill:var(--bad)}.warn{color:var(--warn);fill:var(--warn)}
+.idle{color:var(--idle);fill:var(--idle)}
+svg text{fill:var(--fg);font-family:-apple-system,system-ui,sans-serif}
+.box{fill:var(--box);stroke:var(--line)}.unit:hover .box{stroke:var(--fg)}
+.role{font-size:12px;font-weight:600}.uid,.wmeta,.lmeta,.meta{font-size:10px;fill:var(--muted)}
+.sub{font-size:10.5px;fill:var(--muted)}.badge{font-size:11px;font-weight:600}
+.meta.bad{fill:var(--bad);font-weight:600}.lane{font-size:13px;font-weight:700}.wave{font-size:13px;font-weight:700}
+.par{fill:#4e79a7}.ser{fill:var(--muted)}.rowp{fill:var(--rowp)}.rows{fill:transparent}.band{fill:var(--band)}
+.bandt{font-size:11.5px}.grid{stroke:var(--line)}.link{stroke:var(--muted);stroke-width:1.2;opacity:.55}
+.arrowhead{fill:var(--muted)}.marks{font-size:10.5px}.audit{stroke:var(--box);stroke-width:2}.auditn{font-size:10px;font-weight:700;fill:#fff}
+a{color:inherit}svg a .box{cursor:pointer}
+
+:root{--c0:#2a78d6;--c1:#eb6834;--c2:#1baf7a;--c3:#eda100;--c4:#e87ba4;--c5:#008300;--c6:#6250d6;--c7:#e34948;
+--cx:#8a8985;--main:#52514e;--read:#dcdbd5;--readfg:#1d1d1f}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--c0:#3987e5;--c1:#d95926;--c2:#199e70;
+--c3:#c98500;--c4:#d55181;--c5:#008300;--c6:#9085e9;--c7:#e66767;--cx:#77766f;--main:#c3c2b7;--read:#3b3b40;
+--readfg:#ececf0}}
+:root[data-theme="dark"]{--c0:#3987e5;--c1:#d95926;--c2:#199e70;--c3:#c98500;--c4:#d55181;--c5:#008300;
+--c6:#9085e9;--c7:#e66767;--cx:#77766f;--main:#c3c2b7;--read:#3b3b40;--readfg:#ececf0}
+.c0{fill:var(--c0);background:var(--c0)}.c1{fill:var(--c1);background:var(--c1)}.c2{fill:var(--c2);background:var(--c2)}
+.c3{fill:var(--c3);background:var(--c3)}.c4{fill:var(--c4);background:var(--c4)}.c5{fill:var(--c5);background:var(--c5)}
+.c6{fill:var(--c6);background:var(--c6)}.c7{fill:var(--c7);background:var(--c7)}.cx{fill:var(--cx);background:var(--cx)}
+.cmain{fill:var(--main)}.sc0{stroke:var(--c0)}.sc1{stroke:var(--c1)}.sc2{stroke:var(--c2)}
+.tl text,.sm text,.lc text{font-size:10.5px;fill:var(--muted)}.tl .lbl-in,.sm .lbl-in{fill:#fff;font-size:10.5px;font-weight:600}
+.tl .rowl,.sm .rowl,.lc .rowl{fill:var(--fg);font-size:11.5px;font-weight:600}.tl .band{fill:var(--rowp)}
+.tl .brk{stroke:var(--muted);stroke-dasharray:2 3}.tl a:hover rect,.sm a:hover rect{stroke:var(--fg);stroke-width:1.5}
+.axis{stroke:var(--line)}.sm .val{fill:var(--fg);font-weight:600}.lc path.ln{fill:none;stroke-width:2}
+.lc circle{stroke:var(--bg);stroke-width:2}.lc .end{font-weight:600;fill:var(--fg)}
+.tiles{display:flex;flex-wrap:wrap;gap:10px;margin:12px 0}.tile{border:1px solid var(--line);border-radius:8px;
+padding:8px 12px;min-width:110px;background:var(--box)}.tile b{display:block;font-size:20px;line-height:1.2}
+.tile span{font-size:12px;color:var(--muted)}.tile i{font-style:normal;font-size:12px;margin-left:6px}
+.fm{border-collapse:separate;border-spacing:2px}.fm td,.fm th{border:0;padding:0;text-align:center;font-size:11px}
+.fm th{padding:0 2px;font-weight:600}.fm td.f,.fm th.f{text-align:left;padding-right:10px;white-space:nowrap;
+position:sticky;left:0;background:var(--bg);font:11.5px ui-monospace,Menlo,monospace;
+max-width:380px;overflow:hidden;text-overflow:ellipsis}
+.fm td.cell{min-width:22px;height:20px;border-radius:3px}.fm td.fw{background:var(--c0);color:#fff;font-weight:700}
+.fm td.fe{background:var(--c1);color:#fff;font-weight:700}.fm td.fr{background:var(--read);color:var(--readfg)}
+.fm td.n{color:var(--muted);padding:0 6px}.fm tr.grp td{text-align:left;padding-top:8px;color:var(--muted);
+font-weight:600}
+.key{display:inline-block;min-width:18px;text-align:center;border-radius:3px;font-size:11px;margin-right:4px}
+.bar{display:inline-block;height:9px;border-radius:2px;vertical-align:0}
+
+pre{white-space:pre-wrap;word-break:break-word;background:var(--box);border:1px solid var(--line);border-radius:6px;
+padding:8px 10px;margin:4px 0;font:12px/1.45 ui-monospace,SFMono-Regular,Menlo,monospace;max-width:100%;overflow:auto}
+.step{border-top:1px solid var(--line);padding:6px 0}.step:target{background:var(--rowp)}
+.sid{font:12px ui-monospace,Menlo,monospace;color:var(--muted);margin-right:8px}.kind{font-weight:600;margin-right:8px}
+.err{color:var(--bad);font-weight:600}.hook{color:var(--bad);margin:4px 0 0 16px}.lbl{font-size:12px;color:var(--muted);margin-top:6px}
+details summary{cursor:pointer;color:var(--muted);font-size:12px}.head td:first-child{color:var(--muted)}
+.top{font-size:13px}.narr{list-style:none;padding-left:0}.narr li{margin:3px 0}
+</style></head>
+<body>
+<p class="top"><a href="../flow.html">← the run's flow chart</a></p>
+
+<h1>U35 · implementer · M1-T27 implementer</h1>
+<table class="head"><tr><td>Type</td><td>implementer</td></tr><tr><td>Description</td><td>M1-T27 implementer</td></tr><tr><td>Spawned by</td><td>driver at D204</td></tr><tr><td>Turn</td><td><a href="../turns/T06.html">T06</a></td></tr><tr><td>Model</td><td>claude-opus-5-5</td></tr><tr><td>Start</td><td>2026-10-19 08:31:33 UTC</td></tr><tr><td>Duration</td><td>1 min</td></tr><tr><td>Tool calls</td><td>9</td></tr><tr><td>Errors</td><td>0</td></tr><tr><td>Hook blocks</td><td>0</td></tr><tr><td>Tokens</td><td>1.6k out · 20.1k new in · 103k cached in · peak context 24.9k</td></tr><tr><td>Skills invoked</td><td>none</td></tr><tr><td>Files written or edited</td><td>none</td></tr><tr><td>Definition</td><td>none</td></tr><tr><td>Steps</td><td>14</td></tr><tr><td>Finished</td><td>yes</td></tr></table>
+
+
+<h2>Prompt</h2>
+<pre>You are the implementer for M1-T27. Run `python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/plugin/dev-team/scripts/dt.py claim M1-T27 --role implementer`, then read the packet it names.</pre>
+<h2>Files</h2>
+<table><tr><th>Op</th><th>File</th><th>Calls</th><th>By</th><th>Via</th><th>Steps</th></tr><tr><td>read</td><td><code>.claude/worktrees/agent-a7d90e39a844d00cf/.claude/packet.md</code></td><td>1</td><td>U35</td><td>Read</td><td><a href="#3">U35.S3</a></td></tr><tr><td>read</td><td><code>.claude/worktrees/agent-a7d90e39a844d00cf/CONSTRAINTS.md</code></td><td>1</td><td>U35</td><td>Read</td><td><a href="#4">U35.S4</a></td></tr><tr><td>read</td><td><code>.claude/worktrees/agent-a7d90e39a844d00cf/src/rllab/train/loop/__init__.py</code></td><td>1</td><td>U35</td><td>Read</td><td><a href="#9">U35.S9</a></td></tr><tr><td>read</td><td><code>.claude/worktrees/agent-a7d90e39a844d00cf/src/rllab/train/loop/run.py</code></td><td>1</td><td>U35</td><td>Read</td><td><a href="#8">U35.S8</a></td></tr><tr><td>read</td><td><code>.claude/worktrees/agent-a7d90e39a844d00cf/tests/intent/rllab/test_guard.py</code></td><td>1</td><td>U35</td><td>Read</td><td><a href="#7">U35.S7</a></td></tr></table>
+<h2>Steps</h2>
+<div class="step" id="S1"><span class="sid">U35.S1</span><span class="kind">user</span>You are the implementer for M1-T27. Run `python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/plugin/dev-team/scripts/dt.py claim M1-T27 --role implementer`, then read the packet it names.<details><summary>full text</summary><pre>You are the implementer for M1-T27. Run `python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/plugin/dev-team/scripts/dt.py claim M1-T27 --role implementer`, then read the packet it names.</pre></details></div><div class="step" id="S2"><span class="sid">U35.S2</span><span class="kind">Bash</span>python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/plugin/dev-team/scripts/dt.py claim M1-T27 --role implementer<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/plugin/dev-team/scripts/dt.py claim M1-T27 --role implementer&quot;
+}</pre><div class="lbl">output</div><pre>packet: /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/project/.claude/worktrees/agent-a7d90e39a844d00cf/.claude/packet.md (163 lines; read it in full)
+task: M1-T27 Invalid-number stop · role implementer · package rllab · kind thicken
+writes: src/rllab/train/loop/guard.py
+done: Done when `scripts/check.sh gate` passes (the gate passes on your Writes); the Stop hook runs it. End with one line: `DONE M1-T27 implementer`. If you can&#x27;t finish: `python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/plugin/dev-team/scripts/dt.py escalate &lt;TEST-WRONG|NEEDS-DEP&gt; &quot;&lt;why&gt;&quot;`, or `python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/plugin/dev-team/scripts/dt.py escalate CONTRACT-CHANGE &quot;&lt;why&gt;&quot; --type &lt;the contract symbol&gt;`, then end with one line: `STOPPED M1-T27 implementer: see dt escalate`.</pre></details></div><div class="step" id="S3"><span class="sid">U35.S3</span><span class="kind">Read</span>/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/project/.claude/worktrees/agent-a7d90e39a844d00cf/.claude/packet.md<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/project/.claude/worktrees/agent-a7d90e39a844d00cf/.claude/packet.md&quot;
+}</pre><div class="lbl">output</div><pre>1	# Packet: M1-T27 implementer
+2	You are the implementer for M1-T27. Your edit boundary is your Writes below (`.claude/.task_writes`); the guard blocks everything else.
+3	
+4	Done when `scripts/check.sh gate` passes (the gate passes on your Writes); the Stop hook runs it. End with one line: `DONE M1-T27 implementer`. If you can&#x27;t finish: `python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/plugin/dev-team/scripts/dt.py escalate &lt;TEST-WRONG|NEEDS-DEP&gt; &quot;&lt;why&gt;&quot;`, or `python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/plugin/dev-team/scripts/dt.py escalate CONTRACT-CHANGE &quot;&lt;why&gt;&quot; --type &lt;the contract symbol&gt;`, then end with one line: `STOPPED M1-T27 implementer: see dt escalate`.
+5	
+6	# Context for M1-T27: package rllab · mode split · kind thicken
+7	Read only what is below, plus CONSTRAINTS.md and the files you edit. Your task is the last section.
+8	
+9	&lt;!-- docs/packages/rllab/pipelines.md:27 --&gt;
+10	## PL-02: Training run
+11	**Entry:** `src/rllab/train/pipelines/pl02_train.py::run_train` · **Trigger:** PL-03 `run_parallel`, once per config (`rllab train &lt;config.toml&gt; --seed N` is a one-seed batch)
+12	**Covers:** TRAIN-01–TRAIN-04, TRAIN-07, LOG-01, LOG-02, CHECK-01, WORLD-01–WORLD-07, SNAKE-01–SNAKE-06, FISH-01–FISH-08, FISH-11, PREY-01–PREY-06, PREY-11, QR-01, QR-03, QR-06
+13	
+14	| # | Step | Owner | In → Out | Spine version | Covers |
+15	|---|---|---|---|---|---|
+16	| 1 | `make` | worlds.make | world, variant, overrides → World | name → class lookup, snake only | WORLD-01–WORLD-07 |
+17	| 2 | `Snake` | worlds.snake | overrides → World | 10 × 10 grid, relative turns, food, death, 100-step hunger limit | SNAKE-01–SNAKE-06 |
+18	| 3 | `FishTank` | worlds.fish | variant, overrides → World | &quot;one&quot; variant: bouncing ball, smooth pushes, respawn on hit | FISH-01–FISH-08 |
+19	| 4 | `PredatorPrey` | worlds.prey | overrides → World | fish movement, catches remove prey, pellets without respawn | PREY-01–PREY-06 |
+20	| 5 | `make_learners` | train.setup | RunConfig, WorldSpec → Learner per team | `methods.make_learner` per team, seeded from the run seed | TRAIN-07, CHECK-01 |
+21	| 6 | `DQN` | methods.dqn | MethodConfig, WorldSpec → Learner | online one-step Q-learning on an MLP, ε-greedy; no replay buffer or target net | CHECK-01 |
+22	| 7 | `PPO` | methods.ppo | MethodConfig, WorldSpec → Learner | REINFORCE with a Gaussian policy and mean-return baseline; no clipping or GAE | CHECK-01 |
+23	| 8 | `train_loop` | train.loop | World, Learner per team, RunConfig, root → RunRecord | steps to the budget, writing the run folder through `runlog.RunWriter`; checkpoints at 0–100%; 20-seed evals at every 5% via `core.play_episode`; stops on `NonFiniteError` | TRAIN-01–TRAIN-04, LOG-01, LOG-02, QR-01, QR-03 |
+24	
+25	Layout: `dt layout rllab`
+26	
+27	&lt;!-- docs/packages/rllab/contract.md:215 --&gt;
+28	### train.run_train: One training run
+29	`def run_train(config: RunConfig, root: Path) -&gt; RunRecord`
+30	- **Invariants:** exactly `budget` world steps (TRAIN-01); checkpoints at 0%, 10%, … 100% (TRAIN-03); evaluation of every team on `EVAL_SEEDS` at every 5% (TRAIN-04); same config on the same machine → identical logs and checkpoints (TRAIN-02)
+31	- **Errors:** `RunExistsError` before any work if the run folder exists; `NonFiniteError` ends the run as `failed` with step and value, keeping the last good checkpoint; interruption marks it `incomplete`
+32	- **Boundary:** PL-03 · **Fixtures:** tests/contracts/train.run_train/ · **Cases:** a fake writing the finished 3-checkpoint snake run folder
+33	- **Used by:** train.run_batch; PL-02, PL-03
+34	
+35	&lt;!-- docs/packages/rllab/contract.md:173 --&gt;
+36	### methods.Learner: type
+37	```python
+38	class Learner(Protocol):
+39	    def act(self, obs: Array, rng: np.random.Generator) -&gt; Array: ...   # exploring
+40	    def observe(self, t: Transition) -&gt; None: ...                       # updates on its own schedule
+41	    def policy(self) -&gt; Policy: ...                                      # frozen, deterministic copy
+42	    def state_dict(self) -&gt; dict[str, object]: ...
+43	```
+44	- **Invariants:** hand-written learning code only (CHECK-01); `policy()` is greedy (DQN) or the mean action (PPO) and does not change as the learner trains
+45	- **Errors:** `observe` raises `NonFiniteError(value: float)` when a loss or parameter is NaN or infinite, before changing any parameter
+46	- **Boundary:** train · **Fixtures:** tests/contracts/methods.Learner/ · **Cases:** a replay double of a DQN learner over 10 snake transitions
+47	- **Used by:** train; PL-01, PL-02, PL-03
+48	
+49	&lt;!-- docs/packages/rllab/contract.md:237 --&gt;
+50	### runlog.RunRecord: type
+51	`@dataclass(frozen=True) class RunRecord: config: RunConfig; spec: WorldSpec; started: datetime; ended: datetime | None; status: Literal[&quot;running&quot;, &quot;finished&quot;, &quot;incomplete&quot;, &quot;failed&quot;]; failure: Failure | None; path: Path`
+52	`Failure(step: int, value: float, checkpoint: Path)`
+53	- **Invariants:** every LOG-01 field present once the run ends; `config` is a `core.RunConfig` (AD-12), so `runlog` imports only `core`; `config.methods` holds full settings, defaults included
+54	- **Boundary:** train, evaluate, charts, refcheck, cli · **Fixtures:** tests/contracts/runlog.RunRecord/ · **Cases:** a finished snake run; a failed run with a NaN at step 41,200; an incomplete run
+55	- **Used by:** train, evaluate, charts, refcheck, cli; PL-02, PL-03
+56	
+57	## Layout (`dt layout rllab`)
+58	src/rllab/
+59	  __init__.py — RL Lab: hand-written reinforcement learning on small simulated worlds.
+60	  baselines/
+61	    __init__.py — Random play, each world&#x27;s rule and their mean scores.
+62	    means.py — Rule lookup and the baselines&#x27; mean scores on the evaluation seeds.
+63	    random.py — Uniform random play for any action format (EVAL-01).
+64	    snake.py — The snake rule baseline (SNAKE-07).
+65	    types.py — Types of the baselines.
+66	  charts/
+67	    __init__.py — Charts drawn from run folders, following the `dataviz` skill.
+68	    curve.py — Learning curves with a min-max band and baseline lines (LOG-03 to LOG-05).
+69	    types.py — Types of the charts.
+70	  cli/
+71	    __init__.py — The `rllab` command (AD-10).
+72	    __main__.py — `python -m rllab.cli`: the `rllab` command.
+73	    command.py — The `rllab` command: parses a trigger, calls its pipeline entry and prints the result (AD-10).
+74	    pipelines/
+75	      __init__.py — The PL-04 to PL-12 entries (AD-10).
+76	      pl04_watch.py — PL-04: Watch a run.
+77	      pl05_chart.py — PL-05: Learning-curve chart.
+78	      pl06_evaluate.py — PL-06: Final evaluation.
+79	  core/
+80	    __init__.py — World and policy protocols, shared types, held-out seed sets and the episode loop.
+81	    episode.py — The one episode loop every component plays through (AD-04, AD-05).
+82	    types.py — Shared types of every component: specs, steps, episodes, protocols, configs, seed sets.
+83	  evaluate/
+84	    __init__.py — Final evaluation on the final seeds, permutation tests, verdicts and summaries.
+85	    types.py — Types of the final evaluation: comparisons, verdicts and summaries.
+86	    final/
+87	      __init__.py — The final evaluation and its statistics.
+88	      play.py — Final evaluation: final checkpoints and both baselines on the final seeds (EVAL-03).
+89	      stats.py — Paired permutation tests against each baseline, with Holm&#x27;s correction (EVAL-04).
+90	      summary.py — One team&#x27;s summary from its final-seed scores, its collapse flag and `summary.json` (EVAL-06).
+91	      verdict.py — The baseline verdict: both nulls rejected and every run beating the rule (EVAL-05).
+92	  methods/
+93	    __init__.py — Hand-written learners behind `Learner`, and checkpoint-to-policy loading.
+94	    factory.py — Learner construction and checkpoint-to-policy loading.
+95	    types.py — Types of the learning methods.
+96	    dqn/
+97	      __init__.py — DQN: Q-learning on an MLP for discrete actions (AD-03).
+98	      learner.py — Online one-step Q-learning on an MLP with epsilon-greedy exploration (spine: no replay buffer
+99	  runlog/
+100	    __init__.py — Run folders: record, logs, checkpoints, live progress and lookup.
+101	    progress.py — A live view of one run&#x27;s progress (LOG-06).
+102	    read.py — Run lookup and opening run folders.
+103	    types.py — Types of run folders: record, evaluation points, checkpoints, the run view and progress.
+104	    writer.py — Writes one run folder: record, logs and checkpoints (AD-06).
+105	  train/
+106	    __init__.py — Training: the config loader, the method check and the PL-01 to PL-03 entries (AD-10).
+107	    batch.py — Runs one training run per config in a spawn process pool (TRAIN-05, AD-05).
+108	    check.py — The method check: each team method trained and scored on its check world (TRAIN-06, AD-09).
+109	    config.py — Run configs from a TOML file, one per seed, method defaults filled.
+110	    setup.py — One learner per team of a run (TRAIN-07).
+111	    types.py — Types of training: the method check&#x27;s result and its refusal.
+112	    loop/
+113	      __init__.py — The training loop of one run.
+114	      run.py — Steps a world to the budget, with checkpoints and evaluations, into a run folder.
+115	    pipelines/
+116	      __init__.py — The PL-01 to PL-03 entries (AD-10).
+117	      pl01_check.py — PL-01: Method check.
+118	      pl02_train.py — PL-02: Training run.
+119	      pl03_batch.py — PL-03: Training batch.
+120	  worlds/
+121	    __init__.py — The worlds, behind `make`.
+122	    checks.py — Check worlds with hand-derived best actions (TRAIN-06, AD-09).
+123	    make.py — The world factory: a world name and variant to a World.
+124	    snake.py — Snake: a 10 x 10 grid, relative turns, food, death and a hunger limit (SNAKE-01 to SNAKE-06).
+125	    types.py — Types the worlds add to the core World protocol.
+126	
+127	## Interfaces (frozen: build against these, never change them)
+128	&lt;!-- docs/packages/rllab/contract.md:59 --&gt;
+129	### core.World: type
+130	```python
+131	class World(Protocol):
+132	    spec: WorldSpec
+133	    def reset(self, seed: int) -&gt; Step: ...
+134	    def step(self, actions: Array) -&gt; Step: ...
+135	    def result(self) -&gt; EpisodeResult: ...
+136	    def draw(self) -&gt; DrawState: ...
+137	```
+138	- **Invariants:** same seed → same start (WORLD-01); same seed and actions → same steps (WORLD-02); `actions` has one row per agent, rows of inactive agents ignored
+139	- **Errors:** `step` raises `ActionError(agent: str, value: object)`, a `ValueError`, for an action outside `spec.action`, never clipping it; `step` after `done` raises `RuntimeError`
+140	- **Boundary:** train, evaluate, replay, refcheck · **Fixtures:** tests/contracts/core.World/ · **Cases:** a replay double of a recorded 5-step snake episode from seed 42
+141	- **Used by:** every component that plays episodes; PL-02, PL-08
+142	Sample: tests/contracts/core.World/ (exists)
+143	
+144	&lt;!-- docs/packages/rllab/contract.md:110 --&gt;
+145	### core.RunConfig: type
+146	`@dataclass(frozen=True) class RunConfig: name: str; world: str; variant: str; methods: Mapping[str, MethodConfig]; seed: int; budget: int; check_settings: Mapping[str, Settings]; device: str = &quot;cpu&quot;`
+147	- **Invariants:** `methods` has one entry per team (TRAIN-07); `budget` counts world steps, not agent steps; `check_settings` overrides settings for the check world only (AD-09); owned by `core` so `runlog` can store it (AD-12)
+148	- **Boundary:** train, runlog, refcheck, cli · **Fixtures:** tests/contracts/core.RunConfig/ · **Cases:** a snake config from `configs/snake-default.toml`; a predator-prey config with two methods
+149	- **Used by:** train, runlog, refcheck, cli; PL-01, PL-02, PL-03, PL-09
+150	Sample: tests/contracts/core.RunConfig/ (exists)
+151	
+152	## Writes (edit only these files; the plan gives every other file to another task)
+153	- src/rllab/train/loop/guard.py (new)
+154	
+155	&lt;!-- tasks/plan.md:290 --&gt;
+156	### M1-T27: Invalid-number stop
+157	**Package:** rllab · **Step:** PL-02.train_loop · **Kind:** thicken · **Covers:** TRAIN-01 · **Size:** XS · **Mode:** split
+158	**Skills:** —
+159	**Read:** PL-02, train.run_train, methods.Learner, runlog.RunRecord
+160	**Acceptance:**
+161	- [ ] Given a learner double that raises `NonFiniteError(nan)` at step 700, when the run proceeds, then it stops at once as `failed` with step 700 and the value, keeping the 600-step checkpoint; an interrupted run is marked `incomplete`
+162	**Verify:** `pytest tests/intent/rllab tests/unit/rllab -k nonfinite` · `scripts/check.sh gate`
+163	**Depends on:** M1-T09 · **Writes:** src/rllab/train/loop/guard.py, tests/intent/rllab/test_guard.py
+164	</pre></details></div><div class="step" id="S4"><span class="sid">U35.S4</span><span class="kind">Read</span>/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/project/.claude/worktrees/agent-a7d90e39a844d00cf/CONSTRAINTS.md<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/project/.claude/worktrees/agent-a7d90e39a844d00cf/CONSTRAINTS.md&quot;
+}</pre><div class="lbl">output</div><pre>1	# Constraints
+2	**Status:** Approved · **Last reviewed:** 2026-10-17 by @connor · **Ratcheted:** —
+3	
+4	The standing quality bar. `pyproject.toml` and `scripts/check.sh` enforce it; every number here names its config key, and `dt status` fails if the two disagree. Only `build-setup` changes this file, with the user: tightening is routine, loosening needs an explicit yes.
+5	
+6	## Floor
+7	- **CR-01** No new suppressions. Ruff runs with `--ignore-noqa` in gate and full, so a Ruff exception is a `per-file-ignores` entry in protected config with a row in Exceptions. `floor_guard.sh` catches the other suppressions on the diff
+8	- **CR-02** No stubs: `raise NotImplementedError` outside abstract methods, `pass`-only bodies, bare `except: pass`. One carve-out: the interface task&#x27;s step signatures, whose body is only `raise NotImplementedError(&quot;&lt;task id&gt;&quot;)` naming the open task that replaces it. `check.sh gate` fails on one naming a task that isn&#x27;t open in `tasks/todo.md`, and on a test that expects one (`stub-pinned`); `check.sh full --exit` fails on any
+9	- **CR-03** No skipped, deleted or assertion-free tests, unless a row in Exceptions names the test file
+10	- **CR-04** No secrets in source
+11	- **CR-05** Oracle files (`tests/fixtures/**/expected.json`) change only with the user&#x27;s approval
+12	- **CR-06** The implementer never changes `tests/intent/**`
+13	- **CR-07** This file, `pyproject.toml` tool config, `scripts/` and `.claude/agents/` are not weakened to make a change pass
+14	- **CR-08** Nothing imports from `references/` or `probes/`, or adds either to `sys.path` (or `PYTHONPATH`, pytest `pythonpath`). `floor_guard.sh` checks the diff for both. Code copied from either is project code and meets the same bar
+15	- **CR-09** A frozen interface (`tests/contracts/&lt;id&gt;.&lt;symbol&gt;/`: schema, samples, fake; and the types, signatures and exports the interface task wrote) is frozen once it exists at the task&#x27;s base. Only the interface task freezing it (`**Kind:** interface`) writes a new folder, and no other task&#x27;s `Writes:` names its `types.py` or `__init__.py`; a frozen interface changes only through `architecture-design` Revise, never to make a test pass
+16	
+17	## Readability
+18	- **CR-10** One entry function per pipeline; it reads top to bottom as its named steps (reviewer + `dt layout`)
+19	- **CR-11** No registries, plugin dispatch or config-driven wiring without an AD
+20	- **CR-12** New abstraction only with a second real implementation or a named seam
+21	- **CR-13** No global random state: every generator is spawned from a seed (`np.random.SeedSequence`, a `torch.Generator`), never `np.random.seed` or `torch.manual_seed` (AD-05)
+22	
+23	## Enforced with numbers
+24	| ID | Dimension | Rule | Checked by | Config key | Runs at |
+25	|---|---|---|---|---|---|
+26	| CR-20 | Lint | zero errors; standing per-file-ignores only for `tests/**` and `__init__.py` | ruff | `tool.ruff.lint.select` | edit, gate |
+27	| CR-21 | Complexity | ≤ 10 per function | ruff C901 | `tool.ruff.lint.mccabe.max-complexity` | gate |
+28	| CR-22 | Size | ≤ 500 lines/module, ≤ 60/function | check_size.py | `tool.size_limits` | edit, gate |
+29	| CR-23 | Types | zero errors, strict | mypy | `tool.mypy.strict` | gate |
+30	| CR-24 | Boundaries | import contracts hold | import-linter | `tool.importlinter.contracts` | gate |
+31	| CR-25 | Dependencies | none missing or unused | deptry | `tool.deptry` | gate |
+32	| CR-26 | Deps security | nothing known-vulnerable | pip-audit | — | full, CI nightly |
+33	| CR-27 | Reproducibility | same seed, same result: `repro` tests pass (TRAIN-02, WORLD-02, REPLAY-02) | pytest `-m repro` | `tool.pytest.ini_options.markers` | gate |
+34	
+35	## Measured, not yet enforced
+36	| ID | Metric | Today | Direction |
+37	|---|---|---|---|
+38	| CR-40 | Coverage (branch) | — (no code) (`tool.coverage.report.fail_under`, raised by Ratchet) | must not fall |
+39	| CR-41 | vulture findings at `min_confidence = 60` (`scripts/vulture_whitelist.py`) | 0 | must not grow by `full --exit` (earlier `full` runs report) |
+40	| CR-42 | Duplicate blocks of ≥ 8 similar source lines (pylint `duplicate-code`, `[tool.pylint.similarities]` in pyproject.toml) | 0 | must not grow |
+41	
+42	## Boundaries (generated from architecture — do not edit)
+43	- `rllab.core` imports nothing first-party · `worlds` → core · `runlog` → core · `baselines` → core, worlds · `methods` → core, runlog · `train`, `evaluate`, `replay` → core, worlds, baselines, methods, runlog · `charts` → runlog, evaluate · `refcheck` → core, worlds, train, evaluate, runlog · `notes` → nothing · `cli` → all · only `refcheck` imports Stable-Baselines3 or Gymnasium
+44	
+45	## Roles and protected paths
+46	| Role | May edit | May not edit | Stop gate |
+47	|---|---|---|---|
+48	| tester | `tests/intent/**`, within the task&#x27;s `Writes:` | everything else; reads no source | `check.sh collect` (lint, collect, red for the right reason) |
+49	| implementer / solo | `src/**`, `tests/unit/**`, within the task&#x27;s `Writes:`; an interface task also the `tests/contracts/&lt;id&gt;.&lt;symbol&gt;/` its `Writes:` names | the protected list; `tasks/` | `check.sh gate` + protected-path diff against the worktree&#x27;s base |
+50	| reviewer | its worktree, for the mutation check, and its findings file; nothing lands (the orchestrator records findings with `dt finding`) | everything else | runs `check.sh full` by hand |
+51	
+52	**Protected list** (`PROTECTED` in `scripts/check.sh`; `path_guard.sh deny --protected` reads the same list): `tests/intent/**`, `tests/fixtures/**`, `tests/conftest.py`, `pyproject.toml`, `uv.lock`, `CONSTRAINTS.md`, `scripts/**`, `.claude/agents/**`, `.claude/settings.json`, `references/**`, `probes/**`, `tests/contracts/**`. `tests/contracts/**` covers the contract folders that exist at the task&#x27;s base (CR-09). **`Writes:`**: `dt claim` writes the role&#x27;s share of the task&#x27;s `Writes:` to `.claude/.task_writes` and sets the worktree&#x27;s base; `path_guard.sh writes` blocks edits outside it, and builder edits before the claim. Only the orchestrator writes `tasks/` (`dt land`, `dt finding`).
+53	
+54	**Worktree links:** none
+55	
+56	## Review
+57	Run by the reviewer agent: the interface review after Phase 0, a phase review per package at each checkpoint, and the milestone exit. `dt land` already checked each landing&#x27;s `Writes:`, protected paths and gates; review judges what tools can&#x27;t.
+58	
+59	**Interface** (after Phase 0): the code is the contract, no more and no less.
+60	1. Types match `contract.md`: fields, types, invariants. Nothing a step&#x27;s In → Out needs is missing; no helper is frozen.
+61	2. Signatures match the step tables, in their owner modules. Each stub names the open task that owns its step; no logic beyond types and validation.
+62	3. One sample per case the contract names, valid and realistic, never holding a TC&#x27;s expected value. Replay doubles replay an interaction the Protocol allows. Each fake passes its contract&#x27;s cases; anything it does beyond echoing a fixture (filtering, ordering, an error) is a case the real provider must pass too. Contract tests check shape only, never a stub or other state a later task changes.
+63	4. `__init__.py` exports exactly the contract; each `Mitigated by` in the plan&#x27;s dependency graph exists; each split task&#x27;s tester can write its tests from the frozen interface and its `Read:`.
+64	
+65	**Each phase**, per package, tests before code:
+66	1. **Interfaces followed** (CR-09): no frozen type, signature or contract folder changed outside a Revise. Consumers use the declared types: no dict for a dataclass, no reaching into a provider&#x27;s internals, no local redefinition. A stub is replaced only by the task it names; no cross-package import outside the contract; spine tests run on samples and doubles, not another step&#x27;s code.
+67	2. **Tests prove something:** each intent test asserts its TC case or acceptance bullet, loading expected values and tolerances from fixtures; none is assertion-free or weakened; Hypothesis runs the `ci` profile. Unit tests are specific, never computing the expected value with the code under test or testing only a mock. **Mutation check** (`.claude/agents/reviewer.md`): per acceptance bullet, the smallest change that should break it; a mutation no test catches is a finding.
+68	3. **Correct to the spec:** each acceptance bullet truly met, not special-cased to the sample; the error paths the requirement names; seeding and determinism; numerical edge cases.
+69	4. **Simple** (CR-11, CR-12, CR-42): no abstraction with one implementation outside the contract or an AD; no forwarding wrapper, one-method class, or class where a function does; no parameter, flag or config key every caller sets the same; no `try/except` that only re-raises or swallows, no checks the types already guarantee; no loop the library already provides. No near-copies within or across the phase&#x27;s tasks: one concept is one function in its owner module (tests may repeat for readability). Each finding names the simpler form, with the same tests passing.
+70	5. **Pipelines** (CR-10): entry functions read as their step tables (`dt layout`); step owners respected; spine baselines still selectable.
+71	6. **The bar** (CR-07): diff this file, `pyproject.toml`, `scripts/` and `.claude/agents/` against the milestone&#x27;s Base. Any loosening is Critical; new exceptions need an owner and expiry.
+72	7. **Hidden and parallel risks:** where a real provider could act differently from its double; fixed output paths, global state, test-order dependence.
+73	8. **The rest:** readability, security, performance where a QR sets a number; reused reference or probe code has its Caveats handled and fits the contract; `dt lint` clean, pre-build sections replaced by `dt layout` pointers.
+74	
+75	**Milestone exit**, over the whole diff, adds: the Scope&#x27;s Exit holds; every Covers ID has a test; `check.sh full --exit` finds no stub; system tests use real providers; the same sample through a real provider and its double agrees; deferred requirements untouched; pip-audit ran.
+76	
+77	**Severity:** Critical: a frozen interface changed, a contract test pinning a transient state, a weakened test, an intent test that misses a mutation changing its TC&#x27;s expected output, a wrong answer, a loosened bar, a security hole, lost data; it stops the build. Important: a consumer bypassing a type, any other surviving mutation, an unneeded abstraction, a duplicate across tasks. Suggestion and Nit: local. Findings go under the checkpoint block in `tasks/plan.md` (`dt finding`), each with a fix task or a reason.
+78	
+79	## Done
+80	agent-skills `references/definition-of-done.md`, tailored once:
+81	- **Correctness and Quality:** checked per task by the gate.
+82	- **Integration and Documentation:** checked at each checkpoint.
+83	- **The full list:** checked at milestone exit.
+84	
+85	## Exceptions
+86	| ID | Rule | Path | Reason | Owner | Expires |
+87	|---|---|---|---|---|---|
+88	| EX-01 | CR-25 DEP002 | `numpy`, `torch`, `matplotlib` | M1 dependencies, declared before the code imports them | @connor | M1 exit |
+89	</pre></details></div><div class="step" id="S5"><span class="sid">U35.S5</span><span class="kind">say</span>Now the tester&#x27;s test and the existing loop.<details><summary>full text</summary><pre>Now the tester&#x27;s test and the existing loop.</pre></details></div><div class="step" id="S6"><span class="sid">U35.S6</span><span class="kind">Bash</span>git log --oneline -3; git status --short; ls src/rllab/train/loop tests/intent/rllab<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;git log --oneline -3; git status --short; ls src/rllab/train/loop tests/intent/rllab&quot;
+}</pre><div class="lbl">output</div><pre>142e3f5 Merge branch &#x27;dt/M1-T27-tests&#x27; into worktree-agent-a7d90e39a844d00cf
+8f81167 M1-T22: Wire PL-04
+dc6df52 M1-T20: Wire PL-02
+src/rllab/train/loop:
+__init__.py
+run.py
+
+tests/intent/rllab:
+test_checks.py
+test_guard.py
+test_progress.py
+test_snake.py</pre></details></div><div class="step" id="S7"><span class="sid">U35.S7</span><span class="kind">Read</span>/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/project/.claude/worktrees/agent-a7d90e39a844d00cf/tests/intent/rllab/test_guard.py<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/project/.claude/worktrees/agent-a7d90e39a844d00cf/tests/intent/rllab/test_guard.py&quot;
+}</pre><div class="lbl">output</div><pre>1	&quot;&quot;&quot;M1-T27 intent: a non-finite number stops the run as `failed` (PL-02.train_loop, TRAIN-01).
+2	
+3	The world is the contract&#x27;s replay double of a snake episode; the learner is a Learner double
+4	that raises `NonFiniteError(nan)` (or an interrupt) on its 700th observed transition. With a
+5	budget of 6,000 steps the checkpoints fall every 600 steps, so the last good one is 10%.
+6	&quot;&quot;&quot;
+7	
+8	import contextlib
+9	import importlib.util
+10	import json
+11	import math
+12	import sys
+13	from dataclasses import replace
+14	from pathlib import Path
+15	from typing import Any
+16	
+17	import numpy as np
+18	import pytest
+19	
+20	from rllab.core import Array, RunConfig
+21	from rllab.methods import NonFiniteError, Transition
+22	from rllab.runlog import RunRecord
+23	from rllab.train.loop import train_loop
+24	
+25	CONTRACTS = Path(__file__).resolve().parents[2] / &quot;contracts&quot;
+26	FAIL_AT = 700
+27	BUDGET = 6000  # checkpoints every 10% = 600 steps
+28	LAST_GOOD = &quot;ckpt_10.pt&quot;  # the 600-step checkpoint
+29	
+30	
+31	def _kit() -&gt; Any:
+32	    if &quot;contracts_kit&quot; not in sys.modules:
+33	        spec = importlib.util.spec_from_file_location(&quot;contracts_kit&quot;, CONTRACTS / &quot;kit.py&quot;)
+34	        assert spec is not None
+35	        assert spec.loader is not None
+36	        module = importlib.util.module_from_spec(spec)
+37	        sys.modules[&quot;contracts_kit&quot;] = module
+38	        spec.loader.exec_module(module)
+39	    return sys.modules[&quot;contracts_kit&quot;]
+40	
+41	
+42	class ForwardPolicy:
+43	    &quot;&quot;&quot;Always turns &#x27;straight&#x27; (action 1 of the snake&#x27;s Discrete(3)).&quot;&quot;&quot;
+44	
+45	    def act(self, obs: Array, rng: np.random.Generator) -&gt; Array:
+46	        return np.ones(len(obs), dtype=np.int64)
+47	
+48	
+49	class TrippingLearner:
+50	    &quot;&quot;&quot;A Learner double whose `observe` raises `error` on its `at`-th transition.&quot;&quot;&quot;
+51	
+52	    def __init__(self, error: BaseException, at: int = FAIL_AT) -&gt; None:
+53	        self.error = error
+54	        self.at = at
+55	        self.observed = 0
+56	
+57	    def act(self, obs: Array, rng: np.random.Generator) -&gt; Array:
+58	        return np.ones(len(obs), dtype=np.int64)
+59	
+60	    def observe(self, t: Transition) -&gt; None:
+61	        self.observed += 1
+62	        if self.observed == self.at:
+63	            raise self.error
+64	
+65	    def policy(self) -&gt; ForwardPolicy:
+66	        return ForwardPolicy()
+67	
+68	    def state_dict(self) -&gt; dict[str, object]:
+69	        return {&quot;observed&quot;: self.observed}
+70	
+71	
+72	def _config(name: str) -&gt; RunConfig:
+73	    base: RunConfig = _kit().sample(&quot;core.RunConfig&quot;, &quot;snake_default&quot;)
+74	    return replace(base, name=name, budget=BUDGET)
+75	
+76	
+77	def _folder(root: Path, config: RunConfig) -&gt; Path:
+78	    return root / config.world / config.variant / config.name
+79	
+80	
+81	def _run(learner: TrippingLearner, config: RunConfig, root: Path) -&gt; RunRecord:
+82	    world = _kit().double(&quot;core.World&quot;, &quot;snake_seed42&quot;)
+83	    record: RunRecord = train_loop(world, {&quot;snake&quot;: learner}, config, root)
+84	    return record
+85	
+86	
+87	@pytest.mark.intent
+88	def test_nonfinite_stops_the_run_as_failed_at_step_700(tmp_path: Path) -&gt; None:
+89	    learner = TrippingLearner(NonFiniteError(float(&quot;nan&quot;)))
+90	    record = _run(learner, _config(&quot;snake-nonfinite&quot;), tmp_path)
+91	    assert record.status == &quot;failed&quot;
+92	    assert record.failure is not None
+93	    assert record.failure.step == FAIL_AT
+94	    assert math.isnan(record.failure.value)
+95	    assert record.ended is not None
+96	
+97	
+98	@pytest.mark.intent
+99	def test_nonfinite_stops_at_once_without_further_updates(tmp_path: Path) -&gt; None:
+100	    learner = TrippingLearner(NonFiniteError(float(&quot;nan&quot;)))
+101	    _run(learner, _config(&quot;snake-nonfinite-stop&quot;), tmp_path)
+102	    assert learner.observed == FAIL_AT
+103	
+104	
+105	@pytest.mark.intent
+106	def test_nonfinite_keeps_the_600_step_checkpoint(tmp_path: Path) -&gt; None:
+107	    config = _config(&quot;snake-nonfinite-ckpt&quot;)
+108	    learner = TrippingLearner(NonFiniteError(float(&quot;nan&quot;)))
+109	    record = _run(learner, config, tmp_path)
+110	    checkpoints = _folder(tmp_path, config) / &quot;checkpoints&quot;
+111	    assert record.failure is not None
+112	    assert record.failure.checkpoint.name == LAST_GOOD
+113	    assert (checkpoints / LAST_GOOD).is_file()
+114	    assert sorted(p.name for p in checkpoints.iterdir()) == [&quot;ckpt_0.pt&quot;, LAST_GOOD]
+115	
+116	
+117	@pytest.mark.intent
+118	def test_nonfinite_failure_is_written_to_run_json(tmp_path: Path) -&gt; None:
+119	    config = _config(&quot;snake-nonfinite-log&quot;)
+120	    _run(TrippingLearner(NonFiniteError(float(&quot;nan&quot;))), config, tmp_path)
+121	    saved = json.loads((_folder(tmp_path, config) / &quot;run.json&quot;).read_text())
+122	    assert saved[&quot;status&quot;] == &quot;failed&quot;
+123	    assert saved[&quot;failure&quot;][&quot;step&quot;] == FAIL_AT
+124	    assert math.isnan(float(saved[&quot;failure&quot;][&quot;value&quot;]))
+125	    assert Path(saved[&quot;failure&quot;][&quot;checkpoint&quot;]).name == LAST_GOOD
+126	
+127	
+128	@pytest.mark.intent
+129	def test_nonfinite_interrupted_run_is_marked_incomplete(tmp_path: Path) -&gt; None:
+130	    config = _config(&quot;snake-interrupted&quot;)
+131	    with contextlib.suppress(KeyboardInterrupt):
+132	        _run(TrippingLearner(KeyboardInterrupt()), config, tmp_path)
+133	    saved = json.loads((_folder(tmp_path, config) / &quot;run.json&quot;).read_text())
+134	    assert saved[&quot;status&quot;] == &quot;incomplete&quot;
+135	    assert saved[&quot;failure&quot;] is None
+136	</pre></details></div><div class="step" id="S8"><span class="sid">U35.S8</span><span class="kind">Read</span>/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/project/.claude/worktrees/agent-a7d90e39a844d00cf/src/rllab/train/loop/run.py<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/project/.claude/worktrees/agent-a7d90e39a844d00cf/src/rllab/train/loop/run.py&quot;
+}</pre><div class="lbl">output</div><pre>1	&quot;&quot;&quot;Steps a world to the budget, with checkpoints and evaluations, into a run folder.&quot;&quot;&quot;
+2	
+3	import copy
+4	from collections.abc import Mapping
+5	from pathlib import Path
+6	
+7	import numpy as np
+8	
+9	from rllab.core import EVAL_SEEDS, Array, RunConfig, Step, TeamSpec, World, WorldSpec, play_episode
+10	from rllab.methods import Learner, NonFiniteError, Transition
+11	from rllab.runlog import Checkpoint, EvalPoint, Failure, RunRecord, RunWriter
+12	
+13	TRAINING_SEEDS = 1_000_000  # training episode seeds come from [0, 10**6) (AD-05)
+14	
+15	
+16	def train_loop(
+17	    world: World, learners: Mapping[str, Learner], config: RunConfig, root: Path
+18	) -&gt; RunRecord:
+19	    &quot;&quot;&quot;Steps `world` exactly `config.budget` times, writing the run folder under `root`.&quot;&quot;&quot;
+20	    writer = RunWriter(root, config, world.spec)
+21	    try:
+22	        failure = _train(world, learners, config, writer)
+23	    except KeyboardInterrupt:
+24	        writer.close(&quot;incomplete&quot;)
+25	        raise
+26	    if failure is not None:
+27	        return writer.close(&quot;failed&quot;, failure)
+28	    return writer.close(&quot;finished&quot;)
+29	
+30	
+31	def _train(
+32	    world: World, learners: Mapping[str, Learner], config: RunConfig, writer: RunWriter
+33	) -&gt; Failure | None:
+34	    &quot;&quot;&quot;The training steps; the failure if a learner met a non-finite value, else None.&quot;&quot;&quot;
+35	    # The run seed&#x27;s first child seeds the learners (train.setup); the next two are ours.
+36	    explore, episode_seeds = (
+37	        np.random.default_rng(child) for child in np.random.SeedSequence(config.seed).spawn(3)[1:]
+38	    )
+39	    judge = copy.deepcopy(world)  # evaluation never touches the training world (AD-05)
+40	    last = _checkpoints(0, config.budget, learners, writer)[-1]
+41	    for _ in _due(0, config.budget, 20):
+42	        writer.eval(_evaluate(judge, learners, 0))
+43	    now = world.reset(int(episode_seeds.integers(TRAINING_SEEDS)))
+44	    for step in range(1, config.budget + 1):
+45	        actions = _act(world.spec, learners, now.obs, explore)
+46	        after = world.step(actions)
+47	        try:
+48	            for team in world.spec.teams:
+49	                learners[team.name].observe(_transition(team, now, actions, after))
+50	        except NonFiniteError as error:
+51	            return Failure(step, error.value, last.path)
+52	        if after.done or after.truncated:
+53	            writer.episode(world.result())
+54	            after = world.reset(int(episode_seeds.integers(TRAINING_SEEDS)))
+55	        now = after
+56	        last = (_checkpoints(step, config.budget, learners, writer) or [last])[-1]
+57	        for _ in _due(step, config.budget, 20):
+58	            writer.eval(_evaluate(judge, learners, step))
+59	    return None
+60	
+61	
+62	def _act(
+63	    spec: WorldSpec, learners: Mapping[str, Learner], obs: Array, rng: np.random.Generator
+64	) -&gt; Array:
+65	    &quot;&quot;&quot;One action row per agent, each team&#x27;s rows from its learner.&quot;&quot;&quot;
+66	    rows: list[Array] = [np.zeros(0)] * len(spec.agents)
+67	    for team in spec.teams:
+68	        team_actions = learners[team.name].act(obs[list(team.agents)], rng)
+69	        for agent, action in zip(team.agents, team_actions, strict=True):
+70	            rows[agent] = action
+71	    return np.stack(rows)
+72	
+73	
+74	def _transition(team: TeamSpec, before: Step, actions: Array, after: Step) -&gt; Transition:
+75	    &quot;&quot;&quot;The team&#x27;s rows of one world step; `active` as it was before the step.&quot;&quot;&quot;
+76	    rows = list(team.agents)
+77	    return Transition(
+78	        obs=before.obs[rows],
+79	        actions=actions[rows],
+80	        rewards=after.rewards[rows],
+81	        next_obs=after.obs[rows],
+82	        done=after.done,
+83	        truncated=after.truncated,
+84	        active=before.active[rows],
+85	    )
+86	
+87	
+88	def _due(step: int, budget: int, parts: int) -&gt; list[int]:
+89	    &quot;&quot;&quot;The marks `i` in `0..parts` that fall at `step`: `budget * i // parts == step`.&quot;&quot;&quot;
+90	    return [i for i in range(parts + 1) if budget * i // parts == step]
+91	
+92	
+93	def _checkpoints(
+94	    step: int, budget: int, learners: Mapping[str, Learner], writer: RunWriter
+95	) -&gt; list[Checkpoint]:
+96	    &quot;&quot;&quot;The checkpoints due at `step`, one every 10% of the budget.&quot;&quot;&quot;
+97	    due = _due(step, budget, 10)
+98	    if not due:
+99	        return []
+100	    state = {team: learner.state_dict() for team, learner in learners.items()}
+101	    return [writer.checkpoint(10 * i, step, state) for i in due]
+102	
+103	
+104	def _evaluate(world: World, learners: Mapping[str, Learner], step: int) -&gt; EvalPoint:
+105	    &quot;&quot;&quot;Mean scores per team and means per measure over the `EVAL_SEEDS` episodes.&quot;&quot;&quot;
+106	    policies = {team: learner.policy() for team, learner in learners.items()}
+107	    results = [play_episode(world, policies, seed).result for seed in EVAL_SEEDS]
+108	    scores = {t.name: float(np.mean([r.scores[t.name] for r in results])) for t in world.spec.teams}
+109	    measures = {
+110	        m.name: float(np.mean([r.measures[m.name] for r in results])) for m in world.spec.measures
+111	    }
+112	    return EvalPoint(step, scores, measures)
+113	</pre></details></div><div class="step" id="S9"><span class="sid">U35.S9</span><span class="kind">Read</span>/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/project/.claude/worktrees/agent-a7d90e39a844d00cf/src/rllab/train/loop/__init__.py<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/project/.claude/worktrees/agent-a7d90e39a844d00cf/src/rllab/train/loop/__init__.py&quot;
+}</pre><div class="lbl">output</div><pre>1	&quot;&quot;&quot;The training loop of one run.&quot;&quot;&quot;
+2	
+3	from rllab.train.loop.run import train_loop
+4	
+5	__all__ = [&quot;train_loop&quot;]
+6	</pre></details></div><div class="step" id="S10"><span class="sid">U35.S10</span><span class="kind">say</span>Run.py seemingly handles this already. Let me run the tests.<details><summary>full text</summary><pre>Run.py seemingly handles this already. Let me run the tests.</pre></details></div><div class="step" id="S11"><span class="sid">U35.S11</span><span class="kind">Bash</span>uv run pytest tests/intent/rllab/test_guard.py -q -x<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;uv run pytest tests/intent/rllab/test_guard.py -q -x&quot;,
+  &quot;timeout&quot;: 600000
+}</pre><div class="lbl">output</div><pre>Using CPython 3.12.12 interpreter at: /opt/homebrew/opt/python@3.12/bin/python3.12
+Creating virtual environment at: .venv
+   Building rllab @ file:///Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/project/.claude/worktrees/agent-a7d90e39a844d00cf
+      Built rllab @ file:///Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/project/.claude/worktrees/agent-a7d90e39a844d00cf
+Installed 74 packages in 364ms
+.....                                                                    [100%]
+5 passed in 10.15s</pre></details></div><div class="step" id="S12"><span class="sid">U35.S12</span><span class="kind">think</span>All five intent tests pass since run.py already handles NonFiniteError and KeyboardInterrupt, and since I can&#x27;t edit run.py, adding a separate guard.py would just duplicate that logic. I&#x27;ll check whether the gate passes without creating it.<details><summary>full text</summary><pre>All five intent tests pass since run.py already handles NonFiniteError and KeyboardInterrupt, and since I can&#x27;t edit run.py, adding a separate guard.py would just duplicate that logic. I&#x27;ll check whether the gate passes without creating it.
+
+</pre></details></div><div class="step" id="S13"><span class="sid">U35.S13</span><span class="kind">Bash</span>scripts/check.sh gate<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;scripts/check.sh gate&quot;,
+  &quot;timeout&quot;: 600000
+}</pre><div class="lbl">output</div><pre>-&gt; ruff check --ignore-noqa .
+All checks passed!
+-&gt; ruff format --check .
+121 files already formatted
+-&gt; mypy
+Success: no issues found in 53 source files
+-&gt; python scripts/check_size.py src
+-&gt; deptry . --no-ansi
+Scanning 57 files...
+
+Success! No dependency issues found.
+-&gt; lint-imports --no-logo
+
+---------
+Contracts
+---------
+
+Analyzed 72 files, 199 dependencies.
+------------------------------------
+
+Layers: cli &gt; refcheck | charts | notes &gt; train | evaluate | replay &gt; baselines 
+| methods &gt; worlds | runlog &gt; core KEPT
+Independent: notes | refcheck | charts | replay KEPT
+Independent: notes | train | evaluate | replay KEPT
+Independent: charts | train KEPT
+Independent: notes | baselines | methods KEPT
+Independent: notes | worlds | runlog KEPT
+Independent: methods | worlds KEPT
+Independent: baselines | runlog KEPT
+Independent: notes | core KEPT
+Only refcheck imports Stable-Baselines3 or Gymnasium (CHECK-01, AD-08) KEPT
+
+Contracts: 10 kept, 0 broken.
+-&gt; pytest tests/intent tests/unit tests/contracts --no-cov -q -x
+........................................................................ [ 14%]
+........................................................................ [ 28%]
+........................................................................ [ 43%]
+........................................................................ [ 57%]
+........................................................................ [ 72%]
+........................................................................ [ 86%]
+...................................................................      [100%]
+499 passed in 19.61s
+-&gt; bash scripts/floor_guard.sh
+floor_guard: clean
+-&gt; protected files unchanged since refs/worktree/checks-base</pre></details></div><div class="step" id="S14"><span class="sid">U35.S14</span><span class="kind">say</span>DONE M1-T27 implementer<details><summary>full text</summary><pre>DONE M1-T27 implementer</pre></details></div>
+<h2>Commits</h2>
+<p>None.</p>
+<h2>Returned</h2>
+<pre>DONE M1-T27 implementer</pre>
+</body></html>

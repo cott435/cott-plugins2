@@ -1,0 +1,609 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1"><title>T03 turn</title>
+<style>
+:root{--bg:#fbfbfa;--fg:#1d1d1f;--muted:#6b6b70;--line:#d9d9de;--box:#fff;--rowp:#eef3fb;--band:#fff4d6;
+--ok:#2e7d32;--bad:#c62828;--warn:#b26a00;--idle:#6b6b70}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#17171a;--fg:#ececf0;--muted:#9a9aa3;
+--line:#34343a;--box:#222227;--rowp:#1d2433;--band:#3a3015;--ok:#6fcf73;--bad:#ff6b6b;--warn:#f0b35a;--idle:#9a9aa3}}
+:root[data-theme="dark"]{--bg:#17171a;--fg:#ececf0;--muted:#9a9aa3;--line:#34343a;--box:#222227;--rowp:#1d2433;
+--band:#3a3015;--ok:#6fcf73;--bad:#ff6b6b;--warn:#f0b35a;--idle:#9a9aa3}
+body{margin:0;padding:16px;background:var(--bg);color:var(--fg);font:14px/1.45 -apple-system,system-ui,sans-serif}
+h1{font-size:18px;margin:0 0 4px}h2{font-size:15px;margin:22px 0 8px}.sub{color:var(--muted)}
+table{border-collapse:collapse;margin:4px 0 8px}td,th{border-bottom:1px solid var(--line);padding:4px 10px;text-align:left;
+vertical-align:top}th{color:var(--muted);font-weight:600}.chips span{display:inline-block;margin:0 4px 2px 0}
+.legend span{margin-right:14px;white-space:nowrap}.sw{display:inline-block;width:10px;height:10px;border-radius:2px;
+margin-right:4px;vertical-align:-1px}.scroll{overflow:auto;max-height:88vh;border:1px solid var(--line);border-radius:8px}
+.chart{display:grid;width:max-content}.chart>div{line-height:0}.corner{position:sticky;top:0;left:0;z-index:3}
+.colhead{position:sticky;top:0;z-index:2}.rowhead{position:sticky;left:0;z-index:2}
+svg.bg{background:var(--bg)}.colhead svg{border-bottom:1px solid var(--line)}.rowhead svg{border-right:1px solid var(--line)}
+.ok{color:var(--ok);fill:var(--ok)}.bad{color:var(--bad);fill:var(--bad)}.warn{color:var(--warn);fill:var(--warn)}
+.idle{color:var(--idle);fill:var(--idle)}
+svg text{fill:var(--fg);font-family:-apple-system,system-ui,sans-serif}
+.box{fill:var(--box);stroke:var(--line)}.unit:hover .box{stroke:var(--fg)}
+.role{font-size:12px;font-weight:600}.uid,.wmeta,.lmeta,.meta{font-size:10px;fill:var(--muted)}
+.sub{font-size:10.5px;fill:var(--muted)}.badge{font-size:11px;font-weight:600}
+.meta.bad{fill:var(--bad);font-weight:600}.lane{font-size:13px;font-weight:700}.wave{font-size:13px;font-weight:700}
+.par{fill:#4e79a7}.ser{fill:var(--muted)}.rowp{fill:var(--rowp)}.rows{fill:transparent}.band{fill:var(--band)}
+.bandt{font-size:11.5px}.grid{stroke:var(--line)}.link{stroke:var(--muted);stroke-width:1.2;opacity:.55}
+.arrowhead{fill:var(--muted)}.marks{font-size:10.5px}.audit{stroke:var(--box);stroke-width:2}.auditn{font-size:10px;font-weight:700;fill:#fff}
+a{color:inherit}svg a .box{cursor:pointer}
+
+:root{--c0:#2a78d6;--c1:#eb6834;--c2:#1baf7a;--c3:#eda100;--c4:#e87ba4;--c5:#008300;--c6:#6250d6;--c7:#e34948;
+--cx:#8a8985;--main:#52514e;--read:#dcdbd5;--readfg:#1d1d1f}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--c0:#3987e5;--c1:#d95926;--c2:#199e70;
+--c3:#c98500;--c4:#d55181;--c5:#008300;--c6:#9085e9;--c7:#e66767;--cx:#77766f;--main:#c3c2b7;--read:#3b3b40;
+--readfg:#ececf0}}
+:root[data-theme="dark"]{--c0:#3987e5;--c1:#d95926;--c2:#199e70;--c3:#c98500;--c4:#d55181;--c5:#008300;
+--c6:#9085e9;--c7:#e66767;--cx:#77766f;--main:#c3c2b7;--read:#3b3b40;--readfg:#ececf0}
+.c0{fill:var(--c0);background:var(--c0)}.c1{fill:var(--c1);background:var(--c1)}.c2{fill:var(--c2);background:var(--c2)}
+.c3{fill:var(--c3);background:var(--c3)}.c4{fill:var(--c4);background:var(--c4)}.c5{fill:var(--c5);background:var(--c5)}
+.c6{fill:var(--c6);background:var(--c6)}.c7{fill:var(--c7);background:var(--c7)}.cx{fill:var(--cx);background:var(--cx)}
+.cmain{fill:var(--main)}.sc0{stroke:var(--c0)}.sc1{stroke:var(--c1)}.sc2{stroke:var(--c2)}
+.tl text,.sm text,.lc text{font-size:10.5px;fill:var(--muted)}.tl .lbl-in,.sm .lbl-in{fill:#fff;font-size:10.5px;font-weight:600}
+.tl .rowl,.sm .rowl,.lc .rowl{fill:var(--fg);font-size:11.5px;font-weight:600}.tl .band{fill:var(--rowp)}
+.tl .brk{stroke:var(--muted);stroke-dasharray:2 3}.tl a:hover rect,.sm a:hover rect{stroke:var(--fg);stroke-width:1.5}
+.axis{stroke:var(--line)}.sm .val{fill:var(--fg);font-weight:600}.lc path.ln{fill:none;stroke-width:2}
+.lc circle{stroke:var(--bg);stroke-width:2}.lc .end{font-weight:600;fill:var(--fg)}
+.tiles{display:flex;flex-wrap:wrap;gap:10px;margin:12px 0}.tile{border:1px solid var(--line);border-radius:8px;
+padding:8px 12px;min-width:110px;background:var(--box)}.tile b{display:block;font-size:20px;line-height:1.2}
+.tile span{font-size:12px;color:var(--muted)}.tile i{font-style:normal;font-size:12px;margin-left:6px}
+.fm{border-collapse:separate;border-spacing:2px}.fm td,.fm th{border:0;padding:0;text-align:center;font-size:11px}
+.fm th{padding:0 2px;font-weight:600}.fm td.f,.fm th.f{text-align:left;padding-right:10px;white-space:nowrap;
+position:sticky;left:0;background:var(--bg);font:11.5px ui-monospace,Menlo,monospace;
+max-width:380px;overflow:hidden;text-overflow:ellipsis}
+.fm td.cell{min-width:22px;height:20px;border-radius:3px}.fm td.fw{background:var(--c0);color:#fff;font-weight:700}
+.fm td.fe{background:var(--c1);color:#fff;font-weight:700}.fm td.fr{background:var(--read);color:var(--readfg)}
+.fm td.n{color:var(--muted);padding:0 6px}.fm tr.grp td{text-align:left;padding-top:8px;color:var(--muted);
+font-weight:600}
+.key{display:inline-block;min-width:18px;text-align:center;border-radius:3px;font-size:11px;margin-right:4px}
+.bar{display:inline-block;height:9px;border-radius:2px;vertical-align:0}
+
+pre{white-space:pre-wrap;word-break:break-word;background:var(--box);border:1px solid var(--line);border-radius:6px;
+padding:8px 10px;margin:4px 0;font:12px/1.45 ui-monospace,SFMono-Regular,Menlo,monospace;max-width:100%;overflow:auto}
+.step{border-top:1px solid var(--line);padding:6px 0}.step:target{background:var(--rowp)}
+.sid{font:12px ui-monospace,Menlo,monospace;color:var(--muted);margin-right:8px}.kind{font-weight:600;margin-right:8px}
+.err{color:var(--bad);font-weight:600}.hook{color:var(--bad);margin:4px 0 0 16px}.lbl{font-size:12px;color:var(--muted);margin-top:6px}
+details summary{cursor:pointer;color:var(--muted);font-size:12px}.head td:first-child{color:var(--muted)}
+.top{font-size:13px}.narr{list-style:none;padding-left:0}.narr li{margin:3px 0}
+</style></head>
+<body>
+<p class="top"><a href="../flow.html">← the run's flow chart</a></p>
+<p class="top"><a href="../plan/T03.html">The plan as of T03</a>: this turn changed the plan (+1 ~0 −0) · <a href="../plan/index.html">plan map</a></p>
+<h1>T03 · turn · Yes: evaluate.evaluate has to change. Run architecture-design Revise on its contract section now; I </h1>
+<table class="head"><tr><td>Type</td><td>turn</td></tr><tr><td>Description</td><td>Yes: evaluate.evaluate has to change. Run architecture-design Revise on its contract section now; I </td></tr><tr><td>Spawned by</td><td>user</td></tr><tr><td>Model</td><td>claude-opus-5-5</td></tr><tr><td>Start</td><td>2026-10-18 20:17:43 UTC</td></tr><tr><td>Duration</td><td>1 min</td></tr><tr><td>Tool calls</td><td>18</td></tr><tr><td>Errors</td><td>0</td></tr><tr><td>Hook blocks</td><td>0</td></tr><tr><td>Tokens</td><td>6.4k out · 25.1k new in · 521k cached in · peak context 72.9k</td></tr><tr><td>Skills invoked</td><td>dev-team:architecture-design</td></tr><tr><td>Files written or edited</td><td>docs/packages/rllab/contract.md, docs/architecture.md</td></tr><tr><td>Definition</td><td>none</td></tr><tr><td>Steps</td><td>25</td></tr><tr><td>Finished</td><td>yes</td></tr></table>
+
+
+<h2>Prompt</h2>
+<pre>Yes: evaluate.evaluate has to change. Run architecture-design Revise on its contract section now; I approve the revision when you show it.</pre>
+<h2>Files</h2>
+<table><tr><th>Op</th><th>File</th><th>Calls</th><th>By</th><th>Via</th><th>Steps</th></tr><tr><td>edit</td><td><code>docs/architecture.md</code></td><td>2</td><td>main</td><td>Edit</td><td><a href="#D38">D38</a> <a href="#D42">D42</a></td></tr><tr><td>edit</td><td><code>docs/packages/rllab/contract.md</code></td><td>2</td><td>main</td><td>Edit</td><td><a href="#D36">D36</a> <a href="#D37">D37</a></td></tr><tr><td>read</td><td><code>../plugin/dev-team/skills/architecture-design/references/revise.md</code></td><td>1</td><td>main</td><td>Read</td><td><a href="#D27">D27</a></td></tr><tr><td>read</td><td><code>docs/architecture.md</code></td><td>2</td><td>main</td><td>Read</td><td><a href="#D32">D32</a> <a href="#D33">D33</a></td></tr><tr><td>read</td><td><code>docs/packages/rllab/contract.md</code></td><td>2</td><td>main</td><td>Read, Bash</td><td><a href="#D29">D29</a> <a href="#D35">D35</a></td></tr></table>
+<h2>Steps</h2>
+<div class="step" id="SD21"><span class="sid">D21</span><span class="kind">user</span>Yes: evaluate.evaluate has to change. Run architecture-design Revise on its contract section now; I approve the revision when you show it.<details><summary>full text</summary><pre>Yes: evaluate.evaluate has to change. Run architecture-design Revise on its contract section now; I approve the revision when you show it.</pre></details></div><div class="step" id="SD22"><span class="sid">D22</span><span class="kind">Bash</span>python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r1/with_skill/plugin/dev-team/scripts/dt.py build resolve --help<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r1/with_skill/plugin/dev-team/scripts/dt.py build resolve --help&quot;,
+  &quot;description&quot;: &quot;Show build resolve usage&quot;
+}</pre><div class="lbl">output</div><pre>usage: dt build resolve [-h] [--note NOTE] [--test-stands] id
+
+positional arguments:
+  id             a finding (M1-R03) or a task (M1-T05)
+
+options:
+  -h, --help     show this help message and exit
+  --note NOTE    the decision, in the user&#x27;s words
+  --test-stands  after a TEST-WRONG: the user says the test is right; keep it
+                 and retry the implementer</pre></details></div><div class="step" id="SD23"><span class="sid">D23</span><span class="kind">Skill</span>dev-team:architecture-design Revise: evaluate package contract — evaluate.evaluate takes 7 params, bar max-args=5 (M1-T01 CONTRACT-CHANGE escalation)<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;skill&quot;: &quot;dev-team:architecture-design&quot;,
+  &quot;args&quot;: &quot;Revise: evaluate package contract — evaluate.evaluate takes 7 params, bar max-args=5 (M1-T01 CONTRACT-CHANGE escalation)&quot;
+}</pre><div class="lbl">output</div><pre>Launching skill: dev-team:architecture-design</pre></details></div><div class="step" id="SD24"><span class="sid">D24</span><span class="kind">skill-body</span>skill loaded from `/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r1/with_skill/plugin/dev-team/skills/architecture-design`</div><div class="step" id="SD25"><span class="sid">D25</span><span class="kind">Bash</span>python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r1/with_skill/plugin/dev-team/scripts/dt.py build resolve M1-T01 --note &quot;Yes: evaluate.evaluate has to change. Run architecture-design Revise on its contract section now; I approve the revision when you show it.&quot;<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r1/with_skill/plugin/dev-team/scripts/dt.py build resolve M1-T01 --note \&quot;Yes: evaluate.evaluate has to change. Run architecture-design Revise on its contract section now; I approve the revision when you show it.\&quot;&quot;,
+  &quot;description&quot;: &quot;Record the user&#x27;s decision on M1-T01&quot;
+}</pre><div class="lbl">output</div><pre>{
+  &quot;resolved&quot;: &quot;M1-T01&quot;,
+  &quot;kind&quot;: &quot;task&quot;,
+  &quot;escalations_cleared&quot;: [
+    &quot;M1-T01.solo&quot;
+  ],
+  &quot;reopened_tester&quot;: false,
+  &quot;test_stands&quot;: false
+}</pre></details></div><div class="step" id="SD26"><span class="sid">D26</span><span class="kind">Bash</span>python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r1/with_skill/plugin/dev-team/scripts/dt.py status --skill architecture-design<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r1/with_skill/plugin/dev-team/scripts/dt.py status --skill architecture-design&quot;,
+  &quot;description&quot;: &quot;Show architecture-design status&quot;
+}</pre><div class="lbl">output</div><pre>skill: architecture-design
+mode: current
+docs: brief Accepted · spec Approved · architecture Approved (Single package) · roadmap ok · plan M1 Approved · constraints Approved
+next ids: AD-17 PL-07 TC-72 S4 M4 M1-T32
+references_unindexed: none
+references_changed: none
+references_missing: none
+spec: Approved, 97 live requirements
+architecture: Approved
+next_decision: AD-17
+uncovered: none
+changed_since: none
+spec_rows_pending: none
+stale: none
+package_docs: none
+packages_found: .
+skills: null-hypothesis-testing
+broken_fences: none
+contracts_missing: none
+legacy_layout: none
+grow_triggers: rllab: 6 pipelines &gt; 3
+stale_contracts: none
+probes_answered: none
+probes_failed: none</pre></details></div><div class="step" id="SD27"><span class="sid">D27</span><span class="kind">Read</span>/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r1/with_skill/plugin/dev-team/skills/architecture-design/references/revise.md<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r1/with_skill/plugin/dev-team/skills/architecture-design/references/revise.md&quot;
+}</pre><div class="lbl">output</div><pre>1	# Revise
+2	
+3	Read when `dt status --skill architecture-design` reports Revise: a technical change with no spec change, or probe results to fold in. It ends at the Review Gate in `../SKILL.md`, following `writing-rules.md`. Example: `examples-revise.md`.
+4	
+5	1. Write a new decision whose Context explains what was learned (&quot;the simulator is 40× too slow for QR-02 at 1M steps&quot;). Then supersede the old decision if the new one reverses it, or revise it in place if the new one changes only part of it (`decisions.md`).
+6	2. Update every section and contract the change touches (tech stack, components, Overview; contracts per `contracts.md`), and run the Review Gate.
+7	3. If a contract changes, list its consumers (its **Used by**): their pipelines and tasks need revisiting. A frozen interface&#x27;s type, samples and fake change with it, in a new interface task Replan adds (a `contract-change` edge).
+8	
+9	## Probe results
+10	
+11	For each probe in `probes_answered` or `probes_failed`, read its entry with `dt section PB-NN` (its Verdict, each check&#x27;s Result, its Caveats), never `probes/`. Then, for each decision it informs:
+12	
+13	| Result | Change |
+14	|---|---|
+15	| Every check passed | Cite the finding in the decision&#x27;s Context (&quot;PB-01, 2026-10-20: 6 of 6 institutions link; history 13–24 months&quot;) and delete its Risks line. It becomes Accepted at approval |
+16	| Waived | Cite the waiver and the user&#x27;s reason in Context; keep the Risks line. It becomes Accepted at approval |
+17	| A check failed, and another option still meets the requirements | Steps 1–3: revise the decision in place, or supersede it |
+18	| A check failed, and no affordable option meets a requirement | Name the requirement and the finding at the gate. Only the user can change it, through `spec-writing` |
+19	| Observed fields differ from a contract type | The type&#x27;s fields and invariants follow the evidence (&quot;`merchant_entity_id` is None on 38% of rows&quot;); its **Cases** may name the probe&#x27;s samples (`contracts.md`) |
+20	</pre></details></div><div class="step" id="SD28"><span class="sid">D28</span><span class="kind">Bash</span>ls docs docs/packages docs/packages/*; grep -n &quot;evaluate&quot; docs/packages/*/contract.md | head -60<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;ls docs docs/packages docs/packages/*; grep -n \&quot;evaluate\&quot; docs/packages/*/contract.md | head -60&quot;,
+  &quot;description&quot;: &quot;Locate the evaluate contract&quot;
+}</pre><div class="lbl">output</div><pre>docs:
+architecture.md
+brief.md
+ideas
+packages
+roadmap.md
+routes.md
+spec.md
+
+docs/packages:
+rllab
+
+docs/packages/rllab:
+contract.md
+pipelines.md
+tests.md
+18:- **Boundary:** train, evaluate, reference, lab · **Fixtures:** tests/contracts/core.Env/ · **Cases:** a recorded 20-step Snake game ending in a wall hit; a recorded 9-step corridor game reaching the goal; a recorded 30-step 8-fish tank game with 2 catches; a recorded 40-step predator-prey game with 1 catch and 2 pellets eaten
+19:- **Used by:** envs (provider), train, evaluate, reference, lab; PL-01, PL-03, PL-04, PL-05, PL-06
+30:- **Boundary:** envs, train, evaluate, lab · **Fixtures:** tests/contracts/core.SOLO/ · **Cases:** the constant
+31:- **Used by:** envs, train, evaluate, lab; PL-01, PL-03
+42:- **Boundary:** train, evaluate, reference · **Fixtures:** tests/contracts/core.StepResult/ · **Cases:** an ordinary step; eating food; a wall collision; starvation truncation; a tank step with one fish caught; the tank&#x27;s 1,000-step truncation; a predator-prey step with a catch
+43:- **Used by:** envs, train, evaluate, reference; PL-01, PL-03
+60:- **Boundary:** train, evaluate, lab · **Fixtures:** tests/contracts/core.Agent/ · **Cases:** a replay double recording 5 act/learn calls of a tabular agent
+61:- **Used by:** agents, baselines, reference (providers); train, evaluate, lab; PL-01, PL-03, PL-04, PL-05
+279:- **Boundary:** evaluate, viz · **Fixtures:** tests/contracts/runs.GameRecording/ · **Cases:** a 12-step Snake game ending in a self-collision; a 9-step corridor game; a 30-step 8-fish tank game with 2 catches; a 40-step predator-prey game with 1 catch
+280:- **Used by:** evaluate, viz, lab; PL-01, PL-03, PL-05
+285:- **Boundary:** train, reference, evaluate, viz, lab · **Fixtures:** tests/contracts/runs.RunRecord/ · **Cases:** a complete tabular corridor run; an incomplete Snake run with 3 curve points; a complete predator-prey rung-3 run with 10 generations per team
+286:- **Used by:** train, reference, evaluate, viz, lab, selfplay; PL-01, PL-02, PL-03, PL-04, PL-05, PL-06
+310:- **Boundary:** evaluate, viz, lab · **Fixtures:** tests/contracts/runs.open_run/ · **Cases:** a complete corridor run; a folder missing `settings.json`
+311:- **Used by:** evaluate, viz, lab; PL-03, PL-04, PL-05, PL-06
+313:## evaluate
+315:### evaluate.ScoreSet: type
+318:- **Boundary:** compare, lab · **Fixtures:** tests/contracts/evaluate.ScoreSet/ · **Cases:** 200 scripted-player scores for seed 0; 200 random-player scores for seed 0; 200 scripted-fish scores for seed 0
+321:### evaluate.eval_seeds: Held-out evaluation seeds
+325:- **Boundary:** train · **Fixtures:** tests/contracts/evaluate.eval_seeds/ · **Cases:** seeds for train seed 0, n=200
+326:- **Used by:** evaluate, train; PL-01, PL-03
+328:### evaluate.evaluate: Greedy evaluation
+329:`def evaluate(make_env: Callable[[], Env], agents: Mapping[str, Agent], *, team: str = SOLO, player: str, train_seed: int, n_games: int = 200, record: int = 0) -&gt; ScoreSet`
+331:- **Boundary:** train, reference, lab · **Fixtures:** tests/contracts/evaluate.evaluate/ · **Cases:** a fake returning the scripted-player ScoreSet for seed 0
+338:- **Invariants:** `agents` has one agent per team; the teams `settings.opponents` marks `learn` (or `SOLO` in a single-team run) are learners. Steps the environment for `settings.steps` steps, building one batch-first `Transition` per learning team and calling that team&#x27;s `learn` after every step (CORE-07). With `settings.generations`, it saves each learner&#x27;s generation every tenth of the run (SELF-04); with `self_play == &quot;pool&quot;`, each game&#x27;s opponent for every learner comes from its `selfplay.OpponentPool` (SELF-03, AD-14). Curve points evaluate the first learning team against the run&#x27;s fixed opposition. It evaluates every `eval_every` steps (including step 0) into a `CurvePoint`. It prints a progress line at least every 30 s (RUN-04). It saves each learner&#x27;s checkpoint and 5 recorded evaluation games at the end. The same settings give the same curve (RUN-03). It knows nothing environment-specific (CORE-02).
+347:- **Invariants:** `settings.agent == &quot;reference&quot;`. Trains Stable-Baselines3 DQN on Snake (AD-04), or PPO on the single-fish tank or on the predator-prey predator against scripted prey (AD-10, AD-15), through the AD-03 adapter with `device=&quot;cpu&quot;` and the matching one-to-one settings mapping. Curve points use `evaluate.evaluate` at the same `eval_every`. The checkpoint loads into `ReferencePlayer`.</pre></details></div><div class="step" id="SD29"><span class="sid">D29</span><span class="kind">Read</span>/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r1/with_skill/project/docs/packages/rllab/contract.md offset=300 limit=60<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r1/with_skill/project/docs/packages/rllab/contract.md&quot;,
+  &quot;offset&quot;: 300,
+  &quot;limit&quot;: 60
+}</pre><div class="lbl">output</div><pre>300	
+301	### runs.create_run: Start a run folder
+302	`def create_run(settings: RunSettings, *, root: Path = Path(&quot;runs&quot;)) -&gt; RunWriter`
+303	- **Invariants:** writes `settings.json` and `status=running` before returning. The folder name is unique.
+304	- **Boundary:** train, reference · **Fixtures:** tests/contracts/runs.create_run/ · **Cases:** a fresh corridor run folder
+305	- **Used by:** train, reference; PL-01, PL-02
+306	
+307	### runs.open_run: Read a run folder
+308	`def open_run(path: Path) -&gt; RunRecord`
+309	- **Errors:** `FileNotFoundError` naming the run if the folder or `settings.json` is missing. `ValueError` naming the file if a recording is unreadable.
+310	- **Boundary:** evaluate, viz, lab · **Fixtures:** tests/contracts/runs.open_run/ · **Cases:** a complete corridor run; a folder missing `settings.json`
+311	- **Used by:** evaluate, viz, lab; PL-03, PL-04, PL-05, PL-06
+312	
+313	## evaluate
+314	
+315	### evaluate.ScoreSet: type
+316	`@dataclass(frozen=True) class ScoreSet: player: str; train_seed: int; scores: np.ndarray; games: tuple[GameRecording, ...]`
+317	- **Invariants:** `scores` has one float score per evaluation game (food eaten, or mean survival steps per fish). `games` holds the first `record` games played.
+318	- **Boundary:** compare, lab · **Fixtures:** tests/contracts/evaluate.ScoreSet/ · **Cases:** 200 scripted-player scores for seed 0; 200 random-player scores for seed 0; 200 scripted-fish scores for seed 0
+319	- **Used by:** compare, train, lab; PL-03, PL-04
+320	
+321	### evaluate.eval_seeds: Held-out evaluation seeds
+322	`def eval_seeds(train_seed: int, n: int) -&gt; list[int]`
+323	- **Invariants:** returns `1_000_000 + 1000·train_seed + i` for `i &lt; n`, never overlapping any training seed (DATA-01).
+324	- **Errors:** `ValueError` if `n` &gt; 1000 or `train_seed` ≥ 1,000,000
+325	- **Boundary:** train · **Fixtures:** tests/contracts/evaluate.eval_seeds/ · **Cases:** seeds for train seed 0, n=200
+326	- **Used by:** evaluate, train; PL-01, PL-03
+327	
+328	### evaluate.evaluate: Greedy evaluation
+329	`def evaluate(make_env: Callable[[], Env], agents: Mapping[str, Agent], *, team: str = SOLO, player: str, train_seed: int, n_games: int = 200, record: int = 0) -&gt; ScoreSet`
+330	- **Invariants:** `agents` has one agent per team of the environment; the scores are `team`&#x27;s `score:&lt;team&gt;`. Plays `n_games` games on `eval_seeds(train_seed, n_games)` with `explore=False`. It never calls `learn`. It records the first `record` games (REPLAY-03). 200 games of any environment take ≤ 60 s on the laptop (QR-04).
+331	- **Boundary:** train, reference, lab · **Fixtures:** tests/contracts/evaluate.evaluate/ · **Cases:** a fake returning the scripted-player ScoreSet for seed 0
+332	- **Used by:** train, reference, lab; PL-01, PL-02, PL-03, PL-04, PL-05
+333	
+334	## train
+335	
+336	### train.train: Training loop
+337	`def train(make_env: Callable[[], Env], agents: Mapping[str, Agent], settings: RunSettings, *, root: Path = Path(&quot;runs&quot;)) -&gt; RunRecord`
+338	- **Invariants:** `agents` has one agent per team; the teams `settings.opponents` marks `learn` (or `SOLO` in a single-team run) are learners. Steps the environment for `settings.steps` steps, building one batch-first `Transition` per learning team and calling that team&#x27;s `learn` after every step (CORE-07). With `settings.generations`, it saves each learner&#x27;s generation every tenth of the run (SELF-04); with `self_play == &quot;pool&quot;`, each game&#x27;s opponent for every learner comes from its `selfplay.OpponentPool` (SELF-03, AD-14). Curve points evaluate the first learning team against the run&#x27;s fixed opposition. It evaluates every `eval_every` steps (including step 0) into a `CurvePoint`. It prints a progress line at least every 30 s (RUN-04). It saves each learner&#x27;s checkpoint and 5 recorded evaluation games at the end. The same settings give the same curve (RUN-03). It knows nothing environment-specific (CORE-02).
+339	- **Errors:** on `KeyboardInterrupt`, finishes the run `incomplete`, then re-raises
+340	- **Boundary:** lab · **Fixtures:** tests/contracts/train.train/ · **Cases:** a fake returning a complete 3-point corridor RunRecord
+341	- **Used by:** lab; PL-01
+342	
+343	## reference
+344	
+345	### reference.train_reference: Library agent training
+346	`def train_reference(settings: RunSettings, *, root: Path = Path(&quot;runs&quot;)) -&gt; RunRecord`
+347	- **Invariants:** `settings.agent == &quot;reference&quot;`. Trains Stable-Baselines3 DQN on Snake (AD-04), or PPO on the single-fish tank or on the predator-prey predator against scripted prey (AD-10, AD-15), through the AD-03 adapter with `device=&quot;cpu&quot;` and the matching one-to-one settings mapping. Curve points use `evaluate.evaluate` at the same `eval_every`. The checkpoint loads into `ReferencePlayer`.
+348	- **Errors:** `ValueError` unless the settings are Snake with the compact view, the tank with one fish and the full view, or predator-prey with `opponents == {&quot;predator&quot;: &quot;learn&quot;, &quot;prey&quot;: &quot;scripted&quot;}`
+349	- **Boundary:** lab · **Fixtures:** tests/contracts/reference.train_reference/ · **Cases:** a fake returning a complete 3-point reference RunRecord
+350	- **Used by:** lab; PL-02
+351	
+352	### reference.ReferencePlayer: Trained library agent as an Agent
+353	`class ReferencePlayer(Agent): def __init__(self, checkpoint: Path)`
+354	- **Invariants:** `act` returns the library model&#x27;s deterministic action (greedy for DQN, the mean for PPO), batch-first with one agent. `learn` is a no-op.
+355	- **Boundary:** lab · **Fixtures:** tests/contracts/reference.ReferencePlayer/ · **Cases:** a replay double of 5 greedy `act` calls
+356	- **Used by:** lab; PL-03, PL-04
+357	
+358	## selfplay
+359	</pre></details></div><div class="step" id="SD30"><span class="sid">D30</span><span class="kind">Bash</span>grep -rn &quot;evaluate(&quot; docs tasks src tests 2&gt;/dev/null | grep -v &quot;^docs/packages/rllab/contract.md:329&quot; | head -40; grep -n &quot;^## \|^### AD-\|Changelog\|^\*\*Status&quot; docs/architecture.md | head -60<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;grep -rn \&quot;evaluate(\&quot; docs tasks src tests 2&gt;/dev/null | grep -v \&quot;^docs/packages/rllab/contract.md:329\&quot; | head -40; grep -n \&quot;^## \\|^### AD-\\|Changelog\\|^\\*\\*Status\&quot; docs/architecture.md | head -60&quot;,
+  &quot;description&quot;: &quot;Find evaluate callers and architecture structure&quot;
+}</pre><div class="lbl">output</div><pre>docs/packages/rllab/pipelines.md:75:def run_evaluate(target: str, seed: int, env: str = &quot;snake&quot;, team: str = SOLO, vs: str = &quot;scripted&quot;) -&gt; ScoreSet:
+docs/packages/rllab/pipelines.md:78:    scores = evaluate(make, agents, team=team, player=target, train_seed=seed)
+3:**Status:** Approved · **Shape:** Single package · **Last updated:** 2026-10-17 · **Spec:** [spec.md](spec.md)
+5:## Overview
+25:## Tech stack
+38:## Components
+58:## Interfaces
+61:## Data
+66:## Cross-cutting concerns
+75:## Project layout
+84:## Decisions
+85:### AD-01: Python 3.12, one package `rllab`
+86:**Status:** Accepted · **Date:** 2026-10-17 · **Scope:** system
+92:### AD-02: Hand-written agents on NumPy arrays and PyTorch tensors
+93:**Status:** Accepted · **Date:** 2026-10-17 · **Scope:** `agents`
+99:### AD-03: Own environment protocol, shaped like Gymnasium
+100:**Status:** Accepted · **Date:** 2026-10-17 · **Scope:** `core`
+106:### AD-04: Stable-Baselines3 DQN as the reference implementation
+107:**Status:** Accepted · **Date:** 2026-10-17 · **Scope:** `reference`
+114:### AD-05: An MLP for the compact view, a small CNN for the full grid
+115:**Status:** Accepted · **Date:** 2026-10-17 · **Scope:** `agents`
+121:### AD-06: One folder per run; TOML settings in, plain files out
+122:**Status:** Accepted · **Date:** 2026-10-17 · **Scope:** `runs`
+128:### AD-07: Matplotlib for charts and the replay viewer
+129:**Status:** Accepted · **Date:** 2026-10-17 · **Scope:** `viz`
+135:### AD-08: Single-threaded, deterministic CPU training
+136:**Status:** Accepted · **Date:** 2026-10-17 · **Scope:** system
+142:### AD-09: A batch-first environment interface over agents, adopted before M1 is built
+143:**Status:** Accepted · **Date:** 2026-10-17 · **Scope:** `core`
+149:### AD-10: Stable-Baselines3 PPO as the tank&#x27;s reference
+150:**Status:** Accepted · **Date:** 2026-10-17 · **Scope:** `reference`
+157:### AD-11: Policy-gradient agents: a Gaussian MLP policy with the library&#x27;s defaults
+158:**Status:** Accepted · **Date:** 2026-10-17 · **Scope:** `agents`
+164:### AD-12: Vectorised tank physics; recordings carry the board kind
+165:**Status:** Accepted · **Date:** 2026-10-17 · **Scope:** `envs`
+171:### AD-13: Teams in the core, adopted before M1 is built
+172:**Status:** Accepted · **Date:** 2026-10-17 · **Scope:** `core`
+178:### AD-14: Self-play through opponent pools inside the shared training loop
+179:**Status:** Accepted · **Date:** 2026-10-17 · **Scope:** `selfplay`, `train`
+185:### AD-15: The predator-prey reference plays the predator against frozen scripted prey
+186:**Status:** Accepted · **Date:** 2026-10-17 · **Scope:** `reference`
+192:### AD-16: Predator-prey reuses the tank&#x27;s vectorised physics
+193:**Status:** Accepted · **Date:** 2026-10-17 · **Scope:** `envs`
+199:## Risks and open questions
+209:## Changelog</pre></details></div><div class="step" id="SD31"><span class="sid">D31</span><span class="kind">Bash</span>ls /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r1/with_skill/plugin/dev-team/skills/architecture-design/references/<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;ls /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r1/with_skill/plugin/dev-team/skills/architecture-design/references/&quot;,
+  &quot;description&quot;: &quot;List architecture-design references&quot;
+}</pre><div class="lbl">output</div><pre>components.md
+contracts.md
+decisions.md
+examples-extend.md
+examples-grow.md
+examples-new-multi.md
+examples-new.md
+examples-revise.md
+extend.md
+grow.md
+new.md
+revise.md
+shape.md
+sync.md
+templates.md
+writing-rules.md</pre></details></div><div class="step" id="SD32"><span class="sid">D32</span><span class="kind">Read</span>/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r1/with_skill/project/docs/architecture.md offset=55 limit=30<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r1/with_skill/project/docs/architecture.md&quot;,
+  &quot;offset&quot;: 55,
+  &quot;limit&quot;: 30
+}</pre><div class="lbl">output</div><pre>55	
+56	**Skill routing:** `compare` owns every significance claim. It hands the `null-hypothesis-testing` skill two score sets and a direction (for example &quot;dqn-compact greater than random&quot;, &quot;ppo-1 greater than reinforce-1&quot; or &quot;rung-3 prey greater than rung-2 prey against the prey panel&quot;). The skill chooses the test statistic, the null distribution and the multiple-comparison correction, and `compare` records the skill&#x27;s verdict as a `compare.Claim`. `compare` adds no test procedure of its own. The 90%-of-mean check in REF-02 is plain arithmetic, not a test.
+57	
+58	## Interfaces
+59	See [packages/rllab/contract.md](packages/rllab/contract.md).
+60	
+61	## Data
+62	- All data comes from the lab&#x27;s own environments (DATA-02). No downloads.
+63	- **Seeds (DATA-01):** a run&#x27;s training seed `s` must be below 1,000,000. Its evaluation seeds are `1_000_000 + 1000·s + i`, a disjoint range. `evaluate.eval_seeds` asserts that none of them overlaps the run&#x27;s training seed stream.
+64	- **Ladder runs:** 5 training seeds (0–4) for each rung. Snake: `tabular-compact`, `dqn-compact`, `dqn-grid`, `reference-compact` and the three ablations. Fish tank: `reinforce-1`, `ppo-1`, `ppo-school`, `ppo-school-limited` and `reference-ppo-1`. Predator-prey: `pp-r1-prey`, `pp-r1-predator`, `pp-r2`, `pp-r3` and `reference-pp-predator`; the panels (SELF-07) are each team&#x27;s scripted and random players plus the other team&#x27;s rung-1 policy. Each environment&#x27;s `random` and `scripted` players are evaluated on the same evaluation seeds. Run settings live in `settings/`.
+65	
+66	## Cross-cutting concerns
+67	- **Reproducibility (RUN-03):** one seed feeds a single `np.random.Generator` and `torch.manual_seed`, passed down explicitly. PyTorch runs with one thread and deterministic algorithms (AD-08). No global random state.
+68	- **Timing (QR-01–QR-04, QR-07):** predator-prey runs count both learning teams&#x27; updates inside one run&#x27;s 60 minutes. Each run&#x27;s progress lines and `curve.csv` carry elapsed seconds, so the limits are read from the runs themselves. A timing test trains each agent for 10,000 steps and extrapolates to its full step budget.
+69	- **Laptop only (QR-06):** PyTorch is pinned to CPU. Nothing selects a GPU. Stable-Baselines3 is given `device=&quot;cpu&quot;`, because its default `&quot;auto&quot;` would otherwise pick any GPU it finds.
+70	- **Cloud cap (QR-05):** a rung may go to rented hardware only after its laptop timing test fails QR-03 or QR-07. Spending is tracked by hand against $5 per stage.
+71	- **From scratch (AGENT-06):** import-linter keeps `selfplay` below `train` and above `evaluate`, and forbids `agents`, `core`, `envs`, `baselines`, `selfplay` and `train` from importing `stable_baselines3` or `gymnasium`.
+72	- **Errors:** bad settings raise `ValueError` naming the key. Stepping a finished game raises `RuntimeError`. A missing or broken run folder raises `FileNotFoundError` naming the run.
+73	- **Testing:** pytest, with rule tests per Snake and tank requirement against hand-built states (`Snake.reset_to`, `FishTank.reset_to`, `PredatorPrey.reset_to`).
+74	
+75	## Project layout
+76	```
+77	src/rllab/   → core/ envs/ baselines/ agents/ runs/ evaluate/ selfplay/ train/ reference/ compare/ viz/ lab/ — one folder per component; __init__ exports its contract
+78	settings/    → one TOML file per run family (ladder rungs, ablations, corridor, reference)
+79	runs/        → run folders, git-ignored
+80	reports/     → comparison reports and charts
+81	tests/       → folders only; files are planned in pipelines.md
+82	```
+83	
+84	## Decisions</pre></details></div><div class="step" id="SD33"><span class="sid">D33</span><span class="kind">Read</span>/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r1/with_skill/project/docs/architecture.md offset=170<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r1/with_skill/project/docs/architecture.md&quot;,
+  &quot;offset&quot;: 170
+}</pre><div class="lbl">output</div><pre>170	
+171	### AD-13: Teams in the core, adopted before M1 is built
+172	**Status:** Accepted · **Date:** 2026-10-17 · **Scope:** `core`
+173	- **Context:** CORE-01 now needs environments with two teams of different sizes and views: predator-prey&#x27;s 1-agent predator (19 values) and 6-agent prey (18 values). AD-09&#x27;s batch-first arrays assume one observation shape per environment. M1 is approved but not yet built.
+174	- **Decision:** `core.Env` declares `teams: Mapping[str, TeamSpec]`. Observations, actions, rewards and `done` are maps from team name to AD-09&#x27;s batch-first arrays. Single-team environments use one team, `core.SOLO` (`&quot;agents&quot;`). One `core.Agent` acts for one team, and `train` and `evaluate` take one agent per team. `info` carries `score:&lt;team&gt;` per team, plus `score` for the first. M1 adopts this before it&#x27;s built: a Replan of its interface task.
+175	- **Alternatives:** A separate two-team protocol beside `core.Env` — two code paths in `train`, `evaluate` and replay, against CORE-07. Padding both teams to one observation shape with a team flag — one array, but a policy would see the other team&#x27;s padding, and the scripted players get fiddly. Adding teams after M1 — rewrites M1&#x27;s loop and evaluation.
+176	- **Consequences:** M1&#x27;s Snake and corridor code addresses `SOLO`; its golden values don&#x27;t change. M2&#x27;s fish tank is also one team. S3 adds no second loop.
+177	
+178	### AD-14: Self-play through opponent pools inside the shared training loop
+179	**Status:** Accepted · **Date:** 2026-10-17 · **Scope:** `selfplay`, `train`
+180	- **Context:** SELF-01–SELF-04 need co-learning and pool-based self-play. CORE-07 forbids a training loop of predator-prey&#x27;s own. SELF-05–SELF-06 need cross-play and ratings over saved generations.
+181	- **Decision:** A new `selfplay` component owns `OpponentPool` (the latest policy with probability `pool_latest`, otherwise a uniformly drawn past generation, loaded once and frozen), `cross_play` and `ratings`. `train` saves each learner&#x27;s generation every tenth of the run through `runs.RunWriter.save_generation`, adds it to the other team&#x27;s pool, and asks the pool for each game&#x27;s opponent. Both teams learn in the same loop with their own PPO agents.
+182	- **Alternatives:** A separate self-play trainer — duplicates the loop, and the spec forbids it. Opponent sampling per step instead of per game — opponents would switch mid-chase, which is unrealistic and noisier.
+183	- **Consequences:** `train` gains generation and pool handling, guarded by settings, so single-team runs are unaffected. Cross-play costs 100 cells × 50 games of up to 1,000 steps. It&#x27;s a separate command, not part of training time.
+184	
+185	### AD-15: The predator-prey reference plays the predator against frozen scripted prey
+186	**Status:** Accepted · **Date:** 2026-10-17 · **Scope:** `reference`
+187	- **Context:** REF-01–REF-03 compare rung 1&#x27;s predator, trained against scripted prey, with a library PPO. The library trains one agent in a single-agent environment (AD-10&#x27;s docs).
+188	- **Decision:** The AD-03 adapter exposes one team as the single agent and plays every other team with a frozen `core.Agent`, here `ScriptedPrey`. Stable-Baselines3 PPO trains the predator through it with AD-10&#x27;s settings, observation `(19,)` and action `(2,)`.
+189	- **Alternatives:** The prey side — 6 agents, which the library can&#x27;t run fairly. A multi-agent library — out of scope.
+190	- **Consequences:** The adapter is a general &quot;one learner, others frozen&quot; wrapper, and the fish tank&#x27;s single fish is its no-other-team case.
+191	
+192	### AD-16: Predator-prey reuses the tank&#x27;s vectorised physics
+193	**Status:** Accepted · **Date:** 2026-10-17 · **Scope:** `envs`
+194	- **Context:** HUNT-02 repeats FISH-02 and FISH-03&#x27;s movement rules, and HUNT-09 needs the same seeded reproducibility. QR-07 gives each run 60 minutes, and the environment step is the inner loop.
+195	- **Decision:** The swim-vector shortening, speed scaling, wall stop and seeded placement live as functions in `envs/tank.py`. `PredatorPrey` imports them and adds pellets, catches, respawns and the two views in `envs/predprey.py`, all vectorised over animals.
+196	- **Alternatives:** A shared physics base class — inheritance for two users, against CR-12&#x27;s &quot;one implementation&quot; rule only narrowly. Copying the functions — a duplicate pylint would flag (CR-42).
+197	- **Consequences:** A change to the tank&#x27;s movement changes both environments. Each keeps its own golden cases (FISH and HUNT) as the guard.
+198	
+199	## Risks and open questions
+200	- **Full-grid timing (QR-03):** the CNN rung may need more than 60 CPU minutes to beat random. Mitigation: run the timing test first in that rung&#x27;s milestone. Fall back to the flattened-grid MLP (AD-05), then to rented hardware within QR-05.
+201	- **Scripted player too strong (EVAL-04):** every rung may tie the scripted player. Mitigation: reward and step-budget settings are per run (SNAKE-06), and the grid rung has the most room to beat it.
+202	- **Matching the reference (REF-01):** Stable-Baselines3 has defaults the hand-written agents lack (DQN&#x27;s gradient clipping at 10 and Huber loss; PPO&#x27;s advantage normalisation and value-loss weight). Mitigation: the mapping in `reference` lists every one, and the hand-written agents adopt the same values, so a gap is the learner&#x27;s code rather than a hidden setting.
+203	- **Escape too easy or too hard (EVAL-07):** if fish at 0.8 × the ball&#x27;s speed survive the cap easily, or never, the rungs can&#x27;t separate from the scripted fish. Mitigation: the spec&#x27;s numbers are tank constants; a measurement run of the two baselines comes first in S2&#x27;s build, and a change to the numbers goes back through spec-writing.
+204	- **The teams revision ripples into M1 (AD-13):** M1&#x27;s pipelines and interface task were planned against one team per environment. Mitigation: they&#x27;re revised and re-approved before `/build`; the expected values of TC-01–TC-49 don&#x27;t change.
+205	- **Self-play inside 60 minutes (QR-07):** two PPO learners sharing one run&#x27;s budget may not reach a visible rung-2 failure, or a rung-3 fix. Mitigation: a timing run comes first in S3&#x27;s build. The world numbers are spec constants, so any change goes back through spec-writing.
+206	- **Cross-play cost:** 5,000 games of up to 1,000 steps with 7 animals is several minutes per run, and isn&#x27;t covered by a QR. Mitigation: it&#x27;s a separate command; measure it in S3&#x27;s build and propose a QR if it hurts.
+207	- **Package size:** 12 components and a contract of about 450 lines are at the Grow guides. AD-01 keeps one package. The natural seam, if one is needed, is `selfplay` with predator-prey.
+208	
+209	## Changelog
+210	| Date | Change | Source | IDs |
+211	|---|---|---|---|
+212	| 2026-10-17 | Initial architecture | spec.md | AD-01–AD-08 |
+213	| 2026-10-17 | Contract: `core.Env`, `core.Agent`, `viz.Replay` as type sections; `viz.Chart` added; `viz.plot_curves` takes scores and baseline names; ablation budget wording in `lab.main` | pipeline-design | — |
+214	| 2026-10-17 | Contract: `envs.Snake.reset_to` test seam for hand-built boards | test-planning | — |
+215	| 2026-10-17 | AD-01 records staying single-package past the pipeline-count Grow trigger | build-planning | AD-01 (revised) |
+216	| 2026-10-17 | Components table: `viz` depends on `evaluate`; `lab` lists its dependencies | build-setup | — |
+217	| 2026-10-17 | Fish tank and policy-gradient agents on a batch-first core | ideas/fish-tank-policy-gradients.md | AD-09–AD-12; AD-03, AD-04 (revised) |
+218	| 2026-10-17 | Contract: `agents.returns_to_go`, `agents.gae`, `agents.clipped_objective` for known-answer tests | test-planning | — |
+219	| 2026-10-17 | Predator-prey: teams in the core, self-play pools, cross-play | ideas/predator-prey-self-play.md | AD-13–AD-16; AD-01, AD-03, AD-09 (revised) |
+220	| 2026-10-17 | Contract: `compare.run_claims` links cross-play charts | pipeline-design | — |
+221	</pre></details></div><div class="step" id="SD34"><span class="sid">D34</span><span class="kind">say</span>Still on the architecture revision: I&#x27;m writing the new `evaluate` signature into the contract now.<details><summary>full text</summary><pre>Still on the architecture revision: I&#x27;m writing the new `evaluate` signature into the contract now.</pre></details></div><div class="step" id="SD35"><span class="sid">D35</span><span class="kind">Bash</span>grep -n &quot;Fixtures\|Cases\|Used by\|frozen\|type section\|Status&quot; /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r1/with_skill/plugin/dev-team/skills/architecture-design/references/contracts.md | head -30; head -12 docs/packages/rllab/contract.md; grep -n &quot;evaluate\.\|EvalRequest&quot; docs/packages/rllab/pipelines.md docs/packages/rllab/tests.md tasks/plan.md | head -30<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;grep -n \&quot;Fixtures\\|Cases\\|Used by\\|frozen\\|type section\\|Status\&quot; /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r1/with_skill/plugin/dev-team/skills/architecture-design/references/contracts.md | head -30; head -12 docs/packages/rllab/contract.md; grep -n \&quot;evaluate\\.\\|EvalRequest\&quot; docs/packages/rllab/pipelines.md docs/packages/rllab/tests.md tasks/plan.md | head -30&quot;,
+  &quot;description&quot;: &quot;Check contract rules and evaluate consumers&quot;
+}</pre><div class="lbl">output</div><pre>9:- **Function sections:** the signature in the project&#x27;s language, then **Invariants** (shapes, ranges, guarantees), **Errors** (what fails and how it&#x27;s reported), and **Used by** (consuming components or packages, plus `PL-NN` IDs once those pipelines exist).
+10:- **Type sections.** Every type one step hands to another, and every type a public signature takes or returns, is its own section with the title `type`: `### profile.Profile: type`. The first line is its shape as code: a frozen dataclass&#x27;s fields, a `typing.Protocol`, or a pandera schema&#x27;s columns for a dataframe. Then **Invariants** and **Used by**. `pipeline-design` names these types in every step&#x27;s `In → Out`; the build&#x27;s interface task writes them, as code, into the owner&#x27;s `types.py`. Freeze only what crosses: a helper&#x27;s or a private function&#x27;s types stay out.
+12:- **Boundaries.** A symbol consumed across owners adds one line: `- **Boundary:** &lt;consumers&gt; · **Fixtures:** tests/contracts/&lt;id&gt;.&lt;symbol&gt;/ · **Cases:** &lt;the payloads a fixture must show&gt;`. Every type that crosses step owners has one, components included: consumers are packages, components, or both. This section is the boundary&#x27;s source of truth. `build-planning`&#x27;s interface task freezes it into that folder: a schema (JSON Schema across runtimes; a pandera schema for a dataframe in Python), one sample per case, and, for a function a pipeline calls from another pipeline or package, a fixture-backed fake of the provider. A Protocol or class type&#x27;s case is a replay double (a fixture-backed recording of the real object&#x27;s calls, `a recorded 5-batch epoch`), and so is a function another component&#x27;s step calls: it is the type&#x27;s sample, not a fake. Both sides then build at once against the same samples. A type needs at least one case (`dt lint` `type-cases`). Name the cases; don&#x27;t write the fixtures. A case may name a probe&#x27;s redacted sample (`a posted purchase (PB-01 samples/sync_added.json#0)`); the interface task derives the type&#x27;s sample from it, never copies it.
+18:**Package:** [pkg] · **Status:** Draft · **Last updated:** YYYY-MM-DD · **Architecture:** [../../architecture.md](../../architecture.md)
+23:`@dataclass(frozen=True) class Profile: coefs: np.ndarray; periods: tuple[float, ...]; residuals: np.ndarray`
+25:- **Boundary:** forecast · **Fixtures:** tests/contracts/profile.Profile/ · **Cases:** a planted daily sine over 4 synthetic weeks
+26:- **Used by:** forecast
+32:- **Used by:** forecast
+# rllab — Contract
+
+**Package:** rllab · **Status:** Approved · **Last updated:** 2026-10-17 · **Architecture:** [../../architecture.md](../../architecture.md)
+
+## core
+
+### core.Env: type
+```python
+class Env(Protocol):
+    teams: Mapping[str, TeamSpec]
+    board: Literal[&quot;grid&quot;, &quot;tank&quot;]
+    def reset(self, seed: int) -&gt; tuple[dict[str, np.ndarray], dict[str, float]]: ...
+docs/packages/rllab/pipelines.md:25:| 15 | `train` | train.loop | Env, Agent, RunSettings → RunRecord | batch-first step loop over every team, building one Transition per learning team and calling its `learn` after each step; each learner&#x27;s generation every tenth of the run (SELF-04); `evaluate.evaluate` every `eval_every` into a CurvePoint; progress line every 30 s; checkpoints and 5 recorded games at the end | CORE-02, CORE-07, RUN-02–RUN-04, SELF-01, SELF-04, QR-01–QR-03, QR-07 |
+docs/packages/rllab/pipelines.md:45:| 2 | `train_reference` | reference.train | RunSettings → RunRecord | Stable-Baselines3 DQN on Snake (AD-04), or PPO on the single-fish tank (AD-10) or the predator against scripted prey (AD-15), `MlpPolicy` on the one-learner adapter, one-to-one mapping, `device=&quot;cpu&quot;`; a callback calls `evaluate.evaluate` every `eval_every` | REF-01, QR-06 |
+docs/packages/rllab/pipelines.md:56:**Entry:** `src/rllab/lab/pipelines/pl03_evaluate.py::run_evaluate` · **Trigger:** `python -m rllab.lab eval &lt;run folder | random | scripted&gt; [--env snake|tank|predprey] [--team T] [--vs scripted|random|&lt;run folder&gt;] [--seed S]`
+docs/packages/rllab/pipelines.md:70:| 10 | `evaluate` | evaluate.protocol | Env, Agent, train_seed, team → ScoreSet | 200 games on `eval_seeds(train_seed, 200)`, `explore=False`, no `learn` calls, scoring `team` | EVAL-01, DATA-01, AGENT-07, QR-04 |
+docs/packages/rllab/pipelines.md:164:               pipelines/ pl01_train.py  pl02_train_reference.py  pl03_evaluate.py  pl04_report.py  pl05_replay.py  pl06_crossplay.py
+docs/packages/rllab/tests.md:14:| PL-03 | `python -m rllab.lab eval scripted --seed 0 --smoke` | lab.players, baselines.random, baselines.scripted, reference.player, evaluate.protocol, lab.printing; boundary: `evaluate.ScoreSet` samples | TC-18 (train_seed → eval_seeds → seeds), TC-19 (obs → ScriptedPlayer.act → action), TC-20 (RandomPlayer.act ×30,000), TC-39 (RandomSwimmer.act ×30,000), TC-40 (obs → ScriptedFish.act → action), TC-59 (obs → ScriptedPredator.act → action), TC-60 (obs → ScriptedPrey.act → action), TC-61 (RandomSwimmer.act for the predator ×30,000) | — |
+docs/packages/rllab/tests.md:106:**Source:** the `evaluate.eval_seeds` formula `1_000_000 + 1000·train_seed + i`, approved 2026-10-17
+tasks/plan.md:14:**Read:** PL-01, PL-02, PL-03, PL-04, PL-05, AD-09, AD-13, core.TeamSpec, core.SOLO, core.ActionSpace, core.Env, core.StepResult, core.Transition, core.Agent, core.RunSettings, core.Rewards, core.Exploration, core.AgentParams, runs.CurvePoint, runs.GameRecording, runs.RunRecord, runs.RunWriter, evaluate.ScoreSet, compare.ClaimSpec, compare.Claim, viz.Chart, viz.Replay, envs.COMPACT_FIELDS, core.load_settings, envs.Snake, envs.Corridor, baselines.RandomPlayer, baselines.ScriptedPlayer, agents.TabularAgent, agents.DQNAgent, runs.create_run, runs.open_run, evaluate.eval_seeds, evaluate.evaluate, train.train, reference.train_reference, reference.ReferencePlayer, compare.run_claims, viz.plot_curves, lab.main, AD-03, AD-06
+tasks/plan.md:60:**Read:** PL-01, train.train, core.Env, core.Agent, core.RunSettings, runs.RunWriter, runs.CurvePoint, evaluate.evaluate
+tasks/plan.md:68:**Read:** PL-02, reference.train_reference, core.RunSettings, core.Env, runs.RunWriter, evaluate.evaluate, AD-03, AD-04
+tasks/plan.md:70:- [ ] On the reference `core.RunSettings` sample, `train_reference` trains Stable-Baselines3 DQN with `MlpPolicy` and `device=&quot;cpu&quot;` through a `gymnasium.Env` adapter, with curve points from `evaluate.evaluate`; non-Snake or non-compact settings raise `ValueError`
+tasks/plan.md:85:**Read:** PL-03, PL-04, runs.open_run, runs.RunRecord, evaluate.evaluate, evaluate.ScoreSet, core.Agent, core.RunSettings
+tasks/plan.md:87:- [ ] `load_player` turns the `runs.RunRecord` sample into an agent loaded from its checkpoint, and `random`/`scripted` into baselines on default Snake compact settings; `score_players` returns a ScoreSet per player and seed through the `evaluate.evaluate` fake
+tasks/plan.md:101:**Read:** PL-04, viz.plot_curves, viz.Chart, runs.RunRecord, evaluate.ScoreSet
+tasks/plan.md:103:- [ ] On the `runs.RunRecord` and `evaluate.ScoreSet` samples, `plot_curves` writes a PNG with one mean line and min–max band per group and a horizontal line per baseline, and returns a `Chart` listing them; a missing baseline name raises `ValueError`
+tasks/plan.md:109:**Read:** PL-05, runs.RunRecord, runs.GameRecording, evaluate.evaluate, evaluate.eval_seeds
+tasks/plan.md:111:- [ ] `pick_game` returns game N of the `runs.RunRecord` sample; with `new_seed=S` it records one game on `eval_seeds(S, 1)` through the `evaluate.evaluate` fake
+tasks/plan.md:166:**Read:** PL-03, evaluate.evaluate, evaluate.eval_seeds, evaluate.ScoreSet, core.Env, core.Agent, core.SOLO, runs.GameRecording, TC-18
+tasks/plan.md:171:**Depends on:** M1-T01 · **Writes:** src/rllab/evaluate/protocol.py, tests/intent/rllab/test_evaluate.py, tests/unit/rllab/test_evaluate.py
+tasks/plan.md:177:**Read:** PL-04, compare.run_claims, compare.ClaimSpec, compare.Claim, evaluate.ScoreSet, TC-21, TC-22, TC-23, TC-24
+tasks/plan.md:219:**Read:** PL-03, evaluate.evaluate, evaluate.ScoreSet
+tasks/plan.md:224:**Depends on:** M1-T03, M1-T04, M1-T08, M1-T09, M1-T13, M1-T16, M1-T17, M1-T18 · **Writes:** src/rllab/lab/pipelines/pl03_evaluate.py, src/rllab/lab/printing.py, tests/unit/rllab/test_pl03_smoke.py
+tasks/plan.md:324:| M1-T06 train spine | M1-T18 held-out evaluation | call | evaluate.evaluate fake (M1-T01) |
+tasks/plan.md:325:| M1-T07 train_reference spine | M1-T18 held-out evaluation | call | evaluate.evaluate fake (M1-T01) |
+tasks/plan.md:326:| M1-T09 players spine | M1-T18 held-out evaluation | call | evaluate.evaluate fake (M1-T01) |
+tasks/plan.md:328:| M1-T12 pick_game spine | M1-T18 held-out evaluation | call | evaluate.evaluate fake (M1-T01) |</pre></details></div><div class="step" id="SD36"><span class="sid">D36</span><span class="kind">Edit</span>/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r1/with_skill/project/docs/packages/rllab/contract.md | old: &#x27;### evaluate.evaluate: Greedy evaluation ⏎ `def evaluate(make_env: Callable[[], &#x27; | new: &#x27;### evaluate.EvalRequest: type ⏎ `@dataclass(frozen=True) class EvalRequest: pla&#x27;<div class="lbl">edited /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r1/with_skill/project/docs/packages/rllab/contract.md · old</div><pre>### evaluate.evaluate: Greedy evaluation
+`def evaluate(make_env: Callable[[], Env], agents: Mapping[str, Agent], *, team: str = SOLO, player: str, train_seed: int, n_games: int = 200, record: int = 0) -&gt; ScoreSet`
+- **Invariants:** `agents` has one agent per team of the environment; the scores are `team`&#x27;s `score:&lt;team&gt;`. Plays `n_games` games on `eval_seeds(train_seed, n_games)` with `explore=False`. It never calls `learn`. It records the first `record` games (REPLAY-03). 200 games of any environment take ≤ 60 s on the laptop (QR-04).</pre><div class="lbl">new</div><pre>### evaluate.EvalRequest: type
+`@dataclass(frozen=True) class EvalRequest: player: str; train_seed: int; team: str = SOLO; n_games: int = 200; record: int = 0`
+- **Invariants:** `player` and `train_seed` are copied into the `ScoreSet`. `0 ≤ record ≤ n_games`; `n_games` ≤ 1000 (`eval_seeds`&#x27;s limit).
+- **Boundary:** train, reference, lab · **Fixtures:** tests/contracts/evaluate.EvalRequest/ · **Cases:** the scripted player on train seed 0 with defaults; a learner on train seed 3 scoring the `prey` team with `record=5`
+- **Used by:** evaluate, train, reference, lab; PL-01, PL-02, PL-03, PL-04, PL-05
+
+### evaluate.evaluate: Greedy evaluation
+`def evaluate(make_env: Callable[[], Env], agents: Mapping[str, Agent], request: EvalRequest) -&gt; ScoreSet`
+- **Invariants:** `agents` has one agent per team of the environment; the scores are `request.team`&#x27;s `score:&lt;team&gt;`. Plays `request.n_games` games on `eval_seeds(request.train_seed, request.n_games)` with `explore=False`. It never calls `learn`. It records the first `request.record` games (REPLAY-03). 200 games of any environment take ≤ 60 s on the laptop (QR-04).</pre><div class="hook">hook PostToolUse:Edit said: {&quot;hookSpecificOutput&quot;: {&quot;hookEventName&quot;: &quot;PostToolUse&quot;, &quot;additionalContext&quot;: &quot;dt lint:\ndocs/packages/rllab/contract.md:1: grow-size 461 lines, over the 200-line ceiling for one package&#x27;s contract doc: architecture-design should consider a Grow\ndocs/packages/rllab/contract.md:3: approved-edit Approved doc changed since HEAD without going back to Draft (or the approval isn&#x27;t committed)\n0 errors, 2 warnings&quot;}}
+</div><details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;replace_all&quot;: false,
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r1/with_skill/project/docs/packages/rllab/contract.md&quot;,
+  &quot;old_string&quot;: &quot;### evaluate.evaluate: Greedy evaluation\n`def evaluate(make_env: Callable[[], Env], agents: Mapping[str, Agent], *, team: str = SOLO, player: str, train_seed: int, n_games: int = 200, record: int = 0) -&gt; ScoreSet`\n- **Invariants:** `agents` has one agent per team of the environment; the scores are `team`&#x27;s `score:&lt;team&gt;`. Plays `n_games` games on `eval_seeds(train_seed, n_games)` with `explore=False`. It never calls `learn`. It records the first `record` games (REPLAY-03). 200 games of any environment take ≤ 60 s on the laptop (QR-04).&quot;,
+  &quot;new_string&quot;: &quot;### evaluate.EvalRequest: type\n`@dataclass(frozen=True) class EvalRequest: player: str; train_seed: int; team: str = SOLO; n_games: int = 200; record: int = 0`\n- **Invariants:** `player` and `train_seed` are copied into the `ScoreSet`. `0 ≤ record ≤ n_games`; `n_games` ≤ 1000 (`eval_seeds`&#x27;s limit).\n- **Boundary:** train, reference, lab · **Fixtures:** tests/contracts/evaluate.EvalRequest/ · **Cases:** the scripted player on train seed 0 with defaults; a learner on train seed 3 scoring the `prey` team with `record=5`\n- **Used by:** evaluate, train, reference, lab; PL-01, PL-02, PL-03, PL-04, PL-05\n\n### evaluate.evaluate: Greedy evaluation\n`def evaluate(make_env: Callable[[], Env], agents: Mapping[str, Agent], request: EvalRequest) -&gt; ScoreSet`\n- **Invariants:** `agents` has one agent per team of the environment; the scores are `request.team`&#x27;s `score:&lt;team&gt;`. Plays `request.n_games` games on `eval_seeds(request.train_seed, request.n_games)` with `explore=False`. It never calls `learn`. It records the first `request.record` games (REPLAY-03). 200 games of any environment take ≤ 60 s on the laptop (QR-04).&quot;
+}</pre><div class="lbl">output</div><pre>The file /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r1/with_skill/project/docs/packages/rllab/contract.md has been updated successfully.</pre></details></div><div class="step" id="SD37"><span class="sid">D37</span><span class="kind">Edit</span>/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r1/with_skill/project/docs/packages/rllab/contract.md | old: &#x27;Package: rllab · Status: Approved · Last updated: 2026-10-17&#x27; | new: &#x27;Package: rllab · Status: Draft · Last updated: 2026-10-18&#x27;<div class="lbl">edited /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r1/with_skill/project/docs/packages/rllab/contract.md · old</div><pre>**Package:** rllab · **Status:** Approved · **Last updated:** 2026-10-17</pre><div class="lbl">new</div><pre>**Package:** rllab · **Status:** Draft · **Last updated:** 2026-10-18</pre><div class="hook">hook PostToolUse:Edit said: {&quot;hookSpecificOutput&quot;: {&quot;hookEventName&quot;: &quot;PostToolUse&quot;, &quot;additionalContext&quot;: &quot;dt lint:\ndocs/packages/rllab/contract.md:1: grow-size 461 lines, over the 200-line ceiling for one package&#x27;s contract doc: architecture-design should consider a Grow\n0 errors, 1 warning&quot;}}
+</div><details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;replace_all&quot;: false,
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r1/with_skill/project/docs/packages/rllab/contract.md&quot;,
+  &quot;old_string&quot;: &quot;**Package:** rllab · **Status:** Approved · **Last updated:** 2026-10-17&quot;,
+  &quot;new_string&quot;: &quot;**Package:** rllab · **Status:** Draft · **Last updated:** 2026-10-18&quot;
+}</pre><div class="lbl">output</div><pre>The file /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r1/with_skill/project/docs/packages/rllab/contract.md has been updated successfully.</pre></details></div><div class="step" id="SD38"><span class="sid">D38</span><span class="kind">Edit</span>/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r1/with_skill/project/docs/architecture.md | old: &#x27;| 2026-10-17 | Contract: `compare.run_claims` links cross-play charts | pipeline&#x27; | new: &#x27;| 2026-10-17 | Contract: `compare.run_claims` links cross-play charts | pipeline&#x27;<div class="lbl">edited /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r1/with_skill/project/docs/architecture.md · old</div><pre>| 2026-10-17 | Contract: `compare.run_claims` links cross-play charts | pipeline-design | — |
+</pre><div class="lbl">new</div><pre>| 2026-10-17 | Contract: `compare.run_claims` links cross-play charts | pipeline-design | — |
+| 2026-10-18 | Contract: `evaluate.evaluate` takes an `evaluate.EvalRequest` (player, train seed, team, game and record counts) to meet CR-20&#x27;s 5-argument limit | build M1-T01 escalation | — |
+</pre><div class="hook">hook PostToolUse:Edit said: {&quot;hookSpecificOutput&quot;: {&quot;hookEventName&quot;: &quot;PostToolUse&quot;, &quot;additionalContext&quot;: &quot;dt lint:\ndocs/architecture.md:3: approved-edit Approved doc changed since HEAD without going back to Draft (or the approval isn&#x27;t committed)\n0 errors, 1 warning&quot;}}
+</div><details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;replace_all&quot;: false,
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r1/with_skill/project/docs/architecture.md&quot;,
+  &quot;old_string&quot;: &quot;| 2026-10-17 | Contract: `compare.run_claims` links cross-play charts | pipeline-design | — |\n&quot;,
+  &quot;new_string&quot;: &quot;| 2026-10-17 | Contract: `compare.run_claims` links cross-play charts | pipeline-design | — |\n| 2026-10-18 | Contract: `evaluate.evaluate` takes an `evaluate.EvalRequest` (player, train seed, team, game and record counts) to meet CR-20&#x27;s 5-argument limit | build M1-T01 escalation | — |\n&quot;
+}</pre><div class="lbl">output</div><pre>The file /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r1/with_skill/project/docs/architecture.md has been updated successfully.</pre></details></div><div class="step" id="SD39"><span class="sid">D39</span><span class="kind">Bash</span>python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r1/with_skill/plugin/dev-team/scripts/dt.py lint docs/<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r1/with_skill/plugin/dev-team/scripts/dt.py lint docs/&quot;,
+  &quot;description&quot;: &quot;Lint the docs&quot;
+}</pre><div class="lbl">output</div><pre>docs/architecture.md:3: approved-edit Approved doc changed since HEAD without going back to Draft (or the approval isn&#x27;t committed)
+docs/packages/rllab/contract.md:1: grow-size 461 lines, over the 200-line ceiling for one package&#x27;s contract doc: architecture-design should consider a Grow
+docs/packages/rllab/tests.md:1: grow-size 415 lines, over the 300-line ceiling for one package&#x27;s tests doc: architecture-design should consider a Grow
+0 errors, 3 warnings</pre></details></div><div class="step" id="SD40"><span class="sid">D40</span><span class="kind">Bash</span>python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r1/with_skill/plugin/dev-team/scripts/dt.py status --skill architecture-design<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r1/with_skill/plugin/dev-team/scripts/dt.py status --skill architecture-design&quot;,
+  &quot;description&quot;: &quot;Recheck architecture status gaps&quot;
+}</pre><div class="lbl">output</div><pre>skill: architecture-design
+mode: current
+docs: brief Accepted · spec Approved · architecture Approved (Single package) · roadmap ok · plan M1 Approved · constraints Approved
+next ids: AD-17 PL-07 TC-72 S4 M4 M1-T32
+references_unindexed: none
+references_changed: none
+references_missing: none
+spec: Approved, 97 live requirements
+architecture: Approved
+next_decision: AD-17
+uncovered: none
+changed_since: none
+spec_rows_pending: none
+stale: none
+package_docs: none
+packages_found: .
+skills: null-hypothesis-testing
+broken_fences: none
+contracts_missing: none
+legacy_layout: none
+grow_triggers: rllab: 6 pipelines &gt; 3
+stale_contracts: none
+probes_answered: none
+probes_failed: none</pre></details></div><div class="step" id="SD41"><span class="sid">D41</span><span class="kind">say</span>Set architecture.md to Draft too, since it changed.<details><summary>full text</summary><pre>Set architecture.md to Draft too, since it changed.</pre></details></div><div class="step" id="SD42"><span class="sid">D42</span><span class="kind">Edit</span>/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r1/with_skill/project/docs/architecture.md | old: &#x27;Status: Approved · Shape: Single package · Last updated: 2026-10-17&#x27; | new: &#x27;Status: Draft · Shape: Single package · Last updated: 2026-10-18&#x27;<div class="lbl">edited /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r1/with_skill/project/docs/architecture.md · old</div><pre>**Status:** Approved · **Shape:** Single package · **Last updated:** 2026-10-17</pre><div class="lbl">new</div><pre>**Status:** Draft · **Shape:** Single package · **Last updated:** 2026-10-18</pre><details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;replace_all&quot;: false,
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r1/with_skill/project/docs/architecture.md&quot;,
+  &quot;old_string&quot;: &quot;**Status:** Approved · **Shape:** Single package · **Last updated:** 2026-10-17&quot;,
+  &quot;new_string&quot;: &quot;**Status:** Draft · **Shape:** Single package · **Last updated:** 2026-10-18&quot;
+}</pre><div class="lbl">output</div><pre>The file /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r1/with_skill/project/docs/architecture.md has been updated successfully.</pre></details></div><div class="step" id="SD43"><span class="sid">D43</span><span class="kind">say</span>I&#x27;ve drafted the change to `evaluate.evaluate`; it needs your approval. Both docs are back at Draft, and `dt lint` reports no errors. ⏎ The new signature in `docs/packages/rllab/contract.md`: ⏎ ```python ⏎ @dataclass(frozen=True) ⏎ class EvalRequest: ⏎     player: str ⏎     train_seed: int ⏎     team: str = SOLO ⏎     n_games: int = 200 ⏎     record: int = 0 ⏎ def evaluate(make_env: Callable[[], Env], agents: Mapping[str, Agent], request: EvalRequest) -&gt; ScoreSet ⏎ ``` ⏎ - New type, `evaluate.EvalRequest`: it gets its own section in the contract, with these rules: ⏎   - `player` and `t …[+1698 chars]<details><summary>full text</summary><pre>I&#x27;ve drafted the change to `evaluate.evaluate`; it needs your approval. Both docs are back at Draft, and `dt lint` reports no errors.
+
+**The new signature in `docs/packages/rllab/contract.md`:**
+
+```python
+@dataclass(frozen=True)
+class EvalRequest:
+    player: str
+    train_seed: int
+    team: str = SOLO
+    n_games: int = 200
+    record: int = 0
+
+def evaluate(make_env: Callable[[], Env], agents: Mapping[str, Agent], request: EvalRequest) -&gt; ScoreSet
+```
+
+- **New type, `evaluate.EvalRequest`:** it gets its own section in the contract, with these rules:
+  - `player` and `train_seed` are copied into the `ScoreSet`.
+  - `record` is between 0 and `n_games`.
+  - `n_games` is at most 1000, the most `eval_seeds` allows.
+  - Its fixture folder is `tests/contracts/evaluate.EvalRequest/`, with two cases: the scripted player on seed 0 with defaults, and a learner on seed 3 scoring `prey` with `record=5`.
+- **`evaluate.evaluate`:** it now takes 3 arguments instead of 7, and its rules read their values from `request`. What it does is unchanged.
+- **`docs/architecture.md`:** one new Changelog row. I didn&#x27;t add a new decision (AD-17); earlier contract-only changes didn&#x27;t get one either.
+
+**Assumptions:**
+- I put all five settings into one type, rather than keeping `player` and `train_seed` as separate arguments. That makes every call read the same way, and it matches `ScoreSet`.
+- `team` still defaults to `SOLO`.
+
+**Open question: `agents.DQNAgent.__init__` also takes 7 parameters.** It breaks the same 5-argument rule, so M1-T01 will stop on it again unless it changes too. I recommend folding `use_memory` and `use_target` into `core.AgentParams`, which the ablation settings already feed. If you say nothing, I&#x27;ll leave `DQNAgent` as it is for now, and the build will stop on it again.
+
+**Still to update after you approve:**
+- `docs/packages/rllab/pipelines.md` line 78 calls `evaluate` the old way, so `pipeline-design` has to update it.
+- `build-planning` Replan then adds a task that re-freezes the interface, and updates the plan&#x27;s tasks that read `evaluate.evaluate`: T01, T06, T07, T09, T12 and T18.
+- After that replan, the build needs a new go from you.
+
+Do you approve this revision, and should I add the `DQNAgent` change to it?</pre></details></div><div class="step" id="SD44"><span class="sid">D44</span><span class="kind">hook</span><span class="hook">Stop said: {&quot;systemMessage&quot;: &quot;dt lint: 1 problem\ndocs/packages/rllab/contract.md:1: grow-size 461 lines, over the 200-line ceiling for one package&#x27;s contract doc: architecture-design should consider a Grow&quot;}
+</span></div><div class="step" id="SD45"><span class="sid">D45</span><span class="kind">hook</span><span class="hook">SessionStart:resume said: milestone: M1 Snake value learning · plan Approved
+progress: 0/31 · next: M1-T01 M1 interface
+blocked: none
+draft (waiting for approval): docs/architecture.md, docs/packages/rllab/contract.md
+dt: python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r1/with_skill/plugin/dev-team/scripts/dt.py
+</span></div>
+<h2>Commits</h2>
+<p>None.</p>
+<h2>Returned</h2>
+<pre>I&#x27;ve drafted the change to `evaluate.evaluate`; it needs your approval. Both docs are back at Draft, and `dt lint` reports no errors.
+
+**The new signature in `docs/packages/rllab/contract.md`:**
+
+```python
+@dataclass(frozen=True)
+class EvalRequest:
+    player: str
+    train_seed: int
+    team: str = SOLO
+    n_games: int = 200
+    record: int = 0
+
+def evaluate(make_env: Callable[[], Env], agents: Mapping[str, Agent], request: EvalRequest) -&gt; ScoreSet
+```
+
+- **New type, `evaluate.EvalRequest`:** it gets its own section in the contract, with these rules:
+  - `player` and `train_seed` are copied into the `ScoreSet`.
+  - `record` is between 0 and `n_games`.
+  - `n_games` is at most 1000, the most `eval_seeds` allows.
+  - Its fixture folder is `tests/contracts/evaluate.EvalRequest/`, with two cases: the scripted player on seed 0 with defaults, and a learner on seed 3 scoring `prey` with `record=5`.
+- **`evaluate.evaluate`:** it now takes 3 arguments instead of 7, and its rules read their values from `request`. What it does is unchanged.
+- **`docs/architecture.md`:** one new Changelog row. I didn&#x27;t add a new decision (AD-17); earlier contract-only changes didn&#x27;t get one either.
+
+**Assumptions:**
+- I put all five settings into one type, rather than keeping `player` and `train_seed` as separate arguments. That makes every call read the same way, and it matches `ScoreSet`.
+- `team` still defaults to `SOLO`.
+
+**Open question: `agents.DQNAgent.__init__` also takes 7 parameters.** It breaks the same 5-argument rule, so M1-T01 will stop on it again unless it changes too. I recommend folding `use_memory` and `use_target` into `core.AgentParams`, which the ablation settings already feed. If you say nothing, I&#x27;ll leave `DQNAgent` as it is for now, and the build will stop on it again.
+
+**Still to update after you approve:**
+- `docs/packages/rllab/pipelines.md` line 78 calls `evaluate` the old way, so `pipeline-design` has to update it.
+- `build-planning` Replan then adds a task that re-freezes the interface, and updates the plan&#x27;s tasks that read `evaluate.evaluate`: T01, T06, T07, T09, T12 and T18.
+- After that replan, the build needs a new go from you.
+
+Do you approve this revision, and should I add the `DQNAgent` change to it?</pre>
+</body></html>

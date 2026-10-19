@@ -120,5 +120,36 @@ class ReadyTest(unittest.TestCase):
         self.assertFalse(graph.path_between(self.ts, "M1-T05", "M1-T06"))
 
 
+class HalvesTest(unittest.TestCase):
+    """build-phase.md §6.1, §13: a split task runs tester then implementer; a tester waits only on interfaces."""
+
+    def setUp(self):
+        self.ts = plan(("M1-T01", [], "M", "interface"),
+                       ("M1-T02", ["M1-T01"], "XS", "spine"),
+                       ("M1-T03", ["M1-T02"], "S", "thicken", "split"),
+                       ("M1-T04", ["M1-T02"], "XS", "wiring"))
+
+    def test_half_graph(self):
+        self.assertEqual(graph.roles(self.ts[2]), ["tester", "implementer"])
+        self.assertEqual(graph.half_graph(self.ts), {
+            "M1-T01.solo": ["M1-T02.solo", "M1-T03.tester"],
+            "M1-T02.solo": ["M1-T03.implementer", "M1-T04.solo"],
+            "M1-T03.tester": ["M1-T03.implementer"],
+            "M1-T03.implementer": [],
+            "M1-T04.solo": []})
+
+    def test_critical_path_in_halves(self):
+        self.assertEqual(graph.critical_path(self.ts), ["M1-T01", "M1-T02", "M1-T03"])
+        # Two chains of three halves; the tester's is heavier (S before S, against XS before S).
+        self.assertEqual(graph.critical_path_halves(self.ts), ["M1-T01.solo", "M1-T03.tester", "M1-T03.implementer"])
+        ts = plan(("M1-T01", [], "S", "interface"), ("M1-T02", ["M1-T01"], "S", "thicken", "split"))
+        self.assertEqual(graph.critical_path_halves(ts), ["M1-T01.solo", "M1-T02.tester", "M1-T02.implementer"])
+
+    def test_remaining_weight(self):
+        rem = graph.remaining_weight(self.ts)
+        self.assertEqual((rem["M1-T01.solo"], rem["M1-T02.solo"], rem["M1-T03.tester"], rem["M1-T04.solo"]),
+                         (4 + 2 + 2, 1 + 2, 2 + 2, 1))
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -1,0 +1,1586 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1"><title>U30 implementer</title>
+<style>
+:root{--bg:#fbfbfa;--fg:#1d1d1f;--muted:#6b6b70;--line:#d9d9de;--box:#fff;--rowp:#eef3fb;--band:#fff4d6;
+--ok:#2e7d32;--bad:#c62828;--warn:#b26a00;--idle:#6b6b70}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#17171a;--fg:#ececf0;--muted:#9a9aa3;
+--line:#34343a;--box:#222227;--rowp:#1d2433;--band:#3a3015;--ok:#6fcf73;--bad:#ff6b6b;--warn:#f0b35a;--idle:#9a9aa3}}
+:root[data-theme="dark"]{--bg:#17171a;--fg:#ececf0;--muted:#9a9aa3;--line:#34343a;--box:#222227;--rowp:#1d2433;
+--band:#3a3015;--ok:#6fcf73;--bad:#ff6b6b;--warn:#f0b35a;--idle:#9a9aa3}
+body{margin:0;padding:16px;background:var(--bg);color:var(--fg);font:14px/1.45 -apple-system,system-ui,sans-serif}
+h1{font-size:18px;margin:0 0 4px}h2{font-size:15px;margin:22px 0 8px}.sub{color:var(--muted)}
+table{border-collapse:collapse;margin:4px 0 8px}td,th{border-bottom:1px solid var(--line);padding:4px 10px;text-align:left;
+vertical-align:top}th{color:var(--muted);font-weight:600}.chips span{display:inline-block;margin:0 4px 2px 0}
+.legend span{margin-right:14px;white-space:nowrap}.sw{display:inline-block;width:10px;height:10px;border-radius:2px;
+margin-right:4px;vertical-align:-1px}.scroll{overflow:auto;max-height:88vh;border:1px solid var(--line);border-radius:8px}
+.chart{display:grid;width:max-content}.chart>div{line-height:0}.corner{position:sticky;top:0;left:0;z-index:3}
+.colhead{position:sticky;top:0;z-index:2}.rowhead{position:sticky;left:0;z-index:2}
+svg.bg{background:var(--bg)}.colhead svg{border-bottom:1px solid var(--line)}.rowhead svg{border-right:1px solid var(--line)}
+.ok{color:var(--ok);fill:var(--ok)}.bad{color:var(--bad);fill:var(--bad)}.warn{color:var(--warn);fill:var(--warn)}
+.idle{color:var(--idle);fill:var(--idle)}
+svg text{fill:var(--fg);font-family:-apple-system,system-ui,sans-serif}
+.box{fill:var(--box);stroke:var(--line)}.unit:hover .box{stroke:var(--fg)}
+.role{font-size:12px;font-weight:600}.uid,.wmeta,.lmeta,.meta{font-size:10px;fill:var(--muted)}
+.sub{font-size:10.5px;fill:var(--muted)}.badge{font-size:11px;font-weight:600}
+.meta.bad{fill:var(--bad);font-weight:600}.lane{font-size:13px;font-weight:700}.wave{font-size:13px;font-weight:700}
+.par{fill:#4e79a7}.ser{fill:var(--muted)}.rowp{fill:var(--rowp)}.rows{fill:transparent}.band{fill:var(--band)}
+.bandt{font-size:11.5px}.grid{stroke:var(--line)}.link{stroke:var(--muted);stroke-width:1.2;opacity:.55}
+.arrowhead{fill:var(--muted)}.marks{font-size:10.5px}.audit{stroke:var(--box);stroke-width:2}.auditn{font-size:10px;font-weight:700;fill:#fff}
+a{color:inherit}svg a .box{cursor:pointer}
+
+:root{--c0:#2a78d6;--c1:#eb6834;--c2:#1baf7a;--c3:#eda100;--c4:#e87ba4;--c5:#008300;--c6:#6250d6;--c7:#e34948;
+--cx:#8a8985;--main:#52514e;--read:#dcdbd5;--readfg:#1d1d1f}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--c0:#3987e5;--c1:#d95926;--c2:#199e70;
+--c3:#c98500;--c4:#d55181;--c5:#008300;--c6:#9085e9;--c7:#e66767;--cx:#77766f;--main:#c3c2b7;--read:#3b3b40;
+--readfg:#ececf0}}
+:root[data-theme="dark"]{--c0:#3987e5;--c1:#d95926;--c2:#199e70;--c3:#c98500;--c4:#d55181;--c5:#008300;
+--c6:#9085e9;--c7:#e66767;--cx:#77766f;--main:#c3c2b7;--read:#3b3b40;--readfg:#ececf0}
+.c0{fill:var(--c0);background:var(--c0)}.c1{fill:var(--c1);background:var(--c1)}.c2{fill:var(--c2);background:var(--c2)}
+.c3{fill:var(--c3);background:var(--c3)}.c4{fill:var(--c4);background:var(--c4)}.c5{fill:var(--c5);background:var(--c5)}
+.c6{fill:var(--c6);background:var(--c6)}.c7{fill:var(--c7);background:var(--c7)}.cx{fill:var(--cx);background:var(--cx)}
+.cmain{fill:var(--main)}.sc0{stroke:var(--c0)}.sc1{stroke:var(--c1)}.sc2{stroke:var(--c2)}
+.tl text,.sm text,.lc text{font-size:10.5px;fill:var(--muted)}.tl .lbl-in,.sm .lbl-in{fill:#fff;font-size:10.5px;font-weight:600}
+.tl .rowl,.sm .rowl,.lc .rowl{fill:var(--fg);font-size:11.5px;font-weight:600}.tl .band{fill:var(--rowp)}
+.tl .brk{stroke:var(--muted);stroke-dasharray:2 3}.tl a:hover rect,.sm a:hover rect{stroke:var(--fg);stroke-width:1.5}
+.axis{stroke:var(--line)}.sm .val{fill:var(--fg);font-weight:600}.lc path.ln{fill:none;stroke-width:2}
+.lc circle{stroke:var(--bg);stroke-width:2}.lc .end{font-weight:600;fill:var(--fg)}
+.tiles{display:flex;flex-wrap:wrap;gap:10px;margin:12px 0}.tile{border:1px solid var(--line);border-radius:8px;
+padding:8px 12px;min-width:110px;background:var(--box)}.tile b{display:block;font-size:20px;line-height:1.2}
+.tile span{font-size:12px;color:var(--muted)}.tile i{font-style:normal;font-size:12px;margin-left:6px}
+.fm{border-collapse:separate;border-spacing:2px}.fm td,.fm th{border:0;padding:0;text-align:center;font-size:11px}
+.fm th{padding:0 2px;font-weight:600}.fm td.f,.fm th.f{text-align:left;padding-right:10px;white-space:nowrap;
+position:sticky;left:0;background:var(--bg);font:11.5px ui-monospace,Menlo,monospace;
+max-width:380px;overflow:hidden;text-overflow:ellipsis}
+.fm td.cell{min-width:22px;height:20px;border-radius:3px}.fm td.fw{background:var(--c0);color:#fff;font-weight:700}
+.fm td.fe{background:var(--c1);color:#fff;font-weight:700}.fm td.fr{background:var(--read);color:var(--readfg)}
+.fm td.n{color:var(--muted);padding:0 6px}.fm tr.grp td{text-align:left;padding-top:8px;color:var(--muted);
+font-weight:600}
+.key{display:inline-block;min-width:18px;text-align:center;border-radius:3px;font-size:11px;margin-right:4px}
+.bar{display:inline-block;height:9px;border-radius:2px;vertical-align:0}
+
+pre{white-space:pre-wrap;word-break:break-word;background:var(--box);border:1px solid var(--line);border-radius:6px;
+padding:8px 10px;margin:4px 0;font:12px/1.45 ui-monospace,SFMono-Regular,Menlo,monospace;max-width:100%;overflow:auto}
+.step{border-top:1px solid var(--line);padding:6px 0}.step:target{background:var(--rowp)}
+.sid{font:12px ui-monospace,Menlo,monospace;color:var(--muted);margin-right:8px}.kind{font-weight:600;margin-right:8px}
+.err{color:var(--bad);font-weight:600}.hook{color:var(--bad);margin:4px 0 0 16px}.lbl{font-size:12px;color:var(--muted);margin-top:6px}
+details summary{cursor:pointer;color:var(--muted);font-size:12px}.head td:first-child{color:var(--muted)}
+.top{font-size:13px}.narr{list-style:none;padding-left:0}.narr li{margin:3px 0}
+</style></head>
+<body>
+<p class="top"><a href="../flow.html">← the run's flow chart</a></p>
+
+<h1>U30 · implementer · M1-T20 solo</h1>
+<table class="head"><tr><td>Type</td><td>implementer</td></tr><tr><td>Description</td><td>M1-T20 solo</td></tr><tr><td>Spawned by</td><td>driver at D185</td></tr><tr><td>Turn</td><td><a href="../turns/T06.html">T06</a></td></tr><tr><td>Model</td><td>claude-opus-5-5</td></tr><tr><td>Start</td><td>2026-10-19 08:28:19 UTC</td></tr><tr><td>Duration</td><td>2 min</td></tr><tr><td>Tool calls</td><td>24</td></tr><tr><td>Errors</td><td>1</td></tr><tr><td>Hook blocks</td><td>0</td></tr><tr><td>Tokens</td><td>7.4k out · 42.0k new in · 459k cached in · peak context 46.7k</td></tr><tr><td>Skills invoked</td><td>none</td></tr><tr><td>Files written or edited</td><td>.claude/worktrees/agent-a3f88f6430ab53b75/src/rllab/train/pipelines/pl02_train.py, .claude/worktrees/agent-a3f88f6430ab53b75/tests/unit/rllab/test_pl02_smoke.py</td></tr><tr><td>Definition</td><td>none</td></tr><tr><td>Steps</td><td>27</td></tr><tr><td>Finished</td><td>yes</td></tr></table>
+
+
+<h2>Prompt</h2>
+<pre>You are the solo for M1-T20. Run `python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/plugin/dev-team/scripts/dt.py claim M1-T20 --role solo`, then read the packet it names.</pre>
+<h2>Files</h2>
+<table><tr><th>Op</th><th>File</th><th>Calls</th><th>By</th><th>Via</th><th>Steps</th></tr><tr><td>write</td><td><code>.claude/worktrees/agent-a3f88f6430ab53b75/src/rllab/train/pipelines/pl02_train.py</code></td><td>1</td><td>U30</td><td>Write</td><td><a href="#21">U30.S21</a></td></tr><tr><td>write</td><td><code>.claude/worktrees/agent-a3f88f6430ab53b75/tests/unit/rllab/test_pl02_smoke.py</code></td><td>1</td><td>U30</td><td>Write</td><td><a href="#24">U30.S24</a></td></tr><tr><td>read</td><td><code>.claude/worktrees/agent-a3f88f6430ab53b75/.claude/packet.md</code></td><td>1</td><td>U30</td><td>Read</td><td><a href="#4">U30.S4</a></td></tr><tr><td>read</td><td><code>.claude/worktrees/agent-a3f88f6430ab53b75/CONSTRAINTS.md</code></td><td>1</td><td>U30</td><td>Read</td><td><a href="#3">U30.S3</a></td></tr><tr><td>read</td><td><code>.claude/worktrees/agent-a3f88f6430ab53b75/pyproject.toml</code></td><td>1</td><td>U30</td><td>Bash</td><td><a href="#17">U30.S17</a></td></tr><tr><td>read</td><td><code>.claude/worktrees/agent-a3f88f6430ab53b75/src/rllab/cli/command.py</code></td><td>1</td><td>U30</td><td>Read</td><td><a href="#8">U30.S8</a></td></tr><tr><td>read</td><td><code>.claude/worktrees/agent-a3f88f6430ab53b75/src/rllab/train/loop/run.py</code></td><td>1</td><td>U30</td><td>Read</td><td><a href="#7">U30.S7</a></td></tr><tr><td>read</td><td><code>.claude/worktrees/agent-a3f88f6430ab53b75/src/rllab/train/pipelines/pl02_train.py</code></td><td>1</td><td>U30</td><td>Read</td><td><a href="#5">U30.S5</a></td></tr><tr><td>read</td><td><code>.claude/worktrees/agent-a3f88f6430ab53b75/src/rllab/train/setup.py</code></td><td>1</td><td>U30</td><td>Read</td><td><a href="#11">U30.S11</a></td></tr><tr><td>read</td><td><code>.claude/worktrees/agent-a3f88f6430ab53b75/tests/contracts/core.RunConfig/samples/snake_default.json</code></td><td>1</td><td>U30</td><td>Bash</td><td><a href="#22">U30.S22</a></td></tr><tr><td>read</td><td><code>.claude/worktrees/agent-a3f88f6430ab53b75/tests/contracts/test_train.py</code></td><td>1</td><td>U30</td><td>Read</td><td><a href="#12">U30.S12</a></td></tr><tr><td>read</td><td><code>.claude/worktrees/agent-a3f88f6430ab53b75/tests/fixtures/rllab/TC-04/expected.json</code></td><td>1</td><td>U30</td><td>Bash</td><td><a href="#13">U30.S13</a></td></tr><tr><td>read</td><td><code>.claude/worktrees/agent-a3f88f6430ab53b75/tests/fixtures/rllab/TC-04/input.json</code></td><td>1</td><td>U30</td><td>Bash</td><td><a href="#13">U30.S13</a></td></tr><tr><td>read</td><td><code>.claude/worktrees/agent-a3f88f6430ab53b75/tests/fixtures/rllab/TC-05/expected.json</code></td><td>1</td><td>U30</td><td>Bash</td><td><a href="#13">U30.S13</a></td></tr><tr><td>read</td><td><code>.claude/worktrees/agent-a3f88f6430ab53b75/tests/fixtures/rllab/TC-05/input.json</code></td><td>1</td><td>U30</td><td>Bash</td><td><a href="#13">U30.S13</a></td></tr><tr><td>read</td><td><code>.claude/worktrees/agent-a3f88f6430ab53b75/tests/fixtures/rllab/TC-11/expected.json</code></td><td>1</td><td>U30</td><td>Bash</td><td><a href="#13">U30.S13</a></td></tr><tr><td>read</td><td><code>.claude/worktrees/agent-a3f88f6430ab53b75/tests/fixtures/rllab/TC-11/input.json</code></td><td>1</td><td>U30</td><td>Bash</td><td><a href="#13">U30.S13</a></td></tr><tr><td>read</td><td><code>.claude/worktrees/agent-a3f88f6430ab53b75/tests/unit/rllab/test_loop.py</code></td><td>1</td><td>U30</td><td>Read</td><td><a href="#14">U30.S14</a></td></tr><tr><td>read</td><td><code>.claude/worktrees/agent-a3f88f6430ab53b75/tests/unit/rllab/test_setup.py</code></td><td>1</td><td>U30</td><td>Read</td><td><a href="#19">U30.S19</a></td></tr></table>
+<h2>Steps</h2>
+<div class="step" id="S1"><span class="sid">U30.S1</span><span class="kind">user</span>You are the solo for M1-T20. Run `python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/plugin/dev-team/scripts/dt.py claim M1-T20 --role solo`, then read the packet it names.<details><summary>full text</summary><pre>You are the solo for M1-T20. Run `python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/plugin/dev-team/scripts/dt.py claim M1-T20 --role solo`, then read the packet it names.</pre></details></div><div class="step" id="S2"><span class="sid">U30.S2</span><span class="kind">Bash</span>python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/plugin/dev-team/scripts/dt.py claim M1-T20 --role solo<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/plugin/dev-team/scripts/dt.py claim M1-T20 --role solo&quot;,
+  &quot;description&quot;: &quot;Claim task M1-T20 as solo&quot;
+}</pre><div class="lbl">output</div><pre>packet: /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/project/.claude/worktrees/agent-a3f88f6430ab53b75/.claude/packet.md (218 lines; read it in full)
+task: M1-T20 Wire PL-02 · role solo · package rllab · kind wiring
+writes: src/rllab/train/pipelines/pl02_train.py, tests/unit/rllab/test_pl02_smoke.py
+done: Done when `scripts/check.sh gate` passes (the gate passes on your Writes); the Stop hook runs it. End with one line: `DONE M1-T20 solo`. If you can&#x27;t finish: `python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/plugin/dev-team/scripts/dt.py escalate &lt;TEST-WRONG|NEEDS-DEP&gt; &quot;&lt;why&gt;&quot;`, or `python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/plugin/dev-team/scripts/dt.py escalate CONTRACT-CHANGE &quot;&lt;why&gt;&quot; --type &lt;the contract symbol&gt;`, then end with one line: `STOPPED M1-T20 solo: see dt escalate`.</pre></details></div><div class="step" id="S3"><span class="sid">U30.S3</span><span class="kind">Read</span>/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/project/.claude/worktrees/agent-a3f88f6430ab53b75/CONSTRAINTS.md<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/project/.claude/worktrees/agent-a3f88f6430ab53b75/CONSTRAINTS.md&quot;
+}</pre><div class="lbl">output</div><pre>1	# Constraints
+2	**Status:** Approved · **Last reviewed:** 2026-10-17 by @connor · **Ratcheted:** —
+3	
+4	The standing quality bar. `pyproject.toml` and `scripts/check.sh` enforce it; every number here names its config key, and `dt status` fails if the two disagree. Only `build-setup` changes this file, with the user: tightening is routine, loosening needs an explicit yes.
+5	
+6	## Floor
+7	- **CR-01** No new suppressions. Ruff runs with `--ignore-noqa` in gate and full, so a Ruff exception is a `per-file-ignores` entry in protected config with a row in Exceptions. `floor_guard.sh` catches the other suppressions on the diff
+8	- **CR-02** No stubs: `raise NotImplementedError` outside abstract methods, `pass`-only bodies, bare `except: pass`. One carve-out: the interface task&#x27;s step signatures, whose body is only `raise NotImplementedError(&quot;&lt;task id&gt;&quot;)` naming the open task that replaces it. `check.sh gate` fails on one naming a task that isn&#x27;t open in `tasks/todo.md`, and on a test that expects one (`stub-pinned`); `check.sh full --exit` fails on any
+9	- **CR-03** No skipped, deleted or assertion-free tests, unless a row in Exceptions names the test file
+10	- **CR-04** No secrets in source
+11	- **CR-05** Oracle files (`tests/fixtures/**/expected.json`) change only with the user&#x27;s approval
+12	- **CR-06** The implementer never changes `tests/intent/**`
+13	- **CR-07** This file, `pyproject.toml` tool config, `scripts/` and `.claude/agents/` are not weakened to make a change pass
+14	- **CR-08** Nothing imports from `references/` or `probes/`, or adds either to `sys.path` (or `PYTHONPATH`, pytest `pythonpath`). `floor_guard.sh` checks the diff for both. Code copied from either is project code and meets the same bar
+15	- **CR-09** A frozen interface (`tests/contracts/&lt;id&gt;.&lt;symbol&gt;/`: schema, samples, fake; and the types, signatures and exports the interface task wrote) is frozen once it exists at the task&#x27;s base. Only the interface task freezing it (`**Kind:** interface`) writes a new folder, and no other task&#x27;s `Writes:` names its `types.py` or `__init__.py`; a frozen interface changes only through `architecture-design` Revise, never to make a test pass
+16	
+17	## Readability
+18	- **CR-10** One entry function per pipeline; it reads top to bottom as its named steps (reviewer + `dt layout`)
+19	- **CR-11** No registries, plugin dispatch or config-driven wiring without an AD
+20	- **CR-12** New abstraction only with a second real implementation or a named seam
+21	- **CR-13** No global random state: every generator is spawned from a seed (`np.random.SeedSequence`, a `torch.Generator`), never `np.random.seed` or `torch.manual_seed` (AD-05)
+22	
+23	## Enforced with numbers
+24	| ID | Dimension | Rule | Checked by | Config key | Runs at |
+25	|---|---|---|---|---|---|
+26	| CR-20 | Lint | zero errors; standing per-file-ignores only for `tests/**` and `__init__.py` | ruff | `tool.ruff.lint.select` | edit, gate |
+27	| CR-21 | Complexity | ≤ 10 per function | ruff C901 | `tool.ruff.lint.mccabe.max-complexity` | gate |
+28	| CR-22 | Size | ≤ 500 lines/module, ≤ 60/function | check_size.py | `tool.size_limits` | edit, gate |
+29	| CR-23 | Types | zero errors, strict | mypy | `tool.mypy.strict` | gate |
+30	| CR-24 | Boundaries | import contracts hold | import-linter | `tool.importlinter.contracts` | gate |
+31	| CR-25 | Dependencies | none missing or unused | deptry | `tool.deptry` | gate |
+32	| CR-26 | Deps security | nothing known-vulnerable | pip-audit | — | full, CI nightly |
+33	| CR-27 | Reproducibility | same seed, same result: `repro` tests pass (TRAIN-02, WORLD-02, REPLAY-02) | pytest `-m repro` | `tool.pytest.ini_options.markers` | gate |
+34	
+35	## Measured, not yet enforced
+36	| ID | Metric | Today | Direction |
+37	|---|---|---|---|
+38	| CR-40 | Coverage (branch) | — (no code) (`tool.coverage.report.fail_under`, raised by Ratchet) | must not fall |
+39	| CR-41 | vulture findings at `min_confidence = 60` (`scripts/vulture_whitelist.py`) | 0 | must not grow by `full --exit` (earlier `full` runs report) |
+40	| CR-42 | Duplicate blocks of ≥ 8 similar source lines (pylint `duplicate-code`, `[tool.pylint.similarities]` in pyproject.toml) | 0 | must not grow |
+41	
+42	## Boundaries (generated from architecture — do not edit)
+43	- `rllab.core` imports nothing first-party · `worlds` → core · `runlog` → core · `baselines` → core, worlds · `methods` → core, runlog · `train`, `evaluate`, `replay` → core, worlds, baselines, methods, runlog · `charts` → runlog, evaluate · `refcheck` → core, worlds, train, evaluate, runlog · `notes` → nothing · `cli` → all · only `refcheck` imports Stable-Baselines3 or Gymnasium
+44	
+45	## Roles and protected paths
+46	| Role | May edit | May not edit | Stop gate |
+47	|---|---|---|---|
+48	| tester | `tests/intent/**`, within the task&#x27;s `Writes:` | everything else; reads no source | `check.sh collect` (lint, collect, red for the right reason) |
+49	| implementer / solo | `src/**`, `tests/unit/**`, within the task&#x27;s `Writes:`; an interface task also the `tests/contracts/&lt;id&gt;.&lt;symbol&gt;/` its `Writes:` names | the protected list; `tasks/` | `check.sh gate` + protected-path diff against the worktree&#x27;s base |
+50	| reviewer | its worktree, for the mutation check, and its findings file; nothing lands (the orchestrator records findings with `dt finding`) | everything else | runs `check.sh full` by hand |
+51	
+52	**Protected list** (`PROTECTED` in `scripts/check.sh`; `path_guard.sh deny --protected` reads the same list): `tests/intent/**`, `tests/fixtures/**`, `tests/conftest.py`, `pyproject.toml`, `uv.lock`, `CONSTRAINTS.md`, `scripts/**`, `.claude/agents/**`, `.claude/settings.json`, `references/**`, `probes/**`, `tests/contracts/**`. `tests/contracts/**` covers the contract folders that exist at the task&#x27;s base (CR-09). **`Writes:`**: `dt claim` writes the role&#x27;s share of the task&#x27;s `Writes:` to `.claude/.task_writes` and sets the worktree&#x27;s base; `path_guard.sh writes` blocks edits outside it, and builder edits before the claim. Only the orchestrator writes `tasks/` (`dt land`, `dt finding`).
+53	
+54	**Worktree links:** none
+55	
+56	## Review
+57	Run by the reviewer agent: the interface review after Phase 0, a phase review per package at each checkpoint, and the milestone exit. `dt land` already checked each landing&#x27;s `Writes:`, protected paths and gates; review judges what tools can&#x27;t.
+58	
+59	**Interface** (after Phase 0): the code is the contract, no more and no less.
+60	1. Types match `contract.md`: fields, types, invariants. Nothing a step&#x27;s In → Out needs is missing; no helper is frozen.
+61	2. Signatures match the step tables, in their owner modules. Each stub names the open task that owns its step; no logic beyond types and validation.
+62	3. One sample per case the contract names, valid and realistic, never holding a TC&#x27;s expected value. Replay doubles replay an interaction the Protocol allows. Each fake passes its contract&#x27;s cases; anything it does beyond echoing a fixture (filtering, ordering, an error) is a case the real provider must pass too. Contract tests check shape only, never a stub or other state a later task changes.
+63	4. `__init__.py` exports exactly the contract; each `Mitigated by` in the plan&#x27;s dependency graph exists; each split task&#x27;s tester can write its tests from the frozen interface and its `Read:`.
+64	
+65	**Each phase**, per package, tests before code:
+66	1. **Interfaces followed** (CR-09): no frozen type, signature or contract folder changed outside a Revise. Consumers use the declared types: no dict for a dataclass, no reaching into a provider&#x27;s internals, no local redefinition. A stub is replaced only by the task it names; no cross-package import outside the contract; spine tests run on samples and doubles, not another step&#x27;s code.
+67	2. **Tests prove something:** each intent test asserts its TC case or acceptance bullet, loading expected values and tolerances from fixtures; none is assertion-free or weakened; Hypothesis runs the `ci` profile. Unit tests are specific, never computing the expected value with the code under test or testing only a mock. **Mutation check** (`.claude/agents/reviewer.md`): per acceptance bullet, the smallest change that should break it; a mutation no test catches is a finding.
+68	3. **Correct to the spec:** each acceptance bullet truly met, not special-cased to the sample; the error paths the requirement names; seeding and determinism; numerical edge cases.
+69	4. **Simple** (CR-11, CR-12, CR-42): no abstraction with one implementation outside the contract or an AD; no forwarding wrapper, one-method class, or class where a function does; no parameter, flag or config key every caller sets the same; no `try/except` that only re-raises or swallows, no checks the types already guarantee; no loop the library already provides. No near-copies within or across the phase&#x27;s tasks: one concept is one function in its owner module (tests may repeat for readability). Each finding names the simpler form, with the same tests passing.
+70	5. **Pipelines** (CR-10): entry functions read as their step tables (`dt layout`); step owners respected; spine baselines still selectable.
+71	6. **The bar** (CR-07): diff this file, `pyproject.toml`, `scripts/` and `.claude/agents/` against the milestone&#x27;s Base. Any loosening is Critical; new exceptions need an owner and expiry.
+72	7. **Hidden and parallel risks:** where a real provider could act differently from its double; fixed output paths, global state, test-order dependence.
+73	8. **The rest:** readability, security, performance where a QR sets a number; reused reference or probe code has its Caveats handled and fits the contract; `dt lint` clean, pre-build sections replaced by `dt layout` pointers.
+74	
+75	**Milestone exit**, over the whole diff, adds: the Scope&#x27;s Exit holds; every Covers ID has a test; `check.sh full --exit` finds no stub; system tests use real providers; the same sample through a real provider and its double agrees; deferred requirements untouched; pip-audit ran.
+76	
+77	**Severity:** Critical: a frozen interface changed, a contract test pinning a transient state, a weakened test, an intent test that misses a mutation changing its TC&#x27;s expected output, a wrong answer, a loosened bar, a security hole, lost data; it stops the build. Important: a consumer bypassing a type, any other surviving mutation, an unneeded abstraction, a duplicate across tasks. Suggestion and Nit: local. Findings go under the checkpoint block in `tasks/plan.md` (`dt finding`), each with a fix task or a reason.
+78	
+79	## Done
+80	agent-skills `references/definition-of-done.md`, tailored once:
+81	- **Correctness and Quality:** checked per task by the gate.
+82	- **Integration and Documentation:** checked at each checkpoint.
+83	- **The full list:** checked at milestone exit.
+84	
+85	## Exceptions
+86	| ID | Rule | Path | Reason | Owner | Expires |
+87	|---|---|---|---|---|---|
+88	| EX-01 | CR-25 DEP002 | `numpy`, `torch`, `matplotlib` | M1 dependencies, declared before the code imports them | @connor | M1 exit |
+89	</pre></details></div><div class="step" id="S4"><span class="sid">U30.S4</span><span class="kind">Read</span>/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/project/.claude/worktrees/agent-a3f88f6430ab53b75/.claude/packet.md<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/project/.claude/worktrees/agent-a3f88f6430ab53b75/.claude/packet.md&quot;
+}</pre><div class="lbl">output</div><pre>1	# Packet: M1-T20 solo
+2	You are the solo for M1-T20. Your edit boundary is your Writes below (`.claude/.task_writes`); the guard blocks everything else.
+3	
+4	Done when `scripts/check.sh gate` passes (the gate passes on your Writes); the Stop hook runs it. End with one line: `DONE M1-T20 solo`. If you can&#x27;t finish: `python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/plugin/dev-team/scripts/dt.py escalate &lt;TEST-WRONG|NEEDS-DEP&gt; &quot;&lt;why&gt;&quot;`, or `python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/plugin/dev-team/scripts/dt.py escalate CONTRACT-CHANGE &quot;&lt;why&gt;&quot; --type &lt;the contract symbol&gt;`, then end with one line: `STOPPED M1-T20 solo: see dt escalate`.
+5	
+6	# Context for M1-T20: package rllab · mode solo · kind wiring
+7	Read only what is below, plus CONSTRAINTS.md and the files you edit. Your task is the last section.
+8	
+9	&lt;!-- docs/packages/rllab/pipelines.md:27 --&gt;
+10	## PL-02: Training run
+11	**Entry:** `src/rllab/train/pipelines/pl02_train.py::run_train` · **Trigger:** PL-03 `run_parallel`, once per config (`rllab train &lt;config.toml&gt; --seed N` is a one-seed batch)
+12	**Covers:** TRAIN-01–TRAIN-04, TRAIN-07, LOG-01, LOG-02, CHECK-01, WORLD-01–WORLD-07, SNAKE-01–SNAKE-06, FISH-01–FISH-08, FISH-11, PREY-01–PREY-06, PREY-11, QR-01, QR-03, QR-06
+13	
+14	| # | Step | Owner | In → Out | Spine version | Covers |
+15	|---|---|---|---|---|---|
+16	| 1 | `make` | worlds.make | world, variant, overrides → World | name → class lookup, snake only | WORLD-01–WORLD-07 |
+17	| 2 | `Snake` | worlds.snake | overrides → World | 10 × 10 grid, relative turns, food, death, 100-step hunger limit | SNAKE-01–SNAKE-06 |
+18	| 3 | `FishTank` | worlds.fish | variant, overrides → World | &quot;one&quot; variant: bouncing ball, smooth pushes, respawn on hit | FISH-01–FISH-08 |
+19	| 4 | `PredatorPrey` | worlds.prey | overrides → World | fish movement, catches remove prey, pellets without respawn | PREY-01–PREY-06 |
+20	| 5 | `make_learners` | train.setup | RunConfig, WorldSpec → Learner per team | `methods.make_learner` per team, seeded from the run seed | TRAIN-07, CHECK-01 |
+21	| 6 | `DQN` | methods.dqn | MethodConfig, WorldSpec → Learner | online one-step Q-learning on an MLP, ε-greedy; no replay buffer or target net | CHECK-01 |
+22	| 7 | `PPO` | methods.ppo | MethodConfig, WorldSpec → Learner | REINFORCE with a Gaussian policy and mean-return baseline; no clipping or GAE | CHECK-01 |
+23	| 8 | `train_loop` | train.loop | World, Learner per team, RunConfig, root → RunRecord | steps to the budget, writing the run folder through `runlog.RunWriter`; checkpoints at 0–100%; 20-seed evals at every 5% via `core.play_episode`; stops on `NonFiniteError` | TRAIN-01–TRAIN-04, LOG-01, LOG-02, QR-01, QR-03 |
+24	
+25	### Entry sketch (pre-build — removed by spine task)
+26	```python
+27	def run_train(config: RunConfig, root: Path) -&gt; RunRecord:
+28	    world = make(config.world, config.variant)
+29	    learners = make_learners(config, world.spec)
+30	    return train_loop(world, learners, config, root)
+31	```
+32	
+33	&lt;!-- docs/packages/rllab/tests.md:38 --&gt;
+34	### TC-04: Same config and seed give an identical run
+35	**Pipeline:** PL-02 · **Covers:** TRAIN-02, WORLD-02 · **Kind:** synthetic known-answer · **Fixture:** tests/fixtures/rllab/TC-04/
+36	**Source:** generator `snake_config(budget=2000, seed=1)`, run twice into two empty roots
+37	**Expected:** `episodes.jsonl` and `evals.jsonl` byte-identical; every checkpoint&#x27;s state dicts equal; `run.json` equal except `started`/`ended` · **Tolerance:** exact, TRAIN-02 promises identical runs on one machine
+38	
+39	&lt;!-- docs/packages/rllab/tests.md:43 --&gt;
+40	### TC-05: Budget, checkpoint and evaluation schedule
+41	**Pipeline:** PL-02 · **Covers:** TRAIN-01, TRAIN-03, TRAIN-04, LOG-01, LOG-02 · **Kind:** synthetic known-answer · **Fixture:** tests/fixtures/rllab/TC-05/
+42	**Source:** spec.md, the user&#x27;s worked example (TRAIN-01, TRAIN-03, TRAIN-04); generator `snake_config(budget=2000, seed=1)`
+43	**Expected:** 2,000 world steps; checkpoints at 0%, 10%, … 100% (11, steps 0, 200, … 2,000); 21 evaluation points at steps 0, 100, … 2,000, each the mean of 20 episodes on seeds 1,000,000–1,000,019; every LOG-01 field in `run.json`; one `episodes.jsonl` line per finished training episode · **Tolerance:** exact, all counts are discrete
+44	
+45	&lt;!-- docs/packages/rllab/tests.md:73 --&gt;
+46	### TC-11: A second run with the same name is refused
+47	**Pipeline:** PL-02 · **Covers:** TRAIN-01 · **Kind:** closed form · **Fixture:** tests/fixtures/rllab/TC-11/
+48	**Source:** spec.md, Training runs edge case
+49	**Expected:** the second `run_train` raises `RunExistsError` naming `runs/snake/default/dup` before any work; the first run&#x27;s folder is byte-identical afterwards · **Tolerance:** exact
+50	
+51	&lt;!-- docs/packages/rllab/contract.md:215 --&gt;
+52	### train.run_train: One training run
+53	`def run_train(config: RunConfig, root: Path) -&gt; RunRecord`
+54	- **Invariants:** exactly `budget` world steps (TRAIN-01); checkpoints at 0%, 10%, … 100% (TRAIN-03); evaluation of every team on `EVAL_SEEDS` at every 5% (TRAIN-04); same config on the same machine → identical logs and checkpoints (TRAIN-02)
+55	- **Errors:** `RunExistsError` before any work if the run folder exists; `NonFiniteError` ends the run as `failed` with step and value, keeping the last good checkpoint; interruption marks it `incomplete`
+56	- **Boundary:** PL-03 · **Fixtures:** tests/contracts/train.run_train/ · **Cases:** a fake writing the finished 3-checkpoint snake run folder
+57	- **Used by:** train.run_batch; PL-02, PL-03
+58	
+59	## Layout (`dt layout rllab`)
+60	src/rllab/
+61	  __init__.py — RL Lab: hand-written reinforcement learning on small simulated worlds.
+62	  baselines/
+63	    __init__.py — Random play, each world&#x27;s rule and their mean scores.
+64	    means.py — Rule lookup and the baselines&#x27; mean scores on the evaluation seeds.
+65	    random.py — Uniform random play for any action format (EVAL-01).
+66	    snake.py — The snake rule baseline (SNAKE-07).
+67	    types.py — Types of the baselines.
+68	  charts/
+69	    __init__.py — Charts drawn from run folders, following the `dataviz` skill.
+70	    curve.py — Learning curves with a min-max band and baseline lines (LOG-03 to LOG-05).
+71	    types.py — Types of the charts.
+72	  cli/
+73	    __init__.py — The `rllab` command (AD-10).
+74	    __main__.py — `python -m rllab.cli`: the `rllab` command.
+75	    command.py — The `rllab` command: parses a trigger, calls its pipeline entry and prints the result (AD-10).
+76	    pipelines/
+77	      __init__.py — The PL-04 to PL-12 entries (AD-10).
+78	      pl04_watch.py — PL-04: Watch a run.
+79	      pl05_chart.py — PL-05: Learning-curve chart.
+80	      pl06_evaluate.py — PL-06: Final evaluation.
+81	  core/
+82	    __init__.py — World and policy protocols, shared types, held-out seed sets and the episode loop.
+83	    episode.py — The one episode loop every component plays through (AD-04, AD-05).
+84	    types.py — Shared types of every component: specs, steps, episodes, protocols, configs, seed sets.
+85	  evaluate/
+86	    __init__.py — Final evaluation on the final seeds, permutation tests, verdicts and summaries.
+87	    types.py — Types of the final evaluation: comparisons, verdicts and summaries.
+88	    final/
+89	      __init__.py — The final evaluation and its statistics.
+90	      play.py — Final evaluation: final checkpoints and both baselines on the final seeds (EVAL-03).
+91	      stats.py — Paired permutation tests against each baseline, with Holm&#x27;s correction (EVAL-04).
+92	      summary.py — One team&#x27;s summary from its final-seed scores, its collapse flag and `summary.json` (EVAL-06).
+93	      verdict.py — The baseline verdict: both nulls rejected and every run beating the rule (EVAL-05).
+94	  methods/
+95	    __init__.py — Hand-written learners behind `Learner`, and checkpoint-to-policy loading.
+96	    factory.py — Learner construction and checkpoint-to-policy loading.
+97	    types.py — Types of the learning methods.
+98	    dqn/
+99	      __init__.py — DQN: Q-learning on an MLP for discrete actions (AD-03).
+100	      learner.py — Online one-step Q-learning on an MLP with epsilon-greedy exploration (spine: no replay buffer
+101	  runlog/
+102	    __init__.py — Run folders: record, logs, checkpoints, live progress and lookup.
+103	    progress.py — A live view of one run&#x27;s progress (LOG-06).
+104	    read.py — Run lookup and opening run folders.
+105	    types.py — Types of run folders: record, evaluation points, checkpoints, the run view and progress.
+106	    writer.py — Writes one run folder: record, logs and checkpoints (AD-06).
+107	  train/
+108	    __init__.py — Training: the config loader, the method check and the PL-01 to PL-03 entries (AD-10).
+109	    batch.py — Runs one training run per config in a spawn process pool (TRAIN-05, AD-05).
+110	    check.py — The method check: each team method trained and scored on its check world (TRAIN-06, AD-09).
+111	    config.py — Run configs from a TOML file, one per seed, method defaults filled.
+112	    setup.py — One learner per team of a run (TRAIN-07).
+113	    types.py — Types of training: the method check&#x27;s result and its refusal.
+114	    loop/
+115	      __init__.py — The training loop of one run.
+116	      run.py — Steps a world to the budget, with checkpoints and evaluations, into a run folder.
+117	    pipelines/
+118	      __init__.py — The PL-01 to PL-03 entries (AD-10).
+119	      pl01_check.py — PL-01: Method check.
+120	      pl02_train.py — PL-02: Training run.
+121	      pl03_batch.py — PL-03: Training batch.
+122	  worlds/
+123	    __init__.py — The worlds, behind `make`.
+124	    checks.py — Check worlds with hand-derived best actions (TRAIN-06, AD-09).
+125	    make.py — The world factory: a world name and variant to a World.
+126	    snake.py — Snake: a 10 x 10 grid, relative turns, food, death and a hunger limit (SNAKE-01 to SNAKE-06).
+127	    types.py — Types the worlds add to the core World protocol.
+128	
+129	## Interfaces (frozen: build against these, never change them)
+130	&lt;!-- docs/packages/rllab/contract.md:59 --&gt;
+131	### core.World: type
+132	```python
+133	class World(Protocol):
+134	    spec: WorldSpec
+135	    def reset(self, seed: int) -&gt; Step: ...
+136	    def step(self, actions: Array) -&gt; Step: ...
+137	    def result(self) -&gt; EpisodeResult: ...
+138	    def draw(self) -&gt; DrawState: ...
+139	```
+140	- **Invariants:** same seed → same start (WORLD-01); same seed and actions → same steps (WORLD-02); `actions` has one row per agent, rows of inactive agents ignored
+141	- **Errors:** `step` raises `ActionError(agent: str, value: object)`, a `ValueError`, for an action outside `spec.action`, never clipping it; `step` after `done` raises `RuntimeError`
+142	- **Boundary:** train, evaluate, replay, refcheck · **Fixtures:** tests/contracts/core.World/ · **Cases:** a replay double of a recorded 5-step snake episode from seed 42
+143	- **Used by:** every component that plays episodes; PL-02, PL-08
+144	Sample: tests/contracts/core.World/ (exists)
+145	
+146	&lt;!-- docs/packages/rllab/contract.md:110 --&gt;
+147	### core.RunConfig: type
+148	`@dataclass(frozen=True) class RunConfig: name: str; world: str; variant: str; methods: Mapping[str, MethodConfig]; seed: int; budget: int; check_settings: Mapping[str, Settings]; device: str = &quot;cpu&quot;`
+149	- **Invariants:** `methods` has one entry per team (TRAIN-07); `budget` counts world steps, not agent steps; `check_settings` overrides settings for the check world only (AD-09); owned by `core` so `runlog` can store it (AD-12)
+150	- **Boundary:** train, runlog, refcheck, cli · **Fixtures:** tests/contracts/core.RunConfig/ · **Cases:** a snake config from `configs/snake-default.toml`; a predator-prey config with two methods
+151	- **Used by:** train, runlog, refcheck, cli; PL-01, PL-02, PL-03, PL-09
+152	Sample: tests/contracts/core.RunConfig/ (exists)
+153	
+154	&lt;!-- docs/packages/rllab/contract.md:21 --&gt;
+155	### core.WorldSpec: type
+156	`@dataclass(frozen=True) class WorldSpec: world: str; variant: str; agents: tuple[str, ...]; teams: tuple[TeamSpec, ...]; obs_len: int; action: ActionSpace; max_steps: int; measures: tuple[MeasureSpec, ...]; sight: float | None`
+157	`MeasureSpec(name: str, team: str, direction: Direction)`
+158	- **Invariants:** available without running an episode (WORLD-04); `sight` is the radius in world units for local-sight variants, else `None`; equality of two specs is field by field
+159	- **Boundary:** worlds, methods, runlog, replay, refcheck · **Fixtures:** tests/contracts/core.WorldSpec/ · **Cases:** snake default; fish local-sight (8 agents, sight set); predator-prey
+160	- **Used by:** all components; PL-02, PL-08
+161	Sample: tests/contracts/core.WorldSpec/ (exists)
+162	
+163	&lt;!-- docs/packages/rllab/contract.md:173 --&gt;
+164	### methods.Learner: type
+165	```python
+166	class Learner(Protocol):
+167	    def act(self, obs: Array, rng: np.random.Generator) -&gt; Array: ...   # exploring
+168	    def observe(self, t: Transition) -&gt; None: ...                       # updates on its own schedule
+169	    def policy(self) -&gt; Policy: ...                                      # frozen, deterministic copy
+170	    def state_dict(self) -&gt; dict[str, object]: ...
+171	```
+172	- **Invariants:** hand-written learning code only (CHECK-01); `policy()` is greedy (DQN) or the mean action (PPO) and does not change as the learner trains
+173	- **Errors:** `observe` raises `NonFiniteError(value: float)` when a loss or parameter is NaN or infinite, before changing any parameter
+174	- **Boundary:** train · **Fixtures:** tests/contracts/methods.Learner/ · **Cases:** a replay double of a DQN learner over 10 snake transitions
+175	- **Used by:** train; PL-01, PL-02, PL-03
+176	Sample: tests/contracts/methods.Learner/ (exists)
+177	
+178	&lt;!-- docs/packages/rllab/contract.md:104 --&gt;
+179	### core.MethodConfig: type
+180	`@dataclass(frozen=True) class MethodConfig: method: Literal[&quot;dqn&quot;, &quot;ppo&quot;]; settings: Settings`
+181	- **Invariants:** `settings` holds only keys the method declares, checked by `train.load_run_configs`; missing keys take the method&#x27;s defaults, written back in full to the run record; owned by `core` so `runlog` can store it (AD-12)
+182	- **Boundary:** methods, train, runlog, refcheck · **Fixtures:** tests/contracts/core.MethodConfig/ · **Cases:** snake DQN defaults; PPO with one overridden learning rate
+183	- **Used by:** methods, train, runlog, refcheck; PL-01, PL-03
+184	Sample: tests/contracts/core.MethodConfig/ (exists)
+185	
+186	&lt;!-- docs/packages/rllab/contract.md:237 --&gt;
+187	### runlog.RunRecord: type
+188	`@dataclass(frozen=True) class RunRecord: config: RunConfig; spec: WorldSpec; started: datetime; ended: datetime | None; status: Literal[&quot;running&quot;, &quot;finished&quot;, &quot;incomplete&quot;, &quot;failed&quot;]; failure: Failure | None; path: Path`
+189	`Failure(step: int, value: float, checkpoint: Path)`
+190	- **Invariants:** every LOG-01 field present once the run ends; `config` is a `core.RunConfig` (AD-12), so `runlog` imports only `core`; `config.methods` holds full settings, defaults included
+191	- **Boundary:** train, evaluate, charts, refcheck, cli · **Fixtures:** tests/contracts/runlog.RunRecord/ · **Cases:** a finished snake run; a failed run with a NaN at step 41,200; an incomplete run
+192	- **Used by:** train, evaluate, charts, refcheck, cli; PL-02, PL-03
+193	Sample: tests/contracts/runlog.RunRecord/ (exists)
+194	
+195	&lt;!-- docs/packages/rllab/contract.md:124 --&gt;
+196	### worlds.make: World factory
+197	`def make(world: str, variant: str = &quot;default&quot;, **overrides: int | float) -&gt; World`
+198	- **Invariants:** worlds `snake` (`default`), `fish` (`one`, `many`, `local`), `prey` (`default`), `check-discrete`, `check-continuous`; `overrides` change only the spec&#x27;s starting values (grid size, counts, step limits; spec Assumptions)
+199	- **Errors:** `ValueError` naming an unknown world, variant or override
+200	- **Boundary:** baselines, train, evaluate, replay, refcheck · **Fixtures:** tests/contracts/worlds.make/ · **Cases:** a fake returning the recorded seed-42 snake double for `make(&quot;snake&quot;)`
+201	- **Used by:** train, evaluate, replay, refcheck, baselines; PL-02, PL-08
+202	Sample: tests/contracts/worlds.make/ (exists)
+203	
+204	## Writes (edit only these files; the plan gives every other file to another task)
+205	- src/rllab/train/pipelines/pl02_train.py (exists)
+206	- tests/unit/rllab/test_pl02_smoke.py (new)
+207	
+208	&lt;!-- tasks/plan.md:219 --&gt;
+209	### M1-T20: Wire PL-02
+210	**Package:** rllab · **Step:** PL-02 · **Kind:** wiring · **Covers:** TRAIN-01–TRAIN-04, TRAIN-02 · **Size:** XS · **Mode:** solo
+211	**Skills:** —
+212	**Read:** PL-02, TC-04, TC-05, TC-11, train.run_train
+213	**Acceptance:**
+214	- [ ] `rllab train --smoke` runs end to end; committed as PL-02&#x27;s smoke test
+215	- [ ] TC-04, TC-05 and TC-11 pass
+216	- [ ] PL-02 pre-build sections replaced by a `dt layout` pointer
+217	**Verify:** `rllab train --smoke` · `scripts/check.sh gate`
+218	**Depends on:** M1-T05, M1-T06, M1-T07, M1-T08, M1-T09, M1-T18 · **Writes:** src/rllab/train/pipelines/pl02_train.py, tests/unit/rllab/test_pl02_smoke.py
+219	</pre></details></div><div class="step" id="S5"><span class="sid">U30.S5</span><span class="kind">Read</span>/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/project/.claude/worktrees/agent-a3f88f6430ab53b75/src/rllab/train/pipelines/pl02_train.py<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/project/.claude/worktrees/agent-a3f88f6430ab53b75/src/rllab/train/pipelines/pl02_train.py&quot;
+}</pre><div class="lbl">output</div><pre>1	&quot;&quot;&quot;PL-02: Training run.&quot;&quot;&quot;
+2	
+3	from pathlib import Path
+4	
+5	from rllab.core import RunConfig
+6	from rllab.runlog import RunRecord
+7	
+8	
+9	def run_train(config: RunConfig, root: Path) -&gt; RunRecord:
+10	    raise NotImplementedError(&quot;M1-T20&quot;)
+11	</pre></details></div><div class="step" id="S6"><span class="sid">U30.S6</span><span class="kind">Bash</span>grep -rn &quot;NotImplementedError\|^def \|^from\|^import&quot; src/rllab/train src/rllab/worlds/make.py src/rllab/cli/command.py<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;grep -rn \&quot;NotImplementedError\\|^def \\|^from\\|^import\&quot; src/rllab/train src/rllab/worlds/make.py src/rllab/cli/command.py&quot;,
+  &quot;description&quot;: &quot;Survey train package and stubs&quot;
+}</pre><div class="lbl">output</div><pre>src/rllab/train/config.py:19:import tomllib
+src/rllab/train/config.py:20:from collections.abc import Mapping, Sequence
+src/rllab/train/config.py:21:from collections.abc import Set as AbstractSet
+src/rllab/train/config.py:22:from dataclasses import replace
+src/rllab/train/config.py:23:from pathlib import Path
+src/rllab/train/config.py:24:from typing import Literal
+src/rllab/train/config.py:26:from rllab.core import MethodConfig, RunConfig, Settings
+src/rllab/train/config.py:47:def load_run_configs(path: Path, seeds: Sequence[int]) -&gt; list[RunConfig]:
+src/rllab/train/config.py:55:def _run_config(raw: Mapping[str, object]) -&gt; RunConfig:
+src/rllab/train/config.py:82:def _method_config(raw: object, where: str) -&gt; MethodConfig:
+src/rllab/train/config.py:90:def _settings(raw: object, method: str, where: str) -&gt; dict[str, SettingValue]:
+src/rllab/train/config.py:98:def _setting(value: object, default: SettingValue, where: str) -&gt; SettingValue:
+src/rllab/train/config.py:107:def _method_name(value: str) -&gt; Literal[&quot;dqn&quot;, &quot;ppo&quot;]:
+src/rllab/train/config.py:115:def _budget(value: object) -&gt; int:
+src/rllab/train/config.py:121:def _text(table: Mapping[str, object], key: str, where: str, default: str | None = None) -&gt; str:
+src/rllab/train/config.py:128:def _table(value: object, where: str) -&gt; Mapping[str, object]:
+src/rllab/train/config.py:134:def _check_keys(table: Mapping[str, object], known: AbstractSet[str], where: str) -&gt; None:
+src/rllab/train/types.py:3:from dataclasses import dataclass
+src/rllab/train/__init__.py:3:from rllab.train.config import load_run_configs
+src/rllab/train/__init__.py:4:from rllab.train.pipelines.pl01_check import run_check
+src/rllab/train/__init__.py:5:from rllab.train.pipelines.pl02_train import run_train
+src/rllab/train/__init__.py:6:from rllab.train.pipelines.pl03_batch import run_batch
+src/rllab/train/__init__.py:7:from rllab.train.types import CheckFailedError, CheckResult
+src/rllab/train/check.py:3:from collections.abc import Mapping, Sequence
+src/rllab/train/check.py:4:from typing import cast
+src/rllab/train/check.py:6:import numpy as np
+src/rllab/train/check.py:8:from rllab.core import MethodConfig, RunConfig
+src/rllab/train/check.py:9:from rllab.methods import Learner, Transition, make_learner
+src/rllab/train/check.py:10:from rllab.train.types import CheckFailedError, CheckResult
+src/rllab/train/check.py:11:from rllab.worlds import CheckWorld, make
+src/rllab/train/check.py:19:def check_plan(configs: Sequence[RunConfig]) -&gt; dict[str, MethodConfig]:
+src/rllab/train/check.py:31:def train_checks(plan: Mapping[str, MethodConfig], seed: int) -&gt; dict[str, Learner]:
+src/rllab/train/check.py:36:def _train_check(config: MethodConfig, seed: int) -&gt; Learner:
+src/rllab/train/check.py:63:def score_checks(
+src/rllab/train/check.py:70:def _score_check(method: str, learner: Learner) -&gt; CheckResult:
+src/rllab/train/check.py:80:def require_pass(results: list[CheckResult]) -&gt; list[CheckResult]:
+src/rllab/train/check.py:88:def _check_world(method: str) -&gt; CheckWorld:
+src/rllab/train/batch.py:3:import multiprocessing
+src/rllab/train/batch.py:4:from collections.abc import Sequence
+src/rllab/train/batch.py:5:from concurrent.futures import ProcessPoolExecutor, wait
+src/rllab/train/batch.py:6:from pathlib import Path
+src/rllab/train/batch.py:8:import torch
+src/rllab/train/batch.py:10:from rllab.core import RunConfig
+src/rllab/train/batch.py:11:from rllab.runlog import RunRecord
+src/rllab/train/batch.py:12:from rllab.train.pipelines.pl02_train import run_train
+src/rllab/train/batch.py:15:def run_parallel(configs: Sequence[RunConfig], root: Path, workers: int | None) -&gt; list[RunRecord]:
+src/rllab/train/batch.py:28:def _init_worker() -&gt; None:
+src/rllab/train/pipelines/pl01_check.py:3:from pathlib import Path
+src/rllab/train/pipelines/pl01_check.py:5:from rllab.train.types import CheckResult
+src/rllab/train/pipelines/pl01_check.py:8:def run_check(config_path: Path, seed: int = 0) -&gt; list[CheckResult]:
+src/rllab/train/pipelines/pl01_check.py:9:    raise NotImplementedError(&quot;M1-T19&quot;)
+src/rllab/worlds/make.py:3:from collections.abc import Callable
+src/rllab/worlds/make.py:5:from rllab.core import World
+src/rllab/worlds/make.py:6:from rllab.worlds.checks import CheckDiscrete
+src/rllab/worlds/make.py:7:from rllab.worlds.snake import Snake
+src/rllab/worlds/make.py:10:def make(world: str, variant: str = &quot;default&quot;, **overrides: int | float) -&gt; World:
+src/rllab/train/setup.py:3:import numpy as np
+src/rllab/train/setup.py:5:from rllab.core import RunConfig, WorldSpec
+src/rllab/train/setup.py:6:from rllab.methods import Learner, make_learner
+src/rllab/train/setup.py:9:def make_learners(config: RunConfig, spec: WorldSpec) -&gt; dict[str, Learner]:
+src/rllab/train/pipelines/pl02_train.py:3:from pathlib import Path
+src/rllab/train/pipelines/pl02_train.py:5:from rllab.core import RunConfig
+src/rllab/train/pipelines/pl02_train.py:6:from rllab.runlog import RunRecord
+src/rllab/train/pipelines/pl02_train.py:9:def run_train(config: RunConfig, root: Path) -&gt; RunRecord:
+src/rllab/train/pipelines/pl02_train.py:10:    raise NotImplementedError(&quot;M1-T20&quot;)
+src/rllab/train/loop/__init__.py:3:from rllab.train.loop.run import train_loop
+src/rllab/train/pipelines/pl03_batch.py:3:from collections.abc import Sequence
+src/rllab/train/pipelines/pl03_batch.py:4:from pathlib import Path
+src/rllab/train/pipelines/pl03_batch.py:6:from rllab.runlog import RunRecord
+src/rllab/train/pipelines/pl03_batch.py:9:def run_batch(
+src/rllab/train/pipelines/pl03_batch.py:17:    raise NotImplementedError(&quot;M1-T21&quot;)
+src/rllab/cli/command.py:3:import argparse
+src/rllab/cli/command.py:4:import sys
+src/rllab/cli/command.py:5:from collections.abc import Sequence
+src/rllab/cli/command.py:6:from pathlib import Path
+src/rllab/cli/command.py:8:from rllab.cli.pipelines.pl04_watch import run_watch
+src/rllab/cli/command.py:9:from rllab.cli.pipelines.pl05_chart import run_chart
+src/rllab/cli/command.py:10:from rllab.cli.pipelines.pl06_evaluate import run_evaluate
+src/rllab/cli/command.py:11:from rllab.train import run_batch, run_check
+src/rllab/cli/command.py:14:def parse_seeds(text: str) -&gt; list[int]:
+src/rllab/cli/command.py:23:def _check(args: argparse.Namespace) -&gt; object:
+src/rllab/cli/command.py:27:def _train(args: argparse.Namespace) -&gt; object:
+src/rllab/cli/command.py:31:def _batch(args: argparse.Namespace) -&gt; object:
+src/rllab/cli/command.py:37:def _watch(args: argparse.Namespace) -&gt; object:
+src/rllab/cli/command.py:41:def _chart(args: argparse.Namespace) -&gt; object:
+src/rllab/cli/command.py:47:def _evaluate(args: argparse.Namespace) -&gt; object:
+src/rllab/cli/command.py:53:def _parser() -&gt; argparse.ArgumentParser:
+src/rllab/cli/command.py:95:def _show(result: object) -&gt; None:
+src/rllab/cli/command.py:100:def main(argv: Sequence[str] | None = None) -&gt; int:
+src/rllab/train/loop/run.py:3:import copy
+src/rllab/train/loop/run.py:4:from collections.abc import Mapping
+src/rllab/train/loop/run.py:5:from pathlib import Path
+src/rllab/train/loop/run.py:7:import numpy as np
+src/rllab/train/loop/run.py:9:from rllab.core import EVAL_SEEDS, Array, RunConfig, Step, TeamSpec, World, WorldSpec, play_episode
+src/rllab/train/loop/run.py:10:from rllab.methods import Learner, NonFiniteError, Transition
+src/rllab/train/loop/run.py:11:from rllab.runlog import Checkpoint, EvalPoint, Failure, RunRecord, RunWriter
+src/rllab/train/loop/run.py:16:def train_loop(
+src/rllab/train/loop/run.py:31:def _train(
+src/rllab/train/loop/run.py:62:def _act(
+src/rllab/train/loop/run.py:74:def _transition(team: TeamSpec, before: Step, actions: Array, after: Step) -&gt; Transition:
+src/rllab/train/loop/run.py:88:def _due(step: int, budget: int, parts: int) -&gt; list[int]:
+src/rllab/train/loop/run.py:93:def _checkpoints(
+src/rllab/train/loop/run.py:104:def _evaluate(world: World, learners: Mapping[str, Learner], step: int) -&gt; EvalPoint:</pre></details></div><div class="step" id="S7"><span class="sid">U30.S7</span><span class="kind">Read</span>/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/project/.claude/worktrees/agent-a3f88f6430ab53b75/src/rllab/train/loop/run.py<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/project/.claude/worktrees/agent-a3f88f6430ab53b75/src/rllab/train/loop/run.py&quot;
+}</pre><div class="lbl">output</div><pre>1	&quot;&quot;&quot;Steps a world to the budget, with checkpoints and evaluations, into a run folder.&quot;&quot;&quot;
+2	
+3	import copy
+4	from collections.abc import Mapping
+5	from pathlib import Path
+6	
+7	import numpy as np
+8	
+9	from rllab.core import EVAL_SEEDS, Array, RunConfig, Step, TeamSpec, World, WorldSpec, play_episode
+10	from rllab.methods import Learner, NonFiniteError, Transition
+11	from rllab.runlog import Checkpoint, EvalPoint, Failure, RunRecord, RunWriter
+12	
+13	TRAINING_SEEDS = 1_000_000  # training episode seeds come from [0, 10**6) (AD-05)
+14	
+15	
+16	def train_loop(
+17	    world: World, learners: Mapping[str, Learner], config: RunConfig, root: Path
+18	) -&gt; RunRecord:
+19	    &quot;&quot;&quot;Steps `world` exactly `config.budget` times, writing the run folder under `root`.&quot;&quot;&quot;
+20	    writer = RunWriter(root, config, world.spec)
+21	    try:
+22	        failure = _train(world, learners, config, writer)
+23	    except KeyboardInterrupt:
+24	        writer.close(&quot;incomplete&quot;)
+25	        raise
+26	    if failure is not None:
+27	        return writer.close(&quot;failed&quot;, failure)
+28	    return writer.close(&quot;finished&quot;)
+29	
+30	
+31	def _train(
+32	    world: World, learners: Mapping[str, Learner], config: RunConfig, writer: RunWriter
+33	) -&gt; Failure | None:
+34	    &quot;&quot;&quot;The training steps; the failure if a learner met a non-finite value, else None.&quot;&quot;&quot;
+35	    # The run seed&#x27;s first child seeds the learners (train.setup); the next two are ours.
+36	    explore, episode_seeds = (
+37	        np.random.default_rng(child) for child in np.random.SeedSequence(config.seed).spawn(3)[1:]
+38	    )
+39	    judge = copy.deepcopy(world)  # evaluation never touches the training world (AD-05)
+40	    last = _checkpoints(0, config.budget, learners, writer)[-1]
+41	    for _ in _due(0, config.budget, 20):
+42	        writer.eval(_evaluate(judge, learners, 0))
+43	    now = world.reset(int(episode_seeds.integers(TRAINING_SEEDS)))
+44	    for step in range(1, config.budget + 1):
+45	        actions = _act(world.spec, learners, now.obs, explore)
+46	        after = world.step(actions)
+47	        try:
+48	            for team in world.spec.teams:
+49	                learners[team.name].observe(_transition(team, now, actions, after))
+50	        except NonFiniteError as error:
+51	            return Failure(step, error.value, last.path)
+52	        if after.done or after.truncated:
+53	            writer.episode(world.result())
+54	            after = world.reset(int(episode_seeds.integers(TRAINING_SEEDS)))
+55	        now = after
+56	        last = (_checkpoints(step, config.budget, learners, writer) or [last])[-1]
+57	        for _ in _due(step, config.budget, 20):
+58	            writer.eval(_evaluate(judge, learners, step))
+59	    return None
+60	
+61	
+62	def _act(
+63	    spec: WorldSpec, learners: Mapping[str, Learner], obs: Array, rng: np.random.Generator
+64	) -&gt; Array:
+65	    &quot;&quot;&quot;One action row per agent, each team&#x27;s rows from its learner.&quot;&quot;&quot;
+66	    rows: list[Array] = [np.zeros(0)] * len(spec.agents)
+67	    for team in spec.teams:
+68	        team_actions = learners[team.name].act(obs[list(team.agents)], rng)
+69	        for agent, action in zip(team.agents, team_actions, strict=True):
+70	            rows[agent] = action
+71	    return np.stack(rows)
+72	
+73	
+74	def _transition(team: TeamSpec, before: Step, actions: Array, after: Step) -&gt; Transition:
+75	    &quot;&quot;&quot;The team&#x27;s rows of one world step; `active` as it was before the step.&quot;&quot;&quot;
+76	    rows = list(team.agents)
+77	    return Transition(
+78	        obs=before.obs[rows],
+79	        actions=actions[rows],
+80	        rewards=after.rewards[rows],
+81	        next_obs=after.obs[rows],
+82	        done=after.done,
+83	        truncated=after.truncated,
+84	        active=before.active[rows],
+85	    )
+86	
+87	
+88	def _due(step: int, budget: int, parts: int) -&gt; list[int]:
+89	    &quot;&quot;&quot;The marks `i` in `0..parts` that fall at `step`: `budget * i // parts == step`.&quot;&quot;&quot;
+90	    return [i for i in range(parts + 1) if budget * i // parts == step]
+91	
+92	
+93	def _checkpoints(
+94	    step: int, budget: int, learners: Mapping[str, Learner], writer: RunWriter
+95	) -&gt; list[Checkpoint]:
+96	    &quot;&quot;&quot;The checkpoints due at `step`, one every 10% of the budget.&quot;&quot;&quot;
+97	    due = _due(step, budget, 10)
+98	    if not due:
+99	        return []
+100	    state = {team: learner.state_dict() for team, learner in learners.items()}
+101	    return [writer.checkpoint(10 * i, step, state) for i in due]
+102	
+103	
+104	def _evaluate(world: World, learners: Mapping[str, Learner], step: int) -&gt; EvalPoint:
+105	    &quot;&quot;&quot;Mean scores per team and means per measure over the `EVAL_SEEDS` episodes.&quot;&quot;&quot;
+106	    policies = {team: learner.policy() for team, learner in learners.items()}
+107	    results = [play_episode(world, policies, seed).result for seed in EVAL_SEEDS]
+108	    scores = {t.name: float(np.mean([r.scores[t.name] for r in results])) for t in world.spec.teams}
+109	    measures = {
+110	        m.name: float(np.mean([r.measures[m.name] for r in results])) for m in world.spec.measures
+111	    }
+112	    return EvalPoint(step, scores, measures)
+113	</pre></details></div><div class="step" id="S8"><span class="sid">U30.S8</span><span class="kind">Read</span>/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/project/.claude/worktrees/agent-a3f88f6430ab53b75/src/rllab/cli/command.py<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/project/.claude/worktrees/agent-a3f88f6430ab53b75/src/rllab/cli/command.py&quot;
+}</pre><div class="lbl">output</div><pre>1	&quot;&quot;&quot;The `rllab` command: parses a trigger, calls its pipeline entry and prints the result (AD-10).&quot;&quot;&quot;
+2	
+3	import argparse
+4	import sys
+5	from collections.abc import Sequence
+6	from pathlib import Path
+7	
+8	from rllab.cli.pipelines.pl04_watch import run_watch
+9	from rllab.cli.pipelines.pl05_chart import run_chart
+10	from rllab.cli.pipelines.pl06_evaluate import run_evaluate
+11	from rllab.train import run_batch, run_check
+12	
+13	
+14	def parse_seeds(text: str) -&gt; list[int]:
+15	    &quot;&quot;&quot;`3`, `1-5` or `1,3,5` to a list of seeds.&quot;&quot;&quot;
+16	    seeds: list[int] = []
+17	    for part in text.split(&quot;,&quot;):
+18	        first, _, last = part.partition(&quot;-&quot;)
+19	        seeds.extend(range(int(first), int(last or first) + 1))
+20	    return seeds
+21	
+22	
+23	def _check(args: argparse.Namespace) -&gt; object:
+24	    return run_check(args.config, args.seed)
+25	
+26	
+27	def _train(args: argparse.Namespace) -&gt; object:
+28	    return run_batch(args.config, [args.seed], args.root, check_seed=args.check_seed)
+29	
+30	
+31	def _batch(args: argparse.Namespace) -&gt; object:
+32	    return run_batch(
+33	        args.config, args.seeds, args.root, workers=args.workers, check_seed=args.check_seed
+34	    )
+35	
+36	
+37	def _watch(args: argparse.Namespace) -&gt; object:
+38	    return run_watch(args.run_path)
+39	
+40	
+41	def _chart(args: argparse.Namespace) -&gt; object:
+42	    return run_chart(
+43	        args.root, args.world, args.variant, include=args.include, measure=args.measure
+44	    )
+45	
+46	
+47	def _evaluate(args: argparse.Namespace) -&gt; object:
+48	    return run_evaluate(
+49	        args.root, args.world, args.variant, include=args.include, workers=args.workers
+50	    )
+51	
+52	
+53	def _parser() -&gt; argparse.ArgumentParser:
+54	    parser = argparse.ArgumentParser(prog=&quot;rllab&quot;)
+55	    sub = parser.add_subparsers(dest=&quot;command&quot;, required=True)
+56	    root = argparse.ArgumentParser(add_help=False)
+57	    root.add_argument(&quot;--root&quot;, type=Path, default=Path(&quot;runs&quot;), help=&quot;the runs folder&quot;)
+58	    runs_of = argparse.ArgumentParser(add_help=False, parents=[root])
+59	    runs_of.add_argument(&quot;world&quot;)
+60	    runs_of.add_argument(&quot;variant&quot;)
+61	    runs_of.add_argument(&quot;--include&quot;, action=&quot;append&quot;, default=[], metavar=&quot;NAME&quot;)
+62	
+63	    check = sub.add_parser(&quot;check&quot;, help=&quot;run the method check of a config&quot;)
+64	    check.add_argument(&quot;config&quot;, type=Path)
+65	    check.add_argument(&quot;--seed&quot;, type=int, default=0)
+66	    check.set_defaults(entry=_check)
+67	
+68	    train = sub.add_parser(&quot;train&quot;, parents=[root], help=&quot;train one seed of a config&quot;)
+69	    train.add_argument(&quot;config&quot;, type=Path)
+70	    train.add_argument(&quot;--seed&quot;, type=int, required=True)
+71	    train.add_argument(&quot;--check-seed&quot;, type=int, default=0)
+72	    train.set_defaults(entry=_train)
+73	
+74	    batch = sub.add_parser(&quot;batch&quot;, parents=[root], help=&quot;train several seeds of a config&quot;)
+75	    batch.add_argument(&quot;config&quot;, type=Path)
+76	    batch.add_argument(&quot;--seeds&quot;, type=parse_seeds, required=True, help=&quot;1-5 or 1,3,5&quot;)
+77	    batch.add_argument(&quot;--workers&quot;, type=int, default=None)
+78	    batch.add_argument(&quot;--check-seed&quot;, type=int, default=0)
+79	    batch.set_defaults(entry=_batch)
+80	
+81	    watch = sub.add_parser(&quot;watch&quot;, help=&quot;show a run&#x27;s progress&quot;)
+82	    watch.add_argument(&quot;run_path&quot;, type=Path)
+83	    watch.set_defaults(entry=_watch)
+84	
+85	    chart = sub.add_parser(&quot;chart&quot;, parents=[runs_of], help=&quot;draw a world&#x27;s learning curves&quot;)
+86	    chart.add_argument(&quot;--measure&quot;, default=None)
+87	    chart.set_defaults(entry=_chart)
+88	
+89	    evaluate = sub.add_parser(&quot;evaluate&quot;, parents=[runs_of], help=&quot;evaluate a world&#x27;s runs&quot;)
+90	    evaluate.add_argument(&quot;--workers&quot;, type=int, default=None)
+91	    evaluate.set_defaults(entry=_evaluate)
+92	    return parser
+93	
+94	
+95	def _show(result: object) -&gt; None:
+96	    for item in result if isinstance(result, list) else [result]:
+97	        print(item)
+98	
+99	
+100	def main(argv: Sequence[str] | None = None) -&gt; int:
+101	    args = _parser().parse_args(argv)
+102	    try:
+103	        _show(args.entry(args))
+104	    except Exception as exc:  # every error is one line naming its cause (cli.main)
+105	        print(f&quot;rllab {args.command}: {type(exc).__name__}: {exc}&quot;, file=sys.stderr)
+106	        return 1
+107	    return 0
+108	</pre></details></div><div class="step" id="S9"><span class="sid">U30.S9</span><span class="kind">Bash</span>grep -rln &quot;run_train\|smoke\|TC-04\|TC-05\|TC-11&quot; tests src configs <span class="err">error</span><details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;grep -rln \&quot;run_train\\|smoke\\|TC-04\\|TC-05\\|TC-11\&quot; tests src configs&quot;,
+  &quot;description&quot;: &quot;Find tests referencing run_train and smoke&quot;
+}</pre><div class="lbl">output</div><pre>Exit code 2
+ugrep: warning: configs: No such file or directory
+tests/unit/rllab/test_batch.py
+tests/contracts/kit.py
+tests/contracts/test_train.py
+tests/contracts/test_interface.py
+tests/contracts/train.run_train/fake.py
+tests/fixtures/rllab/TC-13/expected.json
+src/rllab/train/batch.py
+src/rllab/train/__init__.py
+src/rllab/train/pipelines/pl02_train.py</pre></details></div><div class="step" id="S10"><span class="sid">U30.S10</span><span class="kind">Bash</span>ls -R tests/intent tests/fixtures/rllab/TC-04 tests/fixtures/rllab/TC-05 tests/fixtures/rllab/TC-11 tests/unit/rllab<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;ls -R tests/intent tests/fixtures/rllab/TC-04 tests/fixtures/rllab/TC-05 tests/fixtures/rllab/TC-11 tests/unit/rllab&quot;,
+  &quot;description&quot;: &quot;List intent tests and fixtures&quot;
+}</pre><div class="lbl">output</div><pre>tests/fixtures/rllab/TC-04:
+expected.json
+input.json
+
+tests/fixtures/rllab/TC-05:
+expected.json
+input.json
+
+tests/fixtures/rllab/TC-11:
+expected.json
+input.json
+
+tests/intent:
+rllab
+
+tests/intent/rllab:
+test_checks.py
+test_progress.py
+test_snake.py
+
+tests/unit/rllab:
+test_batch.py
+test_check.py
+test_checks.py
+test_config.py
+test_dqn.py
+test_episode.py
+test_final.py
+test_loop.py
+test_make.py
+test_progress.py
+test_random.py
+test_read.py
+test_setup.py
+test_snake.py
+test_snake_rule.py</pre></details></div><div class="step" id="S11"><span class="sid">U30.S11</span><span class="kind">Read</span>/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/project/.claude/worktrees/agent-a3f88f6430ab53b75/src/rllab/train/setup.py<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/project/.claude/worktrees/agent-a3f88f6430ab53b75/src/rllab/train/setup.py&quot;
+}</pre><div class="lbl">output</div><pre>1	&quot;&quot;&quot;One learner per team of a run (TRAIN-07).&quot;&quot;&quot;
+2	
+3	import numpy as np
+4	
+5	from rllab.core import RunConfig, WorldSpec
+6	from rllab.methods import Learner, make_learner
+7	
+8	
+9	def make_learners(config: RunConfig, spec: WorldSpec) -&gt; dict[str, Learner]:
+10	    &quot;&quot;&quot;One learner per team of `spec`, each built from its team&#x27;s method config.
+11	
+12	    Team i&#x27;s generator is the i-th child spawned from the run seed (AD-05), so the same config
+13	    gives the same learners and no two teams share a generator.
+14	    &quot;&quot;&quot;
+15	    children = np.random.SeedSequence(config.seed).spawn(len(spec.teams))
+16	    return {
+17	        team.name: make_learner(
+18	            config.methods[team.name], spec, team.name, np.random.default_rng(child)
+19	        )
+20	        for team, child in zip(spec.teams, children, strict=True)
+21	    }
+22	</pre></details></div><div class="step" id="S12"><span class="sid">U30.S12</span><span class="kind">Read</span>/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/project/.claude/worktrees/agent-a3f88f6430ab53b75/tests/contracts/test_train.py<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/project/.claude/worktrees/agent-a3f88f6430ab53b75/tests/contracts/test_train.py&quot;
+}</pre><div class="lbl">output</div><pre>1	&quot;&quot;&quot;train: CheckResult samples and the load_run_configs, run_check, run_train and run_batch fakes.&quot;&quot;&quot;
+2	
+3	import json
+4	from pathlib import Path
+5	from typing import Any
+6	
+7	import pytest
+8	
+9	from rllab.core import RunConfig
+10	from rllab.runlog import RunExistsError, RunRecord
+11	from rllab.train import CheckFailedError, CheckResult
+12	
+13	
+14	@pytest.mark.parametrize(&quot;name&quot;, [&quot;dqn_pass&quot;, &quot;ppo_fail&quot;])
+15	def test_check_passes_at_95_percent_agreement(kit: Any, name: str) -&gt; None:
+16	    result: CheckResult = kit.sample(&quot;train.CheckResult&quot;, name)
+17	    assert result.passed == (result.agreement &gt;= 0.95)
+18	
+19	
+20	def test_check_failed_error_carries_its_result(kit: Any) -&gt; None:
+21	    result: CheckResult = kit.sample(&quot;train.CheckResult&quot;, &quot;ppo_fail&quot;)
+22	    error = CheckFailedError(result)
+23	    assert error.result == result
+24	    assert &quot;ppo&quot; in str(error)
+25	
+26	
+27	def test_load_run_configs_names_one_config_per_seed(kit: Any, tmp_path: Path) -&gt; None:
+28	    path = tmp_path / &quot;snake.toml&quot;
+29	    path.write_text(&#x27;world = &quot;snake&quot;\n&#x27;)
+30	    configs: list[RunConfig] = kit.fake(&quot;train.load_run_configs&quot;)(path, [1, 2])
+31	    assert [c.name for c in configs] == [&quot;snake-s1&quot;, &quot;snake-s2&quot;]
+32	    assert [c.seed for c in configs] == [1, 2]
+33	    assert all(c.methods[&quot;snake&quot;].settings for c in configs)
+34	
+35	
+36	def test_load_run_configs_raises_for_a_missing_file(kit: Any, tmp_path: Path) -&gt; None:
+37	    with pytest.raises(FileNotFoundError, match=&quot;nowhere&quot;):
+38	        kit.fake(&quot;train.load_run_configs&quot;)(tmp_path / &quot;nowhere.toml&quot;, [1])
+39	
+40	
+41	def test_run_check_reports_each_method(kit: Any, tmp_path: Path) -&gt; None:
+42	    results: list[CheckResult] = kit.fake(&quot;train.run_check&quot;)(tmp_path / &quot;snake.toml&quot;)
+43	    assert [r.method for r in results] == [&quot;dqn&quot;]
+44	    assert all(r.passed == (r.agreement &gt;= 0.95) for r in results)
+45	
+46	
+47	def test_run_train_writes_the_run_folder(kit: Any, tmp_path: Path) -&gt; None:
+48	    config = kit.sample(&quot;core.RunConfig&quot;, &quot;snake_default&quot;)
+49	    record: RunRecord = kit.fake(&quot;train.run_train&quot;)(config, tmp_path)
+50	    folder = tmp_path / &quot;snake&quot; / &quot;default&quot; / config.name
+51	    assert record.path == folder
+52	    assert record.status == &quot;finished&quot;
+53	    assert record.config == config
+54	    assert json.loads((folder / &quot;run.json&quot;).read_text())[&quot;status&quot;] == &quot;finished&quot;
+55	    assert len((folder / &quot;evals.jsonl&quot;).read_text().splitlines()) == 21
+56	    assert sorted(p.name for p in (folder / &quot;checkpoints&quot;).iterdir()) == [
+57	        &quot;ckpt_0.pt&quot;,
+58	        &quot;ckpt_100.pt&quot;,
+59	        &quot;ckpt_50.pt&quot;,
+60	    ]
+61	
+62	
+63	def test_run_train_refuses_an_existing_run_before_any_work(kit: Any, tmp_path: Path) -&gt; None:
+64	    config = kit.sample(&quot;core.RunConfig&quot;, &quot;snake_default&quot;)
+65	    run_train = kit.fake(&quot;train.run_train&quot;)
+66	    run_train(config, tmp_path)
+67	    run_json = tmp_path / &quot;snake&quot; / &quot;default&quot; / config.name / &quot;run.json&quot;
+68	    before = run_json.read_bytes()
+69	    with pytest.raises(RunExistsError, match=config.name):
+70	        run_train(config, tmp_path)
+71	    assert run_json.read_bytes() == before
+72	
+73	
+74	def test_run_batch_returns_one_finished_record_per_seed(kit: Any, tmp_path: Path) -&gt; None:
+75	    records: list[RunRecord] = kit.fake(&quot;train.run_batch&quot;)(
+76	        tmp_path / &quot;snake.toml&quot;, [1, 2], tmp_path
+77	    )
+78	    assert [r.config.seed for r in records] == [1, 2]
+79	    assert all(r.status == &quot;finished&quot; for r in records)
+80	</pre></details></div><div class="step" id="S13"><span class="sid">U30.S13</span><span class="kind">Bash</span>cat tests/fixtures/rllab/TC-04/input.json tests/fixtures/rllab/TC-04/expected.json tests/fixtures/rllab/TC-05/input.json tests/fixtures/rllab/TC-05/expected.json tests/fixtures/rllab/TC-11/input.json tests/fixtures/rllab/TC-11/expected.json<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;cat tests/fixtures/rllab/TC-04/input.json tests/fixtures/rllab/TC-04/expected.json tests/fixtures/rllab/TC-05/input.json tests/fixtures/rllab/TC-05/expected.json tests/fixtures/rllab/TC-11/input.json tests/fixtures/rllab/TC-11/expected.json&quot;,
+  &quot;description&quot;: &quot;Show TC fixtures&quot;
+}</pre><div class="lbl">output</div><pre>{
+ &quot;generator&quot;: &quot;snake_config&quot;,
+ &quot;budget&quot;: 2000,
+ &quot;seed&quot;: 1,
+ &quot;name&quot;: &quot;det&quot;,
+ &quot;runs&quot;: 2
+}
+{&quot;property&quot;: &quot;episodes.jsonl and evals.jsonl byte-identical across the two runs; every checkpoint&#x27;s state dicts equal; run.json equal except started and ended&quot;, &quot;tol&quot;: 0}
+{
+ &quot;generator&quot;: &quot;snake_config&quot;,
+ &quot;budget&quot;: 2000,
+ &quot;seed&quot;: 1,
+ &quot;name&quot;: &quot;sched&quot;
+}
+{&quot;world_steps&quot;: 2000, &quot;checkpoint_pcts&quot;: [0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100], &quot;checkpoint_steps&quot;: [0, 200, 400, 600, 800, 1000, 1200, 1400, 1600, 1800, 2000], &quot;eval_steps&quot;: [0, 100, 200, 300, 400, 500, 600, 700, 800, 900, 1000, 1100, 1200, 1300, 1400, 1500, 1600, 1700, 1800, 1900, 2000], &quot;eval_episodes_per_point&quot;: 20, &quot;eval_seeds&quot;: [1000000, 1000019], &quot;run_json_fields&quot;: [&quot;world&quot;, &quot;variant&quot;, &quot;methods&quot;, &quot;seed&quot;, &quot;budget&quot;, &quot;started&quot;, &quot;ended&quot;, &quot;status&quot;], &quot;property&quot;: &quot;one episodes.jsonl line per finished training episode&quot;, &quot;tol&quot;: 0}
+{
+ &quot;generator&quot;: &quot;snake_config&quot;,
+ &quot;budget&quot;: 2000,
+ &quot;seed&quot;: 1,
+ &quot;name&quot;: &quot;dup&quot;,
+ &quot;runs&quot;: 2,
+ &quot;same_root&quot;: true
+}
+{&quot;error&quot;: {&quot;type&quot;: &quot;RunExistsError&quot;, &quot;path&quot;: &quot;runs/snake/default/dup&quot;}, &quot;property&quot;: &quot;raised before any work; the first run&#x27;s folder is byte-identical afterwards&quot;, &quot;tol&quot;: 0}</pre></details></div><div class="step" id="S14"><span class="sid">U30.S14</span><span class="kind">Read</span>/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/project/.claude/worktrees/agent-a3f88f6430ab53b75/tests/unit/rllab/test_loop.py<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/project/.claude/worktrees/agent-a3f88f6430ab53b75/tests/unit/rllab/test_loop.py&quot;
+}</pre><div class="lbl">output</div><pre>1	&quot;&quot;&quot;train_loop and RunWriter on the core.World and methods.Learner replay doubles (M1-T09).&quot;&quot;&quot;
+2	
+3	import importlib.util
+4	import json
+5	import math
+6	import sys
+7	from collections.abc import Mapping
+8	from dataclasses import replace
+9	from pathlib import Path
+10	from typing import Any
+11	
+12	import pytest
+13	import torch
+14	
+15	from rllab.core import EVAL_SEEDS, Episode, EpisodeResult, Policy, RunConfig, World
+16	from rllab.methods import NonFiniteError, Transition
+17	from rllab.runlog import EvalPoint, Failure, RunExistsError, RunWriter
+18	from rllab.train.loop import run as loop_run
+19	from rllab.train.loop import train_loop
+20	
+21	pytestmark = pytest.mark.unit
+22	
+23	BUDGET = 2000
+24	
+25	
+26	def _load_kit() -&gt; Any:
+27	    if &quot;contracts_kit&quot; not in sys.modules:
+28	        path = Path(__file__).parents[2] / &quot;contracts&quot; / &quot;kit.py&quot;
+29	        spec = importlib.util.spec_from_file_location(&quot;contracts_kit&quot;, path)
+30	        assert spec is not None
+31	        assert spec.loader is not None
+32	        module = importlib.util.module_from_spec(spec)
+33	        sys.modules[&quot;contracts_kit&quot;] = module
+34	        spec.loader.exec_module(module)
+35	    return sys.modules[&quot;contracts_kit&quot;]
+36	
+37	
+38	@pytest.fixture
+39	def kit() -&gt; Any:
+40	    return _load_kit()
+41	
+42	
+43	@pytest.fixture
+44	def config(kit: Any) -&gt; RunConfig:
+45	    sample: RunConfig = kit.sample(&quot;core.RunConfig&quot;, &quot;snake_default&quot;)
+46	    return replace(sample, budget=BUDGET)
+47	
+48	
+49	@pytest.fixture
+50	def evaluated(monkeypatch: pytest.MonkeyPatch) -&gt; list[int]:
+51	    &quot;&quot;&quot;Stands in for `core.play_episode`: scores each episode its seed&#x27;s offset in EVAL_SEEDS.&quot;&quot;&quot;
+52	    seeds: list[int] = []
+53	
+54	    def play_episode(
+55	        world: World, policies: Mapping[str, Policy], seed: int, *, trace: bool = False
+56	    ) -&gt; Episode:
+57	        seeds.append(seed)
+58	        offset = float(seed - EVAL_SEEDS[0])
+59	        result = EpisodeResult(seed, 5, {&quot;snake&quot;: offset}, {&quot;snake&quot;: offset}, {})
+60	        return Episode(result, None, hit_step_limit=False)
+61	
+62	    monkeypatch.setattr(loop_run, &quot;play_episode&quot;, play_episode)
+63	    return seeds
+64	
+65	
+66	def _lines(path: Path) -&gt; list[Any]:
+67	    return [json.loads(line) for line in path.read_text().splitlines()]
+68	
+69	
+70	def test_train_loop_steps_exactly_the_budget(
+71	    kit: Any, config: RunConfig, evaluated: list[int], tmp_path: Path
+72	) -&gt; None:
+73	    learner = kit.double(&quot;methods.Learner&quot;, &quot;dqn_snake_10&quot;)
+74	    record = train_loop(
+75	        kit.double(&quot;core.World&quot;, &quot;snake_seed42&quot;), {&quot;snake&quot;: learner}, config, tmp_path
+76	    )
+77	    assert len(learner.observed) == BUDGET
+78	    assert all(isinstance(t, Transition) for t in learner.observed)
+79	    assert record.status == &quot;finished&quot;
+80	    assert record.failure is None
+81	    episodes = _lines(record.path / &quot;episodes.jsonl&quot;)
+82	    assert len(episodes) == BUDGET // 5  # the recorded episode is 5 steps long
+83	    assert sum(e[&quot;length&quot;] for e in episodes) &lt;= BUDGET
+84	    assert all(0 &lt;= e[&quot;seed&quot;] &lt; 1_000_000 for e in episodes)
+85	
+86	
+87	def test_train_loop_writes_checkpoints_every_10_percent(
+88	    kit: Any, config: RunConfig, evaluated: list[int], tmp_path: Path
+89	) -&gt; None:
+90	    learner = kit.double(&quot;methods.Learner&quot;, &quot;dqn_snake_10&quot;)
+91	    record = train_loop(
+92	        kit.double(&quot;core.World&quot;, &quot;snake_seed42&quot;), {&quot;snake&quot;: learner}, config, tmp_path
+93	    )
+94	    folder = record.path / &quot;checkpoints&quot;
+95	    assert sorted(p.name for p in folder.iterdir()) == sorted(
+96	        f&quot;ckpt_{pct}.pt&quot; for pct in range(0, 101, 10)
+97	    )
+98	    saved = torch.load(folder / &quot;ckpt_50.pt&quot;, weights_only=True)
+99	    assert (saved[&quot;run&quot;], saved[&quot;pct&quot;], saved[&quot;step&quot;]) == (config.name, 50, 1000)
+100	    assert saved[&quot;spec&quot;][&quot;world&quot;] == &quot;snake&quot;
+101	    assert saved[&quot;methods&quot;][&quot;snake&quot;][&quot;method&quot;] == &quot;dqn&quot;
+102	    assert saved[&quot;state&quot;][&quot;snake&quot;] == learner.state_dict()
+103	
+104	
+105	def test_train_loop_evaluates_21_times_on_eval_seeds(
+106	    kit: Any, config: RunConfig, evaluated: list[int], tmp_path: Path
+107	) -&gt; None:
+108	    learner = kit.double(&quot;methods.Learner&quot;, &quot;dqn_snake_10&quot;)
+109	    record = train_loop(
+110	        kit.double(&quot;core.World&quot;, &quot;snake_seed42&quot;), {&quot;snake&quot;: learner}, config, tmp_path
+111	    )
+112	    assert evaluated == list(EVAL_SEEDS) * 21
+113	    points = _lines(record.path / &quot;evals.jsonl&quot;)
+114	    assert [p[&quot;step&quot;] for p in points] == [100 * i for i in range(21)]
+115	    assert all(p[&quot;scores&quot;] == {&quot;snake&quot;: 9.5} for p in points)  # mean of 0..19
+116	    assert all(p[&quot;measures&quot;] == {} for p in points)
+117	
+118	
+119	def test_train_loop_record_is_finished_in_run_json(
+120	    kit: Any, config: RunConfig, evaluated: list[int], tmp_path: Path
+121	) -&gt; None:
+122	    learner = kit.double(&quot;methods.Learner&quot;, &quot;dqn_snake_10&quot;)
+123	    record = train_loop(
+124	        kit.double(&quot;core.World&quot;, &quot;snake_seed42&quot;), {&quot;snake&quot;: learner}, config, tmp_path
+125	    )
+126	    assert record.path == tmp_path / &quot;snake&quot; / &quot;default&quot; / config.name
+127	    saved = json.loads((record.path / &quot;run.json&quot;).read_text())
+128	    assert saved[&quot;status&quot;] == &quot;finished&quot;
+129	    assert saved[&quot;config&quot;][&quot;budget&quot;] == BUDGET
+130	    assert saved[&quot;ended&quot;] is not None
+131	    assert not (record.path / &quot;run.json.tmp&quot;).exists()
+132	
+133	
+134	def test_train_loop_fails_on_a_non_finite_value_keeping_the_last_checkpoint(
+135	    kit: Any, config: RunConfig, evaluated: list[int], tmp_path: Path
+136	) -&gt; None:
+137	    learner = kit.double(&quot;methods.Learner&quot;, &quot;dqn_snake_10&quot;)
+138	    observe = learner.observe
+139	
+140	    def observe_until_nan(t: Transition) -&gt; None:
+141	        if len(learner.observed) == 450:
+142	            raise NonFiniteError(math.nan)
+143	        observe(t)
+144	
+145	    learner.observe = observe_until_nan
+146	    record = train_loop(
+147	        kit.double(&quot;core.World&quot;, &quot;snake_seed42&quot;), {&quot;snake&quot;: learner}, config, tmp_path
+148	    )
+149	    assert record.status == &quot;failed&quot;
+150	    assert record.failure is not None
+151	    assert record.failure.step == 451
+152	    assert math.isnan(record.failure.value)
+153	    assert record.failure.checkpoint == record.path / &quot;checkpoints&quot; / &quot;ckpt_20.pt&quot;
+154	    assert json.loads((record.path / &quot;run.json&quot;).read_text())[&quot;failure&quot;][&quot;step&quot;] == 451
+155	
+156	
+157	def test_train_loop_marks_an_interrupted_run_incomplete(
+158	    kit: Any, config: RunConfig, evaluated: list[int], tmp_path: Path
+159	) -&gt; None:
+160	    learner = kit.double(&quot;methods.Learner&quot;, &quot;dqn_snake_10&quot;)
+161	
+162	    def interrupt(t: Transition) -&gt; None:
+163	        raise KeyboardInterrupt
+164	
+165	    learner.observe = interrupt
+166	    with pytest.raises(KeyboardInterrupt):
+167	        train_loop(kit.double(&quot;core.World&quot;, &quot;snake_seed42&quot;), {&quot;snake&quot;: learner}, config, tmp_path)
+168	    saved = json.loads((tmp_path / &quot;snake&quot; / &quot;default&quot; / config.name / &quot;run.json&quot;).read_text())
+169	    assert saved[&quot;status&quot;] == &quot;incomplete&quot;
+170	
+171	
+172	def test_train_loop_is_the_same_for_the_same_seed(
+173	    kit: Any, config: RunConfig, evaluated: list[int], tmp_path: Path
+174	) -&gt; None:
+175	    runs = []
+176	    for name in (&quot;a&quot;, &quot;b&quot;):
+177	        world = kit.double(&quot;core.World&quot;, &quot;snake_seed42&quot;)
+178	        learner = kit.double(&quot;methods.Learner&quot;, &quot;dqn_snake_10&quot;)
+179	        record = train_loop(world, {&quot;snake&quot;: learner}, replace(config, name=name), tmp_path)
+180	        runs.append((record.path / &quot;episodes.jsonl&quot;).read_text())
+181	    assert runs[0] == runs[1]
+182	
+183	
+184	def test_run_writer_refuses_an_existing_run_before_writing(
+185	    kit: Any, config: RunConfig, tmp_path: Path
+186	) -&gt; None:
+187	    spec = kit.sample(&quot;core.WorldSpec&quot;, &quot;snake_default&quot;)
+188	    folder = tmp_path / &quot;snake&quot; / &quot;default&quot; / config.name
+189	    folder.mkdir(parents=True)
+190	    with pytest.raises(RunExistsError) as caught:
+191	        RunWriter(tmp_path, config, spec)
+192	    assert caught.value.path == folder
+193	    assert list(folder.iterdir()) == []
+194	
+195	
+196	def test_run_writer_replaces_run_json_on_each_status_change(
+197	    kit: Any, config: RunConfig, tmp_path: Path
+198	) -&gt; None:
+199	    spec = kit.sample(&quot;core.WorldSpec&quot;, &quot;snake_default&quot;)
+200	    writer = RunWriter(tmp_path, config, spec)
+201	    run_json = tmp_path / &quot;snake&quot; / &quot;default&quot; / config.name / &quot;run.json&quot;
+202	    running = json.loads(run_json.read_text())
+203	    assert (running[&quot;status&quot;], running[&quot;ended&quot;]) == (&quot;running&quot;, None)
+204	    failure = Failure(7, math.inf, run_json.parent / &quot;checkpoints&quot; / &quot;ckpt_0.pt&quot;)
+205	    record = writer.close(&quot;failed&quot;, failure)
+206	    assert record.status == &quot;failed&quot;
+207	    closed = json.loads(run_json.read_text())
+208	    assert closed[&quot;status&quot;] == &quot;failed&quot;
+209	    assert closed[&quot;failure&quot;][&quot;checkpoint&quot;] == str(failure.checkpoint)
+210	    assert not (run_json.parent / &quot;run.json.tmp&quot;).exists()
+211	
+212	
+213	def test_run_writer_flushes_episodes_at_each_evaluation(
+214	    kit: Any, config: RunConfig, tmp_path: Path
+215	) -&gt; None:
+216	    spec = kit.sample(&quot;core.WorldSpec&quot;, &quot;snake_default&quot;)
+217	    result: EpisodeResult = kit.sample(&quot;core.EpisodeResult&quot;, &quot;snake_12_food&quot;)
+218	    writer = RunWriter(tmp_path, config, spec)
+219	    folder = tmp_path / &quot;snake&quot; / &quot;default&quot; / config.name
+220	    writer.episode(result)
+221	    writer.episode(result)
+222	    writer.eval(EvalPoint(100, {&quot;snake&quot;: 1.5}, {}))
+223	    assert len(_lines(folder / &quot;episodes.jsonl&quot;)) == 2
+224	    assert _lines(folder / &quot;evals.jsonl&quot;) == [
+225	        {&quot;step&quot;: 100, &quot;scores&quot;: {&quot;snake&quot;: 1.5}, &quot;measures&quot;: {}}
+226	    ]
+227	    writer.episode(result)
+228	    writer.close(&quot;finished&quot;)
+229	    assert len(_lines(folder / &quot;episodes.jsonl&quot;)) == 3
+230	
+231	
+232	def test_run_writer_refuses_to_close_as_running(
+233	    kit: Any, config: RunConfig, tmp_path: Path
+234	) -&gt; None:
+235	    writer = RunWriter(tmp_path, config, kit.sample(&quot;core.WorldSpec&quot;, &quot;snake_default&quot;))
+236	    with pytest.raises(ValueError, match=&quot;running&quot;):
+237	        writer.close(&quot;running&quot;)
+238	</pre></details></div><div class="step" id="S15"><span class="sid">U30.S15</span><span class="kind">Bash</span>grep -rn &quot;snake_config\|repro\|markers&quot; tests/conftest.py tests/contracts/kit.py pyproject.toml tests/unit/rllab/test_setup.py<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;grep -rn \&quot;snake_config\\|repro\\|markers\&quot; tests/conftest.py tests/contracts/kit.py pyproject.toml tests/unit/rllab/test_setup.py&quot;,
+  &quot;description&quot;: &quot;Find generator and markers&quot;
+}</pre><div class="lbl">output</div><pre>pyproject.toml:132:addopts = &quot;-ra --strict-markers --strict-config --import-mode=importlib&quot;
+pyproject.toml:134:markers = [
+pyproject.toml:137:    &quot;repro: same seed, same result&quot;,
+tests/unit/rllab/test_setup.py:39:def snake_config(kit: Any) -&gt; RunConfig:
+tests/unit/rllab/test_setup.py:73:    snake_config: RunConfig,
+tests/unit/rllab/test_setup.py:78:    learners = make_learners(snake_config, snake_spec)
+tests/unit/rllab/test_setup.py:82:    assert config == snake_config.methods[&quot;snake&quot;]
+tests/unit/rllab/test_setup.py:91:@pytest.mark.repro
+tests/unit/rllab/test_setup.py:95:    snake_config: RunConfig,
+tests/unit/rllab/test_setup.py:100:    make_learners(snake_config, snake_spec)
+tests/unit/rllab/test_setup.py:101:    make_learners(snake_config, snake_spec)
+tests/unit/rllab/test_setup.py:102:    make_learners(replace(snake_config, seed=2), snake_spec)</pre></details></div><div class="step" id="S16"><span class="sid">U30.S16</span><span class="kind">Bash</span>ls tests/contracts/core.RunConfig tests/contracts/train.run_train<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;ls tests/contracts/core.RunConfig tests/contracts/train.run_train&quot;,
+  &quot;description&quot;: &quot;List contract folders&quot;
+}</pre><div class="lbl">output</div><pre>tests/contracts/core.RunConfig:
+samples
+schema.json
+
+tests/contracts/train.run_train:
+fake.py</pre></details></div><div class="step" id="S17"><span class="sid">U30.S17</span><span class="kind">Bash</span>sed -n 125,145p pyproject.toml<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;sed -n 125,145p pyproject.toml&quot;,
+  &quot;description&quot;: &quot;Show pytest config&quot;
+}</pre><div class="lbl">output</div><pre>enableTypeIgnoreComments = false  # a used `type: ignore[code]` still fails here (CR-01)
+
+# ======================================================= pytest + coverage (CR-27, CR-40)
+[tool.pytest.ini_options]
+minversion = &quot;8.0&quot;
+testpaths = [&quot;tests&quot;]
+norecursedirs = [&quot;.*&quot;, &quot;*.egg&quot;, &quot;build&quot;, &quot;dist&quot;, &quot;node_modules&quot;, &quot;venv&quot;, &quot;references&quot;, &quot;probes&quot;]
+addopts = &quot;-ra --strict-markers --strict-config --import-mode=importlib&quot;
+xfail_strict = true
+markers = [
+    &quot;intent: tester-written specification tests&quot;,
+    &quot;unit: implementer-written unit tests&quot;,
+    &quot;repro: same seed, same result&quot;,
+    &quot;slow: skipped in the fast loop&quot;,
+]
+
+[tool.coverage.run]
+source = [&quot;src&quot;]
+omit = [&quot;references/*&quot;, &quot;probes/*&quot;]
+branch = true</pre></details></div><div class="step" id="S18"><span class="sid">U30.S18</span><span class="kind">Bash</span>ls tests/contracts/core.RunConfig/samples<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;ls tests/contracts/core.RunConfig/samples&quot;,
+  &quot;description&quot;: &quot;List RunConfig samples&quot;
+}</pre><div class="lbl">output</div><pre>prey_two_methods.json
+snake_default.json</pre></details></div><div class="step" id="S19"><span class="sid">U30.S19</span><span class="kind">Read</span>/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/project/.claude/worktrees/agent-a3f88f6430ab53b75/tests/unit/rllab/test_setup.py limit=60<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/project/.claude/worktrees/agent-a3f88f6430ab53b75/tests/unit/rllab/test_setup.py&quot;,
+  &quot;limit&quot;: 60
+}</pre><div class="lbl">output</div><pre>1	&quot;&quot;&quot;make_learners spine: one learner per team through `methods.make_learner`, seeded from the run
+2	seed (TRAIN-07).&quot;&quot;&quot;
+3	
+4	import importlib.util
+5	import sys
+6	from collections.abc import Callable
+7	from dataclasses import replace
+8	from pathlib import Path
+9	from typing import Any
+10	
+11	import numpy as np
+12	import pytest
+13	
+14	from rllab.core import MethodConfig, RunConfig, WorldSpec
+15	from rllab.methods import Learner
+16	from rllab.train import setup
+17	from rllab.train.setup import make_learners
+18	
+19	pytestmark = pytest.mark.unit
+20	
+21	KIT = Path(__file__).parents[2] / &quot;contracts&quot; / &quot;kit.py&quot;
+22	
+23	Call = tuple[MethodConfig, WorldSpec, str, list[int]]
+24	
+25	
+26	@pytest.fixture(scope=&quot;module&quot;)
+27	def kit() -&gt; Any:
+28	    if &quot;contracts_kit&quot; not in sys.modules:
+29	        spec = importlib.util.spec_from_file_location(&quot;contracts_kit&quot;, KIT)
+30	        assert spec is not None
+31	        assert spec.loader is not None
+32	        module = importlib.util.module_from_spec(spec)
+33	        sys.modules[&quot;contracts_kit&quot;] = module
+34	        spec.loader.exec_module(module)
+35	    return sys.modules[&quot;contracts_kit&quot;]
+36	
+37	
+38	@pytest.fixture
+39	def snake_config(kit: Any) -&gt; RunConfig:
+40	    config: RunConfig = kit.sample(&quot;core.RunConfig&quot;, &quot;snake_default&quot;)
+41	    return config
+42	
+43	
+44	@pytest.fixture
+45	def snake_spec(kit: Any) -&gt; WorldSpec:
+46	    spec: WorldSpec = kit.sample(&quot;core.WorldSpec&quot;, &quot;snake_default&quot;)
+47	    return spec
+48	
+49	
+50	def record(
+51	    monkeypatch: pytest.MonkeyPatch, build: Callable[..., Learner], calls: list[Call]
+52	) -&gt; None:
+53	    &quot;&quot;&quot;Route `make_learner` through `build`, noting each call and five draws of its generator.&quot;&quot;&quot;
+54	
+55	    def recorded(
+56	        config: MethodConfig, spec: WorldSpec, team: str, rng: np.random.Generator
+57	    ) -&gt; Learner:
+58	        calls.append((config, spec, team, rng.integers(0, 2**31, 5).tolist()))
+59	        return build(config, spec, team, rng)
+60	</pre></details></div><div class="step" id="S20"><span class="sid">U30.S20</span><span class="kind">say</span>Now write the entry.<details><summary>full text</summary><pre>Now write the entry.</pre></details></div><div class="step" id="S21"><span class="sid">U30.S21</span><span class="kind">Write</span>/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/project/.claude/worktrees/agent-a3f88f6430ab53b75/src/rllab/train/pipelines/pl02_train.py (16 lines)<div class="lbl">wrote /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/project/.claude/worktrees/agent-a3f88f6430ab53b75/src/rllab/train/pipelines/pl02_train.py</div><pre>&quot;&quot;&quot;PL-02: Training run.&quot;&quot;&quot;
+
+from pathlib import Path
+
+from rllab.core import RunConfig
+from rllab.runlog import RunRecord
+from rllab.train.loop import train_loop
+from rllab.train.setup import make_learners
+from rllab.worlds import make
+
+
+def run_train(config: RunConfig, root: Path) -&gt; RunRecord:
+    &quot;&quot;&quot;One training run of `config` into a new run folder under `root`.&quot;&quot;&quot;
+    world = make(config.world, config.variant)
+    learners = make_learners(config, world.spec)
+    return train_loop(world, learners, config, root)
+</pre><details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/project/.claude/worktrees/agent-a3f88f6430ab53b75/src/rllab/train/pipelines/pl02_train.py&quot;,
+  &quot;content&quot;: &quot;\&quot;\&quot;\&quot;PL-02: Training run.\&quot;\&quot;\&quot;\n\nfrom pathlib import Path\n\nfrom rllab.core import RunConfig\nfrom rllab.runlog import RunRecord\nfrom rllab.train.loop import train_loop\nfrom rllab.train.setup import make_learners\nfrom rllab.worlds import make\n\n\ndef run_train(config: RunConfig, root: Path) -&gt; RunRecord:\n    \&quot;\&quot;\&quot;One training run of `config` into a new run folder under `root`.\&quot;\&quot;\&quot;\n    world = make(config.world, config.variant)\n    learners = make_learners(config, world.spec)\n    return train_loop(world, learners, config, root)\n&quot;
+}</pre><div class="lbl">output</div><pre>The file /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/project/.claude/worktrees/agent-a3f88f6430ab53b75/src/rllab/train/pipelines/pl02_train.py has been updated successfully. (file state is current in your context — no need to Read it back)</pre></details></div><div class="step" id="S22"><span class="sid">U30.S22</span><span class="kind">Bash</span>cat tests/contracts/core.RunConfig/samples/snake_default.json<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;cat tests/contracts/core.RunConfig/samples/snake_default.json&quot;,
+  &quot;description&quot;: &quot;Show snake config sample&quot;
+}</pre><div class="lbl">output</div><pre>{
+ &quot;name&quot;: &quot;snake-default-s1&quot;,
+ &quot;world&quot;: &quot;snake&quot;,
+ &quot;variant&quot;: &quot;default&quot;,
+ &quot;methods&quot;: {
+  &quot;snake&quot;: {
+   &quot;method&quot;: &quot;dqn&quot;,
+   &quot;settings&quot;: {
+    &quot;lr&quot;: 0.001,
+    &quot;gamma&quot;: 0.99,
+    &quot;epsilon&quot;: 0.1,
+    &quot;hidden&quot;: 64
+   }
+  }
+ },
+ &quot;seed&quot;: 1,
+ &quot;budget&quot;: 200000,
+ &quot;check_settings&quot;: {
+  &quot;dqn&quot;: {
+   &quot;hidden&quot;: 32
+  }
+ },
+ &quot;device&quot;: &quot;cpu&quot;
+}</pre></details></div><div class="step" id="S23"><span class="sid">U30.S23</span><span class="kind">Bash</span>grep -n &quot;def \|json\|\&quot;&quot; src/rllab/runlog/writer.py<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;grep -n \&quot;def \\|json\\|\\\&quot;\&quot; src/rllab/runlog/writer.py&quot;,
+  &quot;description&quot;: &quot;Inspect RunWriter serialization&quot;
+}</pre><div class="lbl">output</div><pre>1:&quot;&quot;&quot;Writes one run folder: record, logs and checkpoints (AD-06).&quot;&quot;&quot;
+4:import json
+22:    &quot;finished&quot;: &quot;finished&quot;,
+23:    &quot;incomplete&quot;: &quot;incomplete&quot;,
+24:    &quot;failed&quot;: &quot;failed&quot;,
+29:    &quot;&quot;&quot;Creates `runs/&lt;world&gt;/&lt;variant&gt;/&lt;name&gt;` under `root`; refuses an existing one.&quot;&quot;&quot;
+31:    def __init__(self, root: Path, config: RunConfig, spec: WorldSpec) -&gt; None:
+35:        (self.path / &quot;checkpoints&quot;).mkdir(parents=True)
+40:        self._record = RunRecord(config, spec, datetime.now(UTC), None, &quot;running&quot;, None, self.path)
+43:    def episode(self, result: EpisodeResult) -&gt; None:
+46:    def eval(self, point: EvalPoint) -&gt; None:
+50:    def checkpoint(self, pct: int, step: int, state: Mapping[str, dict[str, object]]) -&gt; Checkpoint:
+51:        path = self.path / &quot;checkpoints&quot; / f&quot;ckpt_{pct}.pt&quot;
+53:        saved = {f.name: to_json(getattr(ckpt, f.name)) for f in dataclasses.fields(ckpt)}
+54:        torch.save({**saved, &quot;state&quot;: {team: dict(s) for team, s in state.items()}}, path)
+57:    def close(self, status: str, failure: Failure | None = None) -&gt; RunRecord:
+59:            raise ValueError(f&quot;a run closes as one of {sorted(_CLOSING)}, not {status!r}&quot;)
+67:    def _flush(self) -&gt; None:
+68:        &quot;&quot;&quot;Appends the buffered episodes and evaluation points to their JSON Lines logs.&quot;&quot;&quot;
+69:        for name, items in ((&quot;episodes&quot;, self._episodes), (&quot;evals&quot;, self._evals)):
+70:            with (self.path / f&quot;{name}.jsonl&quot;).open(&quot;a&quot;) as log:
+71:                log.writelines(json.dumps(to_json(item)) + &quot;\n&quot; for item in items)
+74:    def _write_record(self) -&gt; None:
+75:        &quot;&quot;&quot;Replaces `run.json` atomically: write a temporary file, then rename it.&quot;&quot;&quot;
+76:        temporary = self.path / &quot;run.json.tmp&quot;
+77:        temporary.write_text(json.dumps(to_json(self._record), indent=1))
+78:        temporary.replace(self.path / &quot;run.json&quot;)
+81:def to_json(value: object) -&gt; object:
+82:    &quot;&quot;&quot;A contract value as JSON data: dataclasses and mappings as objects, tuples as arrays.&quot;&quot;&quot;
+84:        return {f.name: to_json(getattr(value, f.name)) for f in dataclasses.fields(value)}
+86:        return {str(key): to_json(item) for key, item in value.items()}
+88:        return [to_json(item) for item in value]</pre></details></div><div class="step" id="S24"><span class="sid">U30.S24</span><span class="kind">Write</span>/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/project/.claude/worktrees/agent-a3f88f6430ab53b75/tests/unit/rllab/test_pl02_smoke.py (173 lines)<div class="lbl">wrote /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/project/.claude/worktrees/agent-a3f88f6430ab53b75/tests/unit/rllab/test_pl02_smoke.py</div><pre>&quot;&quot;&quot;PL-02 smoke: `run_train` end to end on the real snake world and DQN learner (TC-04, TC-05,
+TC-11).&quot;&quot;&quot;
+
+import importlib.util
+import json
+import sys
+from collections.abc import Mapping
+from dataclasses import replace
+from pathlib import Path
+from typing import Any
+
+import pytest
+import torch
+
+from rllab.core import EVAL_SEEDS, Episode, Policy, RunConfig, World, play_episode
+from rllab.runlog import RunExistsError, RunRecord
+from rllab.train import run_train
+from rllab.train.loop import run as loop_run
+
+pytestmark = pytest.mark.unit
+
+TESTS = Path(__file__).parents[2]
+KIT = TESTS / &quot;contracts&quot; / &quot;kit.py&quot;
+FIXTURES = TESTS / &quot;fixtures&quot; / &quot;rllab&quot;
+
+
+def _fixture(tc: str, name: str) -&gt; Any:
+    return json.loads((FIXTURES / tc / f&quot;{name}.json&quot;).read_text())
+
+
+def _kit() -&gt; Any:
+    if &quot;contracts_kit&quot; not in sys.modules:
+        spec = importlib.util.spec_from_file_location(&quot;contracts_kit&quot;, KIT)
+        assert spec is not None
+        assert spec.loader is not None
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[&quot;contracts_kit&quot;] = module
+        spec.loader.exec_module(module)
+    return sys.modules[&quot;contracts_kit&quot;]
+
+
+def snake_config(tc: str) -&gt; RunConfig:
+    &quot;&quot;&quot;The TC&#x27;s `snake_config` generator: the snake sample with the fixture&#x27;s name, budget, seed.&quot;&quot;&quot;
+    given = _fixture(tc, &quot;input&quot;)
+    assert given[&quot;generator&quot;] == &quot;snake_config&quot;
+    sample: RunConfig = _kit().sample(&quot;core.RunConfig&quot;, &quot;snake_default&quot;)
+    return replace(sample, name=given[&quot;name&quot;], budget=given[&quot;budget&quot;], seed=given[&quot;seed&quot;])
+
+
+def _lines(path: Path) -&gt; list[Any]:
+    return [json.loads(line) for line in path.read_text().splitlines()]
+
+
+def _files(folder: Path) -&gt; dict[str, bytes]:
+    return {str(p.relative_to(folder)): p.read_bytes() for p in folder.rglob(&quot;*&quot;) if p.is_file()}
+
+
+@pytest.fixture(scope=&quot;module&quot;)
+def schedule_run(tmp_path_factory: pytest.TempPathFactory) -&gt; tuple[RunRecord, list[int]]:
+    &quot;&quot;&quot;One TC-05 run, noting the seed of every evaluation episode the real loop plays.&quot;&quot;&quot;
+    seeds: list[int] = []
+
+    def noted(world: World, policies: Mapping[str, Policy], seed: int) -&gt; Episode:
+        seeds.append(seed)
+        return play_episode(world, policies, seed)
+
+    with pytest.MonkeyPatch.context() as patch:
+        patch.setattr(loop_run, &quot;play_episode&quot;, noted)
+        record = run_train(snake_config(&quot;TC-05&quot;), tmp_path_factory.mktemp(&quot;runs&quot;))
+    return record, seeds
+
+
+def test_run_train_finishes_into_its_run_folder(
+    schedule_run: tuple[RunRecord, list[int]],
+) -&gt; None:
+    record, _ = schedule_run
+    assert record.status == &quot;finished&quot;
+    assert record.failure is None
+    assert record.path.parts[-3:] == (&quot;snake&quot;, &quot;default&quot;, &quot;sched&quot;)
+    assert record.spec.world == &quot;snake&quot;
+
+
+def test_run_train_checkpoints_every_10_percent(
+    schedule_run: tuple[RunRecord, list[int]],
+) -&gt; None:
+    record, _ = schedule_run
+    expected = _fixture(&quot;TC-05&quot;, &quot;expected&quot;)
+    folder = record.path / &quot;checkpoints&quot;
+    assert sorted(p.name for p in folder.iterdir()) == sorted(
+        f&quot;ckpt_{pct}.pt&quot; for pct in expected[&quot;checkpoint_pcts&quot;]
+    )
+    steps = [
+        torch.load(folder / f&quot;ckpt_{pct}.pt&quot;, weights_only=True)[&quot;step&quot;]
+        for pct in expected[&quot;checkpoint_pcts&quot;]
+    ]
+    assert steps == expected[&quot;checkpoint_steps&quot;]
+
+
+def test_run_train_evaluates_on_20_eval_seeds_every_5_percent(
+    schedule_run: tuple[RunRecord, list[int]],
+) -&gt; None:
+    record, seeds = schedule_run
+    expected = _fixture(&quot;TC-05&quot;, &quot;expected&quot;)
+    points = _lines(record.path / &quot;evals.jsonl&quot;)
+    assert [p[&quot;step&quot;] for p in points] == expected[&quot;eval_steps&quot;]
+    first, last = expected[&quot;eval_seeds&quot;]
+    per_point = list(range(first, last + 1))
+    assert len(per_point) == expected[&quot;eval_episodes_per_point&quot;]
+    assert list(EVAL_SEEDS) == per_point
+    assert seeds == per_point * len(expected[&quot;eval_steps&quot;])
+
+
+def test_run_train_logs_one_line_per_finished_training_episode(
+    schedule_run: tuple[RunRecord, list[int]],
+) -&gt; None:
+    record, _ = schedule_run
+    budget = _fixture(&quot;TC-05&quot;, &quot;expected&quot;)[&quot;world_steps&quot;]
+    lengths = [e[&quot;length&quot;] for e in _lines(record.path / &quot;episodes.jsonl&quot;)]
+    assert lengths
+    # Finished episodes fill the budget except for the one still running at the end.
+    assert 0 &lt;= budget - sum(lengths) &lt; record.spec.max_steps
+
+
+def test_run_train_writes_every_log_01_field(
+    schedule_run: tuple[RunRecord, list[int]],
+) -&gt; None:
+    record, _ = schedule_run
+    saved = json.loads((record.path / &quot;run.json&quot;).read_text())
+    fields = {**saved[&quot;config&quot;], **saved}
+    for field in _fixture(&quot;TC-05&quot;, &quot;expected&quot;)[&quot;run_json_fields&quot;]:
+        assert fields[field] is not None, field
+    assert saved[&quot;config&quot;][&quot;budget&quot;] == 2000
+    assert saved[&quot;status&quot;] == &quot;finished&quot;
+
+
+def _same_state(a: object, b: object) -&gt; bool:
+    if isinstance(a, torch.Tensor) and isinstance(b, torch.Tensor):
+        return torch.equal(a, b)
+    if isinstance(a, dict) and isinstance(b, dict):
+        return a.keys() == b.keys() and all(_same_state(a[k], b[k]) for k in a)
+    if isinstance(a, list | tuple) and isinstance(b, list | tuple):
+        return len(a) == len(b) and all(_same_state(x, y) for x, y in zip(a, b, strict=True))
+    return a == b
+
+
+@pytest.mark.repro
+def test_run_train_twice_gives_an_identical_run(tmp_path: Path) -&gt; None:
+    config = snake_config(&quot;TC-04&quot;)
+    first, second = (run_train(config, tmp_path / root) for root in (&quot;a&quot;, &quot;b&quot;))
+    for log in (&quot;episodes.jsonl&quot;, &quot;evals.jsonl&quot;):
+        assert (first.path / log).read_bytes() == (second.path / log).read_bytes()
+    checkpoints = sorted(p.name for p in (first.path / &quot;checkpoints&quot;).iterdir())
+    assert checkpoints == sorted(p.name for p in (second.path / &quot;checkpoints&quot;).iterdir())
+    for name in checkpoints:
+        a, b = (torch.load(r.path / &quot;checkpoints&quot; / name, weights_only=True) for r in (first, second))
+        assert _same_state(a[&quot;state&quot;], b[&quot;state&quot;]), name
+    a_json, b_json = (json.loads((r.path / &quot;run.json&quot;).read_text()) for r in (first, second))
+    for key in (&quot;started&quot;, &quot;ended&quot;, &quot;path&quot;):
+        a_json.pop(key)
+        b_json.pop(key)
+    assert a_json == b_json
+
+
+def test_run_train_refuses_a_second_run_with_the_same_name(tmp_path: Path) -&gt; None:
+    config = snake_config(&quot;TC-11&quot;)
+    expected = _fixture(&quot;TC-11&quot;, &quot;expected&quot;)[&quot;error&quot;]
+    first = run_train(config, tmp_path / &quot;runs&quot;)
+    before = _files(first.path)
+    with pytest.raises(RunExistsError) as caught:
+        run_train(config, tmp_path / &quot;runs&quot;)
+    assert type(caught.value).__name__ == expected[&quot;type&quot;]
+    assert caught.value.path == tmp_path / expected[&quot;path&quot;]
+    assert _files(first.path) == before
+</pre><details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/project/.claude/worktrees/agent-a3f88f6430ab53b75/tests/unit/rllab/test_pl02_smoke.py&quot;,
+  &quot;content&quot;: &quot;\&quot;\&quot;\&quot;PL-02 smoke: `run_train` end to end on the real snake world and DQN learner (TC-04, TC-05,\nTC-11).\&quot;\&quot;\&quot;\n\nimport importlib.util\nimport json\nimport sys\nfrom collections.abc import Mapping\nfrom dataclasses import replace\nfrom pathlib import Path\nfrom typing import Any\n\nimport pytest\nimport torch\n\nfrom rllab.core import EVAL_SEEDS, Episode, Policy, RunConfig, World, play_episode\nfrom rllab.runlog import RunExistsError, RunRecord\nfrom rllab.train import run_train\nfrom rllab.train.loop import run as loop_run\n\npytestmark = pytest.mark.unit\n\nTESTS = Path(__file__).parents[2]\nKIT = TESTS / \&quot;contracts\&quot; / \&quot;kit.py\&quot;\nFIXTURES = TESTS / \&quot;fixtures\&quot; / \&quot;rllab\&quot;\n\n\ndef _fixture(tc: str, name: str) -&gt; Any:\n    return json.loads((FIXTURES / tc / f\&quot;{name}.json\&quot;).read_text())\n\n\ndef _kit() -&gt; Any:\n    if \&quot;contracts_kit\&quot; not in sys.modules:\n        spec = importlib.util.spec_from_file_location(\&quot;contracts_kit\&quot;, KIT)\n        assert spec is not None\n        assert spec.loader is not None\n        module = importlib.util.module_from_spec(spec)\n        sys.modules[\&quot;contracts_kit\&quot;] = module\n        spec.loader.exec_module(module)\n    return sys.modules[\&quot;contracts_kit\&quot;]\n\n\ndef snake_config(tc: str) -&gt; RunConfig:\n    \&quot;\&quot;\&quot;The TC&#x27;s `snake_config` generator: the snake sample with the fixture&#x27;s name, budget, seed.\&quot;\&quot;\&quot;\n    given = _fixture(tc, \&quot;input\&quot;)\n    assert given[\&quot;generator\&quot;] == \&quot;snake_config\&quot;\n    sample: RunConfig = _kit().sample(\&quot;core.RunConfig\&quot;, \&quot;snake_default\&quot;)\n    return replace(sample, name=given[\&quot;name\&quot;], budget=given[\&quot;budget\&quot;], seed=given[\&quot;seed\&quot;])\n\n\ndef _lines(path: Path) -&gt; list[Any]:\n    return [json.loads(line) for line in path.read_text().splitlines()]\n\n\ndef _files(folder: Path) -&gt; dict[str, bytes]:\n    return {str(p.relative_to(folder)): p.read_bytes() for p in folder.rglob(\&quot;*\&quot;) if p.is_file()}\n\n\n@pytest.fixture(scope=\&quot;module\&quot;)\ndef schedule_run(tmp_path_factory: pytest.TempPathFactory) -&gt; tuple[RunRecord, list[int]]:\n    \&quot;\&quot;\&quot;One TC-05 run, noting the seed of every evaluation episode the real loop plays.\&quot;\&quot;\&quot;\n    seeds: list[int] = []\n\n    def noted(world: World, policies: Mapping[str, Policy], seed: int) -&gt; Episode:\n        seeds.append(seed)\n        return play_episode(world, policies, seed)\n\n    with pytest.MonkeyPatch.context() as patch:\n        patch.setattr(loop_run, \&quot;play_episode\&quot;, noted)\n        record = run_train(snake_config(\&quot;TC-05\&quot;), tmp_path_factory.mktemp(\&quot;runs\&quot;))\n    return record, seeds\n\n\ndef test_run_train_finishes_into_its_run_folder(\n    schedule_run: tuple[RunRecord, list[int]],\n) -&gt; None:\n    record, _ = schedule_run\n    assert record.status == \&quot;finished\&quot;\n    assert record.failure is None\n    assert record.path.parts[-3:] == (\&quot;snake\&quot;, \&quot;default\&quot;, \&quot;sched\&quot;)\n    assert record.spec.world == \&quot;snake\&quot;\n\n\ndef test_run_train_checkpoints_every_10_percent(\n    schedule_run: tuple[RunRecord, list[int]],\n) -&gt; None:\n    record, _ = schedule_run\n    expected = _fixture(\&quot;TC-05\&quot;, \&quot;expected\&quot;)\n    folder = record.path / \&quot;checkpoints\&quot;\n    assert sorted(p.name for p in folder.iterdir()) == sorted(\n        f\&quot;ckpt_{pct}.pt\&quot; for pct in expected[\&quot;checkpoint_pcts\&quot;]\n    )\n    steps = [\n        torch.load(folder / f\&quot;ckpt_{pct}.pt\&quot;, weights_only=True)[\&quot;step\&quot;]\n        for pct in expected[\&quot;checkpoint_pcts\&quot;]\n    ]\n    assert steps == expected[\&quot;checkpoint_steps\&quot;]\n\n\ndef test_run_train_evaluates_on_20_eval_seeds_every_5_percent(\n    schedule_run: tuple[RunRecord, list[int]],\n) -&gt; None:\n    record, seeds = schedule_run\n    expected = _fixture(\&quot;TC-05\&quot;, \&quot;expected\&quot;)\n    points = _lines(record.path / \&quot;evals.jsonl\&quot;)\n    assert [p[\&quot;step\&quot;] for p in points] == expected[\&quot;eval_steps\&quot;]\n    first, last = expected[\&quot;eval_seeds\&quot;]\n    per_point = list(range(first, last + 1))\n    assert len(per_point) == expected[\&quot;eval_episodes_per_point\&quot;]\n    assert list(EVAL_SEEDS) == per_point\n    assert seeds == per_point * len(expected[\&quot;eval_steps\&quot;])\n\n\ndef test_run_train_logs_one_line_per_finished_training_episode(\n    schedule_run: tuple[RunRecord, list[int]],\n) -&gt; None:\n    record, _ = schedule_run\n    budget = _fixture(\&quot;TC-05\&quot;, \&quot;expected\&quot;)[\&quot;world_steps\&quot;]\n    lengths = [e[\&quot;length\&quot;] for e in _lines(record.path / \&quot;episodes.jsonl\&quot;)]\n    assert lengths\n    # Finished episodes fill the budget except for the one still running at the end.\n    assert 0 &lt;= budget - sum(lengths) &lt; record.spec.max_steps\n\n\ndef test_run_train_writes_every_log_01_field(\n    schedule_run: tuple[RunRecord, list[int]],\n) -&gt; None:\n    record, _ = schedule_run\n    saved = json.loads((record.path / \&quot;run.json\&quot;).read_text())\n    fields = {**saved[\&quot;config\&quot;], **saved}\n    for field in _fixture(\&quot;TC-05\&quot;, \&quot;expected\&quot;)[\&quot;run_json_fields\&quot;]:\n        assert fields[field] is not None, field\n    assert saved[\&quot;config\&quot;][\&quot;budget\&quot;] == 2000\n    assert saved[\&quot;status\&quot;] == \&quot;finished\&quot;\n\n\ndef _same_state(a: object, b: object) -&gt; bool:\n    if isinstance(a, torch.Tensor) and isinstance(b, torch.Tensor):\n        return torch.equal(a, b)\n    if isinstance(a, dict) and isinstance(b, dict):\n        return a.keys() == b.keys() and all(_same_state(a[k], b[k]) for k in a)\n    if isinstance(a, list | tuple) and isinstance(b, list | tuple):\n        return len(a) == len(b) and all(_same_state(x, y) for x, y in zip(a, b, strict=True))\n    return a == b\n\n\n@pytest.mark.repro\ndef test_run_train_twice_gives_an_identical_run(tmp_path: Path) -&gt; None:\n    config = snake_config(\&quot;TC-04\&quot;)\n    first, second = (run_train(config, tmp_path / root) for root in (\&quot;a\&quot;, \&quot;b\&quot;))\n    for log in (\&quot;episodes.jsonl\&quot;, \&quot;evals.jsonl\&quot;):\n        assert (first.path / log).read_bytes() == (second.path / log).read_bytes()\n    checkpoints = sorted(p.name for p in (first.path / \&quot;checkpoints\&quot;).iterdir())\n    assert checkpoints == sorted(p.name for p in (second.path / \&quot;checkpoints\&quot;).iterdir())\n    for name in checkpoints:\n        a, b = (torch.load(r.path / \&quot;checkpoints\&quot; / name, weights_only=True) for r in (first, second))\n        assert _same_state(a[\&quot;state\&quot;], b[\&quot;state\&quot;]), name\n    a_json, b_json = (json.loads((r.path / \&quot;run.json\&quot;).read_text()) for r in (first, second))\n    for key in (\&quot;started\&quot;, \&quot;ended\&quot;, \&quot;path\&quot;):\n        a_json.pop(key)\n        b_json.pop(key)\n    assert a_json == b_json\n\n\ndef test_run_train_refuses_a_second_run_with_the_same_name(tmp_path: Path) -&gt; None:\n    config = snake_config(\&quot;TC-11\&quot;)\n    expected = _fixture(\&quot;TC-11\&quot;, \&quot;expected\&quot;)[\&quot;error\&quot;]\n    first = run_train(config, tmp_path / \&quot;runs\&quot;)\n    before = _files(first.path)\n    with pytest.raises(RunExistsError) as caught:\n        run_train(config, tmp_path / \&quot;runs\&quot;)\n    assert type(caught.value).__name__ == expected[\&quot;type\&quot;]\n    assert caught.value.path == tmp_path / expected[\&quot;path\&quot;]\n    assert _files(first.path) == before\n&quot;
+}</pre><div class="lbl">output</div><pre>File created successfully at: /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/project/.claude/worktrees/agent-a3f88f6430ab53b75/tests/unit/rllab/test_pl02_smoke.py (file state is current in your context — no need to Read it back)</pre></details></div><div class="step" id="S25"><span class="sid">U30.S25</span><span class="kind">Bash</span>uv run pytest tests/unit/rllab/test_pl02_smoke.py -q --durations=5<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;uv run pytest tests/unit/rllab/test_pl02_smoke.py -q --durations=5&quot;,
+  &quot;description&quot;: &quot;Run the PL-02 smoke tests&quot;,
+  &quot;timeout&quot;: 600000
+}</pre><div class="lbl">output</div><pre>.......                                                                  [100%]
+============================= slowest 5 durations ==============================
+3.25s setup    tests/unit/rllab/test_pl02_smoke.py::test_run_train_finishes_into_its_run_folder
+2.29s call     tests/unit/rllab/test_pl02_smoke.py::test_run_train_twice_gives_an_identical_run
+1.14s call     tests/unit/rllab/test_pl02_smoke.py::test_run_train_refuses_a_second_run_with_the_same_name
+
+(2 durations &lt; 0.005s hidden.  Use -vv to show these durations.)
+7 passed in 13.87s</pre></details></div><div class="step" id="S26"><span class="sid">U30.S26</span><span class="kind">Bash</span>scripts/check.sh gate<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;scripts/check.sh gate&quot;,
+  &quot;description&quot;: &quot;Run the gate checks&quot;,
+  &quot;timeout&quot;: 600000
+}</pre><div class="lbl">output</div><pre>-&gt; ruff check --ignore-noqa .
+All checks passed!
+-&gt; ruff format --check .
+118 files already formatted
+-&gt; mypy
+Success: no issues found in 53 source files
+-&gt; python scripts/check_size.py src
+-&gt; deptry . --no-ansi
+Scanning 57 files...
+
+Success! No dependency issues found.
+-&gt; lint-imports --no-logo
+
+---------
+Contracts
+---------
+
+Analyzed 71 files, 196 dependencies.
+------------------------------------
+
+Layers: cli &gt; refcheck | charts | notes &gt; train | evaluate | replay &gt; baselines 
+| methods &gt; worlds | runlog &gt; core KEPT
+Independent: notes | refcheck | charts | replay KEPT
+Independent: notes | train | evaluate | replay KEPT
+Independent: charts | train KEPT
+Independent: notes | baselines | methods KEPT
+Independent: notes | worlds | runlog KEPT
+Independent: methods | worlds KEPT
+Independent: baselines | runlog KEPT
+Independent: notes | core KEPT
+Only refcheck imports Stable-Baselines3 or Gymnasium (CHECK-01, AD-08) KEPT
+
+Contracts: 10 kept, 0 broken.
+-&gt; pytest tests/intent tests/unit tests/contracts --no-cov -q -x
+........................................................................ [ 14%]
+........................................................................ [ 29%]
+........................................................................ [ 44%]
+........................................................................ [ 59%]
+........................................................................ [ 74%]
+........................................................................ [ 89%]
+...................................................                      [100%]
+483 passed in 25.18s
+-&gt; bash scripts/floor_guard.sh
+floor_guard: clean
+-&gt; protected files unchanged since refs/worktree/checks-base</pre></details></div><div class="step" id="S27"><span class="sid">U30.S27</span><span class="kind">say</span>DONE M1-T20 solo<details><summary>full text</summary><pre>DONE M1-T20 solo</pre></details></div>
+<h2>Commits</h2>
+<p>None.</p>
+<h2>Returned</h2>
+<pre>DONE M1-T20 solo</pre>
+</body></html>

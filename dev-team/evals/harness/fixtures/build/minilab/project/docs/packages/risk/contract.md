@@ -5,24 +5,24 @@
 ## Types
 
 ### risk.Returns: Daily log returns
-**Kind:** type · **Sample:** `tests/contracts/risk.Returns/sample.json`
+**Kind:** type · **Sample:** `tests/contracts/risk.Returns/sample.json` · **Cases:** two tickers' log returns over five dates
 `@dataclass(frozen=True) class Returns: base_date: str; dates: tuple[str, ...]; tickers: tuple[str, ...]; values: Mapping[str, tuple[float, ...]]`
 - **Invariants:** `dates` are the prices' dates after the first, which is `base_date`; one value per date and ticker
 - **Used by:** PL-02, PL-03
 
 ### risk.VolSeries: Rolling volatility
-**Kind:** type · **Sample:** `tests/contracts/risk.VolSeries/sample.json`
+**Kind:** type · **Sample:** `tests/contracts/risk.VolSeries/sample.json` · **Cases:** those returns, window 2, annualized
 `@dataclass(frozen=True) class VolSeries: returns: Returns; window: int; annualized: bool; values: Mapping[str, tuple[float | None, ...]]`
 - **Invariants:** aligned to `returns.dates`; None until `window` earlier returns exist
 - **Used by:** PL-02, PL-03
 
 ### risk.TickerSummary: Whole-period statistics
-**Kind:** type · **Sample:** `tests/contracts/risk.TickerSummary/sample.json`
+**Kind:** type · **Sample:** `tests/contracts/risk.TickerSummary/sample.json` · **Cases:** one ticker with a last vol
 `@dataclass(frozen=True) class TickerSummary: ticker: str; ann_return: float; ann_vol: float; sharpe: float; last_vol: float | None`
 - **Used by:** PL-03
 
 ### risk.Drawdown: Worst fall from a peak
-**Kind:** type · **Sample:** `tests/contracts/risk.Drawdown/sample.json`
+**Kind:** type · **Sample:** `tests/contracts/risk.Drawdown/sample.json` · **Cases:** one ticker's fall from its peak
 `@dataclass(frozen=True) class Drawdown: ticker: str; depth: float; peak_date: str`
 - **Invariants:** `depth` ≤ 0
 - **Used by:** PL-03

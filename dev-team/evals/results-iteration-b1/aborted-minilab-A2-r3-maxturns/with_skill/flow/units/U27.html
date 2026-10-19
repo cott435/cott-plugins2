@@ -1,0 +1,838 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1"><title>U27 tester</title>
+<style>
+:root{--bg:#fbfbfa;--fg:#1d1d1f;--muted:#6b6b70;--line:#d9d9de;--box:#fff;--rowp:#eef3fb;--band:#fff4d6;
+--ok:#2e7d32;--bad:#c62828;--warn:#b26a00;--idle:#6b6b70}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#17171a;--fg:#ececf0;--muted:#9a9aa3;
+--line:#34343a;--box:#222227;--rowp:#1d2433;--band:#3a3015;--ok:#6fcf73;--bad:#ff6b6b;--warn:#f0b35a;--idle:#9a9aa3}}
+:root[data-theme="dark"]{--bg:#17171a;--fg:#ececf0;--muted:#9a9aa3;--line:#34343a;--box:#222227;--rowp:#1d2433;
+--band:#3a3015;--ok:#6fcf73;--bad:#ff6b6b;--warn:#f0b35a;--idle:#9a9aa3}
+body{margin:0;padding:16px;background:var(--bg);color:var(--fg);font:14px/1.45 -apple-system,system-ui,sans-serif}
+h1{font-size:18px;margin:0 0 4px}h2{font-size:15px;margin:22px 0 8px}.sub{color:var(--muted)}
+table{border-collapse:collapse;margin:4px 0 8px}td,th{border-bottom:1px solid var(--line);padding:4px 10px;text-align:left;
+vertical-align:top}th{color:var(--muted);font-weight:600}.chips span{display:inline-block;margin:0 4px 2px 0}
+.legend span{margin-right:14px;white-space:nowrap}.sw{display:inline-block;width:10px;height:10px;border-radius:2px;
+margin-right:4px;vertical-align:-1px}.scroll{overflow:auto;max-height:88vh;border:1px solid var(--line);border-radius:8px}
+.chart{display:grid;width:max-content}.chart>div{line-height:0}.corner{position:sticky;top:0;left:0;z-index:3}
+.colhead{position:sticky;top:0;z-index:2}.rowhead{position:sticky;left:0;z-index:2}
+svg.bg{background:var(--bg)}.colhead svg{border-bottom:1px solid var(--line)}.rowhead svg{border-right:1px solid var(--line)}
+.ok{color:var(--ok);fill:var(--ok)}.bad{color:var(--bad);fill:var(--bad)}.warn{color:var(--warn);fill:var(--warn)}
+.idle{color:var(--idle);fill:var(--idle)}
+svg text{fill:var(--fg);font-family:-apple-system,system-ui,sans-serif}
+.box{fill:var(--box);stroke:var(--line)}.unit:hover .box{stroke:var(--fg)}
+.role{font-size:12px;font-weight:600}.uid,.wmeta,.lmeta,.meta{font-size:10px;fill:var(--muted)}
+.sub{font-size:10.5px;fill:var(--muted)}.badge{font-size:11px;font-weight:600}
+.meta.bad{fill:var(--bad);font-weight:600}.lane{font-size:13px;font-weight:700}.wave{font-size:13px;font-weight:700}
+.par{fill:#4e79a7}.ser{fill:var(--muted)}.rowp{fill:var(--rowp)}.rows{fill:transparent}.band{fill:var(--band)}
+.bandt{font-size:11.5px}.grid{stroke:var(--line)}.link{stroke:var(--muted);stroke-width:1.2;opacity:.55}
+.arrowhead{fill:var(--muted)}.marks{font-size:10.5px}.audit{stroke:var(--box);stroke-width:2}.auditn{font-size:10px;font-weight:700;fill:#fff}
+a{color:inherit}svg a .box{cursor:pointer}
+
+:root{--c0:#2a78d6;--c1:#eb6834;--c2:#1baf7a;--c3:#eda100;--c4:#e87ba4;--c5:#008300;--c6:#6250d6;--c7:#e34948;
+--cx:#8a8985;--main:#52514e;--read:#dcdbd5;--readfg:#1d1d1f}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--c0:#3987e5;--c1:#d95926;--c2:#199e70;
+--c3:#c98500;--c4:#d55181;--c5:#008300;--c6:#9085e9;--c7:#e66767;--cx:#77766f;--main:#c3c2b7;--read:#3b3b40;
+--readfg:#ececf0}}
+:root[data-theme="dark"]{--c0:#3987e5;--c1:#d95926;--c2:#199e70;--c3:#c98500;--c4:#d55181;--c5:#008300;
+--c6:#9085e9;--c7:#e66767;--cx:#77766f;--main:#c3c2b7;--read:#3b3b40;--readfg:#ececf0}
+.c0{fill:var(--c0);background:var(--c0)}.c1{fill:var(--c1);background:var(--c1)}.c2{fill:var(--c2);background:var(--c2)}
+.c3{fill:var(--c3);background:var(--c3)}.c4{fill:var(--c4);background:var(--c4)}.c5{fill:var(--c5);background:var(--c5)}
+.c6{fill:var(--c6);background:var(--c6)}.c7{fill:var(--c7);background:var(--c7)}.cx{fill:var(--cx);background:var(--cx)}
+.cmain{fill:var(--main)}.sc0{stroke:var(--c0)}.sc1{stroke:var(--c1)}.sc2{stroke:var(--c2)}
+.tl text,.sm text,.lc text{font-size:10.5px;fill:var(--muted)}.tl .lbl-in,.sm .lbl-in{fill:#fff;font-size:10.5px;font-weight:600}
+.tl .rowl,.sm .rowl,.lc .rowl{fill:var(--fg);font-size:11.5px;font-weight:600}.tl .band{fill:var(--rowp)}
+.tl .brk{stroke:var(--muted);stroke-dasharray:2 3}.tl a:hover rect,.sm a:hover rect{stroke:var(--fg);stroke-width:1.5}
+.axis{stroke:var(--line)}.sm .val{fill:var(--fg);font-weight:600}.lc path.ln{fill:none;stroke-width:2}
+.lc circle{stroke:var(--bg);stroke-width:2}.lc .end{font-weight:600;fill:var(--fg)}
+.tiles{display:flex;flex-wrap:wrap;gap:10px;margin:12px 0}.tile{border:1px solid var(--line);border-radius:8px;
+padding:8px 12px;min-width:110px;background:var(--box)}.tile b{display:block;font-size:20px;line-height:1.2}
+.tile span{font-size:12px;color:var(--muted)}.tile i{font-style:normal;font-size:12px;margin-left:6px}
+.fm{border-collapse:separate;border-spacing:2px}.fm td,.fm th{border:0;padding:0;text-align:center;font-size:11px}
+.fm th{padding:0 2px;font-weight:600}.fm td.f,.fm th.f{text-align:left;padding-right:10px;white-space:nowrap;
+position:sticky;left:0;background:var(--bg);font:11.5px ui-monospace,Menlo,monospace;
+max-width:380px;overflow:hidden;text-overflow:ellipsis}
+.fm td.cell{min-width:22px;height:20px;border-radius:3px}.fm td.fw{background:var(--c0);color:#fff;font-weight:700}
+.fm td.fe{background:var(--c1);color:#fff;font-weight:700}.fm td.fr{background:var(--read);color:var(--readfg)}
+.fm td.n{color:var(--muted);padding:0 6px}.fm tr.grp td{text-align:left;padding-top:8px;color:var(--muted);
+font-weight:600}
+.key{display:inline-block;min-width:18px;text-align:center;border-radius:3px;font-size:11px;margin-right:4px}
+.bar{display:inline-block;height:9px;border-radius:2px;vertical-align:0}
+
+pre{white-space:pre-wrap;word-break:break-word;background:var(--box);border:1px solid var(--line);border-radius:6px;
+padding:8px 10px;margin:4px 0;font:12px/1.45 ui-monospace,SFMono-Regular,Menlo,monospace;max-width:100%;overflow:auto}
+.step{border-top:1px solid var(--line);padding:6px 0}.step:target{background:var(--rowp)}
+.sid{font:12px ui-monospace,Menlo,monospace;color:var(--muted);margin-right:8px}.kind{font-weight:600;margin-right:8px}
+.err{color:var(--bad);font-weight:600}.hook{color:var(--bad);margin:4px 0 0 16px}.lbl{font-size:12px;color:var(--muted);margin-top:6px}
+details summary{cursor:pointer;color:var(--muted);font-size:12px}.head td:first-child{color:var(--muted)}
+.top{font-size:13px}.narr{list-style:none;padding-left:0}.narr li{margin:3px 0}
+</style></head>
+<body>
+<p class="top"><a href="../flow.html">← the run's flow chart</a></p>
+
+<h1>U27 · tester · M1-T11 tester</h1>
+<table class="head"><tr><td>Type</td><td>tester</td></tr><tr><td>Description</td><td>M1-T11 tester</td></tr><tr><td>Spawned by</td><td>driver at D162</td></tr><tr><td>Turn</td><td><a href="../turns/T05.html">T05</a></td></tr><tr><td>Model</td><td>claude-opus-5-5</td></tr><tr><td>Start</td><td>2026-10-18 10:31:07 UTC</td></tr><tr><td>Duration</td><td>1 min</td></tr><tr><td>Tool calls</td><td>14</td></tr><tr><td>Errors</td><td>1</td></tr><tr><td>Hook blocks</td><td>0</td></tr><tr><td>Tokens</td><td>5.4k out · 22.5k new in · 154k cached in · peak context 26.7k</td></tr><tr><td>Skills invoked</td><td>none</td></tr><tr><td>Files written or edited</td><td>.claude/worktrees/agent-af9ec05f0bd82eb59/tests/intent/risk/test_summary.py</td></tr><tr><td>Definition</td><td>none</td></tr><tr><td>Steps</td><td>16</td></tr><tr><td>Finished</td><td>yes</td></tr></table>
+
+
+<h2>Prompt</h2>
+<pre>You are the tester for M1-T11. Run `python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A2-r3/with_skill/plugin/dev-team/scripts/dt.py claim M1-T11 --role tester`, then read the packet it names.</pre>
+<h2>Files</h2>
+<table><tr><th>Op</th><th>File</th><th>Calls</th><th>By</th><th>Via</th><th>Steps</th></tr><tr><td>write</td><td><code>.claude/worktrees/agent-af9ec05f0bd82eb59/tests/intent/risk/test_summary.py</code></td><td>1</td><td>U27</td><td>Write</td><td><a href="#13">U27.S13</a></td></tr><tr><td>read</td><td><code>.claude/worktrees/agent-af9ec05f0bd82eb59/.claude/packet.md</code></td><td>1</td><td>U27</td><td>Read</td><td><a href="#3">U27.S3</a></td></tr><tr><td>read</td><td><code>.claude/worktrees/agent-af9ec05f0bd82eb59/tests/contracts/risk.Returns/sample.json</code></td><td>1</td><td>U27</td><td>Read</td><td><a href="#8">U27.S8</a></td></tr><tr><td>read</td><td><code>.claude/worktrees/agent-af9ec05f0bd82eb59/tests/contracts/risk.VolSeries/sample.json</code></td><td>1</td><td>U27</td><td>Read</td><td><a href="#7">U27.S7</a></td></tr><tr><td>read</td><td><code>.claude/worktrees/agent-af9ec05f0bd82eb59/tests/fixtures/risk/TC-07/expected.json</code></td><td>1</td><td>U27</td><td>Read</td><td><a href="#6">U27.S6</a></td></tr><tr><td>read</td><td><code>.claude/worktrees/agent-af9ec05f0bd82eb59/tests/fixtures/risk/TC-07/input.json</code></td><td>1</td><td>U27</td><td>Read</td><td><a href="#5">U27.S5</a></td></tr><tr><td>read</td><td><code>.claude/worktrees/agent-af9ec05f0bd82eb59/tests/intent/risk/test_drawdown.py</code></td><td>1</td><td>U27</td><td>Read</td><td><a href="#9">U27.S9</a></td></tr></table>
+<h2>Steps</h2>
+<div class="step" id="S1"><span class="sid">U27.S1</span><span class="kind">user</span>You are the tester for M1-T11. Run `python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A2-r3/with_skill/plugin/dev-team/scripts/dt.py claim M1-T11 --role tester`, then read the packet it names.<details><summary>full text</summary><pre>You are the tester for M1-T11. Run `python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A2-r3/with_skill/plugin/dev-team/scripts/dt.py claim M1-T11 --role tester`, then read the packet it names.</pre></details></div><div class="step" id="S2"><span class="sid">U27.S2</span><span class="kind">Bash</span>python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A2-r3/with_skill/plugin/dev-team/scripts/dt.py claim M1-T11 --role tester<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A2-r3/with_skill/plugin/dev-team/scripts/dt.py claim M1-T11 --role tester&quot;,
+  &quot;description&quot;: &quot;Claim task as tester&quot;
+}</pre><div class="lbl">output</div><pre>packet: /Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A2-r3/with_skill/project/.claude/worktrees/agent-af9ec05f0bd82eb59/.claude/packet.md (117 lines; read it in full)
+task: M1-T11 Annualized summary with Sharpe · role tester · package risk · kind thicken
+writes: tests/intent/risk/test_summary.py
+done: Done when `scripts/check.sh collect` passes (your intent tests lint clean, collect, and are red for the right reason); the Stop hook runs it. End with one line: `DONE M1-T11 tester`. If you can&#x27;t finish: `python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A2-r3/with_skill/plugin/dev-team/scripts/dt.py escalate &lt;TEST-WRONG|NEEDS-DEP&gt; &quot;&lt;why&gt;&quot;`, or `python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A2-r3/with_skill/plugin/dev-team/scripts/dt.py escalate CONTRACT-CHANGE &quot;&lt;why&gt;&quot; --type &lt;the contract symbol&gt;`, then end with one line: `STOPPED M1-T11 tester: see dt escalate`.</pre></details></div><div class="step" id="S3"><span class="sid">U27.S3</span><span class="kind">Read</span>/Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A2-r3/with_skill/project/.claude/worktrees/agent-af9ec05f0bd82eb59/.claude/packet.md<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A2-r3/with_skill/project/.claude/worktrees/agent-af9ec05f0bd82eb59/.claude/packet.md&quot;
+}</pre><div class="lbl">output</div><pre>1	# Packet: M1-T11 tester
+2	You are the tester for M1-T11. Your edit boundary is your Writes below (`.claude/.task_writes`); the guard blocks everything else.
+3	
+4	Done when `scripts/check.sh collect` passes (your intent tests lint clean, collect, and are red for the right reason); the Stop hook runs it. End with one line: `DONE M1-T11 tester`. If you can&#x27;t finish: `python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A2-r3/with_skill/plugin/dev-team/scripts/dt.py escalate &lt;TEST-WRONG|NEEDS-DEP&gt; &quot;&lt;why&gt;&quot;`, or `python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A2-r3/with_skill/plugin/dev-team/scripts/dt.py escalate CONTRACT-CHANGE &quot;&lt;why&gt;&quot; --type &lt;the contract symbol&gt;`, then end with one line: `STOPPED M1-T11 tester: see dt escalate`.
+5	
+6	# Context for M1-T11: package risk · mode split · kind thicken
+7	Read only what is below, plus CONSTRAINTS.md and the files you edit. Your task is the last section.
+8	
+9	&lt;!-- docs/packages/risk/pipelines.md:25 --&gt;
+10	## PL-03: Risk report
+11	**Entry:** `packages/risk/src/risk/report_pipeline.py::risk_report` · **Trigger:** called from Python (`risk.risk_report`)
+12	**Covers:** RISK-04, RISK-05, REP-01, QR-01
+13	
+14	| # | Step | Owner | In → Out | Spine version | Covers |
+15	|---|---|---|---|---|---|
+16	| 1 | `vol_series` | risk | path → VolSeries | PL-02 as built | RISK-02 |
+17	| 2 | `summary_stats` | risk.summary | VolSeries → TickerSummary | daily mean and stdev | RISK-04 |
+18	| 3 | `max_drawdown` | risk.drawdown | Returns → Drawdown | depth only | RISK-05 |
+19	| 4 | `write_report` | risk.report | TickerSummary, Drawdown → Report | JSON rows | REP-01 |
+20	
+21	### Entry sketch (pre-build — removed by spine task)
+22	```python
+23	def risk_report(path, out_path, *, window=20, tickers=None) -&gt; Report:
+24	    vol = vol_series(path, window=window, tickers=tickers)
+25	    summary = summary_stats(vol)
+26	    drawdowns = max_drawdown(vol.returns)
+27	    return write_report(summary, drawdowns, out_path)
+28	```
+29	
+30	&lt;!-- docs/packages/risk/tests.md:26 --&gt;
+31	### TC-07: Whole-period summary
+32	**Pipeline:** PL-03 · **Covers:** RISK-04 · **Kind:** synthetic known-answer · **Fixture:** tests/fixtures/risk/TC-07/
+33	**Source:** six returns for X, a constant series for Y (zero volatility)
+34	**Expected:** 252·mean, √252·sample stdev, their ratio (0 for Y), the last rolling value · **Tolerance:** 1e-9 absolute
+35	
+36	&lt;!-- docs/spec.md:31 --&gt;
+37	- **RISK-04** Each ticker gets a whole-period summary.
+38	  - Given returns, when summarized, then the annualized return is 252 × the mean, the annualized volatility is √252 × the sample standard deviation, the Sharpe ratio is their quotient (0 when the volatility is 0; no risk-free rate), and the last rolling volatility is reported.
+39	
+40	&lt;!-- docs/packages/risk/contract.md:65 --&gt;
+41	### risk.summary_stats: Whole-period summary
+42	`def summary_stats(vol: VolSeries, periods_per_year: int = 252) -&gt; tuple[TickerSummary, ...]`
+43	- **Errors:** `ValueError` with fewer than two returns
+44	- **Used by:** PL-03
+45	
+46	&lt;!-- docs/references.md:5 --&gt;
+47	### RF-01: Volatility notebook
+48	**File:** `references/vol_notebook.py` · **Hash:** 1e1d95d0 · **Kind:** code · **Milestones:** M1
+49	- **Purpose:** the user&#x27;s pandas notebook for returns, rolling volatility, annualizing, a summary and drawdown
+50	- **Key parts:** `daily_returns`, `rolling_vol(returns, window)`, `annualize`, `summary`, `max_drawdown`
+51	- **In → Out:** dates × tickers closes → returns, rolling vol, a summary frame, drawdown per ticker
+52	- **Use for:** PL-02 `rolling_vol` and `annualize`, PL-03 `summary_stats` and `max_drawdown` design
+53	- **Caveats:** pandas and numpy, which the project doesn&#x27;t use (AD-01): reimplement, don&#x27;t copy
+54	
+55	### Reference RF-01: references/vol_notebook.py
+56	&gt; Reference, not part of the project. Reuse what fits the contract and step table as is, adapt it, or ignore it: your call.
+57	&gt; Never import from references/. Anything you bring over meets the same bar as the rest of the code.
+58	&gt; Caveats: pandas and numpy, which the project doesn&#x27;t use (AD-01): reimplement, don&#x27;t copy
+59	```python
+60	&quot;&quot;&quot;My old notebook code for volatility and drawdown (pandas). Kept for the formulas, not to import.&quot;&quot;&quot;
+61	import numpy as np
+62	import pandas as pd
+63	
+64	
+65	def daily_returns(prices: pd.DataFrame) -&gt; pd.DataFrame:
+66	    &quot;&quot;&quot;Log returns of a dates x tickers close panel.&quot;&quot;&quot;
+67	    return np.log(prices / prices.shift(1)).dropna(how=&quot;all&quot;)
+68	
+69	
+70	def rolling_vol(returns: pd.DataFrame, window: int = 20) -&gt; pd.DataFrame:
+71	    &quot;&quot;&quot;Rolling volatility over the last `window` days, today included.&quot;&quot;&quot;
+72	    return returns.rolling(window).apply(lambda x: np.std(x), raw=True)
+73	
+74	
+75	def annualize(vol: pd.DataFrame) -&gt; pd.DataFrame:
+76	    &quot;&quot;&quot;Annualize to a calendar year, like my brokerage statements: 365 days.&quot;&quot;&quot;
+77	    return vol * np.sqrt(365)
+78	
+79	
+80	def summary(returns: pd.DataFrame) -&gt; pd.DataFrame:
+81	    &quot;&quot;&quot;Yearly return and volatility per ticker.&quot;&quot;&quot;
+82	    return pd.DataFrame({&quot;ann_return&quot;: returns.mean() * 365, &quot;ann_vol&quot;: returns.std(ddof=0) * np.sqrt(365)})
+83	
+84	
+85	def max_drawdown(prices: pd.DataFrame) -&gt; pd.Series:
+86	    &quot;&quot;&quot;Deepest fall below the running high.&quot;&quot;&quot;
+87	    return (prices / prices.cummax() - 1).min()
+88	```
+89	
+90	## Interfaces (frozen: build against these, never change them)
+91	&lt;!-- docs/packages/risk/contract.md:13 --&gt;
+92	### risk.VolSeries: Rolling volatility
+93	**Kind:** type · **Sample:** `tests/contracts/risk.VolSeries/sample.json` · **Cases:** those returns, window 2, annualized
+94	`@dataclass(frozen=True) class VolSeries: returns: Returns; window: int; annualized: bool; values: Mapping[str, tuple[float | None, ...]]`
+95	- **Invariants:** aligned to `returns.dates`; None until `window` earlier returns exist
+96	- **Used by:** PL-02, PL-03
+97	Sample: tests/contracts/risk.VolSeries/sample.json (exists)
+98	
+99	&lt;!-- docs/packages/risk/contract.md:19 --&gt;
+100	### risk.TickerSummary: Whole-period statistics
+101	**Kind:** type · **Sample:** `tests/contracts/risk.TickerSummary/sample.json` · **Cases:** one ticker with a last vol
+102	`@dataclass(frozen=True) class TickerSummary: ticker: str; ann_return: float; ann_vol: float; sharpe: float; last_vol: float | None`
+103	- **Used by:** PL-03
+104	Sample: tests/contracts/risk.TickerSummary/sample.json (exists)
+105	
+106	## Writes (edit only these files; the plan gives every other file to another task)
+107	- tests/intent/risk/test_summary.py (new)
+108	
+109	&lt;!-- tasks/plan.md:154 --&gt;
+110	### M1-T11: Annualized summary with Sharpe
+111	**Package:** risk · **Step:** PL-03.summary_stats · **Kind:** thicken · **Covers:** RISK-04 · **Size:** S · **Mode:** split
+112	**Read:** PL-03, TC-07, RISK-04, risk.summary_stats, RF-01
+113	**Acceptance:**
+114	- [ ] TC-07 passes within 1e-9
+115	- [ ] PL-03 smoke test still passes
+116	**Verify:** `pytest tests/intent/risk tests/unit/risk -k summary` · `pytest tests/unit/risk/test_pl03_smoke.py` · `scripts/check.sh gate --pkg risk`
+117	**Depends on:** M1-T04 · **Writes:** packages/risk/src/risk/summary.py, tests/unit/risk/test_summary.py, tests/intent/risk/test_summary.py
+118	</pre></details></div><div class="step" id="S4"><span class="sid">U27.S4</span><span class="kind">Bash</span>ls -R tests/fixtures/risk/TC-07 tests/contracts/risk.VolSeries tests/contracts/risk.TickerSummary tests/contracts/risk.Returns tests/intent/risk<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;ls -R tests/fixtures/risk/TC-07 tests/contracts/risk.VolSeries tests/contracts/risk.TickerSummary tests/contracts/risk.Returns tests/intent/risk&quot;,
+  &quot;description&quot;: &quot;List fixtures and contract samples&quot;
+}</pre><div class="lbl">output</div><pre>tests/contracts/risk.Returns:
+sample.json
+
+tests/contracts/risk.TickerSummary:
+sample.json
+
+tests/contracts/risk.VolSeries:
+sample.json
+
+tests/fixtures/risk/TC-07:
+expected.json
+input.json
+
+tests/intent/risk:
+test_annualize.py
+test_drawdown.py
+test_returns.py
+test_vol.py</pre></details></div><div class="step" id="S5"><span class="sid">U27.S5</span><span class="kind">Read</span>/Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A2-r3/with_skill/project/.claude/worktrees/agent-af9ec05f0bd82eb59/tests/fixtures/risk/TC-07/input.json<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A2-r3/with_skill/project/.claude/worktrees/agent-af9ec05f0bd82eb59/tests/fixtures/risk/TC-07/input.json&quot;
+}</pre><div class="lbl">output</div><pre>1	{
+2	 &quot;vol&quot;: {
+3	  &quot;returns&quot;: {
+4	   &quot;base_date&quot;: &quot;2024-01-02&quot;,
+5	   &quot;dates&quot;: [
+6	    &quot;2024-01-03&quot;,
+7	    &quot;2024-01-04&quot;,
+8	    &quot;2024-01-05&quot;,
+9	    &quot;2024-01-08&quot;,
+10	    &quot;2024-01-09&quot;,
+11	    &quot;2024-01-10&quot;
+12	   ],
+13	   &quot;tickers&quot;: [
+14	    &quot;X&quot;,
+15	    &quot;Y&quot;
+16	   ],
+17	   &quot;values&quot;: {
+18	    &quot;X&quot;: [
+19	     0.01,
+20	     0.02,
+21	     -0.01,
+22	     0.005,
+23	     0.0,
+24	     -0.015
+25	    ],
+26	    &quot;Y&quot;: [
+27	     0.002,
+28	     0.002,
+29	     0.002,
+30	     0.002,
+31	     0.002,
+32	     0.002
+33	    ]
+34	   }
+35	  },
+36	  &quot;window&quot;: 2,
+37	  &quot;annualized&quot;: true,
+38	  &quot;values&quot;: {
+39	   &quot;X&quot;: [
+40	    null,
+41	    null,
+42	    0.2,
+43	    0.25,
+44	    0.18,
+45	    null
+46	   ],
+47	   &quot;Y&quot;: [
+48	    null,
+49	    null,
+50	    0.0,
+51	    0.0,
+52	    0.0,
+53	    0.0
+54	   ]
+55	  }
+56	 }
+57	}
+58	</pre></details></div><div class="step" id="S6"><span class="sid">U27.S6</span><span class="kind">Read</span>/Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A2-r3/with_skill/project/.claude/worktrees/agent-af9ec05f0bd82eb59/tests/fixtures/risk/TC-07/expected.json<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A2-r3/with_skill/project/.claude/worktrees/agent-af9ec05f0bd82eb59/tests/fixtures/risk/TC-07/expected.json&quot;
+}</pre><div class="lbl">output</div><pre>1	{
+2	 &quot;summary&quot;: [
+3	  {
+4	   &quot;ticker&quot;: &quot;X&quot;,
+5	   &quot;ann_return&quot;: 0.4200000000000001,
+6	   &quot;ann_vol&quot;: 0.20493901531919198,
+7	   &quot;sharpe&quot;: 2.04939015319192,
+8	   &quot;last_vol&quot;: 0.18
+9	  },
+10	  {
+11	   &quot;ticker&quot;: &quot;Y&quot;,
+12	   &quot;ann_return&quot;: 0.504,
+13	   &quot;ann_vol&quot;: 0.0,
+14	   &quot;sharpe&quot;: 0.0,
+15	   &quot;last_vol&quot;: 0.0
+16	  }
+17	 ],
+18	 &quot;tol&quot;: 1e-09
+19	}
+20	</pre></details></div><div class="step" id="S7"><span class="sid">U27.S7</span><span class="kind">Read</span>/Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A2-r3/with_skill/project/.claude/worktrees/agent-af9ec05f0bd82eb59/tests/contracts/risk.VolSeries/sample.json<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A2-r3/with_skill/project/.claude/worktrees/agent-af9ec05f0bd82eb59/tests/contracts/risk.VolSeries/sample.json&quot;
+}</pre><div class="lbl">output</div><pre>1	{
+2	  &quot;returns&quot;: {
+3	    &quot;base_date&quot;: &quot;2024-03-04&quot;,
+4	    &quot;dates&quot;: [&quot;2024-03-05&quot;, &quot;2024-03-06&quot;, &quot;2024-03-07&quot;, &quot;2024-03-08&quot;, &quot;2024-03-11&quot;],
+5	    &quot;tickers&quot;: [&quot;AAPL&quot;, &quot;MSFT&quot;],
+6	    &quot;values&quot;: {
+7	      &quot;AAPL&quot;: [-0.028852, -0.005895, -0.000710, 0.010185, 0.011762],
+8	      &quot;MSFT&quot;: [-0.030018, -0.001392, 0.017382, -0.007162, -0.004194]
+9	    }
+10	  },
+11	  &quot;window&quot;: 2,
+12	  &quot;annualized&quot;: true,
+13	  &quot;values&quot;: {
+14	    &quot;AAPL&quot;: [null, null, 0.25769, 0.0582, 0.1223],
+15	    &quot;MSFT&quot;: [null, null, 0.32133, 0.21074, 0.27551]
+16	  }
+17	}
+18	</pre></details></div><div class="step" id="S8"><span class="sid">U27.S8</span><span class="kind">Read</span>/Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A2-r3/with_skill/project/.claude/worktrees/agent-af9ec05f0bd82eb59/tests/contracts/risk.Returns/sample.json<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A2-r3/with_skill/project/.claude/worktrees/agent-af9ec05f0bd82eb59/tests/contracts/risk.Returns/sample.json&quot;
+}</pre><div class="lbl">output</div><pre>1	{
+2	  &quot;base_date&quot;: &quot;2024-03-04&quot;,
+3	  &quot;dates&quot;: [&quot;2024-03-05&quot;, &quot;2024-03-06&quot;, &quot;2024-03-07&quot;, &quot;2024-03-08&quot;, &quot;2024-03-11&quot;],
+4	  &quot;tickers&quot;: [&quot;AAPL&quot;, &quot;MSFT&quot;],
+5	  &quot;values&quot;: {
+6	    &quot;AAPL&quot;: [-0.028852, -0.005895, -0.000710, 0.010185, 0.011762],
+7	    &quot;MSFT&quot;: [-0.030018, -0.001392, 0.017382, -0.007162, -0.004194]
+8	  }
+9	}
+10	</pre></details></div><div class="step" id="S9"><span class="sid">U27.S9</span><span class="kind">Read</span>/Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A2-r3/with_skill/project/.claude/worktrees/agent-af9ec05f0bd82eb59/tests/intent/risk/test_drawdown.py<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A2-r3/with_skill/project/.claude/worktrees/agent-af9ec05f0bd82eb59/tests/intent/risk/test_drawdown.py&quot;
+}</pre><div class="lbl">output</div><pre>1	&quot;&quot;&quot;Intent tests for risk.max_drawdown (RISK-05, TC-08): deepest fall with its peak and trough dates.&quot;&quot;&quot;
+2	
+3	from __future__ import annotations
+4	
+5	import math
+6	from typing import Any
+7	
+8	import pytest
+9	from hypothesis import given
+10	from hypothesis import strategies as st
+11	
+12	from risk.drawdown import Drawdown, max_drawdown
+13	from risk.types import Returns
+14	
+15	
+16	def _returns(payload: dict[str, Any]) -&gt; Returns:
+17	    return Returns(
+18	        base_date=payload[&quot;base_date&quot;],
+19	        dates=tuple(payload[&quot;dates&quot;]),
+20	        tickers=tuple(payload[&quot;tickers&quot;]),
+21	        values={ticker: tuple(series) for ticker, series in payload[&quot;values&quot;].items()},
+22	    )
+23	
+24	
+25	def _one_ticker(values: list[float]) -&gt; Returns:
+26	    dates = tuple(f&quot;2024-02-{day:02d}&quot; for day in range(2, len(values) + 2))
+27	    return Returns(base_date=&quot;2024-02-01&quot;, dates=dates, tickers=(&quot;X&quot;,), values={&quot;X&quot;: tuple(values)})
+28	
+29	
+30	def _brute_force_depth(values: tuple[float, ...]) -&gt; float:
+31	    &quot;&quot;&quot;Independent oracle: wealth 1 at the base date, worst trough/peak - 1 over all pairs.&quot;&quot;&quot;
+32	    wealth = [1.0]
+33	    for r in values:
+34	        wealth.append(wealth[-1] * math.exp(r))
+35	    worst = 0.0
+36	    for i, peak in enumerate(wealth):
+37	        for trough in wealth[i:]:
+38	            worst = min(worst, trough / peak - 1.0)
+39	    return worst
+40	
+41	
+42	@pytest.mark.intent
+43	def test_tc08_depth_and_dates_per_ticker(golden):
+44	    given_input, expected = golden(&quot;risk&quot;, &quot;TC-08&quot;)
+45	    result = max_drawdown(_returns(given_input[&quot;returns&quot;]))
+46	    assert [d.ticker for d in result] == [row[&quot;ticker&quot;] for row in expected[&quot;drawdowns&quot;]]
+47	    for got, want in zip(result, expected[&quot;drawdowns&quot;], strict=True):
+48	        assert isinstance(got, Drawdown)
+49	        assert got.depth == pytest.approx(want[&quot;depth&quot;], abs=expected[&quot;tol&quot;], rel=0)
+50	        assert got.peak_date == want[&quot;peak_date&quot;]
+51	        assert got.trough_date == want[&quot;trough_date&quot;]
+52	
+53	
+54	@pytest.mark.intent
+55	def test_tc08_peak_on_a_later_date_is_dated_there(golden):
+56	    given_input, expected = golden(&quot;risk&quot;, &quot;TC-08&quot;)
+57	    result = {d.ticker: d for d in max_drawdown(_returns(given_input[&quot;returns&quot;]))}
+58	    want = {row[&quot;ticker&quot;]: row for row in expected[&quot;drawdowns&quot;]}
+59	    assert result[&quot;X&quot;].peak_date == want[&quot;X&quot;][&quot;peak_date&quot;]
+60	    assert result[&quot;X&quot;].trough_date == want[&quot;X&quot;][&quot;trough_date&quot;]
+61	    assert result[&quot;X&quot;].peak_date != given_input[&quot;returns&quot;][&quot;base_date&quot;]
+62	
+63	
+64	@pytest.mark.intent
+65	def test_tc08_no_fall_gives_zero_depth_at_the_base_date(golden):
+66	    given_input, expected = golden(&quot;risk&quot;, &quot;TC-08&quot;)
+67	    result = {d.ticker: d for d in max_drawdown(_returns(given_input[&quot;returns&quot;]))}
+68	    want = {row[&quot;ticker&quot;]: row for row in expected[&quot;drawdowns&quot;]}
+69	    assert result[&quot;Y&quot;].depth == pytest.approx(want[&quot;Y&quot;][&quot;depth&quot;], abs=expected[&quot;tol&quot;], rel=0)
+70	    assert result[&quot;Y&quot;].peak_date == given_input[&quot;returns&quot;][&quot;base_date&quot;]
+71	    assert result[&quot;Y&quot;].trough_date == given_input[&quot;returns&quot;][&quot;base_date&quot;]
+72	
+73	
+74	@pytest.mark.intent
+75	def test_tc08_first_day_fall_peaks_at_the_base_date(golden):
+76	    given_input, expected = golden(&quot;risk&quot;, &quot;TC-08&quot;)
+77	    result = {d.ticker: d for d in max_drawdown(_returns(given_input[&quot;returns&quot;]))}
+78	    want = {row[&quot;ticker&quot;]: row for row in expected[&quot;drawdowns&quot;]}
+79	    assert result[&quot;Z&quot;].peak_date == given_input[&quot;returns&quot;][&quot;base_date&quot;]
+80	    assert result[&quot;Z&quot;].trough_date == want[&quot;Z&quot;][&quot;trough_date&quot;]
+81	    assert result[&quot;Z&quot;].depth == pytest.approx(want[&quot;Z&quot;][&quot;depth&quot;], abs=expected[&quot;tol&quot;], rel=0)
+82	
+83	
+84	@pytest.mark.intent
+85	def test_tied_drawdowns_report_the_first():
+86	    a = math.log(2.0)
+87	    returns = _one_ticker([-a, a, -a])
+88	    (result,) = max_drawdown(returns)
+89	    assert result.depth == pytest.approx(-0.5, abs=1e-12, rel=0)
+90	    assert result.peak_date == returns.base_date
+91	    assert result.trough_date == returns.dates[0]
+92	
+93	
+94	@pytest.mark.intent
+95	def test_all_flat_returns_have_no_fall():
+96	    returns = _one_ticker([0.0, 0.0, 0.0])
+97	    (result,) = max_drawdown(returns)
+98	    assert result.depth == 0.0
+99	    assert result.peak_date == returns.base_date
+100	    assert result.trough_date == returns.base_date
+101	
+102	
+103	@pytest.mark.intent
+104	def test_contract_sample_one_drawdown_per_ticker_in_order(contract_sample):
+105	    payload = contract_sample(&quot;risk.Returns&quot;)
+106	    returns = _returns(payload)
+107	    result = max_drawdown(returns)
+108	    assert tuple(d.ticker for d in result) == returns.tickers
+109	    allowed = (returns.base_date, *returns.dates)
+110	    for got in result:
+111	        assert got.depth == pytest.approx(
+112	            _brute_force_depth(returns.values[got.ticker]), abs=1e-12, rel=0
+113	        )
+114	        assert got.depth &lt;= 0.0
+115	        assert got.peak_date in allowed
+116	        assert got.trough_date in allowed
+117	        assert got.peak_date &lt;= got.trough_date
+118	
+119	
+120	@pytest.mark.intent
+121	@given(
+122	    values=st.lists(
+123	        st.floats(min_value=-0.5, max_value=0.5, allow_nan=False, allow_infinity=False),
+124	        min_size=1,
+125	        max_size=30,
+126	    )
+127	)
+128	def test_depth_matches_the_fall_between_its_dates(values):
+129	    returns = _one_ticker(values)
+130	    (result,) = max_drawdown(returns)
+131	    assert result.depth &lt;= 0.0
+132	    assert result.depth == pytest.approx(_brute_force_depth(returns.values[&quot;X&quot;]), abs=1e-9)
+133	    all_dates = (returns.base_date, *returns.dates)
+134	    peak_i = all_dates.index(result.peak_date)
+135	    trough_i = all_dates.index(result.trough_date)
+136	    assert peak_i &lt;= trough_i
+137	    fall = math.exp(math.fsum(values[peak_i:trough_i])) - 1.0
+138	    assert fall == pytest.approx(result.depth, abs=1e-9)
+139	</pre></details></div><div class="step" id="S10"><span class="sid">U27.S10</span><span class="kind">Bash</span>grep -rn &quot;^from\|^import&quot; tests/intent/risk/test_vol.py tests/intent/risk/test_annualize.py<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;grep -rn \&quot;^from\\|^import\&quot; tests/intent/risk/test_vol.py tests/intent/risk/test_annualize.py&quot;,
+  &quot;description&quot;: &quot;Check import paths in sibling tests&quot;
+}</pre><div class="lbl">output</div><pre>tests/intent/risk/test_annualize.py:3:from __future__ import annotations
+tests/intent/risk/test_annualize.py:5:from typing import Any
+tests/intent/risk/test_annualize.py:7:import pytest
+tests/intent/risk/test_annualize.py:9:from risk.annualize import annualize
+tests/intent/risk/test_annualize.py:10:from risk.types import Returns, VolSeries
+tests/intent/risk/test_vol.py:3:import json
+tests/intent/risk/test_vol.py:4:from pathlib import Path
+tests/intent/risk/test_vol.py:5:from typing import Any
+tests/intent/risk/test_vol.py:7:import pytest
+tests/intent/risk/test_vol.py:9:from risk.types import Returns, VolSeries
+tests/intent/risk/test_vol.py:10:from risk.vol import rolling_vol</pre></details></div><div class="step" id="S11"><span class="sid">U27.S11</span><span class="kind">Bash</span>uv run python -c &quot;import risk.summary as s, risk.types as t; print([n for n in dir(s) if not n.startswith(&#x27;_&#x27;)]); print(hasattr(t,&#x27;TickerSummary&#x27;))&quot;<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;uv run python -c \&quot;import risk.summary as s, risk.types as t; print([n for n in dir(s) if not n.startswith(&#x27;_&#x27;)]); print(hasattr(t,&#x27;TickerSummary&#x27;))\&quot;&quot;,
+  &quot;description&quot;: &quot;Check exported names of risk.summary&quot;
+}</pre><div class="lbl">output</div><pre>Using CPython 3.11.15
+Creating virtual environment at: .venv
+   Building mdata @ file:///Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A2-r3/with_skill/project/.claude/worktrees/agent-af9ec05f0bd82eb59/packages/mdata
+   Building risk @ file:///Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A2-r3/with_skill/project/.claude/worktrees/agent-af9ec05f0bd82eb59/packages/risk
+      Built risk @ file:///Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A2-r3/with_skill/project/.claude/worktrees/agent-af9ec05f0bd82eb59/packages/risk
+      Built mdata @ file:///Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A2-r3/with_skill/project/.claude/worktrees/agent-af9ec05f0bd82eb59/packages/mdata
+Installed 58 packages in 115ms
+[&#x27;TickerSummary&#x27;, &#x27;VolSeries&#x27;, &#x27;annotations&#x27;, &#x27;dataclass&#x27;, &#x27;statistics&#x27;, &#x27;summary_stats&#x27;]
+False</pre></details></div><div class="step" id="S12"><span class="sid">U27.S12</span><span class="kind">Bash</span>grep -rn -A2 &quot;pytest.raises&quot; tests/intent<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;grep -rn -A2 \&quot;pytest.raises\&quot; tests/intent&quot;,
+  &quot;description&quot;: &quot;See existing raises patterns&quot;
+}</pre><div class="lbl">output</div><pre>tests/intent/mdata/test_validate.py:43:    with pytest.raises(KeyError, match=&quot;NVDA&quot;):
+tests/intent/mdata/test_validate.py-44-        validate_rows(rows, [&quot;AAPL&quot;, &quot;NVDA&quot;])
+tests/intent/mdata/test_validate.py-45-
+--
+tests/intent/mdata/test_validate.py:52:    with pytest.raises(KeyError, match=&quot;MSFT&quot;):
+tests/intent/mdata/test_validate.py-53-        validate_rows(rows, [&quot;AAPL&quot;, &quot;MSFT&quot;])
+tests/intent/mdata/test_validate.py-54-
+--
+tests/intent/mdata/test_validate.py:60:    with pytest.raises(KeyError, match=r&quot;\bB\b&quot;):
+tests/intent/mdata/test_validate.py-61-        validate_rows(rows, [&quot;A&quot;, &quot;B&quot;])
+tests/intent/mdata/test_calendar.py:49:    with pytest.raises(GapError, match=expected[&quot;match&quot;]):
+tests/intent/mdata/test_calendar.py-50-        align_calendar(_rows(payload), max_gap=payload[&quot;max_gap&quot;])
+tests/intent/mdata/test_calendar.py-51-
+--
+tests/intent/mdata/test_calendar.py:58:    with pytest.raises(GapError, match=expected[&quot;match&quot;]):
+tests/intent/mdata/test_calendar.py-59-        align_calendar(_rows(payload))
+tests/intent/mdata/test_calendar.py-60-
+--
+tests/intent/mdata/test_calendar.py:67:    with pytest.raises(GapError, match=&quot;B&quot;):
+tests/intent/mdata/test_calendar.py-68-        align_calendar(_rows(payload), max_gap=1)
+tests/intent/mdata/test_calendar.py-69-
+tests/intent/risk/test_annualize.py:97:    with pytest.raises(ValueError, match=&quot;annualized&quot;):
+tests/intent/risk/test_annualize.py-98-        annualize(already)
+tests/intent/risk/test_annualize.py-99-
+--
+tests/intent/risk/test_annualize.py:106:    with pytest.raises(ValueError, match=&quot;annualized&quot;):
+tests/intent/risk/test_annualize.py-107-        annualize(once)
+tests/intent/risk/test_returns.py:79:    with pytest.raises(ValueError, match=r&quot;(?i)two|2|dates?&quot;):
+tests/intent/risk/test_returns.py-80-        log_returns(prices)
+tests/intent/risk/test_vol.py:99:    with pytest.raises(ValueError, match=r&quot;(?i)window|2&quot;):
+tests/intent/risk/test_vol.py-100-        rolling_vol(returns, window)</pre></details></div><div class="step" id="S13"><span class="sid">U27.S13</span><span class="kind">Write</span>/Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A2-r3/with_skill/project/.claude/worktrees/agent-af9ec05f0bd82eb59/tests/intent/risk/test_summary.py (120 lines)<div class="lbl">wrote /Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A2-r3/with_skill/project/.claude/worktrees/agent-af9ec05f0bd82eb59/tests/intent/risk/test_summary.py</div><pre>&quot;&quot;&quot;Intent tests for risk.summary_stats (RISK-04, TC-07): annualized return, vol, Sharpe, last vol.&quot;&quot;&quot;
+
+from __future__ import annotations
+
+import math
+import statistics
+from typing import Any
+
+import pytest
+
+from risk.summary import TickerSummary, summary_stats
+from risk.types import Returns, VolSeries
+
+
+def _returns(payload: dict[str, Any]) -&gt; Returns:
+    return Returns(
+        base_date=payload[&quot;base_date&quot;],
+        dates=tuple(payload[&quot;dates&quot;]),
+        tickers=tuple(payload[&quot;tickers&quot;]),
+        values={ticker: tuple(series) for ticker, series in payload[&quot;values&quot;].items()},
+    )
+
+
+def _vol(payload: dict[str, Any]) -&gt; VolSeries:
+    return VolSeries(
+        returns=_returns(payload[&quot;returns&quot;]),
+        window=payload[&quot;window&quot;],
+        annualized=payload[&quot;annualized&quot;],
+        values={ticker: tuple(series) for ticker, series in payload[&quot;values&quot;].items()},
+    )
+
+
+def _one_ticker_vol(values: list[float], vols: list[float | None]) -&gt; VolSeries:
+    dates = tuple(f&quot;2024-02-{day:02d}&quot; for day in range(2, len(values) + 2))
+    returns = Returns(base_date=&quot;2024-02-01&quot;, dates=dates, tickers=(&quot;X&quot;,), values={&quot;X&quot;: tuple(values)})
+    return VolSeries(returns=returns, window=2, annualized=True, values={&quot;X&quot;: tuple(vols)})
+
+
+@pytest.mark.intent
+def test_tc07_summary_per_ticker(golden):
+    given_input, expected = golden(&quot;risk&quot;, &quot;TC-07&quot;)
+    result = summary_stats(_vol(given_input[&quot;vol&quot;]))
+    tol = expected[&quot;tol&quot;]
+    assert [s.ticker for s in result] == [row[&quot;ticker&quot;] for row in expected[&quot;summary&quot;]]
+    for got, want in zip(result, expected[&quot;summary&quot;], strict=True):
+        assert isinstance(got, TickerSummary)
+        assert got.ann_return == pytest.approx(want[&quot;ann_return&quot;], abs=tol, rel=0)
+        assert got.ann_vol == pytest.approx(want[&quot;ann_vol&quot;], abs=tol, rel=0)
+        assert got.sharpe == pytest.approx(want[&quot;sharpe&quot;], abs=tol, rel=0)
+        assert got.last_vol == pytest.approx(want[&quot;last_vol&quot;], abs=tol, rel=0)
+
+
+@pytest.mark.intent
+def test_tc07_zero_volatility_gives_zero_sharpe(golden):
+    given_input, expected = golden(&quot;risk&quot;, &quot;TC-07&quot;)
+    result = {s.ticker: s for s in summary_stats(_vol(given_input[&quot;vol&quot;]))}
+    want = {row[&quot;ticker&quot;]: row for row in expected[&quot;summary&quot;]}
+    assert result[&quot;Y&quot;].ann_vol == pytest.approx(want[&quot;Y&quot;][&quot;ann_vol&quot;], abs=expected[&quot;tol&quot;], rel=0)
+    assert result[&quot;Y&quot;].sharpe == want[&quot;Y&quot;][&quot;sharpe&quot;]
+    assert math.isfinite(result[&quot;Y&quot;].sharpe)
+
+
+@pytest.mark.intent
+def test_tc07_last_vol_skips_trailing_none(golden):
+    given_input, expected = golden(&quot;risk&quot;, &quot;TC-07&quot;)
+    assert given_input[&quot;vol&quot;][&quot;values&quot;][&quot;X&quot;][-1] is None
+    result = {s.ticker: s for s in summary_stats(_vol(given_input[&quot;vol&quot;]))}
+    want = {row[&quot;ticker&quot;]: row for row in expected[&quot;summary&quot;]}
+    assert result[&quot;X&quot;].last_vol == pytest.approx(want[&quot;X&quot;][&quot;last_vol&quot;], abs=expected[&quot;tol&quot;], rel=0)
+
+
+@pytest.mark.intent
+def test_contract_sample_matches_the_formulas(contract_sample):
+    vol = _vol({**contract_sample(&quot;risk.VolSeries&quot;)})
+    result = summary_stats(vol)
+    assert tuple(s.ticker for s in result) == vol.returns.tickers
+    for got in result:
+        series = vol.returns.values[got.ticker]
+        ann_return = 252 * statistics.fmean(series)
+        ann_vol = math.sqrt(252) * statistics.stdev(series)
+        assert got.ann_return == pytest.approx(ann_return, abs=1e-9, rel=0)
+        assert got.ann_vol == pytest.approx(ann_vol, abs=1e-9, rel=0)
+        assert got.sharpe == pytest.approx(ann_return / ann_vol, abs=1e-9, rel=0)
+        assert got.last_vol == pytest.approx(vol.values[got.ticker][-1], abs=1e-12, rel=0)
+
+
+@pytest.mark.intent
+def test_periods_per_year_scales_return_and_vol():
+    values = [0.01, -0.02, 0.03]
+    vol = _one_ticker_vol(values, [None, None, 0.3])
+    (result,) = summary_stats(vol, periods_per_year=12)
+    ann_return = 12 * statistics.fmean(values)
+    ann_vol = math.sqrt(12) * statistics.stdev(values)
+    assert result.ann_return == pytest.approx(ann_return, abs=1e-12, rel=0)
+    assert result.ann_vol == pytest.approx(ann_vol, abs=1e-12, rel=0)
+    assert result.sharpe == pytest.approx(ann_return / ann_vol, abs=1e-12, rel=0)
+
+
+@pytest.mark.intent
+def test_volatility_uses_the_sample_standard_deviation():
+    values = [0.01, -0.01]
+    vol = _one_ticker_vol(values, [None, None])
+    (result,) = summary_stats(vol)
+    # sample stdev of (0.01, -0.01) is sqrt(2) * 0.01; population stdev would be 0.01
+    assert result.ann_vol == pytest.approx(math.sqrt(252) * math.sqrt(2) * 0.01, abs=1e-12, rel=0)
+    assert result.ann_return == pytest.approx(0.0, abs=1e-12)
+
+
+@pytest.mark.intent
+def test_no_rolling_value_gives_none_last_vol():
+    vol = _one_ticker_vol([0.01, -0.01], [None, None])
+    (result,) = summary_stats(vol)
+    assert result.last_vol is None
+
+
+@pytest.mark.intent
+def test_fewer_than_two_returns_raises():
+    vol = _one_ticker_vol([0.01], [None])
+    with pytest.raises(ValueError, match=r&quot;(?i)two|2|returns?&quot;):
+        summary_stats(vol)
+</pre><details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A2-r3/with_skill/project/.claude/worktrees/agent-af9ec05f0bd82eb59/tests/intent/risk/test_summary.py&quot;,
+  &quot;content&quot;: &quot;\&quot;\&quot;\&quot;Intent tests for risk.summary_stats (RISK-04, TC-07): annualized return, vol, Sharpe, last vol.\&quot;\&quot;\&quot;\n\nfrom __future__ import annotations\n\nimport math\nimport statistics\nfrom typing import Any\n\nimport pytest\n\nfrom risk.summary import TickerSummary, summary_stats\nfrom risk.types import Returns, VolSeries\n\n\ndef _returns(payload: dict[str, Any]) -&gt; Returns:\n    return Returns(\n        base_date=payload[\&quot;base_date\&quot;],\n        dates=tuple(payload[\&quot;dates\&quot;]),\n        tickers=tuple(payload[\&quot;tickers\&quot;]),\n        values={ticker: tuple(series) for ticker, series in payload[\&quot;values\&quot;].items()},\n    )\n\n\ndef _vol(payload: dict[str, Any]) -&gt; VolSeries:\n    return VolSeries(\n        returns=_returns(payload[\&quot;returns\&quot;]),\n        window=payload[\&quot;window\&quot;],\n        annualized=payload[\&quot;annualized\&quot;],\n        values={ticker: tuple(series) for ticker, series in payload[\&quot;values\&quot;].items()},\n    )\n\n\ndef _one_ticker_vol(values: list[float], vols: list[float | None]) -&gt; VolSeries:\n    dates = tuple(f\&quot;2024-02-{day:02d}\&quot; for day in range(2, len(values) + 2))\n    returns = Returns(base_date=\&quot;2024-02-01\&quot;, dates=dates, tickers=(\&quot;X\&quot;,), values={\&quot;X\&quot;: tuple(values)})\n    return VolSeries(returns=returns, window=2, annualized=True, values={\&quot;X\&quot;: tuple(vols)})\n\n\n@pytest.mark.intent\ndef test_tc07_summary_per_ticker(golden):\n    given_input, expected = golden(\&quot;risk\&quot;, \&quot;TC-07\&quot;)\n    result = summary_stats(_vol(given_input[\&quot;vol\&quot;]))\n    tol = expected[\&quot;tol\&quot;]\n    assert [s.ticker for s in result] == [row[\&quot;ticker\&quot;] for row in expected[\&quot;summary\&quot;]]\n    for got, want in zip(result, expected[\&quot;summary\&quot;], strict=True):\n        assert isinstance(got, TickerSummary)\n        assert got.ann_return == pytest.approx(want[\&quot;ann_return\&quot;], abs=tol, rel=0)\n        assert got.ann_vol == pytest.approx(want[\&quot;ann_vol\&quot;], abs=tol, rel=0)\n        assert got.sharpe == pytest.approx(want[\&quot;sharpe\&quot;], abs=tol, rel=0)\n        assert got.last_vol == pytest.approx(want[\&quot;last_vol\&quot;], abs=tol, rel=0)\n\n\n@pytest.mark.intent\ndef test_tc07_zero_volatility_gives_zero_sharpe(golden):\n    given_input, expected = golden(\&quot;risk\&quot;, \&quot;TC-07\&quot;)\n    result = {s.ticker: s for s in summary_stats(_vol(given_input[\&quot;vol\&quot;]))}\n    want = {row[\&quot;ticker\&quot;]: row for row in expected[\&quot;summary\&quot;]}\n    assert result[\&quot;Y\&quot;].ann_vol == pytest.approx(want[\&quot;Y\&quot;][\&quot;ann_vol\&quot;], abs=expected[\&quot;tol\&quot;], rel=0)\n    assert result[\&quot;Y\&quot;].sharpe == want[\&quot;Y\&quot;][\&quot;sharpe\&quot;]\n    assert math.isfinite(result[\&quot;Y\&quot;].sharpe)\n\n\n@pytest.mark.intent\ndef test_tc07_last_vol_skips_trailing_none(golden):\n    given_input, expected = golden(\&quot;risk\&quot;, \&quot;TC-07\&quot;)\n    assert given_input[\&quot;vol\&quot;][\&quot;values\&quot;][\&quot;X\&quot;][-1] is None\n    result = {s.ticker: s for s in summary_stats(_vol(given_input[\&quot;vol\&quot;]))}\n    want = {row[\&quot;ticker\&quot;]: row for row in expected[\&quot;summary\&quot;]}\n    assert result[\&quot;X\&quot;].last_vol == pytest.approx(want[\&quot;X\&quot;][\&quot;last_vol\&quot;], abs=expected[\&quot;tol\&quot;], rel=0)\n\n\n@pytest.mark.intent\ndef test_contract_sample_matches_the_formulas(contract_sample):\n    vol = _vol({**contract_sample(\&quot;risk.VolSeries\&quot;)})\n    result = summary_stats(vol)\n    assert tuple(s.ticker for s in result) == vol.returns.tickers\n    for got in result:\n        series = vol.returns.values[got.ticker]\n        ann_return = 252 * statistics.fmean(series)\n        ann_vol = math.sqrt(252) * statistics.stdev(series)\n        assert got.ann_return == pytest.approx(ann_return, abs=1e-9, rel=0)\n        assert got.ann_vol == pytest.approx(ann_vol, abs=1e-9, rel=0)\n        assert got.sharpe == pytest.approx(ann_return / ann_vol, abs=1e-9, rel=0)\n        assert got.last_vol == pytest.approx(vol.values[got.ticker][-1], abs=1e-12, rel=0)\n\n\n@pytest.mark.intent\ndef test_periods_per_year_scales_return_and_vol():\n    values = [0.01, -0.02, 0.03]\n    vol = _one_ticker_vol(values, [None, None, 0.3])\n    (result,) = summary_stats(vol, periods_per_year=12)\n    ann_return = 12 * statistics.fmean(values)\n    ann_vol = math.sqrt(12) * statistics.stdev(values)\n    assert result.ann_return == pytest.approx(ann_return, abs=1e-12, rel=0)\n    assert result.ann_vol == pytest.approx(ann_vol, abs=1e-12, rel=0)\n    assert result.sharpe == pytest.approx(ann_return / ann_vol, abs=1e-12, rel=0)\n\n\n@pytest.mark.intent\ndef test_volatility_uses_the_sample_standard_deviation():\n    values = [0.01, -0.01]\n    vol = _one_ticker_vol(values, [None, None])\n    (result,) = summary_stats(vol)\n    # sample stdev of (0.01, -0.01) is sqrt(2) * 0.01; population stdev would be 0.01\n    assert result.ann_vol == pytest.approx(math.sqrt(252) * math.sqrt(2) * 0.01, abs=1e-12, rel=0)\n    assert result.ann_return == pytest.approx(0.0, abs=1e-12)\n\n\n@pytest.mark.intent\ndef test_no_rolling_value_gives_none_last_vol():\n    vol = _one_ticker_vol([0.01, -0.01], [None, None])\n    (result,) = summary_stats(vol)\n    assert result.last_vol is None\n\n\n@pytest.mark.intent\ndef test_fewer_than_two_returns_raises():\n    vol = _one_ticker_vol([0.01], [None])\n    with pytest.raises(ValueError, match=r\&quot;(?i)two|2|returns?\&quot;):\n        summary_stats(vol)\n&quot;
+}</pre><div class="lbl">output</div><pre>File created successfully at: /Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A2-r3/with_skill/project/.claude/worktrees/agent-af9ec05f0bd82eb59/tests/intent/risk/test_summary.py (file state is current in your context — no need to Read it back)</pre></details></div><div class="step" id="S14"><span class="sid">U27.S14</span><span class="kind">Bash</span>scripts/check.sh collect <span class="err">error</span><details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;scripts/check.sh collect&quot;,
+  &quot;description&quot;: &quot;Run collect check&quot;
+}</pre><div class="lbl">output</div><pre>Exit code 1
+-&gt; ruff check --ignore-noqa tests/intent
+All checks passed!
+-&gt; ruff format --check tests/intent
+7 files already formatted
+-&gt; typos tests/intent
+-&gt; pytest tests/intent --collect-only -q --no-cov
+tests/intent/mdata/test_calendar.py::test_tc02_one_calendar_with_filled_gaps
+tests/intent/mdata/test_calendar.py::test_tc02_default_max_gap_is_five
+tests/intent/mdata/test_calendar.py::test_tc03_six_date_gap_raises_gap_error_naming_ticker
+tests/intent/mdata/test_calendar.py::test_tc03_six_date_gap_raises_with_default_max_gap
+tests/intent/mdata/test_calendar.py::test_max_gap_is_honoured_below_the_default
+tests/intent/mdata/test_calendar.py::test_gap_of_exactly_max_gap_is_filled_not_an_error
+tests/intent/mdata/test_validate.py::test_tc01_drops_unusable_rows_keeps_later_duplicate_and_sorts
+tests/intent/mdata/test_validate.py::test_tc01_reversed_file_order_keeps_the_other_duplicate
+tests/intent/mdata/test_validate.py::test_requested_ticker_absent_from_rows_is_a_keyerror_naming_it
+tests/intent/mdata/test_validate.py::test_requested_ticker_with_only_unusable_rows_is_a_keyerror_naming_it
+tests/intent/mdata/test_validate.py::test_tc01_ticker_whose_rows_are_all_dropped_is_a_keyerror
+tests/intent/risk/test_annualize.py::test_tc06_each_value_scaled_by_sqrt_252_and_gaps_kept
+tests/intent/risk/test_annualize.py::test_tc06_keeps_returns_and_window
+tests/intent/risk/test_annualize.py::test_tc06_default_is_252_trading_days
+tests/intent/risk/test_annualize.py::test_periods_per_year_changes_the_scale
+tests/intent/risk/test_annualize.py::test_annualizing_an_annualized_series_is_a_value_error
+tests/intent/risk/test_annualize.py::test_annualizing_twice_is_a_value_error
+tests/intent/risk/test_drawdown.py::test_tc08_depth_and_dates_per_ticker
+tests/intent/risk/test_drawdown.py::test_tc08_peak_on_a_later_date_is_dated_there
+tests/intent/risk/test_drawdown.py::test_tc08_no_fall_gives_zero_depth_at_the_base_date
+tests/intent/risk/test_drawdown.py::test_tc08_first_day_fall_peaks_at_the_base_date
+tests/intent/risk/test_drawdown.py::test_tied_drawdowns_report_the_first
+tests/intent/risk/test_drawdown.py::test_all_flat_returns_have_no_fall
+tests/intent/risk/test_drawdown.py::test_contract_sample_one_drawdown_per_ticker_in_order
+tests/intent/risk/test_drawdown.py::test_depth_matches_the_fall_between_its_dates
+tests/intent/risk/test_returns.py::test_tc04_geometric_closes_give_closed_form_log_returns
+tests/intent/risk/test_returns.py::test_returns_are_dated_after_the_base_date
+tests/intent/risk/test_returns.py::test_each_return_is_the_log_of_the_close_ratio
+tests/intent/risk/test_returns.py::test_log_returns_sum_to_the_log_of_total_growth
+tests/intent/risk/test_returns.py::test_fewer_than_two_dates_raise_value_error[0]
+tests/intent/risk/test_returns.py::test_fewer_than_two_dates_raise_value_error[1]
+tests/intent/risk/test_summary.py::test_tc07_summary_per_ticker
+tests/intent/risk/test_summary.py::test_tc07_zero_volatility_gives_zero_sharpe
+tests/intent/risk/test_summary.py::test_tc07_last_vol_skips_trailing_none
+tests/intent/risk/test_summary.py::test_contract_sample_matches_the_formulas
+tests/intent/risk/test_summary.py::test_periods_per_year_scales_return_and_vol
+tests/intent/risk/test_summary.py::test_volatility_uses_the_sample_standard_deviation
+tests/intent/risk/test_summary.py::test_no_rolling_value_gives_none_last_vol
+tests/intent/risk/test_summary.py::test_fewer_than_two_returns_raises
+tests/intent/risk/test_vol.py::test_tc05_rolling_vol_values_match_within_tolerance
+tests/intent/risk/test_vol.py::test_tc05_no_value_until_window_earlier_returns_exist
+tests/intent/risk/test_vol.py::test_tc05_metadata_window_not_annualized_and_aligned
+tests/intent/risk/test_vol.py::test_rolling_vol_excludes_current_return
+tests/intent/risk/test_vol.py::test_window_below_two_is_value_error[1]
+tests/intent/risk/test_vol.py::test_window_below_two_is_value_error[0]
+tests/intent/risk/test_vol.py::test_window_below_two_is_value_error[-3]
+
+46 tests collected in 0.04s
+-&gt; python scripts/red_check.py tests/intent/risk/test_summary.py
+FFFFFF..                                                                 [100%]
+=================================== FAILURES ===================================
+_________________________ test_tc07_summary_per_ticker _________________________
+
+golden = &lt;function golden.&lt;locals&gt;.load at 0x1090fe5c0&gt;
+
+    @pytest.mark.intent
+    def test_tc07_summary_per_ticker(golden):
+        given_input, expected = golden(&quot;risk&quot;, &quot;TC-07&quot;)
+&gt;       result = summary_stats(_vol(given_input[&quot;vol&quot;]))
+                               ^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/intent/risk/test_summary.py:44: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tests/intent/risk/test_summary.py:25: in _vol
+    return VolSeries(
+&lt;string&gt;:7: in __init__
+    ???
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = VolSeries(returns=Returns(base_date=&#x27;2024-01-02&#x27;, dates=(&#x27;2024-01-03&#x27;, &#x27;2024-01-04&#x27;, &#x27;2024-01
+
+... [3170 characters truncated] ...
+
+s/intent/risk/test_summary.py:25: in _vol
+    return VolSeries(
+&lt;string&gt;:7: in __init__
+    ???
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = VolSeries(returns=Returns(base_date=&#x27;2024-01-02&#x27;, dates=(&#x27;2024-01-03&#x27;, &#x27;2024-01-04&#x27;, &#x27;2024-01-05&#x27;, &#x27;2024-01-08&#x27;, &#x27;2024...), window=2, annualized=True, values={&#x27;X&#x27;: (None, None, 0.2, 0.25, 0.18, None), &#x27;Y&#x27;: (None, None, 0.0, 0.0, 0.0, 0.0)})
+
+    def __post_init__(self) -&gt; None:
+        if self.window &lt; 2:
+            raise ValueError(&quot;window must be at least 2&quot;)
+        _check_series(self.returns.tickers, self.values, len(self.returns.dates))
+        for ticker, series in self.values.items():
+            if any(value is not None for value in series[: self.window]):
+                raise ValueError(f&quot;{ticker}: None until {self.window} earlier returns exist&quot;)
+            if any(value is None for value in series[self.window :]):
+&gt;               raise ValueError(f&quot;{ticker}: a value once {self.window} earlier returns exist&quot;)
+E               ValueError: X: a value once 2 earlier returns exist
+
+packages/risk/src/risk/types.py:56: ValueError
+__________________ test_contract_sample_matches_the_formulas ___________________
+
+contract_sample = &lt;function contract_sample.&lt;locals&gt;.load at 0x109228fe0&gt;
+
+    @pytest.mark.intent
+    def test_contract_sample_matches_the_formulas(contract_sample):
+        vol = _vol({**contract_sample(&quot;risk.VolSeries&quot;)})
+        result = summary_stats(vol)
+        assert tuple(s.ticker for s in result) == vol.returns.tickers
+        for got in result:
+            series = vol.returns.values[got.ticker]
+            ann_return = 252 * statistics.fmean(series)
+            ann_vol = math.sqrt(252) * statistics.stdev(series)
+&gt;           assert got.ann_return == pytest.approx(ann_return, abs=1e-9, rel=0)
+E           assert -0.002702 == -0.680904 ± 1.0e-09
+E             
+E             comparison failed
+E             Obtained: -0.002702
+E             Expected: -0.680904 ± 1.0e-09
+
+tests/intent/risk/test_summary.py:83: AssertionError
+_________________ test_periods_per_year_scales_return_and_vol __________________
+
+    @pytest.mark.intent
+    def test_periods_per_year_scales_return_and_vol():
+        values = [0.01, -0.02, 0.03]
+        vol = _one_ticker_vol(values, [None, None, 0.3])
+        (result,) = summary_stats(vol, periods_per_year=12)
+        ann_return = 12 * statistics.fmean(values)
+        ann_vol = math.sqrt(12) * statistics.stdev(values)
+&gt;       assert result.ann_return == pytest.approx(ann_return, abs=1e-12, rel=0)
+E       assert 0.006666666666666665 == 0.07999999999999999 ± 1.0e-12
+E         
+E         comparison failed
+E         Obtained: 0.006666666666666665
+E         Expected: 0.07999999999999999 ± 1.0e-12
+
+tests/intent/risk/test_summary.py:96: AssertionError
+______________ test_volatility_uses_the_sample_standard_deviation ______________
+
+    @pytest.mark.intent
+    def test_volatility_uses_the_sample_standard_deviation():
+        values = [0.01, -0.01]
+        vol = _one_ticker_vol(values, [None, None])
+        (result,) = summary_stats(vol)
+        # sample stdev of (0.01, -0.01) is sqrt(2) * 0.01; population stdev would be 0.01
+&gt;       assert result.ann_vol == pytest.approx(math.sqrt(252) * math.sqrt(2) * 0.01, abs=1e-12, rel=0)
+E       assert 0.01414213562373095 == 0.22449944320643653 ± 1.0e-12
+E         
+E         comparison failed
+E         Obtained: 0.01414213562373095
+E         Expected: 0.22449944320643653 ± 1.0e-12
+
+tests/intent/risk/test_summary.py:107: AssertionError
+=========================== short test summary info ============================
+FAILED tests/intent/risk/test_summary.py::test_tc07_summary_per_ticker - Valu...
+FAILED tests/intent/risk/test_summary.py::test_tc07_zero_volatility_gives_zero_sharpe
+FAILED tests/intent/risk/test_summary.py::test_tc07_last_vol_skips_trailing_none
+FAILED tests/intent/risk/test_summary.py::test_contract_sample_matches_the_formulas
+FAILED tests/intent/risk/test_summary.py::test_periods_per_year_scales_return_and_vol
+FAILED tests/intent/risk/test_summary.py::test_volatility_uses_the_sample_standard_deviation
+6 failed, 2 passed in 0.04s
+tests/intent/risk/test_summary.py::test_tc07_last_vol_skips_trailing_none: fails for the wrong reason (call: ValueError)
+tests/intent/risk/test_summary.py::test_tc07_summary_per_ticker: fails for the wrong reason (call: ValueError)
+tests/intent/risk/test_summary.py::test_tc07_zero_volatility_gives_zero_sharpe: fails for the wrong reason (call: ValueError)
+tests/intent/risk/test_summary.py::test_fewer_than_two_returns_raises: passes already (not red)
+tests/intent/risk/test_summary.py::test_no_rolling_value_gives_none_last_vol: passes already (not red)
+red_check: fix the tests above: each must reach the code and fail on its behaviour
+-&gt; bash scripts/floor_guard.sh
+floor_guard: clean
+-&gt; files outside tests/intent unchanged since refs/worktree/checks-base
+FAILED: python scripts/red_check.py tests/intent/risk/test_summary.py</pre></details></div><div class="step" id="S15"><span class="sid">U27.S15</span><span class="kind">Bash</span>python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A2-r3/with_skill/plugin/dev-team/scripts/dt.py escalate CONTRACT-CHANGE &quot;TC-07 fixture input (tests/fixtures/risk/TC-07/input.json) cannot be built as a risk.VolSeries: X&#x27;s rolling values are [null, null, 0.2, 0.25, 0.18, null] with window 2, and VolSeries.__post_init__ rejects a None once window earlier returns exist (ValueError &#x27;X: a value once 2 earlier returns exist&#x27;). expected.json wants last_vol 0.18 for X, i.e. &#x27;last …[+412 chars]<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A2-r3/with_skill/plugin/dev-team/scripts/dt.py escalate CONTRACT-CHANGE \&quot;TC-07 fixture input (tests/fixtures/risk/TC-07/input.json) cannot be built as a risk.VolSeries: X&#x27;s rolling values are [null, null, 0.2, 0.25, 0.18, null] with window 2, and VolSeries.__post_init__ rejects a None once window earlier returns exist (ValueError &#x27;X: a value once 2 earlier returns exist&#x27;). expected.json wants last_vol 0.18 for X, i.e. &#x27;last non-None rolling value&#x27;, which the frozen invariant (&#x27;None until window earlier returns exist&#x27;, values required after) makes impossible to express. Either the fixture&#x27;s trailing null for X must be a number (and expected last_vol updated to it), or the VolSeries invariant must allow later gaps. All three TC-07 golden tests fail with that ValueError in construction, not in summary_stats.\&quot; --type risk.VolSeries&quot;,
+  &quot;description&quot;: &quot;Escalate fixture vs VolSeries invariant conflict&quot;
+}</pre><div class="lbl">output</div><pre>escalated: M1-T11.tester CONTRACT-CHANGE. End now with one line: STOPPED M1-T11 tester: see dt escalate</pre></details></div><div class="step" id="S16"><span class="sid">U27.S16</span><span class="kind">say</span>STOPPED M1-T11 tester: see dt escalate<details><summary>full text</summary><pre>STOPPED M1-T11 tester: see dt escalate</pre></details></div>
+<h2>Commits</h2>
+<p>None.</p>
+<h2>Returned</h2>
+<pre>STOPPED M1-T11 tester: see dt escalate</pre>
+</body></html>

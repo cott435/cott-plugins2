@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import itertools
 import math
 
 from mdata.types import Prices
@@ -16,5 +17,7 @@ def log_returns(prices: Prices) -> Returns:
     values = {}
     for t in prices.tickers:
         c = prices.closes[t]
-        values[t] = tuple(math.log(b / a) for a, b in zip(c[:-1], c[1:]))
-    return Returns(base_date=prices.dates[0], dates=prices.dates[1:], tickers=prices.tickers, values=values)
+        values[t] = tuple(math.log(b / a) for a, b in itertools.pairwise(c))
+    return Returns(
+        base_date=prices.dates[0], dates=prices.dates[1:], tickers=prices.tickers, values=values
+    )

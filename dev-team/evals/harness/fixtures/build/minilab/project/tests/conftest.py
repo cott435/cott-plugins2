@@ -1,12 +1,18 @@
-"""Shared test support (written by build-setup; protected). Golden cases and contract artifacts by name."""
+"""Shared test setup (human-owned): Hypothesis profiles, and golden cases and contract artifacts by name."""
 
 from __future__ import annotations
 
 import importlib.util
 import json
+import os
 from pathlib import Path
 
 import pytest
+from hypothesis import settings
+
+settings.register_profile("dev", max_examples=20)
+settings.register_profile("ci", max_examples=500)
+settings.load_profile(os.getenv("HYPOTHESIS_PROFILE", "dev"))
 
 TESTS = Path(__file__).resolve().parent
 

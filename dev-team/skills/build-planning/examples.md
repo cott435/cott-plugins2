@@ -109,14 +109,15 @@ The interface, wiring, system and long-run tasks are worked in `references/examp
 | `Kind` | `interface`, `spine`, `wiring`, `thicken` or `system` (`phase0.md`) |
 | `Covers` | Spec IDs the task satisfies |
 | `Size` | XS, S or M, counting what the task builds (`tasks.md` step 5, `task-size`) |
-| `Mode` | `split` for checkable behavior, `solo` for interface, spine, wiring, system, refactor, glue, doc-sync |
+| `Mode` | `split` when Acceptance names a TC case, a Given/When/Then or a model criterion, or `Writes:` has a `tests/intent/` path, whatever the Kind; else `solo` (`mode_violations`) |
 | `Skills` | Skill names, or `—`. Every skill on the milestone's `**Skills:**` line (else its stage's) lands on at least one task (`skills_unrouted`). A missing skill is still named |
 | `Read` | IDs and repo paths, comma-separated. Everything the builder needs, nothing more (`missing-ref`). References by ID with an optional selector: `RF-01:deseasonalize`, `RF-01:outline`, `RF-03:<heading>`, `PB-01:probe.py:sync_all`, `PB-01:samples`; a long one with none warns (`ref-large`). Every milestone reference lands on at least one task (`references_unrouted`) |
 | `Acceptance` | ≤ 3 checkbox bullets, each test-backed (`task-acceptance`) |
 | `Verify` | Backticked commands joined by ` · `. Includes the smoke command once the `Depends on` path reaches the pipeline's wiring (`verify-smoke`) |
 | `Depends on` | Task IDs earlier in the plan, or `—`; unmitigated edges only, each with a graph row (`depends`, `edges`) |
-| `Writes` | Comma-separated paths or folder globs, exclusive: no other task off its `Depends on` path writes them; none under `tasks/` (`writes`) |
-| `Reason` | Optional one line: a mode override, or a second package or step |
+| `Writes` | Comma-separated paths or folder globs, exclusive: no other task off its `Depends on` path writes them; none under `tasks/` (`writes`); a `tests/unit/<pkg>/` path on every task but an interface task (`writes-unit`) |
+| `Reason` | Optional one line: `mode: <why>` for a mode override, else a second package or step |
+| `Risk` | Optional: `external` for a task needing credentials or acting outside the repo; the build waits for the user's yes |
 | `Blocked` | Added when a task is paused; Replan removes it once resolved |
 
 Title rule: no " and " (`task-title`). Required fields: Package, Step, Kind, Size, Mode, Read, Acceptance, Verify, Writes (`task-fields`).
@@ -134,16 +135,22 @@ At the end of a later wave:
 
 ```markdown
 ### Checkpoint after M2-T06
-- [ ] Every pipeline in the milestone runs end to end (smoke commands)
-- [ ] All golden cases pass
+- [ ] Reviewed per package over the wave's landings (CONSTRAINTS.md Review, Each phase); every finding has a disposition
+- [ ] `scripts/check.sh full` passes
 - [ ] Entry functions still read top to bottom as the step table says (Sync if not)
-- [ ] No new abstraction without a second implementation or an AD
 - [ ] contract.md matches the contract code (`dt status` freshness check)
-- [ ] `dt layout` output reviewed; Definition of Done holds
-- [ ] `scripts/check.sh full` passes; Review checklist done; every finding has a disposition
 ```
 
-Last, after the final task: the same list under `### Checkpoint: milestone exit`, with `scripts/check.sh full --exit` (which also fails on any interface stub left), plus `- [ ] The Scope's Exit holds`.
+Last, after the final task:
+
+```markdown
+### Checkpoint: milestone exit
+- [ ] Every pipeline in the milestone runs end to end (smoke commands); all golden cases pass
+- [ ] Reviewed per package over the milestone diff (CONSTRAINTS.md Review, Milestone exit); every finding has a disposition
+- [ ] `scripts/check.sh full --exit` passes (it also fails on any interface stub left)
+- [ ] `dt layout` output reviewed; Definition of Done holds
+- [ ] The Scope's Exit holds
+```
 
 Findings are not written by this skill or by builders. The orchestrator records the reviewer's findings with `dt finding`, and they look like this:
 

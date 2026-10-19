@@ -17,7 +17,7 @@ PRECHECK → DETECT → 5 QUESTIONS, ONE MESSAGE → GENERATE → [commit yes] �
 
 **4. Generate.** Derive every value per `derive.md` and fill the templates; `grep -rn '{{[a-z_]*}}'` over the written files must print nothing. `chmod +x scripts/*.sh scripts/hooks/*.sh`; append the `.gitignore` lines. `uv lock && uv sync`, then write the vulture whitelist: the template header plus `uv run --frozen vulture --make-whitelist`, and count `duplicates_today` with `check.sh`'s pylint line (`tools/pylint.md`). Never edit `check.sh` steps or hook commands by hand.
 
-**5. Prove.** On step 3's commit yes, commit and `git update-ref refs/checks/base HEAD`. Run `uv run --frozen ruff check --show-settings >/dev/null` and `time bash scripts/check.sh gate`; fix the config, never the check, until it passes within budget. Headless: don't commit; run the gate, report the protected-path step as expected to fail, leave Draft.
+**5. Prove.** On step 3's commit yes, commit and `git update-ref refs/worktree/checks-base HEAD`. Run `uv run --frozen ruff check --show-settings >/dev/null` and `time bash scripts/check.sh gate`; fix the config, never the check, until it passes within budget. Headless: don't commit; run the gate, report the protected-path step as expected to fail, leave Draft.
 
 ## Example: GridLoad, single package
 

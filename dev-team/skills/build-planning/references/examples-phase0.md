@@ -6,12 +6,12 @@ PL-01 Load meter readings (`read_raw` → `apply_registry`, owner `data`) and PL
 wave 0  T01  types
 wave 1  contract tests T02 data · T03 profile
 wave 2  spines T04 read_raw · T05 apply_registry · T06 fit_seasonality · T07 spectrum · T08 deseason · T09 write_report
-        testers of T12 registry · T13 LS amplitudes · T14 Fourier seasonality · T15 seasonal removal (during the review)
+        testers of T12 registry · T13 LS amplitudes · T14 Fourier seasonality · T15 seasonal removal · T16 system (during the review)
 wave 3  wiring T10 PL-01 · T11 PL-02 (on the load_readings fake); implementers of T12 ← T05 · T13 ← T07 · T14 ← T06 · T15 ← T08
 wave 4  T16  system: PL-02 on the real PL-01
 ```
 
-16 tasks, critical path 5 (T01 → T03 → T07 → T13 → T16, or any other five-task chain), 10 agents in wave 2, every spine and thicken XS or S. Checkpoints after T03 (barrier, reviewing T01–T03) and T15, and the milestone exit after T16. No fold: each step's spine is a real baseline worth testing alone.
+16 tasks, critical path 5 (T01 → T03 → T07 → T13 → T16, or any other five-task chain), 10 agents in wave 2, every spine and thicken XS or S. Checkpoints after T03 (barrier, reviewing T01–T03) and T15, and the milestone exit after T16. No fold: each step's spine is a real baseline worth testing alone. The system task names TC cases, so it is split like the thicken tasks.
 
 ```markdown
 ### M1-T01: M1 types
@@ -58,13 +58,13 @@ wave 4  T16  system: PL-02 on the real PL-01
 **Depends on:** M1-T03, M1-T07 · **Writes:** src/gridload/profile/spectrum.py, tests/intent/gridload/test_spectrum.py, tests/unit/gridload/test_spectrum.py
 
 ### M1-T16: PL-02 on the real PL-01
-**Package:** gridload · **Step:** PL-02 · **Kind:** system · **Covers:** — · **Size:** XS · **Mode:** solo
+**Package:** gridload · **Step:** PL-02 · **Kind:** system · **Covers:** — · **Size:** XS · **Mode:** split
 **Read:** PL-01, PL-02, data.load_readings, TC-01, TC-02, TC-03
 **Acceptance:**
 - [ ] PL-02 calls the real `load_readings`; each fake's contract cases pass on the real provider
 - [ ] Both smoke commands pass; TC-01–TC-03 pass on the real chain
 **Verify:** `python -m gridload.data load --smoke` · `python -m gridload.profile seasonality-report --smoke` · `scripts/check.sh gate`
-**Depends on:** M1-T10, M1-T11, M1-T12, M1-T13, M1-T14, M1-T15 · **Writes:** src/gridload/profile/pipeline.py, tests/unit/gridload/test_load_readings_conformance.py
+**Depends on:** M1-T10, M1-T11, M1-T12, M1-T13, M1-T14, M1-T15 · **Writes:** src/gridload/profile/pipeline.py, tests/intent/gridload/test_pl02_system.py, tests/unit/gridload/test_load_readings_conformance.py
 ```
 
 T03 freezes `profile`'s four types the same way. T13's tester starts once T01 and T03 land, while the interface review runs: it tests `spectrum` as T01 declares it and fails on `NotImplementedError("M1-T07")`. Its implementer follows its tester and T07, nothing else. Wiring T11 waits on PL-02's spines because its smoke runs them, but not on PL-01: the fake stands in. The `load_readings` cases are named in T10's acceptance too, since PL-01's wiring builds the real function, so a drift fails there before T16.
@@ -107,12 +107,12 @@ The graph, excerpted (one row per `Depends on` other than on an interface task, 
 
 ```markdown
 ### M1-T32: Snake DQN against both baselines
-**Package:** rllab · **Step:** PL-01 · **Kind:** system · **Covers:** EVAL-04 · **Size:** XS · **Mode:** solo
+**Package:** rllab · **Step:** PL-01 · **Kind:** system · **Covers:** EVAL-04 · **Size:** XS · **Mode:** split
 **Reason:** long run
 **Read:** PL-01, TC-26, QR-01, train.TrainSettings
 **Acceptance:**
 - [ ] A 50,000-step feasibility run's curve passes the scripted snake's mean in its last third; else TEST-WRONG with the curve, and no full run
 - [ ] Within QR-01's 60 minutes, TC-26 passes on the full run
 **Verify:** `python -m rllab train --env snake` · `scripts/check.sh gate`
-**Depends on:** M1-T31 · **Writes:** tests/unit/rllab/test_snake_long_run.py
+**Depends on:** M1-T31 · **Writes:** tests/intent/rllab/test_snake_long_run.py, tests/unit/rllab/test_snake_long_run.py
 ```

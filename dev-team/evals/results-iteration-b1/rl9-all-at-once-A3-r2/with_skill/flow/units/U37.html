@@ -1,0 +1,811 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1"><title>U37 implementer</title>
+<style>
+:root{--bg:#fbfbfa;--fg:#1d1d1f;--muted:#6b6b70;--line:#d9d9de;--box:#fff;--rowp:#eef3fb;--band:#fff4d6;
+--ok:#2e7d32;--bad:#c62828;--warn:#b26a00;--idle:#6b6b70}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#17171a;--fg:#ececf0;--muted:#9a9aa3;
+--line:#34343a;--box:#222227;--rowp:#1d2433;--band:#3a3015;--ok:#6fcf73;--bad:#ff6b6b;--warn:#f0b35a;--idle:#9a9aa3}}
+:root[data-theme="dark"]{--bg:#17171a;--fg:#ececf0;--muted:#9a9aa3;--line:#34343a;--box:#222227;--rowp:#1d2433;
+--band:#3a3015;--ok:#6fcf73;--bad:#ff6b6b;--warn:#f0b35a;--idle:#9a9aa3}
+body{margin:0;padding:16px;background:var(--bg);color:var(--fg);font:14px/1.45 -apple-system,system-ui,sans-serif}
+h1{font-size:18px;margin:0 0 4px}h2{font-size:15px;margin:22px 0 8px}.sub{color:var(--muted)}
+table{border-collapse:collapse;margin:4px 0 8px}td,th{border-bottom:1px solid var(--line);padding:4px 10px;text-align:left;
+vertical-align:top}th{color:var(--muted);font-weight:600}.chips span{display:inline-block;margin:0 4px 2px 0}
+.legend span{margin-right:14px;white-space:nowrap}.sw{display:inline-block;width:10px;height:10px;border-radius:2px;
+margin-right:4px;vertical-align:-1px}.scroll{overflow:auto;max-height:88vh;border:1px solid var(--line);border-radius:8px}
+.chart{display:grid;width:max-content}.chart>div{line-height:0}.corner{position:sticky;top:0;left:0;z-index:3}
+.colhead{position:sticky;top:0;z-index:2}.rowhead{position:sticky;left:0;z-index:2}
+svg.bg{background:var(--bg)}.colhead svg{border-bottom:1px solid var(--line)}.rowhead svg{border-right:1px solid var(--line)}
+.ok{color:var(--ok);fill:var(--ok)}.bad{color:var(--bad);fill:var(--bad)}.warn{color:var(--warn);fill:var(--warn)}
+.idle{color:var(--idle);fill:var(--idle)}
+svg text{fill:var(--fg);font-family:-apple-system,system-ui,sans-serif}
+.box{fill:var(--box);stroke:var(--line)}.unit:hover .box{stroke:var(--fg)}
+.role{font-size:12px;font-weight:600}.uid,.wmeta,.lmeta,.meta{font-size:10px;fill:var(--muted)}
+.sub{font-size:10.5px;fill:var(--muted)}.badge{font-size:11px;font-weight:600}
+.meta.bad{fill:var(--bad);font-weight:600}.lane{font-size:13px;font-weight:700}.wave{font-size:13px;font-weight:700}
+.par{fill:#4e79a7}.ser{fill:var(--muted)}.rowp{fill:var(--rowp)}.rows{fill:transparent}.band{fill:var(--band)}
+.bandt{font-size:11.5px}.grid{stroke:var(--line)}.link{stroke:var(--muted);stroke-width:1.2;opacity:.55}
+.arrowhead{fill:var(--muted)}.marks{font-size:10.5px}.audit{stroke:var(--box);stroke-width:2}.auditn{font-size:10px;font-weight:700;fill:#fff}
+a{color:inherit}svg a .box{cursor:pointer}
+
+:root{--c0:#2a78d6;--c1:#eb6834;--c2:#1baf7a;--c3:#eda100;--c4:#e87ba4;--c5:#008300;--c6:#6250d6;--c7:#e34948;
+--cx:#8a8985;--main:#52514e;--read:#dcdbd5;--readfg:#1d1d1f}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--c0:#3987e5;--c1:#d95926;--c2:#199e70;
+--c3:#c98500;--c4:#d55181;--c5:#008300;--c6:#9085e9;--c7:#e66767;--cx:#77766f;--main:#c3c2b7;--read:#3b3b40;
+--readfg:#ececf0}}
+:root[data-theme="dark"]{--c0:#3987e5;--c1:#d95926;--c2:#199e70;--c3:#c98500;--c4:#d55181;--c5:#008300;
+--c6:#9085e9;--c7:#e66767;--cx:#77766f;--main:#c3c2b7;--read:#3b3b40;--readfg:#ececf0}
+.c0{fill:var(--c0);background:var(--c0)}.c1{fill:var(--c1);background:var(--c1)}.c2{fill:var(--c2);background:var(--c2)}
+.c3{fill:var(--c3);background:var(--c3)}.c4{fill:var(--c4);background:var(--c4)}.c5{fill:var(--c5);background:var(--c5)}
+.c6{fill:var(--c6);background:var(--c6)}.c7{fill:var(--c7);background:var(--c7)}.cx{fill:var(--cx);background:var(--cx)}
+.cmain{fill:var(--main)}.sc0{stroke:var(--c0)}.sc1{stroke:var(--c1)}.sc2{stroke:var(--c2)}
+.tl text,.sm text,.lc text{font-size:10.5px;fill:var(--muted)}.tl .lbl-in,.sm .lbl-in{fill:#fff;font-size:10.5px;font-weight:600}
+.tl .rowl,.sm .rowl,.lc .rowl{fill:var(--fg);font-size:11.5px;font-weight:600}.tl .band{fill:var(--rowp)}
+.tl .brk{stroke:var(--muted);stroke-dasharray:2 3}.tl a:hover rect,.sm a:hover rect{stroke:var(--fg);stroke-width:1.5}
+.axis{stroke:var(--line)}.sm .val{fill:var(--fg);font-weight:600}.lc path.ln{fill:none;stroke-width:2}
+.lc circle{stroke:var(--bg);stroke-width:2}.lc .end{font-weight:600;fill:var(--fg)}
+.tiles{display:flex;flex-wrap:wrap;gap:10px;margin:12px 0}.tile{border:1px solid var(--line);border-radius:8px;
+padding:8px 12px;min-width:110px;background:var(--box)}.tile b{display:block;font-size:20px;line-height:1.2}
+.tile span{font-size:12px;color:var(--muted)}.tile i{font-style:normal;font-size:12px;margin-left:6px}
+.fm{border-collapse:separate;border-spacing:2px}.fm td,.fm th{border:0;padding:0;text-align:center;font-size:11px}
+.fm th{padding:0 2px;font-weight:600}.fm td.f,.fm th.f{text-align:left;padding-right:10px;white-space:nowrap;
+position:sticky;left:0;background:var(--bg);font:11.5px ui-monospace,Menlo,monospace;
+max-width:380px;overflow:hidden;text-overflow:ellipsis}
+.fm td.cell{min-width:22px;height:20px;border-radius:3px}.fm td.fw{background:var(--c0);color:#fff;font-weight:700}
+.fm td.fe{background:var(--c1);color:#fff;font-weight:700}.fm td.fr{background:var(--read);color:var(--readfg)}
+.fm td.n{color:var(--muted);padding:0 6px}.fm tr.grp td{text-align:left;padding-top:8px;color:var(--muted);
+font-weight:600}
+.key{display:inline-block;min-width:18px;text-align:center;border-radius:3px;font-size:11px;margin-right:4px}
+.bar{display:inline-block;height:9px;border-radius:2px;vertical-align:0}
+
+pre{white-space:pre-wrap;word-break:break-word;background:var(--box);border:1px solid var(--line);border-radius:6px;
+padding:8px 10px;margin:4px 0;font:12px/1.45 ui-monospace,SFMono-Regular,Menlo,monospace;max-width:100%;overflow:auto}
+.step{border-top:1px solid var(--line);padding:6px 0}.step:target{background:var(--rowp)}
+.sid{font:12px ui-monospace,Menlo,monospace;color:var(--muted);margin-right:8px}.kind{font-weight:600;margin-right:8px}
+.err{color:var(--bad);font-weight:600}.hook{color:var(--bad);margin:4px 0 0 16px}.lbl{font-size:12px;color:var(--muted);margin-top:6px}
+details summary{cursor:pointer;color:var(--muted);font-size:12px}.head td:first-child{color:var(--muted)}
+.top{font-size:13px}.narr{list-style:none;padding-left:0}.narr li{margin:3px 0}
+</style></head>
+<body>
+<p class="top"><a href="../flow.html">← the run's flow chart</a></p>
+
+<h1>U37 · implementer · M1-T29 implementer</h1>
+<table class="head"><tr><td>Type</td><td>implementer</td></tr><tr><td>Description</td><td>M1-T29 implementer</td></tr><tr><td>Spawned by</td><td>driver at D206</td></tr><tr><td>Turn</td><td><a href="../turns/T06.html">T06</a></td></tr><tr><td>Model</td><td>claude-opus-5-5</td></tr><tr><td>Start</td><td>2026-10-19 08:31:36 UTC</td></tr><tr><td>Duration</td><td>1 min</td></tr><tr><td>Tool calls</td><td>11</td></tr><tr><td>Errors</td><td>1</td></tr><tr><td>Hook blocks</td><td>0</td></tr><tr><td>Tokens</td><td>2.6k out · 23.3k new in · 220k cached in · peak context 28.1k</td></tr><tr><td>Skills invoked</td><td>none</td></tr><tr><td>Files written or edited</td><td>none</td></tr><tr><td>Definition</td><td>none</td></tr><tr><td>Steps</td><td>13</td></tr><tr><td>Finished</td><td>yes</td></tr></table>
+
+
+<h2>Prompt</h2>
+<pre>You are the implementer for M1-T29. Run `python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/plugin/dev-team/scripts/dt.py claim M1-T29 --role implementer`, then read the packet it names.</pre>
+<h2>Files</h2>
+<table><tr><th>Op</th><th>File</th><th>Calls</th><th>By</th><th>Via</th><th>Steps</th></tr><tr><td>read</td><td><code>.claude/worktrees/agent-aad13193651e9ff5c/.claude/packet.md</code></td><td>1</td><td>U37</td><td>Read</td><td><a href="#3">U37.S3</a></td></tr><tr><td>read</td><td><code>.claude/worktrees/agent-aad13193651e9ff5c/CONSTRAINTS.md</code></td><td>1</td><td>U37</td><td>Read</td><td><a href="#4">U37.S4</a></td></tr><tr><td>read</td><td><code>.claude/worktrees/agent-aad13193651e9ff5c/tests/intent/rllab/test_style.py</code></td><td>1</td><td>U37</td><td>Bash</td><td><a href="#5">U37.S5</a></td></tr></table>
+<h2>Steps</h2>
+<div class="step" id="S1"><span class="sid">U37.S1</span><span class="kind">user</span>You are the implementer for M1-T29. Run `python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/plugin/dev-team/scripts/dt.py claim M1-T29 --role implementer`, then read the packet it names.<details><summary>full text</summary><pre>You are the implementer for M1-T29. Run `python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/plugin/dev-team/scripts/dt.py claim M1-T29 --role implementer`, then read the packet it names.</pre></details></div><div class="step" id="S2"><span class="sid">U37.S2</span><span class="kind">Bash</span>python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/plugin/dev-team/scripts/dt.py claim M1-T29 --role implementer<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/plugin/dev-team/scripts/dt.py claim M1-T29 --role implementer&quot;,
+  &quot;description&quot;: &quot;Claim task M1-T29 as implementer&quot;
+}</pre><div class="lbl">output</div><pre>packet: /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/project/.claude/worktrees/agent-aad13193651e9ff5c/.claude/packet.md (157 lines; read it in full)
+task: M1-T29 Chart style per the dataviz skill · role implementer · package rllab · kind thicken
+writes: src/rllab/charts/style.py
+done: Done when `scripts/check.sh gate` passes (the gate passes on your Writes); the Stop hook runs it. End with one line: `DONE M1-T29 implementer`. If you can&#x27;t finish: `python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/plugin/dev-team/scripts/dt.py escalate &lt;TEST-WRONG|NEEDS-DEP&gt; &quot;&lt;why&gt;&quot;`, or `python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/plugin/dev-team/scripts/dt.py escalate CONTRACT-CHANGE &quot;&lt;why&gt;&quot; --type &lt;the contract symbol&gt;`, then end with one line: `STOPPED M1-T29 implementer: see dt escalate`.</pre></details></div><div class="step" id="S3"><span class="sid">U37.S3</span><span class="kind">Read</span>/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/project/.claude/worktrees/agent-aad13193651e9ff5c/.claude/packet.md<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/project/.claude/worktrees/agent-aad13193651e9ff5c/.claude/packet.md&quot;
+}</pre><div class="lbl">output</div><pre>1	# Packet: M1-T29 implementer
+2	You are the implementer for M1-T29. Your edit boundary is your Writes below (`.claude/.task_writes`); the guard blocks everything else.
+3	
+4	Done when `scripts/check.sh gate` passes (the gate passes on your Writes); the Stop hook runs it. End with one line: `DONE M1-T29 implementer`. If you can&#x27;t finish: `python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/plugin/dev-team/scripts/dt.py escalate &lt;TEST-WRONG|NEEDS-DEP&gt; &quot;&lt;why&gt;&quot;`, or `python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/plugin/dev-team/scripts/dt.py escalate CONTRACT-CHANGE &quot;&lt;why&gt;&quot; --type &lt;the contract symbol&gt;`, then end with one line: `STOPPED M1-T29 implementer: see dt escalate`.
+5	
+6	# Context for M1-T29: package rllab · mode split · kind thicken
+7	Read only what is below, plus CONSTRAINTS.md and the files you edit. Your task is the last section.
+8	
+9	&lt;!-- docs/packages/rllab/pipelines.md:78 --&gt;
+10	## PL-05: Learning-curve chart
+11	**Entry:** `src/rllab/cli/pipelines/pl05_chart.py::run_chart` · **Trigger:** `rllab chart &lt;world&gt; &lt;variant&gt; [--measure M] [--include NAME]`
+12	**Covers:** LOG-03–LOG-05, PREY-10, EVAL-01, EVAL-02, SNAKE-07, FISH-09, PREY-07
+13	
+14	| # | Step | Owner | In → Out | Spine version | Covers |
+15	|---|---|---|---|---|---|
+16	| 1 | `find_runs` | runlog.read | root, world, variant, include → list[Run] | glob run folders, keep `finished` plus named ones | LOG-03 |
+17	| 2 | `baseline_means` | baselines.means | world, variant → BaselineMeans | random and rule per team on the 20 `EVAL_SEEDS`, rule-based opponents | EVAL-01, EVAL-02 |
+18	| 3 | `RandomPolicy` | baselines.random | ActionSpace → Policy | uniform draws from the passed `rng` | EVAL-01 |
+19	| 4 | `SnakeRule` | baselines.snake | none → RulePolicy | toward food on the shorter axis unless fatal next step | SNAKE-07 |
+20	| 5 | `FishRule` | baselines.fish | none → RulePolicy | full push away from the seen ball, else random | FISH-09 |
+21	| 6 | `PreyRule` | baselines.prey | none → RulePolicy | flee nearest seen predator, else toward nearest seen pellet | PREY-07 |
+22	| 7 | `PredatorRule` | baselines.prey | none → RulePolicy | chase nearest seen prey, else random wander | PREY-07 |
+23	| 8 | `learning_curve` | charts.curve | list[Run], BaselineMeans, out → Output | matplotlib mean line, min–max band, two baseline lines, per team; `dataviz` checks | LOG-03–LOG-05, PREY-10 |
+24	
+25	### Entry sketch (pre-build — removed by spine task)
+26	```python
+27	def run_chart(root: Path, world: str, variant: str, out: Path, *, include: Sequence[str] = (), measure: str | None = None) -&gt; Output:
+28	    runs = find_runs(root, world, variant, include=include)
+29	    lines = baseline_means(world, variant)
+30	    return learning_curve(runs, lines, out, measure=measure)
+31	```
+32	
+33	&lt;!-- docs/spec.md:90 --&gt;
+34	- **LOG-04** Learning-curve charts follow the `dataviz` skill&#x27;s guidance for form, colour and labelling.
+35	  - Given any learning-curve chart, when it is reviewed against the `dataviz` skill, then it passes that skill&#x27;s checks.
+36	
+37	&lt;!-- docs/packages/rllab/contract.md:308 --&gt;
+38	### charts.learning_curve: Learning-curve chart
+39	`def learning_curve(runs: Sequence[Run], baselines: BaselineMeans, out: Path, *, measure: str | None = None) -&gt; Output`
+40	- **Invariants:** draws per team a mean line, a min–max band and both baseline lines against &quot;environment steps&quot; (LOG-03, PREY-10), or a declared measure the same way (LOG-05); follows the `dataviz` skill (LOG-04); under 3 runs, titled with the count and a band note
+41	- **Errors:** `MixedRunsError` naming the differing settings when runs differ by more than seed
+42	- **Boundary:** cli · **Fixtures:** tests/contracts/charts.learning_curve/ · **Cases:** a fake writing a placeholder PNG for 5 snake runs
+43	- **Used by:** cli; PL-05
+44	
+45	## Layout (`dt layout rllab`)
+46	src/rllab/
+47	  __init__.py — RL Lab: hand-written reinforcement learning on small simulated worlds.
+48	  baselines/
+49	    __init__.py — Random play, each world&#x27;s rule and their mean scores.
+50	    means.py — Rule lookup and the baselines&#x27; mean scores on the evaluation seeds.
+51	    random.py — Uniform random play for any action format (EVAL-01).
+52	    snake.py — The snake rule baseline (SNAKE-07).
+53	    types.py — Types of the baselines.
+54	  charts/
+55	    __init__.py — Charts drawn from run folders, following the `dataviz` skill.
+56	    curve.py — Learning curves with a min-max band and baseline lines (LOG-03 to LOG-05).
+57	    types.py — Types of the charts.
+58	  cli/
+59	    __init__.py — The `rllab` command (AD-10).
+60	    __main__.py — `python -m rllab.cli`: the `rllab` command.
+61	    command.py — The `rllab` command: parses a trigger, calls its pipeline entry and prints the result (AD-10).
+62	    pipelines/
+63	      __init__.py — The PL-04 to PL-12 entries (AD-10).
+64	      pl04_watch.py — PL-04: Watch a run.
+65	      pl05_chart.py — PL-05: Learning-curve chart.
+66	      pl06_evaluate.py — PL-06: Final evaluation.
+67	  core/
+68	    __init__.py — World and policy protocols, shared types, held-out seed sets and the episode loop.
+69	    episode.py — The one episode loop every component plays through (AD-04, AD-05).
+70	    types.py — Shared types of every component: specs, steps, episodes, protocols, configs, seed sets.
+71	  evaluate/
+72	    __init__.py — Final evaluation on the final seeds, permutation tests, verdicts and summaries.
+73	    types.py — Types of the final evaluation: comparisons, verdicts and summaries.
+74	    final/
+75	      __init__.py — The final evaluation and its statistics.
+76	      play.py — Final evaluation: final checkpoints and both baselines on the final seeds (EVAL-03).
+77	      stats.py — Paired permutation tests against each baseline, with Holm&#x27;s correction (EVAL-04).
+78	      summary.py — One team&#x27;s summary from its final-seed scores, its collapse flag and `summary.json` (EVAL-06).
+79	      verdict.py — The baseline verdict: both nulls rejected and every run beating the rule (EVAL-05).
+80	  methods/
+81	    __init__.py — Hand-written learners behind `Learner`, and checkpoint-to-policy loading.
+82	    factory.py — Learner construction and checkpoint-to-policy loading.
+83	    types.py — Types of the learning methods.
+84	    dqn/
+85	      __init__.py — DQN: Q-learning on an MLP for discrete actions (AD-03).
+86	      learner.py — Online one-step Q-learning on an MLP with epsilon-greedy exploration (spine: no replay buffer
+87	  runlog/
+88	    __init__.py — Run folders: record, logs, checkpoints, live progress and lookup.
+89	    progress.py — A live view of one run&#x27;s progress (LOG-06).
+90	    read.py — Run lookup and opening run folders.
+91	    types.py — Types of run folders: record, evaluation points, checkpoints, the run view and progress.
+92	    writer.py — Writes one run folder: record, logs and checkpoints (AD-06).
+93	  train/
+94	    __init__.py — Training: the config loader, the method check and the PL-01 to PL-03 entries (AD-10).
+95	    batch.py — Runs one training run per config in a spawn process pool (TRAIN-05, AD-05).
+96	    check.py — The method check: each team method trained and scored on its check world (TRAIN-06, AD-09).
+97	    config.py — Run configs from a TOML file, one per seed, method defaults filled.
+98	    setup.py — One learner per team of a run (TRAIN-07).
+99	    types.py — Types of training: the method check&#x27;s result and its refusal.
+100	    loop/
+101	      __init__.py — The training loop of one run.
+102	      run.py — Steps a world to the budget, with checkpoints and evaluations, into a run folder.
+103	    pipelines/
+104	      __init__.py — The PL-01 to PL-03 entries (AD-10).
+105	      pl01_check.py — PL-01: Method check.
+106	      pl02_train.py — PL-02: Training run.
+107	      pl03_batch.py — PL-03: Training batch.
+108	  worlds/
+109	    __init__.py — The worlds, behind `make`.
+110	    checks.py — Check worlds with hand-derived best actions (TRAIN-06, AD-09).
+111	    make.py — The world factory: a world name and variant to a World.
+112	    snake.py — Snake: a 10 x 10 grid, relative turns, food, death and a hunger limit (SNAKE-01 to SNAKE-06).
+113	    types.py — Types the worlds add to the core World protocol.
+114	
+115	## Interfaces (frozen: build against these, never change them)
+116	&lt;!-- docs/packages/rllab/contract.md:256 --&gt;
+117	### runlog.Run: type
+118	```python
+119	class Run(Protocol):
+120	    record: RunRecord
+121	    def episodes(self) -&gt; list[EpisodeResult]: ...
+122	    def evals(self) -&gt; list[EvalPoint]: ...
+123	    def checkpoints(self) -&gt; list[Checkpoint]: ...
+124	```
+125	- **Invariants:** read-only view of one run folder; readable while the run writes (LOG-06)
+126	- **Boundary:** charts, evaluate, replay, refcheck, cli · **Fixtures:** tests/contracts/runlog.Run/ · **Cases:** a replay double of a finished 3-checkpoint snake run folder
+127	- **Used by:** charts, evaluate, replay, refcheck, cli; PL-05, PL-06, PL-12
+128	Sample: tests/contracts/runlog.Run/ (exists)
+129	
+130	&lt;!-- docs/packages/rllab/contract.md:116 --&gt;
+131	### core.BaselineMeans: type
+132	`@dataclass(frozen=True) class BaselineMeans: world: str; variant: str; random: Mapping[str, float]; rule: Mapping[str, float]`
+133	- **Invariants:** `random` and `rule` keyed by team; means over the 20 `EVAL_SEEDS` episodes, the seeds the in-training curve uses; in predator-prey each team&#x27;s baselines play the rule-based opponent; produced by `baselines.baseline_means`, owned by `core` so `charts` can take it (AD-12)
+134	- **Boundary:** baselines, charts, cli · **Fixtures:** tests/contracts/core.BaselineMeans/ · **Cases:** snake; predator-prey with both teams
+135	- **Used by:** baselines, charts, cli; PL-05
+136	Sample: tests/contracts/core.BaselineMeans/ (exists)
+137	
+138	&lt;!-- docs/packages/rllab/contract.md:98 --&gt;
+139	### core.Output: type
+140	`@dataclass(frozen=True) class Output: path: Path; kind: Literal[&quot;chart&quot;, &quot;video&quot;, &quot;writeup&quot;]; made_from: tuple[str, ...]`
+141	- **Invariants:** `path` exists when returned; `made_from` names the runs, checkpoints and seeds behind the file, so a write-up can cite it (NOTES-02)
+142	- **Boundary:** charts, replay, notes, cli · **Fixtures:** tests/contracts/core.Output/ · **Cases:** a 5-run snake learning-curve PNG; a seed-7 snake video
+143	- **Used by:** charts, replay, notes, cli; PL-05, PL-08, PL-10, PL-12
+144	Sample: tests/contracts/core.Output/ (exists)
+145	
+146	## Writes (edit only these files; the plan gives every other file to another task)
+147	- src/rllab/charts/style.py (new)
+148	
+149	&lt;!-- tasks/plan.md:308 --&gt;
+150	### M1-T29: Chart style per the dataviz skill
+151	**Package:** rllab · **Step:** PL-05.learning_curve · **Kind:** thicken · **Covers:** LOG-04 · **Size:** XS · **Mode:** split
+152	**Skills:** dataviz
+153	**Read:** PL-05, LOG-04, charts.learning_curve
+154	**Acceptance:**
+155	- [ ] Given any learning-curve chart, when it is reviewed against the `dataviz` skill, then it passes that skill&#x27;s checks (LOG-04)
+156	**Verify:** `pytest tests/intent/rllab tests/unit/rllab -k style` · `scripts/check.sh gate`
+157	**Depends on:** M1-T16 · **Writes:** src/rllab/charts/style.py, tests/intent/rllab/test_style.py
+158	</pre></details></div><div class="step" id="S4"><span class="sid">U37.S4</span><span class="kind">Read</span>/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/project/.claude/worktrees/agent-aad13193651e9ff5c/CONSTRAINTS.md<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/project/.claude/worktrees/agent-aad13193651e9ff5c/CONSTRAINTS.md&quot;
+}</pre><div class="lbl">output</div><pre>1	# Constraints
+2	**Status:** Approved · **Last reviewed:** 2026-10-17 by @connor · **Ratcheted:** —
+3	
+4	The standing quality bar. `pyproject.toml` and `scripts/check.sh` enforce it; every number here names its config key, and `dt status` fails if the two disagree. Only `build-setup` changes this file, with the user: tightening is routine, loosening needs an explicit yes.
+5	
+6	## Floor
+7	- **CR-01** No new suppressions. Ruff runs with `--ignore-noqa` in gate and full, so a Ruff exception is a `per-file-ignores` entry in protected config with a row in Exceptions. `floor_guard.sh` catches the other suppressions on the diff
+8	- **CR-02** No stubs: `raise NotImplementedError` outside abstract methods, `pass`-only bodies, bare `except: pass`. One carve-out: the interface task&#x27;s step signatures, whose body is only `raise NotImplementedError(&quot;&lt;task id&gt;&quot;)` naming the open task that replaces it. `check.sh gate` fails on one naming a task that isn&#x27;t open in `tasks/todo.md`, and on a test that expects one (`stub-pinned`); `check.sh full --exit` fails on any
+9	- **CR-03** No skipped, deleted or assertion-free tests, unless a row in Exceptions names the test file
+10	- **CR-04** No secrets in source
+11	- **CR-05** Oracle files (`tests/fixtures/**/expected.json`) change only with the user&#x27;s approval
+12	- **CR-06** The implementer never changes `tests/intent/**`
+13	- **CR-07** This file, `pyproject.toml` tool config, `scripts/` and `.claude/agents/` are not weakened to make a change pass
+14	- **CR-08** Nothing imports from `references/` or `probes/`, or adds either to `sys.path` (or `PYTHONPATH`, pytest `pythonpath`). `floor_guard.sh` checks the diff for both. Code copied from either is project code and meets the same bar
+15	- **CR-09** A frozen interface (`tests/contracts/&lt;id&gt;.&lt;symbol&gt;/`: schema, samples, fake; and the types, signatures and exports the interface task wrote) is frozen once it exists at the task&#x27;s base. Only the interface task freezing it (`**Kind:** interface`) writes a new folder, and no other task&#x27;s `Writes:` names its `types.py` or `__init__.py`; a frozen interface changes only through `architecture-design` Revise, never to make a test pass
+16	
+17	## Readability
+18	- **CR-10** One entry function per pipeline; it reads top to bottom as its named steps (reviewer + `dt layout`)
+19	- **CR-11** No registries, plugin dispatch or config-driven wiring without an AD
+20	- **CR-12** New abstraction only with a second real implementation or a named seam
+21	- **CR-13** No global random state: every generator is spawned from a seed (`np.random.SeedSequence`, a `torch.Generator`), never `np.random.seed` or `torch.manual_seed` (AD-05)
+22	
+23	## Enforced with numbers
+24	| ID | Dimension | Rule | Checked by | Config key | Runs at |
+25	|---|---|---|---|---|---|
+26	| CR-20 | Lint | zero errors; standing per-file-ignores only for `tests/**` and `__init__.py` | ruff | `tool.ruff.lint.select` | edit, gate |
+27	| CR-21 | Complexity | ≤ 10 per function | ruff C901 | `tool.ruff.lint.mccabe.max-complexity` | gate |
+28	| CR-22 | Size | ≤ 500 lines/module, ≤ 60/function | check_size.py | `tool.size_limits` | edit, gate |
+29	| CR-23 | Types | zero errors, strict | mypy | `tool.mypy.strict` | gate |
+30	| CR-24 | Boundaries | import contracts hold | import-linter | `tool.importlinter.contracts` | gate |
+31	| CR-25 | Dependencies | none missing or unused | deptry | `tool.deptry` | gate |
+32	| CR-26 | Deps security | nothing known-vulnerable | pip-audit | — | full, CI nightly |
+33	| CR-27 | Reproducibility | same seed, same result: `repro` tests pass (TRAIN-02, WORLD-02, REPLAY-02) | pytest `-m repro` | `tool.pytest.ini_options.markers` | gate |
+34	
+35	## Measured, not yet enforced
+36	| ID | Metric | Today | Direction |
+37	|---|---|---|---|
+38	| CR-40 | Coverage (branch) | — (no code) (`tool.coverage.report.fail_under`, raised by Ratchet) | must not fall |
+39	| CR-41 | vulture findings at `min_confidence = 60` (`scripts/vulture_whitelist.py`) | 0 | must not grow by `full --exit` (earlier `full` runs report) |
+40	| CR-42 | Duplicate blocks of ≥ 8 similar source lines (pylint `duplicate-code`, `[tool.pylint.similarities]` in pyproject.toml) | 0 | must not grow |
+41	
+42	## Boundaries (generated from architecture — do not edit)
+43	- `rllab.core` imports nothing first-party · `worlds` → core · `runlog` → core · `baselines` → core, worlds · `methods` → core, runlog · `train`, `evaluate`, `replay` → core, worlds, baselines, methods, runlog · `charts` → runlog, evaluate · `refcheck` → core, worlds, train, evaluate, runlog · `notes` → nothing · `cli` → all · only `refcheck` imports Stable-Baselines3 or Gymnasium
+44	
+45	## Roles and protected paths
+46	| Role | May edit | May not edit | Stop gate |
+47	|---|---|---|---|
+48	| tester | `tests/intent/**`, within the task&#x27;s `Writes:` | everything else; reads no source | `check.sh collect` (lint, collect, red for the right reason) |
+49	| implementer / solo | `src/**`, `tests/unit/**`, within the task&#x27;s `Writes:`; an interface task also the `tests/contracts/&lt;id&gt;.&lt;symbol&gt;/` its `Writes:` names | the protected list; `tasks/` | `check.sh gate` + protected-path diff against the worktree&#x27;s base |
+50	| reviewer | its worktree, for the mutation check, and its findings file; nothing lands (the orchestrator records findings with `dt finding`) | everything else | runs `check.sh full` by hand |
+51	
+52	**Protected list** (`PROTECTED` in `scripts/check.sh`; `path_guard.sh deny --protected` reads the same list): `tests/intent/**`, `tests/fixtures/**`, `tests/conftest.py`, `pyproject.toml`, `uv.lock`, `CONSTRAINTS.md`, `scripts/**`, `.claude/agents/**`, `.claude/settings.json`, `references/**`, `probes/**`, `tests/contracts/**`. `tests/contracts/**` covers the contract folders that exist at the task&#x27;s base (CR-09). **`Writes:`**: `dt claim` writes the role&#x27;s share of the task&#x27;s `Writes:` to `.claude/.task_writes` and sets the worktree&#x27;s base; `path_guard.sh writes` blocks edits outside it, and builder edits before the claim. Only the orchestrator writes `tasks/` (`dt land`, `dt finding`).
+53	
+54	**Worktree links:** none
+55	
+56	## Review
+57	Run by the reviewer agent: the interface review after Phase 0, a phase review per package at each checkpoint, and the milestone exit. `dt land` already checked each landing&#x27;s `Writes:`, protected paths and gates; review judges what tools can&#x27;t.
+58	
+59	**Interface** (after Phase 0): the code is the contract, no more and no less.
+60	1. Types match `contract.md`: fields, types, invariants. Nothing a step&#x27;s In → Out needs is missing; no helper is frozen.
+61	2. Signatures match the step tables, in their owner modules. Each stub names the open task that owns its step; no logic beyond types and validation.
+62	3. One sample per case the contract names, valid and realistic, never holding a TC&#x27;s expected value. Replay doubles replay an interaction the Protocol allows. Each fake passes its contract&#x27;s cases; anything it does beyond echoing a fixture (filtering, ordering, an error) is a case the real provider must pass too. Contract tests check shape only, never a stub or other state a later task changes.
+63	4. `__init__.py` exports exactly the contract; each `Mitigated by` in the plan&#x27;s dependency graph exists; each split task&#x27;s tester can write its tests from the frozen interface and its `Read:`.
+64	
+65	**Each phase**, per package, tests before code:
+66	1. **Interfaces followed** (CR-09): no frozen type, signature or contract folder changed outside a Revise. Consumers use the declared types: no dict for a dataclass, no reaching into a provider&#x27;s internals, no local redefinition. A stub is replaced only by the task it names; no cross-package import outside the contract; spine tests run on samples and doubles, not another step&#x27;s code.
+67	2. **Tests prove something:** each intent test asserts its TC case or acceptance bullet, loading expected values and tolerances from fixtures; none is assertion-free or weakened; Hypothesis runs the `ci` profile. Unit tests are specific, never computing the expected value with the code under test or testing only a mock. **Mutation check** (`.claude/agents/reviewer.md`): per acceptance bullet, the smallest change that should break it; a mutation no test catches is a finding.
+68	3. **Correct to the spec:** each acceptance bullet truly met, not special-cased to the sample; the error paths the requirement names; seeding and determinism; numerical edge cases.
+69	4. **Simple** (CR-11, CR-12, CR-42): no abstraction with one implementation outside the contract or an AD; no forwarding wrapper, one-method class, or class where a function does; no parameter, flag or config key every caller sets the same; no `try/except` that only re-raises or swallows, no checks the types already guarantee; no loop the library already provides. No near-copies within or across the phase&#x27;s tasks: one concept is one function in its owner module (tests may repeat for readability). Each finding names the simpler form, with the same tests passing.
+70	5. **Pipelines** (CR-10): entry functions read as their step tables (`dt layout`); step owners respected; spine baselines still selectable.
+71	6. **The bar** (CR-07): diff this file, `pyproject.toml`, `scripts/` and `.claude/agents/` against the milestone&#x27;s Base. Any loosening is Critical; new exceptions need an owner and expiry.
+72	7. **Hidden and parallel risks:** where a real provider could act differently from its double; fixed output paths, global state, test-order dependence.
+73	8. **The rest:** readability, security, performance where a QR sets a number; reused reference or probe code has its Caveats handled and fits the contract; `dt lint` clean, pre-build sections replaced by `dt layout` pointers.
+74	
+75	**Milestone exit**, over the whole diff, adds: the Scope&#x27;s Exit holds; every Covers ID has a test; `check.sh full --exit` finds no stub; system tests use real providers; the same sample through a real provider and its double agrees; deferred requirements untouched; pip-audit ran.
+76	
+77	**Severity:** Critical: a frozen interface changed, a contract test pinning a transient state, a weakened test, an intent test that misses a mutation changing its TC&#x27;s expected output, a wrong answer, a loosened bar, a security hole, lost data; it stops the build. Important: a consumer bypassing a type, any other surviving mutation, an unneeded abstraction, a duplicate across tasks. Suggestion and Nit: local. Findings go under the checkpoint block in `tasks/plan.md` (`dt finding`), each with a fix task or a reason.
+78	
+79	## Done
+80	agent-skills `references/definition-of-done.md`, tailored once:
+81	- **Correctness and Quality:** checked per task by the gate.
+82	- **Integration and Documentation:** checked at each checkpoint.
+83	- **The full list:** checked at milestone exit.
+84	
+85	## Exceptions
+86	| ID | Rule | Path | Reason | Owner | Expires |
+87	|---|---|---|---|---|---|
+88	| EX-01 | CR-25 DEP002 | `numpy`, `torch`, `matplotlib` | M1 dependencies, declared before the code imports them | @connor | M1 exit |
+89	</pre></details></div><div class="step" id="S5"><span class="sid">U37.S5</span><span class="kind">Bash</span>ls src/rllab/charts tests/intent/rllab; cat tests/intent/rllab/test_style.py; cat src/rllab/charts/*.py<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;ls src/rllab/charts tests/intent/rllab; cat tests/intent/rllab/test_style.py; cat src/rllab/charts/*.py&quot;,
+  &quot;description&quot;: &quot;Look at charts package and style intent test&quot;
+}</pre><div class="lbl">output</div><pre>src/rllab/charts:
+__init__.py
+curve.py
+types.py
+
+tests/intent/rllab:
+test_checks.py
+test_progress.py
+test_snake.py
+test_style.py
+&quot;&quot;&quot;M1-T29 intent: learning-curve charts pass the `dataviz` skill&#x27;s checks (PL-05, LOG-04).
+
+The chart is drawn on the 5 finished snake runs the `runlog.find_runs` fake serves and the
+snake `core.BaselineMeans` sample. Each test captures the matplotlib figure `learning_curve`
+saves and checks it against a rule from `.claude/skills/dataviz` (SKILL.md, references/
+marks-and-anatomy.md, references/anti-patterns.md), including the skill&#x27;s own palette
+validator (scripts/validate_palette.py).
+&quot;&quot;&quot;
+
+import importlib.util
+import sys
+from collections.abc import Callable
+from pathlib import Path
+from typing import Any
+
+import numpy as np
+import pytest
+from matplotlib.axes import Axes
+from matplotlib.collections import PolyCollection
+from matplotlib.colors import to_hex, to_rgba_array
+from matplotlib.figure import Figure
+from matplotlib.lines import Line2D
+from matplotlib.text import Text
+
+from rllab.charts import learning_curve
+from rllab.core import Output
+
+ROOT = Path(__file__).resolve().parents[3]
+CONTRACTS = ROOT / &quot;tests&quot; / &quot;contracts&quot;
+DATAVIZ = ROOT / &quot;.claude&quot; / &quot;skills&quot; / &quot;dataviz&quot;
+
+# marks-and-anatomy.md: lines are 2px (thin marks); gridlines and axes are 1px hairlines.
+LINE_WIDTH_RANGE = (1.0, 2.5)
+HAIRLINE_MAX = 1.0
+# marks-and-anatomy.md: an area fill is the series hue at ~10% opacity, a wash.
+WASH_ALPHA_MAX = 0.25
+# SKILL.md: a 9th categorical hue is never generated.
+MAX_CATEGORICAL = 8
+# Below this OKLCH chroma a colour is a neutral (de-emphasis gray), not a categorical hue.
+NEUTRAL_CHROMA = 0.03
+SOLID = {&quot;-&quot;, &quot;solid&quot;}
+NOT_SANS = {&quot;serif&quot;, &quot;cursive&quot;, &quot;fantasy&quot;, &quot;monospace&quot;}
+
+
+def _load(name: str, path: Path) -&gt; Any:
+    if name not in sys.modules:
+        spec = importlib.util.spec_from_file_location(name, path)
+        assert spec is not None
+        assert spec.loader is not None
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[name] = module
+        spec.loader.exec_module(module)
+    return sys.modules[name]
+
+
+def kit() -&gt; Any:
+    return _load(&quot;contracts_kit&quot;, CONTRACTS / &quot;kit.py&quot;)
+
+
+def validator() -&gt; Any:
+    return _load(&quot;dataviz_validate_palette&quot;, DATAVIZ / &quot;scripts&quot; / &quot;validate_palette.py&quot;)
+
+
+@pytest.fixture
+def saved(monkeypatch: pytest.MonkeyPatch) -&gt; list[Figure]:
+    &quot;&quot;&quot;Every figure saved while the test runs (pyplot.savefig goes through Figure.savefig).&quot;&quot;&quot;
+    figures: list[Figure] = []
+    original: Callable[..., Any] = Figure.savefig
+
+    def record(self: Figure, *args: Any, **kwargs: Any) -&gt; Any:
+        figures.append(self)
+        return original(self, *args, **kwargs)
+
+    monkeypatch.setattr(Figure, &quot;savefig&quot;, record)
+    return figures
+
+
+def draw(tmp_path: Path, saved: list[Figure]) -&gt; tuple[Output, Figure]:
+    runs = kit().fake(&quot;runlog.find_runs&quot;)(tmp_path, &quot;snake&quot;, &quot;default&quot;)
+    means = kit().sample(&quot;core.BaselineMeans&quot;, &quot;snake&quot;)
+    out = tmp_path / &quot;reports&quot; / &quot;snake&quot; / &quot;learning-curve.png&quot;
+    chart = learning_curve(runs, means, out)
+    assert saved, &quot;learning_curve saved no matplotlib figure&quot;
+    return chart, saved[-1]
+
+
+def plot_axes(fig: Figure) -&gt; list[Axes]:
+    axes = [ax for ax in fig.axes if ax.get_lines() or ax.collections]
+    assert axes, &quot;the chart has no axes with data on them&quot;
+    return axes
+
+
+def data_lines(fig: Figure) -&gt; list[Line2D]:
+    return [line for ax in plot_axes(fig) for line in ax.get_lines() if line.get_visible()]
+
+
+def bands(fig: Figure) -&gt; list[PolyCollection]:
+    return [c for ax in plot_axes(fig) for c in ax.collections if isinstance(c, PolyCollection)]
+
+
+def visible_texts(fig: Figure) -&gt; list[Text]:
+    found = fig.findobj(lambda a: isinstance(a, Text) and a.get_visible())
+    return [t for t in found if isinstance(t, Text) and t.get_text().strip()]
+
+
+def line_hexes(fig: Figure) -&gt; list[str]:
+    ordered: dict[str, None] = {}
+    for line in data_lines(fig):
+        ordered.setdefault(to_hex(line.get_color()), None)
+    return list(ordered)
+
+
+def categorical(fig: Figure) -&gt; list[str]:
+    check = validator()
+    return [c for c in line_hexes(fig) if check.oklch(c)[1] &gt;= NEUTRAL_CHROMA]
+
+
+@pytest.mark.intent
+def test_chart_is_written_as_a_chart_output(tmp_path: Path, saved: list[Figure]) -&gt; None:
+    chart, _ = draw(tmp_path, saved)
+    assert chart.kind == &quot;chart&quot;
+    assert chart.path.is_file()
+    assert chart.path.read_bytes()[:8] == b&quot;\x89PNG\r\n\x1a\n&quot;
+
+
+@pytest.mark.intent
+def test_one_y_axis_per_plot_never_dual_axis(tmp_path: Path, saved: list[Figure]) -&gt; None:
+    _, fig = draw(tmp_path, saved)
+    positions = [tuple(np.round(ax.get_position().bounds, 6)) for ax in fig.axes]
+    assert len(positions) == len(set(positions)), &quot;two y-scales share one plot (twinx)&quot;
+
+
+@pytest.mark.intent
+def test_two_or_more_series_carry_a_legend(tmp_path: Path, saved: list[Figure]) -&gt; None:
+    _, fig = draw(tmp_path, saved)
+    for ax in plot_axes(fig):
+        series = len(ax.get_lines()) + len(ax.collections)
+        assert series &gt;= 2
+        legends = [leg for leg in [ax.get_legend(), *fig.legends] if leg is not None]
+        assert legends, &quot;a chart with 2+ series has no legend&quot;
+        labels = [t.get_text() for leg in legends for t in leg.get_texts()]
+        assert len([lab for lab in labels if lab.strip()]) &gt;= 2
+
+
+@pytest.mark.intent
+def test_axes_and_title_are_labelled(tmp_path: Path, saved: list[Figure]) -&gt; None:
+    _, fig = draw(tmp_path, saved)
+    suptitle = fig.get_suptitle() if hasattr(fig, &quot;get_suptitle&quot;) else &quot;&quot;
+    for ax in plot_axes(fig):
+        assert ax.get_xlabel().strip()
+        assert ax.get_ylabel().strip()
+        assert ax.get_title().strip() or suptitle.strip()
+
+
+@pytest.mark.intent
+def test_lines_are_thin_with_round_caps_and_joins(tmp_path: Path, saved: list[Figure]) -&gt; None:
+    _, fig = draw(tmp_path, saved)
+    lines = data_lines(fig)
+    assert len(lines) &gt;= 3, &quot;a mean line and two baseline lines per team&quot;
+    low, high = LINE_WIDTH_RANGE
+    for line in lines:
+        assert low &lt;= line.get_linewidth() &lt;= high, line.get_label()
+        if line.get_linestyle() in SOLID:
+            assert line.get_solid_capstyle() == &quot;round&quot;, line.get_label()
+            assert line.get_solid_joinstyle() == &quot;round&quot;, line.get_label()
+
+
+@pytest.mark.intent
+def test_min_max_band_is_a_wash_of_its_series_hue(tmp_path: Path, saved: list[Figure]) -&gt; None:
+    _, fig = draw(tmp_path, saved)
+    found = bands(fig)
+    assert found, &quot;no min-max band&quot;
+    hues = {to_hex(line.get_color()) for line in data_lines(fig)}
+    for band in found:
+        faces = to_rgba_array(band.get_facecolor())
+        assert len(faces) &gt;= 1
+        assert 0.0 &lt; float(faces[:, 3].max()) &lt;= WASH_ALPHA_MAX
+        assert {to_hex(face, keep_alpha=False) for face in faces} &lt;= hues
+
+
+@pytest.mark.intent
+def test_series_palette_passes_the_dataviz_validator(tmp_path: Path, saved: list[Figure]) -&gt; None:
+    _, fig = draw(tmp_path, saved)
+    palette = categorical(fig)
+    assert 1 &lt;= len(palette) &lt;= MAX_CATEGORICAL
+    surface = to_hex(plot_axes(fig)[0].get_facecolor())
+    report, ok = validator().validate(palette, &quot;light&quot;, surface)
+    assert ok, report
+
+
+@pytest.mark.intent
+def test_text_never_wears_a_series_colour(tmp_path: Path, saved: list[Figure]) -&gt; None:
+    _, fig = draw(tmp_path, saved)
+    series = set(categorical(fig))
+    texts = visible_texts(fig)
+    assert texts
+    for text in texts:
+        assert to_hex(text.get_color()) not in series, text.get_text()
+
+
+@pytest.mark.intent
+def test_gridlines_and_spines_are_solid_hairlines(tmp_path: Path, saved: list[Figure]) -&gt; None:
+    _, fig = draw(tmp_path, saved)
+    for ax in plot_axes(fig):
+        for axis in (ax.xaxis, ax.yaxis):
+            for grid in axis.get_gridlines():
+                if grid.get_visible():
+                    assert grid.get_linestyle() in SOLID
+                    assert grid.get_linewidth() &lt;= HAIRLINE_MAX
+        for spine in ax.spines.values():
+            if spine.get_visible():
+                assert spine.get_linestyle() in SOLID
+                assert spine.get_linewidth() &lt;= HAIRLINE_MAX
+
+
+@pytest.mark.intent
+def test_direct_labels_are_selective(tmp_path: Path, saved: list[Figure]) -&gt; None:
+    _, fig = draw(tmp_path, saved)
+    for ax in plot_axes(fig):
+        labelled = [t for t in ax.texts if t.get_visible() and t.get_text().strip()]
+        assert len(labelled) &lt;= len(ax.get_lines()), &quot;a number on every point&quot;
+
+
+@pytest.mark.intent
+def test_text_is_set_in_a_sans_face(tmp_path: Path, saved: list[Figure]) -&gt; None:
+    _, fig = draw(tmp_path, saved)
+    for text in visible_texts(fig):
+        families = {family.lower() for family in text.get_fontfamily()}
+        assert not families &amp; NOT_SANS, (text.get_text(), families)
+&quot;&quot;&quot;Charts drawn from run folders, following the `dataviz` skill.&quot;&quot;&quot;
+
+from rllab.charts.curve import learning_curve
+from rllab.charts.types import MixedRunsError
+
+__all__ = [&quot;MixedRunsError&quot;, &quot;learning_curve&quot;]
+&quot;&quot;&quot;Learning curves with a min-max band and baseline lines (LOG-03 to LOG-05).&quot;&quot;&quot;
+
+from collections.abc import Sequence
+from pathlib import Path
+
+import numpy as np
+from matplotlib.axes import Axes
+from matplotlib.figure import Figure
+from numpy.typing import NDArray
+
+from rllab.core import BaselineMeans, Output, WorldSpec
+from rllab.runlog import Run
+
+STEPS_LABEL = &quot;environment steps&quot;
+# The dataviz skill&#x27;s reference palette (light mode): categorical slot 1 and the chart chrome.
+SERIES = &quot;#2a78d6&quot;
+SURFACE = &quot;#fcfcfb&quot;
+INK = &quot;#0b0b0b&quot;
+SECONDARY = &quot;#52514e&quot;
+MUTED = &quot;#898781&quot;
+GRID = &quot;#e1e0d9&quot;
+AXIS = &quot;#c3c2b7&quot;
+
+
+def learning_curve(
+    runs: Sequence[Run], baselines: BaselineMeans, out: Path, *, measure: str | None = None
+) -&gt; Output:
+    figure = draw_curves(runs, baselines, measure)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    figure.savefig(out)
+    figure.savefig(out.with_suffix(&quot;.svg&quot;))
+    return Output(out, &quot;chart&quot;, tuple(run.record.config.name for run in runs))
+
+
+def draw_curves(runs: Sequence[Run], baselines: BaselineMeans, measure: str | None) -&gt; Figure:
+    &quot;&quot;&quot;One panel per team (or one for `measure`): mean line, min-max band, baseline lines.&quot;&quot;&quot;
+    if not runs:
+        raise ValueError(&quot;no runs to chart&quot;)
+    spec = runs[0].record.spec
+    panels = _panels(spec, measure)
+    figure = Figure(figsize=(6.4 * len(panels), 4.2), facecolor=SURFACE, layout=&quot;constrained&quot;)
+    axes = figure.subplots(1, len(panels), squeeze=False)[0]
+    for ax, (team, label) in zip(axes, panels, strict=True):
+        steps, values = _series(runs, team, measure)
+        _draw_band(ax, steps, values, f&quot;{team}: {label}, {len(runs)} runs&quot;)
+        if measure is None:
+            _draw_baselines(ax, baselines, team)
+        _style(ax, label)
+    return figure
+
+
+def _panels(spec: WorldSpec, measure: str | None) -&gt; list[tuple[str, str]]:
+    &quot;&quot;&quot;(team, y-axis label) per panel: each team&#x27;s score, or the declared measure&#x27;s team.&quot;&quot;&quot;
+    if measure is None:
+        return [(team.name, team.score_name) for team in spec.teams]
+    declared = [m for m in spec.measures if m.name == measure]
+    if not declared:
+        raise ValueError(f&quot;{spec.world} declares no measure {measure!r}&quot;)
+    return [(declared[0].team, measure)]
+
+
+def _series(
+    runs: Sequence[Run], team: str, measure: str | None
+) -&gt; tuple[NDArray[np.int64], NDArray[np.float64]]:
+    &quot;&quot;&quot;The evaluation steps every run has, and each run&#x27;s value there (runs x steps).&quot;&quot;&quot;
+    by_run = [
+        {p.step: p.scores[team] if measure is None else p.measures[measure] for p in run.evals()}
+        for run in runs
+    ]
+    steps = sorted(set.intersection(*(set(values) for values in by_run)))
+    rows = [[values[step] for step in steps] for values in by_run]
+    return np.array(steps, dtype=np.int64), np.array(rows, dtype=np.float64)
+
+
+def _draw_band(ax: Axes, steps: NDArray[np.int64], values: NDArray[np.float64], title: str) -&gt; None:
+    ax.fill_between(
+        steps,
+        values.min(axis=0),
+        values.max(axis=0),
+        color=SERIES,
+        alpha=0.18,
+        linewidth=0,
+        label=&quot;min-max range&quot;,
+    )
+    ax.plot(steps, values.mean(axis=0), color=SERIES, linewidth=2, label=&quot;mean&quot;)
+    ax.set_title(title, color=INK, loc=&quot;left&quot;)
+
+
+def _draw_baselines(ax: Axes, baselines: BaselineMeans, team: str) -&gt; None:
+    &quot;&quot;&quot;Both baselines&#x27; mean scores as labelled horizontal reference lines.&quot;&quot;&quot;
+    lines = (
+        (baselines.random[team], &quot;random play&quot;, &quot;--&quot;, MUTED),
+        (baselines.rule[team], &quot;rule-based&quot;, &quot;:&quot;, SECONDARY),
+    )
+    for value, label, style, color in lines:
+        ax.axhline(value, color=color, linestyle=style, linewidth=1.5, label=label)
+        ax.annotate(
+            label,
+            (1.0, value),
+            xycoords=(&quot;axes fraction&quot;, &quot;data&quot;),
+            xytext=(-4, 4),
+            textcoords=&quot;offset points&quot;,
+            ha=&quot;right&quot;,
+            color=SECONDARY,
+            fontsize=8,
+        )
+
+
+def _style(ax: Axes, label: str) -&gt; None:
+    ax.set_facecolor(SURFACE)
+    ax.set_xlabel(STEPS_LABEL, color=SECONDARY)
+    ax.set_ylabel(label, color=SECONDARY)
+    ax.grid(color=GRID, linewidth=0.8)
+    ax.tick_params(colors=MUTED)
+    for side in (&quot;top&quot;, &quot;right&quot;):
+        ax.spines[side].set_visible(False)
+    for side in (&quot;left&quot;, &quot;bottom&quot;):
+        ax.spines[side].set_color(AXIS)
+    ax.legend(frameon=False, labelcolor=SECONDARY, fontsize=8, loc=&quot;upper left&quot;)
+&quot;&quot;&quot;Types of the charts.&quot;&quot;&quot;
+
+from collections.abc import Sequence
+
+
+class MixedRunsError(ValueError):
+    &quot;&quot;&quot;The runs differ by more than their seed, so one chart can&#x27;t summarise them.&quot;&quot;&quot;
+
+    def __init__(self, settings: Sequence[str]) -&gt; None:
+        super().__init__(f&quot;runs differ in: {&#x27;, &#x27;.join(settings)}&quot;)
+        self.settings = tuple(settings)</pre></details></div><div class="step" id="S6"><span class="sid">U37.S6</span><span class="kind">Bash</span>uv run pytest tests/intent/rllab/test_style.py -q <span class="err">error</span><details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;uv run pytest tests/intent/rllab/test_style.py -q&quot;,
+  &quot;description&quot;: &quot;Run the style intent tests&quot;
+}</pre><div class="lbl">output</div><pre>Exit code 1
+Using CPython 3.12.12 interpreter at: /opt/homebrew/opt/python@3.12/bin/python3.12
+Creating virtual environment at: .venv
+   Building rllab @ file:///Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/project/.claude/worktrees/agent-aad13193651e9ff5c
+      Built rllab @ file:///Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/project/.claude/worktrees/agent-aad13193651e9ff5c
+Installed 74 packages in 344ms
+...FF......                                                              [100%]
+=================================== FAILURES ===================================
+_______________________ test_axes_and_title_are_labelled _______________________
+
+tmp_path = PosixPath(&#x27;/private/var/folders/dm/ppw06s61351dpntgs0g04bg80000gn/T/pytest-of-connorott/pytest-36290/test_axes_and_title_are_labell0&#x27;)
+saved = [&lt;Figure size 640x420 with 1 Axes&gt;, &lt;Figure size 640x420 with 1 Axes&gt;]
+
+    @pytest.mark.intent
+    def test_axes_and_title_are_labelled(tmp_path: Path, saved: list[Figure]) -&gt; None:
+        _, fig = draw(tmp_path, saved)
+        suptitle = fig.get_suptitle() if hasattr(fig, &quot;get_suptitle&quot;) else &quot;&quot;
+        for ax in plot_axes(fig):
+            assert ax.get_xlabel().strip()
+            assert ax.get_ylabel().strip()
+&gt;           assert ax.get_title().strip() or suptitle.strip()
+E           AssertionError: assert (&#x27;&#x27; or &#x27;&#x27;)
+E            +  where &#x27;&#x27; = &lt;built-in method strip of str object at 0x105b13590&gt;()
+E            +    where &lt;built-in method strip of str object at 0x105b13590&gt; = &#x27;&#x27;.strip
+E            +      where &#x27;&#x27; = get_title()
+E            +        where get_title = &lt;Axes: title={&#x27;left&#x27;: &#x27;snake: food eaten, 5 runs&#x27;}, xlabel=&#x27;environment steps&#x27;, ylabel=&#x27;food eaten&#x27;&gt;.get_title
+E            +  and   &#x27;&#x27; = &lt;built-in method strip of str object at 0x105b13590&gt;()
+E            +    where &lt;built-in method strip of str object at 0x105b13590&gt; = &#x27;&#x27;.strip
+
+tests/intent/rllab/test_style.py:152: AssertionError
+________________ test_lines_are_thin_with_round_caps_and_joins _________________
+
+tmp_path = PosixPath(&#x27;/private/var/folders/dm/ppw06s61351dpntgs0g04bg80000gn/T/pytest-of-connorott/pytest-36290/test_lines_are_thin_with_round0&#x27;)
+saved = [&lt;Figure size 640x420 with 1 Axes&gt;, &lt;Figure size 640x420 with 1 Axes&gt;]
+
+    @pytest.mark.intent
+    def test_lines_are_thin_with_round_caps_and_joins(tmp_path: Path, saved: list[Figure]) -&gt; None:
+        _, fig = draw(tmp_path, saved)
+        lines = data_lines(fig)
+        assert len(lines) &gt;= 3, &quot;a mean line and two baseline lines per team&quot;
+        low, high = LINE_WIDTH_RANGE
+        for line in lines:
+            assert low &lt;= line.get_linewidth() &lt;= high, line.get_label()
+            if line.get_linestyle() in SOLID:
+&gt;               assert line.get_solid_capstyle() == &quot;round&quot;, line.get_label()
+E               AssertionError: mean
+E               assert &#x27;projecting&#x27; == &#x27;round&#x27;
+E                 
+E                 - round
+E                 + projecting
+
+tests/intent/rllab/test_style.py:164: AssertionError
+=========================== short test summary info ============================
+FAILED tests/intent/rllab/test_style.py::test_axes_and_title_are_labelled - A...
+FAILED tests/intent/rllab/test_style.py::test_lines_are_thin_with_round_caps_and_joins
+2 failed, 9 passed in 17.15s</pre></details></div><div class="step" id="S7"><span class="sid">U37.S7</span><span class="kind">Bash</span>grep -n &quot;style&quot; tasks/plan.md tasks/todo.md<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;grep -n \&quot;style\&quot; tasks/plan.md tasks/todo.md&quot;,
+  &quot;description&quot;: &quot;Search plan for style references&quot;
+}</pre><div class="lbl">output</div><pre>tasks/plan.md:308:### M1-T29: Chart style per the dataviz skill
+tasks/plan.md:314:**Verify:** `pytest tests/intent/rllab tests/unit/rllab -k style` · `scripts/check.sh gate`
+tasks/plan.md:315:**Depends on:** M1-T16 · **Writes:** src/rllab/charts/style.py, tests/intent/rllab/test_style.py
+tasks/plan.md:385:| M1-T29 Chart style per the dataviz skill | M1-T16 learning_curve spine (mean line, band, baseline lines) | code | none: extends the step its spine built |
+tasks/plan.md:396:| M1-T30 PL-03 on the real PL-02 | M1-T29 Chart style per the dataviz skill | order | none: integration: the system task runs every smoke and golden case on the real chain |
+tasks/todo.md:31:- [ ] M1-T29 Chart style per the dataviz skill (rllab, XS, split)</pre></details></div><div class="step" id="S8"><span class="sid">U37.S8</span><span class="kind">Bash</span>python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/plugin/dev-team/scripts/dt.py escalate --help<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/plugin/dev-team/scripts/dt.py escalate --help&quot;,
+  &quot;description&quot;: &quot;Show escalate options&quot;
+}</pre><div class="lbl">output</div><pre>usage: dt escalate [-h] [--type SYMBOL]
+                   {TEST-WRONG,CONTRACT-CHANGE,NEEDS-DEP} why
+
+positional arguments:
+  {TEST-WRONG,CONTRACT-CHANGE,NEEDS-DEP}
+  why                   one line: what is wrong and what would fix it
+
+options:
+  -h, --help            show this help message and exit
+  --type SYMBOL         CONTRACT-CHANGE: the contract symbol that can&#x27;t
+                        express what the task needs (risk.Drawdown)</pre></details></div><div class="step" id="S9"><span class="sid">U37.S9</span><span class="kind">Bash</span>grep -rn &quot;style&quot; src/rllab --include=*.py -l<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;grep -rn \&quot;style\&quot; src/rllab --include=*.py -l&quot;,
+  &quot;description&quot;: &quot;Check whether anything imports a style module&quot;
+}</pre><div class="lbl">output</div><pre>(eval):1: no matches found: --include=*.py</pre></details></div><div class="step" id="S10"><span class="sid">U37.S10</span><span class="kind">Bash</span>grep -rln &quot;charts.style\|from rllab.charts import style\|import style&quot; src<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;grep -rln \&quot;charts.style\\|from rllab.charts import style\\|import style\&quot; src&quot;,
+  &quot;description&quot;: &quot;Check whether anything imports a style module&quot;
+}</pre><div class="lbl">output</div><pre>(Bash completed with no output)</pre></details></div><div class="step" id="S11"><span class="sid">U37.S11</span><span class="kind">Bash</span>grep -rni &quot;title&quot; .claude/skills/dataviz/SKILL.md .claude/skills/dataviz/references/marks-and-anatomy.md<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;grep -rni \&quot;title\&quot; .claude/skills/dataviz/SKILL.md .claude/skills/dataviz/references/marks-and-anatomy.md&quot;,
+  &quot;description&quot;: &quot;Check dataviz guidance on titles&quot;
+}</pre><div class="lbl">output</div><pre>.claude/skills/dataviz/references/marks-and-anatomy.md:35:one color, so the chart&#x27;s title or subtitle already says what is plotted. A box with
+.claude/skills/dataviz/references/marks-and-anatomy.md:36:one swatch restates the title and costs space.
+.claude/skills/dataviz/SKILL.md:50:   are also direct-labeled (a single series needs no legend box - the title names</pre></details></div><div class="step" id="S12"><span class="sid">U37.S12</span><span class="kind">Bash</span>python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/plugin/dev-team/scripts/dt.py escalate TEST-WRONG &quot;tests/intent/rllab/test_style.py cannot be made green within M1-T29&#x27;s Writes (src/rllab/charts/style.py only): nothing imports charts.style, and both red tests need curve.py changes. test_axes_and_title_are_labelled reads ax.get_title() (centre only) but curve.py sets the title with loc=&#x27;left&#x27;; test_lines_are_thin_with_round_caps_and_joins needs sol …[+201 chars]<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/plugin/dev-team/scripts/dt.py escalate TEST-WRONG \&quot;tests/intent/rllab/test_style.py cannot be made green within M1-T29&#x27;s Writes (src/rllab/charts/style.py only): nothing imports charts.style, and both red tests need curve.py changes. test_axes_and_title_are_labelled reads ax.get_title() (centre only) but curve.py sets the title with loc=&#x27;left&#x27;; test_lines_are_thin_with_round_caps_and_joins needs solid_capstyle/joinstyle=&#x27;round&#x27; on the lines curve.py draws. Fix: add src/rllab/charts/curve.py to M1-T29 Writes (so curve applies style.py), or have the title test also accept ax.get_title(loc=&#x27;left&#x27;).\&quot;&quot;,
+  &quot;description&quot;: &quot;Escalate the Writes and test mismatch&quot;
+}</pre><div class="lbl">output</div><pre>escalated: M1-T29.implementer TEST-WRONG. End now with one line: STOPPED M1-T29 implementer: see dt escalate</pre></details></div><div class="step" id="S13"><span class="sid">U37.S13</span><span class="kind">say</span>STOPPED M1-T29 implementer: see dt escalate<details><summary>full text</summary><pre>STOPPED M1-T29 implementer: see dt escalate</pre></details></div>
+<h2>Commits</h2>
+<p>None.</p>
+<h2>Returned</h2>
+<pre>STOPPED M1-T29 implementer: see dt escalate</pre>
+</body></html>

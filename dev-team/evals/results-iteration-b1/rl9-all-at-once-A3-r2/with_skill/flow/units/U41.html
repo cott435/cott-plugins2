@@ -1,0 +1,1460 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1"><title>U41 implementer</title>
+<style>
+:root{--bg:#fbfbfa;--fg:#1d1d1f;--muted:#6b6b70;--line:#d9d9de;--box:#fff;--rowp:#eef3fb;--band:#fff4d6;
+--ok:#2e7d32;--bad:#c62828;--warn:#b26a00;--idle:#6b6b70}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#17171a;--fg:#ececf0;--muted:#9a9aa3;
+--line:#34343a;--box:#222227;--rowp:#1d2433;--band:#3a3015;--ok:#6fcf73;--bad:#ff6b6b;--warn:#f0b35a;--idle:#9a9aa3}}
+:root[data-theme="dark"]{--bg:#17171a;--fg:#ececf0;--muted:#9a9aa3;--line:#34343a;--box:#222227;--rowp:#1d2433;
+--band:#3a3015;--ok:#6fcf73;--bad:#ff6b6b;--warn:#f0b35a;--idle:#9a9aa3}
+body{margin:0;padding:16px;background:var(--bg);color:var(--fg);font:14px/1.45 -apple-system,system-ui,sans-serif}
+h1{font-size:18px;margin:0 0 4px}h2{font-size:15px;margin:22px 0 8px}.sub{color:var(--muted)}
+table{border-collapse:collapse;margin:4px 0 8px}td,th{border-bottom:1px solid var(--line);padding:4px 10px;text-align:left;
+vertical-align:top}th{color:var(--muted);font-weight:600}.chips span{display:inline-block;margin:0 4px 2px 0}
+.legend span{margin-right:14px;white-space:nowrap}.sw{display:inline-block;width:10px;height:10px;border-radius:2px;
+margin-right:4px;vertical-align:-1px}.scroll{overflow:auto;max-height:88vh;border:1px solid var(--line);border-radius:8px}
+.chart{display:grid;width:max-content}.chart>div{line-height:0}.corner{position:sticky;top:0;left:0;z-index:3}
+.colhead{position:sticky;top:0;z-index:2}.rowhead{position:sticky;left:0;z-index:2}
+svg.bg{background:var(--bg)}.colhead svg{border-bottom:1px solid var(--line)}.rowhead svg{border-right:1px solid var(--line)}
+.ok{color:var(--ok);fill:var(--ok)}.bad{color:var(--bad);fill:var(--bad)}.warn{color:var(--warn);fill:var(--warn)}
+.idle{color:var(--idle);fill:var(--idle)}
+svg text{fill:var(--fg);font-family:-apple-system,system-ui,sans-serif}
+.box{fill:var(--box);stroke:var(--line)}.unit:hover .box{stroke:var(--fg)}
+.role{font-size:12px;font-weight:600}.uid,.wmeta,.lmeta,.meta{font-size:10px;fill:var(--muted)}
+.sub{font-size:10.5px;fill:var(--muted)}.badge{font-size:11px;font-weight:600}
+.meta.bad{fill:var(--bad);font-weight:600}.lane{font-size:13px;font-weight:700}.wave{font-size:13px;font-weight:700}
+.par{fill:#4e79a7}.ser{fill:var(--muted)}.rowp{fill:var(--rowp)}.rows{fill:transparent}.band{fill:var(--band)}
+.bandt{font-size:11.5px}.grid{stroke:var(--line)}.link{stroke:var(--muted);stroke-width:1.2;opacity:.55}
+.arrowhead{fill:var(--muted)}.marks{font-size:10.5px}.audit{stroke:var(--box);stroke-width:2}.auditn{font-size:10px;font-weight:700;fill:#fff}
+a{color:inherit}svg a .box{cursor:pointer}
+
+:root{--c0:#2a78d6;--c1:#eb6834;--c2:#1baf7a;--c3:#eda100;--c4:#e87ba4;--c5:#008300;--c6:#6250d6;--c7:#e34948;
+--cx:#8a8985;--main:#52514e;--read:#dcdbd5;--readfg:#1d1d1f}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--c0:#3987e5;--c1:#d95926;--c2:#199e70;
+--c3:#c98500;--c4:#d55181;--c5:#008300;--c6:#9085e9;--c7:#e66767;--cx:#77766f;--main:#c3c2b7;--read:#3b3b40;
+--readfg:#ececf0}}
+:root[data-theme="dark"]{--c0:#3987e5;--c1:#d95926;--c2:#199e70;--c3:#c98500;--c4:#d55181;--c5:#008300;
+--c6:#9085e9;--c7:#e66767;--cx:#77766f;--main:#c3c2b7;--read:#3b3b40;--readfg:#ececf0}
+.c0{fill:var(--c0);background:var(--c0)}.c1{fill:var(--c1);background:var(--c1)}.c2{fill:var(--c2);background:var(--c2)}
+.c3{fill:var(--c3);background:var(--c3)}.c4{fill:var(--c4);background:var(--c4)}.c5{fill:var(--c5);background:var(--c5)}
+.c6{fill:var(--c6);background:var(--c6)}.c7{fill:var(--c7);background:var(--c7)}.cx{fill:var(--cx);background:var(--cx)}
+.cmain{fill:var(--main)}.sc0{stroke:var(--c0)}.sc1{stroke:var(--c1)}.sc2{stroke:var(--c2)}
+.tl text,.sm text,.lc text{font-size:10.5px;fill:var(--muted)}.tl .lbl-in,.sm .lbl-in{fill:#fff;font-size:10.5px;font-weight:600}
+.tl .rowl,.sm .rowl,.lc .rowl{fill:var(--fg);font-size:11.5px;font-weight:600}.tl .band{fill:var(--rowp)}
+.tl .brk{stroke:var(--muted);stroke-dasharray:2 3}.tl a:hover rect,.sm a:hover rect{stroke:var(--fg);stroke-width:1.5}
+.axis{stroke:var(--line)}.sm .val{fill:var(--fg);font-weight:600}.lc path.ln{fill:none;stroke-width:2}
+.lc circle{stroke:var(--bg);stroke-width:2}.lc .end{font-weight:600;fill:var(--fg)}
+.tiles{display:flex;flex-wrap:wrap;gap:10px;margin:12px 0}.tile{border:1px solid var(--line);border-radius:8px;
+padding:8px 12px;min-width:110px;background:var(--box)}.tile b{display:block;font-size:20px;line-height:1.2}
+.tile span{font-size:12px;color:var(--muted)}.tile i{font-style:normal;font-size:12px;margin-left:6px}
+.fm{border-collapse:separate;border-spacing:2px}.fm td,.fm th{border:0;padding:0;text-align:center;font-size:11px}
+.fm th{padding:0 2px;font-weight:600}.fm td.f,.fm th.f{text-align:left;padding-right:10px;white-space:nowrap;
+position:sticky;left:0;background:var(--bg);font:11.5px ui-monospace,Menlo,monospace;
+max-width:380px;overflow:hidden;text-overflow:ellipsis}
+.fm td.cell{min-width:22px;height:20px;border-radius:3px}.fm td.fw{background:var(--c0);color:#fff;font-weight:700}
+.fm td.fe{background:var(--c1);color:#fff;font-weight:700}.fm td.fr{background:var(--read);color:var(--readfg)}
+.fm td.n{color:var(--muted);padding:0 6px}.fm tr.grp td{text-align:left;padding-top:8px;color:var(--muted);
+font-weight:600}
+.key{display:inline-block;min-width:18px;text-align:center;border-radius:3px;font-size:11px;margin-right:4px}
+.bar{display:inline-block;height:9px;border-radius:2px;vertical-align:0}
+
+pre{white-space:pre-wrap;word-break:break-word;background:var(--box);border:1px solid var(--line);border-radius:6px;
+padding:8px 10px;margin:4px 0;font:12px/1.45 ui-monospace,SFMono-Regular,Menlo,monospace;max-width:100%;overflow:auto}
+.step{border-top:1px solid var(--line);padding:6px 0}.step:target{background:var(--rowp)}
+.sid{font:12px ui-monospace,Menlo,monospace;color:var(--muted);margin-right:8px}.kind{font-weight:600;margin-right:8px}
+.err{color:var(--bad);font-weight:600}.hook{color:var(--bad);margin:4px 0 0 16px}.lbl{font-size:12px;color:var(--muted);margin-top:6px}
+details summary{cursor:pointer;color:var(--muted);font-size:12px}.head td:first-child{color:var(--muted)}
+.top{font-size:13px}.narr{list-style:none;padding-left:0}.narr li{margin:3px 0}
+</style></head>
+<body>
+<p class="top"><a href="../flow.html">← the run's flow chart</a></p>
+
+<h1>U41 · implementer · M1-T23 solo</h1>
+<table class="head"><tr><td>Type</td><td>implementer</td></tr><tr><td>Description</td><td>M1-T23 solo</td></tr><tr><td>Spawned by</td><td>driver at D282</td></tr><tr><td>Turn</td><td><a href="../turns/T09.html">T09</a></td></tr><tr><td>Model</td><td>claude-opus-5-5</td></tr><tr><td>Start</td><td>2026-10-19 08:39:35 UTC</td></tr><tr><td>Duration</td><td>2 min</td></tr><tr><td>Tool calls</td><td>26</td></tr><tr><td>Errors</td><td>0</td></tr><tr><td>Hook blocks</td><td>0</td></tr><tr><td>Tokens</td><td>5.9k out · 36.9k new in · 368k cached in · peak context 41.6k</td></tr><tr><td>Skills invoked</td><td>none</td></tr><tr><td>Files written or edited</td><td>.claude/worktrees/agent-a5892e837ea0afe73/src/rllab/cli/pipelines/pl05_chart.py, .claude/worktrees/agent-a5892e837ea0afe73/tests/unit/rllab/test_pl05_smoke.py</td></tr><tr><td>Definition</td><td>none</td></tr><tr><td>Steps</td><td>29</td></tr><tr><td>Finished</td><td>yes</td></tr></table>
+
+
+<h2>Prompt</h2>
+<pre>You are the solo for M1-T23. Run `python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/plugin/dev-team/scripts/dt.py claim M1-T23 --role solo`, then read the packet it names.</pre>
+<h2>Files</h2>
+<table><tr><th>Op</th><th>File</th><th>Calls</th><th>By</th><th>Via</th><th>Steps</th></tr><tr><td>write</td><td><code>.claude/worktrees/agent-a5892e837ea0afe73/src/rllab/cli/pipelines/pl05_chart.py</code></td><td>1</td><td>U41</td><td>Write</td><td><a href="#23">U41.S23</a></td></tr><tr><td>write</td><td><code>.claude/worktrees/agent-a5892e837ea0afe73/tests/unit/rllab/test_pl05_smoke.py</code></td><td>1</td><td>U41</td><td>Write</td><td><a href="#26">U41.S26</a></td></tr><tr><td>read</td><td><code>.claude/worktrees/agent-a5892e837ea0afe73/.claude/packet.md</code></td><td>1</td><td>U41</td><td>Read</td><td><a href="#4">U41.S4</a></td></tr><tr><td>read</td><td><code>.claude/worktrees/agent-a5892e837ea0afe73/CONSTRAINTS.md</code></td><td>1</td><td>U41</td><td>Read</td><td><a href="#3">U41.S3</a></td></tr><tr><td>read</td><td><code>.claude/worktrees/agent-a5892e837ea0afe73/src/rllab/baselines/means.py</code></td><td>1</td><td>U41</td><td>Bash</td><td><a href="#22">U41.S22</a></td></tr><tr><td>read</td><td><code>.claude/worktrees/agent-a5892e837ea0afe73/src/rllab/charts/curve.py</code></td><td>1</td><td>U41</td><td>Read</td><td><a href="#10">U41.S10</a></td></tr><tr><td>read</td><td><code>.claude/worktrees/agent-a5892e837ea0afe73/src/rllab/cli/command.py</code></td><td>1</td><td>U41</td><td>Read</td><td><a href="#9">U41.S9</a></td></tr><tr><td>read</td><td><code>.claude/worktrees/agent-a5892e837ea0afe73/src/rllab/cli/pipelines/pl05_chart.py</code></td><td>1</td><td>U41</td><td>Read</td><td><a href="#5">U41.S5</a></td></tr><tr><td>read</td><td><code>.claude/worktrees/agent-a5892e837ea0afe73/src/rllab/cli/pipelines/pl06_evaluate.py</code></td><td>1</td><td>U41</td><td>Read</td><td><a href="#7">U41.S7</a></td></tr><tr><td>read</td><td><code>.claude/worktrees/agent-a5892e837ea0afe73/src/rllab/runlog/read.py</code></td><td>1</td><td>U41</td><td>Read</td><td><a href="#17">U41.S17</a></td></tr><tr><td>read</td><td><code>.claude/worktrees/agent-a5892e837ea0afe73/tests/fixtures/rllab/TC-15/expected.json</code></td><td>1</td><td>U41</td><td>Read</td><td><a href="#21">U41.S21</a></td></tr><tr><td>read</td><td><code>.claude/worktrees/agent-a5892e837ea0afe73/tests/fixtures/rllab/TC-15/input.json</code></td><td>1</td><td>U41</td><td>Read</td><td><a href="#16">U41.S16</a></td></tr><tr><td>read</td><td><code>.claude/worktrees/agent-a5892e837ea0afe73/tests/fixtures/rllab/TC-15/runs/a/run.json</code></td><td>1</td><td>U41</td><td>Read</td><td><a href="#19">U41.S19</a></td></tr><tr><td>read</td><td><code>.claude/worktrees/agent-a5892e837ea0afe73/tests/fixtures/rllab/TC-15/runs/c/run.json</code></td><td>1</td><td>U41</td><td>Read</td><td><a href="#20">U41.S20</a></td></tr><tr><td>read</td><td><code>.claude/worktrees/agent-a5892e837ea0afe73/tests/unit/rllab/test_pl06_smoke.py</code></td><td>1</td><td>U41</td><td>Read</td><td><a href="#8">U41.S8</a></td></tr></table>
+<h2>Steps</h2>
+<div class="step" id="S1"><span class="sid">U41.S1</span><span class="kind">user</span>You are the solo for M1-T23. Run `python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/plugin/dev-team/scripts/dt.py claim M1-T23 --role solo`, then read the packet it names.<details><summary>full text</summary><pre>You are the solo for M1-T23. Run `python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/plugin/dev-team/scripts/dt.py claim M1-T23 --role solo`, then read the packet it names.</pre></details></div><div class="step" id="S2"><span class="sid">U41.S2</span><span class="kind">Bash</span>python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/plugin/dev-team/scripts/dt.py claim M1-T23 --role solo<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/plugin/dev-team/scripts/dt.py claim M1-T23 --role solo&quot;,
+  &quot;description&quot;: &quot;Claim task M1-T23 as solo&quot;
+}</pre><div class="lbl">output</div><pre>packet: /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/project/.claude/worktrees/agent-a5892e837ea0afe73/.claude/packet.md (202 lines; read it in full)
+task: M1-T23 Wire PL-05 · role solo · package rllab · kind wiring
+writes: src/rllab/cli/pipelines/pl05_chart.py, tests/unit/rllab/test_pl05_smoke.py
+done: Done when `scripts/check.sh gate` passes (the gate passes on your Writes); the Stop hook runs it. End with one line: `DONE M1-T23 solo`. If you can&#x27;t finish: `python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/plugin/dev-team/scripts/dt.py escalate &lt;TEST-WRONG|NEEDS-DEP&gt; &quot;&lt;why&gt;&quot;`, or `python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/plugin/dev-team/scripts/dt.py escalate CONTRACT-CHANGE &quot;&lt;why&gt;&quot; --type &lt;the contract symbol&gt;`, then end with one line: `STOPPED M1-T23 solo: see dt escalate`.</pre></details></div><div class="step" id="S3"><span class="sid">U41.S3</span><span class="kind">Read</span>/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/project/.claude/worktrees/agent-a5892e837ea0afe73/CONSTRAINTS.md<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/project/.claude/worktrees/agent-a5892e837ea0afe73/CONSTRAINTS.md&quot;
+}</pre><div class="lbl">output</div><pre>1	# Constraints
+2	**Status:** Approved · **Last reviewed:** 2026-10-17 by @connor · **Ratcheted:** —
+3	
+4	The standing quality bar. `pyproject.toml` and `scripts/check.sh` enforce it; every number here names its config key, and `dt status` fails if the two disagree. Only `build-setup` changes this file, with the user: tightening is routine, loosening needs an explicit yes.
+5	
+6	## Floor
+7	- **CR-01** No new suppressions. Ruff runs with `--ignore-noqa` in gate and full, so a Ruff exception is a `per-file-ignores` entry in protected config with a row in Exceptions. `floor_guard.sh` catches the other suppressions on the diff
+8	- **CR-02** No stubs: `raise NotImplementedError` outside abstract methods, `pass`-only bodies, bare `except: pass`. One carve-out: the interface task&#x27;s step signatures, whose body is only `raise NotImplementedError(&quot;&lt;task id&gt;&quot;)` naming the open task that replaces it. `check.sh gate` fails on one naming a task that isn&#x27;t open in `tasks/todo.md`, and on a test that expects one (`stub-pinned`); `check.sh full --exit` fails on any
+9	- **CR-03** No skipped, deleted or assertion-free tests, unless a row in Exceptions names the test file
+10	- **CR-04** No secrets in source
+11	- **CR-05** Oracle files (`tests/fixtures/**/expected.json`) change only with the user&#x27;s approval
+12	- **CR-06** The implementer never changes `tests/intent/**`
+13	- **CR-07** This file, `pyproject.toml` tool config, `scripts/` and `.claude/agents/` are not weakened to make a change pass
+14	- **CR-08** Nothing imports from `references/` or `probes/`, or adds either to `sys.path` (or `PYTHONPATH`, pytest `pythonpath`). `floor_guard.sh` checks the diff for both. Code copied from either is project code and meets the same bar
+15	- **CR-09** A frozen interface (`tests/contracts/&lt;id&gt;.&lt;symbol&gt;/`: schema, samples, fake; and the types, signatures and exports the interface task wrote) is frozen once it exists at the task&#x27;s base. Only the interface task freezing it (`**Kind:** interface`) writes a new folder, and no other task&#x27;s `Writes:` names its `types.py` or `__init__.py`; a frozen interface changes only through `architecture-design` Revise, never to make a test pass
+16	
+17	## Readability
+18	- **CR-10** One entry function per pipeline; it reads top to bottom as its named steps (reviewer + `dt layout`)
+19	- **CR-11** No registries, plugin dispatch or config-driven wiring without an AD
+20	- **CR-12** New abstraction only with a second real implementation or a named seam
+21	- **CR-13** No global random state: every generator is spawned from a seed (`np.random.SeedSequence`, a `torch.Generator`), never `np.random.seed` or `torch.manual_seed` (AD-05)
+22	
+23	## Enforced with numbers
+24	| ID | Dimension | Rule | Checked by | Config key | Runs at |
+25	|---|---|---|---|---|---|
+26	| CR-20 | Lint | zero errors; standing per-file-ignores only for `tests/**` and `__init__.py` | ruff | `tool.ruff.lint.select` | edit, gate |
+27	| CR-21 | Complexity | ≤ 10 per function | ruff C901 | `tool.ruff.lint.mccabe.max-complexity` | gate |
+28	| CR-22 | Size | ≤ 500 lines/module, ≤ 60/function | check_size.py | `tool.size_limits` | edit, gate |
+29	| CR-23 | Types | zero errors, strict | mypy | `tool.mypy.strict` | gate |
+30	| CR-24 | Boundaries | import contracts hold | import-linter | `tool.importlinter.contracts` | gate |
+31	| CR-25 | Dependencies | none missing or unused | deptry | `tool.deptry` | gate |
+32	| CR-26 | Deps security | nothing known-vulnerable | pip-audit | — | full, CI nightly |
+33	| CR-27 | Reproducibility | same seed, same result: `repro` tests pass (TRAIN-02, WORLD-02, REPLAY-02) | pytest `-m repro` | `tool.pytest.ini_options.markers` | gate |
+34	
+35	## Measured, not yet enforced
+36	| ID | Metric | Today | Direction |
+37	|---|---|---|---|
+38	| CR-40 | Coverage (branch) | — (no code) (`tool.coverage.report.fail_under`, raised by Ratchet) | must not fall |
+39	| CR-41 | vulture findings at `min_confidence = 60` (`scripts/vulture_whitelist.py`) | 0 | must not grow by `full --exit` (earlier `full` runs report) |
+40	| CR-42 | Duplicate blocks of ≥ 8 similar source lines (pylint `duplicate-code`, `[tool.pylint.similarities]` in pyproject.toml) | 0 | must not grow |
+41	
+42	## Boundaries (generated from architecture — do not edit)
+43	- `rllab.core` imports nothing first-party · `worlds` → core · `runlog` → core · `baselines` → core, worlds · `methods` → core, runlog · `train`, `evaluate`, `replay` → core, worlds, baselines, methods, runlog · `charts` → runlog, evaluate · `refcheck` → core, worlds, train, evaluate, runlog · `notes` → nothing · `cli` → all · only `refcheck` imports Stable-Baselines3 or Gymnasium
+44	
+45	## Roles and protected paths
+46	| Role | May edit | May not edit | Stop gate |
+47	|---|---|---|---|
+48	| tester | `tests/intent/**`, within the task&#x27;s `Writes:` | everything else; reads no source | `check.sh collect` (lint, collect, red for the right reason) |
+49	| implementer / solo | `src/**`, `tests/unit/**`, within the task&#x27;s `Writes:`; an interface task also the `tests/contracts/&lt;id&gt;.&lt;symbol&gt;/` its `Writes:` names | the protected list; `tasks/` | `check.sh gate` + protected-path diff against the worktree&#x27;s base |
+50	| reviewer | its worktree, for the mutation check, and its findings file; nothing lands (the orchestrator records findings with `dt finding`) | everything else | runs `check.sh full` by hand |
+51	
+52	**Protected list** (`PROTECTED` in `scripts/check.sh`; `path_guard.sh deny --protected` reads the same list): `tests/intent/**`, `tests/fixtures/**`, `tests/conftest.py`, `pyproject.toml`, `uv.lock`, `CONSTRAINTS.md`, `scripts/**`, `.claude/agents/**`, `.claude/settings.json`, `references/**`, `probes/**`, `tests/contracts/**`. `tests/contracts/**` covers the contract folders that exist at the task&#x27;s base (CR-09). **`Writes:`**: `dt claim` writes the role&#x27;s share of the task&#x27;s `Writes:` to `.claude/.task_writes` and sets the worktree&#x27;s base; `path_guard.sh writes` blocks edits outside it, and builder edits before the claim. Only the orchestrator writes `tasks/` (`dt land`, `dt finding`).
+53	
+54	**Worktree links:** none
+55	
+56	## Review
+57	Run by the reviewer agent: the interface review after Phase 0, a phase review per package at each checkpoint, and the milestone exit. `dt land` already checked each landing&#x27;s `Writes:`, protected paths and gates; review judges what tools can&#x27;t.
+58	
+59	**Interface** (after Phase 0): the code is the contract, no more and no less.
+60	1. Types match `contract.md`: fields, types, invariants. Nothing a step&#x27;s In → Out needs is missing; no helper is frozen.
+61	2. Signatures match the step tables, in their owner modules. Each stub names the open task that owns its step; no logic beyond types and validation.
+62	3. One sample per case the contract names, valid and realistic, never holding a TC&#x27;s expected value. Replay doubles replay an interaction the Protocol allows. Each fake passes its contract&#x27;s cases; anything it does beyond echoing a fixture (filtering, ordering, an error) is a case the real provider must pass too. Contract tests check shape only, never a stub or other state a later task changes.
+63	4. `__init__.py` exports exactly the contract; each `Mitigated by` in the plan&#x27;s dependency graph exists; each split task&#x27;s tester can write its tests from the frozen interface and its `Read:`.
+64	
+65	**Each phase**, per package, tests before code:
+66	1. **Interfaces followed** (CR-09): no frozen type, signature or contract folder changed outside a Revise. Consumers use the declared types: no dict for a dataclass, no reaching into a provider&#x27;s internals, no local redefinition. A stub is replaced only by the task it names; no cross-package import outside the contract; spine tests run on samples and doubles, not another step&#x27;s code.
+67	2. **Tests prove something:** each intent test asserts its TC case or acceptance bullet, loading expected values and tolerances from fixtures; none is assertion-free or weakened; Hypothesis runs the `ci` profile. Unit tests are specific, never computing the expected value with the code under test or testing only a mock. **Mutation check** (`.claude/agents/reviewer.md`): per acceptance bullet, the smallest change that should break it; a mutation no test catches is a finding.
+68	3. **Correct to the spec:** each acceptance bullet truly met, not special-cased to the sample; the error paths the requirement names; seeding and determinism; numerical edge cases.
+69	4. **Simple** (CR-11, CR-12, CR-42): no abstraction with one implementation outside the contract or an AD; no forwarding wrapper, one-method class, or class where a function does; no parameter, flag or config key every caller sets the same; no `try/except` that only re-raises or swallows, no checks the types already guarantee; no loop the library already provides. No near-copies within or across the phase&#x27;s tasks: one concept is one function in its owner module (tests may repeat for readability). Each finding names the simpler form, with the same tests passing.
+70	5. **Pipelines** (CR-10): entry functions read as their step tables (`dt layout`); step owners respected; spine baselines still selectable.
+71	6. **The bar** (CR-07): diff this file, `pyproject.toml`, `scripts/` and `.claude/agents/` against the milestone&#x27;s Base. Any loosening is Critical; new exceptions need an owner and expiry.
+72	7. **Hidden and parallel risks:** where a real provider could act differently from its double; fixed output paths, global state, test-order dependence.
+73	8. **The rest:** readability, security, performance where a QR sets a number; reused reference or probe code has its Caveats handled and fits the contract; `dt lint` clean, pre-build sections replaced by `dt layout` pointers.
+74	
+75	**Milestone exit**, over the whole diff, adds: the Scope&#x27;s Exit holds; every Covers ID has a test; `check.sh full --exit` finds no stub; system tests use real providers; the same sample through a real provider and its double agrees; deferred requirements untouched; pip-audit ran.
+76	
+77	**Severity:** Critical: a frozen interface changed, a contract test pinning a transient state, a weakened test, an intent test that misses a mutation changing its TC&#x27;s expected output, a wrong answer, a loosened bar, a security hole, lost data; it stops the build. Important: a consumer bypassing a type, any other surviving mutation, an unneeded abstraction, a duplicate across tasks. Suggestion and Nit: local. Findings go under the checkpoint block in `tasks/plan.md` (`dt finding`), each with a fix task or a reason.
+78	
+79	## Done
+80	agent-skills `references/definition-of-done.md`, tailored once:
+81	- **Correctness and Quality:** checked per task by the gate.
+82	- **Integration and Documentation:** checked at each checkpoint.
+83	- **The full list:** checked at milestone exit.
+84	
+85	## Exceptions
+86	| ID | Rule | Path | Reason | Owner | Expires |
+87	|---|---|---|---|---|---|
+88	| EX-01 | CR-25 DEP002 | `numpy`, `torch`, `matplotlib` | M1 dependencies, declared before the code imports them | @connor | M1 exit |
+89	</pre></details></div><div class="step" id="S4"><span class="sid">U41.S4</span><span class="kind">Read</span>/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/project/.claude/worktrees/agent-a5892e837ea0afe73/.claude/packet.md<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/project/.claude/worktrees/agent-a5892e837ea0afe73/.claude/packet.md&quot;
+}</pre><div class="lbl">output</div><pre>1	# Packet: M1-T23 solo
+2	You are the solo for M1-T23. Your edit boundary is your Writes below (`.claude/.task_writes`); the guard blocks everything else.
+3	
+4	Done when `scripts/check.sh gate` passes (the gate passes on your Writes); the Stop hook runs it. End with one line: `DONE M1-T23 solo`. If you can&#x27;t finish: `python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/plugin/dev-team/scripts/dt.py escalate &lt;TEST-WRONG|NEEDS-DEP&gt; &quot;&lt;why&gt;&quot;`, or `python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/plugin/dev-team/scripts/dt.py escalate CONTRACT-CHANGE &quot;&lt;why&gt;&quot; --type &lt;the contract symbol&gt;`, then end with one line: `STOPPED M1-T23 solo: see dt escalate`.
+5	
+6	# Context for M1-T23: package rllab · mode solo · kind wiring
+7	Read only what is below, plus CONSTRAINTS.md and the files you edit. Your task is the last section.
+8	
+9	&lt;!-- docs/packages/rllab/pipelines.md:62 --&gt;
+10	## PL-05: Learning-curve chart
+11	**Entry:** `src/rllab/cli/pipelines/pl05_chart.py::run_chart` · **Trigger:** `rllab chart &lt;world&gt; &lt;variant&gt; [--measure M] [--include NAME]`
+12	**Covers:** LOG-03–LOG-05, PREY-10, EVAL-01, EVAL-02, SNAKE-07, FISH-09, PREY-07
+13	
+14	| # | Step | Owner | In → Out | Spine version | Covers |
+15	|---|---|---|---|---|---|
+16	| 1 | `find_runs` | runlog.read | root, world, variant, include → list[Run] | glob run folders, keep `finished` plus named ones | LOG-03 |
+17	| 2 | `baseline_means` | baselines.means | world, variant → BaselineMeans | random and rule per team on the 20 `EVAL_SEEDS`, rule-based opponents | EVAL-01, EVAL-02 |
+18	| 3 | `RandomPolicy` | baselines.random | ActionSpace → Policy | uniform draws from the passed `rng` | EVAL-01 |
+19	| 4 | `SnakeRule` | baselines.snake | none → RulePolicy | toward food on the shorter axis unless fatal next step | SNAKE-07 |
+20	| 5 | `FishRule` | baselines.fish | none → RulePolicy | full push away from the seen ball, else random | FISH-09 |
+21	| 6 | `PreyRule` | baselines.prey | none → RulePolicy | flee nearest seen predator, else toward nearest seen pellet | PREY-07 |
+22	| 7 | `PredatorRule` | baselines.prey | none → RulePolicy | chase nearest seen prey, else random wander | PREY-07 |
+23	| 8 | `learning_curve` | charts.curve | list[Run], BaselineMeans, out → Output | matplotlib mean line, min–max band, two baseline lines, per team; `dataviz` checks | LOG-03–LOG-05, PREY-10 |
+24	
+25	### Entry sketch (pre-build — removed by spine task)
+26	```python
+27	def run_chart(root: Path, world: str, variant: str, out: Path, *, include: Sequence[str] = (), measure: str | None = None) -&gt; Output:
+28	    runs = find_runs(root, world, variant, include=include)
+29	    lines = baseline_means(world, variant)
+30	    return learning_curve(runs, lines, out, measure=measure)
+31	```
+32	
+33	&lt;!-- docs/packages/rllab/contract.md:281 --&gt;
+34	### runlog.find_runs: Run lookup
+35	`def find_runs(root: Path, world: str, variant: str, *, include: Sequence[str] = ()) -&gt; list[Run]`
+36	- **Invariants:** finished runs only, plus incomplete or failed runs named in `include` (TRAIN edge case); a `running` run with no live process is reported as incomplete
+37	- **Boundary:** charts, evaluate, refcheck, cli · **Fixtures:** tests/contracts/runlog.find_runs/ · **Cases:** a fake returning 5 finished snake runs plus one named incomplete run
+38	- **Used by:** charts, evaluate, refcheck, cli; PL-05, PL-06
+39	
+40	&lt;!-- docs/packages/rllab/contract.md:158 --&gt;
+41	### baselines.baseline_means: Baseline score lines
+42	`def baseline_means(world: str, variant: str) -&gt; BaselineMeans`
+43	- **Invariants:** plays `RandomPolicy` and `rule_for` per team through `core.play_episode`; deterministic
+44	- **Errors:** `KeyError` from `rule_for`
+45	- **Boundary:** cli · **Fixtures:** tests/contracts/baselines.baseline_means/ · **Cases:** a fake returning the snake `BaselineMeans`
+46	- **Used by:** cli; PL-05
+47	
+48	&lt;!-- docs/packages/rllab/contract.md:308 --&gt;
+49	### charts.learning_curve: Learning-curve chart
+50	`def learning_curve(runs: Sequence[Run], baselines: BaselineMeans, out: Path, *, measure: str | None = None) -&gt; Output`
+51	- **Invariants:** draws per team a mean line, a min–max band and both baseline lines against &quot;environment steps&quot; (LOG-03, PREY-10), or a declared measure the same way (LOG-05); follows the `dataviz` skill (LOG-04); under 3 runs, titled with the count and a band note
+52	- **Errors:** `MixedRunsError` naming the differing settings when runs differ by more than seed
+53	- **Boundary:** cli · **Fixtures:** tests/contracts/charts.learning_curve/ · **Cases:** a fake writing a placeholder PNG for 5 snake runs
+54	- **Used by:** cli; PL-05
+55	
+56	## Layout (`dt layout rllab`)
+57	src/rllab/
+58	  __init__.py — RL Lab: hand-written reinforcement learning on small simulated worlds.
+59	  baselines/
+60	    __init__.py — Random play, each world&#x27;s rule and their mean scores.
+61	    means.py — Rule lookup and the baselines&#x27; mean scores on the evaluation seeds.
+62	    random.py — Uniform random play for any action format (EVAL-01).
+63	    snake.py — The snake rule baseline (SNAKE-07).
+64	    types.py — Types of the baselines.
+65	  charts/
+66	    __init__.py — Charts drawn from run folders, following the `dataviz` skill.
+67	    curve.py — Learning curves with a min-max band and baseline lines (LOG-03 to LOG-05).
+68	    types.py — Types of the charts.
+69	  cli/
+70	    __init__.py — The `rllab` command (AD-10).
+71	    __main__.py — `python -m rllab.cli`: the `rllab` command.
+72	    command.py — The `rllab` command: parses a trigger, calls its pipeline entry and prints the result (AD-10).
+73	    pipelines/
+74	      __init__.py — The PL-04 to PL-12 entries (AD-10).
+75	      pl04_watch.py — PL-04: Watch a run.
+76	      pl05_chart.py — PL-05: Learning-curve chart.
+77	      pl06_evaluate.py — PL-06: Final evaluation.
+78	  core/
+79	    __init__.py — World and policy protocols, shared types, held-out seed sets and the episode loop.
+80	    episode.py — The one episode loop every component plays through (AD-04, AD-05).
+81	    types.py — Shared types of every component: specs, steps, episodes, protocols, configs, seed sets.
+82	  evaluate/
+83	    __init__.py — Final evaluation on the final seeds, permutation tests, verdicts and summaries.
+84	    types.py — Types of the final evaluation: comparisons, verdicts and summaries.
+85	    final/
+86	      __init__.py — The final evaluation and its statistics.
+87	      play.py — Final evaluation: final checkpoints and both baselines on the final seeds (EVAL-03).
+88	      stats.py — Paired permutation tests against each baseline, with Holm&#x27;s correction (EVAL-04).
+89	      summary.py — One team&#x27;s summary from its final-seed scores, its collapse flag and `summary.json` (EVAL-06).
+90	      verdict.py — The baseline verdict: both nulls rejected and every run beating the rule (EVAL-05).
+91	  methods/
+92	    __init__.py — Hand-written learners behind `Learner`, and checkpoint-to-policy loading.
+93	    factory.py — Learner construction and checkpoint-to-policy loading.
+94	    types.py — Types of the learning methods.
+95	    dqn/
+96	      __init__.py — DQN: Q-learning on an MLP for discrete actions (AD-03).
+97	      learner.py — Online one-step Q-learning on an MLP with epsilon-greedy exploration (spine: no replay buffer
+98	  runlog/
+99	    __init__.py — Run folders: record, logs, checkpoints, live progress and lookup.
+100	    progress.py — A live view of one run&#x27;s progress (LOG-06).
+101	    read.py — Run lookup and opening run folders.
+102	    types.py — Types of run folders: record, evaluation points, checkpoints, the run view and progress.
+103	    writer.py — Writes one run folder: record, logs and checkpoints (AD-06).
+104	  train/
+105	    __init__.py — Training: the config loader, the method check and the PL-01 to PL-03 entries (AD-10).
+106	    batch.py — Runs one training run per config in a spawn process pool (TRAIN-05, AD-05).
+107	    check.py — The method check: each team method trained and scored on its check world (TRAIN-06, AD-09).
+108	    config.py — Run configs from a TOML file, one per seed, method defaults filled.
+109	    setup.py — One learner per team of a run (TRAIN-07).
+110	    types.py — Types of training: the method check&#x27;s result and its refusal.
+111	    loop/
+112	      __init__.py — The training loop of one run.
+113	      run.py — Steps a world to the budget, with checkpoints and evaluations, into a run folder.
+114	    pipelines/
+115	      __init__.py — The PL-01 to PL-03 entries (AD-10).
+116	      pl01_check.py — PL-01: Method check.
+117	      pl02_train.py — PL-02: Training run.
+118	      pl03_batch.py — PL-03: Training batch.
+119	  worlds/
+120	    __init__.py — The worlds, behind `make`.
+121	    checks.py — Check worlds with hand-derived best actions (TRAIN-06, AD-09).
+122	    make.py — The world factory: a world name and variant to a World.
+123	    snake.py — Snake: a 10 x 10 grid, relative turns, food, death and a hunger limit (SNAKE-01 to SNAKE-06).
+124	    types.py — Types the worlds add to the core World protocol.
+125	
+126	## Interfaces (frozen: build against these, never change them)
+127	&lt;!-- docs/packages/rllab/contract.md:256 --&gt;
+128	### runlog.Run: type
+129	```python
+130	class Run(Protocol):
+131	    record: RunRecord
+132	    def episodes(self) -&gt; list[EpisodeResult]: ...
+133	    def evals(self) -&gt; list[EvalPoint]: ...
+134	    def checkpoints(self) -&gt; list[Checkpoint]: ...
+135	```
+136	- **Invariants:** read-only view of one run folder; readable while the run writes (LOG-06)
+137	- **Boundary:** charts, evaluate, replay, refcheck, cli · **Fixtures:** tests/contracts/runlog.Run/ · **Cases:** a replay double of a finished 3-checkpoint snake run folder
+138	- **Used by:** charts, evaluate, replay, refcheck, cli; PL-05, PL-06, PL-12
+139	Sample: tests/contracts/runlog.Run/ (exists)
+140	
+141	&lt;!-- docs/packages/rllab/contract.md:116 --&gt;
+142	### core.BaselineMeans: type
+143	`@dataclass(frozen=True) class BaselineMeans: world: str; variant: str; random: Mapping[str, float]; rule: Mapping[str, float]`
+144	- **Invariants:** `random` and `rule` keyed by team; means over the 20 `EVAL_SEEDS` episodes, the seeds the in-training curve uses; in predator-prey each team&#x27;s baselines play the rule-based opponent; produced by `baselines.baseline_means`, owned by `core` so `charts` can take it (AD-12)
+145	- **Boundary:** baselines, charts, cli · **Fixtures:** tests/contracts/core.BaselineMeans/ · **Cases:** snake; predator-prey with both teams
+146	- **Used by:** baselines, charts, cli; PL-05
+147	Sample: tests/contracts/core.BaselineMeans/ (exists)
+148	
+149	&lt;!-- docs/packages/rllab/contract.md:9 --&gt;
+150	### core.ActionSpace: type
+151	`ActionSpace = Discrete(n: int) | Box(dims: int, low: float, high: float)`, both frozen dataclasses
+152	- **Invariants:** `Discrete` actions are ints in `[0, n)`; `Box` actions are `dims` floats in `[low, high]`
+153	- **Boundary:** worlds, baselines, methods, refcheck · **Fixtures:** tests/contracts/core.ActionSpace/ · **Cases:** snake `Discrete(3)`; fish `Box(2, -1.0, 1.0)`
+154	- **Used by:** worlds, baselines, methods, refcheck
+155	Sample: tests/contracts/core.ActionSpace/ (exists)
+156	
+157	&lt;!-- docs/packages/rllab/contract.md:73 --&gt;
+158	### core.Policy: type
+159	`class Policy(Protocol): def act(self, obs: Array, rng: np.random.Generator) -&gt; Array`
+160	- **Invariants:** `obs` is `k × obs_len` for the `k` agents of one team; returns `k` actions inside the world&#x27;s `ActionSpace`; deterministic for a given `obs` and `rng` state
+161	- **Boundary:** baselines, methods, evaluate, replay, refcheck · **Fixtures:** tests/contracts/core.Policy/ · **Cases:** a replay double of the snake rule policy over 5 observations
+162	- **Used by:** core.play_episode, train, evaluate, replay, refcheck; PL-08
+163	Sample: tests/contracts/core.Policy/ (exists)
+164	
+165	&lt;!-- docs/packages/rllab/contract.md:145 --&gt;
+166	### baselines.RulePolicy: type
+167	`class RulePolicy(Policy, Protocol): description: str`
+168	- **Invariants:** acts on observations only; `description` is the world&#x27;s one sentence (EVAL-02)
+169	- **Boundary:** evaluate, replay, cli · **Fixtures:** tests/contracts/baselines.RulePolicy/ · **Cases:** a replay double of the snake rule over 5 observations; the fish rule seeing no ball
+170	- **Used by:** evaluate, replay, cli; PL-05
+171	Sample: tests/contracts/baselines.RulePolicy/ (exists)
+172	
+173	&lt;!-- docs/packages/rllab/contract.md:98 --&gt;
+174	### core.Output: type
+175	`@dataclass(frozen=True) class Output: path: Path; kind: Literal[&quot;chart&quot;, &quot;video&quot;, &quot;writeup&quot;]; made_from: tuple[str, ...]`
+176	- **Invariants:** `path` exists when returned; `made_from` names the runs, checkpoints and seeds behind the file, so a write-up can cite it (NOTES-02)
+177	- **Boundary:** charts, replay, notes, cli · **Fixtures:** tests/contracts/core.Output/ · **Cases:** a 5-run snake learning-curve PNG; a seed-7 snake video
+178	- **Used by:** charts, replay, notes, cli; PL-05, PL-08, PL-10, PL-12
+179	Sample: tests/contracts/core.Output/ (exists)
+180	
+181	&lt;!-- docs/packages/rllab/contract.md:139 --&gt;
+182	### baselines.RandomPolicy: Uniform random play
+183	`class RandomPolicy(Policy): def __init__(self, action: ActionSpace) -&gt; None`
+184	- **Invariants:** each action drawn uniformly from the declared action format (EVAL-01), using only the `rng` passed to `act`
+185	- **Boundary:** train, evaluate, replay · **Fixtures:** tests/contracts/baselines.RandomPolicy/ · **Cases:** 5 snake actions from a fixed `rng`; 5 fish pushes from a fixed `rng`
+186	- **Used by:** train, evaluate, replay; PL-05
+187	Sample: tests/contracts/baselines.RandomPolicy/ (exists)
+188	
+189	## Writes (edit only these files; the plan gives every other file to another task)
+190	- src/rllab/cli/pipelines/pl05_chart.py (exists)
+191	- tests/unit/rllab/test_pl05_smoke.py (new)
+192	
+193	&lt;!-- tasks/plan.md:250 --&gt;
+194	### M1-T23: Wire PL-05
+195	**Package:** rllab · **Step:** PL-05 · **Kind:** wiring · **Covers:** LOG-03 · **Size:** XS · **Mode:** solo
+196	**Skills:** —
+197	**Read:** PL-05, runlog.find_runs, baselines.baseline_means, charts.learning_curve
+198	**Acceptance:**
+199	- [ ] `rllab chart --smoke` draws a chart from TC-15&#x27;s equal-settings folders; committed as PL-05&#x27;s smoke test
+200	- [ ] PL-05 pre-build sections replaced by a `dt layout` pointer
+201	**Verify:** `rllab chart --smoke` · `scripts/check.sh gate`
+202	**Depends on:** M1-T12, M1-T13, M1-T14, M1-T15, M1-T16, M1-T18, M1-T06, M1-T05 · **Writes:** src/rllab/cli/pipelines/pl05_chart.py, tests/unit/rllab/test_pl05_smoke.py
+203	</pre></details></div><div class="step" id="S5"><span class="sid">U41.S5</span><span class="kind">Read</span>/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/project/.claude/worktrees/agent-a5892e837ea0afe73/src/rllab/cli/pipelines/pl05_chart.py<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/project/.claude/worktrees/agent-a5892e837ea0afe73/src/rllab/cli/pipelines/pl05_chart.py&quot;
+}</pre><div class="lbl">output</div><pre>1	&quot;&quot;&quot;PL-05: Learning-curve chart.&quot;&quot;&quot;
+2	
+3	from collections.abc import Sequence
+4	from pathlib import Path
+5	
+6	from rllab.core import Output
+7	
+8	
+9	def run_chart(
+10	    root: Path, world: str, variant: str, *, include: Sequence[str] = (), measure: str | None = None
+11	) -&gt; Output:
+12	    &quot;&quot;&quot;Draws the runs under `root` into `reports/&lt;world&gt;/`, the sibling of `root` (AD-06).&quot;&quot;&quot;
+13	    raise NotImplementedError(&quot;M1-T23&quot;)
+14	</pre></details></div><div class="step" id="S6"><span class="sid">U41.S6</span><span class="kind">Bash</span>ls /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/project/.claude/worktrees/agent-a5892e837ea0afe73/src/rllab/cli/pipelines /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/project/.claude/worktrees/agent-a5892e837ea0afe73/tests/unit/rllab /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/project/.claude/worktrees/agent-a5892e837ea0afe73/tests/fixtures /Users/connorott/plug …[+131 chars]<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;ls /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/project/.claude/worktrees/agent-a5892e837ea0afe73/src/rllab/cli/pipelines /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/project/.claude/worktrees/agent-a5892e837ea0afe73/tests/unit/rllab /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/project/.claude/worktrees/agent-a5892e837ea0afe73/tests/fixtures /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/project/.claude/worktrees/agent-a5892e837ea0afe73/tests/intent&quot;,
+  &quot;description&quot;: &quot;List pipelines, unit tests, fixtures, intent tests&quot;
+}</pre><div class="lbl">output</div><pre>/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/project/.claude/worktrees/agent-a5892e837ea0afe73/src/rllab/cli/pipelines:
+__init__.py
+pl04_watch.py
+pl05_chart.py
+pl06_evaluate.py
+
+/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/project/.claude/worktrees/agent-a5892e837ea0afe73/tests/fixtures:
+rllab
+
+/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/project/.claude/worktrees/agent-a5892e837ea0afe73/tests/intent:
+rllab
+
+/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/project/.claude/worktrees/agent-a5892e837ea0afe73/tests/unit/rllab:
+test_batch.py
+test_check.py
+test_checks.py
+test_compare.py
+test_config.py
+test_curve.py
+test_dqn.py
+test_episode.py
+test_final.py
+test_loop.py
+test_make.py
+test_means.py
+test_pl01_smoke.py
+test_pl02_smoke.py
+test_pl03_smoke.py
+test_pl04_smoke.py
+test_pl06_smoke.py
+test_progress.py
+test_random.py
+test_read.py
+test_setup.py
+test_snake.py
+test_snake_rule.py</pre></details></div><div class="step" id="S7"><span class="sid">U41.S7</span><span class="kind">Read</span>/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/project/.claude/worktrees/agent-a5892e837ea0afe73/src/rllab/cli/pipelines/pl06_evaluate.py<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/project/.claude/worktrees/agent-a5892e837ea0afe73/src/rllab/cli/pipelines/pl06_evaluate.py&quot;
+}</pre><div class="lbl">output</div><pre>1	&quot;&quot;&quot;PL-06: Final evaluation.&quot;&quot;&quot;
+2	
+3	from collections.abc import Sequence
+4	from datetime import UTC, datetime
+5	from pathlib import Path
+6	
+7	from rllab.evaluate import Summary, final_evaluation
+8	from rllab.runlog import find_runs
+9	
+10	
+11	def run_evaluate(
+12	    root: Path, world: str, variant: str, *, include: Sequence[str] = (), workers: int | None = None
+13	) -&gt; list[Summary]:
+14	    &quot;&quot;&quot;Evaluates the runs under `root` into `&lt;root&gt;/&lt;world&gt;/&lt;variant&gt;/_eval/&lt;date&gt;/` (AD-06).&quot;&quot;&quot;
+15	    runs = find_runs(root, world, variant, include=include)
+16	    return final_evaluation(
+17	        runs, root / world / variant / &quot;_eval&quot; / f&quot;{datetime.now(UTC):%Y-%m-%d}&quot;, workers=workers
+18	    )
+19	</pre></details></div><div class="step" id="S8"><span class="sid">U41.S8</span><span class="kind">Read</span>/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/project/.claude/worktrees/agent-a5892e837ea0afe73/tests/unit/rllab/test_pl06_smoke.py<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/project/.claude/worktrees/agent-a5892e837ea0afe73/tests/unit/rllab/test_pl06_smoke.py&quot;
+}</pre><div class="lbl">output</div><pre>1	&quot;&quot;&quot;PL-06 smoke test (`rllab evaluate --smoke`): the `rllab evaluate` command end to end on the
+2	`runlog.Run` doubles, with the `runlog.find_runs` and `evaluate.final_evaluation` fakes.&quot;&quot;&quot;
+3	
+4	import importlib.util
+5	import sys
+6	from collections.abc import Sequence
+7	from datetime import UTC, datetime
+8	from pathlib import Path
+9	from typing import Any
+10	
+11	import pytest
+12	
+13	from rllab.cli.command import main
+14	from rllab.cli.pipelines import pl06_evaluate
+15	from rllab.evaluate import Summary
+16	from rllab.runlog import Run
+17	
+18	CONTRACTS = Path(__file__).parents[2] / &quot;contracts&quot;
+19	
+20	
+21	def load_kit() -&gt; Any:
+22	    if &quot;contracts_kit&quot; not in sys.modules:
+23	        spec = importlib.util.spec_from_file_location(&quot;contracts_kit&quot;, CONTRACTS / &quot;kit.py&quot;)
+24	        assert spec is not None
+25	        assert spec.loader is not None
+26	        module = importlib.util.module_from_spec(spec)
+27	        sys.modules[&quot;contracts_kit&quot;] = module
+28	        spec.loader.exec_module(module)
+29	    return sys.modules[&quot;contracts_kit&quot;]
+30	
+31	
+32	class Calls:
+33	    &quot;&quot;&quot;What the faked steps were called with.&quot;&quot;&quot;
+34	
+35	    def __init__(self) -&gt; None:
+36	        self.find: list[tuple[Path, str, str, tuple[str, ...]]] = []
+37	        self.final: list[tuple[list[Run], Path, int | None]] = []
+38	        self.found: list[Run] = []
+39	
+40	
+41	@pytest.fixture
+42	def calls(monkeypatch: pytest.MonkeyPatch) -&gt; Calls:
+43	    kit = load_kit()
+44	    find_fake = kit.fake(&quot;runlog.find_runs&quot;)
+45	    final_fake = kit.fake(&quot;evaluate.final_evaluation&quot;)
+46	    seen = Calls()
+47	
+48	    def find_runs(
+49	        root: Path, world: str, variant: str, *, include: Sequence[str] = ()
+50	    ) -&gt; list[Run]:
+51	        seen.find.append((root, world, variant, tuple(include)))
+52	        seen.found = find_fake(root, world, variant, include=include)
+53	        return seen.found
+54	
+55	    def final_evaluation(
+56	        runs: Sequence[Run], out: Path, *, workers: int | None = None
+57	    ) -&gt; list[Summary]:
+58	        seen.final.append((list(runs), out, workers))
+59	        result: list[Summary] = final_fake(runs, out, workers=workers)
+60	        return result
+61	
+62	    monkeypatch.setattr(pl06_evaluate, &quot;find_runs&quot;, find_runs)
+63	    monkeypatch.setattr(pl06_evaluate, &quot;final_evaluation&quot;, final_evaluation)
+64	    return seen
+65	
+66	
+67	def test_pl06_smoke_evaluate_command_prints_the_summary(
+68	    calls: Calls, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+69	) -&gt; None:
+70	    code = main([&quot;evaluate&quot;, &quot;snake&quot;, &quot;default&quot;, &quot;--root&quot;, str(tmp_path), &quot;--workers&quot;, &quot;2&quot;])
+71	
+72	    assert code == 0
+73	    printed = capsys.readouterr().out
+74	    assert &quot;world=&#x27;snake&#x27;&quot; in printed
+75	    assert &quot;beats_baselines=True&quot; in printed
+76	    assert calls.find == [(tmp_path, &quot;snake&quot;, &quot;default&quot;, ())]
+77	    assert len(calls.final) == 1
+78	    assert calls.final[0][2] == 2
+79	
+80	
+81	def test_pl06_smoke_passes_the_found_runs_to_the_final_evaluation(
+82	    calls: Calls, tmp_path: Path
+83	) -&gt; None:
+84	    summaries = pl06_evaluate.run_evaluate(tmp_path, &quot;snake&quot;, &quot;default&quot;)
+85	
+86	    runs, _out, workers = calls.final[0]
+87	    assert [r.record.config.name for r in runs] == [f&quot;snake-s{i}&quot; for i in range(1, 6)]
+88	    assert runs == calls.found
+89	    assert workers is None
+90	    assert [(s.world, s.variant, s.team) for s in summaries] == [(&quot;snake&quot;, &quot;default&quot;, &quot;snake&quot;)]
+91	
+92	
+93	def test_pl06_smoke_include_adds_the_named_incomplete_run(calls: Calls, tmp_path: Path) -&gt; None:
+94	    names = [
+95	        r[&quot;record&quot;][&quot;config&quot;][&quot;name&quot;]
+96	        for r in load_kit().read(&quot;runlog.find_runs&quot;, &quot;snake_5_plus_incomplete&quot;)
+97	    ]
+98	    incomplete = names[-1]
+99	
+100	    pl06_evaluate.run_evaluate(tmp_path, &quot;snake&quot;, &quot;default&quot;, include=[incomplete])
+101	
+102	    assert calls.find[0][3] == (incomplete,)
+103	    assert len(calls.final[0][0]) == 6
+104	    assert calls.final[0][0][-1].record.config.name == incomplete
+105	
+106	
+107	def test_pl06_smoke_writes_under_the_dated_eval_folder(calls: Calls, tmp_path: Path) -&gt; None:
+108	    before = datetime.now(UTC).date().isoformat()
+109	    pl06_evaluate.run_evaluate(tmp_path, &quot;snake&quot;, &quot;default&quot;)
+110	    after = datetime.now(UTC).date().isoformat()
+111	
+112	    out = calls.final[0][1]
+113	    assert out.parent == tmp_path / &quot;snake&quot; / &quot;default&quot; / &quot;_eval&quot;
+114	    assert out.name in {before, after}
+115	</pre></details></div><div class="step" id="S9"><span class="sid">U41.S9</span><span class="kind">Read</span>/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/project/.claude/worktrees/agent-a5892e837ea0afe73/src/rllab/cli/command.py<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/project/.claude/worktrees/agent-a5892e837ea0afe73/src/rllab/cli/command.py&quot;
+}</pre><div class="lbl">output</div><pre>1	&quot;&quot;&quot;The `rllab` command: parses a trigger, calls its pipeline entry and prints the result (AD-10).&quot;&quot;&quot;
+2	
+3	import argparse
+4	import sys
+5	from collections.abc import Sequence
+6	from pathlib import Path
+7	
+8	from rllab.cli.pipelines.pl04_watch import run_watch
+9	from rllab.cli.pipelines.pl05_chart import run_chart
+10	from rllab.cli.pipelines.pl06_evaluate import run_evaluate
+11	from rllab.train import run_batch, run_check
+12	
+13	
+14	def parse_seeds(text: str) -&gt; list[int]:
+15	    &quot;&quot;&quot;`3`, `1-5` or `1,3,5` to a list of seeds.&quot;&quot;&quot;
+16	    seeds: list[int] = []
+17	    for part in text.split(&quot;,&quot;):
+18	        first, _, last = part.partition(&quot;-&quot;)
+19	        seeds.extend(range(int(first), int(last or first) + 1))
+20	    return seeds
+21	
+22	
+23	def _check(args: argparse.Namespace) -&gt; object:
+24	    return run_check(args.config, args.seed)
+25	
+26	
+27	def _train(args: argparse.Namespace) -&gt; object:
+28	    return run_batch(args.config, [args.seed], args.root, check_seed=args.check_seed)
+29	
+30	
+31	def _batch(args: argparse.Namespace) -&gt; object:
+32	    return run_batch(
+33	        args.config, args.seeds, args.root, workers=args.workers, check_seed=args.check_seed
+34	    )
+35	
+36	
+37	def _watch(args: argparse.Namespace) -&gt; object:
+38	    return run_watch(args.run_path)
+39	
+40	
+41	def _chart(args: argparse.Namespace) -&gt; object:
+42	    return run_chart(
+43	        args.root, args.world, args.variant, include=args.include, measure=args.measure
+44	    )
+45	
+46	
+47	def _evaluate(args: argparse.Namespace) -&gt; object:
+48	    return run_evaluate(
+49	        args.root, args.world, args.variant, include=args.include, workers=args.workers
+50	    )
+51	
+52	
+53	def _parser() -&gt; argparse.ArgumentParser:
+54	    parser = argparse.ArgumentParser(prog=&quot;rllab&quot;)
+55	    sub = parser.add_subparsers(dest=&quot;command&quot;, required=True)
+56	    root = argparse.ArgumentParser(add_help=False)
+57	    root.add_argument(&quot;--root&quot;, type=Path, default=Path(&quot;runs&quot;), help=&quot;the runs folder&quot;)
+58	    runs_of = argparse.ArgumentParser(add_help=False, parents=[root])
+59	    runs_of.add_argument(&quot;world&quot;)
+60	    runs_of.add_argument(&quot;variant&quot;)
+61	    runs_of.add_argument(&quot;--include&quot;, action=&quot;append&quot;, default=[], metavar=&quot;NAME&quot;)
+62	
+63	    check = sub.add_parser(&quot;check&quot;, help=&quot;run the method check of a config&quot;)
+64	    check.add_argument(&quot;config&quot;, type=Path)
+65	    check.add_argument(&quot;--seed&quot;, type=int, default=0)
+66	    check.set_defaults(entry=_check)
+67	
+68	    train = sub.add_parser(&quot;train&quot;, parents=[root], help=&quot;train one seed of a config&quot;)
+69	    train.add_argument(&quot;config&quot;, type=Path)
+70	    train.add_argument(&quot;--seed&quot;, type=int, required=True)
+71	    train.add_argument(&quot;--check-seed&quot;, type=int, default=0)
+72	    train.set_defaults(entry=_train)
+73	
+74	    batch = sub.add_parser(&quot;batch&quot;, parents=[root], help=&quot;train several seeds of a config&quot;)
+75	    batch.add_argument(&quot;config&quot;, type=Path)
+76	    batch.add_argument(&quot;--seeds&quot;, type=parse_seeds, required=True, help=&quot;1-5 or 1,3,5&quot;)
+77	    batch.add_argument(&quot;--workers&quot;, type=int, default=None)
+78	    batch.add_argument(&quot;--check-seed&quot;, type=int, default=0)
+79	    batch.set_defaults(entry=_batch)
+80	
+81	    watch = sub.add_parser(&quot;watch&quot;, help=&quot;show a run&#x27;s progress&quot;)
+82	    watch.add_argument(&quot;run_path&quot;, type=Path)
+83	    watch.set_defaults(entry=_watch)
+84	
+85	    chart = sub.add_parser(&quot;chart&quot;, parents=[runs_of], help=&quot;draw a world&#x27;s learning curves&quot;)
+86	    chart.add_argument(&quot;--measure&quot;, default=None)
+87	    chart.set_defaults(entry=_chart)
+88	
+89	    evaluate = sub.add_parser(&quot;evaluate&quot;, parents=[runs_of], help=&quot;evaluate a world&#x27;s runs&quot;)
+90	    evaluate.add_argument(&quot;--workers&quot;, type=int, default=None)
+91	    evaluate.set_defaults(entry=_evaluate)
+92	    return parser
+93	
+94	
+95	def _show(result: object) -&gt; None:
+96	    for item in result if isinstance(result, list) else [result]:
+97	        print(item)
+98	
+99	
+100	def main(argv: Sequence[str] | None = None) -&gt; int:
+101	    args = _parser().parse_args(argv)
+102	    try:
+103	        _show(args.entry(args))
+104	    except Exception as exc:  # every error is one line naming its cause (cli.main)
+105	        print(f&quot;rllab {args.command}: {type(exc).__name__}: {exc}&quot;, file=sys.stderr)
+106	        return 1
+107	    return 0
+108	</pre></details></div><div class="step" id="S10"><span class="sid">U41.S10</span><span class="kind">Read</span>/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/project/.claude/worktrees/agent-a5892e837ea0afe73/src/rllab/charts/curve.py<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/project/.claude/worktrees/agent-a5892e837ea0afe73/src/rllab/charts/curve.py&quot;
+}</pre><div class="lbl">output</div><pre>1	&quot;&quot;&quot;Learning curves with a min-max band and baseline lines (LOG-03 to LOG-05).&quot;&quot;&quot;
+2	
+3	from collections.abc import Sequence
+4	from pathlib import Path
+5	
+6	import numpy as np
+7	from matplotlib.axes import Axes
+8	from matplotlib.figure import Figure
+9	from numpy.typing import NDArray
+10	
+11	from rllab.core import BaselineMeans, Output, WorldSpec
+12	from rllab.runlog import Run
+13	
+14	STEPS_LABEL = &quot;environment steps&quot;
+15	# The dataviz skill&#x27;s reference palette (light mode): categorical slot 1 and the chart chrome.
+16	SERIES = &quot;#2a78d6&quot;
+17	SURFACE = &quot;#fcfcfb&quot;
+18	INK = &quot;#0b0b0b&quot;
+19	SECONDARY = &quot;#52514e&quot;
+20	MUTED = &quot;#898781&quot;
+21	GRID = &quot;#e1e0d9&quot;
+22	AXIS = &quot;#c3c2b7&quot;
+23	
+24	
+25	def learning_curve(
+26	    runs: Sequence[Run], baselines: BaselineMeans, out: Path, *, measure: str | None = None
+27	) -&gt; Output:
+28	    figure = draw_curves(runs, baselines, measure)
+29	    out.parent.mkdir(parents=True, exist_ok=True)
+30	    figure.savefig(out)
+31	    figure.savefig(out.with_suffix(&quot;.svg&quot;))
+32	    return Output(out, &quot;chart&quot;, tuple(run.record.config.name for run in runs))
+33	
+34	
+35	def draw_curves(runs: Sequence[Run], baselines: BaselineMeans, measure: str | None) -&gt; Figure:
+36	    &quot;&quot;&quot;One panel per team (or one for `measure`): mean line, min-max band, baseline lines.&quot;&quot;&quot;
+37	    if not runs:
+38	        raise ValueError(&quot;no runs to chart&quot;)
+39	    spec = runs[0].record.spec
+40	    panels = _panels(spec, measure)
+41	    figure = Figure(figsize=(6.4 * len(panels), 4.2), facecolor=SURFACE, layout=&quot;constrained&quot;)
+42	    axes = figure.subplots(1, len(panels), squeeze=False)[0]
+43	    for ax, (team, label) in zip(axes, panels, strict=True):
+44	        steps, values = _series(runs, team, measure)
+45	        _draw_band(ax, steps, values, f&quot;{team}: {label}, {len(runs)} runs&quot;)
+46	        if measure is None:
+47	            _draw_baselines(ax, baselines, team)
+48	        _style(ax, label)
+49	    return figure
+50	
+51	
+52	def _panels(spec: WorldSpec, measure: str | None) -&gt; list[tuple[str, str]]:
+53	    &quot;&quot;&quot;(team, y-axis label) per panel: each team&#x27;s score, or the declared measure&#x27;s team.&quot;&quot;&quot;
+54	    if measure is None:
+55	        return [(team.name, team.score_name) for team in spec.teams]
+56	    declared = [m for m in spec.measures if m.name == measure]
+57	    if not declared:
+58	        raise ValueError(f&quot;{spec.world} declares no measure {measure!r}&quot;)
+59	    return [(declared[0].team, measure)]
+60	
+61	
+62	def _series(
+63	    runs: Sequence[Run], team: str, measure: str | None
+64	) -&gt; tuple[NDArray[np.int64], NDArray[np.float64]]:
+65	    &quot;&quot;&quot;The evaluation steps every run has, and each run&#x27;s value there (runs x steps).&quot;&quot;&quot;
+66	    by_run = [
+67	        {p.step: p.scores[team] if measure is None else p.measures[measure] for p in run.evals()}
+68	        for run in runs
+69	    ]
+70	    steps = sorted(set.intersection(*(set(values) for values in by_run)))
+71	    rows = [[values[step] for step in steps] for values in by_run]
+72	    return np.array(steps, dtype=np.int64), np.array(rows, dtype=np.float64)
+73	
+74	
+75	def _draw_band(ax: Axes, steps: NDArray[np.int64], values: NDArray[np.float64], title: str) -&gt; None:
+76	    ax.fill_between(
+77	        steps,
+78	        values.min(axis=0),
+79	        values.max(axis=0),
+80	        color=SERIES,
+81	        alpha=0.18,
+82	        linewidth=0,
+83	        label=&quot;min-max range&quot;,
+84	    )
+85	    ax.plot(steps, values.mean(axis=0), color=SERIES, linewidth=2, label=&quot;mean&quot;)
+86	    ax.set_title(title, color=INK, loc=&quot;left&quot;)
+87	
+88	
+89	def _draw_baselines(ax: Axes, baselines: BaselineMeans, team: str) -&gt; None:
+90	    &quot;&quot;&quot;Both baselines&#x27; mean scores as labelled horizontal reference lines.&quot;&quot;&quot;
+91	    lines = (
+92	        (baselines.random[team], &quot;random play&quot;, &quot;--&quot;, MUTED),
+93	        (baselines.rule[team], &quot;rule-based&quot;, &quot;:&quot;, SECONDARY),
+94	    )
+95	    for value, label, style, color in lines:
+96	        ax.axhline(value, color=color, linestyle=style, linewidth=1.5, label=label)
+97	        ax.annotate(
+98	            label,
+99	            (1.0, value),
+100	            xycoords=(&quot;axes fraction&quot;, &quot;data&quot;),
+101	            xytext=(-4, 4),
+102	            textcoords=&quot;offset points&quot;,
+103	            ha=&quot;right&quot;,
+104	            color=SECONDARY,
+105	            fontsize=8,
+106	        )
+107	
+108	
+109	def _style(ax: Axes, label: str) -&gt; None:
+110	    ax.set_facecolor(SURFACE)
+111	    ax.set_xlabel(STEPS_LABEL, color=SECONDARY)
+112	    ax.set_ylabel(label, color=SECONDARY)
+113	    ax.grid(color=GRID, linewidth=0.8)
+114	    ax.tick_params(colors=MUTED)
+115	    for side in (&quot;top&quot;, &quot;right&quot;):
+116	        ax.spines[side].set_visible(False)
+117	    for side in (&quot;left&quot;, &quot;bottom&quot;):
+118	        ax.spines[side].set_color(AXIS)
+119	    ax.legend(frameon=False, labelcolor=SECONDARY, fontsize=8, loc=&quot;upper left&quot;)
+120	</pre></details></div><div class="step" id="S11"><span class="sid">U41.S11</span><span class="kind">Bash</span>grep -rn &quot;reports/&quot; --include=*.md --include=*.py . --exclude-dir=.venv --exclude-dir=.claude<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;grep -rn \&quot;reports/\&quot; --include=*.md --include=*.py . --exclude-dir=.venv --exclude-dir=.claude&quot;,
+  &quot;description&quot;: &quot;Search for reports folder conventions&quot;
+}</pre><div class="lbl">output</div><pre>(eval):1: no matches found: --include=*.md</pre></details></div><div class="step" id="S12"><span class="sid">U41.S12</span><span class="kind">Bash</span>grep -rn &quot;reports/&quot; docs src tests<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;grep -rn \&quot;reports/\&quot; docs src tests&quot;,
+  &quot;description&quot;: &quot;Search for reports folder conventions&quot;
+}</pre><div class="lbl">output</div><pre>docs/architecture.md:62:- Final evaluations under `runs/&lt;world&gt;/&lt;variant&gt;/_eval/&lt;date&gt;/` (`summary.json`, per-episode scores), reference runs under `_reference/`, charts and videos under `reports/&lt;world&gt;/`, write-ups at `notes/&lt;world&gt;.md`.
+docs/architecture.md:82:reports/       → charts and videos kept alongside the write-ups
+docs/packages/rllab/contract.md:453:- **Invariants:** `ok` only when no part is empty, the struggle part links at least one existing file under `reports/` (NOTES-02) and no link is broken (NOTES edge case)
+docs/packages/rllab/tests.md:186:**Source:** spec.md NOTES-02 and its edge case; two write-ups written by hand and a placeholder `reports/snake/curve.png`
+docs/packages/rllab/tests.md:187:**Expected:** the complete write-up (struggle part links `reports/snake/curve.png`) → `ok` true; the broken one (empty &quot;Why it works here&quot;, struggle part links `reports/snake/missing.mp4`) → `ok` false, `empty_parts` = (&quot;Why it works here&quot;,), `broken_links` = (&quot;reports/snake/missing.mp4&quot;,) · **Tolerance:** exact
+src/rllab/cli/pipelines/pl05_chart.py:12:    &quot;&quot;&quot;Draws the runs under `root` into `reports/&lt;world&gt;/`, the sibling of `root` (AD-06).&quot;&quot;&quot;
+tests/contracts/make_samples.py:326:        Output(Path(&quot;reports/snake/learning-curve-default.png&quot;), &quot;chart&quot;, five),
+tests/contracts/make_samples.py:331:        Output(Path(&quot;reports/snake/rule-seed7.mp4&quot;), &quot;video&quot;, (&quot;rule&quot;, &quot;seed 7&quot;)),
+tests/contracts/core.Output/samples/snake_video.json:2: &quot;path&quot;: &quot;reports/snake/rule-seed7.mp4&quot;,
+tests/contracts/core.Output/samples/snake_curve.json:2: &quot;path&quot;: &quot;reports/snake/learning-curve-default.png&quot;,
+tests/fixtures/rllab/TC-32/expected.json:1:{&quot;complete&quot;: {&quot;ok&quot;: true, &quot;empty_parts&quot;: [], &quot;broken_links&quot;: []}, &quot;broken&quot;: {&quot;ok&quot;: false, &quot;empty_parts&quot;: [&quot;Why it works here&quot;], &quot;broken_links&quot;: [&quot;reports/snake/missing.mp4&quot;]}, &quot;tol&quot;: 0}
+tests/fixtures/rllab/TC-32/broken/notes/snake.md:9:See the replay: [video](../reports/snake/missing.mp4).
+tests/fixtures/rllab/TC-32/complete/notes/snake.md:10:It traps itself late in long episodes: [curve](../reports/snake/curve.png).</pre></details></div><div class="step" id="S13"><span class="sid">U41.S13</span><span class="kind">Bash</span>grep -n -A12 &quot;## PL-0[456]&quot; docs/packages/rllab/pipelines.md<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;grep -n -A12 \&quot;## PL-0[456]\&quot; docs/packages/rllab/pipelines.md&quot;,
+  &quot;description&quot;: &quot;Show PL-04 to PL-06 docs sections&quot;
+}</pre><div class="lbl">output</div><pre>52:## PL-04: Watch a run
+53-**Entry:** `src/rllab/cli/pipelines/pl04_watch.py::run_watch` · **Trigger:** `rllab watch &lt;run-path&gt;`
+54-**Covers:** LOG-06
+55-
+56-| # | Step | Owner | In → Out | Spine version | Covers |
+57-|---|---|---|---|---|---|
+58-| 1 | `progress` | runlog.progress | run path → Progress | last line of `evals.jsonl` plus `run.json`, one snapshot; `--follow` re-reading at each evaluation point is its upgrade | LOG-06 |
+59-
+60-Layout: `dt layout rllab`
+61-
+62:## PL-05: Learning-curve chart
+63-**Entry:** `src/rllab/cli/pipelines/pl05_chart.py::run_chart` · **Trigger:** `rllab chart &lt;world&gt; &lt;variant&gt; [--measure M] [--include NAME]`
+64-**Covers:** LOG-03–LOG-05, PREY-10, EVAL-01, EVAL-02, SNAKE-07, FISH-09, PREY-07
+65-
+66-| # | Step | Owner | In → Out | Spine version | Covers |
+67-|---|---|---|---|---|---|
+68-| 1 | `find_runs` | runlog.read | root, world, variant, include → list[Run] | glob run folders, keep `finished` plus named ones | LOG-03 |
+69-| 2 | `baseline_means` | baselines.means | world, variant → BaselineMeans | random and rule per team on the 20 `EVAL_SEEDS`, rule-based opponents | EVAL-01, EVAL-02 |
+70-| 3 | `RandomPolicy` | baselines.random | ActionSpace → Policy | uniform draws from the passed `rng` | EVAL-01 |
+71-| 4 | `SnakeRule` | baselines.snake | none → RulePolicy | toward food on the shorter axis unless fatal next step | SNAKE-07 |
+72-| 5 | `FishRule` | baselines.fish | none → RulePolicy | full push away from the seen ball, else random | FISH-09 |
+73-| 6 | `PreyRule` | baselines.prey | none → RulePolicy | flee nearest seen predator, else toward nearest seen pellet | PREY-07 |
+74-| 7 | `PredatorRule` | baselines.prey | none → RulePolicy | chase nearest seen prey, else random wander | PREY-07 |
+--
+85:## PL-06: Final evaluation
+86-**Entry:** `src/rllab/cli/pipelines/pl06_evaluate.py::run_evaluate` · **Trigger:** `rllab evaluate &lt;world&gt; &lt;variant&gt; [--include NAME]`
+87-**Covers:** EVAL-03–EVAL-06, SNAKE-08, FISH-10, PREY-08, QR-05
+88-
+89-| # | Step | Owner | In → Out | Spine version | Covers |
+90-|---|---|---|---|---|---|
+91-| 1 | `find_runs` | runlog.read | root, world, variant, include → list[Run] | PL-05 as built | EVAL-03 |
+92-| 2 | `final_evaluation` | evaluate.final | list[Run], out → list[Summary] | serial play of final checkpoints and both baselines on `FINAL_SEEDS`; `compare` per baseline with the `null-hypothesis-testing` skill, Holm, EVAL-05 verdict, `summary.json` | EVAL-03–EVAL-06, PREY-08, QR-05 |
+93-
+94-Layout: `dt layout rllab`
+95-
+96-## PL-07: Replay viewer
+97-**Entry:** `src/rllab/cli/pipelines/pl07_replay.py::run_replay` · **Trigger:** `rllab replay &lt;world&gt; &lt;variant&gt; &lt;side&gt; [&lt;side&gt;] --seed N [--sight]`</pre></details></div><div class="step" id="S14"><span class="sid">U41.S14</span><span class="kind">Bash</span>ls -R tests/fixtures/rllab/TC-15<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;ls -R tests/fixtures/rllab/TC-15&quot;,
+  &quot;description&quot;: &quot;List TC-15 fixture files&quot;
+}</pre><div class="lbl">output</div><pre>expected.json
+input.json
+runs
+
+tests/fixtures/rllab/TC-15/runs:
+a
+b
+c
+
+tests/fixtures/rllab/TC-15/runs/a:
+evals.jsonl
+run.json
+
+tests/fixtures/rllab/TC-15/runs/b:
+evals.jsonl
+run.json
+
+tests/fixtures/rllab/TC-15/runs/c:
+evals.jsonl
+run.json</pre></details></div><div class="step" id="S15"><span class="sid">U41.S15</span><span class="kind">Bash</span>grep -rln &quot;TC-15&quot; tests src<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;grep -rln \&quot;TC-15\&quot; tests src&quot;,
+  &quot;description&quot;: &quot;Find TC-15 references&quot;
+}</pre><div class="lbl">output</div><pre>tests/unit/rllab/test_read.py</pre></details></div><div class="step" id="S16"><span class="sid">U41.S16</span><span class="kind">Read</span>/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/project/.claude/worktrees/agent-a5892e837ea0afe73/tests/fixtures/rllab/TC-15/input.json<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/project/.claude/worktrees/agent-a5892e837ea0afe73/tests/fixtures/rllab/TC-15/input.json&quot;
+}</pre><div class="lbl">output</div><pre>1	{
+2	 &quot;mixed&quot;: [
+3	  &quot;runs/a/&quot;,
+4	  &quot;runs/b/&quot;
+5	 ],
+6	 &quot;few&quot;: [
+7	  &quot;runs/a/&quot;,
+8	  &quot;runs/c/&quot;
+9	 ]
+10	}
+11	</pre></details></div><div class="step" id="S17"><span class="sid">U41.S17</span><span class="kind">Read</span>/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/project/.claude/worktrees/agent-a5892e837ea0afe73/src/rllab/runlog/read.py<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/project/.claude/worktrees/agent-a5892e837ea0afe73/src/rllab/runlog/read.py&quot;
+}</pre><div class="lbl">output</div><pre>1	&quot;&quot;&quot;Run lookup and opening run folders.&quot;&quot;&quot;
+2	
+3	import json
+4	import os
+5	from collections.abc import Sequence
+6	from dataclasses import dataclass
+7	from datetime import UTC, datetime
+8	from pathlib import Path
+9	from typing import Any, Literal
+10	
+11	import torch
+12	
+13	from rllab.core import (
+14	    ActionSpace,
+15	    Box,
+16	    Discrete,
+17	    EpisodeResult,
+18	    MeasureSpec,
+19	    MethodConfig,
+20	    RunConfig,
+21	    TeamSpec,
+22	    WorldSpec,
+23	)
+24	from rllab.runlog.types import Checkpoint, EvalPoint, Failure, Run, RunRecord, RunStatus
+25	
+26	_STATUSES: dict[str, RunStatus] = {
+27	    &quot;running&quot;: &quot;running&quot;,
+28	    &quot;finished&quot;: &quot;finished&quot;,
+29	    &quot;incomplete&quot;: &quot;incomplete&quot;,
+30	    &quot;failed&quot;: &quot;failed&quot;,
+31	}
+32	_METHODS: dict[str, Literal[&quot;dqn&quot;, &quot;ppo&quot;]] = {&quot;dqn&quot;: &quot;dqn&quot;, &quot;ppo&quot;: &quot;ppo&quot;}
+33	_DIRECTIONS: dict[str, Literal[&quot;higher&quot;, &quot;lower&quot;]] = {&quot;higher&quot;: &quot;higher&quot;, &quot;lower&quot;: &quot;lower&quot;}
+34	
+35	
+36	@dataclass
+37	class FolderRun:
+38	    &quot;&quot;&quot;A run folder read from disk; the logs and checkpoints are re-read on each call (LOG-06).&quot;&quot;&quot;
+39	
+40	    record: RunRecord
+41	
+42	    def episodes(self) -&gt; list[EpisodeResult]:
+43	        return [EpisodeResult(**line) for line in _lines(self.record.path / &quot;episodes.jsonl&quot;)]
+44	
+45	    def evals(self) -&gt; list[EvalPoint]:
+46	        return [EvalPoint(**line) for line in _lines(self.record.path / &quot;evals.jsonl&quot;)]
+47	
+48	    def checkpoints(self) -&gt; list[Checkpoint]:
+49	        paths = (self.record.path / &quot;checkpoints&quot;).glob(&quot;ckpt_*.pt&quot;)
+50	        return sorted((_checkpoint(p) for p in paths), key=lambda c: c.pct)
+51	
+52	
+53	def find_runs(root: Path, world: str, variant: str, *, include: Sequence[str] = ()) -&gt; list[Run]:
+54	    &quot;&quot;&quot;The finished runs under `root/&lt;world&gt;/&lt;variant&gt;/`, plus the other runs named in `include`.&quot;&quot;&quot;
+55	    opened = [open_run(p.parent) for p in sorted((root / world / variant).glob(&quot;*/run.json&quot;))]
+56	    return [r for r in opened if r.record.status == &quot;finished&quot; or r.record.config.name in include]
+57	
+58	
+59	def open_run(path: Path) -&gt; Run:
+60	    &quot;&quot;&quot;The run folder at `path`, whatever its status; `FileNotFoundError` without a `run.json`.&quot;&quot;&quot;
+61	    record_file = path / &quot;run.json&quot;
+62	    if not record_file.is_file():
+63	        raise FileNotFoundError(f&quot;no run.json at {path}&quot;)
+64	    return FolderRun(_record(path, json.loads(record_file.read_text())))
+65	
+66	
+67	def _record(path: Path, data: dict[str, Any]) -&gt; RunRecord:
+68	    &quot;&quot;&quot;`run.json` as a record. A hand-written one may leave out the spec, the start time, the
+69	    method settings or the path: the folder itself stands in for the path, its `run.json` time
+70	    for the start and its config&#x27;s world, variant and teams for the spec.&quot;&quot;&quot;
+71	    config = _config(data[&quot;config&quot;])
+72	    written = datetime.fromtimestamp((path / &quot;run.json&quot;).stat().st_mtime, UTC)
+73	    ended = data.get(&quot;ended&quot;)
+74	    failure = data.get(&quot;failure&quot;)
+75	    return RunRecord(
+76	        config=config,
+77	        spec=_spec(data[&quot;spec&quot;]) if &quot;spec&quot; in data else _bare_spec(config),
+78	        started=datetime.fromisoformat(data[&quot;started&quot;]) if &quot;started&quot; in data else written,
+79	        ended=datetime.fromisoformat(ended) if ended else None,
+80	        status=_status(data[&quot;status&quot;], data.get(&quot;pid&quot;)),
+81	        failure=Failure(failure[&quot;step&quot;], failure[&quot;value&quot;], Path(failure[&quot;checkpoint&quot;]))
+82	        if failure
+83	        else None,
+84	        path=path,
+85	    )
+86	
+87	
+88	def _status(status: str, pid: int | None) -&gt; RunStatus:
+89	    &quot;&quot;&quot;A `running` run whose writing process (`pid` in `run.json`) is gone reads as incomplete.&quot;&quot;&quot;
+90	    if status == &quot;running&quot; and not (pid is not None and _alive(pid)):
+91	        return &quot;incomplete&quot;
+92	    return _STATUSES[status]
+93	
+94	
+95	def _alive(pid: int) -&gt; bool:
+96	    try:
+97	        os.kill(pid, 0)
+98	    except ProcessLookupError:
+99	        return False
+100	    except PermissionError:
+101	        return True
+102	    return True
+103	
+104	
+105	def _config(data: dict[str, Any]) -&gt; RunConfig:
+106	    return RunConfig(
+107	        name=data[&quot;name&quot;],
+108	        world=data[&quot;world&quot;],
+109	        variant=data[&quot;variant&quot;],
+110	        methods=_methods(data.get(&quot;methods&quot;, {})),
+111	        seed=data[&quot;seed&quot;],
+112	        budget=data[&quot;budget&quot;],
+113	        check_settings=data.get(&quot;check_settings&quot;, {}),
+114	        device=data.get(&quot;device&quot;, &quot;cpu&quot;),
+115	    )
+116	
+117	
+118	def _methods(data: dict[str, Any]) -&gt; dict[str, MethodConfig]:
+119	    return {
+120	        team: MethodConfig(_METHODS[m[&quot;method&quot;]], m.get(&quot;settings&quot;, {})) for team, m in data.items()
+121	    }
+122	
+123	
+124	def _spec(data: dict[str, Any]) -&gt; WorldSpec:
+125	    return WorldSpec(
+126	        world=data[&quot;world&quot;],
+127	        variant=data[&quot;variant&quot;],
+128	        agents=tuple(data[&quot;agents&quot;]),
+129	        teams=tuple(_team(t) for t in data[&quot;teams&quot;]),
+130	        obs_len=data[&quot;obs_len&quot;],
+131	        action=_action(data[&quot;action&quot;]),
+132	        max_steps=data[&quot;max_steps&quot;],
+133	        measures=tuple(
+134	            MeasureSpec(m[&quot;name&quot;], m[&quot;team&quot;], _DIRECTIONS[m[&quot;direction&quot;]]) for m in data[&quot;measures&quot;]
+135	        ),
+136	        sight=data[&quot;sight&quot;],
+137	    )
+138	
+139	
+140	def _bare_spec(config: RunConfig) -&gt; WorldSpec:
+141	    &quot;&quot;&quot;The spec of a hand-written `run.json` without one: its world, variant and teams only.&quot;&quot;&quot;
+142	    teams = tuple(TeamSpec(team, (), team, &quot;higher&quot;) for team in config.methods)
+143	    return WorldSpec(config.world, config.variant, (), teams, 0, Discrete(0), 0, (), None)
+144	
+145	
+146	def _team(data: dict[str, Any]) -&gt; TeamSpec:
+147	    direction = _DIRECTIONS[data[&quot;direction&quot;]]
+148	    return TeamSpec(data[&quot;name&quot;], tuple(data[&quot;agents&quot;]), data[&quot;score_name&quot;], direction)
+149	
+150	
+151	def _action(data: dict[str, Any]) -&gt; ActionSpace:
+152	    if &quot;n&quot; in data:
+153	        return Discrete(data[&quot;n&quot;])
+154	    return Box(data[&quot;dims&quot;], data[&quot;low&quot;], data[&quot;high&quot;])
+155	
+156	
+157	def _checkpoint(path: Path) -&gt; Checkpoint:
+158	    saved = torch.load(path, weights_only=True)
+159	    return Checkpoint(
+160	        run=saved[&quot;run&quot;],
+161	        pct=saved[&quot;pct&quot;],
+162	        step=saved[&quot;step&quot;],
+163	        spec=_spec(saved[&quot;spec&quot;]),
+164	        methods=_methods(saved[&quot;methods&quot;]),
+165	        state=saved[&quot;state&quot;],
+166	        path=path,
+167	    )
+168	
+169	
+170	def _lines(path: Path) -&gt; list[dict[str, Any]]:
+171	    &quot;&quot;&quot;The complete lines of a JSON Lines log; a line still being written is left out.&quot;&quot;&quot;
+172	    if not path.is_file():
+173	        return []
+174	    *complete, _partial = path.read_text().split(&quot;\n&quot;)
+175	    return [json.loads(line) for line in complete if line]
+176	</pre></details></div><div class="step" id="S18"><span class="sid">U41.S18</span><span class="kind">Bash</span>grep -n &quot;TC-15\|TC15&quot; -A15 tests/unit/rllab/test_read.py<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;grep -n \&quot;TC-15\\|TC15\&quot; -A15 tests/unit/rllab/test_read.py&quot;,
+  &quot;description&quot;: &quot;Show TC-15 use in test_read&quot;
+}</pre><div class="lbl">output</div><pre>1:&quot;&quot;&quot;find_runs and open_run on hand-written folders (TC-14, TC-15) and RunWriter folders (M1-T12).&quot;&quot;&quot;
+2-
+3-import importlib.util
+4-import json
+5-import math
+6-import os
+7-import shutil
+8-import subprocess
+9-import sys
+10-from pathlib import Path
+11-from typing import Any
+12-
+13-import pytest
+14-import torch
+15-
+16-from rllab.core import EpisodeResult, RunConfig, WorldSpec
+--
+22:TC15_RUNS = FIXTURES / &quot;TC-15&quot; / &quot;runs&quot;
+23-TC14_RUN = FIXTURES / &quot;TC-14&quot; / &quot;run&quot;
+24-
+25-
+26-def _load_kit() -&gt; Any:
+27-    if &quot;contracts_kit&quot; not in sys.modules:
+28-        path = Path(__file__).parents[2] / &quot;contracts&quot; / &quot;kit.py&quot;
+29-        spec = importlib.util.spec_from_file_location(&quot;contracts_kit&quot;, path)
+30-        assert spec is not None
+31-        assert spec.loader is not None
+32-        module = importlib.util.module_from_spec(spec)
+33-        sys.modules[&quot;contracts_kit&quot;] = module
+34-        spec.loader.exec_module(module)
+35-    return sys.modules[&quot;contracts_kit&quot;]
+36-
+37-
+--
+45:    &quot;&quot;&quot;TC-15&#x27;s three finished folders under `snake/default/`, plus an incomplete `snake-s4`.&quot;&quot;&quot;
+46-    variant = tmp_path / &quot;snake&quot; / &quot;default&quot;
+47-    for name in (&quot;a&quot;, &quot;b&quot;, &quot;c&quot;):
+48:        shutil.copytree(TC15_RUNS / name, variant / name)
+49:    record = json.loads((TC15_RUNS / &quot;c&quot; / &quot;run.json&quot;).read_text())
+50-    record[&quot;config&quot;][&quot;name&quot;] = &quot;snake-s4&quot;
+51-    record[&quot;status&quot;] = &quot;incomplete&quot;
+52-    (variant / &quot;d&quot;).mkdir()
+53-    (variant / &quot;d&quot; / &quot;run.json&quot;).write_text(json.dumps(record))
+54-    (variant / &quot;_eval&quot;).mkdir()
+55-    return tmp_path
+56-
+57-
+58-def _copy_with(tmp_path: Path, source: Path, **changes: object) -&gt; Path:
+59-    folder = tmp_path / source.name
+60-    shutil.copytree(source, folder)
+61-    record = json.loads((folder / &quot;run.json&quot;).read_text())
+62-    (folder / &quot;run.json&quot;).write_text(json.dumps({**record, **changes}))
+63-    return folder
+64-
+--
+84:    run = open_run(TC15_RUNS / &quot;b&quot;)
+85-    assert run.record.config.budget == 4000
+86-    assert run.record.config.methods[&quot;snake&quot;].settings == {&quot;lr&quot;: 0.001}
+87-    assert run.record.status == &quot;finished&quot;
+88:    assert run.record.path == TC15_RUNS / &quot;b&quot;
+89-    assert [t.name for t in run.record.spec.teams] == [&quot;snake&quot;]
+90-    assert [p.step for p in run.evals()] == [200 * i for i in range(21)]
+91-    assert run.episodes() == []
+92-    assert run.checkpoints() == []
+93-
+94-
+95-def test_open_run_reads_a_running_run_with_no_process_as_incomplete() -&gt; None:
+96-    assert open_run(TC14_RUN).record.status == &quot;incomplete&quot;
+97-
+98-
+99-def test_open_run_keeps_running_while_its_process_lives(tmp_path: Path) -&gt; None:
+100-    folder = _copy_with(tmp_path, TC14_RUN, pid=os.getpid())
+101-    assert open_run(folder).record.status == &quot;running&quot;
+102-
+103-</pre></details></div><div class="step" id="S19"><span class="sid">U41.S19</span><span class="kind">Read</span>/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/project/.claude/worktrees/agent-a5892e837ea0afe73/tests/fixtures/rllab/TC-15/runs/a/run.json<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/project/.claude/worktrees/agent-a5892e837ea0afe73/tests/fixtures/rllab/TC-15/runs/a/run.json&quot;
+}</pre><div class="lbl">output</div><pre>1	{
+2	 &quot;config&quot;: {
+3	  &quot;world&quot;: &quot;snake&quot;,
+4	  &quot;variant&quot;: &quot;default&quot;,
+5	  &quot;methods&quot;: {
+6	   &quot;snake&quot;: {
+7	    &quot;method&quot;: &quot;dqn&quot;,
+8	    &quot;settings&quot;: {
+9	     &quot;lr&quot;: 0.001
+10	    }
+11	   }
+12	  },
+13	  &quot;budget&quot;: 2000,
+14	  &quot;name&quot;: &quot;snake-s1&quot;,
+15	  &quot;seed&quot;: 1
+16	 },
+17	 &quot;status&quot;: &quot;finished&quot;
+18	}
+19	</pre></details></div><div class="step" id="S20"><span class="sid">U41.S20</span><span class="kind">Read</span>/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/project/.claude/worktrees/agent-a5892e837ea0afe73/tests/fixtures/rllab/TC-15/runs/c/run.json<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/project/.claude/worktrees/agent-a5892e837ea0afe73/tests/fixtures/rllab/TC-15/runs/c/run.json&quot;
+}</pre><div class="lbl">output</div><pre>1	{
+2	 &quot;config&quot;: {
+3	  &quot;world&quot;: &quot;snake&quot;,
+4	  &quot;variant&quot;: &quot;default&quot;,
+5	  &quot;methods&quot;: {
+6	   &quot;snake&quot;: {
+7	    &quot;method&quot;: &quot;dqn&quot;,
+8	    &quot;settings&quot;: {
+9	     &quot;lr&quot;: 0.001
+10	    }
+11	   }
+12	  },
+13	  &quot;budget&quot;: 2000,
+14	  &quot;name&quot;: &quot;snake-s3&quot;,
+15	  &quot;seed&quot;: 3
+16	 },
+17	 &quot;status&quot;: &quot;finished&quot;
+18	}
+19	</pre></details></div><div class="step" id="S21"><span class="sid">U41.S21</span><span class="kind">Read</span>/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/project/.claude/worktrees/agent-a5892e837ea0afe73/tests/fixtures/rllab/TC-15/expected.json<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/project/.claude/worktrees/agent-a5892e837ea0afe73/tests/fixtures/rllab/TC-15/expected.json&quot;
+}</pre><div class="lbl">output</div><pre>1	{&quot;mixed&quot;: {&quot;error&quot;: &quot;MixedRunsError&quot;, &quot;names&quot;: [&quot;budget&quot;]}, &quot;few&quot;: {&quot;title_contains&quot;: &quot;2 runs&quot;, &quot;band_note&quot;: true}, &quot;tol&quot;: 0}
+2	</pre></details></div><div class="step" id="S22"><span class="sid">U41.S22</span><span class="kind">Bash</span>ls tests/contracts/baselines.baseline_means tests/contracts &amp;&amp; cat src/rllab/baselines/means.py<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;ls tests/contracts/baselines.baseline_means tests/contracts &amp;&amp; cat src/rllab/baselines/means.py&quot;,
+  &quot;description&quot;: &quot;Inspect baseline_means contract and source&quot;
+}</pre><div class="lbl">output</div><pre>tests/contracts:
+baselines.RandomPolicy
+baselines.RulePolicy
+baselines.baseline_means
+baselines.rule_for
+charts.learning_curve
+conftest.py
+core.ActionSpace
+core.BaselineMeans
+core.DrawState
+core.EVAL_SEEDS
+core.Episode
+core.EpisodeResult
+core.FINAL_SEEDS
+core.Frame
+core.MethodConfig
+core.Output
+core.Policy
+core.RunConfig
+core.Step
+core.TeamSpec
+core.World
+core.WorldSpec
+core.play_episode
+evaluate.Comparison
+evaluate.Summary
+evaluate.final_evaluation
+kit.py
+make_samples.py
+methods.Learner
+methods.Transition
+methods.load_policy
+methods.make_learner
+runlog.Checkpoint
+runlog.EvalPoint
+runlog.Progress
+runlog.Run
+runlog.RunRecord
+runlog.RunWriter
+runlog.find_runs
+runlog.open_run
+test_baselines.py
+test_charts.py
+test_cli.py
+test_core.py
+test_evaluate.py
+test_interface.py
+test_methods.py
+test_runlog.py
+test_samples.py
+test_train.py
+test_worlds.py
+train.CheckResult
+train.load_run_configs
+train.run_batch
+train.run_check
+train.run_train
+worlds.CheckWorld
+worlds.make
+
+tests/contracts/baselines.baseline_means:
+fake.py
+&quot;&quot;&quot;Rule lookup and the baselines&#x27; mean scores on the evaluation seeds.&quot;&quot;&quot;
+
+from statistics import fmean
+
+from rllab.baselines.random import RandomPolicy
+from rllab.baselines.snake import SnakeRule
+from rllab.baselines.types import RulePolicy
+from rllab.core import EVAL_SEEDS, BaselineMeans, Policy, World, play_episode
+from rllab.worlds import make
+
+
+def rule_for(world: str, variant: str, team: str) -&gt; RulePolicy:
+    &quot;&quot;&quot;The rule baseline of `team` in `world`&#x27;s `variant`; `KeyError` naming all three if none.&quot;&quot;&quot;
+    match (world, variant, team):
+        case (&quot;snake&quot;, &quot;default&quot;, &quot;snake&quot;):
+            return SnakeRule()
+    raise KeyError(f&quot;no rule for team {team!r} of world {world!r}, variant {variant!r}&quot;)
+
+
+def baseline_means(world: str, variant: str) -&gt; BaselineMeans:
+    &quot;&quot;&quot;Random and rule mean score per team on `EVAL_SEEDS`, each against rule-based opponents.&quot;&quot;&quot;
+    try:
+        played = make(world, variant)
+    except ValueError as error:
+        raise KeyError(f&quot;no rule for world {world!r}, variant {variant!r}: {error}&quot;) from error
+    spec = played.spec
+    random: dict[str, float] = {}
+    rule: dict[str, float] = {}
+    for team in spec.teams:
+        opponents: dict[str, Policy] = {
+            other.name: rule_for(world, variant, other.name)
+            for other in spec.teams
+            if other.name != team.name
+        }
+        random[team.name] = mean_score(
+            played, {**opponents, team.name: RandomPolicy(spec.action)}, team.name
+        )
+        rule[team.name] = mean_score(
+            played, {**opponents, team.name: rule_for(world, variant, team.name)}, team.name
+        )
+    return BaselineMeans(world=world, variant=variant, random=random, rule=rule)
+
+
+def mean_score(world: World, policies: dict[str, Policy], team: str) -&gt; float:
+    &quot;&quot;&quot;`team`&#x27;s mean score over one episode per evaluation seed.&quot;&quot;&quot;
+    return fmean(play_episode(world, policies, seed).result.scores[team] for seed in EVAL_SEEDS)</pre></details></div><div class="step" id="S23"><span class="sid">U41.S23</span><span class="kind">Write</span>/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/project/.claude/worktrees/agent-a5892e837ea0afe73/src/rllab/cli/pipelines/pl05_chart.py (24 lines)<div class="lbl">wrote /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/project/.claude/worktrees/agent-a5892e837ea0afe73/src/rllab/cli/pipelines/pl05_chart.py</div><pre>&quot;&quot;&quot;PL-05: Learning-curve chart.&quot;&quot;&quot;
+
+from collections.abc import Sequence
+from pathlib import Path
+
+from rllab.baselines import baseline_means
+from rllab.charts import learning_curve
+from rllab.core import Output
+from rllab.runlog import find_runs
+
+
+def run_chart(
+    root: Path, world: str, variant: str, *, include: Sequence[str] = (), measure: str | None = None
+) -&gt; Output:
+    &quot;&quot;&quot;Draws the runs under `root` into `reports/&lt;world&gt;/`, the sibling of `root` (AD-06).&quot;&quot;&quot;
+    runs = find_runs(root, world, variant, include=include)
+    lines = baseline_means(world, variant)
+    return learning_curve(runs, lines, chart_path(root, world, variant, measure), measure=measure)
+
+
+def chart_path(root: Path, world: str, variant: str, measure: str | None) -&gt; Path:
+    &quot;&quot;&quot;`reports/&lt;world&gt;/learning-curve-&lt;variant&gt;[-&lt;measure&gt;].png`, beside `root`.&quot;&quot;&quot;
+    name = f&quot;learning-curve-{variant}&quot; + (f&quot;-{measure}&quot; if measure else &quot;&quot;)
+    return root.parent / &quot;reports&quot; / world / f&quot;{name}.png&quot;
+</pre><details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/project/.claude/worktrees/agent-a5892e837ea0afe73/src/rllab/cli/pipelines/pl05_chart.py&quot;,
+  &quot;content&quot;: &quot;\&quot;\&quot;\&quot;PL-05: Learning-curve chart.\&quot;\&quot;\&quot;\n\nfrom collections.abc import Sequence\nfrom pathlib import Path\n\nfrom rllab.baselines import baseline_means\nfrom rllab.charts import learning_curve\nfrom rllab.core import Output\nfrom rllab.runlog import find_runs\n\n\ndef run_chart(\n    root: Path, world: str, variant: str, *, include: Sequence[str] = (), measure: str | None = None\n) -&gt; Output:\n    \&quot;\&quot;\&quot;Draws the runs under `root` into `reports/&lt;world&gt;/`, the sibling of `root` (AD-06).\&quot;\&quot;\&quot;\n    runs = find_runs(root, world, variant, include=include)\n    lines = baseline_means(world, variant)\n    return learning_curve(runs, lines, chart_path(root, world, variant, measure), measure=measure)\n\n\ndef chart_path(root: Path, world: str, variant: str, measure: str | None) -&gt; Path:\n    \&quot;\&quot;\&quot;`reports/&lt;world&gt;/learning-curve-&lt;variant&gt;[-&lt;measure&gt;].png`, beside `root`.\&quot;\&quot;\&quot;\n    name = f\&quot;learning-curve-{variant}\&quot; + (f\&quot;-{measure}\&quot; if measure else \&quot;\&quot;)\n    return root.parent / \&quot;reports\&quot; / world / f\&quot;{name}.png\&quot;\n&quot;
+}</pre><div class="lbl">output</div><pre>The file /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/project/.claude/worktrees/agent-a5892e837ea0afe73/src/rllab/cli/pipelines/pl05_chart.py has been updated successfully. (file state is current in your context — no need to Read it back)</pre></details></div><div class="step" id="S24"><span class="sid">U41.S24</span><span class="kind">Bash</span>grep -n &quot;baseline_means\|learning_curve&quot; src/rllab/baselines/__init__.py src/rllab/charts/__init__.py<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;grep -n \&quot;baseline_means\\|learning_curve\&quot; src/rllab/baselines/__init__.py src/rllab/charts/__init__.py&quot;,
+  &quot;description&quot;: &quot;Check package exports&quot;
+}</pre><div class="lbl">output</div><pre>src/rllab/charts/__init__.py:3:from rllab.charts.curve import learning_curve
+src/rllab/charts/__init__.py:6:__all__ = [&quot;MixedRunsError&quot;, &quot;learning_curve&quot;]
+src/rllab/baselines/__init__.py:3:from rllab.baselines.means import baseline_means, rule_for
+src/rllab/baselines/__init__.py:7:__all__ = [&quot;RandomPolicy&quot;, &quot;RulePolicy&quot;, &quot;baseline_means&quot;, &quot;rule_for&quot;]</pre></details></div><div class="step" id="S25"><span class="sid">U41.S25</span><span class="kind">say</span>Now the smoke test.<details><summary>full text</summary><pre>Now the smoke test.</pre></details></div><div class="step" id="S26"><span class="sid">U41.S26</span><span class="kind">Write</span>/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/project/.claude/worktrees/agent-a5892e837ea0afe73/tests/unit/rllab/test_pl05_smoke.py (65 lines)<div class="lbl">wrote /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/project/.claude/worktrees/agent-a5892e837ea0afe73/tests/unit/rllab/test_pl05_smoke.py</div><pre>&quot;&quot;&quot;PL-05 smoke test (`rllab chart --smoke`): the `rllab chart` command end to end on TC-15&#x27;s
+equal-settings run folders, with the real run lookup, baseline means and chart.&quot;&quot;&quot;
+
+import shutil
+from pathlib import Path
+
+import pytest
+
+from rllab.cli.command import main
+from rllab.cli.pipelines import pl05_chart
+
+TC15_RUNS = Path(__file__).parents[2] / &quot;fixtures&quot; / &quot;rllab&quot; / &quot;TC-15&quot; / &quot;runs&quot;
+PNG_MAGIC = b&quot;\x89PNG\r\n\x1a\n&quot;
+
+
+@pytest.fixture
+def root(tmp_path: Path) -&gt; Path:
+    &quot;&quot;&quot;TC-15&#x27;s equal-settings folders `a` and `c` under `runs/snake/default/`.&quot;&quot;&quot;
+    runs = tmp_path / &quot;runs&quot;
+    for name in (&quot;a&quot;, &quot;c&quot;):
+        shutil.copytree(TC15_RUNS / name, runs / &quot;snake&quot; / &quot;default&quot; / name)
+    return runs
+
+
+def test_pl05_smoke_chart_command_draws_the_chart(
+    root: Path, capsys: pytest.CaptureFixture[str]
+) -&gt; None:
+    code = main([&quot;chart&quot;, &quot;snake&quot;, &quot;default&quot;, &quot;--root&quot;, str(root)])
+
+    assert code == 0
+    chart = root.parent / &quot;reports&quot; / &quot;snake&quot; / &quot;learning-curve-default.png&quot;
+    assert chart.read_bytes().startswith(PNG_MAGIC)
+    assert chart.with_suffix(&quot;.svg&quot;).is_file()
+    printed = capsys.readouterr().out
+    assert &quot;kind=&#x27;chart&#x27;&quot; in printed
+    assert &quot;made_from=(&#x27;snake-s1&#x27;, &#x27;snake-s3&#x27;)&quot; in printed
+
+
+def test_pl05_smoke_run_chart_returns_the_chart_of_the_found_runs(root: Path) -&gt; None:
+    output = pl05_chart.run_chart(root, &quot;snake&quot;, &quot;default&quot;)
+
+    assert output.path == root.parent / &quot;reports&quot; / &quot;snake&quot; / &quot;learning-curve-default.png&quot;
+    assert output.path.is_file()
+    assert output.kind == &quot;chart&quot;
+    assert output.made_from == (&quot;snake-s1&quot;, &quot;snake-s3&quot;)
+
+
+def test_pl05_smoke_chart_command_reports_a_missing_world_in_one_line(
+    root: Path, capsys: pytest.CaptureFixture[str]
+) -&gt; None:
+    code = main([&quot;chart&quot;, &quot;nowhere&quot;, &quot;default&quot;, &quot;--root&quot;, str(root)])
+
+    assert code == 1
+    assert capsys.readouterr().err.startswith(&quot;rllab chart: &quot;)
+
+
+def test_chart_path_names_the_measure_when_one_is_drawn() -&gt; None:
+    root = Path(&quot;work&quot;) / &quot;runs&quot;
+
+    assert pl05_chart.chart_path(root, &quot;prey&quot;, &quot;default&quot;, None) == Path(
+        &quot;work/reports/prey/learning-curve-default.png&quot;
+    )
+    assert pl05_chart.chart_path(root, &quot;prey&quot;, &quot;default&quot;, &quot;catches&quot;) == Path(
+        &quot;work/reports/prey/learning-curve-default-catches.png&quot;
+    )
+</pre><details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/project/.claude/worktrees/agent-a5892e837ea0afe73/tests/unit/rllab/test_pl05_smoke.py&quot;,
+  &quot;content&quot;: &quot;\&quot;\&quot;\&quot;PL-05 smoke test (`rllab chart --smoke`): the `rllab chart` command end to end on TC-15&#x27;s\nequal-settings run folders, with the real run lookup, baseline means and chart.\&quot;\&quot;\&quot;\n\nimport shutil\nfrom pathlib import Path\n\nimport pytest\n\nfrom rllab.cli.command import main\nfrom rllab.cli.pipelines import pl05_chart\n\nTC15_RUNS = Path(__file__).parents[2] / \&quot;fixtures\&quot; / \&quot;rllab\&quot; / \&quot;TC-15\&quot; / \&quot;runs\&quot;\nPNG_MAGIC = b\&quot;\\x89PNG\\r\\n\\x1a\\n\&quot;\n\n\n@pytest.fixture\ndef root(tmp_path: Path) -&gt; Path:\n    \&quot;\&quot;\&quot;TC-15&#x27;s equal-settings folders `a` and `c` under `runs/snake/default/`.\&quot;\&quot;\&quot;\n    runs = tmp_path / \&quot;runs\&quot;\n    for name in (\&quot;a\&quot;, \&quot;c\&quot;):\n        shutil.copytree(TC15_RUNS / name, runs / \&quot;snake\&quot; / \&quot;default\&quot; / name)\n    return runs\n\n\ndef test_pl05_smoke_chart_command_draws_the_chart(\n    root: Path, capsys: pytest.CaptureFixture[str]\n) -&gt; None:\n    code = main([\&quot;chart\&quot;, \&quot;snake\&quot;, \&quot;default\&quot;, \&quot;--root\&quot;, str(root)])\n\n    assert code == 0\n    chart = root.parent / \&quot;reports\&quot; / \&quot;snake\&quot; / \&quot;learning-curve-default.png\&quot;\n    assert chart.read_bytes().startswith(PNG_MAGIC)\n    assert chart.with_suffix(\&quot;.svg\&quot;).is_file()\n    printed = capsys.readouterr().out\n    assert \&quot;kind=&#x27;chart&#x27;\&quot; in printed\n    assert \&quot;made_from=(&#x27;snake-s1&#x27;, &#x27;snake-s3&#x27;)\&quot; in printed\n\n\ndef test_pl05_smoke_run_chart_returns_the_chart_of_the_found_runs(root: Path) -&gt; None:\n    output = pl05_chart.run_chart(root, \&quot;snake\&quot;, \&quot;default\&quot;)\n\n    assert output.path == root.parent / \&quot;reports\&quot; / \&quot;snake\&quot; / \&quot;learning-curve-default.png\&quot;\n    assert output.path.is_file()\n    assert output.kind == \&quot;chart\&quot;\n    assert output.made_from == (\&quot;snake-s1\&quot;, \&quot;snake-s3\&quot;)\n\n\ndef test_pl05_smoke_chart_command_reports_a_missing_world_in_one_line(\n    root: Path, capsys: pytest.CaptureFixture[str]\n) -&gt; None:\n    code = main([\&quot;chart\&quot;, \&quot;nowhere\&quot;, \&quot;default\&quot;, \&quot;--root\&quot;, str(root)])\n\n    assert code == 1\n    assert capsys.readouterr().err.startswith(\&quot;rllab chart: \&quot;)\n\n\ndef test_chart_path_names_the_measure_when_one_is_drawn() -&gt; None:\n    root = Path(\&quot;work\&quot;) / \&quot;runs\&quot;\n\n    assert pl05_chart.chart_path(root, \&quot;prey\&quot;, \&quot;default\&quot;, None) == Path(\n        \&quot;work/reports/prey/learning-curve-default.png\&quot;\n    )\n    assert pl05_chart.chart_path(root, \&quot;prey\&quot;, \&quot;default\&quot;, \&quot;catches\&quot;) == Path(\n        \&quot;work/reports/prey/learning-curve-default-catches.png\&quot;\n    )\n&quot;
+}</pre><div class="lbl">output</div><pre>File created successfully at: /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/project/.claude/worktrees/agent-a5892e837ea0afe73/tests/unit/rllab/test_pl05_smoke.py (file state is current in your context — no need to Read it back)</pre></details></div><div class="step" id="S27"><span class="sid">U41.S27</span><span class="kind">Bash</span>uv run pytest tests/unit/rllab/test_pl05_smoke.py -q<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;uv run pytest tests/unit/rllab/test_pl05_smoke.py -q&quot;,
+  &quot;description&quot;: &quot;Run PL-05 smoke tests&quot;
+}</pre><div class="lbl">output</div><pre>....                                                                     [100%]
+4 passed in 11.76s</pre></details></div><div class="step" id="S28"><span class="sid">U41.S28</span><span class="kind">Bash</span>scripts/check.sh gate<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;scripts/check.sh gate&quot;,
+  &quot;description&quot;: &quot;Run the gate checks&quot;,
+  &quot;timeout&quot;: 600000
+}</pre><div class="lbl">output</div><pre>-&gt; ruff check --ignore-noqa .
+All checks passed!
+-&gt; ruff format --check .
+128 files already formatted
+-&gt; mypy
+Success: no issues found in 53 source files
+-&gt; python scripts/check_size.py src
+-&gt; deptry . --no-ansi
+Scanning 57 files...
+
+Success! No dependency issues found.
+-&gt; lint-imports --no-logo
+
+---------
+Contracts
+---------
+
+Analyzed 73 files, 213 dependencies.
+------------------------------------
+
+Layers: cli &gt; refcheck | charts | notes &gt; train | evaluate | replay &gt; baselines 
+| methods &gt; worlds | runlog &gt; core KEPT
+Independent: notes | refcheck | charts | replay KEPT
+Independent: notes | train | evaluate | replay KEPT
+Independent: charts | train KEPT
+Independent: notes | baselines | methods KEPT
+Independent: notes | worlds | runlog KEPT
+Independent: methods | worlds KEPT
+Independent: baselines | runlog KEPT
+Independent: notes | core KEPT
+Only refcheck imports Stable-Baselines3 or Gymnasium (CHECK-01, AD-08) KEPT
+
+Contracts: 10 kept, 0 broken.
+-&gt; pytest tests/intent tests/unit tests/contracts --no-cov -q -x
+........................................................................ [ 13%]
+........................................................................ [ 26%]
+........................................................................ [ 39%]
+........................................................................ [ 52%]
+........................................................................ [ 65%]
+........................................................................ [ 78%]
+........................................................................ [ 91%]
+............................................                             [100%]
+548 passed in 33.73s
+-&gt; bash scripts/floor_guard.sh
+floor_guard: clean
+-&gt; protected files unchanged since refs/worktree/checks-base</pre></details></div><div class="step" id="S29"><span class="sid">U41.S29</span><span class="kind">say</span>DONE M1-T23 solo<details><summary>full text</summary><pre>DONE M1-T23 solo</pre></details></div>
+<h2>Commits</h2>
+<p>None.</p>
+<h2>Returned</h2>
+<pre>DONE M1-T23 solo</pre>
+</body></html>

@@ -15,6 +15,8 @@ A decision that picks one cites, in its Context, the official docs it relied on:
 - `**Probe:** PB-NN — <question>` when it rests on what the docs leave open or contradict, or on the user's own accounts or plan (is their team eligible for the free tier, how much history do their banks return). Take the ID from `dt next-id PB`, or reuse a probe another decision already cites. Add a Risks line naming the probe. The entry and its scripts are `api-probe`'s: name the hand-off at the gate, never write them.
 - `**Probe:** none — <why the docs settle it>` otherwise.
 
+A pipeline fed by external sources also decides, once for all of them (*Shared decisions state a rule*): which source wins, field by field, when two cover the same record; one rate limit per provider, shared by every caller and process; the share of rejected records that fails the whole batch; and, when runs repeat, the watermark each source resumes from and how far it backfills.
+
 ## When it touches older decisions
 
 Find every Accepted decision a new one touches: search the doc for the components, data, counts and names it changes.

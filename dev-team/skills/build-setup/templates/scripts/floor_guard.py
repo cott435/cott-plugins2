@@ -12,6 +12,8 @@ Rules (CONSTRAINTS.md ID in brackets):
     stub-task [CR-02]              an interface stub, `raise NotImplementedError("M1-T05")`, naming
                                    a task that is not open in tasks/todo.md (whole repo, not the diff)
     stub-left [CR-02]              any interface stub, with --exit (the milestone exit)
+    stub-pinned [CR-02]            a test naming NotImplementedError: it would pin a stub that a
+                                   later task replaces, so no implementer could pass it
     swallowed-exception [CR-02]    `except:` / `except Exception:` with only pass
     test-skipped [CR-03]           a new skip, skipif, xfail or importorskip
     test-deleted [CR-03]           a test file removed
@@ -80,6 +82,7 @@ RULE_IDS = {
     "stub": "CR-02",
     "stub-task": "CR-02",
     "stub-left": "CR-02",
+    "stub-pinned": "CR-02",
     "swallowed-exception": "CR-02",
     "test-skipped": "CR-03",
     "test-deleted": "CR-03",
@@ -378,6 +381,14 @@ def _asserts(func: ast.AST) -> bool:
     return False
 
 
+def _stub_pinned(path: str, node: ast.AST, test: bool) -> list[Finding]:
+    """A test naming NotImplementedError: it passes only while a stub stands (CR-02)."""
+    if not test or isinstance(node, ast.Call) or _name(node) != "NotImplementedError":
+        return []
+    message = "a test expects NotImplementedError: check the signature, not the stub body"
+    return [Finding("stub-pinned", path, getattr(node, "lineno", 0), message)]
+
+
 def ast_findings(path: str, lines: set[int]) -> list[Finding]:
     try:
         tree = ast.parse(Path(path).read_text(encoding="utf-8"))
@@ -390,6 +401,7 @@ def ast_findings(path: str, lines: set[int]) -> list[Finding]:
             continue
         if outside := _outside_finding(path, node):
             found.append(outside)
+        found += _stub_pinned(path, node, test)
         if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
             if (
                 node not in exempt

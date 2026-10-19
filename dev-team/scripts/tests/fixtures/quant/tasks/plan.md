@@ -127,7 +127,7 @@
 **Acceptance:**
 - [ ] TC-03 passes with a fixed seed
 **Verify:** `pytest tests/intent/quant -k pca` · `scripts/check.sh gate`
-**Depends on:** M1-T06 · **Writes:** src/quant/stats/pca.py, tests/intent/quant/test_pca.py
+**Depends on:** M1-T06 · **Writes:** src/quant/stats/pca.py, tests/unit/quant/test_pca.py, tests/intent/quant/test_pca.py
 
 ### Checkpoint after M1-T13
 - [ ] Every pipeline in the milestone runs end to end (smoke commands)
@@ -140,12 +140,13 @@
 
 ### M1-T14: PL-02 on the real PL-01
 **Package:** quant · **Step:** PL-02 · **Kind:** system · **Size:** S · **Mode:** solo
+**Reason:** mode: the golden cases' intent tests land with the thicken tasks before it
 **Read:** PL-01, PL-02, TC-01, TC-02, TC-03, data.load_prices
 **Acceptance:**
 - [ ] PL-02 calls the real `load_prices`; the fake is used only by contract tests
 - [ ] Both smoke commands pass; TC-01–TC-03 pass
 **Verify:** `python -m quant.data load --smoke` · `python -m quant.stats cov-report --smoke` · `pytest tests/intent/quant` · `scripts/check.sh gate`
-**Depends on:** M1-T08, M1-T09, M1-T10, M1-T11, M1-T12, M1-T13 · **Writes:** src/quant/stats/pipeline.py
+**Depends on:** M1-T08, M1-T09, M1-T10, M1-T11, M1-T12, M1-T13 · **Writes:** src/quant/stats/pipeline.py, tests/unit/quant/test_pl02_smoke.py
 
 ### Checkpoint: milestone exit
 - [ ] Every pipeline in the milestone runs end to end (smoke commands)

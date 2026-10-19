@@ -41,7 +41,7 @@ Ask for approval (a yes also commits) and **stop the turn**.
 
 | The user says | Do |
 |---|---|
-| An unambiguous yes | Set `**Status:** Approved` and `**Last reviewed:**`. Commit the bar if `git status` lists it. **New or Extend:** after that commit, run `python3 ../../scripts/dt.py base` (sets the plan's `**Base:**` to HEAD, so guard-the-bar diffs and Audit start from a commit that holds the bar) and say the next step is `/build`, run by the user. Other modes: the mode file's last step. **Stop.** |
+| An unambiguous yes | Set `**Status:** Approved` and `**Last reviewed:**`. Commit the bar if `git status` lists it. **New or Extend:** after that commit, run `python3 ../../scripts/dt.py base` (sets the plan's `**Base:**` to HEAD, so guard-the-bar diffs and Audit start from a commit that holds the bar) and say the next step is the `build` skill, run by the user. Other modes: the mode file's last step. **Stop.** |
 | A hedge on a loosening or exception ("fine I guess") | Not approval. Ask again about that item |
 | Changes | Edit, keep Draft, repeat the gate |
 

@@ -5,13 +5,13 @@
 ## Types
 
 ### mdata.RawRow: One CSV row
-**Kind:** type · **Sample:** `tests/contracts/mdata.RawRow/sample.json`
+**Kind:** type · **Sample:** `tests/contracts/mdata.RawRow/sample.json` · **Cases:** eight rows of two tickers, one with a blank close
 `@dataclass(frozen=True) class RawRow: date: str; ticker: str; close: float | None`
 - **Invariants:** `date` is ISO `yyyy-mm-dd`; `close` is None for a blank cell
 - **Used by:** PL-01
 
 ### mdata.Prices: Aligned daily closes
-**Kind:** type · **Sample:** `tests/contracts/mdata.Prices/sample.json`
+**Kind:** type · **Sample:** `tests/contracts/mdata.Prices/sample.json` · **Cases:** two tickers over six aligned dates
 `@dataclass(frozen=True) class Prices: dates: tuple[str, ...]; tickers: tuple[str, ...]; closes: Mapping[str, tuple[float, ...]]`
 - **Invariants:** dates ascending; tickers sorted; every ticker has one positive close per date
 - **Used by:** PL-01, PL-02

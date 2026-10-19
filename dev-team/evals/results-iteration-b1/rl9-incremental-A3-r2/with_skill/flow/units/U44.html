@@ -1,0 +1,1166 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1"><title>U44 implementer</title>
+<style>
+:root{--bg:#fbfbfa;--fg:#1d1d1f;--muted:#6b6b70;--line:#d9d9de;--box:#fff;--rowp:#eef3fb;--band:#fff4d6;
+--ok:#2e7d32;--bad:#c62828;--warn:#b26a00;--idle:#6b6b70}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#17171a;--fg:#ececf0;--muted:#9a9aa3;
+--line:#34343a;--box:#222227;--rowp:#1d2433;--band:#3a3015;--ok:#6fcf73;--bad:#ff6b6b;--warn:#f0b35a;--idle:#9a9aa3}}
+:root[data-theme="dark"]{--bg:#17171a;--fg:#ececf0;--muted:#9a9aa3;--line:#34343a;--box:#222227;--rowp:#1d2433;
+--band:#3a3015;--ok:#6fcf73;--bad:#ff6b6b;--warn:#f0b35a;--idle:#9a9aa3}
+body{margin:0;padding:16px;background:var(--bg);color:var(--fg);font:14px/1.45 -apple-system,system-ui,sans-serif}
+h1{font-size:18px;margin:0 0 4px}h2{font-size:15px;margin:22px 0 8px}.sub{color:var(--muted)}
+table{border-collapse:collapse;margin:4px 0 8px}td,th{border-bottom:1px solid var(--line);padding:4px 10px;text-align:left;
+vertical-align:top}th{color:var(--muted);font-weight:600}.chips span{display:inline-block;margin:0 4px 2px 0}
+.legend span{margin-right:14px;white-space:nowrap}.sw{display:inline-block;width:10px;height:10px;border-radius:2px;
+margin-right:4px;vertical-align:-1px}.scroll{overflow:auto;max-height:88vh;border:1px solid var(--line);border-radius:8px}
+.chart{display:grid;width:max-content}.chart>div{line-height:0}.corner{position:sticky;top:0;left:0;z-index:3}
+.colhead{position:sticky;top:0;z-index:2}.rowhead{position:sticky;left:0;z-index:2}
+svg.bg{background:var(--bg)}.colhead svg{border-bottom:1px solid var(--line)}.rowhead svg{border-right:1px solid var(--line)}
+.ok{color:var(--ok);fill:var(--ok)}.bad{color:var(--bad);fill:var(--bad)}.warn{color:var(--warn);fill:var(--warn)}
+.idle{color:var(--idle);fill:var(--idle)}
+svg text{fill:var(--fg);font-family:-apple-system,system-ui,sans-serif}
+.box{fill:var(--box);stroke:var(--line)}.unit:hover .box{stroke:var(--fg)}
+.role{font-size:12px;font-weight:600}.uid,.wmeta,.lmeta,.meta{font-size:10px;fill:var(--muted)}
+.sub{font-size:10.5px;fill:var(--muted)}.badge{font-size:11px;font-weight:600}
+.meta.bad{fill:var(--bad);font-weight:600}.lane{font-size:13px;font-weight:700}.wave{font-size:13px;font-weight:700}
+.par{fill:#4e79a7}.ser{fill:var(--muted)}.rowp{fill:var(--rowp)}.rows{fill:transparent}.band{fill:var(--band)}
+.bandt{font-size:11.5px}.grid{stroke:var(--line)}.link{stroke:var(--muted);stroke-width:1.2;opacity:.55}
+.arrowhead{fill:var(--muted)}.marks{font-size:10.5px}.audit{stroke:var(--box);stroke-width:2}.auditn{font-size:10px;font-weight:700;fill:#fff}
+a{color:inherit}svg a .box{cursor:pointer}
+
+:root{--c0:#2a78d6;--c1:#eb6834;--c2:#1baf7a;--c3:#eda100;--c4:#e87ba4;--c5:#008300;--c6:#6250d6;--c7:#e34948;
+--cx:#8a8985;--main:#52514e;--read:#dcdbd5;--readfg:#1d1d1f}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--c0:#3987e5;--c1:#d95926;--c2:#199e70;
+--c3:#c98500;--c4:#d55181;--c5:#008300;--c6:#9085e9;--c7:#e66767;--cx:#77766f;--main:#c3c2b7;--read:#3b3b40;
+--readfg:#ececf0}}
+:root[data-theme="dark"]{--c0:#3987e5;--c1:#d95926;--c2:#199e70;--c3:#c98500;--c4:#d55181;--c5:#008300;
+--c6:#9085e9;--c7:#e66767;--cx:#77766f;--main:#c3c2b7;--read:#3b3b40;--readfg:#ececf0}
+.c0{fill:var(--c0);background:var(--c0)}.c1{fill:var(--c1);background:var(--c1)}.c2{fill:var(--c2);background:var(--c2)}
+.c3{fill:var(--c3);background:var(--c3)}.c4{fill:var(--c4);background:var(--c4)}.c5{fill:var(--c5);background:var(--c5)}
+.c6{fill:var(--c6);background:var(--c6)}.c7{fill:var(--c7);background:var(--c7)}.cx{fill:var(--cx);background:var(--cx)}
+.cmain{fill:var(--main)}.sc0{stroke:var(--c0)}.sc1{stroke:var(--c1)}.sc2{stroke:var(--c2)}
+.tl text,.sm text,.lc text{font-size:10.5px;fill:var(--muted)}.tl .lbl-in,.sm .lbl-in{fill:#fff;font-size:10.5px;font-weight:600}
+.tl .rowl,.sm .rowl,.lc .rowl{fill:var(--fg);font-size:11.5px;font-weight:600}.tl .band{fill:var(--rowp)}
+.tl .brk{stroke:var(--muted);stroke-dasharray:2 3}.tl a:hover rect,.sm a:hover rect{stroke:var(--fg);stroke-width:1.5}
+.axis{stroke:var(--line)}.sm .val{fill:var(--fg);font-weight:600}.lc path.ln{fill:none;stroke-width:2}
+.lc circle{stroke:var(--bg);stroke-width:2}.lc .end{font-weight:600;fill:var(--fg)}
+.tiles{display:flex;flex-wrap:wrap;gap:10px;margin:12px 0}.tile{border:1px solid var(--line);border-radius:8px;
+padding:8px 12px;min-width:110px;background:var(--box)}.tile b{display:block;font-size:20px;line-height:1.2}
+.tile span{font-size:12px;color:var(--muted)}.tile i{font-style:normal;font-size:12px;margin-left:6px}
+.fm{border-collapse:separate;border-spacing:2px}.fm td,.fm th{border:0;padding:0;text-align:center;font-size:11px}
+.fm th{padding:0 2px;font-weight:600}.fm td.f,.fm th.f{text-align:left;padding-right:10px;white-space:nowrap;
+position:sticky;left:0;background:var(--bg);font:11.5px ui-monospace,Menlo,monospace;
+max-width:380px;overflow:hidden;text-overflow:ellipsis}
+.fm td.cell{min-width:22px;height:20px;border-radius:3px}.fm td.fw{background:var(--c0);color:#fff;font-weight:700}
+.fm td.fe{background:var(--c1);color:#fff;font-weight:700}.fm td.fr{background:var(--read);color:var(--readfg)}
+.fm td.n{color:var(--muted);padding:0 6px}.fm tr.grp td{text-align:left;padding-top:8px;color:var(--muted);
+font-weight:600}
+.key{display:inline-block;min-width:18px;text-align:center;border-radius:3px;font-size:11px;margin-right:4px}
+.bar{display:inline-block;height:9px;border-radius:2px;vertical-align:0}
+
+pre{white-space:pre-wrap;word-break:break-word;background:var(--box);border:1px solid var(--line);border-radius:6px;
+padding:8px 10px;margin:4px 0;font:12px/1.45 ui-monospace,SFMono-Regular,Menlo,monospace;max-width:100%;overflow:auto}
+.step{border-top:1px solid var(--line);padding:6px 0}.step:target{background:var(--rowp)}
+.sid{font:12px ui-monospace,Menlo,monospace;color:var(--muted);margin-right:8px}.kind{font-weight:600;margin-right:8px}
+.err{color:var(--bad);font-weight:600}.hook{color:var(--bad);margin:4px 0 0 16px}.lbl{font-size:12px;color:var(--muted);margin-top:6px}
+details summary{cursor:pointer;color:var(--muted);font-size:12px}.head td:first-child{color:var(--muted)}
+.top{font-size:13px}.narr{list-style:none;padding-left:0}.narr li{margin:3px 0}
+</style></head>
+<body>
+<p class="top"><a href="../flow.html">← the run's flow chart</a></p>
+
+<h1>U44 · implementer · M1-T20 implementer</h1>
+<table class="head"><tr><td>Type</td><td>implementer</td></tr><tr><td>Description</td><td>M1-T20 implementer</td></tr><tr><td>Spawned by</td><td>driver at D334</td></tr><tr><td>Turn</td><td><a href="../turns/T12.html">T12</a></td></tr><tr><td>Model</td><td>claude-opus-5-5</td></tr><tr><td>Start</td><td>2026-10-19 05:58:07 UTC</td></tr><tr><td>Duration</td><td>2 min</td></tr><tr><td>Tool calls</td><td>20</td></tr><tr><td>Errors</td><td>1</td></tr><tr><td>Hook blocks</td><td>0</td></tr><tr><td>Tokens</td><td>8.2k out · 31.7k new in · 341k cached in · peak context 36.4k</td></tr><tr><td>Skills invoked</td><td>none</td></tr><tr><td>Files written or edited</td><td>.claude/worktrees/agent-afa0e783c69fb3fcc/src/rllab/viz/replay.py, .claude/worktrees/agent-afa0e783c69fb3fcc/tests/unit/rllab/test_replay_viewer.py</td></tr><tr><td>Definition</td><td>none</td></tr><tr><td>Steps</td><td>23</td></tr><tr><td>Finished</td><td>yes</td></tr></table>
+
+
+<h2>Prompt</h2>
+<pre>You are the implementer for M1-T20. Run `python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/plugin/dev-team/scripts/dt.py claim M1-T20 --role implementer`, then read the packet it names.</pre>
+<h2>Files</h2>
+<table><tr><th>Op</th><th>File</th><th>Calls</th><th>By</th><th>Via</th><th>Steps</th></tr><tr><td>write</td><td><code>.claude/worktrees/agent-afa0e783c69fb3fcc/src/rllab/viz/replay.py</code></td><td>1</td><td>U44</td><td>Write</td><td><a href="#12">U44.S12</a></td></tr><tr><td>write</td><td><code>.claude/worktrees/agent-afa0e783c69fb3fcc/tests/unit/rllab/test_replay_viewer.py</code></td><td>1</td><td>U44</td><td>Write</td><td><a href="#16">U44.S16</a></td></tr><tr><td>edit</td><td><code>.claude/worktrees/agent-afa0e783c69fb3fcc/tests/unit/rllab/test_replay_viewer.py</code></td><td>1</td><td>U44</td><td>Edit</td><td><a href="#21">U44.S21</a></td></tr><tr><td>read</td><td><code>.claude/worktrees/agent-afa0e783c69fb3fcc/.claude/packet.md</code></td><td>1</td><td>U44</td><td>Read</td><td><a href="#4">U44.S4</a></td></tr><tr><td>read</td><td><code>.claude/worktrees/agent-afa0e783c69fb3fcc/CONSTRAINTS.md</code></td><td>1</td><td>U44</td><td>Read</td><td><a href="#3">U44.S3</a></td></tr><tr><td>read</td><td><code>.claude/worktrees/agent-afa0e783c69fb3fcc/src/rllab/viz/curves.py</code></td><td>1</td><td>U44</td><td>Read</td><td><a href="#10">U44.S10</a></td></tr><tr><td>read</td><td><code>.claude/worktrees/agent-afa0e783c69fb3fcc/src/rllab/viz/replay.py</code></td><td>1</td><td>U44</td><td>Read</td><td><a href="#5">U44.S5</a></td></tr><tr><td>read</td><td><code>.claude/worktrees/agent-afa0e783c69fb3fcc/tests/contracts/viz.Replay/fake.py</code></td><td>1</td><td>U44</td><td>Read</td><td><a href="#8">U44.S8</a></td></tr><tr><td>read</td><td><code>.claude/worktrees/agent-afa0e783c69fb3fcc/tests/contracts/viz.Replay/test_viz_replay.py</code></td><td>1</td><td>U44</td><td>Read</td><td><a href="#9">U44.S9</a></td></tr><tr><td>read</td><td><code>.claude/worktrees/agent-afa0e783c69fb3fcc/tests/intent/rllab/test_replay_viewer.py</code></td><td>1</td><td>U44</td><td>Read</td><td><a href="#7">U44.S7</a></td></tr><tr><td>read</td><td><code>.claude/worktrees/agent-afa0e783c69fb3fcc/tests/unit/rllab/test_curves.py</code></td><td>1</td><td>U44</td><td>Read</td><td><a href="#13">U44.S13</a></td></tr></table>
+<h2>Steps</h2>
+<div class="step" id="S1"><span class="sid">U44.S1</span><span class="kind">user</span>You are the implementer for M1-T20. Run `python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/plugin/dev-team/scripts/dt.py claim M1-T20 --role implementer`, then read the packet it names.<details><summary>full text</summary><pre>You are the implementer for M1-T20. Run `python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/plugin/dev-team/scripts/dt.py claim M1-T20 --role implementer`, then read the packet it names.</pre></details></div><div class="step" id="S2"><span class="sid">U44.S2</span><span class="kind">Bash</span>python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/plugin/dev-team/scripts/dt.py claim M1-T20 --role implementer<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/plugin/dev-team/scripts/dt.py claim M1-T20 --role implementer&quot;,
+  &quot;description&quot;: &quot;Claim the task&quot;
+}</pre><div class="lbl">output</div><pre>packet: /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/project/.claude/worktrees/agent-afa0e783c69fb3fcc/.claude/packet.md (146 lines; read it in full)
+task: M1-T20 Interactive replay viewer · role implementer · package rllab · kind thicken
+writes: src/rllab/viz/replay.py, tests/unit/rllab/test_replay_viewer.py
+done: Done when `scripts/check.sh gate` passes (the gate passes on your Writes); the Stop hook runs it. End with one line: `DONE M1-T20 implementer`. If you can&#x27;t finish: `python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/plugin/dev-team/scripts/dt.py escalate &lt;TEST-WRONG|NEEDS-DEP&gt; &quot;&lt;why&gt;&quot;`, or `python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/plugin/dev-team/scripts/dt.py escalate CONTRACT-CHANGE &quot;&lt;why&gt;&quot; --type &lt;the contract symbol&gt;`, then end with one line: `STOPPED M1-T20 implementer: see dt escalate`.</pre></details></div><div class="step" id="S3"><span class="sid">U44.S3</span><span class="kind">Read</span>/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/project/.claude/worktrees/agent-afa0e783c69fb3fcc/CONSTRAINTS.md<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/project/.claude/worktrees/agent-afa0e783c69fb3fcc/CONSTRAINTS.md&quot;
+}</pre><div class="lbl">output</div><pre>1	# Constraints
+2	**Status:** Approved · **Last reviewed:** 2026-10-19 by @connorott · **Ratcheted:** —
+3	
+4	The standing quality bar. `pyproject.toml` and `scripts/check.sh` enforce it; every number here names its config key, and `dt status` fails if the two disagree. Only `build-setup` changes this file, with the user: tightening is routine, loosening needs an explicit yes.
+5	
+6	## Floor
+7	- **CR-01** No new suppressions. Ruff runs with `--ignore-noqa` in gate and full, so a Ruff exception is a `per-file-ignores` entry in protected config with a row in Exceptions. `floor_guard.sh` catches the other suppressions on the diff
+8	- **CR-02** No stubs: `raise NotImplementedError` outside abstract methods, `pass`-only bodies, bare `except: pass`. One carve-out: the interface task&#x27;s step signatures, whose body is only `raise NotImplementedError(&quot;&lt;task id&gt;&quot;)` naming the open task that replaces it. `check.sh gate` fails on one naming a task that isn&#x27;t open in `tasks/todo.md`, and on a test that expects one (`stub-pinned`); `check.sh full --exit` fails on any
+9	- **CR-03** No skipped, deleted or assertion-free tests, unless a row in Exceptions names the test file
+10	- **CR-04** No secrets in source
+11	- **CR-05** Oracle files (`tests/fixtures/**/expected.json`) change only with the user&#x27;s approval
+12	- **CR-06** The implementer never changes `tests/intent/**`
+13	- **CR-07** This file, `pyproject.toml` tool config, `scripts/` and `.claude/agents/` are not weakened to make a change pass
+14	- **CR-08** Nothing imports from `references/` or `probes/`, or adds either to `sys.path` (or `PYTHONPATH`, pytest `pythonpath`). `floor_guard.sh` checks the diff for both. Code copied from either is project code and meets the same bar
+15	- **CR-09** A frozen interface (`tests/contracts/&lt;id&gt;.&lt;symbol&gt;/`: schema, samples, fake; and the types, signatures and exports the interface task wrote) is frozen once it exists at the task&#x27;s base. Only the interface task freezing it (`**Kind:** interface`) writes a new folder, and no other task&#x27;s `Writes:` names its `types.py` or `__init__.py`; a frozen interface changes only through `architecture-design` Revise, never to make a test pass
+16	
+17	## Readability
+18	- **CR-10** One entry function per pipeline; it reads top to bottom as its named steps (reviewer + `dt layout`)
+19	- **CR-11** No registries, plugin dispatch or config-driven wiring without an AD
+20	- **CR-12** New abstraction only with a second real implementation or a named seam
+21	
+22	
+23	## Enforced with numbers
+24	| ID | Dimension | Rule | Checked by | Config key | Runs at |
+25	|---|---|---|---|---|---|
+26	| CR-20 | Lint | zero errors; standing per-file-ignores only for `tests/**` and `__init__.py` | ruff | `tool.ruff.lint.select` | edit, gate |
+27	| CR-21 | Complexity | ≤ 10 per function | ruff C901 | `tool.ruff.lint.mccabe.max-complexity` | gate |
+28	| CR-22 | Size | ≤ 500 lines/module, ≤ 60/function | check_size.py | `tool.size_limits` | edit, gate |
+29	| CR-23 | Types | zero errors, strict | mypy | `tool.mypy.strict` | gate |
+30	| CR-24 | Boundaries | import contracts hold | import-linter | `tool.importlinter.contracts` | gate |
+31	| CR-25 | Dependencies | none missing or unused | deptry | `tool.deptry` | gate |
+32	| CR-26 | Deps security | nothing known-vulnerable | pip-audit | — | full, CI nightly |
+33	| CR-27 | Reproducibility | same settings and seed give the same run (RUN-03, AD-08) | pytest `-m repro` | `tool.pytest.ini_options.markers` | gate |
+34	
+35	## Measured, not yet enforced
+36	| ID | Metric | Today | Direction |
+37	|---|---|---|---|
+38	| CR-40 | Coverage (branch) | — (no code) (`tool.coverage.report.fail_under`, raised by Ratchet) | must not fall |
+39	| CR-41 | vulture findings at `min_confidence = 60` (`scripts/vulture_whitelist.py`) | 0 | must not grow by `full --exit` (earlier `full` runs report) |
+40	| CR-42 | Duplicate blocks of ≥ 8 similar source lines (pylint `duplicate-code`, `[tool.pylint.similarities]` in pyproject.toml) | 0 | must not grow |
+41	
+42	## Boundaries (generated from architecture — do not edit)
+43	- `rllab.core` imports nothing first-party · `envs`, `agents`, `runs` → core · `evaluate` → core, runs · `baselines` → core, envs · `train` → core, runs, evaluate · `reference` → core, envs, runs, evaluate · `compare` → evaluate · `viz` → runs · `lab` → all
+44	- Only `rllab.reference` imports `stable_baselines3` or `gymnasium`; only `rllab.agents` imports `torch`
+45	
+46	## Roles and protected paths
+47	| Role | May edit | May not edit | Stop gate |
+48	|---|---|---|---|
+49	| tester | `tests/intent/**`, within the task&#x27;s `Writes:` | everything else; reads no source | `check.sh collect` (lint, collect, red for the right reason) |
+50	| implementer / solo | `src/**`, `tests/unit/**`, within the task&#x27;s `Writes:`; an interface task also the `tests/contracts/&lt;id&gt;.&lt;symbol&gt;/` its `Writes:` names | the protected list; `tasks/` | `check.sh gate` + protected-path diff against the worktree&#x27;s base |
+51	| reviewer | its worktree, for the mutation check, and its findings file; nothing lands (the orchestrator records findings with `dt finding`) | everything else | runs `check.sh full` by hand |
+52	
+53	**Protected list** (`PROTECTED` in `scripts/check.sh`; `path_guard.sh deny --protected` reads the same list): `tests/intent/**`, `tests/fixtures/**`, `tests/conftest.py`, `pyproject.toml`, `uv.lock`, `CONSTRAINTS.md`, `scripts/**`, `.claude/agents/**`, `.claude/settings.json`, `references/**`, `probes/**`, `tests/contracts/**`. `tests/contracts/**` covers the contract folders that exist at the task&#x27;s base (CR-09). **`Writes:`**: `dt claim` writes the role&#x27;s share of the task&#x27;s `Writes:` to `.claude/.task_writes` and sets the worktree&#x27;s base; `path_guard.sh writes` blocks edits outside it, and builder edits before the claim. Only the orchestrator writes `tasks/` (`dt land`, `dt finding`).
+54	
+55	**Worktree links:** none
+56	
+57	## Review
+58	Run by the reviewer agent: the interface review after Phase 0, a phase review per package at each checkpoint, and the milestone exit. `dt land` already checked each landing&#x27;s `Writes:`, protected paths and gates; review judges what tools can&#x27;t.
+59	
+60	**Interface** (after Phase 0): the code is the contract, no more and no less.
+61	1. Types match `contract.md`: fields, types, invariants. Nothing a step&#x27;s In → Out needs is missing; no helper is frozen.
+62	2. Signatures match the step tables, in their owner modules. Each stub names the open task that owns its step; no logic beyond types and validation.
+63	3. One sample per case the contract names, valid and realistic, never holding a TC&#x27;s expected value. Replay doubles replay an interaction the Protocol allows. Each fake passes its contract&#x27;s cases; anything it does beyond echoing a fixture (filtering, ordering, an error) is a case the real provider must pass too. Contract tests check shape only, never a stub or other state a later task changes.
+64	4. `__init__.py` exports exactly the contract; each `Mitigated by` in the plan&#x27;s dependency graph exists; each split task&#x27;s tester can write its tests from the frozen interface and its `Read:`.
+65	
+66	**Each phase**, per package, tests before code:
+67	1. **Interfaces followed** (CR-09): no frozen type, signature or contract folder changed outside a Revise. Consumers use the declared types: no dict for a dataclass, no reaching into a provider&#x27;s internals, no local redefinition. A stub is replaced only by the task it names; no cross-package import outside the contract; spine tests run on samples and doubles, not another step&#x27;s code.
+68	2. **Tests prove something:** each intent test asserts its TC case or acceptance bullet, loading expected values and tolerances from fixtures; none is assertion-free or weakened; Hypothesis runs the `ci` profile. Unit tests are specific, never computing the expected value with the code under test or testing only a mock. **Mutation check** (`.claude/agents/reviewer.md`): per acceptance bullet, the smallest change that should break it; a mutation no test catches is a finding.
+69	3. **Correct to the spec:** each acceptance bullet truly met, not special-cased to the sample; the error paths the requirement names; seeding and determinism; numerical edge cases.
+70	4. **Simple** (CR-11, CR-12, CR-42): no abstraction with one implementation outside the contract or an AD; no forwarding wrapper, one-method class, or class where a function does; no parameter, flag or config key every caller sets the same; no `try/except` that only re-raises or swallows, no checks the types already guarantee; no loop the library already provides. No near-copies within or across the phase&#x27;s tasks: one concept is one function in its owner module (tests may repeat for readability). Each finding names the simpler form, with the same tests passing.
+71	5. **Pipelines** (CR-10): entry functions read as their step tables (`dt layout`); step owners respected; spine baselines still selectable.
+72	6. **The bar** (CR-07): diff this file, `pyproject.toml`, `scripts/` and `.claude/agents/` against the milestone&#x27;s Base. Any loosening is Critical; new exceptions need an owner and expiry.
+73	7. **Hidden and parallel risks:** where a real provider could act differently from its double; fixed output paths, global state, test-order dependence.
+74	8. **The rest:** readability, security, performance where a QR sets a number; reused reference or probe code has its Caveats handled and fits the contract; `dt lint` clean, pre-build sections replaced by `dt layout` pointers.
+75	
+76	**Milestone exit**, over the whole diff, adds: the Scope&#x27;s Exit holds; every Covers ID has a test; `check.sh full --exit` finds no stub; system tests use real providers; the same sample through a real provider and its double agrees; deferred requirements untouched; pip-audit ran.
+77	
+78	**Severity:** Critical: a frozen interface changed, a contract test pinning a transient state, a weakened test, an intent test that misses a mutation changing its TC&#x27;s expected output, a wrong answer, a loosened bar, a security hole, lost data; it stops the build. Important: a consumer bypassing a type, any other surviving mutation, an unneeded abstraction, a duplicate across tasks. Suggestion and Nit: local. Findings go under the checkpoint block in `tasks/plan.md` (`dt finding`), each with a fix task or a reason.
+79	
+80	## Done
+81	agent-skills `references/definition-of-done.md`, tailored once:
+82	- **Correctness and Quality:** checked per task by the gate.
+83	- **Integration and Documentation:** checked at each checkpoint.
+84	- **The full list:** checked at milestone exit.
+85	
+86	## Exceptions
+87	| ID | Rule | Path | Reason | Owner | Expires |
+88	|---|---|---|---|---|---|
+89	| EX-01 | CR-25 DEP002 | `numpy`, `torch`, `matplotlib`, `stable-baselines3`, `gymnasium` | M1 dependencies, declared before the code imports them | @connorott | M1 exit |
+90	| EX-02 | CR-24 layers | `rllab.compare` → `rllab.viz` | `compare.run_claims` takes `charts: Sequence[viz.Chart]` (contract); the sibling layers forbid it (M1-T01 escalation) | @connorott | M1 exit |
+91	</pre></details></div><div class="step" id="S4"><span class="sid">U44.S4</span><span class="kind">Read</span>/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/project/.claude/worktrees/agent-afa0e783c69fb3fcc/.claude/packet.md<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/project/.claude/worktrees/agent-afa0e783c69fb3fcc/.claude/packet.md&quot;
+}</pre><div class="lbl">output</div><pre>1	# Packet: M1-T20 implementer
+2	You are the implementer for M1-T20. Your edit boundary is your Writes below (`.claude/.task_writes`); the guard blocks everything else.
+3	
+4	Done when `scripts/check.sh gate` passes (the gate passes on your Writes); the Stop hook runs it. End with one line: `DONE M1-T20 implementer`. If you can&#x27;t finish: `python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/plugin/dev-team/scripts/dt.py escalate &lt;TEST-WRONG|NEEDS-DEP&gt; &quot;&lt;why&gt;&quot;`, or `python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/plugin/dev-team/scripts/dt.py escalate CONTRACT-CHANGE &quot;&lt;why&gt;&quot; --type &lt;the contract symbol&gt;`, then end with one line: `STOPPED M1-T20 implementer: see dt escalate`.
+5	
+6	# Context for M1-T20: package rllab · mode split · kind thicken
+7	Read only what is below, plus CONSTRAINTS.md and the files you edit. Your task is the last section.
+8	
+9	&lt;!-- docs/packages/rllab/pipelines.md:106 --&gt;
+10	## PL-05: Replay
+11	**Entry:** `src/rllab/lab/pipelines/pl05_replay.py::run_replay` · **Trigger:** `python -m rllab.lab replay &lt;run folder&gt; [--game N | --new --seed S | --pair &lt;predator gen&gt; &lt;prey gen&gt;]`
+12	**Covers:** REPLAY-01–REPLAY-03
+13	
+14	| # | Step | Owner | In → Out | Spine version | Covers |
+15	|---|---|---|---|---|---|
+16	| 1 | `open_run` | runs.store | path → RunRecord | read `settings.json` and `games.npz`; `FileNotFoundError` naming the run | REPLAY-01, RUN-05 |
+17	| 2 | `pick_game` | lab.replay | RunRecord, game, new_seed, pair → GameRecording | the recorded game at index N; with `--pair`, one new game of those two generations (`lab.players.load_generation`, then PL-03 step 10 as built); with `--new`, PL-03 steps 1, 9 and 10 as built with `n_games=1, record=1` | REPLAY-01, REPLAY-03 |
+18	| 3 | `Replay` | viz.replay | GameRecording → Replay | Matplotlib loop drawing grid cells (`imshow`) or tank circles by `board` (AD-12); space, right arrow, `+`/`-` key handlers; `show()` blocks until the window closes | REPLAY-01, REPLAY-02 |
+19	
+20	### Entry sketch (pre-build — removed by spine task)
+21	```python
+22	def run_replay(run: Path, game: int = 0, new_seed: int | None = None, pair: tuple[int, int] | None = None) -&gt; None:
+23	    record = open_run(run)
+24	    recording = pick_game(record, game, new_seed, pair)
+25	    Replay(recording).show()
+26	```
+27	
+28	&lt;!-- docs/packages/rllab/contract.md:464 --&gt;
+29	### viz.Replay: type
+30	```python
+31	class Replay:
+32	    index: int
+33	    fps: float
+34	    paused: bool
+35	    def __init__(self, game: GameRecording, *, fps: float = 8.0) -&gt; None: ...
+36	    def advance(self) -&gt; int: ...
+37	    def on_key(self, key: str) -&gt; None: ...
+38	    def current(self) -&gt; tuple[np.ndarray, dict[str, float], int]: ...
+39	    def show(self) -&gt; None: ...
+40	```
+41	- **Invariants:** each frame shows the board (the grid; or the tank with the ball, the fish, the predator, the prey and the pellets, caught animals greyed), the scores and the step (REPLAY-01). `on_key` handles one Matplotlib key name: `&quot; &quot;` toggles `paused`, `&quot;right&quot;` calls `advance` once, and `&quot;+&quot;`/`&quot;-&quot;` double or halve `fps`; other keys do nothing (REPLAY-02). The figure&#x27;s `key_press_event` calls `on_key`. `advance` returns the new `index` and stops at the last frame. `current()` returns what frame `index` shows: the recorded frame, the scores and the step. `index`, `fps` and `paused` are read-only to callers; a new replay starts at index 0, not paused. Building a `Replay` needs no display; only `show` opens a window.
+42	- **Boundary:** lab · **Fixtures:** tests/contracts/viz.Replay/ · **Cases:** a replay double advancing a 12-frame game to its end
+43	- **Used by:** lab; PL-05
+44	
+45	&lt;!-- docs/packages/rllab/contract.md:295 --&gt;
+46	### runs.GameRecording: type
+47	`@dataclass(frozen=True) class GameRecording: seed: int; board: Literal[&quot;grid&quot;, &quot;tank&quot;]; frames: np.ndarray; rewards: np.ndarray; scores: dict[str, np.ndarray]`
+48	- **Invariants:** `frames` holds the start frame plus one per step: T×H×W int8 for `grid`, T×K×4 float32 circles for `tank` (AD-12). `rewards` is the per-step total over all agents, length T−1; `scores` maps each team to its score at every frame, length T.
+49	- **Boundary:** evaluate, viz · **Fixtures:** tests/contracts/runs.GameRecording/ · **Cases:** a 12-step Snake game ending in a self-collision; a 9-step corridor game; a 30-step 8-fish tank game with 2 catches; a 40-step predator-prey game with 1 catch
+50	- **Used by:** evaluate, viz, lab; PL-01, PL-03, PL-05
+51	
+52	&lt;!-- docs/packages/rllab/tests.md:173 --&gt;
+53	### TC-28: Replay shows the recorded frames and stops at the end
+54	**Pipeline:** PL-05 · **Covers:** REPLAY-01, REPLAY-02, REPLAY-03 · **Kind:** synthetic known-answer · **Fixture:** tests/fixtures/rllab/TC-28/
+55	**Source:** the `viz.Replay` and `runs.GameRecording` contract invariants, approved 2026-10-17; generator: the TC-06 start board with 11 × action 2, recorded as a 12-frame game
+56	**Expected:** frame `i` of the replay equals `Snake.frame()` after step `i`; `advance` called 15 times returns 1, 2, …, 11, then 11 four more times; score and step shown on each frame match the recording · **Tolerance:** exact, frames are int8 grids
+57	
+58	&lt;!-- docs/architecture.md:128 --&gt;
+59	### AD-07: Matplotlib for charts and the replay viewer
+60	**Status:** Accepted · **Date:** 2026-10-17 · **Scope:** `viz`
+61	- **Context:** EVAL-06 and ABL-04 need charts. REPLAY-01 and REPLAY-02 need a plain player with pause, step and speed control. The brief rules out polished graphics.
+62	- **Decision:** Matplotlib draws the curves and plays recorded frames in an interactive window, as grid cells or tank circles by the recording&#x27;s board kind (AD-12). Space pauses, the right arrow steps one frame, and `+`/`-` change speed.
+63	- **Alternatives:** pygame — smoother, but a second graphics dependency. A terminal viewer (curses) — no dependency, but charts would still need Matplotlib.
+64	- **Consequences:** One plotting dependency. Replay needs a GUI backend, which macOS has by default. Tests drive the viewer headless through its frame-advance function.
+65	
+66	## Layout (`dt layout rllab`)
+67	src/rllab/
+68	  __init__.py — rllab: a reinforcement-learning lab for Snake and the fish tank.
+69	  agents/
+70	    __init__.py — The learning agents.
+71	    tabular.py — The table-based value learner (AGENT-01, AGENT-02, ABL-03).
+72	    dqn/
+73	      __init__.py — The neural value learner.
+74	      agent.py — The neural value learner (AGENT-03 to AGENT-05, ABL-01, ABL-02).
+75	      networks.py — The value networks: one output per action from a flattened observation (AD-05).
+76	  baselines/
+77	    __init__.py — The baseline players.
+78	    random.py — The random baseline (BASE-01).
+79	    scripted.py — The scripted baseline on the compact view (BASE-02).
+80	  compare/
+81	    __init__.py — Claims between players, tested and reported.
+82	    claims.py — Tested claims over pooled scores, and the report (PL-04 step 4).
+83	    types.py — A claim to test between two players, and its tested result.
+84	  core/
+85	    __init__.py — The core: environment and agent interfaces, and run settings.
+86	    protocols.py — The two interfaces every environment and every player implements (AD-03, AD-09, AD-13).
+87	    settings.py — Run settings from TOML (PL-01 step 1).
+88	    types.py — The core&#x27;s data types: teams, actions, steps, transitions and run settings (AD-09, AD-13).
+89	  envs/
+90	    __init__.py — The environments: Snake and the corridor.
+91	    corridor.py — A 1-D corridor with the goal at its far end (CORE-03).
+92	    snake.py — Snake on a square grid, one agent, compact or grid view (SNAKE-01 to SNAKE-09).
+93	    types.py — Observation layouts shared with the players that read them.
+94	  evaluate/
+95	    __init__.py — Held-out greedy evaluation.
+96	    protocol.py — Greedy evaluation on held-out seeds (EVAL-01, DATA-01, AGENT-07).
+97	    types.py — What one evaluation asks for and what it returns.
+98	  lab/
+99	    __init__.py — The lab: the command line and the pipelines it runs.
+100	    __main__.py — `python -m rllab.lab`: dispatch `train`, `eval`, `replay` and `report`.
+101	    build.py — The environment and the agents a run&#x27;s settings name (PL-01 steps 2 and 7).
+102	    cli.py — The command line: `python -m rllab.lab &lt;train | eval | replay | report&gt; ...`.
+103	    players.py — Players from run folders or baseline names, scored or opened (PL-03 step 1, PL-04 steps 2-3).
+104	    printing.py — One line of scores (PL-03 step 11).
+105	    replay.py — The game a replay shows (PL-05 step 2).
+106	    report_spec.py — A report&#x27;s TOML: players, claims and chart groups (PL-04 step 1).
+107	    types.py — What a report names: its players, baselines and chart groups (PL-04).
+108	    pipelines/
+109	      __init__.py — One entry function per pipeline.
+110	      pl01_train.py — PL-01: train a run.
+111	      pl02_train_reference.py — PL-02: train the reference.
+112	      pl03_evaluate.py — PL-03: evaluate.
+113	      pl04_report.py — PL-04: report.
+114	      pl05_replay.py — PL-05: replay.
+115	  reference/
+116	    __init__.py — The reference: a library agent trained and played on the lab&#x27;s environments.
+117	    player.py — A trained library model as an Agent (REF-01).
+118	    train/
+119	      __init__.py — The library agent&#x27;s training through the gymnasium adapter (AD-03, AD-04).
+120	  runs/
+121	    __init__.py — Run folders: settings, curve, checkpoints and recorded games.
+122	    store.py — One folder per run: create it, write it as the run goes, read it back (AD-06).
+123	    types.py — What a run folder holds: its curve, its recorded games and the run itself (AD-06).
+124	  train/
+125	    __init__.py — The training loop.
+126	    loop.py — The training loop over every team (PL-01 step 15).
+127	  viz/
+128	    __init__.py — Charts and the replay window.
+129	    curves.py — Learning curves with baseline lines (PL-04 step 5).
+130	    replay.py — The interactive replay window (REPLAY-01, REPLAY-02).
+131	    types.py — A written chart and what it draws.
+132	
+133	## Writes (edit only these files; the plan gives every other file to another task)
+134	- src/rllab/viz/replay.py (exists)
+135	- tests/unit/rllab/test_replay_viewer.py (new)
+136	
+137	&lt;!-- tasks/plan.md:221 --&gt;
+138	### M1-T20: Interactive replay viewer
+139	**Package:** rllab · **Step:** PL-05.Replay · **Kind:** thicken · **Covers:** REPLAY-01, REPLAY-02 · **Size:** XS · **Mode:** split
+140	**Reason:** fold: spine is the whole behavior
+141	**Read:** PL-05, viz.Replay, runs.GameRecording, TC-28, AD-07
+142	**Acceptance:**
+143	- [ ] TC-28 passes headless (frames match; `advance` stops at the last frame)
+144	- [ ] Space, right arrow and `+`/`-` call pause, `advance` and the fps doubling and halving
+145	**Verify:** `pytest tests/intent/rllab tests/unit/rllab -k replay_viewer` · `scripts/check.sh gate`
+146	**Depends on:** M1-T01, M1-T32 · **Writes:** src/rllab/viz/replay.py, tests/intent/rllab/test_replay_viewer.py, tests/unit/rllab/test_replay_viewer.py
+147	</pre></details></div><div class="step" id="S5"><span class="sid">U44.S5</span><span class="kind">Read</span>/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/project/.claude/worktrees/agent-afa0e783c69fb3fcc/src/rllab/viz/replay.py<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/project/.claude/worktrees/agent-afa0e783c69fb3fcc/src/rllab/viz/replay.py&quot;
+}</pre><div class="lbl">output</div><pre>1	&quot;&quot;&quot;The interactive replay window (REPLAY-01, REPLAY-02).&quot;&quot;&quot;
+2	
+3	import numpy as np
+4	
+5	from rllab.runs import GameRecording
+6	
+7	
+8	class Replay:
+9	    &quot;&quot;&quot;Draws a recorded game frame by frame; space pauses, right arrow steps, +/- change speed.
+10	
+11	    `index`, `fps` and `paused` are read-only to callers; a new replay starts at frame 0,
+12	    not paused. Building one needs no display; only `show` opens a window.
+13	    &quot;&quot;&quot;
+14	
+15	    index: int
+16	    fps: float
+17	    paused: bool
+18	
+19	    def __init__(self, game: GameRecording, *, fps: float = 8.0) -&gt; None:
+20	        raise NotImplementedError(&quot;M1-T20&quot;)
+21	
+22	    def advance(self) -&gt; int:
+23	        &quot;&quot;&quot;Move to the next frame and return its index, stopping at the last frame.&quot;&quot;&quot;
+24	        raise NotImplementedError(&quot;M1-T20&quot;)
+25	
+26	    def on_key(self, key: str) -&gt; None:
+27	        &quot;&quot;&quot;One Matplotlib key name: `&quot; &quot;` pauses, `&quot;right&quot;` advances, `&quot;+&quot;`/`&quot;-&quot;` change fps.&quot;&quot;&quot;
+28	        raise NotImplementedError(&quot;M1-T20&quot;)
+29	
+30	    def current(self) -&gt; tuple[np.ndarray, dict[str, float], int]:
+31	        &quot;&quot;&quot;What frame `index` shows: the recorded frame, the scores and the step.&quot;&quot;&quot;
+32	        raise NotImplementedError(&quot;M1-T20&quot;)
+33	
+34	    def show(self) -&gt; None:
+35	        &quot;&quot;&quot;Play the game in a window, blocking until it closes.&quot;&quot;&quot;
+36	        raise NotImplementedError(&quot;M1-T20&quot;)
+37	</pre></details></div><div class="step" id="S6"><span class="sid">U44.S6</span><span class="kind">Bash</span>ls /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/project/.claude/worktrees/agent-afa0e783c69fb3fcc/tests/intent/rllab /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/project/.claude/worktrees/agent-afa0e783c69fb3fcc/tests/unit/rllab /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/project/.claude/worktrees/agent-afa0e783c69fb3fcc/tests/contracts/viz.Replay /Users/connoro …[+152 chars]<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;ls /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/project/.claude/worktrees/agent-afa0e783c69fb3fcc/tests/intent/rllab /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/project/.claude/worktrees/agent-afa0e783c69fb3fcc/tests/unit/rllab /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/project/.claude/worktrees/agent-afa0e783c69fb3fcc/tests/contracts/viz.Replay /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/project/.claude/worktrees/agent-afa0e783c69fb3fcc/tests/fixtures/rllab/TC-28&quot;,
+  &quot;description&quot;: &quot;List relevant test directories&quot;
+}</pre><div class="lbl">output</div><pre>/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/project/.claude/worktrees/agent-afa0e783c69fb3fcc/tests/contracts/viz.Replay:
+fake.py
+samples.json
+schema.json
+test_viz_replay.py
+
+/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/project/.claude/worktrees/agent-afa0e783c69fb3fcc/tests/fixtures/rllab/TC-28:
+expected.json
+input.json
+
+/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/project/.claude/worktrees/agent-afa0e783c69fb3fcc/tests/intent/rllab:
+test_ablation_pairs.py
+test_claims.py
+test_corridor.py
+test_evaluate.py
+test_random_player.py
+test_replay_viewer.py
+test_scripted.py
+test_snake.py
+
+/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/project/.claude/worktrees/agent-afa0e783c69fb3fcc/tests/unit/rllab:
+test_build.py
+test_claims.py
+test_corridor.py
+test_curves.py
+test_dqn.py
+test_evaluate.py
+test_pick_game.py
+test_players.py
+test_random_player.py
+test_reference_player.py
+test_report_spec.py
+test_scripted.py
+test_settings.py
+test_snake.py
+test_store.py
+test_train_loop.py</pre></details></div><div class="step" id="S7"><span class="sid">U44.S7</span><span class="kind">Read</span>/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/project/.claude/worktrees/agent-afa0e783c69fb3fcc/tests/intent/rllab/test_replay_viewer.py<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/project/.claude/worktrees/agent-afa0e783c69fb3fcc/tests/intent/rllab/test_replay_viewer.py&quot;
+}</pre><div class="lbl">output</div><pre>1	&quot;&quot;&quot;M1-T20 intent: the replay viewer, driven headless (TC-28, REPLAY-01, REPLAY-02).&quot;&quot;&quot;
+2	
+3	import json
+4	from pathlib import Path
+5	
+6	import matplotlib
+7	import numpy as np
+8	import pytest
+9	
+10	from rllab.core import SOLO, Rewards
+11	from rllab.envs import Snake
+12	from rllab.runs import GameRecording
+13	from rllab.viz import Replay
+14	
+15	matplotlib.use(&quot;Agg&quot;)
+16	
+17	FIXTURES = Path(__file__).resolve().parents[2] / &quot;fixtures&quot; / &quot;rllab&quot;
+18	CONTRACTS = Path(__file__).resolve().parents[2] / &quot;contracts&quot;
+19	
+20	
+21	def _load(tc: str) -&gt; tuple[dict, dict]:
+22	    folder = FIXTURES / tc
+23	    inp = json.loads((folder / &quot;input.json&quot;).read_text())
+24	    exp = json.loads((folder / &quot;expected.json&quot;).read_text())
+25	    return inp, exp
+26	
+27	
+28	def _act(action: int) -&gt; dict[str, np.ndarray]:
+29	    return {SOLO: np.array([action], dtype=np.int64)}
+30	
+31	
+32	def _tc28_game(inp: dict) -&gt; tuple[GameRecording, list[np.ndarray]]:
+33	    &quot;&quot;&quot;Play the TC-06 start board with the repeated action and record every frame.&quot;&quot;&quot;
+34	    env = Snake(view=&quot;compact&quot;, rewards=Rewards(), size=inp[&quot;size&quot;])
+35	    env.reset(0)
+36	    body = [(int(r), int(c)) for r, c in inp[&quot;body&quot;]]
+37	    _, info = env.reset_to(body, inp[&quot;heading&quot;], tuple(inp[&quot;food&quot;]))
+38	    snake_frames = [np.asarray(env.frame()).copy()]
+39	    scores = [float(info.get(f&quot;score:{SOLO}&quot;, 0.0))]
+40	    rewards = []
+41	    for _ in range(inp[&quot;n_steps&quot;]):
+42	        result = env.step(_act(inp[&quot;repeat_action&quot;]))
+43	        snake_frames.append(np.asarray(env.frame()).copy())
+44	        scores.append(float(result.info[f&quot;score:{SOLO}&quot;]))
+45	        rewards.append(float(np.asarray(result.reward[SOLO])[0]))
+46	    game = GameRecording(
+47	        seed=0,
+48	        board=&quot;grid&quot;,
+49	        frames=np.stack(snake_frames).astype(np.int8),
+50	        rewards=np.asarray(rewards, dtype=np.float32),
+51	        scores={SOLO: np.asarray(scores, dtype=np.float32)},
+52	    )
+53	    return game, snake_frames
+54	
+55	
+56	def _sample_game() -&gt; GameRecording:
+57	    raw = json.loads((CONTRACTS / &quot;viz.Replay&quot; / &quot;samples.json&quot;).read_text())[&quot;snake_12_frames&quot;]
+58	
+59	    def arr(spec: dict) -&gt; np.ndarray:
+60	        return np.asarray(spec[&quot;data&quot;], dtype=spec[&quot;dtype&quot;]).reshape(spec[&quot;shape&quot;])
+61	
+62	    return GameRecording(
+63	        seed=int(raw[&quot;seed&quot;]),
+64	        board=raw[&quot;board&quot;],
+65	        frames=arr(raw[&quot;frames&quot;]),
+66	        rewards=arr(raw[&quot;rewards&quot;]),
+67	        scores={team: arr(spec) for team, spec in raw[&quot;scores&quot;].items()},
+68	    )
+69	
+70	
+71	def _with_rising_scores(game: GameRecording) -&gt; GameRecording:
+72	    &quot;&quot;&quot;The same frames with a score that differs on every frame, so a wrong index shows.&quot;&quot;&quot;
+73	    t = game.frames.shape[0]
+74	    return GameRecording(
+75	        seed=game.seed,
+76	        board=game.board,
+77	        frames=game.frames,
+78	        rewards=game.rewards,
+79	        scores={team: np.arange(t, dtype=np.float32) * 2 + 1 for team in game.scores},
+80	    )
+81	
+82	
+83	def _assert_shows(replay: Replay, game: GameRecording, index: int) -&gt; None:
+84	    frame, scores, step = replay.current()
+85	    np.testing.assert_array_equal(np.asarray(frame), game.frames[index])
+86	    assert scores == {team: float(values[index]) for team, values in game.scores.items()}
+87	    assert step == index
+88	
+89	
+90	@pytest.mark.intent
+91	def test_tc28_frames_match_the_snake_and_advance_stops_at_the_end():
+92	    inp, exp = _load(&quot;TC-28&quot;)
+93	    game, snake_frames = _tc28_game(inp)
+94	    assert len(snake_frames) == exp[&quot;frames&quot;]
+95	    replay = Replay(game)
+96	    assert replay.index == 0
+97	    assert replay.paused is False
+98	    frame, _, step = replay.current()
+99	    np.testing.assert_array_equal(np.asarray(frame), snake_frames[0])
+100	    assert step == 0
+101	    returns = []
+102	    for _ in range(inp[&quot;advance_calls&quot;]):
+103	        returns.append(replay.advance())
+104	        i = replay.index
+105	        frame, scores, step = replay.current()
+106	        np.testing.assert_array_equal(np.asarray(frame), snake_frames[i])
+107	        assert step == i
+108	        assert scores == {SOLO: float(game.scores[SOLO][i])}
+109	    assert returns == exp[&quot;advance_returns&quot;]
+110	    assert replay.index == exp[&quot;advance_returns&quot;][-1]
+111	
+112	
+113	@pytest.mark.intent
+114	def test_current_shows_the_recorded_score_and_step_at_each_frame():
+115	    game = _with_rising_scores(_sample_game())
+116	    replay = Replay(game)
+117	    last = game.frames.shape[0] - 1
+118	    _assert_shows(replay, game, 0)
+119	    for i in range(1, last + 1):
+120	        assert replay.advance() == i
+121	        _assert_shows(replay, game, i)
+122	    assert replay.advance() == last
+123	    _assert_shows(replay, game, last)
+124	
+125	
+126	@pytest.mark.intent
+127	def test_space_toggles_pause_without_moving():
+128	    game = _sample_game()
+129	    replay = Replay(game)
+130	    replay.on_key(&quot; &quot;)
+131	    assert replay.paused is True
+132	    assert replay.index == 0
+133	    replay.on_key(&quot; &quot;)
+134	    assert replay.paused is False
+135	    assert replay.index == 0
+136	
+137	
+138	@pytest.mark.intent
+139	def test_right_arrow_steps_one_frame_and_stops_at_the_last():
+140	    game = _with_rising_scores(_sample_game())
+141	    replay = Replay(game)
+142	    last = game.frames.shape[0] - 1
+143	    replay.on_key(&quot;right&quot;)
+144	    assert replay.index == 1
+145	    _assert_shows(replay, game, 1)
+146	    for _ in range(last + 3):
+147	        replay.on_key(&quot;right&quot;)
+148	    assert replay.index == last
+149	    _assert_shows(replay, game, last)
+150	
+151	
+152	@pytest.mark.intent
+153	def test_right_arrow_steps_while_paused():
+154	    replay = Replay(_sample_game())
+155	    replay.on_key(&quot; &quot;)
+156	    replay.on_key(&quot;right&quot;)
+157	    assert replay.index == 1
+158	    assert replay.paused is True
+159	
+160	
+161	@pytest.mark.intent
+162	def test_plus_and_minus_double_and_halve_fps():
+163	    replay = Replay(_sample_game(), fps=8.0)
+164	    assert replay.fps == 8.0
+165	    replay.on_key(&quot;+&quot;)
+166	    assert replay.fps == 16.0
+167	    replay.on_key(&quot;+&quot;)
+168	    assert replay.fps == 32.0
+169	    replay.on_key(&quot;-&quot;)
+170	    replay.on_key(&quot;-&quot;)
+171	    replay.on_key(&quot;-&quot;)
+172	    assert replay.fps == 4.0
+173	    assert replay.index == 0
+174	    assert replay.paused is False
+175	
+176	
+177	@pytest.mark.intent
+178	def test_default_fps_is_eight():
+179	    assert Replay(_sample_game()).fps == 8.0
+180	
+181	
+182	@pytest.mark.intent
+183	@pytest.mark.parametrize(&quot;key&quot;, [&quot;q&quot;, &quot;left&quot;, &quot;up&quot;, &quot;enter&quot;, &quot;a&quot;, &quot;escape&quot;])
+184	def test_other_keys_do_nothing(key):
+185	    replay = Replay(_sample_game(), fps=8.0)
+186	    replay.on_key(key)
+187	    assert (replay.index, replay.paused, replay.fps) == (0, False, 8.0)
+188	</pre></details></div><div class="step" id="S8"><span class="sid">U44.S8</span><span class="kind">Read</span>/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/project/.claude/worktrees/agent-afa0e783c69fb3fcc/tests/contracts/viz.Replay/fake.py<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/project/.claude/worktrees/agent-afa0e783c69fb3fcc/tests/contracts/viz.Replay/fake.py&quot;
+}</pre><div class="lbl">output</div><pre>1	&quot;&quot;&quot;viz.Replay: a windowless double stepping through a recording, and the provider check.
+2	
+3	`check_replay(replay, game)` takes the provider, so the real Replay (on a headless backend)
+4	runs the same check as the double.
+5	&quot;&quot;&quot;
+6	
+7	import numpy as np
+8	
+9	from rllab.runs import GameRecording
+10	
+11	
+12	class ReplayDouble:
+13	    &quot;&quot;&quot;Frame indices only: `advance` moves on and stops at the last frame; `show` plays out.&quot;&quot;&quot;
+14	
+15	    def __init__(self, game: GameRecording, *, fps: float = 8.0) -&gt; None:
+16	        self.game = game
+17	        self.fps = fps
+18	        self.index = 0
+19	        self.paused = False
+20	
+21	    def advance(self) -&gt; int:
+22	        self.index = min(self.index + 1, len(self.game.frames) - 1)
+23	        return self.index
+24	
+25	    def on_key(self, key: str) -&gt; None:
+26	        if key == &quot; &quot;:
+27	            self.paused = not self.paused
+28	        elif key == &quot;right&quot;:
+29	            self.advance()
+30	        elif key == &quot;+&quot;:
+31	            self.fps *= 2
+32	        elif key == &quot;-&quot;:
+33	            self.fps /= 2
+34	
+35	    def current(self) -&gt; tuple[np.ndarray, dict[str, float], int]:
+36	        scores = {team: float(values[self.index]) for team, values in self.game.scores.items()}
+37	        return self.game.frames[self.index], scores, self.index
+38	
+39	    def show(self) -&gt; None:
+40	        while self.index &lt; len(self.game.frames) - 1:
+41	            self.advance()
+42	
+43	
+44	def _assert_shows(replay: ReplayDouble, game: GameRecording, index: int) -&gt; None:
+45	    frame, scores, step = replay.current()
+46	    np.testing.assert_array_equal(frame, game.frames[index])
+47	    assert scores == {team: float(values[index]) for team, values in game.scores.items()}
+48	    assert step == index
+49	
+50	
+51	def check_replay(replay: ReplayDouble, game: GameRecording) -&gt; None:
+52	    &quot;&quot;&quot;A fresh replay at frame 0, not paused; each key as REPLAY-02; `advance` stops at the end.&quot;&quot;&quot;
+53	    last = len(game.frames) - 1
+54	    fps = replay.fps
+55	    assert (replay.index, replay.paused) == (0, False)
+56	    _assert_shows(replay, game, 0)
+57	    replay.on_key(&quot; &quot;)
+58	    assert replay.paused
+59	    replay.on_key(&quot; &quot;)
+60	    assert not replay.paused
+61	    replay.on_key(&quot;+&quot;)
+62	    assert replay.fps == fps * 2
+63	    replay.on_key(&quot;-&quot;)
+64	    replay.on_key(&quot;-&quot;)
+65	    assert replay.fps == fps / 2
+66	    replay.on_key(&quot;q&quot;)
+67	    assert (replay.index, replay.paused, replay.fps) == (0, False, fps / 2)
+68	    replay.on_key(&quot;right&quot;)
+69	    assert replay.index == 1
+70	    _assert_shows(replay, game, 1)
+71	    assert [replay.advance() for _ in range(last + 2)] == [*range(2, last + 1), last, last, last]
+72	    _assert_shows(replay, game, last)
+73	</pre></details></div><div class="step" id="S9"><span class="sid">U44.S9</span><span class="kind">Read</span>/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/project/.claude/worktrees/agent-afa0e783c69fb3fcc/tests/contracts/viz.Replay/test_viz_replay.py<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/project/.claude/worktrees/agent-afa0e783c69fb3fcc/tests/contracts/viz.Replay/test_viz_replay.py&quot;
+}</pre><div class="lbl">output</div><pre>1	&quot;&quot;&quot;viz.Replay: the windowless double advances a 12-frame game to its end and stops.&quot;&quot;&quot;
+2	
+3	import inspect
+4	from typing import Protocol
+5	
+6	import numpy as np
+7	import pytest
+8	
+9	from rllab.runs import GameRecording
+10	from rllab.viz import Replay
+11	
+12	SYMBOL = &quot;viz.Replay&quot;
+13	
+14	
+15	class ReplayMethods(Protocol):
+16	    def on_key(self, key: str) -&gt; None: ...
+17	    def current(self) -&gt; tuple[np.ndarray, dict[str, float], int]: ...
+18	
+19	
+20	def test_samples_follow_the_schema(codec):
+21	    codec.assert_samples_valid(SYMBOL)
+22	
+23	
+24	def test_double_passes_the_replay_check(codec):
+25	    fake = codec.fake(SYMBOL)
+26	    game = codec.sample(SYMBOL, &quot;snake_12_frames&quot;, GameRecording)
+27	    assert game.frames.shape[0] == 12
+28	    fake.check_replay(fake.ReplayDouble(game), game)
+29	
+30	
+31	def test_double_show_plays_to_the_last_frame(codec):
+32	    fake = codec.fake(SYMBOL)
+33	    game = codec.sample(SYMBOL, &quot;snake_12_frames&quot;, GameRecording)
+34	    replay = fake.ReplayDouble(game, fps=16.0)
+35	    replay.show()
+36	    assert replay.index == 11
+37	
+38	
+39	def test_replay_has_the_contract_members():
+40	    assert {&quot;advance&quot;, &quot;on_key&quot;, &quot;current&quot;, &quot;show&quot;} &lt;= set(dir(Replay))
+41	    assert {&quot;index&quot;: int, &quot;fps&quot;: float, &quot;paused&quot;: bool}.items() &lt;= Replay.__annotations__.items()
+42	
+43	
+44	@pytest.mark.parametrize(&quot;name&quot;, [&quot;on_key&quot;, &quot;current&quot;])
+45	def test_inspection_methods_have_their_signatures(name):
+46	    assert inspect.signature(getattr(Replay, name)) == inspect.signature(
+47	        getattr(ReplayMethods, name)
+48	    )
+49	</pre></details></div><div class="step" id="S10"><span class="sid">U44.S10</span><span class="kind">Read</span>/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/project/.claude/worktrees/agent-afa0e783c69fb3fcc/src/rllab/viz/curves.py<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/project/.claude/worktrees/agent-afa0e783c69fb3fcc/src/rllab/viz/curves.py&quot;
+}</pre><div class="lbl">output</div><pre>1	&quot;&quot;&quot;Learning curves with baseline lines (PL-04 step 5).&quot;&quot;&quot;
+2	
+3	from collections.abc import Mapping, Sequence
+4	from pathlib import Path
+5	
+6	import numpy as np
+7	from matplotlib.figure import Figure
+8	
+9	from rllab.evaluate import ScoreSet
+10	from rllab.runs import RunRecord
+11	from rllab.viz.types import Chart
+12	
+13	
+14	def plot_curves(
+15	    groups: Mapping[str, Sequence[RunRecord]],
+16	    *,
+17	    scores: Mapping[str, Sequence[ScoreSet]],
+18	    baselines: Sequence[str],
+19	    out: Path,
+20	) -&gt; Chart:
+21	    &quot;&quot;&quot;One mean line with a min-max band per group, one horizontal line per baseline.&quot;&quot;&quot;
+22	    missing = [name for name in baselines if name not in scores]
+23	    if missing:
+24	        raise ValueError(f&quot;no scores for baselines {missing}&quot;)
+25	    figure = Figure(figsize=(8, 5))
+26	    axes = figure.add_subplot()
+27	    for name, runs in groups.items():
+28	        steps, mean, low, high = _band(runs)
+29	        (line,) = axes.plot(steps, mean, label=name)
+30	        axes.fill_between(steps, low, high, color=line.get_color(), alpha=0.2)
+31	    for i, name in enumerate(baselines):
+32	        axes.axhline(_pooled_mean(scores[name]), color=f&quot;C{len(groups) + i}&quot;, ls=&quot;--&quot;, label=name)
+33	    axes.set_xlabel(&quot;training step&quot;)
+34	    axes.set_ylabel(&quot;mean score&quot;)
+35	    axes.legend()
+36	    out.parent.mkdir(parents=True, exist_ok=True)
+37	    figure.savefig(out, format=&quot;png&quot;)
+38	    return Chart(path=out, groups=tuple(groups), baselines=tuple(baselines))
+39	
+40	
+41	def _band(
+42	    runs: Sequence[RunRecord],
+43	) -&gt; tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+44	    &quot;&quot;&quot;Steps every run evaluated at, and the mean, min and max score over the runs there.&quot;&quot;&quot;
+45	    common = set.intersection(*({point.step for point in run.curve} for run in runs))
+46	    steps = np.array(sorted(common), dtype=np.int64)
+47	    table = np.array(
+48	        [[point.mean_score for point in run.curve if point.step in common] for run in runs],
+49	        dtype=np.float64,
+50	    ).reshape(len(runs), len(steps))
+51	    return steps, table.mean(axis=0), table.min(axis=0), table.max(axis=0)
+52	
+53	
+54	def _pooled_mean(sets: Sequence[ScoreSet]) -&gt; float:
+55	    &quot;&quot;&quot;The mean over every game of every seed.&quot;&quot;&quot;
+56	    return float(np.concatenate([s.scores for s in sets]).mean())
+57	</pre></details></div><div class="step" id="S11"><span class="sid">U44.S11</span><span class="kind">Bash</span>grep -rn -i &quot;circle\|AD-12&quot; /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/project/.claude/worktrees/agent-afa0e783c69fb3fcc/src /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/project/.claude/worktrees/agent-afa0e783c69fb3fcc/docs/architecture.md<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;grep -rn -i \&quot;circle\\|AD-12\&quot; /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/project/.claude/worktrees/agent-afa0e783c69fb3fcc/src /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/project/.claude/worktrees/agent-afa0e783c69fb3fcc/docs/architecture.md&quot;,
+  &quot;description&quot;: &quot;Search for tank circle layout&quot;
+}</pre><div class="lbl">output</div><pre>/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/project/.claude/worktrees/agent-afa0e783c69fb3fcc/docs/architecture.md:33:| Tank physics | Vectorised NumPy, one array per quantity over all animals; shared by the fish tank and predator-prey | AD-12, AD-16 |
+/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/project/.claude/worktrees/agent-afa0e783c69fb3fcc/docs/architecture.md:131:- **Decision:** Matplotlib draws the curves and plays recorded frames in an interactive window, as grid cells or tank circles by the recording&#x27;s board kind (AD-12). Space pauses, the right arrow steps one frame, and `+`/`-` change speed.
+/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/project/.claude/worktrees/agent-afa0e783c69fb3fcc/docs/architecture.md:164:### AD-12: Vectorised tank physics; recordings carry the board kind
+/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/project/.claude/worktrees/agent-afa0e783c69fb3fcc/docs/architecture.md:167:- **Decision:** The tank keeps NumPy arrays over all fish (positions, velocities, alive mask) and steps them in one vectorised update, with one seeded `np.random.Generator`. Its `frame()` is a `(K, 4)` float32 array of circles `(x, y, radius, kind)`: the ball, swimming fish and caught fish. `runs.GameRecording` gains `board` (`grid` or `tank`), and `viz.Replay` draws cells or circles accordingly (AD-07&#x27;s viewer, same controls).
+/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/project/.claude/worktrees/agent-afa0e783c69fb3fcc/docs/architecture.md:169:- **Consequences:** Ball reflection is computed exactly at the wall each step, never by small sub-steps. Recordings stay small (K ≤ 17 circles per frame).
+/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/project/.claude/worktrees/agent-afa0e783c69fb3fcc/docs/architecture.md:217:| 2026-10-17 | Fish tank and policy-gradient agents on a batch-first core | ideas/fish-tank-policy-gradients.md | AD-09–AD-12; AD-03, AD-04 (revised) |</pre></details></div><div class="step" id="S12"><span class="sid">U44.S12</span><span class="kind">Write</span>/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/project/.claude/worktrees/agent-afa0e783c69fb3fcc/src/rllab/viz/replay.py (100 lines)<div class="lbl">wrote /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/project/.claude/worktrees/agent-afa0e783c69fb3fcc/src/rllab/viz/replay.py</div><pre>&quot;&quot;&quot;The interactive replay window (REPLAY-01, REPLAY-02).&quot;&quot;&quot;
+
+import matplotlib.pyplot as plt
+import numpy as np
+from matplotlib.axes import Axes
+from matplotlib.backend_bases import KeyEvent
+from matplotlib.patches import Circle
+
+from rllab.runs import GameRecording
+
+
+class Replay:
+    &quot;&quot;&quot;Draws a recorded game frame by frame; space pauses, right arrow steps, +/- change speed.
+
+    `index`, `fps` and `paused` are read-only to callers; a new replay starts at frame 0,
+    not paused. Building one needs no display; only `show` opens a window.
+    &quot;&quot;&quot;
+
+    index: int
+    fps: float
+    paused: bool
+
+    def __init__(self, game: GameRecording, *, fps: float = 8.0) -&gt; None:
+        self._game = game
+        self.index = 0
+        self.fps = fps
+        self.paused = False
+
+    def advance(self) -&gt; int:
+        &quot;&quot;&quot;Move to the next frame and return its index, stopping at the last frame.&quot;&quot;&quot;
+        self.index = min(self.index + 1, len(self._game.frames) - 1)
+        return self.index
+
+    def on_key(self, key: str) -&gt; None:
+        &quot;&quot;&quot;One Matplotlib key name: `&quot; &quot;` pauses, `&quot;right&quot;` advances, `&quot;+&quot;`/`&quot;-&quot;` change fps.&quot;&quot;&quot;
+        if key == &quot; &quot;:
+            self.paused = not self.paused
+        elif key == &quot;right&quot;:
+            self.advance()
+        elif key == &quot;+&quot;:
+            self.fps *= 2
+        elif key == &quot;-&quot;:
+            self.fps /= 2
+
+    def current(self) -&gt; tuple[np.ndarray, dict[str, float], int]:
+        &quot;&quot;&quot;What frame `index` shows: the recorded frame, the scores and the step.&quot;&quot;&quot;
+        scores = {team: float(values[self.index]) for team, values in self._game.scores.items()}
+        return self._game.frames[self.index], scores, self.index
+
+    def show(self) -&gt; None:
+        &quot;&quot;&quot;Play the game in a window, blocking until it closes.&quot;&quot;&quot;
+        figure, axes = plt.subplots()
+        timer = figure.canvas.new_timer(interval=_interval_ms(self.fps))
+
+        def redraw() -&gt; None:
+            timer.interval = _interval_ms(self.fps)
+            self._draw(axes)
+            figure.canvas.draw_idle()
+
+        def tick() -&gt; None:
+            if not self.paused:
+                self.advance()
+            redraw()
+
+        def key_pressed(event: KeyEvent) -&gt; None:
+            if event.key is not None:
+                self.on_key(event.key)
+            redraw()
+
+        figure.canvas.mpl_connect(&quot;key_press_event&quot;, key_pressed)
+        timer.add_callback(tick)
+        self._draw(axes)
+        timer.start()
+        plt.show()
+
+    def _draw(self, axes: Axes) -&gt; None:
+        &quot;&quot;&quot;The current frame as grid cells or tank circles, titled with its step and scores.&quot;&quot;&quot;
+        frame, scores, step = self.current()
+        axes.clear()
+        if self._game.board == &quot;grid&quot;:
+            axes.imshow(frame, cmap=&quot;viridis&quot;, interpolation=&quot;nearest&quot;)
+        else:
+            _draw_circles(axes, frame)
+        shown = &quot;  &quot;.join(f&quot;{team}: {score:g}&quot; for team, score in scores.items())
+        axes.set_title(f&quot;step {step}  {shown}&quot;)
+        axes.set_xticks([])
+        axes.set_yticks([])
+
+
+def _draw_circles(axes: Axes, circles: np.ndarray) -&gt; None:
+    &quot;&quot;&quot;Tank circles `(x, y, radius, kind)` (AD-12), coloured by kind.&quot;&quot;&quot;
+    for x, y, radius, kind in circles:
+        axes.add_patch(Circle((float(x), float(y)), float(radius), color=f&quot;C{int(kind)}&quot;))
+    axes.set_aspect(&quot;equal&quot;)
+    axes.autoscale_view()
+
+
+def _interval_ms(fps: float) -&gt; int:
+    &quot;&quot;&quot;The timer interval for `fps` frames a second, at least one millisecond.&quot;&quot;&quot;
+    return max(1, round(1000 / fps))
+</pre><details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/project/.claude/worktrees/agent-afa0e783c69fb3fcc/src/rllab/viz/replay.py&quot;,
+  &quot;content&quot;: &quot;\&quot;\&quot;\&quot;The interactive replay window (REPLAY-01, REPLAY-02).\&quot;\&quot;\&quot;\n\nimport matplotlib.pyplot as plt\nimport numpy as np\nfrom matplotlib.axes import Axes\nfrom matplotlib.backend_bases import KeyEvent\nfrom matplotlib.patches import Circle\n\nfrom rllab.runs import GameRecording\n\n\nclass Replay:\n    \&quot;\&quot;\&quot;Draws a recorded game frame by frame; space pauses, right arrow steps, +/- change speed.\n\n    `index`, `fps` and `paused` are read-only to callers; a new replay starts at frame 0,\n    not paused. Building one needs no display; only `show` opens a window.\n    \&quot;\&quot;\&quot;\n\n    index: int\n    fps: float\n    paused: bool\n\n    def __init__(self, game: GameRecording, *, fps: float = 8.0) -&gt; None:\n        self._game = game\n        self.index = 0\n        self.fps = fps\n        self.paused = False\n\n    def advance(self) -&gt; int:\n        \&quot;\&quot;\&quot;Move to the next frame and return its index, stopping at the last frame.\&quot;\&quot;\&quot;\n        self.index = min(self.index + 1, len(self._game.frames) - 1)\n        return self.index\n\n    def on_key(self, key: str) -&gt; None:\n        \&quot;\&quot;\&quot;One Matplotlib key name: `\&quot; \&quot;` pauses, `\&quot;right\&quot;` advances, `\&quot;+\&quot;`/`\&quot;-\&quot;` change fps.\&quot;\&quot;\&quot;\n        if key == \&quot; \&quot;:\n            self.paused = not self.paused\n        elif key == \&quot;right\&quot;:\n            self.advance()\n        elif key == \&quot;+\&quot;:\n            self.fps *= 2\n        elif key == \&quot;-\&quot;:\n            self.fps /= 2\n\n    def current(self) -&gt; tuple[np.ndarray, dict[str, float], int]:\n        \&quot;\&quot;\&quot;What frame `index` shows: the recorded frame, the scores and the step.\&quot;\&quot;\&quot;\n        scores = {team: float(values[self.index]) for team, values in self._game.scores.items()}\n        return self._game.frames[self.index], scores, self.index\n\n    def show(self) -&gt; None:\n        \&quot;\&quot;\&quot;Play the game in a window, blocking until it closes.\&quot;\&quot;\&quot;\n        figure, axes = plt.subplots()\n        timer = figure.canvas.new_timer(interval=_interval_ms(self.fps))\n\n        def redraw() -&gt; None:\n            timer.interval = _interval_ms(self.fps)\n            self._draw(axes)\n            figure.canvas.draw_idle()\n\n        def tick() -&gt; None:\n            if not self.paused:\n                self.advance()\n            redraw()\n\n        def key_pressed(event: KeyEvent) -&gt; None:\n            if event.key is not None:\n                self.on_key(event.key)\n            redraw()\n\n        figure.canvas.mpl_connect(\&quot;key_press_event\&quot;, key_pressed)\n        timer.add_callback(tick)\n        self._draw(axes)\n        timer.start()\n        plt.show()\n\n    def _draw(self, axes: Axes) -&gt; None:\n        \&quot;\&quot;\&quot;The current frame as grid cells or tank circles, titled with its step and scores.\&quot;\&quot;\&quot;\n        frame, scores, step = self.current()\n        axes.clear()\n        if self._game.board == \&quot;grid\&quot;:\n            axes.imshow(frame, cmap=\&quot;viridis\&quot;, interpolation=\&quot;nearest\&quot;)\n        else:\n            _draw_circles(axes, frame)\n        shown = \&quot;  \&quot;.join(f\&quot;{team}: {score:g}\&quot; for team, score in scores.items())\n        axes.set_title(f\&quot;step {step}  {shown}\&quot;)\n        axes.set_xticks([])\n        axes.set_yticks([])\n\n\ndef _draw_circles(axes: Axes, circles: np.ndarray) -&gt; None:\n    \&quot;\&quot;\&quot;Tank circles `(x, y, radius, kind)` (AD-12), coloured by kind.\&quot;\&quot;\&quot;\n    for x, y, radius, kind in circles:\n        axes.add_patch(Circle((float(x), float(y)), float(radius), color=f\&quot;C{int(kind)}\&quot;))\n    axes.set_aspect(\&quot;equal\&quot;)\n    axes.autoscale_view()\n\n\ndef _interval_ms(fps: float) -&gt; int:\n    \&quot;\&quot;\&quot;The timer interval for `fps` frames a second, at least one millisecond.\&quot;\&quot;\&quot;\n    return max(1, round(1000 / fps))\n&quot;
+}</pre><div class="lbl">output</div><pre>The file /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/project/.claude/worktrees/agent-afa0e783c69fb3fcc/src/rllab/viz/replay.py has been updated successfully. (file state is current in your context — no need to Read it back)</pre></details></div><div class="step" id="S13"><span class="sid">U44.S13</span><span class="kind">Read</span>/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/project/.claude/worktrees/agent-afa0e783c69fb3fcc/tests/unit/rllab/test_curves.py limit=30<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/project/.claude/worktrees/agent-afa0e783c69fb3fcc/tests/unit/rllab/test_curves.py&quot;,
+  &quot;limit&quot;: 30
+}</pre><div class="lbl">output</div><pre>1	&quot;&quot;&quot;viz.curves: mean line and min-max band per group, a pooled-mean line per baseline.&quot;&quot;&quot;
+2	
+3	import importlib.util
+4	import sys
+5	import types
+6	from dataclasses import replace
+7	from pathlib import Path
+8	from typing import Any
+9	
+10	import numpy as np
+11	import pytest
+12	from matplotlib.figure import Figure
+13	
+14	from rllab.evaluate import ScoreSet
+15	from rllab.runs import CurvePoint, RunRecord
+16	from rllab.viz import Chart, curves, plot_curves
+17	
+18	pytestmark = pytest.mark.unit
+19	
+20	CONTRACTS = Path(__file__).parents[2] / &quot;contracts&quot;
+21	
+22	
+23	def _codec() -&gt; types.ModuleType:
+24	    name = &quot;contracts_codec&quot;
+25	    if name not in sys.modules:
+26	        spec = importlib.util.spec_from_file_location(name, CONTRACTS / &quot;codec.py&quot;)
+27	        assert spec is not None
+28	        assert spec.loader is not None
+29	        sys.modules[name] = importlib.util.module_from_spec(spec)
+30	        spec.loader.exec_module(sys.modules[name])</pre></details></div><div class="step" id="S14"><span class="sid">U44.S14</span><span class="kind">Bash</span>grep -n &quot;def \|fixture&quot; /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/project/.claude/worktrees/agent-afa0e783c69fb3fcc/tests/conftest.py<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;grep -n \&quot;def \\|fixture\&quot; /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/project/.claude/worktrees/agent-afa0e783c69fb3fcc/tests/conftest.py&quot;,
+  &quot;description&quot;: &quot;List conftest fixtures&quot;
+}</pre><div class="lbl">output</div><pre>(Bash completed with no output)</pre></details></div><div class="step" id="S15"><span class="sid">U44.S15</span><span class="kind">Bash</span>grep -rn &quot;def codec\|def fake\|def sample&quot; /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/project/.claude/worktrees/agent-afa0e783c69fb3fcc/tests/contracts/conftest.py /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/project/.claude/worktrees/agent-afa0e783c69fb3fcc/tests/contracts/codec.py<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;grep -rn \&quot;def codec\\|def fake\\|def sample\&quot; /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/project/.claude/worktrees/agent-afa0e783c69fb3fcc/tests/contracts/conftest.py /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/project/.claude/worktrees/agent-afa0e783c69fb3fcc/tests/contracts/codec.py&quot;,
+  &quot;description&quot;: &quot;Find codec helpers&quot;
+}</pre><div class="lbl">output</div><pre>/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/project/.claude/worktrees/agent-afa0e783c69fb3fcc/tests/contracts/conftest.py:26:def codec() -&gt; types.ModuleType:
+/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/project/.claude/worktrees/agent-afa0e783c69fb3fcc/tests/contracts/codec.py:45:def samples(symbol: str) -&gt; dict[str, Any]:
+/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/project/.claude/worktrees/agent-afa0e783c69fb3fcc/tests/contracts/codec.py:54:def sample(symbol: str, case: str, hint: Any) -&gt; Any:
+/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/project/.claude/worktrees/agent-afa0e783c69fb3fcc/tests/contracts/codec.py:73:def fake(symbol: str) -&gt; types.ModuleType:</pre></details></div><div class="step" id="S16"><span class="sid">U44.S16</span><span class="kind">Write</span>/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/project/.claude/worktrees/agent-afa0e783c69fb3fcc/tests/unit/rllab/test_replay_viewer.py (115 lines)<div class="lbl">wrote /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/project/.claude/worktrees/agent-afa0e783c69fb3fcc/tests/unit/rllab/test_replay_viewer.py</div><pre>&quot;&quot;&quot;viz.Replay: the contract check on the real viewer, and the window `show` draws headless.&quot;&quot;&quot;
+
+import importlib.util
+import sys
+import types
+from pathlib import Path
+
+import matplotlib
+import numpy as np
+import pytest
+from matplotlib.backend_bases import KeyEvent
+from matplotlib.figure import Figure
+from matplotlib.image import AxesImage
+from matplotlib.patches import Circle
+
+from rllab.runs import GameRecording
+from rllab.viz import Replay, replay
+
+matplotlib.use(&quot;Agg&quot;)
+
+pytestmark = pytest.mark.unit
+
+CONTRACTS = Path(__file__).parents[2] / &quot;contracts&quot;
+
+
+def _codec() -&gt; types.ModuleType:
+    name = &quot;contracts_codec&quot;
+    if name not in sys.modules:
+        spec = importlib.util.spec_from_file_location(name, CONTRACTS / &quot;codec.py&quot;)
+        assert spec is not None
+        assert spec.loader is not None
+        sys.modules[name] = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(sys.modules[name])
+    return sys.modules[name]
+
+
+def _grid_game() -&gt; GameRecording:
+    frames = np.arange(3 * 2 * 2, dtype=np.int8).reshape(3, 2, 2)
+    return GameRecording(
+        seed=0,
+        board=&quot;grid&quot;,
+        frames=frames,
+        rewards=np.zeros(2, dtype=np.float32),
+        scores={&quot;solo&quot;: np.array([0.0, 1.0, 2.0], dtype=np.float32)},
+    )
+
+
+def _tank_game() -&gt; GameRecording:
+    circles = np.array([[[1.0, 2.0, 0.5, 0.0], [3.0, 4.0, 0.25, 1.0]]], dtype=np.float32)
+    return GameRecording(
+        seed=0,
+        board=&quot;tank&quot;,
+        frames=np.repeat(circles, 2, axis=0),
+        rewards=np.zeros(1, dtype=np.float32),
+        scores={&quot;fish&quot;: np.array([0.0, 3.0], dtype=np.float32)},
+    )
+
+
+def _show_and_capture(
+    viewer: Replay, monkeypatch: pytest.MonkeyPatch, keys: tuple[str, ...] = ()
+) -&gt; Figure:
+    &quot;&quot;&quot;Run `show` with a `plt.show` that presses `keys` and keeps the figure.&quot;&quot;&quot;
+    shown: list[Figure] = []
+
+    def fake_show() -&gt; None:
+        figure = replay.plt.gcf()
+        for key in keys:
+            event = KeyEvent(&quot;key_press_event&quot;, figure.canvas, key)
+            figure.canvas.callbacks.process(&quot;key_press_event&quot;, event)
+        shown.append(figure)
+
+    monkeypatch.setattr(replay.plt, &quot;show&quot;, fake_show)
+    viewer.show()
+    replay.plt.close(shown[0])
+    return shown[0]
+
+
+def test_real_replay_passes_the_contract_check():
+    codec = _codec()
+    fake = codec.fake(&quot;viz.Replay&quot;)
+    game = codec.sample(&quot;viz.Replay&quot;, &quot;snake_12_frames&quot;, GameRecording)
+    fake.check_replay(Replay(game), game)
+
+
+def test_show_draws_the_grid_frame_with_step_and_score(monkeypatch):
+    game = _grid_game()
+    figure = _show_and_capture(Replay(game), monkeypatch)
+    (axes,) = figure.axes
+    (image,) = [a for a in axes.get_children() if isinstance(a, AxesImage)]
+    np.testing.assert_array_equal(np.asarray(image.get_array()), game.frames[0])
+    assert axes.get_title() == &quot;step 0  solo: 0&quot;
+
+
+def test_show_key_presses_reach_on_key_and_redraw(monkeypatch):
+    game = _grid_game()
+    viewer = Replay(game, fps=8.0)
+    figure = _show_and_capture(viewer, monkeypatch, keys=(&quot; &quot;, &quot;right&quot;, &quot;+&quot;))
+    assert (viewer.index, viewer.paused, viewer.fps) == (1, True, 16.0)
+    (axes,) = figure.axes
+    (image,) = [a for a in axes.get_children() if isinstance(a, AxesImage)]
+    np.testing.assert_array_equal(np.asarray(image.get_array()), game.frames[1])
+    assert axes.get_title() == &quot;step 1  solo: 1&quot;
+
+
+def test_show_draws_tank_circles(monkeypatch):
+    figure = _show_and_capture(Replay(_tank_game()), monkeypatch)
+    (axes,) = figure.axes
+    circles = [p for p in axes.patches if isinstance(p, Circle)]
+    assert [(c.center, c.radius) for c in circles] == [((1.0, 2.0), 0.5), ((3.0, 4.0), 0.25)]
+    assert axes.get_title() == &quot;step 0  fish: 0&quot;
+
+
+@pytest.mark.parametrize((&quot;fps&quot;, &quot;ms&quot;), [(8.0, 125), (1.0, 1000), (5000.0, 1)])
+def test_interval_follows_fps(fps, ms):
+    assert replay._interval_ms(fps) == ms
+</pre><details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/project/.claude/worktrees/agent-afa0e783c69fb3fcc/tests/unit/rllab/test_replay_viewer.py&quot;,
+  &quot;content&quot;: &quot;\&quot;\&quot;\&quot;viz.Replay: the contract check on the real viewer, and the window `show` draws headless.\&quot;\&quot;\&quot;\n\nimport importlib.util\nimport sys\nimport types\nfrom pathlib import Path\n\nimport matplotlib\nimport numpy as np\nimport pytest\nfrom matplotlib.backend_bases import KeyEvent\nfrom matplotlib.figure import Figure\nfrom matplotlib.image import AxesImage\nfrom matplotlib.patches import Circle\n\nfrom rllab.runs import GameRecording\nfrom rllab.viz import Replay, replay\n\nmatplotlib.use(\&quot;Agg\&quot;)\n\npytestmark = pytest.mark.unit\n\nCONTRACTS = Path(__file__).parents[2] / \&quot;contracts\&quot;\n\n\ndef _codec() -&gt; types.ModuleType:\n    name = \&quot;contracts_codec\&quot;\n    if name not in sys.modules:\n        spec = importlib.util.spec_from_file_location(name, CONTRACTS / \&quot;codec.py\&quot;)\n        assert spec is not None\n        assert spec.loader is not None\n        sys.modules[name] = importlib.util.module_from_spec(spec)\n        spec.loader.exec_module(sys.modules[name])\n    return sys.modules[name]\n\n\ndef _grid_game() -&gt; GameRecording:\n    frames = np.arange(3 * 2 * 2, dtype=np.int8).reshape(3, 2, 2)\n    return GameRecording(\n        seed=0,\n        board=\&quot;grid\&quot;,\n        frames=frames,\n        rewards=np.zeros(2, dtype=np.float32),\n        scores={\&quot;solo\&quot;: np.array([0.0, 1.0, 2.0], dtype=np.float32)},\n    )\n\n\ndef _tank_game() -&gt; GameRecording:\n    circles = np.array([[[1.0, 2.0, 0.5, 0.0], [3.0, 4.0, 0.25, 1.0]]], dtype=np.float32)\n    return GameRecording(\n        seed=0,\n        board=\&quot;tank\&quot;,\n        frames=np.repeat(circles, 2, axis=0),\n        rewards=np.zeros(1, dtype=np.float32),\n        scores={\&quot;fish\&quot;: np.array([0.0, 3.0], dtype=np.float32)},\n    )\n\n\ndef _show_and_capture(\n    viewer: Replay, monkeypatch: pytest.MonkeyPatch, keys: tuple[str, ...] = ()\n) -&gt; Figure:\n    \&quot;\&quot;\&quot;Run `show` with a `plt.show` that presses `keys` and keeps the figure.\&quot;\&quot;\&quot;\n    shown: list[Figure] = []\n\n    def fake_show() -&gt; None:\n        figure = replay.plt.gcf()\n        for key in keys:\n            event = KeyEvent(\&quot;key_press_event\&quot;, figure.canvas, key)\n            figure.canvas.callbacks.process(\&quot;key_press_event\&quot;, event)\n        shown.append(figure)\n\n    monkeypatch.setattr(replay.plt, \&quot;show\&quot;, fake_show)\n    viewer.show()\n    replay.plt.close(shown[0])\n    return shown[0]\n\n\ndef test_real_replay_passes_the_contract_check():\n    codec = _codec()\n    fake = codec.fake(\&quot;viz.Replay\&quot;)\n    game = codec.sample(\&quot;viz.Replay\&quot;, \&quot;snake_12_frames\&quot;, GameRecording)\n    fake.check_replay(Replay(game), game)\n\n\ndef test_show_draws_the_grid_frame_with_step_and_score(monkeypatch):\n    game = _grid_game()\n    figure = _show_and_capture(Replay(game), monkeypatch)\n    (axes,) = figure.axes\n    (image,) = [a for a in axes.get_children() if isinstance(a, AxesImage)]\n    np.testing.assert_array_equal(np.asarray(image.get_array()), game.frames[0])\n    assert axes.get_title() == \&quot;step 0  solo: 0\&quot;\n\n\ndef test_show_key_presses_reach_on_key_and_redraw(monkeypatch):\n    game = _grid_game()\n    viewer = Replay(game, fps=8.0)\n    figure = _show_and_capture(viewer, monkeypatch, keys=(\&quot; \&quot;, \&quot;right\&quot;, \&quot;+\&quot;))\n    assert (viewer.index, viewer.paused, viewer.fps) == (1, True, 16.0)\n    (axes,) = figure.axes\n    (image,) = [a for a in axes.get_children() if isinstance(a, AxesImage)]\n    np.testing.assert_array_equal(np.asarray(image.get_array()), game.frames[1])\n    assert axes.get_title() == \&quot;step 1  solo: 1\&quot;\n\n\ndef test_show_draws_tank_circles(monkeypatch):\n    figure = _show_and_capture(Replay(_tank_game()), monkeypatch)\n    (axes,) = figure.axes\n    circles = [p for p in axes.patches if isinstance(p, Circle)]\n    assert [(c.center, c.radius) for c in circles] == [((1.0, 2.0), 0.5), ((3.0, 4.0), 0.25)]\n    assert axes.get_title() == \&quot;step 0  fish: 0\&quot;\n\n\n@pytest.mark.parametrize((\&quot;fps\&quot;, \&quot;ms\&quot;), [(8.0, 125), (1.0, 1000), (5000.0, 1)])\ndef test_interval_follows_fps(fps, ms):\n    assert replay._interval_ms(fps) == ms\n&quot;
+}</pre><div class="lbl">output</div><pre>File created successfully at: /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/project/.claude/worktrees/agent-afa0e783c69fb3fcc/tests/unit/rllab/test_replay_viewer.py (file state is current in your context — no need to Read it back)</pre></details></div><div class="step" id="S17"><span class="sid">U44.S17</span><span class="kind">Bash</span>grep -n &quot;replay\|import&quot; /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/project/.claude/worktrees/agent-afa0e783c69fb3fcc/src/rllab/viz/__init__.py<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;grep -n \&quot;replay\\|import\&quot; /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/project/.claude/worktrees/agent-afa0e783c69fb3fcc/src/rllab/viz/__init__.py&quot;,
+  &quot;description&quot;: &quot;Check viz exports&quot;
+}</pre><div class="lbl">output</div><pre>1:&quot;&quot;&quot;Charts and the replay window.&quot;&quot;&quot;
+3:from rllab.viz.curves import plot_curves
+4:from rllab.viz.replay import Replay
+5:from rllab.viz.types import Chart</pre></details></div><div class="step" id="S18"><span class="sid">U44.S18</span><span class="kind">Bash</span>uv run pytest tests/intent/rllab tests/unit/rllab tests/contracts/viz.Replay -k &quot;replay_viewer or viz_replay&quot; -q<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;uv run pytest tests/intent/rllab tests/unit/rllab tests/contracts/viz.Replay -k \&quot;replay_viewer or viz_replay\&quot; -q&quot;,
+  &quot;description&quot;: &quot;Run replay tests&quot;
+}</pre><div class="lbl">output</div><pre>..........................                                               [100%]
+26 passed, 252 deselected in 11.90s</pre></details></div><div class="step" id="S19"><span class="sid">U44.S19</span><span class="kind">Bash</span>scripts/check.sh gate <span class="err">error</span><details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;scripts/check.sh gate&quot;,
+  &quot;description&quot;: &quot;Run the gate&quot;,
+  &quot;timeout&quot;: 600000
+}</pre><div class="lbl">output</div><pre>Exit code 1
+-&gt; ruff check --ignore-noqa .
+All checks passed!
+-&gt; ruff format --check .
+137 files already formatted
+-&gt; mypy
+Success: no issues found in 50 source files
+-&gt; python scripts/check_size.py src
+-&gt; deptry . --no-ansi
+Scanning 54 files...
+
+Success! No dependency issues found.
+-&gt; lint-imports --no-logo
+
+---------
+Contracts
+---------
+
+Analyzed 70 files, 174 dependencies.
+------------------------------------
+
+Layers: lab &gt; train | reference | compare | viz | baselines &gt; evaluate | envs | 
+agents &gt; runs &gt; core KEPT (1 ignored import)
+Hand-written code stays free of the reference library (AGENT-06, AD-04) KEPT
+Only agents imports PyTorch (AD-02) KEPT
+envs → core only KEPT
+agents → core only KEPT
+baselines → core, envs KEPT
+train → core, runs, evaluate KEPT
+reference → core, envs, runs, evaluate KEPT
+compare → evaluate KEPT
+viz → runs, evaluate KEPT
+
+Contracts: 10 kept, 0 broken.
+-&gt; pytest tests/intent tests/unit tests/contracts --no-cov -q -x
+........................................................................ [ 14%]
+........................................................................ [ 29%]
+........................................................................ [ 43%]
+........................................................................ [ 58%]
+........................................................................ [ 73%]
+........................................................................ [ 87%]
+...........................................................              [100%]
+491 passed in 8.60s
+-&gt; bash scripts/floor_guard.sh
+floor_guard: 1 floor violation(s). Fix the code; a real exception goes through build-setup (Revise) and the Exceptions table in CONSTRAINTS.md.
+tests/unit/rllab/test_replay_viewer.py:78: [test-without-assertion] `test_real_replay_passes_the_contract_check` asserts nothing
+-&gt; protected files unchanged since refs/worktree/checks-base
+FAILED: bash scripts/floor_guard.sh</pre></details></div><div class="step" id="S20"><span class="sid">U44.S20</span><span class="kind">say</span>Adding an explicit assertion after the contract check.<details><summary>full text</summary><pre>Adding an explicit assertion after the contract check.</pre></details></div><div class="step" id="S21"><span class="sid">U44.S21</span><span class="kind">Edit</span>/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/project/.claude/worktrees/agent-afa0e783c69fb3fcc/tests/unit/rllab/test_replay_viewer.py | old: &#x27;fake.check_replay(Replay(game), game)&#x27; | new: &#x27;viewer = Replay(game) ⏎     fake.check_replay(viewer, game) ⏎     assert viewer.&#x27;<div class="lbl">edited /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/project/.claude/worktrees/agent-afa0e783c69fb3fcc/tests/unit/rllab/test_replay_viewer.py · old</div><pre>    fake.check_replay(Replay(game), game)</pre><div class="lbl">new</div><pre>    viewer = Replay(game)
+    fake.check_replay(viewer, game)
+    assert viewer.index == len(game.frames) - 1</pre><details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;replace_all&quot;: false,
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/project/.claude/worktrees/agent-afa0e783c69fb3fcc/tests/unit/rllab/test_replay_viewer.py&quot;,
+  &quot;old_string&quot;: &quot;    fake.check_replay(Replay(game), game)&quot;,
+  &quot;new_string&quot;: &quot;    viewer = Replay(game)\n    fake.check_replay(viewer, game)\n    assert viewer.index == len(game.frames) - 1&quot;
+}</pre><div class="lbl">output</div><pre>The file /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/project/.claude/worktrees/agent-afa0e783c69fb3fcc/tests/unit/rllab/test_replay_viewer.py has been updated successfully. (file state is current in your context — no need to Read it back)</pre></details></div><div class="step" id="S22"><span class="sid">U44.S22</span><span class="kind">Bash</span>scripts/check.sh gate<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;scripts/check.sh gate&quot;,
+  &quot;description&quot;: &quot;Rerun the gate&quot;,
+  &quot;timeout&quot;: 600000
+}</pre><div class="lbl">output</div><pre>-&gt; ruff check --ignore-noqa .
+All checks passed!
+-&gt; ruff format --check .
+137 files already formatted
+-&gt; mypy
+Success: no issues found in 50 source files
+-&gt; python scripts/check_size.py src
+-&gt; deptry . --no-ansi
+Scanning 54 files...
+
+Success! No dependency issues found.
+-&gt; lint-imports --no-logo
+
+---------
+Contracts
+---------
+
+Analyzed 70 files, 174 dependencies.
+------------------------------------
+
+Layers: lab &gt; train | reference | compare | viz | baselines &gt; evaluate | envs | 
+agents &gt; runs &gt; core KEPT (1 ignored import)
+Hand-written code stays free of the reference library (AGENT-06, AD-04) KEPT
+Only agents imports PyTorch (AD-02) KEPT
+envs → core only KEPT
+agents → core only KEPT
+baselines → core, envs KEPT
+train → core, runs, evaluate KEPT
+reference → core, envs, runs, evaluate KEPT
+compare → evaluate KEPT
+viz → runs, evaluate KEPT
+
+Contracts: 10 kept, 0 broken.
+-&gt; pytest tests/intent tests/unit tests/contracts --no-cov -q -x
+........................................................................ [ 14%]
+........................................................................ [ 29%]
+........................................................................ [ 43%]
+........................................................................ [ 58%]
+........................................................................ [ 73%]
+........................................................................ [ 87%]
+...........................................................              [100%]
+491 passed in 8.03s
+-&gt; bash scripts/floor_guard.sh
+floor_guard: clean
+-&gt; protected files unchanged since refs/worktree/checks-base</pre></details></div><div class="step" id="S23"><span class="sid">U44.S23</span><span class="kind">say</span>DONE M1-T20 implementer<details><summary>full text</summary><pre>DONE M1-T20 implementer</pre></details></div>
+<h2>Commits</h2>
+<p>None.</p>
+<h2>Returned</h2>
+<pre>DONE M1-T20 implementer</pre>
+</body></html>

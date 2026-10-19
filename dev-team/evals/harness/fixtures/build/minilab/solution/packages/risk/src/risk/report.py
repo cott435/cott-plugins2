@@ -10,7 +10,9 @@ from pathlib import Path
 from .types import Drawdown, Report, TickerSummary
 
 
-def write_report(summary: Sequence[TickerSummary], drawdowns: Sequence[Drawdown], out_path: str | Path) -> Report:
+def write_report(
+    summary: Sequence[TickerSummary], drawdowns: Sequence[Drawdown], out_path: str | Path
+) -> Report:
     """One row per ticker, its summary then its drawdown (depth as max_drawdown), written as {"tickers": [...]}."""
     dd = {d.ticker: d for d in drawdowns}
     if set(dd) != {s.ticker for s in summary}:

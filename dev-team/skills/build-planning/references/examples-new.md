@@ -58,7 +58,7 @@ With no plan yet, `uncovered`, `no_spine` and the unrouted lists have nothing to
 
 > Cut S1 into one milestone, M1 Ingest & clean (both pipelines). Wrote the M1 plan (16 tasks: types, 2 contract, 6 spines, 2 wiring, 4 thicken, system; critical path 5, 10 agents once the interface lands; checkpoints after M1-T03 (barrier), M1-T15 and at exit), its todo, the M1 roadmap row and the AGENTS.md doc map. `dt lint` is clean; `uncovered`, `no_spine` and `mode_violations` are empty; `dt ready` lists only M1-T01; every `dt context` packet is under 2,000 lines.
 >
-> **ASSUMPTIONS:** M1-T01 freezes six types and every step signature, M1-T02 and M1-T03 their samples and the `load_readings` fake; the only unmitigated edges are stubs, spines under their thicken tasks and wiring, and the system task; no folds; interface tasks, spines, wiring and system solo, the four thicken tasks split; data-science routed to the three profile thicken tasks.
+> **ASSUMPTIONS:** M1-T01 freezes six types and every step signature, M1-T02 and M1-T03 their samples and the `load_readings` fake; the only unmitigated edges are stubs, spines under their thicken tasks and wiring, and the system task; no folds; interface tasks, spines and wiring solo; the four thicken tasks and the system task split, since each names a TC case; data-science routed to the three profile thicken tasks.
 >
 > **Open questions:** none. **Uncovered:** none deferred.
 >

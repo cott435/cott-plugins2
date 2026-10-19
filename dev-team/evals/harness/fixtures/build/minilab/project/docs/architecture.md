@@ -30,8 +30,8 @@ tests/intent/<pkg>/  tests/unit/<pkg>/  tests/fixtures/<pkg>/  tests/contracts/ 
 ## Shared tech stack and tooling
 | Area | Choice | Decision |
 |---|---|---|
-| Language | Python 3.10+, standard library only | AD-01 |
-| Tests | pytest, `pythonpath` over both `src/` folders | AD-02 |
+| Language | Python 3.11+, standard library only | AD-01 |
+| Packaging and tests | a uv workspace (`packages/*`), pytest from the root | AD-02 |
 
 ## Decisions
 ### AD-01: Standard library only
@@ -41,12 +41,12 @@ tests/intent/<pkg>/  tests/unit/<pkg>/  tests/fixtures/<pkg>/  tests/contracts/ 
 - **Alternatives:** pandas — a heavy dependency for a few hundred rows.
 - **Consequences:** Types are frozen dataclasses of tuples; the code is explicit about windows and denominators.
 
-### AD-02: One test tree, no install step
+### AD-02: One uv workspace, one test tree
 **Status:** Accepted · **Date:** 2026-10-17 · **Scope:** system
 - **Context:** Two packages in one repo, built by several agents at once.
-- **Decision:** pytest's `pythonpath` lists `packages/*/src`; tests live under `tests/` by role and package.
-- **Alternatives:** A uv workspace — needs a lock and network for no gain here.
-- **Consequences:** `python -m pytest` from the root is the whole test run.
+- **Decision:** A uv workspace with members `packages/mdata` and `packages/risk` (`risk` depends on `mdata`); tests live under `tests/` by role and package.
+- **Alternatives:** pytest's `pythonpath` over both `src/` folders — no lock, but nothing checks what each package declares.
+- **Consequences:** `uv run pytest` from the root is the whole test run; each worktree gets its own `.venv`.
 
 ## Risks and open questions
 - Missing dates are filled with the previous close; a long gap would invent prices, so DATA-04 makes it an error.

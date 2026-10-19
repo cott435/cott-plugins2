@@ -1,0 +1,1528 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1"><title>U47 implementer</title>
+<style>
+:root{--bg:#fbfbfa;--fg:#1d1d1f;--muted:#6b6b70;--line:#d9d9de;--box:#fff;--rowp:#eef3fb;--band:#fff4d6;
+--ok:#2e7d32;--bad:#c62828;--warn:#b26a00;--idle:#6b6b70}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#17171a;--fg:#ececf0;--muted:#9a9aa3;
+--line:#34343a;--box:#222227;--rowp:#1d2433;--band:#3a3015;--ok:#6fcf73;--bad:#ff6b6b;--warn:#f0b35a;--idle:#9a9aa3}}
+:root[data-theme="dark"]{--bg:#17171a;--fg:#ececf0;--muted:#9a9aa3;--line:#34343a;--box:#222227;--rowp:#1d2433;
+--band:#3a3015;--ok:#6fcf73;--bad:#ff6b6b;--warn:#f0b35a;--idle:#9a9aa3}
+body{margin:0;padding:16px;background:var(--bg);color:var(--fg);font:14px/1.45 -apple-system,system-ui,sans-serif}
+h1{font-size:18px;margin:0 0 4px}h2{font-size:15px;margin:22px 0 8px}.sub{color:var(--muted)}
+table{border-collapse:collapse;margin:4px 0 8px}td,th{border-bottom:1px solid var(--line);padding:4px 10px;text-align:left;
+vertical-align:top}th{color:var(--muted);font-weight:600}.chips span{display:inline-block;margin:0 4px 2px 0}
+.legend span{margin-right:14px;white-space:nowrap}.sw{display:inline-block;width:10px;height:10px;border-radius:2px;
+margin-right:4px;vertical-align:-1px}.scroll{overflow:auto;max-height:88vh;border:1px solid var(--line);border-radius:8px}
+.chart{display:grid;width:max-content}.chart>div{line-height:0}.corner{position:sticky;top:0;left:0;z-index:3}
+.colhead{position:sticky;top:0;z-index:2}.rowhead{position:sticky;left:0;z-index:2}
+svg.bg{background:var(--bg)}.colhead svg{border-bottom:1px solid var(--line)}.rowhead svg{border-right:1px solid var(--line)}
+.ok{color:var(--ok);fill:var(--ok)}.bad{color:var(--bad);fill:var(--bad)}.warn{color:var(--warn);fill:var(--warn)}
+.idle{color:var(--idle);fill:var(--idle)}
+svg text{fill:var(--fg);font-family:-apple-system,system-ui,sans-serif}
+.box{fill:var(--box);stroke:var(--line)}.unit:hover .box{stroke:var(--fg)}
+.role{font-size:12px;font-weight:600}.uid,.wmeta,.lmeta,.meta{font-size:10px;fill:var(--muted)}
+.sub{font-size:10.5px;fill:var(--muted)}.badge{font-size:11px;font-weight:600}
+.meta.bad{fill:var(--bad);font-weight:600}.lane{font-size:13px;font-weight:700}.wave{font-size:13px;font-weight:700}
+.par{fill:#4e79a7}.ser{fill:var(--muted)}.rowp{fill:var(--rowp)}.rows{fill:transparent}.band{fill:var(--band)}
+.bandt{font-size:11.5px}.grid{stroke:var(--line)}.link{stroke:var(--muted);stroke-width:1.2;opacity:.55}
+.arrowhead{fill:var(--muted)}.marks{font-size:10.5px}.audit{stroke:var(--box);stroke-width:2}.auditn{font-size:10px;font-weight:700;fill:#fff}
+a{color:inherit}svg a .box{cursor:pointer}
+
+:root{--c0:#2a78d6;--c1:#eb6834;--c2:#1baf7a;--c3:#eda100;--c4:#e87ba4;--c5:#008300;--c6:#6250d6;--c7:#e34948;
+--cx:#8a8985;--main:#52514e;--read:#dcdbd5;--readfg:#1d1d1f}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--c0:#3987e5;--c1:#d95926;--c2:#199e70;
+--c3:#c98500;--c4:#d55181;--c5:#008300;--c6:#9085e9;--c7:#e66767;--cx:#77766f;--main:#c3c2b7;--read:#3b3b40;
+--readfg:#ececf0}}
+:root[data-theme="dark"]{--c0:#3987e5;--c1:#d95926;--c2:#199e70;--c3:#c98500;--c4:#d55181;--c5:#008300;
+--c6:#9085e9;--c7:#e66767;--cx:#77766f;--main:#c3c2b7;--read:#3b3b40;--readfg:#ececf0}
+.c0{fill:var(--c0);background:var(--c0)}.c1{fill:var(--c1);background:var(--c1)}.c2{fill:var(--c2);background:var(--c2)}
+.c3{fill:var(--c3);background:var(--c3)}.c4{fill:var(--c4);background:var(--c4)}.c5{fill:var(--c5);background:var(--c5)}
+.c6{fill:var(--c6);background:var(--c6)}.c7{fill:var(--c7);background:var(--c7)}.cx{fill:var(--cx);background:var(--cx)}
+.cmain{fill:var(--main)}.sc0{stroke:var(--c0)}.sc1{stroke:var(--c1)}.sc2{stroke:var(--c2)}
+.tl text,.sm text,.lc text{font-size:10.5px;fill:var(--muted)}.tl .lbl-in,.sm .lbl-in{fill:#fff;font-size:10.5px;font-weight:600}
+.tl .rowl,.sm .rowl,.lc .rowl{fill:var(--fg);font-size:11.5px;font-weight:600}.tl .band{fill:var(--rowp)}
+.tl .brk{stroke:var(--muted);stroke-dasharray:2 3}.tl a:hover rect,.sm a:hover rect{stroke:var(--fg);stroke-width:1.5}
+.axis{stroke:var(--line)}.sm .val{fill:var(--fg);font-weight:600}.lc path.ln{fill:none;stroke-width:2}
+.lc circle{stroke:var(--bg);stroke-width:2}.lc .end{font-weight:600;fill:var(--fg)}
+.tiles{display:flex;flex-wrap:wrap;gap:10px;margin:12px 0}.tile{border:1px solid var(--line);border-radius:8px;
+padding:8px 12px;min-width:110px;background:var(--box)}.tile b{display:block;font-size:20px;line-height:1.2}
+.tile span{font-size:12px;color:var(--muted)}.tile i{font-style:normal;font-size:12px;margin-left:6px}
+.fm{border-collapse:separate;border-spacing:2px}.fm td,.fm th{border:0;padding:0;text-align:center;font-size:11px}
+.fm th{padding:0 2px;font-weight:600}.fm td.f,.fm th.f{text-align:left;padding-right:10px;white-space:nowrap;
+position:sticky;left:0;background:var(--bg);font:11.5px ui-monospace,Menlo,monospace;
+max-width:380px;overflow:hidden;text-overflow:ellipsis}
+.fm td.cell{min-width:22px;height:20px;border-radius:3px}.fm td.fw{background:var(--c0);color:#fff;font-weight:700}
+.fm td.fe{background:var(--c1);color:#fff;font-weight:700}.fm td.fr{background:var(--read);color:var(--readfg)}
+.fm td.n{color:var(--muted);padding:0 6px}.fm tr.grp td{text-align:left;padding-top:8px;color:var(--muted);
+font-weight:600}
+.key{display:inline-block;min-width:18px;text-align:center;border-radius:3px;font-size:11px;margin-right:4px}
+.bar{display:inline-block;height:9px;border-radius:2px;vertical-align:0}
+
+pre{white-space:pre-wrap;word-break:break-word;background:var(--box);border:1px solid var(--line);border-radius:6px;
+padding:8px 10px;margin:4px 0;font:12px/1.45 ui-monospace,SFMono-Regular,Menlo,monospace;max-width:100%;overflow:auto}
+.step{border-top:1px solid var(--line);padding:6px 0}.step:target{background:var(--rowp)}
+.sid{font:12px ui-monospace,Menlo,monospace;color:var(--muted);margin-right:8px}.kind{font-weight:600;margin-right:8px}
+.err{color:var(--bad);font-weight:600}.hook{color:var(--bad);margin:4px 0 0 16px}.lbl{font-size:12px;color:var(--muted);margin-top:6px}
+details summary{cursor:pointer;color:var(--muted);font-size:12px}.head td:first-child{color:var(--muted)}
+.top{font-size:13px}.narr{list-style:none;padding-left:0}.narr li{margin:3px 0}
+</style></head>
+<body>
+<p class="top"><a href="../flow.html">← the run's flow chart</a></p>
+
+<h1>U47 · implementer · M1-T30 implementer</h1>
+<table class="head"><tr><td>Type</td><td>implementer</td></tr><tr><td>Description</td><td>M1-T30 implementer</td></tr><tr><td>Spawned by</td><td>driver at D410</td></tr><tr><td>Turn</td><td><a href="../turns/T16.html">T16</a></td></tr><tr><td>Model</td><td>claude-opus-5-5</td></tr><tr><td>Start</td><td>2026-10-18 22:37:47 UTC</td></tr><tr><td>Duration</td><td>3 min</td></tr><tr><td>Tool calls</td><td>28</td></tr><tr><td>Errors</td><td>0</td></tr><tr><td>Hook blocks</td><td>4</td></tr><tr><td>Tokens</td><td>9.2k out · 44.0k new in · 546k cached in · peak context 48.7k</td></tr><tr><td>Skills invoked</td><td>none</td></tr><tr><td>Files written or edited</td><td>.claude/worktrees/agent-a16a9bcae9da881ce/src/rllab/lab/players.py, .claude/worktrees/agent-a16a9bcae9da881ce/tests/unit/rllab/test_ablation_pairs.py</td></tr><tr><td>Definition</td><td>none</td></tr><tr><td>Steps</td><td>32</td></tr><tr><td>Finished</td><td>yes</td></tr></table>
+
+
+<h2>Prompt</h2>
+<pre>You are the implementer for M1-T30. Run `python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r1/with_skill/plugin/dev-team/scripts/dt.py claim M1-T30 --role implementer`, then read the packet it names.</pre>
+<h2>Files</h2>
+<table><tr><th>Op</th><th>File</th><th>Calls</th><th>By</th><th>Via</th><th>Steps</th></tr><tr><td>write</td><td><code>.claude/worktrees/agent-a16a9bcae9da881ce/tests/unit/rllab/test_ablation_pairs.py</code></td><td>1</td><td>U47</td><td>Write</td><td><a href="#25">U47.S25</a></td></tr><tr><td>edit</td><td><code>.claude/worktrees/agent-a16a9bcae9da881ce/src/rllab/lab/players.py</code></td><td>3</td><td>U47</td><td>Edit</td><td><a href="#19">U47.S19</a> <a href="#21">U47.S21</a> <a href="#22">U47.S22</a></td></tr><tr><td>edit</td><td><code>.claude/worktrees/agent-a16a9bcae9da881ce/tests/unit/rllab/test_ablation_pairs.py</code></td><td>2</td><td>U47</td><td>Edit</td><td><a href="#27">U47.S27</a> <a href="#29">U47.S29</a></td></tr><tr><td>read</td><td><code>.claude/worktrees/agent-a16a9bcae9da881ce/.claude/packet.md</code></td><td>1</td><td>U47</td><td>Read</td><td><a href="#4">U47.S4</a></td></tr><tr><td>read</td><td><code>.claude/worktrees/agent-a16a9bcae9da881ce/CONSTRAINTS.md</code></td><td>1</td><td>U47</td><td>Read</td><td><a href="#3">U47.S3</a></td></tr><tr><td>read</td><td><code>.claude/worktrees/agent-a16a9bcae9da881ce/src/rllab/lab/players.py</code></td><td>2</td><td>U47</td><td>Read</td><td><a href="#5">U47.S5</a> <a href="#23">U47.S23</a></td></tr><tr><td>read</td><td><code>.claude/worktrees/agent-a16a9bcae9da881ce/src/rllab/lab/types.py</code></td><td>1</td><td>U47</td><td>Read</td><td><a href="#8">U47.S8</a></td></tr><tr><td>read</td><td><code>.claude/worktrees/agent-a16a9bcae9da881ce/tests/fixtures/rllab/TC-25/expected.json</code></td><td>1</td><td>U47</td><td>Read</td><td><a href="#11">U47.S11</a></td></tr><tr><td>read</td><td><code>.claude/worktrees/agent-a16a9bcae9da881ce/tests/fixtures/rllab/TC-25/input.json</code></td><td>1</td><td>U47</td><td>Read</td><td><a href="#10">U47.S10</a></td></tr><tr><td>read</td><td><code>.claude/worktrees/agent-a16a9bcae9da881ce/tests/intent/rllab/test_ablation_pairs.py</code></td><td>1</td><td>U47</td><td>Read</td><td><a href="#9">U47.S9</a></td></tr><tr><td>read</td><td><code>.claude/worktrees/agent-a16a9bcae9da881ce/tests/unit/rllab/test_ablation_pairs.py</code></td><td>1</td><td>U47</td><td>Read</td><td><a href="#26">U47.S26</a></td></tr><tr><td>read</td><td><code>.claude/worktrees/agent-a16a9bcae9da881ce/tests/unit/rllab/test_players.py</code></td><td>1</td><td>U47</td><td>Read</td><td><a href="#17">U47.S17</a></td></tr></table>
+<h2>Steps</h2>
+<div class="step" id="S1"><span class="sid">U47.S1</span><span class="kind">user</span>You are the implementer for M1-T30. Run `python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r1/with_skill/plugin/dev-team/scripts/dt.py claim M1-T30 --role implementer`, then read the packet it names.<details><summary>full text</summary><pre>You are the implementer for M1-T30. Run `python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r1/with_skill/plugin/dev-team/scripts/dt.py claim M1-T30 --role implementer`, then read the packet it names.</pre></details></div><div class="step" id="S2"><span class="sid">U47.S2</span><span class="kind">Bash</span>python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r1/with_skill/plugin/dev-team/scripts/dt.py claim M1-T30 --role implementer<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r1/with_skill/plugin/dev-team/scripts/dt.py claim M1-T30 --role implementer&quot;,
+  &quot;description&quot;: &quot;Claim task M1-T30 as implementer&quot;
+}</pre><div class="lbl">output</div><pre>packet: /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r1/with_skill/project/.claude/worktrees/agent-a16a9bcae9da881ce/.claude/packet.md (132 lines; read it in full)
+task: M1-T30 Mismatched ablations refused · role implementer · package rllab · kind thicken
+writes: src/rllab/lab/players.py, tests/unit/rllab/test_ablation_pairs.py
+done: Done when `scripts/check.sh gate` passes (the gate passes on your Writes); the Stop hook runs it. End with one line: `DONE M1-T30 implementer`. If you can&#x27;t finish: `python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r1/with_skill/plugin/dev-team/scripts/dt.py escalate &lt;TEST-WRONG|NEEDS-DEP&gt; &quot;&lt;why&gt;&quot;`, or `python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r1/with_skill/plugin/dev-team/scripts/dt.py escalate CONTRACT-CHANGE &quot;&lt;why&gt;&quot; --type &lt;the contract symbol&gt;`, then end with one line: `STOPPED M1-T30 implementer: see dt escalate`.</pre></details></div><div class="step" id="S3"><span class="sid">U47.S3</span><span class="kind">Read</span>/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r1/with_skill/project/.claude/worktrees/agent-a16a9bcae9da881ce/CONSTRAINTS.md<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r1/with_skill/project/.claude/worktrees/agent-a16a9bcae9da881ce/CONSTRAINTS.md&quot;
+}</pre><div class="lbl">output</div><pre>1	# Constraints
+2	**Status:** Approved · **Last reviewed:** 2026-10-18 by @connorott · **Ratcheted:** —
+3	
+4	The standing quality bar. `pyproject.toml` and `scripts/check.sh` enforce it; every number here names its config key, and `dt status` fails if the two disagree. Only `build-setup` changes this file, with the user: tightening is routine, loosening needs an explicit yes.
+5	
+6	## Floor
+7	- **CR-01** No new suppressions. Ruff runs with `--ignore-noqa` in gate and full, so a Ruff exception is a `per-file-ignores` entry in protected config with a row in Exceptions. `# type: ignore`, `pyright:` comments and `pragma: no cover` are caught by `floor_guard.sh` on the diff
+8	- **CR-02** No stubs: `raise NotImplementedError` outside abstract methods, `pass`-only bodies, bare `except: pass`. One carve-out: the interface task&#x27;s step signatures, whose body is only `raise NotImplementedError(&quot;&lt;task id&gt;&quot;)` naming the open task that replaces it. `check.sh gate` fails on one naming a task that isn&#x27;t open in `tasks/todo.md`; `check.sh full --exit` (the milestone exit) fails on any
+9	- **CR-03** No skipped, deleted or assertion-free tests, unless a row in Exceptions names the test file
+10	- **CR-04** No secrets in source
+11	- **CR-05** Oracle files (`tests/fixtures/**/expected.json`) change only with the user&#x27;s approval
+12	- **CR-06** The implementer never changes `tests/intent/**`
+13	- **CR-07** This file, `pyproject.toml` tool config, `scripts/` and `.claude/agents/` are not weakened to make a change pass
+14	- **CR-08** Nothing imports from `references/` or `probes/`, or adds either to `sys.path` (or `PYTHONPATH`, pytest `pythonpath`). References and probe scripts are outside the tooling, so imported code would bypass the bar; `floor_guard.sh` checks the diff for both. Code copied from either is project code and meets the same bar
+15	- **CR-09** A frozen interface (`tests/contracts/&lt;id&gt;.&lt;symbol&gt;/`: schema, samples, fake; and the types, signatures and exports the interface task wrote) is frozen once it exists at the task&#x27;s base. Only the interface task freezing it (`**Kind:** interface`) writes a new folder, and no other task&#x27;s `Writes:` names its `types.py` or `__init__.py`; a frozen interface changes only through `architecture-design` Revise, never to make a test pass
+16	
+17	## Readability
+18	- **CR-10** One entry function per pipeline; it reads top to bottom as its named steps (reviewer + `dt layout`)
+19	- **CR-11** No registries, plugin dispatch or config-driven wiring without an AD
+20	- **CR-12** New abstraction only with a second real implementation or a named seam
+21	
+22	
+23	## Enforced with numbers
+24	| ID | Dimension | Rule | Checked by | Config key | Runs at |
+25	|---|---|---|---|---|---|
+26	| CR-20 | Lint | zero errors; standing per-file-ignores only for `tests/**` and `__init__.py` | ruff | `tool.ruff.lint.select` | edit, gate |
+27	| CR-21 | Complexity | ≤ 10 per function | ruff C901 | `tool.ruff.lint.mccabe.max-complexity` | gate |
+28	| CR-22 | Size | ≤ 500 lines/module, ≤ 60/function | check_size.py | `tool.size_limits` | edit, gate |
+29	| CR-23 | Types | zero errors, strict | mypy | `tool.mypy.strict` | gate |
+30	| CR-24 | Boundaries | import contracts hold | import-linter | `tool.importlinter.contracts` | gate |
+31	| CR-25 | Dependencies | none missing or unused | deptry | `tool.deptry` | gate |
+32	| CR-26 | Deps security | nothing known-vulnerable | pip-audit | — | full, CI nightly |
+33	| CR-27 | Reproducibility | same settings and seed give the same run (RUN-03, AD-08) | pytest `-m repro` | `tool.pytest.ini_options.markers` | gate |
+34	
+35	## Measured, not yet enforced
+36	| ID | Metric | Today | Direction |
+37	|---|---|---|---|
+38	| CR-40 | Coverage (branch) | — (no code) (`tool.coverage.report.fail_under`, raised by Ratchet) | must not fall |
+39	| CR-41 | vulture findings at `min_confidence = 60` (`scripts/vulture_whitelist.py`) | 0 | must not grow by `full --exit` (earlier `full` runs report) |
+40	| CR-42 | Duplicate blocks of ≥ 8 similar source lines (pylint `duplicate-code`, `[tool.pylint.similarities]` in pyproject.toml) | 0 | must not grow |
+41	
+42	## Boundaries (generated from architecture — do not edit)
+43	- `rllab.core` imports nothing first-party · `envs`, `agents`, `runs` → core · `evaluate` → core, runs · `baselines` → core, envs · `train` → core, runs, evaluate · `reference` → core, envs, runs, evaluate · `compare` → evaluate · `viz` → runs, evaluate · `lab` → all
+44	- Only `rllab.reference` imports `stable_baselines3` or `gymnasium`; only `rllab.agents` imports `torch`
+45	
+46	## Roles and protected paths
+47	| Role | May edit | May not edit | Stop gate |
+48	|---|---|---|---|
+49	| tester | `tests/intent/**`, within the task&#x27;s `Writes:` | everything else; reads no source | `check.sh collect` (lint, collect, red for the right reason) |
+50	| implementer / solo | `src/**`, `tests/unit/**`, within the task&#x27;s `Writes:`; an interface task also the `tests/contracts/&lt;id&gt;.&lt;symbol&gt;/` its `Writes:` names | the protected list; `tasks/` | `check.sh gate` + protected-path diff against the worktree&#x27;s base |
+51	| reviewer | its worktree, for the mutation check, and its findings file; nothing lands (the orchestrator records findings with `dt finding`) | everything else | runs `check.sh full` by hand |
+52	
+53	**Protected list** (`PROTECTED` in `scripts/check.sh`; `path_guard.sh deny --protected` reads the same list): `tests/intent/**`, `tests/fixtures/**`, `tests/conftest.py`, `pyproject.toml`, `uv.lock`, `CONSTRAINTS.md`, `scripts/**`, `.claude/agents/**`, `.claude/settings.json`, `references/**`, `probes/**`, `tests/contracts/**`. `tests/contracts/**` covers the contract folders that exist at the task&#x27;s base (CR-09). **`Writes:`**: `dt claim`, in the builder&#x27;s worktree, writes the role&#x27;s share of the task&#x27;s `Writes:` to `.claude/.task_writes` and sets the worktree&#x27;s base (`refs/worktree/checks-base`); `path_guard.sh writes` blocks edits outside the list, and a tester&#x27;s or implementer&#x27;s edits before the claim. Only the orchestrator writes `tasks/` (`dt land`, `dt finding`).
+54	
+55	**Worktree links:** none
+56	
+57	## Review
+58	Run by the reviewer agent over what it is given (base, package, tasks, paths): the interface review after Phase 0, a phase review per package at each checkpoint, and the milestone exit. `dt land` already checked each landing&#x27;s `Writes:`, protected paths and gates; review judges what tools can&#x27;t.
+59	
+60	**Interface** (after Phase 0): the code is the contract, no more and no less.
+61	1. Types match `contract.md`: fields, types, invariants. Nothing a step&#x27;s In → Out needs is missing; no helper is frozen.
+62	2. Signatures match the step tables, in their owner modules. Each stub names the open task that owns its step; no logic beyond types and validation.
+63	3. One sample per case the contract names, valid and realistically shaped, never carrying a TC&#x27;s expected value. Replay doubles replay an interaction the Protocol allows; fakes serve their fixtures.
+64	4. `__init__.py` exports exactly the contract; each `Mitigated by` in the plan&#x27;s dependency graph exists; each split task&#x27;s tester can write its tests from the frozen interface and its `Read:`.
+65	
+66	**Each phase**, per package, tests before code:
+67	1. **Interfaces followed** (CR-09): no frozen type, signature or contract folder changed outside a Revise. Consumers use the declared types: no dict for a dataclass, no reaching into a provider&#x27;s internals, no local redefinition. A stub is replaced only by the task it names; no cross-package import outside the contract; spine tests run on samples and doubles, not another step&#x27;s code.
+68	2. **Tests prove something:** each intent test asserts its TC case or acceptance bullet, loading expected values and tolerances from fixtures; none is assertion-free or weakened; Hypothesis runs the `ci` profile. Unit tests are specific, never computing the expected value with the code under test or testing only a mock. **Mutation check** (`.claude/agents/reviewer.md`): per acceptance bullet, the smallest change that should break it; a mutation no test catches is a finding.
+69	3. **Correct to the spec:** each acceptance bullet truly met, not special-cased to the sample; the error paths the requirement names; seeding and determinism; numerical edge cases.
+70	4. **Simple** (CR-11, CR-12, CR-42): no abstraction with one implementation outside the contract or an AD; no forwarding wrapper, one-method class, or class where a function does; no parameter, flag or config key every caller sets the same; no `try/except` that only re-raises or swallows, no checks the types already guarantee; no loop the library already provides. No near-copies within or across the phase&#x27;s tasks: one concept is one function in its owner module (tests may repeat for readability). Each finding names the simpler form, with the same tests passing.
+71	5. **Pipelines** (CR-10): entry functions read as their step tables (`dt layout`); step owners respected; spine baselines still selectable.
+72	6. **The bar** (CR-07): diff this file, `pyproject.toml`, `scripts/` and `.claude/agents/` against the milestone&#x27;s Base. Any loosening is Critical; new exceptions need an owner and expiry.
+73	7. **Hidden and parallel risks:** where a real provider could act differently from its double (flagged for the system phase); fixed output paths, global state, test-order dependence.
+74	8. **The rest:** readability, security, performance where a QR sets a number; reused reference or probe code has its Caveats handled and fits the contract; `dt lint` clean, pre-build sections replaced by `dt layout` pointers.
+75	
+76	**Milestone exit**, over the whole diff, adds: the Scope&#x27;s Exit holds; every Covers ID has a test; `check.sh full --exit` finds no stub; system tests use real providers; the same sample through a real provider and its double agrees; deferred requirements untouched; pip-audit ran.
+77	
+78	**Severity:** Critical: a frozen interface changed, a weakened test, an intent test that misses a mutation changing its TC&#x27;s expected output, a wrong answer, a loosened bar, a security hole, lost data; it stops the build. Important: a consumer bypassing a type, any other surviving mutation, an unneeded abstraction, a duplicate across tasks. Suggestion and Nit: local. Findings go under the checkpoint block in `tasks/plan.md` (`dt finding`), each with a fix task or a reason.
+79	
+80	## Done
+81	agent-skills `references/definition-of-done.md`, tailored once:
+82	- **Correctness and Quality:** checked per task by the gate.
+83	- **Integration and Documentation:** checked at each checkpoint.
+84	- **The full list:** checked at milestone exit.
+85	
+86	## Exceptions
+87	| ID | Rule | Path | Reason | Owner | Expires |
+88	|---|---|---|---|---|---|
+89	| EX-01 | CR-25 DEP002 | `numpy`, `torch`, `matplotlib`, `stable-baselines3`, `gymnasium` | M1 dependencies, declared before the code imports them | @connorott | M1 exit |
+90	</pre></details></div><div class="step" id="S4"><span class="sid">U47.S4</span><span class="kind">Read</span>/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r1/with_skill/project/.claude/worktrees/agent-a16a9bcae9da881ce/.claude/packet.md<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r1/with_skill/project/.claude/worktrees/agent-a16a9bcae9da881ce/.claude/packet.md&quot;
+}</pre><div class="lbl">output</div><pre>1	# Packet: M1-T30 implementer
+2	You are the implementer for M1-T30. Your edit boundary is your Writes below (`.claude/.task_writes`); the guard blocks everything else.
+3	
+4	Done when `scripts/check.sh gate` passes (the gate passes on your Writes); the Stop hook runs it. End with one line: `DONE M1-T30 implementer`. If you can&#x27;t finish: `python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r1/with_skill/plugin/dev-team/scripts/dt.py escalate &lt;TEST-WRONG|NEEDS-DEP&gt; &quot;&lt;why&gt;&quot;`, or `python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r1/with_skill/plugin/dev-team/scripts/dt.py escalate CONTRACT-CHANGE &quot;&lt;why&gt;&quot; --type &lt;the contract symbol&gt;`, then end with one line: `STOPPED M1-T30 implementer: see dt escalate`.
+5	
+6	# Context for M1-T30: package rllab · mode split · kind thicken
+7	Read only what is below, plus CONSTRAINTS.md and the files you edit. Your task is the last section.
+8	
+9	&lt;!-- docs/packages/rllab/pipelines.md:76 --&gt;
+10	## PL-04: Report
+11	**Entry:** `src/rllab/lab/pipelines/pl04_report.py::run_report` · **Trigger:** `python -m rllab.lab report &lt;report.toml&gt;`
+12	**Covers:** EVAL-02–EVAL-11, REF-02, REF-03, ABL-04, BASE-03
+13	
+14	| # | Step | Owner | In → Out | Spine version | Covers |
+15	|---|---|---|---|---|---|
+16	| 1 | `load_report_spec` | lab.report_spec | path → ClaimSpec, targets | TOML: players (name → run folders or a baseline name, plus `team` and `vs` for predator-prey), claims, two curve charts, and PL-06&#x27;s cross-play chart paths | EVAL-02–EVAL-05, EVAL-09–EVAL-11 |
+17	| 2 | `score_players` | lab.players | targets → ScoreSet | for each player, opponent and seed: PL-03 steps 1, 9 and 10 as built; a predator-prey player&#x27;s panel scores are pooled over its `vs` opponents | EVAL-01, BASE-03, SELF-07 |
+18	| 3 | `open_curve_runs` | lab.players | targets → RunRecord | `runs.open_run` per folder; `ValueError` if an ablation&#x27;s seeds or `steps` differ from its full agent&#x27;s | ABL-04, RUN-05 |
+19	| 4 | `run_claims` | compare.claims | ScoreSet, ClaimSpec → Claim | each claim through the `null-hypothesis-testing` skill, one correction over all claims; REF-02&#x27;s ratio as arithmetic; writes `report.md`, linking the cross-play charts by path | EVAL-02–EVAL-05, EVAL-07–EVAL-11, REF-02, REF-03, BASE-03 |
+20	| 5 | `plot_curves` | viz.curves | RunRecord, ScoreSet → Chart | mean over seeds with a min–max band; one horizontal line at each named baseline&#x27;s pooled mean; once for the ladder chart and once for the ablation chart | EVAL-06, ABL-04 |
+21	
+22	### Entry sketch (pre-build — removed by spine task)
+23	```python
+24	def run_report(spec_path: Path, out: Path) -&gt; list[Claim]:
+25	    specs, targets = load_report_spec(spec_path)
+26	    scores = score_players(targets)
+27	    curves = open_curve_runs(targets)
+28	    claims = run_claims(scores, specs, charts=targets.crossplay, out=out)
+29	    plot_curves(curves.ladder, scores=scores, baselines=targets.baselines, out=out / &quot;ladder.png&quot;)
+30	    plot_curves(curves.ablations, scores=scores, baselines=targets.baselines, out=out / &quot;ablations.png&quot;)
+31	    return claims
+32	```
+33	
+34	&lt;!-- docs/packages/rllab/contract.md:317 --&gt;
+35	### runs.open_run: Read a run folder
+36	`def open_run(path: Path) -&gt; RunRecord`
+37	- **Errors:** `FileNotFoundError` naming the run if the folder or `settings.json` is missing. `ValueError` naming the file if a recording is unreadable.
+38	- **Boundary:** evaluate, viz, lab · **Fixtures:** tests/contracts/runs.open_run/ · **Cases:** a complete corridor run; a folder missing `settings.json`
+39	- **Used by:** evaluate, viz, lab; PL-03, PL-04, PL-05, PL-06
+40	
+41	&lt;!-- docs/packages/rllab/contract.md:292 --&gt;
+42	### runs.RunRecord: type
+43	`@dataclass(frozen=True) class RunRecord: path: Path; settings: RunSettings; curve: tuple[CurvePoint, ...]; status: Literal[&quot;running&quot;, &quot;complete&quot;, &quot;incomplete&quot;]; checkpoints: dict[str, Path]; generations: dict[str, tuple[Path, ...]]; games: tuple[GameRecording, ...]`
+44	- **Invariants:** `settings` round-trips through `settings.json` unchanged. `checkpoints` holds one final checkpoint per learning team (single-team runs: `SOLO`), present when `status` is `complete`. `generations` holds each learning team&#x27;s numbered generations in order (10 when `settings.generations == 10`, else empty) (RUN-02, SELF-04).
+45	- **Boundary:** train, reference, evaluate, viz, lab · **Fixtures:** tests/contracts/runs.RunRecord/ · **Cases:** a complete tabular corridor run; an incomplete Snake run with 3 curve points; a complete predator-prey rung-3 run with 10 generations per team
+46	- **Used by:** train, reference, evaluate, viz, lab, selfplay; PL-01, PL-02, PL-03, PL-04, PL-05, PL-06
+47	
+48	&lt;!-- docs/packages/rllab/tests.md:149 --&gt;
+49	### TC-25: A mismatched ablation is refused
+50	**Pipeline:** PL-04 · **Covers:** ABL-04 · **Kind:** closed form · **Fixture:** tests/fixtures/rllab/TC-25/
+51	**Source:** the `lab.main` contract invariant (&quot;report refuses an ablation whose seeds or steps differ from its full agent&#x27;s&quot;), approved 2026-10-17
+52	**Expected:** a full `dqn-compact` run set (steps 300,000, seeds 0–4) against a `no_target` set with steps 200,000 → `ValueError` naming `steps`; against seeds 0–3 → `ValueError` naming the seeds; against an exact match → no error · **Tolerance:** exact
+53	
+54	## Layout (`dt layout rllab`)
+55	src/rllab/
+56	  __init__.py — rllab: a reinforcement-learning lab for Snake, the fish tank and predator-prey.
+57	  agents/
+58	    __init__.py — The hand-written learners: a table-based and a neural value learner.
+59	    tabular.py — The table-based value learner (AGENT-01, AGENT-02, ABL-03).
+60	    dqn/
+61	      __init__.py — The DQN learner.
+62	      agent.py — The neural value learner: memory, target network, Huber loss (AGENT-03-AGENT-05, AD-05).
+63	  baselines/
+64	    __init__.py — The fixed baselines: a random and a scripted Snake player.
+65	    random.py — The random baseline: a uniform action from a seeded generator (BASE-01).
+66	    scripted.py — The scripted baseline: toward food if safe, else any safe move, else straight (BASE-02).
+67	  compare/
+68	    __init__.py — Statistical comparison of players.
+69	    claims.py — Claims tested with one correction over all of them, and the report (EVAL-02-EVAL-05).
+70	    types.py — Claims to test and their results (EVAL-02-EVAL-05, REF-02).
+71	  core/
+72	    __init__.py — The core: environment and agent protocols, teams, transitions and run settings.
+73	    protocols.py — The two behaviours every pipeline passes around: an environment and an agent (AD-03, AD-09).
+74	    settings.py — Run settings from TOML (RUN-01, AD-06).
+75	    types.py — The core&#x27;s data types: teams, actions, steps, transitions and run settings (AD-09, AD-13).
+76	  envs/
+77	    __init__.py — The environments: Snake and the corridor.
+78	    corridor.py — A 1-D corridor: walk right to the goal before the step cap (CORE-03).
+79	    snake.py — Snake on a square grid, one team of one agent (SNAKE-01-SNAKE-09).
+80	    types.py — Observation layouts the environments publish to their consumers.
+81	  evaluate/
+82	    __init__.py — Greedy evaluation on held-out seeds.
+83	    protocol.py — The held-out greedy evaluation protocol (EVAL-01, DATA-01, AGENT-07).
+84	    types.py — Evaluation results and options (AD-17).
+85	  lab/
+86	    __init__.py — The lab: building runs from settings, the pipelines and the command line.
+87	    __main__.py — `python -m rllab.lab train | eval | report | replay`.
+88	    build.py — The environment and the agents a run&#x27;s settings name (CORE-01, DATA-02).
+89	    cli.py — The command line: one entry call per seed or target, bad input returns 2.
+90	    players.py — Players from run folders or baseline names, their scores and their curves (RUN-05).
+91	    printing.py — Scores printed on one line (EVAL-01, BASE-03).
+92	    replay.py — The game a replay shows: recorded, or newly played (REPLAY-01, REPLAY-03).
+93	    report_spec.py — The report TOML: players, claims and charts (EVAL-02).
+94	    types.py — What a report names: its players, their roles on the charts, and the runs it plots.
+95	    pipelines/
+96	      __init__.py — One entry module per pipeline.
+97	      pl01_train.py — PL-01: Train a run.
+98	      pl02_train_reference.py — PL-02: Train the reference.
+99	      pl03_evaluate.py — PL-03: Evaluate.
+100	      pl04_report.py — PL-04: Report.
+101	      pl05_replay.py — PL-05: Replay.
+102	  reference/
+103	    __init__.py — The library reference agent: training and playing it.
+104	    player.py — A trained library model played as a core Agent (REF-01).
+105	    train/
+106	      __init__.py — Reference training.
+107	      trainer.py — The library reference agent, trained through the Gymnasium adapter (REF-01, AD-03, AD-04).
+108	  runs/
+109	    __init__.py — Run folders: writing them during training and reading them back.
+110	    store.py — One folder per run: settings.json, curve.csv, checkpoints, games.npz, status (AD-06).
+111	    types.py — What a run folder holds: its curve, its recorded games and the run record (AD-06).
+112	  train/
+113	    __init__.py — The training loop.
+114	    loop.py — The training loop: every team stepped batch-first, every learner fed (CORE-02, CORE-07).
+115	  viz/
+116	    __init__.py — Charts and the replay viewer.
+117	    curves.py — Learning curves: mean over seeds, a min-max band, baseline lines (EVAL-06, ABL-04).
+118	    replay.py — The interactive replay viewer (REPLAY-01, REPLAY-02, AD-07).
+119	    types.py — What a chart drew.
+120	
+121	## Writes (edit only these files; the plan gives every other file to another task)
+122	- src/rllab/lab/players.py (exists)
+123	- tests/unit/rllab/test_ablation_pairs.py (new)
+124	
+125	&lt;!-- tasks/plan.md:289 --&gt;
+126	### M1-T30: Mismatched ablations refused
+127	**Package:** rllab · **Step:** PL-04.open_curve_runs · **Kind:** thicken · **Covers:** ABL-04 · **Size:** XS · **Mode:** split
+128	**Read:** PL-04, runs.open_run, runs.RunRecord, TC-25
+129	**Acceptance:**
+130	- [ ] TC-25 passes (steps mismatch and seeds mismatch raise `ValueError` naming them; an exact match passes)
+131	**Verify:** `pytest tests/intent/rllab tests/unit/rllab -k ablation_pairs` · `scripts/check.sh gate`
+132	**Depends on:** M1-T09 · **Writes:** src/rllab/lab/players.py, tests/intent/rllab/test_ablation_pairs.py, tests/unit/rllab/test_ablation_pairs.py
+133	</pre></details></div><div class="step" id="S5"><span class="sid">U47.S5</span><span class="kind">Read</span>/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r1/with_skill/project/.claude/worktrees/agent-a16a9bcae9da881ce/src/rllab/lab/players.py<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r1/with_skill/project/.claude/worktrees/agent-a16a9bcae9da881ce/src/rllab/lab/players.py&quot;
+}</pre><div class="lbl">output</div><pre>1	&quot;&quot;&quot;Players from run folders or baseline names, their scores and their curves (RUN-05).&quot;&quot;&quot;
+2	
+3	import dataclasses
+4	from pathlib import Path
+5	
+6	from rllab.baselines import RandomPlayer, ScriptedPlayer
+7	from rllab.core import SOLO, Agent, AgentParams, Exploration, Rewards, RunSettings
+8	from rllab.evaluate import EvalOptions, ScoreSet, evaluate
+9	from rllab.lab.build import make_agent, make_env
+10	from rllab.lab.types import CurveRuns, PlayerTarget, ReportTargets
+11	from rllab.runs import RunRecord, open_run
+12	
+13	# The settings a baseline plays under: default Snake on the compact view. It never trains,
+14	# so the learner fields only have to be valid.
+15	_BASELINE_SETTINGS = RunSettings(
+16	    name=&quot;scripted&quot;,
+17	    env=&quot;snake&quot;,
+18	    view=&quot;compact&quot;,
+19	    agent=&quot;scripted&quot;,
+20	    n_agents=1,
+21	    opponents={},
+22	    self_play=&quot;none&quot;,
+23	    pool_latest=0.5,
+24	    generations=0,
+25	    ablation=&quot;none&quot;,
+26	    rewards=Rewards(),
+27	    exploration=Exploration(),
+28	    params=AgentParams(lr=0.0005, gamma=0.99),
+29	    steps=1,
+30	    seed=0,
+31	    eval_every=1,
+32	    eval_games=200,
+33	)
+34	
+35	
+36	def load_player(
+37	    target: str, seed: int, *, env: str, team: str, vs: str
+38	) -&gt; tuple[dict[str, Agent], RunSettings]:
+39	    &quot;&quot;&quot;One agent per team: `team`&#x27;s from the run folder or baseline, the rest from `vs`.
+40	
+41	    `seed` seeds a baseline; a run folder carries its own. Single-team environments ignore
+42	    `team` and `vs`.&quot;&quot;&quot;
+43	    if target in {&quot;random&quot;, &quot;scripted&quot;}:
+44	        return _load_baseline(target, seed, env)
+45	    return _load_run(Path(target))
+46	
+47	
+48	def score_players(targets: ReportTargets) -&gt; dict[str, list[ScoreSet]]:
+49	    &quot;&quot;&quot;Each player&#x27;s ScoreSet per training seed.&quot;&quot;&quot;
+50	    from_runs = {
+51	        name: [_score(name, player, *_load_run(path)) for path in player.runs]
+52	        for name, player in targets.players.items()
+53	        if player.runs
+54	    }
+55	    seeds = sorted({s.train_seed for sets in from_runs.values() for s in sets})
+56	    from_baselines = {
+57	        name: [
+58	            _score(name, player, *_load_baseline(player.baseline, seed, &quot;snake&quot;)) for seed in seeds
+59	        ]
+60	        for name, player in targets.players.items()
+61	        if player.baseline is not None
+62	    }
+63	    scored = from_runs | from_baselines
+64	    return {name: scored[name] for name in targets.players}
+65	
+66	
+67	def open_curve_runs(targets: ReportTargets) -&gt; CurveRuns:
+68	    &quot;&quot;&quot;The ladder and ablation runs; ValueError if an ablation&#x27;s seeds or steps differ.&quot;&quot;&quot;
+69	    return CurveRuns(
+70	        ladder={name: _open_runs(targets.players[name]) for name in targets.ladder},
+71	        ablations={name: _open_runs(targets.players[name]) for name in targets.ablations},
+72	    )
+73	
+74	
+75	def _load_baseline(name: str, seed: int, env: str) -&gt; tuple[dict[str, Agent], RunSettings]:
+76	    &quot;&quot;&quot;The named baseline on default Snake compact settings, seeded with `seed`.&quot;&quot;&quot;
+77	    if env != &quot;snake&quot;:
+78	        raise ValueError(f&quot;no {name!r} baseline for env {env!r}: the baselines play Snake&quot;)
+79	    if name == &quot;scripted&quot;:
+80	        return {SOLO: ScriptedPlayer()}, dataclasses.replace(_BASELINE_SETTINGS, seed=seed)
+81	    settings = dataclasses.replace(_BASELINE_SETTINGS, name=name, agent=&quot;random&quot;, seed=seed)
+82	    n_actions = make_env(settings)().teams[SOLO].actions.n
+83	    return {SOLO: RandomPlayer(n_actions, seed=seed)}, settings
+84	
+85	
+86	def _load_run(path: Path) -&gt; tuple[dict[str, Agent], RunSettings]:
+87	    &quot;&quot;&quot;The run&#x27;s agents as PL-01 built them, each learning team loaded from its checkpoint.&quot;&quot;&quot;
+88	    record = open_run(path)
+89	    if record.status != &quot;complete&quot;:
+90	        raise ValueError(f&quot;run {path}: status {record.status!r}, so no final checkpoint&quot;)
+91	    agents = make_agent(record.settings, make_env(record.settings)())
+92	    for team, checkpoint in record.checkpoints.items():
+93	        agents[team].load(checkpoint)
+94	    return agents, record.settings
+95	
+96	
+97	def _score(
+98	    name: str, player: PlayerTarget, agents: dict[str, Agent], settings: RunSettings
+99	) -&gt; ScoreSet:
+100	    &quot;&quot;&quot;The held-out evaluation of one player&#x27;s agents on its settings&#x27; training seed.&quot;&quot;&quot;
+101	    options = EvalOptions(team=player.team)
+102	    return evaluate(
+103	        make_env(settings), agents, player=name, train_seed=settings.seed, options=options
+104	    )
+105	
+106	
+107	def _open_runs(player: PlayerTarget) -&gt; list[RunRecord]:
+108	    return [open_run(path) for path in player.runs]
+109	</pre></details></div><div class="step" id="S6"><span class="sid">U47.S6</span><span class="kind">Bash</span>git status --short<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;git status --short&quot;,
+  &quot;description&quot;: &quot;Show working tree status&quot;
+}</pre><div class="lbl">output</div><pre>(Bash completed with no output)</pre></details></div><div class="step" id="S7"><span class="sid">U47.S7</span><span class="kind">Bash</span>ls tests/intent/rllab/ tests/fixtures/rllab/TC-25/ tests/unit/rllab/<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;ls tests/intent/rllab/ tests/fixtures/rllab/TC-25/ tests/unit/rllab/&quot;,
+  &quot;description&quot;: &quot;List intent tests, TC-25 fixture, unit tests&quot;
+}</pre><div class="lbl">output</div><pre>tests/fixtures/rllab/TC-25/:
+expected.json
+input.json
+
+tests/intent/rllab/:
+test_ablation_pairs.py
+test_claims.py
+test_corridor.py
+test_evaluate.py
+test_random_player.py
+test_scripted.py
+test_snake.py
+
+tests/unit/rllab/:
+test_claims.py
+test_corridor.py
+test_curves.py
+test_dqn.py
+test_evaluate.py
+test_pick_game.py
+test_pl02_smoke.py
+test_players.py
+test_random_player.py
+test_reference_player.py
+test_report_spec.py
+test_scripted.py
+test_settings.py
+test_snake.py
+test_store.py
+test_train_loop.py
+test_train_reference.py</pre></details></div><div class="step" id="S8"><span class="sid">U47.S8</span><span class="kind">Read</span>/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r1/with_skill/project/.claude/worktrees/agent-a16a9bcae9da881ce/src/rllab/lab/types.py<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r1/with_skill/project/.claude/worktrees/agent-a16a9bcae9da881ce/src/rllab/lab/types.py&quot;
+}</pre><div class="lbl">output</div><pre>1	&quot;&quot;&quot;What a report names: its players, their roles on the charts, and the runs it plots.&quot;&quot;&quot;
+2	
+3	from collections.abc import Mapping, Sequence
+4	from dataclasses import dataclass
+5	from pathlib import Path
+6	
+7	from rllab.core import SOLO
+8	from rllab.runs import RunRecord
+9	
+10	_BASELINES = (&quot;random&quot;, &quot;scripted&quot;)
+11	
+12	
+13	@dataclass(frozen=True)
+14	class PlayerTarget:
+15	    &quot;&quot;&quot;A player: its run folders (one per training seed) or a named baseline.&quot;&quot;&quot;
+16	
+17	    runs: tuple[Path, ...] = ()
+18	    baseline: str | None = None
+19	    team: str = SOLO
+20	    vs: tuple[str, ...] = ()
+21	
+22	    def __post_init__(self) -&gt; None:
+23	        if bool(self.runs) == (self.baseline is not None):
+24	            raise ValueError(&quot;a player names exactly one of runs and baseline&quot;)
+25	        if self.baseline is not None and self.baseline not in _BASELINES:
+26	            raise ValueError(f&quot;baseline must be one of {_BASELINES}, got {self.baseline!r}&quot;)
+27	
+28	
+29	@dataclass(frozen=True)
+30	class ReportTargets:
+31	    &quot;&quot;&quot;The report&#x27;s players and, in legend order, its baselines, ladder and ablations.&quot;&quot;&quot;
+32	
+33	    players: Mapping[str, PlayerTarget]
+34	    baselines: tuple[str, ...]
+35	    ladder: tuple[str, ...]
+36	    ablations: tuple[str, ...]
+37	    crossplay: tuple[Path, ...] = ()
+38	
+39	    def __post_init__(self) -&gt; None:
+40	        unknown = sorted(set(self.baselines + self.ladder + self.ablations) - set(self.players))
+41	        if unknown:
+42	            raise ValueError(f&quot;names not among the players: {unknown}&quot;)
+43	
+44	
+45	@dataclass(frozen=True)
+46	class CurveRuns:
+47	    &quot;&quot;&quot;The ladder and ablation groups, one RunRecord per training seed.&quot;&quot;&quot;
+48	
+49	    ladder: Mapping[str, Sequence[RunRecord]]
+50	    ablations: Mapping[str, Sequence[RunRecord]]
+51	</pre></details></div><div class="step" id="S9"><span class="sid">U47.S9</span><span class="kind">Read</span>/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r1/with_skill/project/.claude/worktrees/agent-a16a9bcae9da881ce/tests/intent/rllab/test_ablation_pairs.py<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r1/with_skill/project/.claude/worktrees/agent-a16a9bcae9da881ce/tests/intent/rllab/test_ablation_pairs.py&quot;
+}</pre><div class="lbl">output</div><pre>1	&quot;&quot;&quot;Intent tests for M1-T30: a mismatched ablation is refused (PL-04.open_curve_runs, TC-25).
+2	
+3	Covers ABL-04. The full `dqn-compact` run set and each `no_target` run set come from the TC-25
+4	fixture; each run folder&#x27;s RunRecord is built from the contract samples (`runs.RunRecord`,
+5	`core.RunSettings`) and served by a stand-in for `runs.open_run`.
+6	&quot;&quot;&quot;
+7	
+8	import dataclasses
+9	import importlib.util
+10	import json
+11	import sys
+12	from pathlib import Path
+13	from types import ModuleType
+14	from typing import Any
+15	
+16	import pytest
+17	
+18	import rllab.lab.players as players
+19	import rllab.runs as runs
+20	from rllab.core import RunSettings
+21	from rllab.lab import ReportTargets
+22	from rllab.lab.players import open_curve_runs
+23	from rllab.runs import RunRecord
+24	
+25	TESTS = Path(__file__).resolve().parents[2]
+26	FIXTURE = TESTS / &quot;fixtures&quot; / &quot;rllab&quot; / &quot;TC-25&quot;
+27	
+28	FULL = &quot;dqn-compact&quot;
+29	ABLATION = &quot;dqn-compact-no-target&quot;
+30	
+31	
+32	def _load_kit() -&gt; ModuleType:
+33	    spec = importlib.util.spec_from_file_location(&quot;contract_kit&quot;, TESTS / &quot;contracts&quot; / &quot;kit.py&quot;)
+34	    assert spec is not None
+35	    assert spec.loader is not None
+36	    module = importlib.util.module_from_spec(spec)
+37	    sys.modules[&quot;contract_kit&quot;] = module
+38	    spec.loader.exec_module(module)
+39	    return module
+40	
+41	
+42	kit = _load_kit()
+43	
+44	
+45	def _load(name: str) -&gt; Any:
+46	    return json.loads((FIXTURE / name).read_text(encoding=&quot;utf-8&quot;))
+47	
+48	
+49	def _records(name: str, settings_case: str, run_set: dict[str, Any]) -&gt; dict[str, RunRecord]:
+50	    &quot;&quot;&quot;One complete RunRecord per seed of `run_set`, keyed by its run folder.&quot;&quot;&quot;
+51	    base: RunRecord = kit.sample(&quot;runs.RunRecord&quot;, &quot;complete_corridor&quot;, RunRecord)
+52	    settings: RunSettings = kit.sample(&quot;core.RunSettings&quot;, settings_case, RunSettings)
+53	    out: dict[str, RunRecord] = {}
+54	    for seed in run_set[&quot;seeds&quot;]:
+55	        folder = f&quot;runs/{name}-s{seed}-20261018-000000&quot;
+56	        run_settings = dataclasses.replace(
+57	            settings,
+58	            name=name,
+59	            agent=run_set[&quot;agent&quot;],
+60	            ablation=run_set[&quot;ablation&quot;],
+61	            steps=run_set[&quot;steps&quot;],
+62	            seed=seed,
+63	        )
+64	        out[folder] = dataclasses.replace(base, path=Path(folder), settings=run_settings)
+65	    return out
+66	
+67	
+68	def _targets(full: dict[str, RunRecord], ablation: dict[str, RunRecord]) -&gt; Any:
+69	    def player(folders: dict[str, RunRecord]) -&gt; dict[str, Any]:
+70	        return {&quot;runs&quot;: list(folders), &quot;baseline&quot;: None, &quot;team&quot;: &quot;agents&quot;, &quot;vs&quot;: []}
+71	
+72	    return kit.decode(
+73	        ReportTargets,
+74	        {
+75	            &quot;players&quot;: {FULL: player(full), ABLATION: player(ablation)},
+76	            &quot;baselines&quot;: [],
+77	            &quot;ladder&quot;: [FULL],
+78	            &quot;ablations&quot;: [ABLATION],
+79	            &quot;crossplay&quot;: [],
+80	        },
+81	    )
+82	
+83	
+84	def _serve(monkeypatch: pytest.MonkeyPatch, records: dict[str, RunRecord]) -&gt; list[str]:
+85	    &quot;&quot;&quot;Patch `runs.open_run` to serve `records` by folder name; returns the folders opened.&quot;&quot;&quot;
+86	    by_name = {Path(folder).name: record for folder, record in records.items()}
+87	    opened: list[str] = []
+88	
+89	    def fake_open_run(path: Path) -&gt; RunRecord:
+90	        name = Path(path).name
+91	        if name not in by_name:
+92	            raise FileNotFoundError(f&quot;run {path}: no settings.json&quot;)
+93	        opened.append(name)
+94	        return by_name[name]
+95	
+96	    monkeypatch.setattr(runs, &quot;open_run&quot;, fake_open_run)
+97	    monkeypatch.setattr(players, &quot;open_run&quot;, fake_open_run, raising=False)
+98	    return opened
+99	
+100	
+101	def _case(monkeypatch: pytest.MonkeyPatch, case: str) -&gt; tuple[Any, list[str], list[str]]:
+102	    data = _load(&quot;input.json&quot;)
+103	    full = _records(FULL, &quot;dqn_compact&quot;, data[&quot;full&quot;])
+104	    ablation = _records(ABLATION, &quot;no_target&quot;, data[&quot;ablations&quot;][case])
+105	    opened = _serve(monkeypatch, {**full, **ablation})
+106	    folders = [Path(f).name for f in [*full, *ablation]]
+107	    return _targets(full, ablation), opened, folders
+108	
+109	
+110	# ---------------------------------------------------------------------------------- TC-25
+111	@pytest.mark.intent
+112	def test_tc25_ablation_with_fewer_steps_is_refused_naming_steps(
+113	    monkeypatch: pytest.MonkeyPatch,
+114	) -&gt; None:
+115	    expected = _load(&quot;expected.json&quot;)[&quot;steps_mismatch&quot;]
+116	    targets, _, _ = _case(monkeypatch, &quot;steps_mismatch&quot;)
+117	    assert expected[&quot;raises&quot;] == &quot;ValueError&quot;
+118	    with pytest.raises(ValueError, match=expected[&quot;names&quot;]):
+119	        open_curve_runs(targets)
+120	
+121	
+122	@pytest.mark.intent
+123	def test_tc25_ablation_with_fewer_seeds_is_refused_naming_seeds(
+124	    monkeypatch: pytest.MonkeyPatch,
+125	) -&gt; None:
+126	    expected = _load(&quot;expected.json&quot;)[&quot;seeds_mismatch&quot;]
+127	    targets, _, _ = _case(monkeypatch, &quot;seeds_mismatch&quot;)
+128	    assert expected[&quot;raises&quot;] == &quot;ValueError&quot;
+129	    with pytest.raises(ValueError, match=expected[&quot;names&quot;]):
+130	        open_curve_runs(targets)
+131	
+132	
+133	@pytest.mark.intent
+134	def test_tc25_ablation_matching_its_full_agent_is_accepted(
+135	    monkeypatch: pytest.MonkeyPatch,
+136	) -&gt; None:
+137	    expected = _load(&quot;expected.json&quot;)[&quot;match&quot;]
+138	    targets, opened, folders = _case(monkeypatch, &quot;match&quot;)
+139	    assert expected[&quot;raises&quot;] is None
+140	    open_curve_runs(targets)
+141	    assert sorted(opened) == sorted(folders)
+142	</pre></details></div><div class="step" id="S10"><span class="sid">U47.S10</span><span class="kind">Read</span>/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r1/with_skill/project/.claude/worktrees/agent-a16a9bcae9da881ce/tests/fixtures/rllab/TC-25/input.json<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r1/with_skill/project/.claude/worktrees/agent-a16a9bcae9da881ce/tests/fixtures/rllab/TC-25/input.json&quot;
+}</pre><div class="lbl">output</div><pre>1	{
+2	 &quot;full&quot;: {
+3	  &quot;agent&quot;: &quot;dqn&quot;,
+4	  &quot;ablation&quot;: &quot;none&quot;,
+5	  &quot;steps&quot;: 300000,
+6	  &quot;seeds&quot;: [
+7	   0,
+8	   1,
+9	   2,
+10	   3,
+11	   4
+12	  ]
+13	 },
+14	 &quot;ablations&quot;: {
+15	  &quot;steps_mismatch&quot;: {
+16	   &quot;agent&quot;: &quot;dqn&quot;,
+17	   &quot;ablation&quot;: &quot;no_target&quot;,
+18	   &quot;steps&quot;: 200000,
+19	   &quot;seeds&quot;: [
+20	    0,
+21	    1,
+22	    2,
+23	    3,
+24	    4
+25	   ]
+26	  },
+27	  &quot;seeds_mismatch&quot;: {
+28	   &quot;agent&quot;: &quot;dqn&quot;,
+29	   &quot;ablation&quot;: &quot;no_target&quot;,
+30	   &quot;steps&quot;: 300000,
+31	   &quot;seeds&quot;: [
+32	    0,
+33	    1,
+34	    2,
+35	    3
+36	   ]
+37	  },
+38	  &quot;match&quot;: {
+39	   &quot;agent&quot;: &quot;dqn&quot;,
+40	   &quot;ablation&quot;: &quot;no_target&quot;,
+41	   &quot;steps&quot;: 300000,
+42	   &quot;seeds&quot;: [
+43	    0,
+44	    1,
+45	    2,
+46	    3,
+47	    4
+48	   ]
+49	  }
+50	 }
+51	}
+52	</pre></details></div><div class="step" id="S11"><span class="sid">U47.S11</span><span class="kind">Read</span>/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r1/with_skill/project/.claude/worktrees/agent-a16a9bcae9da881ce/tests/fixtures/rllab/TC-25/expected.json<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r1/with_skill/project/.claude/worktrees/agent-a16a9bcae9da881ce/tests/fixtures/rllab/TC-25/expected.json&quot;
+}</pre><div class="lbl">output</div><pre>1	{&quot;steps_mismatch&quot;: {&quot;raises&quot;: &quot;ValueError&quot;, &quot;names&quot;: &quot;steps&quot;}, &quot;seeds_mismatch&quot;: {&quot;raises&quot;: &quot;ValueError&quot;, &quot;names&quot;: &quot;seeds&quot;}, &quot;match&quot;: {&quot;raises&quot;: null}}
+2	</pre></details></div><div class="step" id="S12"><span class="sid">U47.S12</span><span class="kind">Bash</span>grep -rn &quot;ABL-04\|full agent&quot; docs/ --include=*.md<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;grep -rn \&quot;ABL-04\\|full agent\&quot; docs/ --include=*.md&quot;,
+  &quot;description&quot;: &quot;Find ABL-04 and full-agent references in docs&quot;
+}</pre><div class="lbl">output</div><pre>(eval):1: no matches found: --include=*.md</pre></details></div><div class="step" id="S13"><span class="sid">U47.S13</span><span class="kind">Bash</span>ls tests/contracts/core.RunSettings/ tests/contracts/core.RunSettings/samples<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;ls tests/contracts/core.RunSettings/ tests/contracts/core.RunSettings/samples&quot;,
+  &quot;description&quot;: &quot;List RunSettings contract samples&quot;
+}</pre><div class="lbl">output</div><pre>tests/contracts/core.RunSettings/:
+samples
+schema.json
+
+tests/contracts/core.RunSettings/samples:
+corridor_tabular.json
+corridor_tabular.toml
+dqn_compact.json
+dqn_compact.toml
+no_target.json
+no_target.toml
+predprey_rung1.json
+predprey_rung1.toml
+predprey_rung3.json
+predprey_rung3.toml
+tank_reference.json
+tank_reference.toml
+tank_rung3.json
+tank_rung3.toml</pre></details></div><div class="step" id="S14"><span class="sid">U47.S14</span><span class="kind">Bash</span>grep -rn -e &quot;ABL-04&quot; -e &quot;full agent&quot; docs/<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;grep -rn -e \&quot;ABL-04\&quot; -e \&quot;full agent\&quot; docs/&quot;,
+  &quot;description&quot;: &quot;Find ABL-04 and full-agent references in docs&quot;
+}</pre><div class="lbl">output</div><pre>docs/routes.md:5:- [x] architecture-design · contract.md: retitle core.Env, core.Agent and viz.Replay as &#x27;: type&#x27; sections (Protocol/class types crossing steps); add viz.Chart: type (path: Path; groups: tuple[str, ...]; baselines: tuple[str, ...]) with Boundary lab; change viz.plot_curves to (groups, *, scores: Mapping[str, Sequence[ScoreSet]], baselines: Sequence[str], out: Path) -&gt; Chart, drawing each named baseline&#x27;s pooled mean; lab.main: ablation settings files carry the full agent&#x27;s step budget and PL-04 checks seeds and steps match (ABL-04), replacing &#x27;inherits&#x27; (from pipeline-design, 2026-10-17)
+docs/architecture.md:51:| `viz` | Learning-curve and ablation charts; interactive replay | EVAL-06, EVAL-11, ABL-04, REPLAY-01, REPLAY-02 | `runs`, `evaluate`, `selfplay` |
+docs/architecture.md:52:| `lab` | Command line: builds env and agent from settings; train, eval, replay and report commands | RUN-01, ABL-04, CORE-04, PG-05, SELF-07, REPLAY-03 | `core`, `envs`, `baselines`, `agents`, `runs`, `evaluate`, `selfplay`, `train`, `reference`, `compare`, `viz` |
+docs/architecture.md:130:- **Context:** EVAL-06 and ABL-04 need charts. REPLAY-01 and REPLAY-02 need a plain player with pause, step and speed control. The brief rules out polished graphics.
+docs/packages/rllab/pipelines.md:78:**Covers:** EVAL-02–EVAL-11, REF-02, REF-03, ABL-04, BASE-03
+docs/packages/rllab/pipelines.md:84:| 3 | `open_curve_runs` | lab.players | targets → RunRecord | `runs.open_run` per folder; `ValueError` if an ablation&#x27;s seeds or `steps` differ from its full agent&#x27;s | ABL-04, RUN-05 |
+docs/packages/rllab/pipelines.md:86:| 5 | `plot_curves` | viz.curves | RunRecord, ScoreSet → Chart | mean over seeds with a min–max band; one horizontal line at each named baseline&#x27;s pooled mean; once for the ladder chart and once for the ablation chart | EVAL-06, ABL-04 |
+docs/spec.md:286:**Behavior:** Remove one piece, retrain, and see what changes. Each ablation is a full agent with one behavior switched off.
+docs/spec.md:295:- **ABL-04** Each ablation trains with the same seeds and step budget as the full agent. Its learning curve is shown on one chart beside the full agent&#x27;s.
+docs/packages/rllab/contract.md:457:- **Invariants:** one line per group (the mean over its seeds, with a min–max band). Each name in `baselines` gets a horizontal line at its pooled mean from `scores` (EVAL-06). Several groups on one chart form the ablation comparison (ABL-04).
+docs/packages/rllab/contract.md:504:- **Invariants:** subcommands are `train &lt;settings.toml&gt; [--seeds 0-4]`, `eval &lt;run | random | scripted&gt;… [--env snake|tank|predprey] [--team T]`, `replay &lt;run&gt; [--game N | --new --seed S | --pair &lt;predator gen&gt; &lt;prey gen&gt;]`, `crossplay &lt;run&gt;` and `report &lt;report.toml&gt;`. `train` builds the env and agent from the settings alone (RUN-01), and runs reference settings through `train_reference`. An ablation settings file carries its full agent&#x27;s step budget, and `report` refuses an ablation whose seeds or steps differ from its full agent&#x27;s (ABL-04). Returns 0 on success, 2 on bad input.
+docs/packages/rllab/tests.md:150:**Pipeline:** PL-04 · **Covers:** ABL-04 · **Kind:** closed form · **Fixture:** tests/fixtures/rllab/TC-25/
+docs/packages/rllab/tests.md:151:**Source:** the `lab.main` contract invariant (&quot;report refuses an ablation whose seeds or steps differ from its full agent&#x27;s&quot;), approved 2026-10-17</pre></details></div><div class="step" id="S15"><span class="sid">U47.S15</span><span class="kind">Bash</span>git diff --no-index tests/contracts/core.RunSettings/samples/dqn_compact.json tests/contracts/core.RunSettings/samples/no_target.json<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;git diff --no-index tests/contracts/core.RunSettings/samples/dqn_compact.json tests/contracts/core.RunSettings/samples/no_target.json&quot;,
+  &quot;description&quot;: &quot;Compare dqn_compact and no_target settings samples&quot;
+}</pre><div class="lbl">output</div><pre>diff --git a/tests/contracts/core.RunSettings/samples/dqn_compact.json b/tests/contracts/core.RunSettings/samples/no_target.json
+index d6cad98..57bf52f 100644
+--- a/tests/contracts/core.RunSettings/samples/dqn_compact.json
++++ b/tests/contracts/core.RunSettings/samples/no_target.json
+@@ -1,5 +1,5 @@
+ {
+- &quot;name&quot;: &quot;dqn-compact&quot;,
++ &quot;name&quot;: &quot;dqn-compact-no-target&quot;,
+  &quot;env&quot;: &quot;snake&quot;,
+  &quot;view&quot;: &quot;compact&quot;,
+  &quot;agent&quot;: &quot;dqn&quot;,
+@@ -8,7 +8,7 @@
+  &quot;self_play&quot;: &quot;none&quot;,
+  &quot;pool_latest&quot;: 0.5,
+  &quot;generations&quot;: 0,
+- &quot;ablation&quot;: &quot;none&quot;,
++ &quot;ablation&quot;: &quot;no_target&quot;,
+  &quot;rewards&quot;: {
+   &quot;food&quot;: 1.0,
+   &quot;death&quot;: -1.0,</pre></details></div><div class="step" id="S16"><span class="sid">U47.S16</span><span class="kind">Bash</span>grep -n -e &quot;open_curve_runs&quot; -e &quot;ablation&quot; -e &quot;^def &quot; tests/unit/rllab/test_players.py<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;grep -n -e \&quot;open_curve_runs\&quot; -e \&quot;ablation\&quot; -e \&quot;^def \&quot; tests/unit/rllab/test_players.py&quot;,
+  &quot;description&quot;: &quot;Find open_curve_runs tests in unit tests&quot;
+}</pre><div class="lbl">output</div><pre>61:def wired(monkeypatch: pytest.MonkeyPatch) -&gt; dict[str, Any]:
+86:def _targets(**extra: PlayerTarget) -&gt; ReportTargets:
+96:        ablations=(),
+100:def test_run_folder_loads_its_checkpoint(wired: dict[str, Any]) -&gt; None:
+115:def test_missing_run_folder_raises(wired: dict[str, Any]) -&gt; None:
+122:def test_incomplete_run_raises(wired: dict[str, Any], monkeypatch: pytest.MonkeyPatch) -&gt; None:
+129:def test_random_baseline_is_seeded_on_default_snake_compact(wired: dict[str, Any]) -&gt; None:
+144:def test_scripted_baseline_on_default_snake_compact(wired: dict[str, Any]) -&gt; None:
+156:def test_baseline_off_snake_raises(wired: dict[str, Any]) -&gt; None:
+161:def test_score_players_gives_a_scoreset_per_player_and_seed(wired: dict[str, Any]) -&gt; None:
+172:def test_baselines_follow_the_run_players_seeds(
+189:def test_open_curve_runs_opens_each_folder(wired: dict[str, Any]) -&gt; None:
+191:        _targets(), ladder=(&quot;tabular&quot;, &quot;scripted&quot;), ablations=(&quot;tabular&quot;,)
+193:    curves = players.open_curve_runs(targets)
+196:    assert [r.status for r in curves.ablations[&quot;tabular&quot;]] == [&quot;complete&quot;]</pre></details></div><div class="step" id="S17"><span class="sid">U47.S17</span><span class="kind">Read</span>/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r1/with_skill/project/.claude/worktrees/agent-a16a9bcae9da881ce/tests/unit/rllab/test_players.py<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r1/with_skill/project/.claude/worktrees/agent-a16a9bcae9da881ce/tests/unit/rllab/test_players.py&quot;
+}</pre><div class="lbl">output</div><pre>1	&quot;&quot;&quot;Unit tests for lab.players: players from run folders or baselines, scored and opened (RUN-05).&quot;&quot;&quot;
+2	
+3	import dataclasses
+4	import importlib.util
+5	import sys
+6	import types
+7	from pathlib import Path
+8	from typing import Any
+9	
+10	import numpy as np
+11	import pytest
+12	
+13	from rllab.core import SOLO, Rewards, RunSettings, Transition
+14	from rllab.lab import players
+15	from rllab.lab.types import PlayerTarget, ReportTargets
+16	from rllab.runs import RunRecord
+17	
+18	KIT_PATH = Path(__file__).resolve().parents[2] / &quot;contracts&quot; / &quot;kit.py&quot;
+19	_spec = importlib.util.spec_from_file_location(&quot;contract_kit&quot;, KIT_PATH)
+20	assert _spec is not None
+21	assert _spec.loader is not None
+22	kit = importlib.util.module_from_spec(_spec)
+23	sys.modules[&quot;contract_kit&quot;] = kit
+24	_spec.loader.exec_module(kit)
+25	
+26	CORRIDOR_RUN = Path(&quot;runs/corridor-tabular-s0-20261018-101500&quot;)
+27	CHECKPOINT = CORRIDOR_RUN / &quot;checkpoint.npz&quot;
+28	
+29	
+30	class _Agent:
+31	    &quot;&quot;&quot;A stand-in learner recording the checkpoints it loads.&quot;&quot;&quot;
+32	
+33	    def __init__(self) -&gt; None:
+34	        self.loaded: list[Path] = []
+35	
+36	    def act(self, obs: np.ndarray, *, explore: bool) -&gt; np.ndarray:
+37	        return np.zeros(obs.shape[0], dtype=np.int64)
+38	
+39	    def learn(self, t: Transition) -&gt; None:
+40	        raise AssertionError(&quot;players never trains&quot;)
+41	
+42	    def save(self, path: Path) -&gt; None:
+43	        raise AssertionError(&quot;players never saves&quot;)
+44	
+45	    def load(self, path: Path) -&gt; None:
+46	        self.loaded.append(path)
+47	
+48	
+49	class _Random(_Agent):
+50	    def __init__(self, n_actions: int, *, seed: int) -&gt; None:
+51	        super().__init__()
+52	        self.n_actions = n_actions
+53	        self.seed = seed
+54	
+55	
+56	class _Scripted(_Agent):
+57	    pass
+58	
+59	
+60	@pytest.fixture
+61	def wired(monkeypatch: pytest.MonkeyPatch) -&gt; dict[str, Any]:
+62	    &quot;&quot;&quot;players with the contract fakes and doubles in place of the steps it calls.&quot;&quot;&quot;
+63	    built: dict[str, Any] = {&quot;envs&quot;: [], &quot;agents&quot;: []}
+64	
+65	    def make_env(settings: RunSettings) -&gt; Any:
+66	        built[&quot;envs&quot;].append(settings)
+67	        return lambda: kit.env_double(&quot;core.Env&quot;, &quot;snake_wall&quot;)
+68	
+69	    def make_agent(settings: RunSettings, env: Any) -&gt; dict[str, Any]:
+70	        agents = {team: _Agent() for team in env.teams}
+71	        built[&quot;agents&quot;].append(agents)
+72	        return agents
+73	
+74	    evaluate_fake: types.ModuleType = kit.fake(&quot;evaluate.evaluate&quot;)
+75	    evaluate_fake.calls.clear()
+76	    monkeypatch.setattr(players, &quot;open_run&quot;, kit.fake(&quot;runs.open_run&quot;).open_run)
+77	    monkeypatch.setattr(players, &quot;make_env&quot;, make_env)
+78	    monkeypatch.setattr(players, &quot;make_agent&quot;, make_agent)
+79	    monkeypatch.setattr(players, &quot;evaluate&quot;, evaluate_fake.evaluate)
+80	    monkeypatch.setattr(players, &quot;RandomPlayer&quot;, _Random)
+81	    monkeypatch.setattr(players, &quot;ScriptedPlayer&quot;, _Scripted)
+82	    built[&quot;evaluate_calls&quot;] = evaluate_fake.calls
+83	    return built
+84	
+85	
+86	def _targets(**extra: PlayerTarget) -&gt; ReportTargets:
+87	    return ReportTargets(
+88	        players={
+89	            &quot;random&quot;: PlayerTarget(baseline=&quot;random&quot;),
+90	            &quot;scripted&quot;: PlayerTarget(baseline=&quot;scripted&quot;),
+91	            &quot;tabular&quot;: PlayerTarget(runs=(CORRIDOR_RUN,)),
+92	            **extra,
+93	        },
+94	        baselines=(&quot;random&quot;, &quot;scripted&quot;),
+95	        ladder=(&quot;tabular&quot;,),
+96	        ablations=(),
+97	    )
+98	
+99	
+100	def test_run_folder_loads_its_checkpoint(wired: dict[str, Any]) -&gt; None:
+101	    record: RunRecord = kit.decode(
+102	        RunRecord, kit.raw_sample(&quot;runs.open_run&quot;, &quot;complete_corridor&quot;)[&quot;record&quot;]
+103	    )
+104	    agents, settings = players.load_player(
+105	        str(CORRIDOR_RUN), 7, env=&quot;snake&quot;, team=SOLO, vs=&quot;scripted&quot;
+106	    )
+107	    assert settings == record.settings
+108	    assert list(agents) == [SOLO]
+109	    built = wired[&quot;agents&quot;][0][SOLO]
+110	    assert agents[SOLO] is built
+111	    assert built.loaded == [CHECKPOINT]
+112	    assert wired[&quot;envs&quot;] == [record.settings]
+113	
+114	
+115	def test_missing_run_folder_raises(wired: dict[str, Any]) -&gt; None:
+116	    with pytest.raises(FileNotFoundError, match=&quot;dqn-compact-s3&quot;):
+117	        players.load_player(
+118	            &quot;runs/dqn-compact-s3-20261018-120000&quot;, 0, env=&quot;snake&quot;, team=SOLO, vs=&quot;scripted&quot;
+119	        )
+120	
+121	
+122	def test_incomplete_run_raises(wired: dict[str, Any], monkeypatch: pytest.MonkeyPatch) -&gt; None:
+123	    record: RunRecord = kit.sample(&quot;runs.RunRecord&quot;, &quot;incomplete_snake&quot;, RunRecord)
+124	    monkeypatch.setattr(players, &quot;open_run&quot;, lambda path: record)
+125	    with pytest.raises(ValueError, match=&quot;&#x27;incomplete&#x27;&quot;):
+126	        players.load_player(&quot;runs/x&quot;, 0, env=&quot;snake&quot;, team=SOLO, vs=&quot;scripted&quot;)
+127	
+128	
+129	def test_random_baseline_is_seeded_on_default_snake_compact(wired: dict[str, Any]) -&gt; None:
+130	    agents, settings = players.load_player(&quot;random&quot;, 3, env=&quot;snake&quot;, team=SOLO, vs=&quot;scripted&quot;)
+131	    agent = agents[SOLO]
+132	    assert isinstance(agent, _Random)
+133	    assert (agent.n_actions, agent.seed) == (3, 3)
+134	    assert (settings.env, settings.view, settings.agent, settings.seed) == (
+135	        &quot;snake&quot;,
+136	        &quot;compact&quot;,
+137	        &quot;random&quot;,
+138	        3,
+139	    )
+140	    assert settings.rewards == Rewards(food=1.0, death=-1.0, step=0.0)
+141	    assert settings.opponents == {}
+142	
+143	
+144	def test_scripted_baseline_on_default_snake_compact(wired: dict[str, Any]) -&gt; None:
+145	    agents, settings = players.load_player(&quot;scripted&quot;, 2, env=&quot;snake&quot;, team=SOLO, vs=&quot;random&quot;)
+146	    assert list(agents) == [SOLO]
+147	    assert isinstance(agents[SOLO], _Scripted)
+148	    assert (settings.env, settings.view, settings.agent, settings.seed) == (
+149	        &quot;snake&quot;,
+150	        &quot;compact&quot;,
+151	        &quot;scripted&quot;,
+152	        2,
+153	    )
+154	
+155	
+156	def test_baseline_off_snake_raises(wired: dict[str, Any]) -&gt; None:
+157	    with pytest.raises(ValueError, match=&quot;&#x27;tank&#x27;&quot;):
+158	        players.load_player(&quot;scripted&quot;, 0, env=&quot;tank&quot;, team=SOLO, vs=&quot;random&quot;)
+159	
+160	
+161	def test_score_players_gives_a_scoreset_per_player_and_seed(wired: dict[str, Any]) -&gt; None:
+162	    scores = players.score_players(_targets())
+163	    assert list(scores) == [&quot;random&quot;, &quot;scripted&quot;, &quot;tabular&quot;]
+164	    for name, sets in scores.items():
+165	        assert [(s.player, s.train_seed) for s in sets] == [(name, 0)]
+166	        assert sets[0].scores.shape == (200,)
+167	    calls = wired[&quot;evaluate_calls&quot;]
+168	    assert sorted(c[&quot;player&quot;] for c in calls) == [&quot;random&quot;, &quot;scripted&quot;, &quot;tabular&quot;]
+169	    assert all(c[&quot;teams&quot;] == [SOLO] and c[&quot;options&quot;].team == SOLO for c in calls)
+170	
+171	
+172	def test_baselines_follow_the_run_players_seeds(
+173	    wired: dict[str, Any], monkeypatch: pytest.MonkeyPatch
+174	) -&gt; None:
+175	    sample: RunRecord = kit.sample(&quot;runs.RunRecord&quot;, &quot;complete_corridor&quot;, RunRecord)
+176	    by_seed = {
+177	        Path(f&quot;runs/s{seed}&quot;): dataclasses.replace(
+178	            sample, settings=dataclasses.replace(sample.settings, seed=seed)
+179	        )
+180	        for seed in (4, 1)
+181	    }
+182	    monkeypatch.setattr(players, &quot;open_run&quot;, by_seed.__getitem__)
+183	    scores = players.score_players(_targets(tabular=PlayerTarget(runs=tuple(by_seed))))
+184	    assert [s.train_seed for s in scores[&quot;tabular&quot;]] == [4, 1]
+185	    assert [s.train_seed for s in scores[&quot;random&quot;]] == [1, 4]
+186	    assert [s.train_seed for s in scores[&quot;scripted&quot;]] == [1, 4]
+187	
+188	
+189	def test_open_curve_runs_opens_each_folder(wired: dict[str, Any]) -&gt; None:
+190	    targets = dataclasses.replace(
+191	        _targets(), ladder=(&quot;tabular&quot;, &quot;scripted&quot;), ablations=(&quot;tabular&quot;,)
+192	    )
+193	    curves = players.open_curve_runs(targets)
+194	    assert [r.path for r in curves.ladder[&quot;tabular&quot;]] == [CORRIDOR_RUN]
+195	    assert list(curves.ladder[&quot;scripted&quot;]) == []
+196	    assert [r.status for r in curves.ablations[&quot;tabular&quot;]] == [&quot;complete&quot;]
+197	</pre></details></div><div class="step" id="S18"><span class="sid">U47.S18</span><span class="kind">Bash</span>grep -n -A30 &quot;class RunSettings&quot; src/rllab/core/types.py<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;grep -n -A30 \&quot;class RunSettings\&quot; src/rllab/core/types.py&quot;,
+  &quot;description&quot;: &quot;Show RunSettings definition&quot;
+}</pre><div class="lbl">output</div><pre>151:class RunSettings:
+152-    &quot;&quot;&quot;A fully resolved run: the environment, the learner, its opposition and its budget.&quot;&quot;&quot;
+153-
+154-    name: str
+155-    env: EnvName
+156-    view: ViewName
+157-    agent: AgentName
+158-    n_agents: int
+159-    opponents: Mapping[str, OpponentMode]
+160-    self_play: SelfPlay
+161-    pool_latest: float
+162-    generations: int
+163-    ablation: Ablation
+164-    rewards: Rewards
+165-    exploration: Exploration
+166-    params: AgentParams
+167-    steps: int
+168-    seed: int
+169-    eval_every: int
+170-    eval_games: int
+171-
+172-    def __post_init__(self) -&gt; None:
+173-        _check_budget(self)
+174-        _check_env(self)
+175-        _check_opposition(self)
+176-
+177-
+178-def _check_budget(s: RunSettings) -&gt; None:
+179-    if not 0 &lt;= s.seed &lt; _MAX_SEED:
+180-        raise ValueError(f&quot;seed must be in [0, {_MAX_SEED}), got {s.seed}&quot;)
+181-    if s.steps &lt;= 0:</pre></details></div><div class="step" id="S19"><span class="sid">U47.S19</span><span class="kind">Edit</span>/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r1/with_skill/project/.claude/worktrees/agent-a16a9bcae9da881ce/src/rllab/lab/players.py | old: &#x27;&quot;&quot;&quot;The ladder and ablation runs; ValueError if an ablation\&#x27;s seeds or steps diff&#x27; | new: &#x27;&quot;&quot;&quot;The ladder and ablation runs; ValueError if an ablation\&#x27;s seeds or steps diff&#x27;<div class="lbl">edited /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r1/with_skill/project/.claude/worktrees/agent-a16a9bcae9da881ce/src/rllab/lab/players.py · old</div><pre>    &quot;&quot;&quot;The ladder and ablation runs; ValueError if an ablation&#x27;s seeds or steps differ.&quot;&quot;&quot;
+    return CurveRuns(
+        ladder={name: _open_runs(targets.players[name]) for name in targets.ladder},
+        ablations={name: _open_runs(targets.players[name]) for name in targets.ablations},
+    )</pre><div class="lbl">new</div><pre>    &quot;&quot;&quot;The ladder and ablation runs; ValueError if an ablation&#x27;s seeds or steps differ.&quot;&quot;&quot;
+    curves = CurveRuns(
+        ladder={name: _open_runs(targets.players[name]) for name in targets.ladder},
+        ablations={name: _open_runs(targets.players[name]) for name in targets.ablations},
+    )
+    groups = {**curves.ladder, **curves.ablations}
+    for name, runs in curves.ablations.items():
+        if runs and runs[0].settings.ablation != &quot;none&quot;:
+            _check_ablation(name, runs, groups)
+    return curves</pre><div class="hook">⛔ hook PostToolUse:Edit blocked: [bash &quot;$CLAUDE_PROJECT_DIR&quot;/scripts/hooks/post_edit.sh]: -&gt; ruff check --fix --quiet /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r1/with_skill/project/.claude/worktrees/agent-a16a9bcae9da881ce/src/rllab/lab/players.py
+F821 Undefined name `_check_ablation`
+  --&gt; src/rllab/lab/players.py:76:13
+   |
+74 |     for name, runs in curves.ablations.items():
+75 |         if runs and runs[0].settings.ablation != &quot;none&quot;:
+76 |             _check_ablation(name, runs, groups)
+   |             ^^^^^^^^^^^^^^^
+77 |     return curves
+   |
+
+-&gt; ruff format --quiet /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r1/with_skill/project/.claude/worktrees/agent-a16a9bcae9da881ce/src/rllab/lab/players.py
+-&gt; typos /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r1/with_skill/project/.claude/worktrees/agent-a16a9bcae9da881ce/src/rllab/lab/players.py
+-&gt; python scripts/check_size.py /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r1/with_skill/project/.claude/worktrees/agent-a16a9bcae9da881ce/src/rllab/lab/players.py
+FAILED: ruff check --fix --quiet /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r1/with_skill/project/.claude/worktrees/agent-a16a9bcae9da881ce/src/rllab/lab/players.py
+</div><details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;replace_all&quot;: false,
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r1/with_skill/project/.claude/worktrees/agent-a16a9bcae9da881ce/src/rllab/lab/players.py&quot;,
+  &quot;old_string&quot;: &quot;    \&quot;\&quot;\&quot;The ladder and ablation runs; ValueError if an ablation&#x27;s seeds or steps differ.\&quot;\&quot;\&quot;\n    return CurveRuns(\n        ladder={name: _open_runs(targets.players[name]) for name in targets.ladder},\n        ablations={name: _open_runs(targets.players[name]) for name in targets.ablations},\n    )&quot;,
+  &quot;new_string&quot;: &quot;    \&quot;\&quot;\&quot;The ladder and ablation runs; ValueError if an ablation&#x27;s seeds or steps differ.\&quot;\&quot;\&quot;\n    curves = CurveRuns(\n        ladder={name: _open_runs(targets.players[name]) for name in targets.ladder},\n        ablations={name: _open_runs(targets.players[name]) for name in targets.ablations},\n    )\n    groups = {**curves.ladder, **curves.ablations}\n    for name, runs in curves.ablations.items():\n        if runs and runs[0].settings.ablation != \&quot;none\&quot;:\n            _check_ablation(name, runs, groups)\n    return curves&quot;
+}</pre><div class="lbl">output</div><pre>The file /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r1/with_skill/project/.claude/worktrees/agent-a16a9bcae9da881ce/src/rllab/lab/players.py has been updated successfully. (file state is current in your context — no need to Read it back)</pre></details></div><div class="step" id="S20"><span class="sid">U47.S20</span><span class="kind">say</span>Now the helpers.<details><summary>full text</summary><pre>Now the helpers.</pre></details></div><div class="step" id="S21"><span class="sid">U47.S21</span><span class="kind">Edit</span>/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r1/with_skill/project/.claude/worktrees/agent-a16a9bcae9da881ce/src/rllab/lab/players.py | old: &#x27;def _open_runs(player: PlayerTarget) -&gt; list[RunRecord]: ⏎     return [open_run(&#x27; | new: &#x27;def _open_runs(player: PlayerTarget) -&gt; list[RunRecord]: ⏎     return [open_run(&#x27;<div class="lbl">edited /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r1/with_skill/project/.claude/worktrees/agent-a16a9bcae9da881ce/src/rllab/lab/players.py · old</div><pre>def _open_runs(player: PlayerTarget) -&gt; list[RunRecord]:
+    return [open_run(path) for path in player.runs]</pre><div class="lbl">new</div><pre>def _open_runs(player: PlayerTarget) -&gt; list[RunRecord]:
+    return [open_run(path) for path in player.runs]
+
+
+# What may differ between an ablation and its full agent: the switch itself, the run&#x27;s name,
+# and its budget and seed, which the check below compares group against group.
+_PER_RUN = frozenset({&quot;name&quot;, &quot;ablation&quot;, &quot;steps&quot;, &quot;seed&quot;})
+
+
+def _agent_of(settings: RunSettings) -&gt; tuple[object, ...]:
+    &quot;&quot;&quot;The settings an ablation shares with its full agent.&quot;&quot;&quot;
+    return tuple(
+        getattr(settings, f.name) for f in dataclasses.fields(settings) if f.name not in _PER_RUN
+    )
+
+
+def _check_ablation(
+    name: str, runs: Sequence[RunRecord], groups: Mapping[str, Sequence[RunRecord]]
+) -&gt; None:
+    &quot;&quot;&quot;ValueError unless a full agent&#x27;s run group has this ablation&#x27;s seeds and steps (ABL-04).&quot;&quot;&quot;
+    agent = _agent_of(runs[0].settings)
+    fulls = [
+        (full, full_runs)
+        for full, full_runs in groups.items()
+        if full_runs
+        and full_runs[0].settings.ablation == &quot;none&quot;
+        and _agent_of(full_runs[0].settings) == agent
+    ]
+    if not fulls:
+        raise ValueError(f&quot;ablation {name!r}: no full agent among the report&#x27;s run players&quot;)
+    full, full_runs = fulls[0]
+    seeds, full_seeds = _seeds(runs), _seeds(full_runs)
+    if seeds != full_seeds:
+        raise ValueError(f&quot;ablation {name!r} has seeds {seeds}, its full agent {full!r} {full_seeds}&quot;)
+    steps, full_steps = _steps(runs), _steps(full_runs)
+    if steps != full_steps:
+        raise ValueError(f&quot;ablation {name!r} has steps {steps}, its full agent {full!r} {full_steps}&quot;)
+
+
+def _seeds(runs: Sequence[RunRecord]) -&gt; list[int]:
+    return sorted(r.settings.seed for r in runs)
+
+
+def _steps(runs: Sequence[RunRecord]) -&gt; list[int]:
+    return sorted({r.settings.steps for r in runs})</pre><div class="hook">⛔ hook PostToolUse:Edit blocked: [bash &quot;$CLAUDE_PROJECT_DIR&quot;/scripts/hooks/post_edit.sh]: -&gt; ruff check --fix --quiet /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r1/with_skill/project/.claude/worktrees/agent-a16a9bcae9da881ce/src/rllab/lab/players.py
+F821 Undefined name `Sequence`
+   --&gt; src/rllab/lab/players.py:129:22
+    |
+128 | def _check_ablation(
+129 |     name: str, runs: Sequence[RunRecord], groups: Mapping[str, Sequence[RunRecord]]
+    |                      ^^^^^^^^
+130 | ) -&gt; None:
+131 |     &quot;&quot;&quot;ValueError unless a full agent&#x27;s run group has this ablation&#x27;s seeds and steps (ABL-04).&quot;&quot;&quot;
+    |
+
+F821 Undefined name `Mapping`
+   --&gt; src/rllab/lab/players.py:129:51
+    |
+128 | def _check_ablation(
+129 |     name: str, runs: Sequence[RunRecord], groups: Mapping[str, Sequence[RunRecord]]
+    |                                                   ^^^^^^^
+130 | ) -&gt; None:
+131 |     &quot;&quot;&quot;ValueError unless a full agent&#x27;s run group has this ablation&#x27;s seeds and steps (ABL-04).&quot;&quot;&quot;
+    |
+
+F821 Undefined name `Sequence`
+   --&gt; src/rllab/lab/players.py:129:64
+    |
+128 | def _check_ablation(
+129 |     name: str, runs: Sequence[RunRecord], groups: Mapping[str, Sequence[RunRecord]]
+    |                                                                ^^^^^^^^
+130 | ) -&gt; None:
+131 |     &quot;&quot;&quot;ValueError unless a full agent&#x27;s run group has this ablation&#x27;s seeds and steps (ABL-04).&quot;&quot;&quot;
+    |
+
+F821 Undefined name `Sequence`
+   --&gt; src/rllab/lab/players.py:151:18
+    |
+151 | def _seeds(runs: Sequence[RunRecord]) -&gt; list[int]:
+    |                  ^^^^^^^^
+152 |     return sorted(r.settings.seed for r in runs)
+    |
+
+F821 Undefined name `Sequence`
+   --&gt; src/rllab/lab/players.py:155:18
+    |
+155 | def _steps(runs: Sequence[RunRecord]) -&gt; list[int]:
+    |                  ^^^^^^^^
+156 |     return sorted({r.settings.steps for r in runs})
+    |
+
+-&gt; ruff format --quiet /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r1/with_skill/project/.claude/worktrees/agent-a16a9bcae9da881ce/src/rllab/lab/players.py
+-&gt; typos /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r1/with_skill/project/.claude/worktrees/agent-a16a9bcae9da881ce/src/rllab/lab/players.py
+-&gt; python scripts/check_size.py /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r1/with_skill/project/.claude/worktrees/agent-a16a9bcae9da881ce/src/rllab/lab/players.py
+FAILED: ruff check --fix --quiet /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r1/with_skill/project/.claude/worktrees/agent-a16a9bcae9da881ce/src/rllab/lab/players.py
+</div><details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;replace_all&quot;: false,
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r1/with_skill/project/.claude/worktrees/agent-a16a9bcae9da881ce/src/rllab/lab/players.py&quot;,
+  &quot;old_string&quot;: &quot;def _open_runs(player: PlayerTarget) -&gt; list[RunRecord]:\n    return [open_run(path) for path in player.runs]&quot;,
+  &quot;new_string&quot;: &quot;def _open_runs(player: PlayerTarget) -&gt; list[RunRecord]:\n    return [open_run(path) for path in player.runs]\n\n\n# What may differ between an ablation and its full agent: the switch itself, the run&#x27;s name,\n# and its budget and seed, which the check below compares group against group.\n_PER_RUN = frozenset({\&quot;name\&quot;, \&quot;ablation\&quot;, \&quot;steps\&quot;, \&quot;seed\&quot;})\n\n\ndef _agent_of(settings: RunSettings) -&gt; tuple[object, ...]:\n    \&quot;\&quot;\&quot;The settings an ablation shares with its full agent.\&quot;\&quot;\&quot;\n    return tuple(\n        getattr(settings, f.name) for f in dataclasses.fields(settings) if f.name not in _PER_RUN\n    )\n\n\ndef _check_ablation(\n    name: str, runs: Sequence[RunRecord], groups: Mapping[str, Sequence[RunRecord]]\n) -&gt; None:\n    \&quot;\&quot;\&quot;ValueError unless a full agent&#x27;s run group has this ablation&#x27;s seeds and steps (ABL-04).\&quot;\&quot;\&quot;\n    agent = _agent_of(runs[0].settings)\n    fulls = [\n        (full, full_runs)\n        for full, full_runs in groups.items()\n        if full_runs\n        and full_runs[0].settings.ablation == \&quot;none\&quot;\n        and _agent_of(full_runs[0].settings) == agent\n    ]\n    if not fulls:\n        raise ValueError(f\&quot;ablation {name!r}: no full agent among the report&#x27;s run players\&quot;)\n    full, full_runs = fulls[0]\n    seeds, full_seeds = _seeds(runs), _seeds(full_runs)\n    if seeds != full_seeds:\n        raise ValueError(f\&quot;ablation {name!r} has seeds {seeds}, its full agent {full!r} {full_seeds}\&quot;)\n    steps, full_steps = _steps(runs), _steps(full_runs)\n    if steps != full_steps:\n        raise ValueError(f\&quot;ablation {name!r} has steps {steps}, its full agent {full!r} {full_steps}\&quot;)\n\n\ndef _seeds(runs: Sequence[RunRecord]) -&gt; list[int]:\n    return sorted(r.settings.seed for r in runs)\n\n\ndef _steps(runs: Sequence[RunRecord]) -&gt; list[int]:\n    return sorted({r.settings.steps for r in runs})&quot;
+}</pre><div class="lbl">output</div><pre>The file /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r1/with_skill/project/.claude/worktrees/agent-a16a9bcae9da881ce/src/rllab/lab/players.py has been updated successfully. (file state is current in your context — no need to Read it back)</pre></details></div><div class="step" id="S22"><span class="sid">U47.S22</span><span class="kind">Edit</span>/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r1/with_skill/project/.claude/worktrees/agent-a16a9bcae9da881ce/src/rllab/lab/players.py | old: &#x27;import dataclasses ⏎ from pathlib import Path&#x27; | new: &#x27;import dataclasses ⏎ from collections.abc import Mapping, Sequence ⏎ from pathli&#x27;<div class="lbl">edited /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r1/with_skill/project/.claude/worktrees/agent-a16a9bcae9da881ce/src/rllab/lab/players.py · old</div><pre>import dataclasses
+from pathlib import Path</pre><div class="lbl">new</div><pre>import dataclasses
+from collections.abc import Mapping, Sequence
+from pathlib import Path</pre><details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;replace_all&quot;: false,
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r1/with_skill/project/.claude/worktrees/agent-a16a9bcae9da881ce/src/rllab/lab/players.py&quot;,
+  &quot;old_string&quot;: &quot;import dataclasses\nfrom pathlib import Path&quot;,
+  &quot;new_string&quot;: &quot;import dataclasses\nfrom collections.abc import Mapping, Sequence\nfrom pathlib import Path&quot;
+}</pre><div class="lbl">output</div><pre>The file /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r1/with_skill/project/.claude/worktrees/agent-a16a9bcae9da881ce/src/rllab/lab/players.py has been updated successfully.</pre></details></div><div class="step" id="S23"><span class="sid">U47.S23</span><span class="kind">Read</span>/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r1/with_skill/project/.claude/worktrees/agent-a16a9bcae9da881ce/src/rllab/lab/players.py offset=1 limit=12<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r1/with_skill/project/.claude/worktrees/agent-a16a9bcae9da881ce/src/rllab/lab/players.py&quot;,
+  &quot;offset&quot;: 1,
+  &quot;limit&quot;: 12
+}</pre><div class="lbl">output</div><pre>1	&quot;&quot;&quot;Players from run folders or baseline names, their scores and their curves (RUN-05).&quot;&quot;&quot;
+2	
+3	import dataclasses
+4	from collections.abc import Mapping, Sequence
+5	from pathlib import Path
+6	
+7	from rllab.baselines import RandomPlayer, ScriptedPlayer
+8	from rllab.core import SOLO, Agent, AgentParams, Exploration, Rewards, RunSettings
+9	from rllab.evaluate import EvalOptions, ScoreSet, evaluate
+10	from rllab.lab.build import make_agent, make_env
+11	from rllab.lab.types import CurveRuns, PlayerTarget, ReportTargets
+12	from rllab.runs import RunRecord, open_run</pre></details></div><div class="step" id="S24"><span class="sid">U47.S24</span><span class="kind">say</span>Now the unit tests.<details><summary>full text</summary><pre>Now the unit tests.</pre></details></div><div class="step" id="S25"><span class="sid">U47.S25</span><span class="kind">Write</span>/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r1/with_skill/project/.claude/worktrees/agent-a16a9bcae9da881ce/tests/unit/rllab/test_ablation_pairs.py (111 lines)<div class="lbl">wrote /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r1/with_skill/project/.claude/worktrees/agent-a16a9bcae9da881ce/tests/unit/rllab/test_ablation_pairs.py</div><pre>&quot;&quot;&quot;Unit tests for lab.players.open_curve_runs: an ablation must match its full agent (ABL-04).&quot;&quot;&quot;
+
+import dataclasses
+import importlib.util
+import sys
+from pathlib import Path
+
+import pytest
+
+from rllab.core import RunSettings
+from rllab.lab import players
+from rllab.lab.types import PlayerTarget, ReportTargets
+from rllab.runs import RunRecord
+
+KIT_PATH = Path(__file__).resolve().parents[2] / &quot;contracts&quot; / &quot;kit.py&quot;
+_spec = importlib.util.spec_from_file_location(&quot;contract_kit&quot;, KIT_PATH)
+assert _spec is not None
+assert _spec.loader is not None
+kit = importlib.util.module_from_spec(_spec)
+sys.modules[&quot;contract_kit&quot;] = kit
+_spec.loader.exec_module(kit)
+
+
+def _group(
+    name: str, case: str, seeds: tuple[int, ...], steps: int, **changes: object
+) -&gt; dict[Path, RunRecord]:
+    base: RunRecord = kit.sample(&quot;runs.RunRecord&quot;, &quot;complete_corridor&quot;, RunRecord)
+    settings: RunSettings = kit.sample(&quot;core.RunSettings&quot;, case, RunSettings)
+    return {
+        Path(f&quot;runs/{name}-s{seed}&quot;): dataclasses.replace(
+            base,
+            path=Path(f&quot;runs/{name}-s{seed}&quot;),
+            settings=dataclasses.replace(settings, steps=steps, seed=seed, **changes),
+        )
+        for seed in seeds
+    }
+
+
+def _open(
+    monkeypatch: pytest.MonkeyPatch,
+    ladder: dict[str, dict[Path, RunRecord]],
+    ablations: dict[str, dict[Path, RunRecord]],
+) -&gt; players.CurveRuns:
+    groups = {**ladder, **ablations}
+    records = {path: r for group in groups.values() for path, r in group.items()}
+    monkeypatch.setattr(players, &quot;open_run&quot;, records.__getitem__)
+    targets = ReportTargets(
+        players={name: PlayerTarget(runs=tuple(group)) for name, group in groups.items()},
+        baselines=(),
+        ladder=tuple(ladder),
+        ablations=tuple(ablations),
+    )
+    return players.open_curve_runs(targets)
+
+
+FULL = _group(&quot;full&quot;, &quot;dqn_compact&quot;, (0, 1, 2), 300_000)
+
+
+def test_matching_ablation_is_opened(monkeypatch: pytest.MonkeyPatch) -&gt; None:
+    ablation = _group(&quot;abl&quot;, &quot;no_target&quot;, (2, 0, 1), 300_000)
+    curves = _open(monkeypatch, {&quot;full&quot;: FULL}, {&quot;abl&quot;: ablation})
+    assert [r.settings.seed for r in curves.ablations[&quot;abl&quot;]] == [2, 0, 1]
+    assert len(curves.ladder[&quot;full&quot;]) == 3
+
+
+def test_fewer_steps_names_both_budgets(monkeypatch: pytest.MonkeyPatch) -&gt; None:
+    ablation = _group(&quot;abl&quot;, &quot;no_target&quot;, (0, 1, 2), 200_000)
+    with pytest.raises(ValueError, match=r&quot;steps \[200000\], its full agent &#x27;full&#x27; \[300000\]&quot;):
+        _open(monkeypatch, {&quot;full&quot;: FULL}, {&quot;abl&quot;: ablation})
+
+
+def test_missing_seed_names_both_seed_lists(monkeypatch: pytest.MonkeyPatch) -&gt; None:
+    ablation = _group(&quot;abl&quot;, &quot;no_target&quot;, (0, 1), 300_000)
+    with pytest.raises(ValueError, match=r&quot;seeds \[0, 1\], its full agent &#x27;full&#x27; \[0, 1, 2\]&quot;):
+        _open(monkeypatch, {&quot;full&quot;: FULL}, {&quot;abl&quot;: ablation})
+
+
+def test_one_seed_with_other_steps_is_refused(monkeypatch: pytest.MonkeyPatch) -&gt; None:
+    ablation = {
+        **_group(&quot;abl&quot;, &quot;no_target&quot;, (0, 1), 300_000),
+        **_group(&quot;abl&quot;, &quot;no_target&quot;, (2,), 100_000),
+    }
+    with pytest.raises(ValueError, match=r&quot;steps \[100000, 300000\]&quot;):
+        _open(monkeypatch, {&quot;full&quot;: FULL}, {&quot;abl&quot;: ablation})
+
+
+def test_full_agent_found_in_the_ablation_chart(monkeypatch: pytest.MonkeyPatch) -&gt; None:
+    ablation = _group(&quot;abl&quot;, &quot;no_target&quot;, (0, 1), 300_000)
+    with pytest.raises(ValueError, match=&quot;seeds&quot;):
+        _open(monkeypatch, {}, {&quot;full&quot;: FULL, &quot;abl&quot;: ablation})
+
+
+def test_full_agent_is_the_one_with_the_same_settings(monkeypatch: pytest.MonkeyPatch) -&gt; None:
+    other = _group(&quot;grid&quot;, &quot;dqn_compact&quot;, (0,), 300_000, view=&quot;grid&quot;)
+    ablation = _group(&quot;abl&quot;, &quot;no_target&quot;, (0, 1, 2), 300_000)
+    curves = _open(monkeypatch, {&quot;grid&quot;: other, &quot;full&quot;: FULL}, {&quot;abl&quot;: ablation})
+    assert len(curves.ablations[&quot;abl&quot;]) == 3
+
+
+def test_ablation_without_its_full_agent_is_refused(monkeypatch: pytest.MonkeyPatch) -&gt; None:
+    other = _group(&quot;grid&quot;, &quot;dqn_compact&quot;, (0, 1, 2), 300_000, view=&quot;grid&quot;)
+    ablation = _group(&quot;abl&quot;, &quot;no_target&quot;, (0, 1, 2), 300_000)
+    with pytest.raises(ValueError, match=&quot;ablation &#x27;abl&#x27;: no full agent&quot;):
+        _open(monkeypatch, {&quot;grid&quot;: other}, {&quot;abl&quot;: ablation})
+
+
+def test_full_agent_on_the_ablation_chart_is_not_checked(
+    monkeypatch: pytest.MonkeyPatch,
+) -&gt; None:
+    curves = _open(monkeypatch, {}, {&quot;full&quot;: FULL})
+    assert [r.settings.seed for r in curves.ablations[&quot;full&quot;]] == [0, 1, 2]
+</pre><div class="hook">⛔ hook PostToolUse:Write blocked: [bash &quot;$CLAUDE_PROJECT_DIR&quot;/scripts/hooks/post_edit.sh]: -&gt; ruff check --fix --quiet /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r1/with_skill/project/.claude/worktrees/agent-a16a9bcae9da881ce/tests/unit/rllab/test_ablation_pairs.py
+-&gt; ruff format --quiet /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r1/with_skill/project/.claude/worktrees/agent-a16a9bcae9da881ce/tests/unit/rllab/test_ablation_pairs.py
+-&gt; typos /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r1/with_skill/project/.claude/worktrees/agent-a16a9bcae9da881ce/tests/unit/rllab/test_ablation_pairs.py
+error: `abl` should be `able`
+   ╭▸ /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r1/with_skill/project/.claude/worktrees/agent-a16a9bcae9da881ce/tests/unit/rllab/test_ablation_pairs.py:60:24
+   │
+60 │     ablation = _group(&quot;abl&quot;, &quot;no_target&quot;, (2, 0, 1), 300_000)
+   ╰╴                       ━━━
+error: `abl` should be `able`
+   ╭▸ /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r1/with_skill/project/.claude/worktrees/agent-a16a9bcae9da881ce/tests/unit/rllab/test_ablation_pairs.py:61:51
+   │
+61 │     curves = _open(monkeypatch, {&quot;full&quot;: FULL}, {&quot;abl&quot;: ablation})
+   ╰╴                                                  ━━━
+error: `abl` should be `able`
+   ╭▸ /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r1/with_skill/project/.claude/worktrees/agent-a16a9bcae9da881ce/tests/unit/rllab/test_ablation_pairs.py:62:56
+   │
+62 │     assert [r.settings.seed for r in curves.ablations[&quot;abl&quot;]] == [2, 0, 1]
+   ╰╴                                                       ━━━
+error: `abl` should be `able`
+   ╭▸ /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r1/with_skill/project/.claude/worktrees/agent-a16a9bcae9da881ce/tests/unit/rllab/test_ablation_pairs.py:67:24
+   │
+67 │     ablation = _group(&quot;abl&quot;, &quot;no_target&quot;, (0, 1, 2), 200_000)
+   ╰╴                       ━━━
+error: `abl` should be `able`
+   ╭▸ /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r1/with_skill/project/.claude/worktrees/agent-a16a9bcae9da881ce/tests/unit/rllab/test_ablation_pairs.py:69:46
+   │
+69 │         _open(monkeypatch, {&quot;full&quot;: FULL}, {&quot;abl&quot;: ablation})
+   ╰╴                                             ━━━
+error: `abl` should be `able`
+   ╭▸ /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r1/with_skill/project/.claude/worktrees/agent-a16a9bcae9da881ce/tests/unit/rllab/test_ablation_pairs.py:73:24
+   │
+73 │     ablation = _group(&quot;abl&quot;, &quot;no_target&quot;, (0, 1), 300_000)
+   ╰╴                       ━━━
+error: `abl` should be `able`
+   ╭▸ /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r1/with_skill/project/.claude/worktrees/agent-a16a9bcae9da881ce/tests/unit/rllab/test_ablation_pairs.py:75:46
+   │
+75 │         _open(monkeypatch, {&quot;full&quot;: FULL}, {&quot;abl&quot;: ablation})
+   ╰╴                                             ━━━
+error: `abl` should be `able`
+   ╭▸ /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r1/with_skill/project/.claude/worktrees/agent-a16a9bcae9da881ce/tests/unit/rllab/test_ablation_pairs.py:80:19
+   │
+80 │         **_group(&quot;abl&quot;, &quot;no_target&quot;, (0, 1), 300_000),
+   ╰╴                  ━━━
+error: `abl` should be `able`
+   ╭▸ /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r1/with_skill/project/.claude/worktrees/agent-a16a9bcae9da881ce/tests/unit/rllab/test_ablation_pairs.py:81:19
+   │
+81 │         **_group(&quot;abl&quot;, &quot;no_target&quot;, (2,), 100_000),
+   ╰╴                  ━━━
+error: `abl` should be `able`
+   ╭▸ /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r1/with_skill/project/.claude/worktrees/agent-a16a9bcae9da881ce/tests/unit/rllab/test_ablation_pairs.py:84:46
+   │
+84 │         _open(monkeypatch, {&quot;full&quot;: FULL}, {&quot;abl&quot;: ablation})
+   ╰╴                                             ━━━
+error: `abl` should be `able`
+   ╭▸ /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r1/with_skill/project/.claude/worktrees/agent-a16a9bcae9da881ce/tests/unit/rllab/test_ablation_pairs.py:88:24
+   │
+88 │     ablation = _group(&quot;abl&quot;, &quot;no_target&quot;, (0, 1), 300_000)
+   ╰╴                       ━━━
+error: `abl` should be `able`
+   ╭▸ /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r1/with_skill/project/.claude/worktrees/agent-a16a9bcae9da881ce/tests/unit/rllab/test_ablation_pairs.py:90:48
+   │
+90 │         _open(monkeypatch, {}, {&quot;full&quot;: FULL, &quot;abl&quot;: ablation})
+   ╰╴                                               ━━━
+error: `abl` should be `able`
+   ╭▸ /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r1/with_skill/project/.claude/worktrees/agent-a16a9bcae9da881ce/tests/unit/rllab/test_ablation_pairs.py:95:24
+   │
+95 │     ablation = _group(&quot;abl&quot;, &quot;no_target&quot;, (0, 1, 2), 300_000)
+   ╰╴                       ━━━
+error: `abl` should be `able`
+   ╭▸ /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r1/with_skill/project/.claude/worktrees/agent-a16a9bcae9da881ce/tests/unit/rllab/test_ablation_pairs.py:96:66
+   │
+96 │     curves = _open(monkeypatch, {&quot;grid&quot;: other, &quot;full&quot;: FULL}, {&quot;abl&quot;: ablation})
+   ╰╴                                                                 ━━━
+error: `abl` should be `able`
+   ╭▸ /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r1/with_skill/project/.claude/worktrees/agent-a16a9bcae9da881ce/tests/unit/rllab/test_ablation_pairs.py:97:34
+   │
+97 │     assert len(curves.ablations[&quot;abl&quot;]) == 3
+   ╰╴                                 ━━━
+error: `abl` should be `able`
+    ╭▸ /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r1/with_skill/project/.claude/worktrees/agent-a16a9bcae9da881ce/tests/unit/rllab/test_ablation_pairs.py:102:24
+    │
+102 │     ablation = _group(&quot;abl&quot;, &quot;no_target&quot;, (0, 1, 2), 300_000)
+    ╰╴                       ━━━
+error: `abl` should be `able`
+    ╭▸ /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r1/with_skill/project/.claude/worktrees/agent-a16a9bcae9da881ce/tests/unit/rllab/test_ablation_pairs.py:103:53
+    │
+103 │     with pytest.raises(ValueError, match=&quot;ablation &#x27;abl&#x27;: no full agent&quot;):
+    ╰╴                                                    ━━━
+error: `abl` should be `able`
+    ╭▸ /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r1/with_skill/project/.claude/worktrees/agent-a16a9bcae9da881ce/tests/unit/rllab/test_ablation_pairs.py:104:47
+    │
+104 │         _open(monkeypatch, {&quot;grid&quot;: other}, {&quot;abl&quot;: ablation})
+    ╰╴                                              ━━━
+-&gt; python scripts/check_size.py /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r1/with_skill/project/.claude/worktrees/agent-a16a9bcae9da881ce/tests/unit/rllab/test_ablation_pairs.py
+FAILED: typos /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r1/with_skill/project/.claude/worktrees/agent-a16a9bcae9da881ce/tests/unit/rllab/test_ablation_pairs.py
+</div><details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r1/with_skill/project/.claude/worktrees/agent-a16a9bcae9da881ce/tests/unit/rllab/test_ablation_pairs.py&quot;,
+  &quot;content&quot;: &quot;\&quot;\&quot;\&quot;Unit tests for lab.players.open_curve_runs: an ablation must match its full agent (ABL-04).\&quot;\&quot;\&quot;\n\nimport dataclasses\nimport importlib.util\nimport sys\nfrom pathlib import Path\n\nimport pytest\n\nfrom rllab.core import RunSettings\nfrom rllab.lab import players\nfrom rllab.lab.types import PlayerTarget, ReportTargets\nfrom rllab.runs import RunRecord\n\nKIT_PATH = Path(__file__).resolve().parents[2] / \&quot;contracts\&quot; / \&quot;kit.py\&quot;\n_spec = importlib.util.spec_from_file_location(\&quot;contract_kit\&quot;, KIT_PATH)\nassert _spec is not None\nassert _spec.loader is not None\nkit = importlib.util.module_from_spec(_spec)\nsys.modules[\&quot;contract_kit\&quot;] = kit\n_spec.loader.exec_module(kit)\n\n\ndef _group(\n    name: str, case: str, seeds: tuple[int, ...], steps: int, **changes: object\n) -&gt; dict[Path, RunRecord]:\n    base: RunRecord = kit.sample(\&quot;runs.RunRecord\&quot;, \&quot;complete_corridor\&quot;, RunRecord)\n    settings: RunSettings = kit.sample(\&quot;core.RunSettings\&quot;, case, RunSettings)\n    return {\n        Path(f\&quot;runs/{name}-s{seed}\&quot;): dataclasses.replace(\n            base,\n            path=Path(f\&quot;runs/{name}-s{seed}\&quot;),\n            settings=dataclasses.replace(settings, steps=steps, seed=seed, **changes),\n        )\n        for seed in seeds\n    }\n\n\ndef _open(\n    monkeypatch: pytest.MonkeyPatch,\n    ladder: dict[str, dict[Path, RunRecord]],\n    ablations: dict[str, dict[Path, RunRecord]],\n) -&gt; players.CurveRuns:\n    groups = {**ladder, **ablations}\n    records = {path: r for group in groups.values() for path, r in group.items()}\n    monkeypatch.setattr(players, \&quot;open_run\&quot;, records.__getitem__)\n    targets = ReportTargets(\n        players={name: PlayerTarget(runs=tuple(group)) for name, group in groups.items()},\n        baselines=(),\n        ladder=tuple(ladder),\n        ablations=tuple(ablations),\n    )\n    return players.open_curve_runs(targets)\n\n\nFULL = _group(\&quot;full\&quot;, \&quot;dqn_compact\&quot;, (0, 1, 2), 300_000)\n\n\ndef test_matching_ablation_is_opened(monkeypatch: pytest.MonkeyPatch) -&gt; None:\n    ablation = _group(\&quot;abl\&quot;, \&quot;no_target\&quot;, (2, 0, 1), 300_000)\n    curves = _open(monkeypatch, {\&quot;full\&quot;: FULL}, {\&quot;abl\&quot;: ablation})\n    assert [r.settings.seed for r in curves.ablations[\&quot;abl\&quot;]] == [2, 0, 1]\n    assert len(curves.ladder[\&quot;full\&quot;]) == 3\n\n\ndef test_fewer_steps_names_both_budgets(monkeypatch: pytest.MonkeyPatch) -&gt; None:\n    ablation = _group(\&quot;abl\&quot;, \&quot;no_target\&quot;, (0, 1, 2), 200_000)\n    with pytest.raises(ValueError, match=r\&quot;steps \\[200000\\], its full agent &#x27;full&#x27; \\[300000\\]\&quot;):\n        _open(monkeypatch, {\&quot;full\&quot;: FULL}, {\&quot;abl\&quot;: ablation})\n\n\ndef test_missing_seed_names_both_seed_lists(monkeypatch: pytest.MonkeyPatch) -&gt; None:\n    ablation = _group(\&quot;abl\&quot;, \&quot;no_target\&quot;, (0, 1), 300_000)\n    with pytest.raises(ValueError, match=r\&quot;seeds \\[0, 1\\], its full agent &#x27;full&#x27; \\[0, 1, 2\\]\&quot;):\n        _open(monkeypatch, {\&quot;full\&quot;: FULL}, {\&quot;abl\&quot;: ablation})\n\n\ndef test_one_seed_with_other_steps_is_refused(monkeypatch: pytest.MonkeyPatch) -&gt; None:\n    ablation = {\n        **_group(\&quot;abl\&quot;, \&quot;no_target\&quot;, (0, 1), 300_000),\n        **_group(\&quot;abl\&quot;, \&quot;no_target\&quot;, (2,), 100_000),\n    }\n    with pytest.raises(ValueError, match=r\&quot;steps \\[100000, 300000\\]\&quot;):\n        _open(monkeypatch, {\&quot;full\&quot;: FULL}, {\&quot;abl\&quot;: ablation})\n\n\ndef test_full_agent_found_in_the_ablation_chart(monkeypatch: pytest.MonkeyPatch) -&gt; None:\n    ablation = _group(\&quot;abl\&quot;, \&quot;no_target\&quot;, (0, 1), 300_000)\n    with pytest.raises(ValueError, match=\&quot;seeds\&quot;):\n        _open(monkeypatch, {}, {\&quot;full\&quot;: FULL, \&quot;abl\&quot;: ablation})\n\n\ndef test_full_agent_is_the_one_with_the_same_settings(monkeypatch: pytest.MonkeyPatch) -&gt; None:\n    other = _group(\&quot;grid\&quot;, \&quot;dqn_compact\&quot;, (0,), 300_000, view=\&quot;grid\&quot;)\n    ablation = _group(\&quot;abl\&quot;, \&quot;no_target\&quot;, (0, 1, 2), 300_000)\n    curves = _open(monkeypatch, {\&quot;grid\&quot;: other, \&quot;full\&quot;: FULL}, {\&quot;abl\&quot;: ablation})\n    assert len(curves.ablations[\&quot;abl\&quot;]) == 3\n\n\ndef test_ablation_without_its_full_agent_is_refused(monkeypatch: pytest.MonkeyPatch) -&gt; None:\n    other = _group(\&quot;grid\&quot;, \&quot;dqn_compact\&quot;, (0, 1, 2), 300_000, view=\&quot;grid\&quot;)\n    ablation = _group(\&quot;abl\&quot;, \&quot;no_target\&quot;, (0, 1, 2), 300_000)\n    with pytest.raises(ValueError, match=\&quot;ablation &#x27;abl&#x27;: no full agent\&quot;):\n        _open(monkeypatch, {\&quot;grid\&quot;: other}, {\&quot;abl\&quot;: ablation})\n\n\ndef test_full_agent_on_the_ablation_chart_is_not_checked(\n    monkeypatch: pytest.MonkeyPatch,\n) -&gt; None:\n    curves = _open(monkeypatch, {}, {\&quot;full\&quot;: FULL})\n    assert [r.settings.seed for r in curves.ablations[\&quot;full\&quot;]] == [0, 1, 2]\n&quot;
+}</pre><div class="lbl">output</div><pre>File created successfully at: /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r1/with_skill/project/.claude/worktrees/agent-a16a9bcae9da881ce/tests/unit/rllab/test_ablation_pairs.py (file state is current in your context — no need to Read it back)</pre></details></div><div class="step" id="S26"><span class="sid">U47.S26</span><span class="kind">Read</span>/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r1/with_skill/project/.claude/worktrees/agent-a16a9bcae9da881ce/tests/unit/rllab/test_ablation_pairs.py offset=55<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r1/with_skill/project/.claude/worktrees/agent-a16a9bcae9da881ce/tests/unit/rllab/test_ablation_pairs.py&quot;,
+  &quot;offset&quot;: 55
+}</pre><div class="lbl">output</div><pre>55	
+56	FULL = _group(&quot;full&quot;, &quot;dqn_compact&quot;, (0, 1, 2), 300_000)
+57	
+58	
+59	def test_matching_ablation_is_opened(monkeypatch: pytest.MonkeyPatch) -&gt; None:
+60	    ablation = _group(&quot;abl&quot;, &quot;no_target&quot;, (2, 0, 1), 300_000)
+61	    curves = _open(monkeypatch, {&quot;full&quot;: FULL}, {&quot;abl&quot;: ablation})
+62	    assert [r.settings.seed for r in curves.ablations[&quot;abl&quot;]] == [2, 0, 1]
+63	    assert len(curves.ladder[&quot;full&quot;]) == 3
+64	
+65	
+66	def test_fewer_steps_names_both_budgets(monkeypatch: pytest.MonkeyPatch) -&gt; None:
+67	    ablation = _group(&quot;abl&quot;, &quot;no_target&quot;, (0, 1, 2), 200_000)
+68	    with pytest.raises(ValueError, match=r&quot;steps \[200000\], its full agent &#x27;full&#x27; \[300000\]&quot;):
+69	        _open(monkeypatch, {&quot;full&quot;: FULL}, {&quot;abl&quot;: ablation})
+70	
+71	
+72	def test_missing_seed_names_both_seed_lists(monkeypatch: pytest.MonkeyPatch) -&gt; None:
+73	    ablation = _group(&quot;abl&quot;, &quot;no_target&quot;, (0, 1), 300_000)
+74	    with pytest.raises(ValueError, match=r&quot;seeds \[0, 1\], its full agent &#x27;full&#x27; \[0, 1, 2\]&quot;):
+75	        _open(monkeypatch, {&quot;full&quot;: FULL}, {&quot;abl&quot;: ablation})
+76	
+77	
+78	def test_one_seed_with_other_steps_is_refused(monkeypatch: pytest.MonkeyPatch) -&gt; None:
+79	    ablation = {
+80	        **_group(&quot;abl&quot;, &quot;no_target&quot;, (0, 1), 300_000),
+81	        **_group(&quot;abl&quot;, &quot;no_target&quot;, (2,), 100_000),
+82	    }
+83	    with pytest.raises(ValueError, match=r&quot;steps \[100000, 300000\]&quot;):
+84	        _open(monkeypatch, {&quot;full&quot;: FULL}, {&quot;abl&quot;: ablation})
+85	
+86	
+87	def test_full_agent_found_in_the_ablation_chart(monkeypatch: pytest.MonkeyPatch) -&gt; None:
+88	    ablation = _group(&quot;abl&quot;, &quot;no_target&quot;, (0, 1), 300_000)
+89	    with pytest.raises(ValueError, match=&quot;seeds&quot;):
+90	        _open(monkeypatch, {}, {&quot;full&quot;: FULL, &quot;abl&quot;: ablation})
+91	
+92	
+93	def test_full_agent_is_the_one_with_the_same_settings(monkeypatch: pytest.MonkeyPatch) -&gt; None:
+94	    other = _group(&quot;grid&quot;, &quot;dqn_compact&quot;, (0,), 300_000, view=&quot;grid&quot;)
+95	    ablation = _group(&quot;abl&quot;, &quot;no_target&quot;, (0, 1, 2), 300_000)
+96	    curves = _open(monkeypatch, {&quot;grid&quot;: other, &quot;full&quot;: FULL}, {&quot;abl&quot;: ablation})
+97	    assert len(curves.ablations[&quot;abl&quot;]) == 3
+98	
+99	
+100	def test_ablation_without_its_full_agent_is_refused(monkeypatch: pytest.MonkeyPatch) -&gt; None:
+101	    other = _group(&quot;grid&quot;, &quot;dqn_compact&quot;, (0, 1, 2), 300_000, view=&quot;grid&quot;)
+102	    ablation = _group(&quot;abl&quot;, &quot;no_target&quot;, (0, 1, 2), 300_000)
+103	    with pytest.raises(ValueError, match=&quot;ablation &#x27;abl&#x27;: no full agent&quot;):
+104	        _open(monkeypatch, {&quot;grid&quot;: other}, {&quot;abl&quot;: ablation})
+105	
+106	
+107	def test_full_agent_on_the_ablation_chart_is_not_checked(
+108	    monkeypatch: pytest.MonkeyPatch,
+109	) -&gt; None:
+110	    curves = _open(monkeypatch, {}, {&quot;full&quot;: FULL})
+111	    assert [r.settings.seed for r in curves.ablations[&quot;full&quot;]] == [0, 1, 2]
+112	</pre></details></div><div class="step" id="S27"><span class="sid">U47.S27</span><span class="kind">Edit</span>/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r1/with_skill/project/.claude/worktrees/agent-a16a9bcae9da881ce/tests/unit/rllab/test_ablation_pairs.py replace_all | old: &#x27;&quot;abl&quot;&#x27; | new: &#x27;&quot;no-target&quot;&#x27;<div class="lbl">edited /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r1/with_skill/project/.claude/worktrees/agent-a16a9bcae9da881ce/tests/unit/rllab/test_ablation_pairs.py · old</div><pre>&quot;abl&quot;</pre><div class="lbl">new</div><pre>&quot;no-target&quot;</pre><div class="hook">⛔ hook PostToolUse:Edit blocked: [bash &quot;$CLAUDE_PROJECT_DIR&quot;/scripts/hooks/post_edit.sh]: -&gt; ruff check --fix --quiet /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r1/with_skill/project/.claude/worktrees/agent-a16a9bcae9da881ce/tests/unit/rllab/test_ablation_pairs.py
+-&gt; ruff format --quiet /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r1/with_skill/project/.claude/worktrees/agent-a16a9bcae9da881ce/tests/unit/rllab/test_ablation_pairs.py
+-&gt; typos /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r1/with_skill/project/.claude/worktrees/agent-a16a9bcae9da881ce/tests/unit/rllab/test_ablation_pairs.py
+error: `abl` should be `able`
+    ╭▸ /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r1/with_skill/project/.claude/worktrees/agent-a16a9bcae9da881ce/tests/unit/rllab/test_ablation_pairs.py:103:53
+    │
+103 │     with pytest.raises(ValueError, match=&quot;ablation &#x27;abl&#x27;: no full agent&quot;):
+    ╰╴                                                    ━━━
+-&gt; python scripts/check_size.py /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r1/with_skill/project/.claude/worktrees/agent-a16a9bcae9da881ce/tests/unit/rllab/test_ablation_pairs.py
+FAILED: typos /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r1/with_skill/project/.claude/worktrees/agent-a16a9bcae9da881ce/tests/unit/rllab/test_ablation_pairs.py
+</div><details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;replace_all&quot;: true,
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r1/with_skill/project/.claude/worktrees/agent-a16a9bcae9da881ce/tests/unit/rllab/test_ablation_pairs.py&quot;,
+  &quot;old_string&quot;: &quot;\&quot;abl\&quot;&quot;,
+  &quot;new_string&quot;: &quot;\&quot;no-target\&quot;&quot;
+}</pre><div class="lbl">output</div><pre>The file /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r1/with_skill/project/.claude/worktrees/agent-a16a9bcae9da881ce/tests/unit/rllab/test_ablation_pairs.py has been updated. All occurrences were successfully replaced.</pre></details></div><div class="step" id="S28"><span class="sid">U47.S28</span><span class="kind">Bash</span>grep -n -e &quot;ViewName&quot; -e &quot;Ablation =&quot; src/rllab/core/types.py<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;grep -n -e \&quot;ViewName\&quot; -e \&quot;Ablation =\&quot; src/rllab/core/types.py&quot;,
+  &quot;description&quot;: &quot;Check view and ablation literals&quot;
+}</pre><div class="lbl">output</div><pre>12:ViewName = Literal[&quot;compact&quot;, &quot;grid&quot;, &quot;index&quot;, &quot;full&quot;, &quot;limited&quot;]
+16:Ablation = Literal[&quot;none&quot;, &quot;no_memory&quot;, &quot;no_target&quot;, &quot;no_explore&quot;]
+156:    view: ViewName</pre></details></div><div class="step" id="S29"><span class="sid">U47.S29</span><span class="kind">Edit</span>/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r1/with_skill/project/.claude/worktrees/agent-a16a9bcae9da881ce/tests/unit/rllab/test_ablation_pairs.py | old: &quot;&#x27;abl&#x27;&quot; | new: &quot;&#x27;no-target&#x27;&quot;<div class="lbl">edited /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r1/with_skill/project/.claude/worktrees/agent-a16a9bcae9da881ce/tests/unit/rllab/test_ablation_pairs.py · old</div><pre>&#x27;abl&#x27;</pre><div class="lbl">new</div><pre>&#x27;no-target&#x27;</pre><details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;replace_all&quot;: false,
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r1/with_skill/project/.claude/worktrees/agent-a16a9bcae9da881ce/tests/unit/rllab/test_ablation_pairs.py&quot;,
+  &quot;old_string&quot;: &quot;&#x27;abl&#x27;&quot;,
+  &quot;new_string&quot;: &quot;&#x27;no-target&#x27;&quot;
+}</pre><div class="lbl">output</div><pre>The file /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r1/with_skill/project/.claude/worktrees/agent-a16a9bcae9da881ce/tests/unit/rllab/test_ablation_pairs.py has been updated successfully.</pre></details></div><div class="step" id="S30"><span class="sid">U47.S30</span><span class="kind">Bash</span>uv run pytest tests/intent/rllab tests/unit/rllab -k &quot;ablation_pairs or players&quot; -q<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;uv run pytest tests/intent/rllab tests/unit/rllab -k \&quot;ablation_pairs or players\&quot; -q&quot;,
+  &quot;description&quot;: &quot;Run ablation pair and players tests&quot;
+}</pre><div class="lbl">output</div><pre>......................                                                   [100%]
+22 passed, 228 deselected in 14.69s</pre></details></div><div class="step" id="S31"><span class="sid">U47.S31</span><span class="kind">Bash</span>scripts/check.sh gate<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;scripts/check.sh gate&quot;,
+  &quot;description&quot;: &quot;Run the gate checks&quot;,
+  &quot;timeout&quot;: 600000
+}</pre><div class="lbl">output</div><pre>-&gt; ruff check --ignore-noqa .
+All checks passed!
+-&gt; ruff format --check .
+97 files already formatted
+-&gt; mypy
+Success: no issues found in 50 source files
+-&gt; python scripts/check_size.py src
+-&gt; deptry . --no-ansi
+Scanning 54 files...
+
+Success! No dependency issues found.
+-&gt; lint-imports --no-logo
+
+---------
+Contracts
+---------
+
+Analyzed 71 files, 186 dependencies.
+------------------------------------
+
+Layers: lab &gt; train | reference | compare | viz | baselines &gt; evaluate | envs | 
+agents &gt; runs &gt; core KEPT
+Hand-written code stays free of the reference library (AGENT-06, AD-04) KEPT
+Only agents imports PyTorch (AD-02) KEPT
+envs → core only KEPT
+agents → core only KEPT
+baselines → core, envs KEPT
+train → core, runs, evaluate KEPT
+reference → core, envs, runs, evaluate KEPT
+compare → evaluate KEPT
+viz → runs, evaluate KEPT
+
+Contracts: 10 kept, 0 broken.
+-&gt; pytest tests/intent tests/unit tests/contracts --no-cov -q -x
+........................................................................ [ 11%]
+........................................................................ [ 23%]
+........................................................................ [ 35%]
+........................................................................ [ 47%]
+........................................................................ [ 59%]
+........................................................................ [ 70%]
+........................................................................ [ 82%]
+........................................................................ [ 94%]
+.................................                                        [100%]
+609 passed in 9.01s
+-&gt; bash scripts/floor_guard.sh
+floor_guard: clean
+-&gt; protected files unchanged since refs/worktree/checks-base</pre></details></div><div class="step" id="S32"><span class="sid">U47.S32</span><span class="kind">say</span>DONE M1-T30 implementer<details><summary>full text</summary><pre>DONE M1-T30 implementer</pre></details></div>
+<h2>Commits</h2>
+<p>None.</p>
+<h2>Returned</h2>
+<pre>DONE M1-T30 implementer</pre>
+</body></html>

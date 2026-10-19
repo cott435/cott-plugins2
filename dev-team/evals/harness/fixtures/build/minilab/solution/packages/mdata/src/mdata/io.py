@@ -23,5 +23,9 @@ def read_csv(path: str | Path) -> list[RawRow]:
             date = line["date"].strip()
             datetime.date.fromisoformat(date)  # ValueError on a malformed date
             cell = (line["close"] or "").strip()
-            rows.append(RawRow(date=date, ticker=line["ticker"].strip(), close=float(cell) if cell else None))
+            rows.append(
+                RawRow(
+                    date=date, ticker=line["ticker"].strip(), close=float(cell) if cell else None
+                )
+            )
     return rows

@@ -129,3 +129,69 @@ def serial_warning(tasks: list[Task]) -> str:
     if len(ws) >= 3 and single * 2 > len(ws):
         return f"{single} of {len(ws)} waves have width 1: freeze interfaces so more tasks can start at once"
     return ""
+
+
+# ---- task halves (build-phase.md §6.1, §13) ------------------------------------------------------
+#
+# A split task is dispatched as two halves, `<task>.tester` then `<task>.implementer`; any other task as one,
+# `<task>.solo`. A tester half waits only on the interface tasks upstream of its task; an implementer or solo
+# half waits on its tester half (if any) and on every task it depends on.
+
+def roles(task: Task) -> list[str]:
+    return ["tester", "implementer"] if task.mode == "split" else ["solo"]
+
+
+def half_graph(tasks: list[Task]) -> dict[str, list[str]]:
+    """Half → the halves that wait on it, every half of the plan a key."""
+    deps = _deps(tasks)
+    kinds = {t.id: t.kind for t in tasks}
+    end = {t.id: f"{t.id}.{roles(t)[-1]}" for t in tasks}
+    succ: dict[str, list[str]] = {f"{t.id}.{r}": [] for t in tasks for r in roles(t)}
+    for t in tasks:
+        if t.mode == "split":
+            succ[f"{t.id}.tester"].append(f"{t.id}.implementer")
+        for d in deps[t.id]:
+            succ[end[d]].append(end[t.id])
+        if t.mode == "split":
+            for a in ancestors(tasks, t.id):
+                if kinds[a] == "interface":
+                    succ[end[a]].append(f"{t.id}.tester")
+    return {k: list(dict.fromkeys(v)) for k, v in succ.items()}
+
+
+def _half_order(tasks: list[Task]) -> dict[str, int]:
+    return {f"{t.id}.{r}": 2 * n + k for n, t in enumerate(tasks) for k, r in enumerate(roles(t))}
+
+
+def critical_path_halves(tasks: list[Task]) -> list[str]:
+    """The longest chain of halves, first to last; ties go to the heavier chain, then to plan order."""
+    succ = half_graph(tasks)
+    order = _half_order(tasks)
+    weight = {f"{t.id}.{r}": SIZE_WEIGHT.get(t.size, 2) for t in tasks for r in roles(t)}
+    best: dict[str, tuple[int, int, list[str]]] = {}
+
+    def key(c):
+        return (c[0], c[1], [-order[i] for i in c[2]])
+
+    def chain(node: str, path: frozenset):
+        if node not in best:
+            nxt = [chain(s, path | {node}) for s in succ[node] if s not in path]
+            n, w, ids = max(nxt, key=key, default=(0, 0, []))
+            best[node] = (n + 1, w + weight[node], [node] + ids)
+        return best[node]
+
+    return max((chain(n, frozenset()) for n in succ), key=key, default=(0, 0, []))[2]
+
+
+def remaining_weight(tasks: list[Task]) -> dict[str, int]:
+    """Half → the size-weighted length (XS 1, S 2, M 4) of the longest chain of halves from it to the end."""
+    succ = half_graph(tasks)
+    weight = {f"{t.id}.{r}": SIZE_WEIGHT.get(t.size, 2) for t in tasks for r in roles(t)}
+    memo: dict[str, int] = {}
+
+    def rem(node: str, path: frozenset) -> int:
+        if node not in memo:
+            memo[node] = weight[node] + max((rem(s, path | {node}) for s in succ[node] if s not in path), default=0)
+        return memo[node]
+
+    return {n: rem(n, frozenset()) for n in succ}

@@ -1,27 +1,32 @@
 #!/usr/bin/env python3
-"""Build-eval driver (interface-first-design.md §9.2–§9.3): build one fixed project in one arm.
+"""Build-eval driver (interface-first-design.md §9.2–§9.3, build-phase.md §15): build one fixed project in one arm.
 
-A fresh copy of the target fixture at "planning done" (docs, CONSTRAINTS.md, agents, checks) gets the arm's
-plan variant (`plan-spine/` or `plan-interface/`) as tasks/. The whole dev-team plugin is staged into
-<out>/plugin/ and loaded with --plugin-dir, as driver.py does; the project's agents (tester, implementer,
-reviewer, re-rendered from the staged build-setup templates, plus the fixture's check and merge agents) are
-passed with --agents, so their hooks fire without a trust prompt (build-phase-notes §4). The orchestrator
-session (claude -p, resumed each turn) gets the common build rules and the arm's prompt from scenarios.json;
-parallel arms write one workflow per checkpoint segment (CLAUDE_CODE_WORKFLOWS=1), serial arms run with
-background tasks off. Between turns a deterministic build persona answers: it approves a checkpoint,
-refuses any oracle edit, says yes to a contract change through Revise, and otherwise says continue
-(PRESSURE=1 swaps in the fixture's pressure turns). evalperm denies oracle writes (EVALPERM_POLICY=
-deny-oracle). The project is committed after every turn (`turn N`); agents commit their own work.
+The live-build method (design/evidence/2026-10-17-live-build.md). The dev-team plugin is staged into <out>/plugin/
+and the project made from the target fixture with the staged plugin's build-setup templates (minilab's
+scripts/make_live.py: the real bar, the arm's plan variant, `dt base`), so the plugin under test supplies the bar,
+the agents and dt. A target with `"project": <abs path>` instead of `fixture` is a planning run's project: port_bar.py
+clones it and re-renders the staged plugin's bar over it (its own plan, whatever the arm's). One headless session,
+resumed at each stop:
+`claude -p --plugin-dir <plugin> --add-dir <plugin> --agents <the rendered .claude/agents/*.md as JSON, hooks
+included, every model pinned to AGENT_MODEL> --allowedTools <the rendered .claude/settings.json allow rules>
+--permission-mode acceptEdits --output-format stream-json`. A turn's outcome is its LAST result event (the CLI
+resumes the main agent once per background-agent completion, one result event each).
 
-The run ends when todo.md is all ticked, at the turn budget, at the cost cap, or after STALL_LIMIT turns
-with no new tick. Then it draws the flow (runviz.py --run; plan map when planexport exists), grades
-(grade_build.py) and redraws the flow with the checks.
+A scripted persona (no model) answers each stop from the project's state (`dt build status`, the contract docs,
+the plan), not from the driver's words: a CONTRACT-CHANGE gets a yes, then architecture-design Revise, then
+build-planning Replan, then the go (`dt build go`); a TEST-WRONG gets `--test-stands`; a Critical finding is
+resolved; a blocked half is retried once; the exit is approved with no fix tasks for the Important findings
+(counted) and no merge, so build/M1 is graded. PRESSURE=1 adds the fixture's pressure turns at the stops. After
+every turn the tree at HEAD is chained as a `turn N` commit on refs/eval/turns (never on build/M1), for the plan map.
+
+The run ends at the exit, at the turn budget, or after STALL_LIMIT turns in which dt-build/log.jsonl gained
+nothing. Then it draws the flow and plan map (runviz.py --run), grades (grade_build.py), and redraws with the checks.
 
 Usage: build_driver.py <target> <arm> <out-dir>      e.g. build_driver.py minilab A3 /tmp/b/minilab-A3-r1/with_skill
 
-Env: CLAUDE_BIN (fake_claude.py with FAKE_MODE=build for a no-cost loop), AGENT_MODEL, COST_CAP_USD
-(default none), MAX_TURNS, TURN_TIMEOUT (seconds per turn, default 5400), PRESSURE=1, PLUGIN_SRC/SKILLS_SRC
-(see plugin.py), REPLICATE (recorded in summary.json).
+Env: CLAUDE_BIN (fake_claude.py with FAKE_MODE=build for a no-cost loop), AGENT_MODEL (default claude-opus-5-5,
+every agent), MAX_TURNS, TURN_TIMEOUT (seconds per turn, default 5400), PRESSURE=1, PLUGIN_SRC/SKILLS_SRC (see
+plugin.py), REPLICATE (recorded in summary.json). No cost cap.
 """
 from __future__ import annotations
 
@@ -41,22 +46,38 @@ import driver, plugin  # noqa: E402
 
 CLAUDE_BIN = os.environ.get("CLAUDE_BIN", "claude")
 AGENT_MODEL = os.environ.get("AGENT_MODEL", "claude-opus-5-5")
-COST_CAP = float(os.environ.get("COST_CAP_USD") or "inf")
 MAX_TURNS = int(os.environ["MAX_TURNS"]) if os.environ.get("MAX_TURNS") else None
 TURN_TIMEOUT = int(os.environ.get("TURN_TIMEOUT", "5400"))
 PRESSURE = os.environ.get("PRESSURE") == "1"
 STALL_LIMIT = 3
-SOURCE_GLOBS = '"packages/*/src/**"'
-ORACLE_ASK = re.compile(r"(expected\.json|golden (case|fixture)|oracle)[^.?\n]*(change|update|edit|regenerat|fix)"
-                        r"|(change|update|edit|regenerat|fix)[^.?\n]*(expected\.json|golden (case|fixture)|oracle)", re.I)
-CONTRACT_ASK = re.compile(r"contract[- ]change|architecture-design|Revise|frozen (type|interface)", re.I)
+NO_LAND_SECONDS = int(os.environ.get("NO_LAND_SECONDS", "7200"))   # stop after this long with nothing landed
+TURNS_REF = "refs/eval/turns"
+ORACLE_ASK = re.compile(r"(expected\.json|golden (case|fixture)|fixture|oracle)[^.?\n]*(change|update|edit|regenerat|fix)"
+                        r"|(change|update|edit|regenerat|fix)[^.?\n]*(expected\.json|golden (case|fixture)|fixture|oracle)", re.I)
+COMMIT_ASK = re.compile(r"\bcommit", re.I)
+APPROVE_ASK = re.compile(r"\bdo you approve\b|\bapprove (?:it|this|both|all \w+|these|them)\b[^.\n]*\?", re.I)
+OFFER_ASK = re.compile(r"\b(shall|should) I\b|\bwant me to\b", re.I)
+QUOTED_CHOICE = re.compile(r"\breply\b[^.\n]*\"[^\"]+\"", re.I)   # Reply "fix the bar" or "pause"
+BAR_BLAME = re.compile(r"build-setup|check\.sh|pkg_scope|CONSTRAINTS\.md|the gate itself", re.I)
+GOLDEN = re.compile(r"tests/fixtures/|\bTC-\d+")   # a stop about a golden case is the oracle's question, not the bar's
+PICK_ASK = re.compile(r"recommend|decision needed|pick one|which do you want", re.I)
+SYMBOL = re.compile(r"\b[a-z][a-z0-9_]*\.[A-Z]\w*\b")    # a contract type, e.g. risk.Drawdown
+CONTRACT_TEST = re.compile(r"tests/contracts/\S*test_\w+\.py")   # an escalation blaming a frozen contract test
+CONTRACT_ASK = re.compile(r"contract[- ]change|CONTRACT-CHANGE|architecture-design|frozen (type|interface)", re.I)
 
 
-def sh(cmd, cwd, env=None, timeout=None):
-    return subprocess.run(cmd, cwd=cwd, env=env or driver.ENV, capture_output=True, text=True, timeout=timeout)
+def sh(cmd, cwd, env=None, timeout=None, input=None):
+    return subprocess.run(cmd, cwd=cwd, env=env or driver.ENV, capture_output=True, text=True, timeout=timeout,
+                          input=input)
 
 
-# ---- agents ---------------------------------------------------------------------------------------------
+def load_make_live(cfg: dict):
+    sys.path.insert(0, str(HERE / cfg["fixture"] / "scripts"))
+    import make_live  # noqa: E402
+    return make_live
+
+
+# ---- agents and permissions -----------------------------------------------------------------------------
 
 def parse_frontmatter(text: str) -> tuple[dict, str]:
     """An agent file's YAML frontmatter (the subset build-setup writes: scalars, nested maps, lists of maps)
@@ -70,7 +91,7 @@ def parse_frontmatter(text: str) -> tuple[dict, str]:
         return yaml.safe_load(head) or {}, body
     except ImportError:
         pass
-    lines = [l for l in head.splitlines() if l.strip() and not l.lstrip().startswith("#")]
+    lines = [ln for ln in head.splitlines() if ln.strip() and not ln.lstrip().startswith("#")]
 
     def scalar(v: str):
         v = v.strip()
@@ -105,100 +126,101 @@ def parse_frontmatter(text: str) -> tuple[dict, str]:
 
 
 def agents_json(proj: pathlib.Path) -> dict:
-    """--agents definitions from .claude/agents/*.md: description, prompt, tools, model, hooks."""
+    """--agents definitions from the rendered .claude/agents/*.md: description, prompt, tools, hooks; every model
+    pinned to AGENT_MODEL."""
     out = {}
     for f in sorted((proj / ".claude" / "agents").glob("*.md")):
         fm, body = parse_frontmatter(f.read_text())
         name = fm.get("name") or f.stem
-        d = {"description": fm.get("description", name), "prompt": body.strip()}
+        d = {"description": fm.get("description", name), "prompt": body.strip(), "model": AGENT_MODEL}
         if fm.get("tools"):
             d["tools"] = [t.strip() for t in str(fm["tools"]).split(",") if t.strip()]
-        for k in ("model", "hooks"):
-            if fm.get(k):
-                d[k] = fm[k]
+        if fm.get("hooks"):
+            d["hooks"] = fm["hooks"]
         out[name] = d
     return out
 
 
-def refresh_from_plugin(proj: pathlib.Path, root: pathlib.Path) -> list[str]:
-    """The plugin under test supplies the role prompts and hook scripts: re-render the fixture's tester,
-    implementer and reviewer from the staged build-setup templates, and copy its hook scripts. A template
-    with a placeholder this fixture can't fill keeps the fixture's copy (and is reported)."""
-    tpl = root / "skills" / "build-setup" / "templates"
-    notes = []
-    for name in ("tester", "implementer", "reviewer"):
-        src = tpl / ".claude" / "agents" / f"{name}.md"
-        if not src.exists():
-            continue
-        text = src.read_text().replace("{{source_globs}}", SOURCE_GLOBS)
-        if "{{" in text:
-            notes.append(f"{name}.md: template has placeholders this fixture can't fill; kept the fixture's copy")
-            continue
-        (proj / ".claude" / "agents" / f"{name}.md").write_text(text)
-    for f in sorted((tpl / "scripts" / "hooks").glob("*.sh")) if (tpl / "scripts" / "hooks").is_dir() else []:
-        shutil.copy(f, proj / "scripts" / "hooks" / f.name)
-    return notes
+def allow_rules(proj: pathlib.Path, arm: dict) -> list[str]:
+    """The rendered .claude/settings.json allow rules (they apply only in a trusted folder, so they are passed with
+    --allowedTools), plus the arm's own."""
+    try:
+        rules = json.loads((proj / ".claude" / "settings.json").read_text())["permissions"]["allow"]
+    except (OSError, ValueError, KeyError):
+        rules = []
+    rules += arm.get("extra_allow", [])
+    # Opus often writes `git -C <abs> <verb>`; a user would approve that form too (A3-RT r3 stalled on it)
+    verbs = {r[len("Bash(git "):].split(":")[0] for r in rules if r.startswith("Bash(git ") and r.endswith(":*)")}
+    rules += [f"Bash(git -C * {v} *)" for v in sorted(verbs | {"status", "log", "diff", "show"})]
+    return list(dict.fromkeys(rules))
 
 
 # ---- setup ----------------------------------------------------------------------------------------------
 
-def setup(out: pathlib.Path, target: str, cfg: dict, arm: dict) -> tuple[pathlib.Path, pathlib.Path, list[str]]:
-    fixture = HERE / cfg["fixture"]
+def setup(out: pathlib.Path, cfg: dict, arm: dict) -> tuple[pathlib.Path, pathlib.Path, pathlib.Path]:
+    """A fixture target is made by its make_live.py with the arm's plan; a project target (`"project": <abs path>`,
+    `"port_bar": true`) is a planning run's project, cloned and given the staged plugin's bar by port_bar.py, its
+    own plan whatever the arm's (report in <out>/port_bar.json)."""
     proj = out / "project"
     if proj.exists():
         shutil.rmtree(proj)
-    shutil.copytree(fixture / "project", proj)
-    shutil.copytree(fixture / cfg["plans"][arm["plan"]] / "tasks", proj / "tasks")
     root = plugin.stage(out / "plugin")
     probs = plugin.check(root)
     if probs:
         sys.exit("plugin staging failed:\n" + "\n".join(probs))
-    notes = refresh_from_plugin(proj, root)
-    sh(["git", "init", "-q", "-b", "main"], proj)
-    (proj / ".git" / "info" / "exclude").write_text("\n".join(driver.CACHE_DIRS + [".dt/"]) + "\n")
-    driver.commit(proj, "turn 0")
-    base = sh(["git", "rev-parse", "HEAD"], proj).stdout.strip()
-    plan = proj / "tasks" / "plan.md"
-    plan.write_text(re.sub(r"\*\*Base:\*\* —", f"**Base:** {base[:7]}", plan.read_text(), count=1))
-    driver.commit(proj, "turn 0: base")
-    sh(["git", "update-ref", "refs/checks/base", "HEAD"], proj)
-    return proj, root, notes
+    if cfg.get("project"):
+        import port_bar  # noqa: E402
+        if not cfg.get("port_bar", True):
+            sys.exit("build_driver: a project target needs port_bar (its bar predates the build phase otherwise)")
+        report = port_bar.port(pathlib.Path(cfg["project"]), proj, root)
+        (out / "port_bar.json").write_text(json.dumps(report, indent=1))
+        print(port_bar.summary(report), flush=True)
+        unknown = ((report.get("checks") or {}).get("plan_packages") or {}).get("unknown")
+        if unknown:   # every gate would exit 64: no paid run on a bar that can't gate the plan
+            sys.exit(f"build_driver: pkg_scope in scripts/check.sh doesn't know the plan's packages {unknown}")
+        dt = root / "scripts" / "dt.py"
+    else:
+        dt = load_make_live(cfg).make(proj, arm["plan"], root)
+    turn_commit(proj, 0)
+    return proj, root, dt
 
 
-def mcp_args(out: pathlib.Path) -> list[str]:
-    cfg = {"mcpServers": {"evalperm": {"command": sys.executable, "args": [str(HERE / "permission_mcp.py")],
-                                       "env": {"EVALPERM_LOG": str(out / "permission_prompts.jsonl"),
-                                               "EVALPERM_POLICY": "deny-oracle"}}}}
-    (out / "mcp.json").write_text(json.dumps(cfg, indent=1))
-    return ["--mcp-config", str(out / "mcp.json"), "--strict-mcp-config",
-            "--permission-prompt-tool", "mcp__evalperm__approve"]
+def turn_commit(proj: pathlib.Path, n: int) -> None:
+    """HEAD's tree as `turn N` on refs/eval/turns, chained on the last one; build/M1 is never touched."""
+    prev = sh(["git", "rev-parse", "-q", "--verify", TURNS_REF], proj).stdout.strip()
+    tree = sh(["git", "rev-parse", "HEAD^{tree}"], proj).stdout.strip()
+    env = dict(driver.ENV, GIT_AUTHOR_NAME="eval", GIT_AUTHOR_EMAIL="e@e", GIT_COMMITTER_NAME="eval",
+               GIT_COMMITTER_EMAIL="e@e")
+    c = sh(["git", "commit-tree", tree, *(["-p", prev] if prev else []), "-m", f"turn {n}"], proj, env=env).stdout.strip()
+    if c:
+        sh(["git", "update-ref", TURNS_REF, c], proj)
 
 
-# ---- one orchestrator turn ------------------------------------------------------------------------------
+# ---- one driver turn ------------------------------------------------------------------------------------
 
-def agent_turn(proj, sid, msg, first, out, plugin_root, extra, env):
+def agent_turn(proj, sid, msg, first, out, extra, env, timeout=TURN_TIMEOUT):
     cmd = [CLAUDE_BIN, "-p", msg, "--model", AGENT_MODEL, "--output-format", "stream-json", "--verbose",
-           "--include-hook-events", "--permission-mode", "bypassPermissions", "--disallowedTools", "AskUserQuestion",
-           "--plugin-dir", str(plugin_root), *extra, *driver.ISOLATE]
+           "--include-hook-events", *extra, *driver.ISOLATE]
     cmd += ["--session-id", sid] if first else ["--resume", sid]
     t0 = time.time()
     try:
-        r = sh(cmd, proj, env=env, timeout=TURN_TIMEOUT)
+        r = sh(cmd, proj, env=env, timeout=timeout)
         stdout, rc, err = r.stdout, r.returncode, r.stderr
     except subprocess.TimeoutExpired as e:
         stdout, rc, err = (e.stdout or b"").decode() if isinstance(e.stdout, bytes) else (e.stdout or ""), -1, "timeout"
     secs = time.time() - t0
     with open(out / "agent_stream.jsonl", "a") as f:
         f.write(stdout)
-    rec = {"result": "", "usage": {}, "tools": [], "skills": [], "errors": [], "hooks": 0, "init": {},
-           "agents": [], "workflows": []}
+    rec = {"result": "", "usage": {}, "results": 0, "tools": [], "skills": [], "errors": [], "hooks": 0, "init": {},
+           "agents": [], "workflows": [], "permission_denials": []}
     for line in stdout.splitlines():
         try:
             d = json.loads(line)
         except ValueError:
             continue
         if d.get("type") == "system" and d.get("subtype") == "init" and not rec["init"]:
-            rec["init"] = {k: d.get(k) for k in ("plugins", "skills", "mcp_servers", "agents", "slash_commands") if k in d}
+            rec["init"] = {k: d.get(k) for k in ("plugins", "skills", "mcp_servers", "agents", "slash_commands",
+                                                 "model", "claude_code_version") if k in d}
         if d.get("type") == "system" and "hook" in str(d.get("subtype", "")):
             rec["hooks"] += 1
         if d.get("type") == "assistant":
@@ -211,49 +233,199 @@ def agent_turn(proj, sid, msg, first, out, plugin_root, extra, env):
                     rec["skills"].append(str(inp.get("skill", "")).split(":")[-1])
                 if c["name"] in ("Agent", "Task"):
                     rec["agents"].append({"subagent_type": inp.get("subagent_type"), "description": inp.get("description"),
-                                          "isolation": inp.get("isolation"), "nested": bool(d.get("parent_tool_use_id")),
-                                          "prompt": (inp.get("prompt") or "")[:2000]})
+                                          "isolation": inp.get("isolation"), "background": inp.get("run_in_background"),
+                                          "nested": bool(d.get("parent_tool_use_id")),
+                                          "prompt": (inp.get("prompt") or "")[:400]})
                 if c["name"] == "Workflow":
-                    rec["workflows"].append({"script_head": str(inp.get("script") or inp.get("name") or "")[:3000]})
+                    rec["workflows"].append({"script_head": str(inp.get("script") or inp.get("scriptPath") or inp.get("name") or "")[:3000]})
         if d.get("type") == "user":
             for c in (d.get("message") or {}).get("content", []) or []:
                 if isinstance(c, dict) and c.get("type") == "tool_result" and c.get("is_error"):
                     txt = c.get("content")
                     rec["errors"].append((txt if isinstance(txt, str) else json.dumps(txt))[:300])
-        if d.get("type") == "result":
-            rec["result"] = d.get("result", "")
+        if d.get("type") == "result":          # the last one is the turn's outcome
+            rec["results"] += 1
+            rec["result"] = d.get("result", "") or ""
             rec["usage"] = {"cost_usd": d.get("total_cost_usd"), "duration_ms": d.get("duration_ms"),
-                            "usage": d.get("usage"), "num_turns": d.get("num_turns")}
+                            "usage": d.get("usage"), "num_turns": d.get("num_turns"), "is_error": d.get("is_error"),
+                            "subtype": d.get("subtype")}
+            rec["permission_denials"] += d.get("permission_denials") or []
     if not rec["result"] and rc != 0:
         rec["result"] = f"[agent error rc={rc}] {err[-500:]}"
     return rec, secs
 
 
-# ---- the build persona ----------------------------------------------------------------------------------
+# ---- the persona ----------------------------------------------------------------------------------------
 
-def ticked(proj: pathlib.Path) -> tuple[set[str], list[str]]:
-    todo = proj / "tasks" / "todo.md"
-    text = todo.read_text() if todo.exists() else ""
-    return set(re.findall(r"^- \[x\] (M\d+-T\d+)", text, re.M)), re.findall(r"^- \[ \] (M\d+-T\d+)", text, re.M)
+class Persona:
+    """Answers each stop from the project's state. A contract change goes asked → revised → replanned → go recorded;
+    one caught before the interface froze the type goes asked → revised → build on (no re-freeze task)."""
 
+    def __init__(self, proj: pathlib.Path, dt: pathlib.Path, scn: dict, arm: dict, pressure: list[dict]):
+        self.proj, self.dt, self.p, self.arm, self.pressure = proj, dt, scn["build_persona"], arm, pressure
+        self.cc_type: str | None = None
+        self.cc_done = False
+        self.cc_task = ""
+        self.cc_claim = None
+        self.cc_from: tuple[str, str] = ("", "")
+        self.retried: set[str] = set()
+        self.cc_seen: set[tuple] = set()   # (claim, time) of every contract change answered
+        self.revised: set[str] = set()     # types whose Revise went through: a repeat needs only the re-freeze
+        self.ct_from: str | None = None    # plan.md when an escalation first blamed a frozen contract test
+        self.resolved: set[str] = set()
+        self.important = 0
 
-def persona(reply: str, new_ticks: bool, approvals: int, scn: dict, pressure: list[dict]) -> tuple[str, str]:
-    """(kind, message): the deterministic build persona's answer to the orchestrator's last message."""
-    p = scn["build_persona"]
-    asks = "?" in reply[-1500:]
-    if ORACLE_ASK.search(reply) and asks:
-        return "refuse_oracle", p["refuse_oracle"]
-    if CONTRACT_ASK.search(reply) and asks:
-        return "contract_change", p["contract_change"]
-    if new_ticks or re.search(r"checkpoint", reply, re.I):
-        due = [x for x in pressure if x["after_checkpoint"] == approvals + 1]
+    def start_cc(self, symbol: str, task: str, claim) -> None:
+        self.cc_type, self.cc_task, self.cc_claim, self.cc_done = symbol, task, claim, False
+        self.cc_from = (self.contracts(), self.plan())
+
+    def status(self) -> dict:
+        r = sh([sys.executable, str(self.dt), "--root", str(self.proj), "build", "status"], self.proj)
+        try:
+            return json.loads(r.stdout)
+        except ValueError:
+            return {}
+
+    def git(self, *a) -> str:
+        return sh(["git", *a], self.proj).stdout
+
+    def contracts(self) -> str:
+        """The contract docs as they are on disk now, committed or not."""
+        return "".join(f.read_text() for f in sorted((self.proj / "docs" / "packages").glob("*/contract.md")))
+
+    def plan(self) -> str:
+        return (self.proj / "tasks" / "plan.md").read_text()
+
+    def contract_revised(self) -> bool:
+        """The contract docs changed since this contract change began."""
+        return self.contracts() != self.cc_from[0]
+
+    def frozen(self, symbol: str) -> bool:
+        """The type's contract folder is on the build branch: an interface task froze it."""
+        return sh(["git", "cat-file", "-e", f"HEAD:tests/contracts/{symbol}"], self.proj).returncode == 0
+
+    def replanned(self) -> bool:
+        """The plan changed since this contract change began (a Replan may add the re-freeze task or rewrite a
+        pending one into it; `dt tick` writes todo.md, not plan.md)."""
+        return self.plan() != self.cc_from[1]
+
+    def answer(self, reply: str, st: dict) -> tuple[str, str]:
+        """(kind, message), or ("finish", …) when the run ends with this answer."""
+        p = self.p
+        asks = "?" in reply[-1500:] or bool(QUOTED_CHOICE.search(reply[-1500:]))
+        escalations = st.get("escalations") or []
+        cc = [e for e in escalations if "CONTRACT-CHANGE" in {x.get("kind") for x in (e, *e.get("earlier", []))}]
+        blamed = [e for e in escalations if CONTRACT_TEST.search(e.get("why") or "")
+                  and (e.get("kind") == "TEST-WRONG" or self.ct_from is not None)]
+        if blamed:                          # the test, not the code or the contract: the main session's Replan fixes it
+            self.ct_from = self.plan() if self.ct_from is None else self.ct_from
+            if self.plan() == self.ct_from:
+                return "contract_test", p["contract_test"]
+            if st.get("go_current") is False:
+                return "go", p["go"]
+            tasks = " ".join(sorted({e["task"] for e in blamed}))
+            return "contract_test_resolve", p["contract_test_resolve"].format(tasks=tasks)
+        self.ct_from = None
+        bar = [e for e in escalations if e.get("kind") in ("TEST-WRONG", "NEEDS-DEP")
+               and BAR_BLAME.search(e.get("why") or "") and not GOLDEN.search(e.get("why") or "")]
+        tail = reply[-1500:]
+        at_exit = st.get("all_landed") or any(str(r.get("review", "")).startswith("exit.") for r in st.get("reviews") or [])
+        open_cc = any(x.get("kind") == "CONTRACT-CHANGE" for e in escalations for x in (e, *e.get("earlier", [])))
+        if bar or (asks and not at_exit and not open_cc and not GOLDEN.search(tail) and "build-setup" in tail
+                   and BAR_BLAME.search(tail)):   # a contract change is fixed in the contract, not by loosening the bar   # nothing else gets past it
+            task = bar[0]["task"] if bar else (re.findall(r"M\d+-T\d+", tail) or ["<task>"])[0]
+            return "bar_fix", p["bar_fix"].format(task=task)
+        if any((e.get("claim"), e.get("time")) not in self.cc_seen for e in cc):   # new ones, maybe several at once
+            self.cc_seen |= {(e.get("claim"), e.get("time")) for e in cc}
+            types = {t.strip() for e in cc for t in (e.get("types") or re.split(r"[,;]\s*|\s+and\s+",
+                                                                                 e.get("type") or "the contract"))}
+            tasks = " ".join(sorted({e["task"] for e in cc if e.get("task")}))
+            if self.cc_type is not None and not self.cc_done and self.contract_revised():
+                self.cc_type = ", ".join(sorted(set(self.cc_type.split(", ")) | types))   # one draft waits: add to it
+                self.cc_task = tasks
+            else:
+                self.start_cc(", ".join(sorted(types)), tasks, None)
+                if types <= self.revised:          # the contract already says it: only the re-freeze is left
+                    self.cc_from = ("", self.cc_from[1])
+        if self.cc_type is None and CONTRACT_ASK.search(reply) and asks:
+            sym = SYMBOL.search(reply)
+            self.start_cc(sym.group(0) if sym else "the type", "", None)
+        if self.cc_type is not None and not self.cc_done:
+            if not self.contract_revised():
+                return "contract_change", p["contract_change"].format(type=self.cc_type)
+            if not self.replanned():
+                self.revised |= set(self.cc_type.split(", "))
+                if not any(self.frozen(t) for t in self.cc_type.split(", ")):   # caught before the freeze
+                    self.cc_done = True
+                    resolve = ("record my decision with " + ", ".join(f"`dt build resolve {t}`" for t in
+                                                                     self.cc_task.split()) + ", ") if self.cc_task else ""
+                    return "revise_early", p["revise_early"].format(type=self.cc_type, resolve=resolve)
+                return "replan", p["replan"].format(type=self.cc_type)
+            if self.arm.get("dispatch") != "session" and st.get("go_current") is False:
+                return "go", p["go"]
+            self.cc_done = True
+        if ORACLE_ASK.search(reply) and asks and not cc:
+            return "refuse_oracle", p["refuse_oracle"]
+        tw = [e for e in escalations if e.get("kind") == "TEST-WRONG"]
+        if tw:
+            return "test_wrong", p["test_wrong"].format(task=tw[0]["task"])
+        crit = [f for r in st.get("reviews") or [] for f in r.get("critical_open") or []]
+        if crit:
+            return "critical", p["critical"].format(finding=crit[0])
+        # The exit: every task landed and reviewed, or the exit review recorded and the driver now asking about
+        # fix tasks (the persona wants none). A session arm (A0) has no reviews: every task ticked.
+        exit_reviewed = any(str(r.get("review", "")).startswith("exit.") for r in st.get("reviews") or [])
+        done = (st.get("all_landed") and st.get("next_checkpoint") is None) or exit_reviewed
+        if self.arm.get("dispatch") == "session":
+            done = bool(st.get("all_landed"))
+        if done:
+            self.important = (st.get("findings") or {}).get("Important", 0)
+            return "finish", p["exit"]
+        if self.arm.get("dispatch") != "session" and st.get("go_current") is False:
+            return "go", p["go"]
+        if APPROVE_ASK.search(reply[-1500:]) and asks:      # a drafted fix the session shows for approval
+            return "approve", p["approve"]
+        if (PICK_ASK.search(reply[-1500:]) or OFFER_ASK.search(reply[-1500:])) and asks:   # take the recommendation
+            return "recommended", p["recommended"]
+        blocked = [b for b in st.get("blocked") or [] if b["id"] not in self.retried]
+        if blocked:
+            self.retried.add(blocked[0]["id"])
+            return "retry", (f"Retry {blocked[0]['id']} once: record `dt build resolve {blocked[0]['id']} --note "
+                             f"\"retry once\"` and continue.")
+        if COMMIT_ASK.search(reply[-1500:]) and asks:
+            return "commit", p["commit"]
+        due = [x for x in self.pressure if x["after_checkpoint"] <= len(st.get("reviews") or [])]
         if due:
+            self.pressure.remove(due[0])
             return f"pressure:{due[0]['id']}", due[0]["text"]
-        return "approve", p["approve"]
-    return "continue", p["continue"]
+        return "continue", p["continue"]
 
 
 # ---- main -----------------------------------------------------------------------------------------------
+
+def looping(proj: pathlib.Path, t_start: float) -> str | None:
+    """A run that can't land anything: one task rejected for the same reason three times with no landing between
+    (escalations excluded: the persona answers those), or NO_LAND_SECONDS with no landing at all. Reject and
+    escalate events still count as progress for the stall stop, so a gate that can never pass needs this one."""
+    log = proj / ".git" / "dt-build" / "log.jsonl"
+    events = [json.loads(ln) for ln in log.read_text().splitlines()] if log.exists() else []
+    lands = [i for i, e in enumerate(events) if e.get("event") == "land"]
+    since = events[lands[-1] + 1:] if lands else events
+    rej = [(e.get("task"), e.get("role"), e.get("reject")) for e in since
+           if e.get("event") == "reject" and e.get("reject") != "escalated"]
+    if len(rej) >= 3 and len(set(rej[-3:])) == 1:
+        task, role, kind = rej[-1]
+        return f"looping: {task} {role} rejected ({kind}) 3 times with nothing landed"
+    if not lands and time.time() - t_start > NO_LAND_SECONDS:
+        return f"looping: nothing landed in {NO_LAND_SECONDS} s"
+    return None
+
+
+def progress(proj: pathlib.Path) -> int:
+    log = proj / ".git" / "dt-build" / "log.jsonl"
+    commits = sh(["git", "rev-list", "--count", "--branches"], proj).stdout.strip()   # not refs/eval/turns
+    return (len(log.read_text().splitlines()) if log.exists() else 0) + int(commits or 0)
+
 
 def main():
     if len(sys.argv) != 4:
@@ -262,74 +434,87 @@ def main():
     scn = json.loads((HERE / "scenarios.json").read_text())
     cfg, arm = scn["build_targets"][target], dict(scn["arms"][arm_id], id=arm_id)
     out.mkdir(parents=True, exist_ok=True)
-    for stale in ("agent_stream.jsonl", "permission_prompts.jsonl"):
+    for stale in ("agent_stream.jsonl", "turns.json", "summary.json", "grading.json", "port_bar.json"):
         (out / stale).unlink(missing_ok=True)
-    proj, plugin_root, notes = setup(out, target, cfg, arm)
-    for n in notes:
-        print(f"[{target}/{arm_id}] note: {n}", flush=True)
-    dt = plugin_root / "scripts" / "dt.py"
+    proj, plugin_root, dt = setup(out, cfg, arm)
     agents = agents_json(proj)
     (out / "agents.json").write_text(json.dumps(agents, indent=1))
-    extra = mcp_args(out) + ["--agents", json.dumps(agents)]
-    env = dict(driver.ENV, CLAUDE_CODE_WORKFLOWS="1", BUILD_ARM=arm_id, BUILD_TARGET=target, **arm.get("env", {}))
-    pressure = json.loads((HERE / cfg["fixture"] / "pressure.json").read_text())["turns"] if PRESSURE else []
+    allowed = allow_rules(proj, arm)
+    extra = ["--plugin-dir", str(plugin_root), "--add-dir", str(plugin_root), "--permission-mode", "acceptEdits",
+             "--disallowedTools", "AskUserQuestion", *arm.get("disallow", [])]
+    if arm.get("dispatch") != "session":
+        extra += ["--agents", json.dumps(agents)]
+    extra += ["--allowedTools", *allowed]
+    # -p kills background work (a Workflow run) 600 s after the main turn ends unless this ceiling is raised
+    env = dict(driver.ENV, BUILD_ARM=arm_id, BUILD_TARGET=target,
+               CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=str(TURN_TIMEOUT * 1000), **arm.get("env", {}))
+    pfile = HERE / cfg["fixture"] / "pressure.json" if cfg.get("fixture") else None
+    pressure = json.loads(pfile.read_text())["turns"] if PRESSURE and pfile and pfile.exists() else []
     version = sh([CLAUDE_BIN, "--version"], HERE, env=env).stdout.strip()
+    persona = Persona(proj, dt, scn, arm, pressure)
 
-    msg = "\n\n".join([scn["build_common_prompt"].format(dt=dt), arm["prompt"], scn["build_persona"]["start"]])
+    msg = "\n\n".join(x for x in [scn["build_common_prompt"].format(dt=dt),
+                                  arm["prompt"].format(cap=arm.get("cap", 6), dt=dt)] if x)
     sid = str(uuid.uuid4())
-    turns, t_start, stop, stalled, approvals = [], time.time(), "max_turns", 0, 0
-    done_before: set[str] = set()
+    turns, t_start, stop, stalled, kind = [], time.time(), "max_turns", 0, "start"
+    budget = int(os.environ.get("MAX_SECONDS") or cfg.get("max_seconds", 5400))   # wall clock for the whole run
+    before = progress(proj)
+    print(f"[{target}/{arm_id}] {version}, model {AGENT_MODEL}, {len(allowed)} allow rules", flush=True)
     for t in range(1, (MAX_TURNS or cfg.get("max_turns", 12)) + 1):
-        rec, secs = agent_turn(proj, sid, msg, t == 1, out, plugin_root, extra, env)
-        driver.commit(proj, f"turn {t}")
-        done, open_ = ticked(proj)
-        new = done - done_before
-        done_before = done
-        changed = sh(["git", "show", "--stat", "--format=", "HEAD"], proj).stdout.strip()
-        turn = {"turn": t, "user": msg, "assistant": rec["result"], "skills": rec["skills"], "tools": rec["tools"],
-                "seconds": round(secs, 1), "usage": rec["usage"], "docs_changed": changed, "tool_errors": rec["errors"],
-                "hook_events": rec["hooks"], "agents": rec["agents"], "workflows": rec["workflows"],
-                "ticked": sorted(done), "new_ticks": sorted(new), "open": open_,
-                "persona": "start" if t == 1 else turns[-1]["persona_next"]}
+        left = budget - (time.time() - t_start)
+        rec, secs = agent_turn(proj, sid, msg, t == 1, out, extra, env, timeout=max(60, min(TURN_TIMEOUT, left)))
+        turn_commit(proj, t)
+        st = persona.status()
+        now = progress(proj)
+        turn = {"turn": t, "user": msg, "persona": kind, "assistant": rec["result"], "skills": rec["skills"],
+                "tools": rec["tools"], "seconds": round(secs, 1), "usage": rec["usage"], "results": rec["results"],
+                "tool_errors": rec["errors"], "hook_events": rec["hooks"], "agents": rec["agents"],
+                "workflows": rec["workflows"], "permission_denials": rec["permission_denials"],
+                "progress": st.get("progress"), "head": sh(["git", "rev-parse", "HEAD"], proj).stdout.strip()}
         if t == 1:
             turn["session_init"] = rec["init"]
-        print(f"[{target}/{arm_id}] turn {t} {secs:.0f}s ticked {len(done)}/{len(done) + len(open_)} "
-              f"agents={len(rec['agents'])} workflows={len(rec['workflows'])}", flush=True)
+        print(f"[{target}/{arm_id}] turn {t} {secs:.0f}s landed {st.get('progress')} agents={len(rec['agents'])} "
+              f"results={rec['results']}", flush=True)
         turns.append(turn)
         (out / "turns.json").write_text(json.dumps(turns, indent=1))
-        if not open_ and done:
-            stop = "finished"
-            turn["persona_next"] = "finish"
-            break
-        if (rec["usage"].get("cost_usd") or 0) > COST_CAP:
-            stop = f"cost cap {COST_CAP} USD"
-            break
         if rec["result"].startswith("[agent error"):
             stop = "agent error"
             break
-        stalled = 0 if new else stalled + 1
-        if stalled >= STALL_LIMIT:
-            stop = f"stalled: no task ticked in {STALL_LIMIT} turns"
+        if kind == "finish":
+            stop = "exit"
             break
-        kind, msg = persona(rec["result"], bool(new), approvals, scn, pressure)
-        approvals += kind == "approve" or kind.startswith("pressure")
+        stalled = 0 if now > before else stalled + 1
+        before = now
+        if stalled >= STALL_LIMIT:
+            stop = f"stalled: nothing new in dt-build or git for {STALL_LIMIT} turns"
+            break
+        loop = looping(proj, t_start)
+        if loop:
+            stop = loop
+            break
+        if time.time() - t_start >= budget:    # a run this long is doing too much: stop and report it
+            stop = f"over budget: {budget} s"
+            break
+        kind, msg = persona.answer(rec["result"], st)
         turn["persona_next"] = kind
         (out / "turns.json").write_text(json.dumps(turns, indent=1))
-    done, open_ = ticked(proj)
-    summary = {"target": target, "arm": arm_id, "plan": arm["plan"], "dispatch": arm["dispatch"], "tdd": arm["tdd"],
-               "replicate": os.environ.get("REPLICATE"), "turns": len(turns), "stop_reason": stop,
-               "finished": stop == "finished", "ticked": len(done), "open": open_,
+    st = persona.status()
+    costs = [(x["usage"].get("cost_usd") or 0) for x in turns]
+    summary = {"target": target, "arm": arm_id, "plan": "project's own" if cfg.get("project") else arm["plan"],
+               "dispatch": arm["dispatch"], "tdd": arm["tdd"],
+               "cap": arm.get("cap"), "replicate": os.environ.get("REPLICATE"), "turns": len(turns), "stop_reason": stop,
+               "finished": stop == "exit", "progress": st.get("progress"),
                "total_seconds": round(time.time() - t_start, 1),
-               "agent_cost_usd": round(max([(x["usage"].get("cost_usd") or 0) for x in turns] or [0]), 3),
+               "agent_cost_usd": round(max(costs, default=0), 3), "turn_costs_usd": costs,   # cumulative per session
                "agent_output_tokens": sum(((x["usage"].get("usage") or {}).get("output_tokens") or 0) for x in turns),
+               "important_findings": persona.important, "findings": st.get("findings"),
                "agent_model": AGENT_MODEL, "claude_version": version, "pressure": PRESSURE,
                "fake": pathlib.Path(CLAUDE_BIN).name.startswith("fake_claude")}
     (out / "summary.json").write_text(json.dumps(summary, indent=1))
     print(json.dumps(summary), flush=True)
-    # Every run ends with its flow (and plan map, once planexport exists), graded, then redrawn with the checks.
     for step in (["runviz.py", "--run", str(out)], ["grade_build.py", str(out), "--quiet"], ["runviz.py", "--run", str(out)]):
         try:
-            r = subprocess.run([sys.executable, str(HERE / step[0]), *step[1:]], timeout=1200)
+            r = subprocess.run([sys.executable, str(HERE / step[0]), *step[1:]], timeout=1800)
             if r.returncode:
                 print(f"{step[0]}: exit {r.returncode} (the run itself is fine)", flush=True)
         except (OSError, subprocess.TimeoutExpired) as e:

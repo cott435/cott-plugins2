@@ -79,13 +79,12 @@ M2-T05 Out-of-sample comparison (`compare`, split, RES-02, on M2-T03): Given a w
 
 ### M2-T07: Fourier profile as the allocation default
 **Package:** gridload · **Step:** PL-03.fit_seasonality · **Kind:** thicken · **Covers:** STAT-02 · **Size:** XS · **Mode:** solo
-**Reason:** wiring only; the Fourier fit's behavior is already tested by M1-T12
 **Read:** PL-03, profile.fit_seasonality
 **Acceptance:**
 - [ ] The allocation uses the Fourier profile by default; `--profile means` still selects the baseline
 - [ ] PL-03 smoke test still passes
 **Verify:** `python -m gridload.reserve evaluate --smoke` · `scripts/check.sh gate`
-**Depends on:** M2-T04 · **Writes:** src/gridload/reserve/pipeline.py
+**Depends on:** M2-T04 · **Writes:** src/gridload/reserve/pipeline.py, tests/unit/gridload/test_reserve_default.py
 
 ### Checkpoint: milestone exit
 …
@@ -110,8 +109,8 @@ M2-T05 Out-of-sample comparison (`compare`, split, RES-02, on M2-T03): Given a w
 ## Replan notes
 ````
 
-Why this shape: `fit_seasonality` is M1's, built and real, so PL-03 needs no fake and M2 no system task. M2-T03 doesn't wait for M2-T02: it builds on the `Allocation` sample. The comparison is the evaluation and the riskiest step, but nothing needs to wait for it, so risk adds no edge; its tester starts in wave 1 like M2-T06's. Critical path 4 (M2-T01 → M2-T02 → M2-T04 → M2-T07), widest wave 4 (two spines, two testers). M2-T07 changes a default, which is behavior, so `solo` needs the `Reason` line. Checkpoints after M2-T01 (barrier) and M2-T06, then the milestone exit.
+Why this shape: `fit_seasonality` is M1's, built and real, so PL-03 needs no fake and M2 no system task. M2-T03 doesn't wait for M2-T02: it builds on the `Allocation` sample. The comparison is the evaluation and the riskiest step, but nothing needs to wait for it, so risk adds no edge; its tester starts in wave 1 like M2-T06's. Critical path 4 (M2-T01 → M2-T02 → M2-T04 → M2-T07), widest wave 4 (two spines, two testers). M2-T07 changes a default but names no TC case, Given/When/Then or criterion, so it is solo by the rule; its unit test pins the default. Checkpoints after M2-T01 (barrier) and M2-T06, then the milestone exit.
 
-Write M2's row (Depends `M1 (profile.fit_seasonality)`) and section (Packages, Pipelines, Outline, Exit, Plan link) and run `dt roadmap` (M2 → Planned, S2 → Planned). Run the Review Gate and present it with ASSUMPTIONS (the shape above, the unmitigated edges, the M2-T07 override, data-science routed to M2-T06 only). *(Turn ends.)*
+Write M2's row (Depends `M1 (profile.fit_seasonality)`) and section (Packages, Pipelines, Outline, Exit, Plan link) and run `dt roadmap` (M2 → Planned, S2 → Planned). Run the Review Gate and present it with ASSUMPTIONS (the shape above, the unmitigated edges, data-science routed to M2-T06 only). *(Turn ends.)*
 
 **Turn 5.** User: "Approved." Set Status `Approved`; offer the commit if `git status` shows changes. `dt next` names `build-setup` Extend (M2 adds the `gridload.reserve` module, so its import contracts change), so go on to it; once its bar is approved and committed, it sets the plan's `Base` with `dt base`.

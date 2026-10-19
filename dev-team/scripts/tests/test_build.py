@@ -679,6 +679,17 @@ class FindingFromTest(BuildCase):
                          [("exit.mini", "exit", ["M1-T01", "M1-T02", "M1-T03", "M1-T04"])])
         self.assertEqual(len(rows[0]["commits"]), 4)
         self.assertEqual(rows[0]["end"], self.head())
+        # minilab: the exit review repeated what the checkpoints had reviewed. It covers the whole diff, but
+        # reviews and mutation-checks code only for tasks no checkpoint covered.
+        self.assertEqual(rows[0]["reviewed"], ["M1-T01"])
+        self.assertIn("A checkpoint already reviewed M1-T01: run the Milestone exit list over the whole diff, and "
+                      "review and mutation-check code only for M1-T02, M1-T03, M1-T04.", rows[0]["prompt"])
+
+    def test_phase_review_rows_name_no_reviewed_tasks(self):
+        self.fake_land("M1-T01")
+        row = self.ready()["rows"][0]
+        self.assertEqual((row["kind"], row["reviewed"]), ("interface", []))
+        self.assertNotIn("already reviewed", row["prompt"])
 
 
 @unittest.skipUnless(HAS_GIT, "git not installed")

@@ -276,6 +276,13 @@ class Build:
                 rows.append(self.review_row(ph, pkg, todo, lands, lead=n == 0))
         return rows
 
+    def checkpoint_reviewed(self, pkg: str, ids: list[str]) -> list[str]:
+        """Those of the tasks a recorded checkpoint review (interface or phase) of the package already covered: the
+        exit review doesn't review or mutation-check their code again."""
+        seen = {t for r in self.reviews.values() if r.get("checkpoint") != "exit" and r.get("pkg") == pkg
+                for t in r.get("tasks", [])}
+        return [i for i in ids if i in seen]
+
     def review_row(self, ph: Phase, pkg: str, tasks: list[model.Task], lands: dict, lead: bool) -> dict:
         root = self.repo.root
         shas = [lands[t.id]["sha"] for t in tasks if t.id in lands]
@@ -289,17 +296,22 @@ class Build:
         rid = f"{ph.key}.{pkg}"
         findings = self.state.path("reviews", f"{rid}.md")
         ids = [t.id for t in tasks]
+        reviewed = self.checkpoint_reviewed(pkg, ids) if ph.kind == "exit" else []
+        rest = [i for i in ids if i not in reviewed]
         prompt = (f"You are the reviewer for the {ph.kind} review at checkpoint {ph.key}, package {pkg} "
                   f"(lead: {'yes' if lead else 'no'}). Tasks {', '.join(ids)}; base {base[:12]}, end {end[:12]}; "
                   f"commits {' '.join(s[:12] for s in shas) or 'none'}; paths {' '.join(paths) or 'none'}. "
                   + (f"What later tasks need from this surface: `python3 {bs.DT_PY} build needs {ph.key}`. "
                      if ph.kind == "interface" else "")
+                  + (f"A checkpoint already reviewed {', '.join(reviewed)}: run the Milestone exit list over the whole "
+                     f"diff, and review and mutation-check code only for {', '.join(rest) or 'none'}. "
+                     if reviewed else "")
                   + f"Write your finding lines to .dt/review.md in your worktree, then run "
                   f"`python3 {bs.DT_PY} build submit-review {rid} .dt/review.md`, and end with one line: "
                   f"REVIEW {ph.key} {pkg}: <n> findings, <c> Critical. dt is `python3 {bs.DT_PY}`.")
         return {"id": rid, "role": "reviewer", "agent_type": "reviewer", "title": ph.checkpoint.title,
                 "kind": ph.kind, "pkg": pkg, "checkpoint": ph.key, "tasks": ids, "commits": shas, "base": base,
-                "end": end, "paths": paths, "lead": lead, "findings_file": str(findings),
+                "end": end, "paths": paths, "lead": lead, "reviewed": reviewed, "findings_file": str(findings),
                 "remaining_cp": 0, "claim": f"{rid}.reviewer", "prompt": prompt}
 
     # ---- ready ------------------------------------------------------------------------------

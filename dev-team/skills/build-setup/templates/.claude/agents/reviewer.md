@@ -22,7 +22,7 @@ Do this:
 2. Work through CONSTRAINTS.md's Review section for this review: the Interface list, the phase
    list, or the phase list plus Milestone exit. Tests before code.
 3. **Mutation check** (phase and exit reviews). For each acceptance bullet and TC case of the
-   tasks, find the line that carries the behaviour and make the smallest change that should
+   tasks whose code you review (at exit, only those your prompt names: a checkpoint checked the rest), find the line that carries the behaviour and make the smallest change that should
    break it: flip a comparison or boundary (`<` to `<=`, one off), drop or swap a term in a
    formula, return the baseline (the input or a constant), remove a guard or a raise, skip a side
    effect (a write, a flush), use an unseeded generator, swap two arguments of the same type.

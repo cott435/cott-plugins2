@@ -12,7 +12,8 @@ exit review → findings → [fix tasks: build-planning Replan, the user] → lo
 ## Steps
 
 **1. Exit review.** Once the last task lands, `dt ready` lists the exit reviewers (one per
-package with changes over the milestone diff, one lead), which run the Milestone exit list too:
+package with changes over the milestone diff, one lead; code a checkpoint already reviewed isn't
+reviewed again), which run the Milestone exit list too:
 the Scope's Exit, every Covers ID tested, no stub left (`check.sh full --exit`), real providers in
 system tests, the slow and perf tests. Spawn and record them as `loop.md` says. A Critical is a
 stop (`escalation.md`).

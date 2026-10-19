@@ -1,6 +1,6 @@
 # Contract-gap proposals for build-planning
 
-**For:** the owner of `skills/build-planning` (proposal 6b is architecture-design's). **From:** the
+**For:** the owner of `skills/build-planning`. **From:** the
 contract-first gap review of build eval b1 and the b1 findings
 ([contract-first-gaps.html](../evals/results-iteration-b1/contract-first-gaps.html),
 [findings-stage4.md](../evals/results-iteration-b1/findings-stage4.md),
@@ -125,13 +125,12 @@ Proposed: `phase0.md` §c, the wiring Acceptance, and `tasks.md:50`: "a smoke te
 and the shape of what it writes, never a value a thicken changes". This is the same rule as proposal 1 (check
 shape, never a transient state), applied to smoke tests.
 
-**b. One-sided invariants in a type section** (architecture-design, `references/contracts.md`). Stage 5,
+**b. One-sided invariants in a type section** (architecture-design). Stage 5,
 A2-r3: `risk.VolSeries` said only "None until `window` earlier returns exist" and never said a later value may
 be None too. One spine agent read it as two-sided and added a validator, which made golden case TC-07 (a gap
 after the window) impossible to build, and the run stalled at 11/12. Proposed, in the type-section bullet: "an
-invariant on a field's values says what holds on both sides of its condition (`None until window returns exist;
-later values may be None after a gap`)". This is a one-sentence change to a skill this branch already edits, but
-it changes how every contract is written, so it waits for the owner's yes.
+invariant on a field's values says what holds on both sides of its condition". **Done on the branch**, in the
+type-section bullet of `contracts.md`. Nothing is needed from build-planning.
 
 **c. A wiring acceptance bullet that asks for a file outside `Writes:`** (build-planning). Stage 5: both minilab
 plans asked the wiring tasks to replace `pipelines.md`'s pre-build sections with a `dt layout` pointer, but
@@ -140,12 +139,11 @@ were rejected for writes. `dt land` already runs `dt prebuild-clear` when a wiri
 so the bullet asks the builder for work dt does. Proposed: drop that bullet from `phase0.md` §c's Acceptance and
 from `examples-phase0.md:39` and `examples-advance.md:75`, or reword it as a check on dt's result, not an edit.
 
-**d. Outside the plan phase, for the build skill's owner.** Stage 5, A2-r3: when a tester escalated the TC-07
+**d. Outside the plan phase: the build skill.** Stage 5, A2-r3: when a tester escalated the TC-07
 clash, the main session recommended editing the golden input. That runs against test-planning's rule that
-expected outputs come from outside the agent. The build skill's escalation table
-(`skills/build/references/escalation.md`) could say that a clash between a golden case and a contract is
-answered with a contract Revise or the user's oracle change through `test-planning`, never a recommendation to
-change the fixture.
+expected outputs come from outside the agent. **Done on the branch:** `skills/build/references/escalation.md`'s Never list
+forbids recommending a change to a golden case's input or expected value; a clash with the contract is a contract
+Revise, or an oracle change the user makes through `test-planning`. Nothing is needed from build-planning.
 
 ## Release level for the branch
 

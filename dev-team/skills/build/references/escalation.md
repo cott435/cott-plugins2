@@ -42,7 +42,9 @@ Replan, `dt ready` holds everything (`go:`) until the user's new go, recorded wi
 
 ## Never
 
-- Edit a test, a fixture, the bar or the contract to get past a stop.
+- Edit a test, a fixture, the bar or the contract to get past a stop, or recommend that the user change a
+  golden case's input or expected value: a golden case that clashes with the contract is a contract Revise,
+  or an oracle change the user makes through `test-planning`.
 - Re-dispatch a blocked half without a recorded decision.
 - Read a gate log, a diff or a findings file to decide for the user: show the `detail_file` path
   and the status lines, and let `dt build status` summarise.

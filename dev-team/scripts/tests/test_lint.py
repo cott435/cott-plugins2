@@ -714,6 +714,22 @@ class PlanChecks(LintCase):
         self.p.edit(PLAN, "**Deferred:** none", "**Deferred:** PL-02.plot_spectrum (to M2: the report comes first)")
         self.assertEqual([p for p in self.problems() if p.code == "step-unplanned"], [])
 
+    BARRIER = ("### Checkpoint after M1-T01 (barrier)\n- [x] Every frozen type and signature matches contract.md; "
+               "no test pins a stub\n\n")
+
+    def test_interface_barrier(self):
+        # Contract-gap proposal 2: an interface task followed straight by a non-interface task needs a checkpoint.
+        self.assertEqual([p for p in self.problems() if p.code == "interface-barrier"], [])
+        self.p.edit(PLAN, self.BARRIER, "")
+        got = [(p.path, p.line, p.severity, p.message) for p in self.problems() if p.code == "interface-barrier"]
+        self.assertEqual(got, [(PLAN, 12, "W", "M1-T01 (interface) is followed by M1-T02 with no checkpoint between: "
+                                              "add `### Checkpoint after M1-T01 (barrier)` so the interface is "
+                                              "reviewed before it is built on")])
+        # A second interface task straight after the first needs none between them; the last one does.
+        self.p.edit(PLAN, "**Step:** PL-01.read_raw · **Kind:** spine", "**Step:** PL-01.read_raw · **Kind:** interface")
+        got = [p.message.split(" ")[0] for p in self.problems() if p.code == "interface-barrier"]
+        self.assertEqual(got, ["M1-T02"])
+
     def test_foreign_plan(self):
         self.p.write(PLAN, "# Plan\n\n## Tasks\n- [ ] Task 1: do the thing and the other thing\n")
         self.assertEqual({(p.path, p.code, p.severity) for p in self.problems()}, {(PLAN, "foreign-plan", "W")})
@@ -912,7 +928,7 @@ class ParallelStep(LintCase):
 
     def test_two_thickens_of_one_step_in_parallel(self):
         self.p.edit(PLAN, "**Step:** PL-02.pca · **Kind:** thicken", "**Step:** PL-02.estimate_cov · **Kind:** thicken")
-        self.assertEqual(self.messages(), [(120, "W", "M1-T13 and M1-T12 both thicken PL-02.estimate_cov with no Depends "
+        self.assertEqual(self.messages(), [(123, "W", "M1-T13 and M1-T12 both thicken PL-02.estimate_cov with no Depends "
                                                       "on path between them: the step's code is one function, so order "
                                                       "them (a `code` graph row) or fold one into the other")])
 
@@ -941,7 +957,7 @@ class SpineClaim(LintCase):
 
     def test_claimed_function_written_outside_the_owner(self):
         self.p.edit(PLAN, self.T02, self.T02.replace("raw.py,", "raw.py, src/quant/stats/shrink.py,"))
-        self.assertEqual(self.messages(), [(26, "W", "M1-T02 (spine on data) claims stats.shrink in its Reason, which "
+        self.assertEqual(self.messages(), [(29, "W", "M1-T02 (spine on data) claims stats.shrink in its Reason, which "
                                                     "no pipeline step owns, and writes src/quant/stats/shrink.py "
                                                     "outside its step's owner: give each its own step, or put it in "
                                                     "the step's folder owner")])
@@ -1035,7 +1051,7 @@ class ScopeAndTitleChecks(LintCase):
     def test_title_names_another_kind(self):
         self.p.edit(PLAN, "### M1-T10: Delisting-aware universe", "### M1-T10: Delisting-aware universe spine")
         self.assertEqual(self.messages("kind-title"), [
-            (PLAN, 92, "E", "M1-T10 title says 'spine' but its Kind is thicken: retitle it or fix the Kind")])
+            (PLAN, 95, "E", "M1-T10 title says 'spine' but its Kind is thicken: retitle it or fix the Kind")])
 
     def test_title_naming_its_own_kind_is_fine(self):
         self.p.edit(PLAN, "### M1-T10: Delisting-aware universe", "### M1-T10: Delisting-aware universe (thicken)")
@@ -1045,14 +1061,14 @@ class ScopeAndTitleChecks(LintCase):
         self.p.edit(PLAN, "**Deferred:** none", "**Deferred:** STAT-04 (to M2: the report waits for portfolios)")
         self.assertEqual(self.messages("covers-vs-deferred"), [
             (PLAN, 7, "E", "Scope Covers and Deferred both list STAT-04: pick one"),
-            (PLAN, 65, "E", "M1-T07 covers STAT-04, which the plan's Scope defers: drop it from the task, or from "
+            (PLAN, 68, "E", "M1-T07 covers STAT-04, which the plan's Scope defers: drop it from the task, or from "
                             "Deferred")])
 
     def test_covers_another_steps_requirement(self):
         self.p.edit(PLAN, "**Step:** PL-02.pca · **Kind:** thicken · **Covers:** STAT-01, QR-01",
                     "**Step:** PL-02.pca · **Kind:** thicken · **Covers:** STAT-01, STAT-03, QR-01")
         self.assertEqual(self.messages("covers-vs-deferred"), [
-            (PLAN, 121, "W", "M1-T13 covers STAT-03, which the Covers cells of PL-02.clean_eigen list, not "
+            (PLAN, 124, "W", "M1-T13 covers STAT-03, which the Covers cells of PL-02.clean_eigen list, not "
                              "PL-02.pca's: cover what the step delivers, or route the step table to pipeline-design")])
 
 

@@ -19,6 +19,9 @@
 **Verify:** `pytest tests/contracts` · `scripts/check.sh gate`
 **Depends on:** — · **Writes:** src/quant/__init__.py, src/quant/data/**, src/quant/stats/**, tests/contracts/**
 
+### Checkpoint after M1-T01 (barrier)
+- [x] Every frozen type and signature matches contract.md; no test pins a stub
+
 ## Phase 1: Step spines
 
 ### M1-T02: read_raw spine on a synthetic CSV

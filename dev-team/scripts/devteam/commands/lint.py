@@ -45,6 +45,7 @@ SEVERITY = {
     "packet-type-closure": "W", "parallel-step": "W", "milestone-lines": "E", "milestone-order": "E",
     "exit-cases-in-scope": "E", "kind-title": "E", "covers-vs-deferred": "E", "closed-open-question": "W",
     "process-narration": "W", "explain-stale": "W", "spine-claim": "W", "step-unplanned": "W",
+    "interface-barrier": "W",
 }
 
 # Size budgets (planning-stage.md §3), in lines. Package docs are budgeted per unit (lines per unit × units +
@@ -1345,6 +1346,19 @@ def check_step_unplanned(ctx: Context):
                      f"(`{pid}.{names[0]} (to M<n>: why)`)")
 
 
+def check_interface_barrier(ctx: Context):
+    """An interface task followed straight, in plan order, by a non-interface task with no checkpoint between them
+    (`### Checkpoint after M1-T01 (barrier)`): the build adds the review anyway; the block's items guide it."""
+    for doc in ctx.plan_docs:
+        tasks = sorted(model.tasks(doc), key=lambda t: t.start)
+        marks = [c.start for c in model.checkpoints(doc)]
+        for a, b in zip(tasks, tasks[1:]):
+            if a.kind == "interface" and b.kind != "interface" and not any(a.start < m < b.start for m in marks):
+                yield _p(doc, a.start, "interface-barrier",
+                         f"{a.id} (interface) is followed by {b.id} with no checkpoint between: add "
+                         f"`### Checkpoint after {a.id} (barrier)` so the interface is reviewed before it is built on")
+
+
 def check_parallel_step(ctx: Context):
     """Two thicken tasks on one step (`PL-NN.<name>`) with no `Depends on` path between them: the step is one
     function, so each needs the file the other changes even when their Writes don't overlap."""
@@ -1770,7 +1784,7 @@ CHECKS = [
     check_todo_mismatch, check_finding_disposition, check_foreign_plan,
     check_ref_file, check_ref_hash, check_ref_large, check_ref_prefix, check_roadmap_skill, check_roadmap_stage,
     check_spec_stage, check_milestone_lines, check_milestone_order, check_exit_cases_in_scope,
-    check_kind_title, check_covers_vs_deferred, check_step_unplanned, check_closed_open_question, check_process_narration,
+    check_kind_title, check_covers_vs_deferred, check_step_unplanned, check_interface_barrier, check_closed_open_question, check_process_narration,
     check_probe_fields, check_probe_informs, check_probe_cite, check_probe_runner, check_probe_leak,
     check_probe_sample, check_probe_results, check_probe_stale, check_probe_large,
     check_boundaries, check_probe_open, check_milestone_depends,

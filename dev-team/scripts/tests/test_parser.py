@@ -169,8 +169,8 @@ class ModelTest(unittest.TestCase):
 
     def test_checkpoints(self):
         cps = model.checkpoints(self.repo.plan)
-        self.assertEqual([c.after for c in cps], ["M1-T13", ""])
-        self.assertEqual(len(cps[0].items), 5)
+        self.assertEqual([c.after for c in cps], ["M1-T01", "M1-T13", ""])
+        self.assertEqual(len(cps[1].items), 5)
 
     def test_findings(self):
         doc = Doc(QUANT, "tasks/plan.md", "# M1: X — Plan\n**Milestone:** M1\n## Phase 1: T\n"

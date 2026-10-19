@@ -50,6 +50,39 @@ def uncovered(repo: Repo, plan: Doc, tasks: list[model.Task], pipelines: list[st
     return sorted(left & live if live else left)
 
 
+REUSED = re.compile(r"\bas built\b|^\s*as PL-\d{2,}", re.IGNORECASE)
+
+
+def steps_unplanned(repo: Repo, plan: Doc) -> dict[str, list[str]]:
+    """Pipeline → the steps of the plan's milestone pipelines that no task builds and the Scope doesn't defer by
+    name (`PL-07.daily_bars (to M3: …)`). A task builds a step its Step names (`PL-07.daily_bars`); a spine task
+    on the whole pipeline (`PL-07`) builds all of them; a step another milestone built (a task of this, a queued or
+    an archived plan names the step's name on another pipeline) or whose Spine version reuses one (`as PL-05`,
+    `PL-01 as built`) needs none."""
+    row = milestone_row(repo, model.milestone_of(plan))
+    if row is None:
+        return {}
+    tasks = model.tasks(plan)
+    others = [t for d in repo.docs("plan", "queued-plan", "archived-plan", archive=True) for t in model.tasks(d)]
+    named = {m.group(0) for t in tasks for m in re.finditer(r"PL-\d{2,}\.[\w.]+", t.step)}
+    refs = {(m.group(1), m.group(2)) for t in tasks + others for m in re.finditer(r"(PL-\d{2,})\.([\w.]+)", t.step)}
+    whole = {t.step.strip() for t in tasks if re.fullmatch(r"PL-\d{2,}", t.step.strip())
+             and (t.kind == "spine" or (not t.kind and t.is_spine))}
+    deferred = set(re.findall(r"PL-\d{2,}\.[\w.]+", md.fields_in(plan.lines, 0, len(plan.lines)).get("Deferred", "")))
+    by_id = {p.id: p for p in model.all_pipelines(repo)}
+    out: dict[str, list[str]] = {}
+    for pid in roadmap_cmd.milestone_pipelines(repo, row)[0]:
+        p = by_id.get(pid)
+        if p is None or repo.is_retired(pid) or pid in whole:
+            continue
+        left = [s.name for s in p.steps if f"{pid}.{s.name}" not in named | deferred
+                and not REUSED.search(md.strip_md(s.spine))
+                and not any(name == s.name and pl != pid for pl, name in refs)]
+        if left:
+            out[pid] = left
+    return out
+
+
 def skills_missing(plan: Doc | None, tasks: list[model.Task], available: list[str],
                    milestone_skills: list[str] = ()) -> list[str]:
     referenced = list(milestone_skills)
@@ -407,6 +440,8 @@ def build_planning(repo: Repo, r: Report) -> None:
     r.add("blocked_tasks", blocked_tasks)
     r.add("uncovered", uncovered(repo, active, tasks, milestone_pls) if active else [])
     r.add("no_spine", [p for p in milestone_pls if p not in spined])
+    r.add("steps_unplanned", [f"{pid}.{s}" for pid, ss in (steps_unplanned(repo, active) if active else {}).items()
+                              for s in ss])
     r.add("mode_violations", mode_violations(tasks))
     r.add("boundaries_unfrozen", boundaries_unfrozen(repo, pkgs, tasks) if active else [])
     r.add("draft_pipelines", drafts)

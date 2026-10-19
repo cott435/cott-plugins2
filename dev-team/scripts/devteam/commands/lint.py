@@ -22,6 +22,7 @@ from .. import requests as rq
 from .. import routes as rt
 from ..repo import Doc, Repo
 from ..status.common import available_skills
+from ..status.build_planning import steps_unplanned
 from ..status.packages import shape_kept
 from . import roadmap as roadmap_cmd
 
@@ -43,7 +44,7 @@ SEVERITY = {
     "request-number": "W", "request-cite": "W", "request-source": "W",
     "packet-type-closure": "W", "parallel-step": "W", "milestone-lines": "E", "milestone-order": "E",
     "exit-cases-in-scope": "E", "kind-title": "E", "covers-vs-deferred": "E", "closed-open-question": "W",
-    "process-narration": "W", "explain-stale": "W", "spine-claim": "W",
+    "process-narration": "W", "explain-stale": "W", "spine-claim": "W", "step-unplanned": "W",
 }
 
 # Size budgets (planning-stage.md §3), in lines. Package docs are budgeted per unit (lines per unit × units +
@@ -1330,6 +1331,20 @@ def check_covers_vs_deferred(ctx: Context):
                               "W")
 
 
+def check_step_unplanned(ctx: Context):
+    """A step of the milestone's pipelines that no task builds and the Scope doesn't defer by name
+    (`build_planning.steps_unplanned`): spec IDs can all be covered while a step is left out."""
+    for doc in ctx.plan_docs:
+        at = md.field_line(doc.lines, 0, len(doc.lines), "Deferred")
+        if at is None:
+            at = md.field_line(doc.lines, 0, len(doc.lines), "Covers")
+        for pid, names in steps_unplanned(ctx.repo, doc).items():
+            shown = ", ".join(names[:6]) + (f" and {len(names) - 6} more" if len(names) > 6 else "")
+            yield _p(doc, at or 0, "step-unplanned",
+                     f"{pid} steps on no task and not Deferred by name: {shown}: give each a task, or defer it "
+                     f"(`{pid}.{names[0]} (to M<n>: why)`)")
+
+
 def check_parallel_step(ctx: Context):
     """Two thicken tasks on one step (`PL-NN.<name>`) with no `Depends on` path between them: the step is one
     function, so each needs the file the other changes even when their Writes don't overlap."""
@@ -1755,7 +1770,7 @@ CHECKS = [
     check_todo_mismatch, check_finding_disposition, check_foreign_plan,
     check_ref_file, check_ref_hash, check_ref_large, check_ref_prefix, check_roadmap_skill, check_roadmap_stage,
     check_spec_stage, check_milestone_lines, check_milestone_order, check_exit_cases_in_scope,
-    check_kind_title, check_covers_vs_deferred, check_closed_open_question, check_process_narration,
+    check_kind_title, check_covers_vs_deferred, check_step_unplanned, check_closed_open_question, check_process_narration,
     check_probe_fields, check_probe_informs, check_probe_cite, check_probe_runner, check_probe_leak,
     check_probe_sample, check_probe_results, check_probe_stale, check_probe_large,
     check_boundaries, check_probe_open, check_milestone_depends,

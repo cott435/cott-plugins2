@@ -702,6 +702,18 @@ class PlanChecks(LintCase):
         self.assertEqual(len(msgs), 1)
         self.assertTrue(msgs[0].startswith("M1-R02"))
 
+    def test_step_unplanned(self):
+        # iteration 10 D7: a step added to a milestone pipeline after the plan, on no task and not Deferred by name.
+        self.p.edit(PIPES, "| 5 | `write_report` | stats | Factors → CovReport | print table | STAT-04 |",
+                    "| 5 | `write_report` | stats | Factors → CovReport | print table | STAT-04 |\n"
+                    "| 6 | `plot_spectrum` | stats | Factors → Figure | no plot | — |")
+        msgs = [(p.path, p.line, p.message) for p in self.problems() if p.code == "step-unplanned"]
+        self.assertEqual(msgs, [(PLAN, 7, "PL-02 steps on no task and not Deferred by name: plot_spectrum: give each "
+                                         "a task, or defer it (`PL-02.plot_spectrum (to M<n>: why)`)")])
+        self.assertEqual(lint.SEVERITY["step-unplanned"], "W")
+        self.p.edit(PLAN, "**Deferred:** none", "**Deferred:** PL-02.plot_spectrum (to M2: the report comes first)")
+        self.assertEqual([p for p in self.problems() if p.code == "step-unplanned"], [])
+
     def test_foreign_plan(self):
         self.p.write(PLAN, "# Plan\n\n## Tasks\n- [ ] Task 1: do the thing and the other thing\n")
         self.assertEqual({(p.path, p.code, p.severity) for p in self.problems()}, {(PLAN, "foreign-plan", "W")})

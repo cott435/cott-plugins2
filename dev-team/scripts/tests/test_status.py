@@ -36,7 +36,7 @@ KEYS = {
                         "routed_changes"],
     "test-planning": ["packages", "pipelines_no_smoke", "pipelines_no_golden", "cases_no_source",
                       "cases_no_tolerance", "fixtures_missing", "fixtures_orphan", "skills", "routed_changes"],
-    "build-planning": ["milestone", "progress", "next_task", "blocked_tasks", "uncovered", "no_spine",
+    "build-planning": ["milestone", "progress", "next_task", "blocked_tasks", "uncovered", "no_spine", "steps_unplanned",
                        "mode_violations", "boundaries_unfrozen", "draft_pipelines", "changed_since_plan", "stage_to_cut",
                        "pipelines_inferred",
                        "milestone_references", "milestone_skills", "references_unrouted", "skills_unrouted",
@@ -421,6 +421,14 @@ class BuildPlanningTest(Base):
         self.assertEqual(d["skills_missing"], ["rmt-tools"])
         self.assertEqual(d["no_spine"], ["PL-02"])          # no wiring task builds PL-02 now
         self.assertEqual(d["uncovered"], ["STAT-03"])
+
+    def test_steps_unplanned(self):
+        self.edit("docs/packages/quant/pipelines.md", "| print table | STAT-04 |",
+                  "| print table | STAT-04 |\n| 6 | `plot_spectrum` | stats | Factors → Figure | no plot | — |")
+        self.assertEqual(self.status("build-planning")["steps_unplanned"], ["PL-02.plot_spectrum"])
+        # A Spine version reusing another pipeline's step needs no task of its own.
+        self.edit("docs/packages/quant/pipelines.md", "| no plot | — |", "| as PL-01 | — |")
+        self.assertEqual(self.status("build-planning")["steps_unplanned"], [])
 
     def test_boundaries_unfrozen(self):
         self.write("docs/packages/feed/contract.md",

@@ -780,7 +780,7 @@ def check_request_trace(ctx: Context):
     for r in reqs:
         if r.superseded_by and (r.superseded_by not in ids or r.superseded_by == r.id):
             yield _p(doc, r.line, "request-trace", f"{r.id} is superseded by {r.superseded_by}: no such later request")
-        defs = {i: ctx.repo.lookup(i, archive=False) for i in r.honoured_by if not rq.is_section(i)}
+        defs = {i: ctx.repo.lookup(i) for i in r.honoured_by if not rq.is_section(i)}
         for i, d in defs.items():
             if d is None:
                 yield _p(doc, r.line, "request-trace", f"{r.id} → {i}: {i} is not defined")
@@ -789,7 +789,7 @@ def check_request_trace(ctx: Context):
                 yield _p(doc, r.line, "request-trace",
                          f"{r.id} → {i}: no such heading in {', '.join(rq.HONOUR_KINDS[r.owner])}")
         for i in r.into:
-            if (d := ctx.repo.lookup(i, archive=False)) is None or d.retired:
+            if (d := ctx.repo.lookup(i)) is None or d.retired:
                 yield _p(doc, r.line, "request-trace", f"{r.id} was changed in {i}: {i} is not defined")
         if (defs and len(defs) == len(r.honoured_by) and all(d is not None and not d.retired for d in defs.values())
                 and not rq.honouring(ctx.repo, r)):

@@ -15,9 +15,10 @@ ID = r"UR-\d{2,}"
 # Owner (the doc that must honour a request) → the skill that writes that doc.
 OWNERS = {"brief": "idea-refine", "spec": "spec-writing", "architecture": "architecture-design", "pipelines": "pipeline-design",
           "tests": "test-planning", "plan": "build-planning", "constraints": "build-setup"}
-# The doc kinds whose live IDs, or sections (`§Out of scope`), can honour an owner's request.
+# The doc kinds whose live IDs, or sections (`§Out of scope`), can honour an owner's request. A trace is looked up in
+# the archive too: `dt archive` moves a built plan's task IDs there.
 HONOUR_KINDS = {"brief": ("brief", "idea"), "spec": ("spec",), "architecture": ("architecture", "package-architecture", "contract"),
-                "pipelines": ("pipelines",), "tests": ("tests",), "plan": ("plan", "queued-plan"),
+                "pipelines": ("pipelines",), "tests": ("tests",), "plan": ("plan", "queued-plan", "archived-plan"),
                 "constraints": ("constraints",)}
 # Owners whose open requests fail `dt lint` once their doc is Approved, and send `dt next` back to their skill.
 DUE_WHEN_APPROVED = {"spec": "docs/spec.md", "architecture": "docs/architecture.md"}
@@ -117,14 +118,14 @@ def is_section(item: str) -> bool:
 def section_docs(repo: Repo, owner: str, item: str) -> list[Doc]:
     """The owner's docs with a heading whose text is the item's (case and markup ignored)."""
     want = md.strip_md(item[1:]).strip().lower()
-    return [d for d in repo.docs(*HONOUR_KINDS[owner])
+    return [d for d in repo.docs(*HONOUR_KINDS[owner], archive=True)
             if any(md.strip_md(h.text).strip().lower() == want for h in d.headings)]
 
 
 def resolves(repo: Repo, owner: str, item: str) -> bool:
     if is_section(item):
         return bool(section_docs(repo, owner, item))
-    return repo.lookup(item, archive=False) is not None
+    return repo.lookup(item) is not None
 
 
 def all_requests(repo: Repo) -> list[Request]:
@@ -140,7 +141,7 @@ def honouring(repo: Repo, r: Request) -> list[str]:
             if section_docs(repo, r.owner, id_):
                 out.append(id_)
             continue
-        d = repo.lookup(id_, archive=False)
+        d = repo.lookup(id_)
         if d is not None and not d.retired and d.doc.kind in kinds:
             out.append(id_)
     return out
@@ -285,7 +286,7 @@ def unstated(text: str, sources: list[str]) -> list[str]:
 
 
 def definition_text(repo: Repo, id_: str) -> str:
-    d = repo.lookup(id_, archive=False)
+    d = repo.lookup(id_)
     return "" if d is None or d.retired else "\n".join(d.doc.lines[d.start:d.end])
 
 

@@ -247,6 +247,19 @@ class LintTest(Base):
         self.assertEqual(sorted(p.message.split(" ")[0] for p in self.problems("request-open")),
                          ["UR-01", "UR-02", "UR-03"])
 
+    def test_plan_trace_survives_archive(self):
+        # iteration 10 D3: `dt archive` moves the plan's task IDs to tasks/archive/; a trace to them still holds.
+        self.write(PATH, DOC.replace(" · architecture-design 2026-10-18\n", " · architecture-design 2026-10-18 → AD-03\n")
+                   + '- **UR-07** plan · "build the loader first" · build-planning 2026-10-19 → M1-T01\n')
+        self.assertEqual(self.problems("request-trace"), [])
+        self.write("tasks/archive/M1-data-stats.md", self.read("tasks/plan.md"))
+        self.write("tasks/plan.md", "# Between milestones\n\n**Status:** Between milestones · **Last updated:** "
+                   "2026-11-02\n")
+        self.assertEqual(self.problems("request-trace"), [])
+        self.assertEqual([r.id for r in rq.open_requests(Repo(self.root), "plan")], [])
+        self.assertEqual(self.dt("request", "trace", "UR-07", "M1-T02")[0], 0)
+        self.assertEqual(self.requests()["UR-07"].honoured_by, ["M1-T01", "M1-T02"])
+
     def test_trace_to_a_missing_section(self):
         self.write(PATH, DOC.replace("→ DATA-02", "→ §Out of scope"))
         self.assertEqual([p.message for p in self.problems("request-trace")],

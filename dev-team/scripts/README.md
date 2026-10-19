@@ -335,7 +335,7 @@ Checks (code: severity):
   - `roadmap-stage` E — once the roadmap has stages, a milestone row whose Stage cell names no stage row, isn't an `S<n>`, or is empty on a row with no Source of its own
 - Request checks (design/requests.md §5):
   - `request-format` E — a `- **UR-NN**` line that isn't the request form, names an unknown owner, or whose trace is none of the three forms
-  - `request-trace` E — a trace naming an undefined ID, a `§heading` none of the owner's docs has, or a request that doesn't exist, or IDs (none retired) of which none is defined in the owner's docs (a retired one is `retired-ref`), or a change written into an ID that isn't defined
+  - `request-trace` E — a trace naming an undefined ID, a `§heading` none of the owner's docs has, or a request that doesn't exist, or IDs (none retired) of which none is defined in the owner's docs (a retired one is `retired-ref`), or a change written into an ID that isn't defined. IDs resolve in the archive too: a plan request traced to task IDs still holds after `dt archive` (an archived plan honours it)
   - `request-open` E — an Approved spec.md or architecture.md with an open request of its owner (`spec`, `architecture`), at that doc's header line
   - `request-edit` E (git) — a request whose words, context, skill or date differ from HEAD, or that is gone: only its trace changes
   - `request-ref` E — a `UR-NN` in any doc that docs/requests.md doesn't define

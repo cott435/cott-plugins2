@@ -82,7 +82,7 @@ def _trace(args, repo) -> int:
         return _fail(f"not defined: {', '.join(unknown)}")
     # Items traced earlier that no longer resolve or are retired drop out; the rest stay.
     kept = [i for i in r.honoured_by if rq.is_section(i) and rq.resolves(repo, r.owner, i)
-            or (d := repo.lookup(i, archive=False)) is not None and not d.retired]
+            or (d := repo.lookup(i)) is not None and not d.retired]
     ids = list(dict.fromkeys(kept + new))
     if not rq.honouring(repo, dataclasses.replace(r, honoured_by=ids)):
         kinds = ", ".join(rq.HONOUR_KINDS[r.owner])
@@ -101,7 +101,7 @@ def _change(args, repo) -> int:
     if r.state == "superseded":
         return _fail(f"{r.id} is {r.trace}: change that one")
     into = [i.strip(",") for i in args.into]
-    unknown = [i for i in into if (d := repo.lookup(i, archive=False)) is None or d.retired]
+    unknown = [i for i in into if (d := repo.lookup(i)) is None or d.retired]
     if unknown:
         return _fail(f"not defined: {', '.join(unknown)}")
     if len(args.args) == 1 and not args.approved:
@@ -116,7 +116,7 @@ def _change(args, repo) -> int:
         return _fail('change needs a UR-NN, what was done instead, --approved "<the user\'s words>", --skill and '
                      "--into the IDs the change was written into")
     kinds = rq.HONOUR_KINDS[r.owner]
-    if not any(repo.lookup(i, archive=False).doc.kind in kinds for i in into):
+    if not any(repo.lookup(i).doc.kind in kinds for i in into):
         return _fail(f"{r.id} ({r.owner}): --into needs an ID defined in {', '.join(kinds)}")
     missed = [i for i in rq.honouring(repo, r) if not rq.is_section(i) and i not in into]
     if missed:

@@ -11,11 +11,11 @@ from .. import routes
 from .. import specdocs
 from ..repo import Repo
 from .common import Report, add_common, available_skills, doc_state, fmt, live_spec_ids, next_decision
-from .packages import WALK_IGNORE, grow_triggers, known_packages, stale_contracts
+from .packages import WALK_IGNORE, grow_triggers, known_packages, shape_kept, stale_contracts
 
 MANIFESTS = {"pyproject.toml", "setup.py", "package.json", "Cargo.toml", "go.mod"}
 KEYS = ("uncovered", "changed_since", "spec_rows_pending", "stale", "package_docs", "packages_found", "skills",
-        "broken_fences", "contracts_missing", "legacy_layout", "grow_triggers", "stale_contracts", "probes_answered",
+        "broken_fences", "contracts_missing", "legacy_layout", "grow_triggers", "grow_held", "stale_contracts", "probes_answered",
         "probes_failed", "routed_changes")
 
 
@@ -91,6 +91,7 @@ def architecture_design(repo: Repo, r: Report) -> None:
     r.add("contracts_missing", contracts_missing)
     r.add("legacy_layout", legacy)
     r.add("grow_triggers", grow_triggers(repo))
+    r.add("grow_held", shape_kept(repo))
     r.add("stale_contracts", stale_contracts(repo))
     r.add("probes_answered", probe_state.answered)
     r.add("probes_failed", probe_state.failed)

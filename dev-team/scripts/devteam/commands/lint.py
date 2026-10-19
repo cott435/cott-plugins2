@@ -21,6 +21,7 @@ from .. import requests as rq
 from .. import routes as rt
 from ..repo import Doc, Repo
 from ..status.common import available_skills
+from ..status.packages import shape_kept
 from . import roadmap as roadmap_cmd
 
 # code → severity (E fails the run, W doesn't)
@@ -267,6 +268,7 @@ def _unit_budget(doc) -> tuple[int, str]:
 
 
 def check_budget(ctx: Context):
+    kept = shape_kept(ctx.repo)       # the user kept one package: no Grow nudge
     for doc in ctx.scoped_docs:
         limit = BUDGETS.get(doc.kind)
         if limit and len(doc.lines) > limit:
@@ -276,7 +278,7 @@ def check_budget(ctx: Context):
             if len(doc.lines) > limit:
                 yield _p(doc, 0, "budget", f"{len(doc.lines)} lines, budget {limit} ({how})")
             ceiling = GROW_CEILINGS[doc.kind]
-            if len(doc.lines) > ceiling:
+            if len(doc.lines) > ceiling and not kept:
                 yield _p(doc, 0, "grow-size", f"{len(doc.lines)} lines, over the {ceiling}-line ceiling for one "
                          f"package's {doc.kind} doc: architecture-design should consider a Grow")
         if doc.kind == "brief":

@@ -12,7 +12,7 @@ from ..commands import roadmap as roadmap_cmd
 from ..repo import Doc, Repo
 from .common import (OWN_SKILLS, Report, add_common, add_graph, advance_ready, available_skills, blocked_reason,
                      live_spec_ids, milestone_row, next_task, plan_base)
-from .packages import drift, grow_triggers, known_packages, stale_contracts
+from .packages import drift, grow_triggers, known_packages, shape_kept, stale_contracts
 
 
 def expected_mode(task: model.Task) -> str:
@@ -423,6 +423,7 @@ def build_planning(repo: Repo, r: Report) -> None:
     r.add("skills_missing", skills_missing(active, tasks, available, focus_skills))
     r.add("skills_available", available)
     r.add("grow_triggers", grow_triggers(repo))
+    r.add("grow_held", shape_kept(repo))
     pl_drift = drift(repo, [p for p in model.all_pipelines(repo) if p.id in milestone_pls])
     r.add("drift", "unknown" if pl_drift is None else pl_drift)
     r.add("stale_contracts", stale_contracts(repo))

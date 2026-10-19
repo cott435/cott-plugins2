@@ -217,6 +217,23 @@ class ArchitectureTest(Base):
         for n in range(13):
             self.write(f"src/quant/stats/m{n}.py", '"""m."""\n')
         self.assertEqual(self.status("architecture-design")["grow_triggers"], ["quant: 15 modules > 12"])
+        # iteration 10 D5: the user's "one package" holds the triggers until a later request replaces it.
+        self.write("docs/requests.md", "# Quant Lab — User requests\n\n**Last updated:** 2026-10-18\n\n"
+                   '- **UR-01** architecture · "Keep it as one package, no split." · architecture-design 2026-10-18 '
+                   "→ AD-01\n")
+        d = self.status("architecture-design")
+        self.assertEqual((d["grow_triggers"], d["grow_held"]), ([], ['UR-01 "Keep it as one package, no split."']))
+        self.assertEqual(self.status("build-planning")["grow_triggers"], [])
+        self.edit("docs/requests.md", "→ AD-01\n", "→ superseded by UR-02\n"
+                  '- **UR-02** architecture · "Yes, go with one package per component." · architecture-design '
+                  "2026-10-19\n")
+        d = self.status("architecture-design")
+        self.assertEqual((d["grow_triggers"], d["grow_held"]), (["quant: 15 modules > 12"], []))
+        # An Accepted decision that declines the split holds them too; one that only names the shape doesn't.
+        self.edit("docs/architecture.md", "- **Decision:** One package, uv.",
+                  "- **Decision:** One package, uv. Grow declined: quant stays one package.")
+        self.assertEqual(self.status("architecture-design")["grow_held"],
+                         ['AD-01 "Python 3.12 single package, managed with uv"'])
 
     def test_changelog_same_day_order(self):
         spec = [specdocs.ChangelogRow("2026-10-15", "a", "brief.md", {"brief.md"}, {"A-01": "added"}),

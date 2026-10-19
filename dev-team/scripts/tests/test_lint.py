@@ -135,6 +135,13 @@ class BudgetChecks(LintCase):
         code, _ = run_main("--root", str(self.p.root), "lint")
         self.assertEqual(code, 0)
 
+    def test_grow_ceiling_held_by_the_users_one_package(self):
+        self._add_symbols(22)
+        self.p.write("docs/requests.md", "# Quant Lab — User requests\n\n**Last updated:** 2026-10-18\n\n"
+                     '- **UR-01** architecture · "Keep it as one package, no split." · architecture-design 2026-10-18 '
+                     "→ AD-01\n")
+        self.assertEqual(self.budget_messages(CONTRACT), [])
+
     def test_plan_over_budget(self):
         self.p.edit(PLAN, "## Replan notes", "## Replan notes\n" + "- note\n" * 400)
         self.assertCode(PLAN, "budget")

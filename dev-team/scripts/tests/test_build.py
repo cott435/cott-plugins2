@@ -404,6 +404,18 @@ class LandTest(BuildCase):
         code, out, _ = self.claim("M1-T03", "implementer", self.worktree("again"))
         self.assertIn("the user decided the intent tests stand", out)
 
+    def test_two_escalations_on_one_claim_keep_both(self):
+        self.to_phase1()
+        wt = self.run_half("M1-T03", "tester", {})
+        self.dt("escalate", "CONTRACT-CHANGE", "summarize can't take a window", "--type", "core.summarize", root=wt)
+        self.dt("escalate", "NEEDS-DEP", "needs numpy", root=wt)
+        out = self.land("M1-T03", "tester")
+        self.assertEqual((out["reject"], out["kind"]), ("escalated", "NEEDS-DEP"))
+        _, st = self.dt_json("build", "status")
+        esc = st["escalations"][0]
+        self.assertEqual([e["kind"] for e in esc["earlier"]], ["CONTRACT-CHANGE"])
+        self.assertEqual(esc["types"], ["core.summarize"])
+
     def test_escalate_needs_a_claim_and_the_right_role(self):
         self.to_phase1()
         wt = self.worktree("loose")

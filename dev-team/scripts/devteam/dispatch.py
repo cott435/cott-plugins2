@@ -29,8 +29,10 @@ DEFAULT_CAP = 6
 
 
 def holds_all(esc: dict) -> bool:
-    """An escalation that holds every half: NEEDS-DEP, or a CONTRACT-CHANGE that names no type."""
-    return esc.get("kind") == "NEEDS-DEP" or (esc.get("kind") == "CONTRACT-CHANGE" and not esc.get("type"))
+    """An escalation that holds every half: NEEDS-DEP, or a CONTRACT-CHANGE that names no type (an earlier stop on
+    the same claim counts too)."""
+    return any(e.get("kind") == "NEEDS-DEP" or (e.get("kind") == "CONTRACT-CHANGE" and not e.get("type"))
+               for e in (esc, *esc.get("earlier", [])))
 
 
 def half_id(task: str, role: str) -> str:
@@ -154,13 +156,16 @@ class Build:
         """Why a CONTRACT-CHANGE naming a type holds this task: it reads the type, or depends on the task that
         escalated. "" when none does."""
         for e in self.escalations.values():
-            if e.get("kind") != "CONTRACT-CHANGE" or not e.get("type") or e.get("task") == task.id:
+            types = [t for x in (e, *e.get("earlier", [])) if x.get("kind") == "CONTRACT-CHANGE"
+                     for t in ([x["type"]] if x.get("type") else [])]
+            if not types or e.get("task") == task.id:
                 continue
             reads = {md.strip_md(r) for r in task.read}
-            if e["type"] in reads:
-                return f"escalation: {e['claim']} CONTRACT-CHANGE on {e['type']}, which {task.id} reads"
+            for t in types:
+                if t in reads:
+                    return f"escalation: {e['claim']} CONTRACT-CHANGE on {t}, which {task.id} reads"
             if e.get("task") in graph.ancestors(self.tasks, task.id):
-                return f"escalation: {e['claim']} CONTRACT-CHANGE on {e['type']}; {task.id} depends on {e['task']}"
+                return f"escalation: {e['claim']} CONTRACT-CHANGE on {', '.join(types)}; {task.id} depends on {e['task']}"
         return ""
 
     def review_passed(self, phase: Phase, pkg: str) -> bool:

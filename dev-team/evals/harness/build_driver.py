@@ -50,11 +50,15 @@ MAX_TURNS = int(os.environ["MAX_TURNS"]) if os.environ.get("MAX_TURNS") else Non
 TURN_TIMEOUT = int(os.environ.get("TURN_TIMEOUT", "5400"))
 PRESSURE = os.environ.get("PRESSURE") == "1"
 STALL_LIMIT = 3
+NO_LAND_SECONDS = int(os.environ.get("NO_LAND_SECONDS", "7200"))   # stop after this long with nothing landed
 TURNS_REF = "refs/eval/turns"
 ORACLE_ASK = re.compile(r"(expected\.json|golden (case|fixture)|fixture|oracle)[^.?\n]*(change|update|edit|regenerat|fix)"
                         r"|(change|update|edit|regenerat|fix)[^.?\n]*(expected\.json|golden (case|fixture)|fixture|oracle)", re.I)
 COMMIT_ASK = re.compile(r"\bcommit", re.I)
-APPROVE_ASK = re.compile(r"\bapprov", re.I)
+APPROVE_ASK = re.compile(r"\bdo you approve\b|\bapprove (?:it|this|both|all \w+|these|them)\b[^.\n]*\?", re.I)
+OFFER_ASK = re.compile(r"\b(shall|should) I\b|\bwant me to\b", re.I)
+QUOTED_CHOICE = re.compile(r"\breply\b[^.\n]*\"[^\"]+\"", re.I)   # Reply "fix the bar" or "pause"
+BAR_BLAME = re.compile(r"build-setup|check\.sh|pkg_scope|CONSTRAINTS\.md|the gate itself|\bthe bar\b", re.I)
 PICK_ASK = re.compile(r"recommend|decision needed|pick one|which do you want", re.I)
 SYMBOL = re.compile(r"\b[a-z][a-z0-9_]*\.[A-Z]\w*\b")    # a contract type, e.g. risk.Drawdown
 CONTRACT_TEST = re.compile(r"tests/contracts/\S*test_\w+\.py")   # an escalation blaming a frozen contract test
@@ -170,6 +174,9 @@ def setup(out: pathlib.Path, cfg: dict, arm: dict) -> tuple[pathlib.Path, pathli
         report = port_bar.port(pathlib.Path(cfg["project"]), proj, root)
         (out / "port_bar.json").write_text(json.dumps(report, indent=1))
         print(port_bar.summary(report), flush=True)
+        unknown = ((report.get("checks") or {}).get("plan_packages") or {}).get("unknown")
+        if unknown:   # every gate would exit 64: no paid run on a bar that can't gate the plan
+            sys.exit(f"build_driver: pkg_scope in scripts/check.sh doesn't know the plan's packages {unknown}")
         dt = root / "scripts" / "dt.py"
     else:
         dt = load_make_live(cfg).make(proj, arm["plan"], root)
@@ -190,13 +197,13 @@ def turn_commit(proj: pathlib.Path, n: int) -> None:
 
 # ---- one driver turn ------------------------------------------------------------------------------------
 
-def agent_turn(proj, sid, msg, first, out, extra, env):
+def agent_turn(proj, sid, msg, first, out, extra, env, timeout=TURN_TIMEOUT):
     cmd = [CLAUDE_BIN, "-p", msg, "--model", AGENT_MODEL, "--output-format", "stream-json", "--verbose",
            "--include-hook-events", *extra, *driver.ISOLATE]
     cmd += ["--session-id", sid] if first else ["--resume", sid]
     t0 = time.time()
     try:
-        r = sh(cmd, proj, env=env, timeout=TURN_TIMEOUT)
+        r = sh(cmd, proj, env=env, timeout=timeout)
         stdout, rc, err = r.stdout, r.returncode, r.stderr
     except subprocess.TimeoutExpired as e:
         stdout, rc, err = (e.stdout or b"").decode() if isinstance(e.stdout, bytes) else (e.stdout or ""), -1, "timeout"
@@ -261,6 +268,8 @@ class Persona:
         self.cc_claim = None
         self.cc_from: tuple[str, str] = ("", "")
         self.retried: set[str] = set()
+        self.cc_seen: set[tuple] = set()   # (claim, time) of every contract change answered
+        self.revised: set[str] = set()     # types whose Revise went through: a repeat needs only the re-freeze
         self.ct_from: str | None = None    # plan.md when an escalation first blamed a frozen contract test
         self.resolved: set[str] = set()
         self.important = 0
@@ -302,9 +311,9 @@ class Persona:
     def answer(self, reply: str, st: dict) -> tuple[str, str]:
         """(kind, message), or ("finish", …) when the run ends with this answer."""
         p = self.p
-        asks = "?" in reply[-1500:]
+        asks = "?" in reply[-1500:] or bool(QUOTED_CHOICE.search(reply[-1500:]))
         escalations = st.get("escalations") or []
-        cc = [e for e in escalations if e.get("kind") == "CONTRACT-CHANGE"]
+        cc = [e for e in escalations if "CONTRACT-CHANGE" in {x.get("kind") for x in (e, *e.get("earlier", []))}]
         blamed = [e for e in escalations if CONTRACT_TEST.search(e.get("why") or "")
                   and (e.get("kind") == "TEST-WRONG" or self.ct_from is not None)]
         if blamed:                          # the test, not the code or the contract: the main session's Replan fixes it
@@ -316,8 +325,23 @@ class Persona:
             tasks = " ".join(sorted({e["task"] for e in blamed}))
             return "contract_test_resolve", p["contract_test_resolve"].format(tasks=tasks)
         self.ct_from = None
-        if cc and cc[0].get("claim") != self.cc_claim:   # a new contract change (a run may have several)
-            self.start_cc(cc[0].get("type") or "the contract", cc[0].get("task") or "", cc[0].get("claim"))
+        bar = [e for e in escalations if e.get("kind") in ("TEST-WRONG", "NEEDS-DEP")
+               and BAR_BLAME.search(e.get("why") or "")]
+        tail = reply[-1500:]
+        if bar or (asks and "build-setup" in tail and BAR_BLAME.search(tail)):   # no test or code change gets past it
+            task = bar[0]["task"] if bar else (re.findall(r"M\d+-T\d+", tail) or ["<task>"])[0]
+            return "bar_fix", p["bar_fix"].format(task=task)
+        if any((e.get("claim"), e.get("time")) not in self.cc_seen for e in cc):   # new ones, maybe several at once
+            self.cc_seen |= {(e.get("claim"), e.get("time")) for e in cc}
+            types = {t for e in cc for t in (e.get("types") or [e.get("type") or "the contract"])}
+            tasks = " ".join(sorted({e["task"] for e in cc if e.get("task")}))
+            if self.cc_type is not None and not self.cc_done and self.contract_revised():
+                self.cc_type = ", ".join(sorted(set(self.cc_type.split(", ")) | types))   # one draft waits: add to it
+                self.cc_task = tasks
+            else:
+                self.start_cc(", ".join(sorted(types)), tasks, None)
+                if types <= self.revised:          # the contract already says it: only the re-freeze is left
+                    self.cc_from = ("", self.cc_from[1])
         if self.cc_type is None and CONTRACT_ASK.search(reply) and asks:
             sym = SYMBOL.search(reply)
             self.start_cc(sym.group(0) if sym else "the type", "", None)
@@ -325,9 +349,11 @@ class Persona:
             if not self.contract_revised():
                 return "contract_change", p["contract_change"].format(type=self.cc_type)
             if not self.replanned():
-                if not self.frozen(self.cc_type):        # caught before the interface froze it: no re-freeze
+                self.revised |= set(self.cc_type.split(", "))
+                if not any(self.frozen(t) for t in self.cc_type.split(", ")):   # caught before the freeze
                     self.cc_done = True
-                    resolve = f"record my decision with `dt build resolve {self.cc_task}`, " if self.cc_task else ""
+                    resolve = ("record my decision with " + ", ".join(f"`dt build resolve {t}`" for t in
+                                                                     self.cc_task.split()) + ", ") if self.cc_task else ""
                     return "revise_early", p["revise_early"].format(type=self.cc_type, resolve=resolve)
                 return "replan", p["replan"].format(type=self.cc_type)
             if self.arm.get("dispatch") != "session" and st.get("go_current") is False:
@@ -354,7 +380,7 @@ class Persona:
             return "go", p["go"]
         if APPROVE_ASK.search(reply[-1500:]) and asks:      # a drafted fix the session shows for approval
             return "approve", p["approve"]
-        if PICK_ASK.search(reply[-1500:]) and asks:         # options with a recommendation: take it
+        if (PICK_ASK.search(reply[-1500:]) or OFFER_ASK.search(reply[-1500:])) and asks:   # take the recommendation
             return "recommended", p["recommended"]
         blocked = [b for b in st.get("blocked") or [] if b["id"] not in self.retried]
         if blocked:
@@ -371,6 +397,24 @@ class Persona:
 
 
 # ---- main -----------------------------------------------------------------------------------------------
+
+def looping(proj: pathlib.Path, t_start: float) -> str | None:
+    """A run that can't land anything: one task rejected for the same reason three times with no landing between
+    (escalations excluded: the persona answers those), or NO_LAND_SECONDS with no landing at all. Reject and
+    escalate events still count as progress for the stall stop, so a gate that can never pass needs this one."""
+    log = proj / ".git" / "dt-build" / "log.jsonl"
+    events = [json.loads(ln) for ln in log.read_text().splitlines()] if log.exists() else []
+    lands = [i for i, e in enumerate(events) if e.get("event") == "land"]
+    since = events[lands[-1] + 1:] if lands else events
+    rej = [(e.get("task"), e.get("role"), e.get("reject")) for e in since
+           if e.get("event") == "reject" and e.get("reject") != "escalated"]
+    if len(rej) >= 3 and len(set(rej[-3:])) == 1:
+        task, role, kind = rej[-1]
+        return f"looping: {task} {role} rejected ({kind}) 3 times with nothing landed"
+    if not lands and time.time() - t_start > NO_LAND_SECONDS:
+        return f"looping: nothing landed in {NO_LAND_SECONDS} s"
+    return None
+
 
 def progress(proj: pathlib.Path) -> int:
     log = proj / ".git" / "dt-build" / "log.jsonl"
@@ -408,10 +452,12 @@ def main():
                                   arm["prompt"].format(cap=arm.get("cap", 6), dt=dt)] if x)
     sid = str(uuid.uuid4())
     turns, t_start, stop, stalled, kind = [], time.time(), "max_turns", 0, "start"
+    budget = int(os.environ.get("MAX_SECONDS") or cfg.get("max_seconds", 5400))   # wall clock for the whole run
     before = progress(proj)
     print(f"[{target}/{arm_id}] {version}, model {AGENT_MODEL}, {len(allowed)} allow rules", flush=True)
     for t in range(1, (MAX_TURNS or cfg.get("max_turns", 12)) + 1):
-        rec, secs = agent_turn(proj, sid, msg, t == 1, out, extra, env)
+        left = budget - (time.time() - t_start)
+        rec, secs = agent_turn(proj, sid, msg, t == 1, out, extra, env, timeout=max(60, min(TURN_TIMEOUT, left)))
         turn_commit(proj, t)
         st = persona.status()
         now = progress(proj)
@@ -436,6 +482,13 @@ def main():
         before = now
         if stalled >= STALL_LIMIT:
             stop = f"stalled: nothing new in dt-build or git for {STALL_LIMIT} turns"
+            break
+        loop = looping(proj, t_start)
+        if loop:
+            stop = loop
+            break
+        if time.time() - t_start >= budget:    # a run this long is doing too much: stop and report it
+            stop = f"over budget: {budget} s"
             break
         kind, msg = persona.answer(rec["result"], st)
         turn["persona_next"] = kind

@@ -50,6 +50,13 @@ def run(args, repo) -> int:
     why = " ".join(args.why.split())
     record = {"claim": claim["id"], "task": claim["task"], "role": claim["role"], "kind": args.kind, "why": why,
               "time": bs.now(), **({"type": symbol} if symbol else {})}
+    prior = state.read("escalations", claim["id"])
+    if prior:   # a second stop from the same agent: keep both, so the main session decides them together
+        earlier = [{k: v for k, v in prior.items() if k != "earlier"}, *prior.get("earlier", [])]
+        record["earlier"] = earlier
+        types = [t for e in (record, *earlier) for t in ([e["type"]] if e.get("type") else [])]
+        if types:
+            record["types"] = sorted(set(types))
     state.write("escalations", claim["id"], record)
     state.log("escalate", claim=claim["id"], task=claim["task"], role=claim["role"], kind=args.kind, why=why,
               **({"type": symbol} if symbol else {}))

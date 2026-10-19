@@ -309,6 +309,7 @@ def checks(dest: Path, dt: Path, old_scope: str, skeleton: str | None = None) ->
     mism = [f"{k}: check.sh {sorted(scope.get(k, '').split())} vs dt {sorted({k, *v})}" for k, v in deps.items()
             if sorted(scope.get(k, "").split()) != sorted({k, *v})] if isinstance(deps, dict) else []
     out["pkg_scope_vs_dependents"] = mism or "match"
+    out["plan_packages"] = plan_packages(dest)
     lint = run([sys.executable, dt, "--root", dest, "lint", "--json"], dest)
     try:
         ld = json.loads(lint.stdout)
@@ -327,6 +328,21 @@ def checks(dest: Path, dt: Path, old_scope: str, skeleton: str | None = None) ->
     if gate.returncode and skeleton:
         out["gate_with_skeleton"] = skeleton_gate(dest, skeleton)
     return out
+
+
+def plan_packages(dest: Path) -> dict:
+    """Each plan `Package:` run through the rendered check.sh's pkg_scope: `dt claim` passes it as `--pkg`, and an
+    unknown one makes every gate exit 64 before it runs a step (rl9: hours of interface builds thrown away)."""
+    sys.path.insert(0, str(HERE))
+    import grade_build  # noqa: E402
+    pkgs = sorted({t["package"] for t in grade_build.parse_plan((dest / "tasks" / "plan.md").read_text())["tasks"]
+                   if t.get("package")})
+    func = re.search(r"(?ms)^pkg_scope\(\) \{.*?^\}", (dest / "scripts" / "check.sh").read_text())
+    if not func:
+        return {"packages": pkgs, "unknown": pkgs, "note": "no pkg_scope() in scripts/check.sh"}
+    unknown = [k for k in pkgs if run(["bash", "-c", func.group(0) + '\npkg_scope "$1" >/dev/null', "_", k], dest)
+               .returncode != 0]
+    return {"packages": pkgs, "unknown": unknown}
 
 
 def skeleton_gate(dest: Path, init: str) -> dict:
@@ -388,6 +404,16 @@ def port(src: Path, dest: Path, plugin: Path = PLUGIN, gate: bool = True) -> dic
     if lacking:
         raise SystemExit(f"port_bar: no value for {lacking} in the project's files (read: {sorted(vals)})")
     multi = bool(vals.get("packages_dir", "").strip())
+    if not multi:   # dt claim passes the plan's Package as --pkg: a single package's own name scopes to every test
+        sys.path.insert(0, str(HERE))
+        import grade_build  # noqa: E402
+        cases = vals.get("pkg_scope_cases", "")
+        known = set(re.findall(r"^\s*([\w.-]+)\)", cases, re.M))
+        plan = (dest / "tasks" / "plan.md").read_text(encoding="utf-8") if (dest / "tasks" / "plan.md").exists() else ""
+        added = sorted({t["package"] for t in grade_build.parse_plan(plan)["tasks"] if t.get("package")} - known)
+        if added:
+            vals["pkg_scope_cases"] = cases.rstrip("\n") + "".join(f'\n    {k}) echo "" ;;' for k in added)
+            notes["derived"]["pkg_scope_cases"] = f"added {added}: the plan's package, scoped to every test"
     report["render"] = render_bar(dest, tpl, bp, vals)
     if report["render"]["placeholders_left"]:
         raise SystemExit(f"port_bar: placeholders left: {report['render']['placeholders_left']}")
@@ -458,6 +484,7 @@ def summary(r: dict) -> str:
                   f"{(' (' + str(st.get('blocked')) + ')') if st.get('blocked') else ''}; CONSTRAINTS "
                   f"{st.get('constraints')}; base {st.get('base')}; gaps {st.get('gaps') or 'none'}",
                   f"  pkg_scope vs dt dependents: {c['pkg_scope_vs_dependents']}",
+                  f"  plan packages pkg_scope doesn't know: {', '.join(c['plan_packages']['unknown']) or 'none'}",
                   f"  dt lint: exit {c['lint']['exit']}, {c['lint'].get('errors')} errors, "
                   f"{c['lint'].get('warnings')} warnings"
                   + "".join(f"\n    {e}" for e in c["lint"].get("error_lines", [])[:15]),

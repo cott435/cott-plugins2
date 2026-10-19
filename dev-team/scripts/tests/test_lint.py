@@ -747,6 +747,31 @@ class FormatChecks(LintCase):
         self.p.edit(ARCH, "## Interfaces", "### stats.a / stats.b: Two\n\n## Interfaces")
         self.assertNotIn((ARCH, "contract-heading"), self.found())
 
+    def test_contract_args_over_the_default_limits(self):
+        """rl9: `evaluate` with 7 arguments couldn't be frozen under max-args 5. `self` and `*args` don't count."""
+        self.p.edit(CONTRACT, "`def clean_eigen(cov: Cov, *, n_obs: int) -> Cov`",
+                    "`def clean_eigen(cov: Cov, a: int, b: int, c: int, d: int, *, n_obs: int) -> Cov`")
+        self.p.edit(CONTRACT, "`def min_variance(cov: Cov) -> Weights`",
+                    "`class Opt: def __init__(self, cov: Cov, a: int, *args: int, b: int, c: int, d: int) -> None`")
+        found = [p.message for p in self.problems() if p.code == "contract-args"]
+        self.assertEqual(found, ["stats.clean_eigen: `clean_eigen` takes 6 arguments (max-args 5) and 5 positional "
+                                 "(max-positional-args 4), past the bar's limit: group arguments into a type or "
+                                 "make them keyword-only"])
+
+    def test_contract_args_reads_the_bar(self):
+        self.p.path("pyproject.toml").write_text("[tool.ruff.lint.pylint]\nmax-args = 2\nmax-positional-args = 1\n")
+        found = [p.message.split(":")[0] for p in self.problems() if p.code == "contract-args"]
+        self.assertEqual(found, ["data.load_prices"])
+
+    def test_contract_depends(self):
+        """rl9: `compare.run_claims` took a `viz.Chart`, but compare didn't depend on viz."""
+        self.p.edit(CONTRACT, "`def load_prices(universe: Universe, start: date, end: date) -> Prices`",
+                    "`def load_prices(universe: Universe, start: date, end: date, cov: Cov) -> Prices`")
+        self.p.edit(CONTRACT, "`def min_variance(cov: Cov) -> Weights`",
+                    "`def min_variance(cov: Cov, prices: data.Prices) -> Weights`")
+        found = [p.message.split(",")[0] for p in self.problems() if p.code == "contract-depends"]
+        self.assertEqual(found, ["data.load_prices names stats.Cov"])
+
     def test_roadmap_and_todo_need_no_status(self):
         self.assertNotIn(("docs/roadmap.md", "header"), self.found())
         self.assertNotIn((TODO, "header"), self.found())

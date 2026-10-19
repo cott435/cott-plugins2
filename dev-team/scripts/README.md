@@ -332,6 +332,7 @@ Checks (code: severity):
   - `spec-stage` E — once the roadmap has stages, a spec feature with no `**Stage:**` line (nor a stage heading grouping it), or one naming no stage row
   - `milestone-lines` E — a Designed, Planned or Building milestone with no `**Exit:**` line, or (in a stage cut into more than one milestone) a milestone section with no `**Skills:**` or `**References:**` line (build-planning `cut.md`); a milestone that needs either with no `## M<n>` section at all, at its row
   - `milestone-order` E — a milestone row with a lower ID than a row above it (rows run in build order), or whose Depends names its own or a higher ID
+  - `milestone-lopsided` W — a stage held whole in one milestone whose Pipelines cell names more pipelines than every milestone of a stage cut into several, at least twice the smallest of those and at least 4: one lump beside slices (rl: M3 holds all of S2, 7 pipelines, beside S1's M1 at 3 and M2 at 5). Silent while no stage is cut into several milestones
   - `exit-cases-in-scope` E — a TC that a milestone's roadmap Exit or Outline, or its plan's Scope Exit, names (ranges expanded) that no tests.md defines, or whose Pipeline isn't in the milestone's Pipelines (its row's cell, else the inferred set)
   - `milestone-depends` E — a cycle in the roadmap milestones' Depends (IDs outside parentheses), once, at its first milestone's row
   - `roadmap-stage` E — once the roadmap has stages, a milestone row whose Stage cell names no stage row, isn't an `S<n>`, or is empty on a row with no Source of its own

@@ -46,6 +46,7 @@ SEVERITY = {
     "exit-cases-in-scope": "E", "kind-title": "E", "covers-vs-deferred": "E", "closed-open-question": "W",
     "process-narration": "E", "explain-stale": "W", "spine-claim": "W", "step-unplanned": "W",
     "interface-barrier": "W", "stale-row": "E",
+    "milestone-lopsided": "W",
 }
 
 # Size budgets (planning-stage.md §3), in lines. Package docs are budgeted per unit (lines per unit × units +
@@ -641,6 +642,35 @@ def check_milestone_order(ctx: Context):
             yield _p(roadmap, m.row_line, "milestone-order",
                      f"{m.id} depends on {', '.join(later)}, not an earlier milestone: renumber so a milestone "
                      "comes after those it needs")
+
+
+LOPSIDED_MIN_PIPELINES = 4
+
+
+def check_milestone_lopsided(ctx: Context):
+    """A stage held whole in one milestone that carries more pipelines than every milestone of a stage cut into
+    several, at least twice the smallest of them and at least `LOPSIDED_MIN_PIPELINES`: one lump beside slices
+    (rl: M3 holds all of S2, 7 pipelines, beside S1's M1 at 3 and M2 at 5). A warning: cut the stage into slices."""
+    roadmap = ctx.repo.roadmap
+    if roadmap is None or not ctx.in_scope(roadmap.rel):
+        return
+    by_stage: dict[str, list[model.Milestone]] = {}
+    for m in model.milestones(roadmap):
+        if m.stage and m.row_line is not None:
+            by_stage.setdefault(m.stage, []).append(m)
+    sliced = [m for ms in by_stage.values() if len(ms) > 1 for m in ms]
+    if not sliced:
+        return
+    sizes = {m.id: len([p for p in m.pipelines if p.startswith("PL-")]) for ms in by_stage.values() for m in ms}
+    small, large = min(sizes[m.id] for m in sliced), max(sizes[m.id] for m in sliced)
+    for stage, ms in by_stage.items():
+        m = ms[0]
+        n = sizes[m.id]
+        if len(ms) == 1 and n > large and n >= max(2 * small, LOPSIDED_MIN_PIPELINES):
+            beside = ", ".join(f"{x.id} {sizes[x.id]}" for x in sliced)
+            yield _p(roadmap, m.row_line, "milestone-lopsided",
+                     f"{m.id} holds all of {stage} in one milestone ({n} pipelines), beside sliced milestones "
+                     f"({beside}): cut {stage} into slices, the first one end to end")
 
 
 def _milestone_plans(ctx: Context) -> dict[str, Doc]:
@@ -1846,7 +1876,7 @@ CHECKS = [
     check_step_io_types, check_packet_type_closure, check_type_cases, check_task_ref,
     check_todo_mismatch, check_finding_disposition, check_foreign_plan,
     check_ref_file, check_ref_hash, check_ref_large, check_ref_prefix, check_roadmap_skill, check_roadmap_stage,
-    check_spec_stage, check_milestone_lines, check_milestone_order, check_exit_cases_in_scope,
+    check_spec_stage, check_milestone_lines, check_milestone_order, check_milestone_lopsided, check_exit_cases_in_scope,
     check_kind_title, check_covers_vs_deferred, check_step_unplanned, check_interface_barrier, check_closed_open_question, check_process_narration,
     check_stale_row,
     check_probe_fields, check_probe_informs, check_probe_cite, check_probe_runner, check_probe_leak,

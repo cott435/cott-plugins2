@@ -984,7 +984,7 @@ class SpineClaim(LintCase):
 
 
 class MilestoneChecks(LintCase):
-    """`milestone-lines` and `milestone-order` on the roadmap."""
+    """`milestone-lines`, `milestone-order` and `milestone-lopsided` on the roadmap."""
     ROADMAP = "docs/roadmap.md"
     M2_ROW = "| M2 | Classical portfolios | ideas/classical-portfolios.md | quant | PL-03 | M1 | Designed |"
 
@@ -1021,6 +1021,25 @@ class MilestoneChecks(LintCase):
         text = self.p.read(self.ROADMAP)
         self.p.write(self.ROADMAP, text[:text.index("## M2:")])
         self.assertEqual(self.messages("milestone-lines"), [(8, "M2 (Designed) has no `## M2: <name>` section")])
+
+    def lump(self, pipelines: str):
+        """The staged roadmap with S1 cut into M1 (2 pipelines) and M2 (1), and all of S2 in M3."""
+        self.staged("## M2: Shrinkage\n**Outline:** Shrinkage.\n**Skills:** —\n**References:** —\n**Exit:** TC-02 passes.\n")
+        self.p.edit(self.ROADMAP, "| M1 | Designed |\n",
+                    f"| M1 | Designed |\n| M3 | S2 | Classical portfolios | quant | {pipelines} | M2 | Planned |\n")
+
+    def test_whole_stage_beside_slices_warns(self):
+        self.lump("PL-01, PL-02, PL-03, PL-05")
+        self.assertEqual([(p.line, p.severity, p.message) for p in self.problems() if p.code == "milestone-lopsided"], [
+            (14, "W", "M3 holds all of S2 in one milestone (4 pipelines), beside sliced milestones (M1 2, M2 1): cut "
+                      "S2 into slices, the first one end to end")])
+
+    def test_small_stage_in_one_milestone_passes(self):
+        self.lump("PL-03, PL-05")
+        self.assertEqual(self.messages("milestone-lopsided"), [])
+        self.p.write(self.ROADMAP, self.p.read(self.ROADMAP).replace("| M2 | S1 | Shrinkage | quant | PL-02 | M1 | Designed |\n", ""))
+        self.p.edit(self.ROADMAP, "| PL-03, PL-05 |", "| PL-01, PL-02, PL-03, PL-05 |")
+        self.assertEqual(self.messages("milestone-lopsided"), [], "no stage is sliced: nothing to be lopsided against")
 
     def test_rows_out_of_build_order(self):
         row1 = "| M1 | Data + stats | brief | quant | PL-01, PL-02 | — | Building |"

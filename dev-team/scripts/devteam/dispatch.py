@@ -7,9 +7,11 @@ landing commit); a tester half when its tests branch `dt/<task>-tests` exists.
 Holds, in the order they are reported:
 - **critical** — a recorded review has a Critical finding not yet resolved: nothing is released.
 - **escalation** — an unresolved NEEDS-DEP escalation, or a CONTRACT-CHANGE naming no type: nothing is released.
-- **barrier** — a `(barrier)` checkpoint whose reviews haven't all passed: no half of a task after it in the plan.
-  A checkpoint straight after an interface task is a barrier too, and where the plan puts another task straight
-  after one, dt adds the barrier (`added_barriers`): nothing builds on a frozen interface before its review.
+- **barrier** — a `(barrier)` checkpoint whose reviews haven't all passed: no implementer or solo half of a task after
+  it in the plan. A checkpoint straight after an interface task is a barrier too, and where the plan puts another
+  task straight after one, dt adds the barrier (`added_barriers`): no code builds on a frozen interface before its
+  review. Tester halves run during it: they read only the frozen surface, so they are the fastest check of what it
+  lacks, and their tests are red by design.
 - **contract** — an unresolved CONTRACT-CHANGE naming a contract type (`dt escalate CONTRACT-CHANGE --type`): no
   half of a task that reads that type, nor of a task depending on the escalating one, directly or not.
 - **blocked** — a half rejected twice, three harness failures in a row, or a TEST-WRONG escalation unresolved.
@@ -237,7 +239,7 @@ class Build:
             why = ""
             if glob:
                 why = glob[0]
-            elif (ph := self.barrier_for(t)) is not None:
+            elif role != "tester" and (ph := self.barrier_for(t)) is not None:
                 why = f"barrier: checkpoint after {ph.key} not passed"
             else:
                 why = self.blocked_why(t, role) or self.contract_hold(t)

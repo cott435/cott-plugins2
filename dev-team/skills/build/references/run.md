@@ -28,8 +28,9 @@ switches to `build/M<n>`, the branch every worktree starts from and every landin
 commits the go there as `**Build:**` in `tasks/plan.md`. A refusal is reported as it stands; fix nothing yourself.
 
 **3. Interface first.** The first `dt ready` lists only the interface task(s). After they land,
-the interface review runs as a barrier, which `dt` adds when the plan has none: `dt ready` releases nothing else until it is recorded as
-passed. A Critical there is a stop like any other.
+the interface review runs as a barrier, which `dt` adds when the plan has none, and the testers
+run beside it: no implementer or solo half starts until the review is recorded as passed. A
+Critical there is a stop like any other.
 
 **4. Loop** (`loop.md`) until it ends: Exit when every task has landed and the exit review is
 recorded, otherwise a stop reported per `escalation.md`.
@@ -49,9 +50,9 @@ $ dt build start M1
 $ dt ready --reserve --cap 6 --json      → M1-T01 solo (implementer)
   spawn 1 agent
   … DONE M1-T01 solo → dt land → landed
-$ dt ready --reserve --cap 6 --json      → M1-T01.gridload reviewer (barrier, lead)
+$ dt ready --reserve --cap 6 --json      → M1-T01.gridload reviewer (barrier, lead), T11 tester, T12 tester, …
   … REVIEW M1-T01 gridload: 2 findings, 0 Critical → dt finding --from …/reviews/M1-T01.gridload.md
-$ dt ready --reserve --cap 6 --json      → 6 rows: T05 solo, T02 solo, T11 tester, T12 tester, …
+$ dt ready --reserve --cap 6 --json      → T05 solo, T02 solo, … (the free slots)
 ```
 
 Each later turn is one completion and one landing, a few lines each.

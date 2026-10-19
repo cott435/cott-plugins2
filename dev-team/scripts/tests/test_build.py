@@ -50,12 +50,13 @@ class ReadyTest(BuildCase):
         self.assertEqual((row["pkg"], row["kind"], row["remaining_cp"]), ("mini", "interface", 6))
         self.fake_land("M1-T01")
         r = self.ready()
-        self.assertEqual([(x["id"], x["role"]) for x in r["rows"]], [("M1-T01.mini", "reviewer")])
+        # rl9: testers found the interface's missing seams first, so they run during its review; code waits.
+        self.assertEqual([(x["id"], x["role"]) for x in r["rows"]], [("M1-T01.mini", "reviewer"), ("M1-T03", "tester")])
         review = r["rows"][0]
         self.assertEqual((review["kind"], review["tasks"], review["lead"]), ("interface", ["M1-T01"], True))
         self.assertTrue(review["findings_file"].endswith("dt-build/reviews/M1-T01.mini.md"))
         self.assertIn("REVIEW M1-T01 mini: <n> findings, <c> Critical", review["prompt"])
-        self.assertEqual({(h["id"], h["role"]) for h in r["held"]}, {("M1-T02", "solo"), ("M1-T03", "tester")})
+        self.assertEqual({(h["id"], h["role"]) for h in r["held"]}, {("M1-T02", "solo")})
         self.assertTrue(all(h["why"].startswith("barrier:") for h in r["held"]))
         self.pass_barrier()
         r = self.ready()
@@ -93,7 +94,7 @@ class ReadyTest(BuildCase):
         self.commit("plan without the interface barrier")
         self.fake_land("M1-T01")
         r = self.ready()
-        self.assertEqual([(x["id"], x["kind"]) for x in r["rows"]], [("M1-T01.mini", "interface")])
+        self.assertEqual([(x["id"], x["kind"]) for x in r["rows"]], [("M1-T01.mini", "interface"), ("M1-T03", "thicken")])
         self.assertEqual({h["why"] for h in r["held"]}, {"barrier: checkpoint after M1-T01 not passed"})
         found = self.ctl / "M1-T01.mini.md"
         found.write_text("Important · Interface · tests/contracts/test_x.py the fake drops a field → keep it\n")
@@ -111,7 +112,7 @@ class ReadyTest(BuildCase):
         self.commit("plain checkpoint")
         self.fake_land("M1-T01")
         r = self.ready()
-        self.assertEqual([(x["id"], x["kind"]) for x in r["rows"]], [("M1-T01.mini", "interface")])
+        self.assertEqual([(x["id"], x["role"]) for x in r["rows"]], [("M1-T01.mini", "reviewer"), ("M1-T03", "tester")])
         self.assertTrue(r["held"] and all(h["why"].startswith("barrier:") for h in r["held"]))
 
     def test_reserve_and_cap(self):
@@ -622,7 +623,7 @@ class FindingFromTest(BuildCase):
 
     def test_records_commits_and_holds(self):
         self.fake_land("M1-T01")
-        self.reserve()
+        self.reserve("--cap", "1")
         path = self.state() / "reviews" / "M1-T01.mini.md"
         path.write_text(self.LINES, encoding="utf-8")
         code, out = self.dt_json("finding", "--from", str(path))

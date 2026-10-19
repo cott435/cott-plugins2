@@ -548,7 +548,8 @@ def outside_milestone(m_pls, m_tasks, deferred=(), declared_names=(), packages=(
         for s in pl["steps"]:
             sid = f"{pl['id']}.{s['name']}"
             if sid in dfr and sid not in own_steps:
-                out[sid] = "Deferred by name"
+                also = sorted(set(s.get("covers") or []) & dfr)
+                out[sid] = "Deferred by name" + (f" ({', '.join(also)})" if also else "")
                 continue
             by = [] if call_step(pl, s, packages) else covering_tasks(pl, s, m_tasks, units, packages) + wiring_folds(pl, s, m_tasks, packages)
             (built if by else unbuilt).append((pl, s))

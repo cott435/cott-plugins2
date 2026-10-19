@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Good and bad cases for the grader's structural rules (dtrun.py, probefacts.py, probegrade.py, planexport.py), one
-pair or more per check that iteration 7's, 8's and 9's findings changed. The good cases are the forms those plans used that the old grader flagged by mistake;
+pair or more per check that iteration 7's, 8's, 9's and 10's findings changed. The good cases are the forms those plans used that the old grader flagged by mistake;
 the bad cases are the defects each check must still catch. No dt, no model calls; the dry run runs this too.
 
 Usage: checks.py   prints one line per case; exit 1 if any case comes out wrong
@@ -703,6 +703,17 @@ case("sim_ready_3", True, "it10 rl aao: M1-T14 builds PL-01.train_dqn in package
      w and w["id"] == "M1-T19" and own == ["M1-T05"])
 w, own = simulate.wiring_spines(t10, [pipe("PL-01", lab_pl["steps"], package="lab")], ("lab",))
 case("sim_ready_3", False, "a step of the pipeline's own package is still one the wiring waits on", own == ["M1-T05", "M1-T14"])
+lab_pl2 = pipe("PL-01", lab_pl["steps"] + [step("load_agent", "lab.agents", "RunId → Agent", covers=["POOL-03", "POOL-04"])], package="lab")
+t10b = t10[:3] + [task("M1-T06", "spine", "PL-01.load_agent")] + t10[3:]
+w, own = simulate.wiring_spines(t10b, [lab_pl2], ("lab", "dqn"), ["POOL-01", "POOL-02", "POOL-03", "POOL-04"])
+case("sim_ready_3", True, "it10 rl aao: M1-T06 builds PL-01.load_agent, whose Covers are all Deferred (to M6): not held", own == ["M1-T05"])
+w, own = simulate.wiring_spines(t10b, [lab_pl2], ("lab", "dqn"), ["POOL-04"])
+case("sim_ready_3", False, "with one of its Covers still this milestone's, it is held", own == ["M1-T05", "M1-T06"])
+t10c = t10b[:4] + [task("M1-T19", "wiring", "PL-01", ["packages/lab/src/rllab/lab/pipeline.py", "tests/unit/lab/test_pl01_smoke.py"])]
+t10c[-1]["depends_on"] = ["M1-T05", "M1-T06"]
+w, own = simulate.wiring_spines(t10c, [lab_pl2], ("lab", "dqn"), ["POOL-01", "POOL-02", "POOL-03", "POOL-04"])
+case("sim_ready_3", False, "it9 quant inc M1-T04 (open_primary, DATA-01 Deferred): a spine the wiring waits on is held",
+     own == ["M1-T05", "M1-T06"])
 
 # ---- phase0_split, wave_width (it10 G4): steps the Deferred list names by ID
 cell = ("SYNC-04 (to M2), PL-07.raise_finding (to M2: findings land with validation), PL-09.useReport, PL-09.ReportView "
@@ -722,7 +733,7 @@ dq = ["SYNC-04"] + d.named_steps(cell)
 names10 = {"Universe", "Returns", "Store", "Ids", "Id", "Stock"}
 o10 = d.outside_milestone([pl07, pl09], tq, dq, names10, ("eqdata", "web"))
 case("phase0_split", True, "it10 quant inc: PL-07.raise_finding, PL-07.latest_day and PL-09.useReport are Deferred by name",
-     {k for k, v in o10.items() if v == "Deferred by name"} == {"PL-07.raise_finding", "PL-07.latest_day", "PL-09.useReport"})
+     {k for k, v in o10.items() if v.startswith("Deferred by name")} == {"PL-07.raise_finding", "PL-07.latest_day", "PL-09.useReport"})
 m10 = d.phase0_misses([pl07, pl09], tq, {"M1-T01"}, names10, ("eqdata", "web"), o10)
 case("phase0_split", True, "...so useReport's Report and raise_finding's Finding aren't asked of the interface, though api.queries is built",
      not any("Report" in m or "Finding" in m or "raise_finding" in m or "latest_day" in m for m in m10))

@@ -5,6 +5,7 @@ These are the baselines for iteration 10. They come from the "Harness: grader" t
 - **Grades:** `grading-<trajectory>.json` here for iteration 9, and in [../../results-iteration-8/regrade/](../../results-iteration-8/regrade/) for iteration 8. [smoke-10-grading-rl-all-at-once.json](smoke-10-grading-rl-all-at-once.json) is the ten-turn smoke run.
 - **How they were made:** each run was copied from `dev-team-workspace/` into a scratch folder without its venvs and `flow/`, then graded there. The workspace was only read.
 - **quant all-at-once (iteration 9):** graded at `9ece2e6` (`turn 50`). Two build sessions committed to that project folder after the run. `adjudicate.py` now does the same (`AT_COMMIT`).
+- **Iteration-11 grader:** the `grading-*.json` files were regraded again with the G1–G5 fixes ([../../results-iteration-10/regrade/README.md](../../results-iteration-10/regrade/README.md)). No outcome, evidence or check text moved; only the scratch `dt` path differs.
 - **"Before":** the grader at `65cd08e` (dev-team 0.5.0), run on the same copies.
   - Its iteration-9 scores are 64, 61, 80 and 82. At run time they were 64, 61, 79 and 82.
   - quant incremental's `docs_before_probe` passes now because group 0 added Sharadar's `data.nasdaq.com` docs to `scenarios.json`.

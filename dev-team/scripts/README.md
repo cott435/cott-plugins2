@@ -340,7 +340,7 @@ Checks (code: severity):
   - `request-open` E — an Approved spec.md or architecture.md with an open request of its owner (`spec`, `architecture`), at that doc's header line
   - `request-edit` E (git) — a request whose words, context, skill or date differ from HEAD, or that is gone: only its trace changes
   - `request-ref` E — a `UR-NN` in any doc that docs/requests.md doesn't define
-  - `request-number` W — a number in a traced request's words (or a change's what) that none of the IDs it names states: digits, number words to twenty, `5%` as 0.05, `2k` as 2000; a time ("1 hour") matches only a time ("60 minutes")
+  - `request-number` W — a number in a traced request's words (or a change's what) that none of the IDs it names states: digits, number words to twenty, `5%` as 0.05, `2k` as 2000; a time ("1 hour") matches only a time ("60 minutes"). Numbers that name rather than state are skipped (`requests.strip_labels`): a numbered thing (`Environment 3`, `variation 4`), a step of a sequence (`1 → 2`), a count of the choices asked (`all seven assumptions`), and a bare number that labels an option in the request's `[context]` (`Go with 2 + 4` for `[2 = …; 4 = …]`); a number with a unit always counts
   - `request-cite` W — a doc citing a superseded request, or a changed one from an ID the change wasn't written into (`--into`)
   - `request-source` W — a test case whose Source is only requests, with an Expected number none of them states (a superseded request reads as its replacement, a changed one as what was done instead)
 - `explain-stale` W — a page under `docs/explained/` that differs from what `dt explain --write` writes now, or whose package has no pipelines left

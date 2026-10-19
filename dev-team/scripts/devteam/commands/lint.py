@@ -859,7 +859,7 @@ def check_request_number(ctx: Context):
         texts = [rq.definition_text(ctx.repo, i) for i in ids]
         if not ids or not all(texts):
             continue
-        for shown in rq.unstated(r.changed or r.words, texts):
+        for shown in rq.unstated(rq.strip_labels(r.changed or r.words, r.about), texts):
             yield _p(doc, r.line, "request-number",
                      f"{r.id} says {shown!r}, which {', '.join(ids)} doesn't state: honour the number, or change it "
                      "with the user's yes")

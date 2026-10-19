@@ -305,6 +305,22 @@ class LintTest(Base):
         self.assertIn("UR-09 says 'three', which STAT-01 doesn't state", msgs[1])
         self.assertEqual(lint.SEVERITY["request-number"], "W")
 
+    def test_number_ignores_labels_and_counts(self):
+        # Option labels, numbered things, sequences and counts of the choices asked name; they don't state.
+        self.write(PATH, DOC + '- **UR-07** spec · "Go with 2 + 4." [factors: 1 = one; 2 = PCA; 4 = MP edge] · '
+                   "idea-refine 2026-10-19 → STAT-01\n"
+                   '- **UR-08** spec · "Stage 3 is fine, the ladder 1 → 2, all seven assumptions" · idea-refine '
+                   "2026-10-19 → STAT-01\n"
+                   '- **UR-09** spec · "A report in under ~1 hour, 2 factors" [1 = fast; 2 = slow] · idea-refine '
+                   "2026-10-19 → STAT-04\n")
+        self.replace("docs/spec.md", "then a report lists the top factors.", "then a report lists the top factors "
+                     "within 90 minutes.")
+        msgs = [p.message for p in self.problems("request-number")]
+        self.assertEqual(len(msgs), 1, msgs)
+        self.assertIn("UR-09 says '1 hour', which STAT-04 doesn't state", msgs[0])
+        self.assertEqual(rq.strip_labels("Go with 2 + 4.", "1 = a; 2 = b; 4 = c"), "Go with   +  .")
+        self.assertEqual(rq.unstated(rq.strip_labels("5 seeds"), ["three seeds"]), ["5"])
+
     def test_cite(self):
         changed = 'spec-writing 2026-10-19; in DATA-01)'
         self.write(PATH, DOC.replace('spec-writing 2026-10-19)', changed))

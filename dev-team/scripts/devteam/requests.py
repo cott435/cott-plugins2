@@ -246,6 +246,32 @@ NUMBER = re.compile(r"(?<![\w.\-])(\d{1,3}(?:,\d{3})+|\d+(?:\.\d+)?)(?![\w-]*\d)
 NUMBER_WORD = re.compile(r"\b(" + "|".join(WORDS) + r")\b(?:\s+(hours?|minutes?))?", re.I)
 
 
+_N = r"(?:\d+|" + "|".join(WORDS) + r")"
+UNIT_AFTER = r"(?!\s*(?:%|k\b|h\b|hours?\b|hrs?\b|minutes?\b|mins?\b))"
+# Numbers that name, not state: `Environment 3`, `variation 4`; `1 → 2 → 3`; `all seven assumptions`.
+NAMED = re.compile(rf"\b((?:environment|env|stage|step|option|variation|variant|choice|question|item|level|phase|part|"
+                   rf"rung|round|number|no\.)s?\s+){_N}\b", re.IGNORECASE)
+SEQUENCE = re.compile(r"\b\d+\b(?=\s*(?:→|->))|(?<=→)\s*\d+\b|(?<=->)\s*\d+\b")
+COUNTED = re.compile(rf"\b{_N}(?=\s+(?:\w+\s+)?(?:choices|assumptions|decisions|defaults|options|variations|questions|"
+                     rf"answers|items|points|changes|suggestions|picks|recommendations|proposals)\b)", re.IGNORECASE)
+# An option label in a request's context: `[1 = tabular first; 2 = …]`, `[S3 variations: 1 per-feature …; 5 …]`.
+LABEL = re.compile(r"(?:^|[\[;:,.]|->|→)\s*(\d+)\s*(?=[=().:]|\s|$)")
+
+
+def strip_labels(text: str, about: str = "") -> str:
+    """The text with the numbers that name rather than state blanked: a numbered thing (`Environment 3`), a step of a
+    sequence (`1 → 2`), a count of the choices asked (`all seven assumptions`), and a bare number that is one of the
+    context's option labels (`Go with 2 + 4` for `[2 = …; 4 = …]`). A number with a unit always stays."""
+    labels = set(LABEL.findall(about))
+    text = NAMED.sub(lambda m: m.group(1), text)
+    text = SEQUENCE.sub(" ", text)
+    text = COUNTED.sub(" ", text)
+    if labels:
+        text = re.sub(rf"(?<![\w.\-])(\d+)\b(?![.,]\d){UNIT_AFTER}",
+                      lambda m: " " if m.group(1) in labels else m.group(0), text)
+    return text
+
+
 def numbers(text: str) -> list[tuple[str, set[float], str]]:
     """Each number stated in the text, as written, with the values it may appear as elsewhere (an hour is also 60
     minutes, 5% is also 0.05, 2k is 2000) and its kind: "time" for hours and minutes, else "". IDs (AD-03, S2),

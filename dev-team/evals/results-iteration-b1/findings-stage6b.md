@@ -49,6 +49,25 @@ On minilab one session working alone (A0) builds the same 21 tasks in 894 s; A3 
 3. **The review before fan-out** costs 4.5 minutes and earns it only partly; checking each downstream task's Read and acceptance against the frozen surface (does every type and method a task's tests need exist?) would aim it at the gaps builders actually hit.
 4. **The system task's real training** (incremental) belongs in its own task with a time budget and a feasibility probe first (below).
 
+## The overhead cuts, measured (minilab A3-r5)
+
+`build-overhead` (e74b0b7, merged into build-phase) made four cuts: `dt lint` checks contracts against the bar's argument and layering limits at planning time; the interface review checks what later tasks need from the frozen surface; testers start during the interface review, the barrier holding code only; the exit review re-reviews only code no checkpoint covered. Splitting the interface task and moving long work into its own task are proposals for build-planning, not built. One run, A3-r5: 23/23, 1,877 s, $22.29, 21/22.
+
+| Phase (s) | A3 r1–r3 (stage 5) | A3-r4 (contract-gap fixes) | A3-r5 (cuts) |
+|---|---|---|---|
+| Contract change at M1-T01 | 106–137 | 112 | 84 |
+| Interface M1-T01 | 303–385 | 374 | 452 |
+| M1-T01 landed → first claim | 116–130 | 148 | **12** (testers) |
+| M1-T01 landed → first code claim | 171–198 | 228 | **106** |
+| M1-T02–T20 | 308–370 | 370 | 316 |
+| M1-T21 claim → land | 93–117 (r1 410) | 93 | 814 (a Replan) |
+| M1-T21 landed → exit reviews done | 198–263 | 206 | **118** |
+
+- **Where the cuts touched, they saved about 200 s:** about 100 s at the barrier (testers start 12 s after the interface lands) and 80–145 s at the exit. The parallel phase is at the low end of its range.
+- **The total doesn't show it.** M1-T21 escalated the `load_prices` contract change (the real `validate_rows` doesn't narrow tickers; the fakes do), as in A3-r1, A3-WF-r2 and A3-RT-r3, and its Revise, re-freeze M1-T22 and fix task M1-T23 took 814 s. Without that cycle the run would be about 1,160 s: below A3's stage-5 range (1,247–1,790) but still 1.3× A0's 894. The interface task (452 s, the slowest A3 so far) is agent variance; none of the cuts touch it.
+- **Correctness held:** golden 8/8, holdout 6/6, beliefs 3/3, mutants 16/16. `red_right_reason` 49/60 misses only M1-T23's tests, which pin behaviour `validate_rows` already had (as in A3-RT-r3), not the cuts.
+- **What's left:** the interface task itself (300–450 s of every minilab run, 35–40 min on rl9) is the largest fixed cost, and its split per component waits on build-planning. The `load_prices` contract gap recurs in 4 of 9 A3-family runs; the fixture's fake and real code disagree, which the system task's new contract-case check now catches at M1-T21, after the parallel phase. n = 1.
+
 ## Planning findings
 
 - **An unreachable requirement frozen as a golden case** (incremental). TC-26 / EVAL-04 asks that an agent beat the scripted player within QR-01..QR-03. The system agent's evidence: scripted 18.7; tabular 17.3–18.3 over many settings; dqn-compact 18.9; the library reference DQN 19.0; clearing scripted after Holm over about 7 claims needs about +0.7. A beats-baseline result was written as a pass condition with no source that it is reachable. spec-writing (`references/spec.md:79`) asks for a metric, threshold and baseline but no evidence the threshold is reachable under the spec's compute limits; architecture-design named the risk (`architecture.md:201`) without a probe; test-planning took the spec line as the oracle's source (`references/cases.md:40`); build-planning put all real training in one size-S system task. Proposal for the planning owners: a beats-baseline requirement under a compute cap needs a source (paper, reference result, probe) or the reported/stretch form.

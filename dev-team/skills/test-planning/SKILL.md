@@ -5,9 +5,9 @@ description: Plans how each package's pipelines are proven correct - a test stra
 
 # Test Planning
 
-A golden case is an oracle: an input and the output the code must produce, recorded before the code exists, from a source outside the agent that will build it. This skill writes `docs/packages/<pkg>/tests.md` (strategy and case index) and the fixtures under `tests/fixtures/<pkg>/TC-NN/`, and mints the `TC-NN` IDs. It's optional: when skipped, `build-planning` still requires a smoke test per pipeline and test-backed acceptance per task.
+A golden case is an oracle: an input and the output the code must produce, recorded before the code exists, from a source outside the agent that will build it. This skill writes only `docs/packages/<pkg>/tests.md` (strategy and case index) and the fixtures under `tests/fixtures/<pkg>/TC-NN/`, and mints the `TC-NN` IDs. It's optional: when skipped, `build-planning` still requires a smoke test per pipeline and test-backed acceptance per task.
 
-**Not for:** test code (the build's), pipeline design (`pipeline-design`), task order (`build-planning`). A change another skill owns (a contract, a pipeline, a spec ID) is recorded for its Revise, never made here: `dt route <owner> "<change>" --from test-planning`, and listed at the gate.
+**Not for:** test code (the build's), pipeline design (`pipeline-design`), task order (`build-planning`). A change another skill owns (a contract, a pipeline, a spec ID) is recorded for its Revise, never made here: `dt route <owner> "<change>" --from test-planning`, and listed at the gate. To `pipeline-design`, route only step changes (a call, an In → Out, a missing step), never restated contract fields or rules.
 
 `dt` means `python3 ../../scripts/dt.py`, relative to this skill's folder, run from the project root; write it out each call, never as a shell variable. `examples.md` here has the `tests.md` template, fixture shapes and a routed case; each mode file names its own examples.
 
@@ -24,7 +24,7 @@ Start with `dt status --skill test-planning`: the mode per package, its gap keys
 | **Grow** | The package split; cases move with their pipelines | Move sections and fixtures; content unchanged: `references/grow.md` |
 | **Current** | Nothing to do | Stop; start what `dt next` names, this turn |
 
-**Read:** `pipelines.md`, `contract.md`, the spec's DATA-, QR- and model-quality criteria for the IDs in scope (`dt section …`), and the milestone's `docs/references.md` entries (if `dt status` lists references waiting, route to `reference-intake` first). **Don't read** `tasks/plan.md`: cases follow the pipelines and the spec, not the task order.
+**Read:** `pipelines.md`, `contract.md`, the spec's DATA-, QR- and model-quality criteria for the IDs in scope (`dt section …`), and the milestone's `docs/references.md` entries (if `dt status` lists references waiting, route to `reference-intake` first). **Don't read** `tasks/plan.md`: cases follow the pipelines and spec.
 
 ## Asking
 
@@ -33,11 +33,11 @@ All questions in one message, each with your guess and a default, and only about
 ## Rules
 
 - Every case has a Source outside the agent and a Tolerance with its reason.
-- Each ID comes from `dt next-id TC`, the section written before the next; never count by hand.
+- Each ID comes from `dt next-id TC`, one section written before the next.
 - Fixtures are kilobytes; large data is a path plus hash. CSV for tables, JSON for structure and parameters.
-- **Every write of an `expected.json` brings a `dt guard` permission prompt**: the user approves every oracle write. Never route around it (no Bash `echo >`, no copying over).
+- **Every write of an `expected.json` brings a `dt guard` permission prompt**: the user approves every oracle write. Never route around it (no Bash `echo >`).
 - `expected.json` changes only through Revise with the user's approval, never by a builder to make a test pass.
-- Write only `docs/packages/*/tests.md` and `tests/fixtures/**`. Never create or run anything under `src/`, `tests/intent/`, `tests/unit/` or `tests/contracts/`, nor a generator.
+- Never create or run anything under `src/`, `tests/intent/`, `tests/unit/` or `tests/contracts/`, nor a generator.
 
 ## Review Gate (CRITICAL)
 
@@ -56,4 +56,4 @@ Fix what `dt lint docs/packages/<pkg>/tests.md` reports. Rerun `dt status --skil
 | "Approved, go ahead" | As above | Start what `dt next` names. Never start code |
 | A hedge on any oracle ("looks fine I guess") | Keep Draft. Ask again, naming the cases and values | Repeat this gate |
 | Changes to a case, or a case dropped | Edit; list drops explicitly; keep Draft | Repeat this gate |
-| Approved, plus an upstream change (a contract, a pipeline, a spec ID) | Set Approved; record it with `dt route` (Not for), never make it this turn | Stop; the owner's Revise is next |
+| Approved, plus an upstream change (a contract, a pipeline, a spec ID) | Set Approved; `dt route` it (Not for) | Stop; the owner's Revise is next |

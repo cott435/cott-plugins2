@@ -88,6 +88,20 @@ def inferred_pipelines(repo: Repo, ms: model.Milestone | model.Stage) -> list[st
     return sorted(out, key=lambda i: int(i.split("-")[1]))
 
 
+def staged_pipelines(repo: Repo, st: model.Stage) -> list[str] | None:
+    """A brief stage's own pipelines: the live ones whose Covers (else step Covers) include a requirement of a
+    spec feature whose `**Stage:**` line names it. Every brief stage's Source adds every brief ID, so
+    `inferred_pipelines` gives each one all of them. None for an idea-file stage, or when no feature names it."""
+    if source_files(st.source) or not repo.spec:
+        return None
+    ids = {r for f in model.spec_features(repo.spec)[0] if f.stage == st.id for r in f.requirements}
+    if not ids:
+        return None
+    out = [p.id for p in model.all_pipelines(repo) if not repo.is_retired(p.id)
+           and (set(p.covers) or set().union(*(s.covers for s in p.steps))) & ids]
+    return sorted(set(out), key=lambda i: int(i.split("-")[1]))
+
+
 def live_requirement_ids(repo: Repo) -> set[str]:
     """The spec's requirement IDs that aren't retired."""
     if not repo.spec:

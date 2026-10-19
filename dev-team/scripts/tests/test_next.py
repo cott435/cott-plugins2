@@ -132,6 +132,31 @@ class NextTest(NextCase):
 
 
 class AllAtOnceTest(NextCase):
+    def brief_stages(self):
+        """No plan yet; S1 and S2 both from the brief, with the spec's features naming their stages."""
+        (self.root / "tasks/plan.md").unlink()
+        (self.root / "tasks/todo.md").unlink()
+        self.write("docs/roadmap.md", "# Quant Lab — Roadmap\n\n**Last updated:** 2026-10-16\n\n"
+                   "| Stage | Name | Source | Status* |\n|---|---|---|---|\n"
+                   "| S1 | Data + stats | brief | Designed |\n| S2 | Classical portfolios | brief | Designed |\n\n"
+                   "## S1: Data + stats\n**Outline:** PCA.\n\n## S2: Classical portfolios\n**Outline:** Min-var.\n")
+        self.replace("docs/spec.md", "| ideas/classical-portfolios.md | PORT-01", "| brief.md | PORT-01")
+        for code, stage in (("DATA", "S1"), ("STAT", "S1"), ("PORT", "S2")):
+            self.replace("docs/spec.md", f"(`{code}`)\n**Serves:**", f"(`{code}`)\n**Stage:** {stage}\n**Serves:**")
+
+    def test_optional_test_planning_scoped_by_feature_stage(self):
+        # iteration 10 D2: before the first cut every brief stage infers every pipeline; S1's own are its features'.
+        self.brief_stages()
+        for name, body in NextTest.LAB.items():       # lab's PL-06 covers PORT-02, an S2 requirement
+            self.write(f"docs/packages/lab/{name}.md", f"# lab — {name.title()}\n\n**Package:** lab · **Status:** "
+                       f"Approved · **Last updated:** 2026-10-16\n\n{body}")
+        d = self.next()
+        self.assertEqual((d["skill"], d["packages"]), ("test-planning", ["quant"]))
+        self.assertIn("for S1 (optional)", d["reason"])
+        # PL-06 covers an S1 requirement: lab is in S1's scope.
+        self.replace("docs/packages/lab/pipelines.md", "**Covers:** PORT-02", "**Covers:** PORT-02, STAT-04")
+        self.assertEqual(self.next()["packages"], ["lab", "quant"])
+
     def test_stage_below_designed_goes_to_pipeline_design(self):
         (self.root / "tasks/plan.md").unlink()
         (self.root / "tasks/todo.md").unlink()

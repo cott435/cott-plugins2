@@ -36,6 +36,8 @@ state Critical.
   signature imports and matches the contract; each fake passes its contract's cases".
 - `references/tasks.md:50`, the interface task's `Verify:`: "the schema check over every sample, and each
   fake's contract cases", nothing about stubs.
+- `references/phase0.md:36` (Fakes and stubs), the stub sentence: add that no test may expect a stub
+  (`stub-pinned`), beside "the gate fails on one naming a done task, the milestone exit on any".
 
 ## 2. The barrier checkpoint after the interface task
 
@@ -76,6 +78,10 @@ move the finding to the task that builds the behaviour:
   (a spine, a thicken or the wiring). A case with no such task is a plan gap, like an uncovered requirement.
   A `dt status --skill build-planning` list (`fake_cases_unbuilt`) could report it, if the cases can be read
   from the contract's `**Cases:**` line.
+- `phase0.md:36` (Fakes and stubs) says both sides of a fake "test against the same fixtures, so neither
+  drifts from the contract unseen". minilab shows they can: the fixtures held, and the fake did more than
+  they showed. Reword it to say the fake's cases run on the real provider too (the system task's
+  Conformance block), and that anything the fake does beyond its fixtures must be a case.
 - `phase0.md` §d: the system task's `Writes:` name the conformance test the Conformance block asks for
   (`tests/unit/<pkg>/test_<symbol>_conformance.py`), and its acceptance reads "each fake's contract cases pass
   on the real provider" in place of "the boundary samples still validate against real output".

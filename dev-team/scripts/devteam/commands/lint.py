@@ -7,6 +7,7 @@ problems located in the files asked for. Cross-doc checks always read the whole 
 from __future__ import annotations
 
 import json
+import math
 import os
 import re
 import sys
@@ -49,6 +50,8 @@ SEVERITY = {
 # an allowance for the header, groups and Retired lines); pipelines.md's pre-build layout section is extra.
 BUDGETS = {"plan": 400, "queued-plan": 400}
 UNIT_BUDGETS = {"contract": (8, 12, "symbol"), "pipelines": (35, 10, "pipeline"), "tests": (10, 15, "test case")}
+# A pipeline with many step rows (library classes and called contract functions are steps) gets 20 + 1.5 a row.
+PIPELINE_BASE, PER_STEP_ROW = 20, 1.5
 # Past these a package holds too much for one set of docs: consider a Grow.
 GROW_CEILINGS = {"contract": 200, "pipelines": 300, "tests": 300}
 ROADMAP_SECTION_MAX = 6
@@ -259,12 +262,18 @@ def _units(doc) -> int:
 
 
 def _unit_budget(doc) -> tuple[int, str]:
-    """(budget in lines, how it was worked out) for a contract, pipelines or tests doc."""
+    """(budget in lines, how it was worked out) for a contract, pipelines or tests doc. A pipeline gets the larger
+    of its per-unit lines and `PIPELINE_BASE` + `PER_STEP_ROW` a step row."""
     per, allowance, unit = UNIT_BUDGETS[doc.kind]
     n = _units(doc)
     layout = sum(h.end - h.line for h in doc.prebuild_sections() if h.level == 2) if doc.kind == "pipelines" else 0
-    how = f"{per} per {unit} × {n} + {allowance}" + (f" + {layout} layout" if layout else "")
-    return per * n + allowance + layout, how
+    rows = [len(p.steps) for p in model.pipelines(doc)] if doc.kind == "pipelines" else []
+    long = [r for r in rows if PIPELINE_BASE + math.ceil(PER_STEP_ROW * r) > per]
+    units = per * (n - len(long)) + sum(PIPELINE_BASE + math.ceil(PER_STEP_ROW * r) for r in long)
+    how = f"{per} per {unit} × {n - len(long)}" + (f" + ({PIPELINE_BASE} + {PER_STEP_ROW:g} per step row) × "
+                                                   f"{len(long)} ({sum(long)} rows)" if long else "")
+    how += f" + {allowance}" + (f" + {layout} layout" if layout else "")
+    return units + allowance + layout, how
 
 
 def check_budget(ctx: Context):

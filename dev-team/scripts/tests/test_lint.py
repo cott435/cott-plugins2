@@ -117,6 +117,15 @@ class BudgetChecks(LintCase):
         self.p.edit(PIPES, "**Covers:** PORT-01, PORT-02", "**Covers:** PORT-01, PORT-02\n" + "filler\n" * 70)
         self.assertEqual(self.budget_messages(PIPES), ["135 lines, budget 127 (35 per pipeline × 3 + 10 + 12 layout)"])
 
+    def test_pipelines_budget_grows_with_step_rows(self):
+        # iteration 10 D6: a pipeline of 20 step rows gets 20 + 1.5 × 20 = 50 lines, not 35.
+        rows = "".join(f"| {k} | `extra{k}` | portfolio | Weights → Weights | identity | — |\n" for k in range(4, 21))
+        self.p.edit(PIPES, "| realized variance only | PORT-02 |\n", "| realized variance only | PORT-02 |\n" + rows)
+        self.assertEqual(self.budget_messages(PIPES), [])
+        self.p.edit(PIPES, "**Covers:** PORT-01, PORT-02", "**Covers:** PORT-01, PORT-02\n" + "filler\n" * 61)
+        self.assertEqual(self.budget_messages(PIPES), ["143 lines, budget 142 (35 per pipeline × 2 + (20 + 1.5 per "
+                                                       "step row) × 1 (20 rows) + 10 + 12 layout)"])
+
     def test_pipelines_layout_section_is_extra(self):
         layout = "## Planned layout (pre-build — removed by spine task)"
         self.p.edit(PIPES, layout, layout + "\n" + "- line\n" * 100)

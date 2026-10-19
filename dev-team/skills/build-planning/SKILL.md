@@ -5,7 +5,7 @@ description: Cuts each roadmap stage into build-sized milestones once its pipeli
 
 # Build Planning
 
-The build plan says **in what order** the pipelines get built. Once a stage's pipelines are approved, this skill cuts it into milestones (`M<n>`), vertical slices each runnable end to end, then plans one milestone at a time in `tasks/plan.md` and `tasks/todo.md`: small tasks, many built at once.
+Once a stage's pipelines are approved, this skill cuts it into milestones (`M<n>`), vertical slices each runnable end to end, then plans one milestone at a time in `tasks/plan.md` and `tasks/todo.md`: small tasks, many built at once.
 
 **Not for:** plans from agent-skills' `/plan` (foreign); pipelines, oracles or the quality bar (`pipeline-design`, `test-planning`, `build-setup`); building tasks. A fix their docs need goes to `dt route <owner> "<change>" --from build-planning`.
 
@@ -21,7 +21,7 @@ The build plan says **in what order** the pipelines get built. Once a stage's pi
 
 - No roadmap stage for the work: route to `idea-refine`.
 - **References waiting:** route to `reference-intake`.
-- **Probes open:** `probes_blocking` blocks New and Extend for that milestone: name the probe and route to `api-probe`. Cutting stages into rows (`cut.md` steps 1–2) still runs, and one queued plan at most. Only the user waives a probe, never on a headless run.
+- **Probes:** a milestone is planned only once `probes_blocking` is empty and a `PB-NN` sample backs the record type of each external source its pipelines read (`docs/probes.md`, decisions' `**Probe:**` lines). Else name the probe, or the source's type, and go on to `api-probe`. Cutting stages into rows (`cut.md` steps 1–2) still runs; one queued plan at most. Only the user waives a probe, never on a headless run.
 
 ## Modes
 
@@ -41,7 +41,7 @@ A foreign plan's question: `references/examples-foreign.md`. **Next run:** with 
 
 ## Asking
 
-- **Interview one question at a time**, with a guess and a default, only on the user's decisions: the cut, what the milestone covers and defers, the exit, queued plans, a missing skill, a mode override. Infer the rest as ASSUMPTIONS. For a choice from a list, show it, then ask once.
+- **Interview one question at a time**, with a guess and a default, only on the user's decisions: the cut, scope and deferrals, the exit, queued plans, a missing skill, a mode override. Infer the rest as ASSUMPTIONS. For a choice from a list, show it, then ask once.
 - **The user's words:** record them and honour yours (`requests_open`) per `../idea-refine/references/requests.md`.
 - **No live user:** open decisions go under Open questions; leave Draft.
 
@@ -54,7 +54,7 @@ Before presenting the Draft:
 - Every plan header field is set.
 
 Then present:
-1. **What was written:** files; any cut (milestones, pipelines, dependency lines); scope, exit, phases with task counts, critical path and widest wave, checkpoints.
+1. **What was written:** files; any cut; scope, exit, phases with task counts, critical path, widest wave, checkpoints.
 2. **ASSUMPTIONS:** interfaces frozen, every unmitigated edge with its reason, folds, sizes, modes and overrides, skill and reference routing, `Read:` choices.
 3. **Open questions:** missing skills, overrides to confirm, routed fixes.
 4. **Uncovered:** each Deferred ID with its target.
@@ -64,4 +64,4 @@ Then present:
 |---|---|---|
 | An unambiguous yes | Set Status `Approved` and the date. Offer a commit only if `git status` shows changes; commit only on a yes | **Stop:** next run (`build-setup`, never `/build`) |
 | Yes, with a change | Make exactly that edit. Approve only if it adds, drops or reorders nothing (a re-cut stage is a reorder) | List what changed. **Stop:** next run once approved |
-| Changes, or a hedge ("looks fine I guess") on a drop, an override or the exit | Edit, keep Draft | Repeat the gate |
+| Changes, or a hedge on a drop, an override or the exit | Edit, keep Draft | Repeat the gate |

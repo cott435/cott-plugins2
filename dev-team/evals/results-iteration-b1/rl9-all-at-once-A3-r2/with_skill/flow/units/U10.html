@@ -1,0 +1,2402 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1"><title>U10 implementer</title>
+<style>
+:root{--bg:#fbfbfa;--fg:#1d1d1f;--muted:#6b6b70;--line:#d9d9de;--box:#fff;--rowp:#eef3fb;--band:#fff4d6;
+--ok:#2e7d32;--bad:#c62828;--warn:#b26a00;--idle:#6b6b70}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#17171a;--fg:#ececf0;--muted:#9a9aa3;
+--line:#34343a;--box:#222227;--rowp:#1d2433;--band:#3a3015;--ok:#6fcf73;--bad:#ff6b6b;--warn:#f0b35a;--idle:#9a9aa3}}
+:root[data-theme="dark"]{--bg:#17171a;--fg:#ececf0;--muted:#9a9aa3;--line:#34343a;--box:#222227;--rowp:#1d2433;
+--band:#3a3015;--ok:#6fcf73;--bad:#ff6b6b;--warn:#f0b35a;--idle:#9a9aa3}
+body{margin:0;padding:16px;background:var(--bg);color:var(--fg);font:14px/1.45 -apple-system,system-ui,sans-serif}
+h1{font-size:18px;margin:0 0 4px}h2{font-size:15px;margin:22px 0 8px}.sub{color:var(--muted)}
+table{border-collapse:collapse;margin:4px 0 8px}td,th{border-bottom:1px solid var(--line);padding:4px 10px;text-align:left;
+vertical-align:top}th{color:var(--muted);font-weight:600}.chips span{display:inline-block;margin:0 4px 2px 0}
+.legend span{margin-right:14px;white-space:nowrap}.sw{display:inline-block;width:10px;height:10px;border-radius:2px;
+margin-right:4px;vertical-align:-1px}.scroll{overflow:auto;max-height:88vh;border:1px solid var(--line);border-radius:8px}
+.chart{display:grid;width:max-content}.chart>div{line-height:0}.corner{position:sticky;top:0;left:0;z-index:3}
+.colhead{position:sticky;top:0;z-index:2}.rowhead{position:sticky;left:0;z-index:2}
+svg.bg{background:var(--bg)}.colhead svg{border-bottom:1px solid var(--line)}.rowhead svg{border-right:1px solid var(--line)}
+.ok{color:var(--ok);fill:var(--ok)}.bad{color:var(--bad);fill:var(--bad)}.warn{color:var(--warn);fill:var(--warn)}
+.idle{color:var(--idle);fill:var(--idle)}
+svg text{fill:var(--fg);font-family:-apple-system,system-ui,sans-serif}
+.box{fill:var(--box);stroke:var(--line)}.unit:hover .box{stroke:var(--fg)}
+.role{font-size:12px;font-weight:600}.uid,.wmeta,.lmeta,.meta{font-size:10px;fill:var(--muted)}
+.sub{font-size:10.5px;fill:var(--muted)}.badge{font-size:11px;font-weight:600}
+.meta.bad{fill:var(--bad);font-weight:600}.lane{font-size:13px;font-weight:700}.wave{font-size:13px;font-weight:700}
+.par{fill:#4e79a7}.ser{fill:var(--muted)}.rowp{fill:var(--rowp)}.rows{fill:transparent}.band{fill:var(--band)}
+.bandt{font-size:11.5px}.grid{stroke:var(--line)}.link{stroke:var(--muted);stroke-width:1.2;opacity:.55}
+.arrowhead{fill:var(--muted)}.marks{font-size:10.5px}.audit{stroke:var(--box);stroke-width:2}.auditn{font-size:10px;font-weight:700;fill:#fff}
+a{color:inherit}svg a .box{cursor:pointer}
+
+:root{--c0:#2a78d6;--c1:#eb6834;--c2:#1baf7a;--c3:#eda100;--c4:#e87ba4;--c5:#008300;--c6:#6250d6;--c7:#e34948;
+--cx:#8a8985;--main:#52514e;--read:#dcdbd5;--readfg:#1d1d1f}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--c0:#3987e5;--c1:#d95926;--c2:#199e70;
+--c3:#c98500;--c4:#d55181;--c5:#008300;--c6:#9085e9;--c7:#e66767;--cx:#77766f;--main:#c3c2b7;--read:#3b3b40;
+--readfg:#ececf0}}
+:root[data-theme="dark"]{--c0:#3987e5;--c1:#d95926;--c2:#199e70;--c3:#c98500;--c4:#d55181;--c5:#008300;
+--c6:#9085e9;--c7:#e66767;--cx:#77766f;--main:#c3c2b7;--read:#3b3b40;--readfg:#ececf0}
+.c0{fill:var(--c0);background:var(--c0)}.c1{fill:var(--c1);background:var(--c1)}.c2{fill:var(--c2);background:var(--c2)}
+.c3{fill:var(--c3);background:var(--c3)}.c4{fill:var(--c4);background:var(--c4)}.c5{fill:var(--c5);background:var(--c5)}
+.c6{fill:var(--c6);background:var(--c6)}.c7{fill:var(--c7);background:var(--c7)}.cx{fill:var(--cx);background:var(--cx)}
+.cmain{fill:var(--main)}.sc0{stroke:var(--c0)}.sc1{stroke:var(--c1)}.sc2{stroke:var(--c2)}
+.tl text,.sm text,.lc text{font-size:10.5px;fill:var(--muted)}.tl .lbl-in,.sm .lbl-in{fill:#fff;font-size:10.5px;font-weight:600}
+.tl .rowl,.sm .rowl,.lc .rowl{fill:var(--fg);font-size:11.5px;font-weight:600}.tl .band{fill:var(--rowp)}
+.tl .brk{stroke:var(--muted);stroke-dasharray:2 3}.tl a:hover rect,.sm a:hover rect{stroke:var(--fg);stroke-width:1.5}
+.axis{stroke:var(--line)}.sm .val{fill:var(--fg);font-weight:600}.lc path.ln{fill:none;stroke-width:2}
+.lc circle{stroke:var(--bg);stroke-width:2}.lc .end{font-weight:600;fill:var(--fg)}
+.tiles{display:flex;flex-wrap:wrap;gap:10px;margin:12px 0}.tile{border:1px solid var(--line);border-radius:8px;
+padding:8px 12px;min-width:110px;background:var(--box)}.tile b{display:block;font-size:20px;line-height:1.2}
+.tile span{font-size:12px;color:var(--muted)}.tile i{font-style:normal;font-size:12px;margin-left:6px}
+.fm{border-collapse:separate;border-spacing:2px}.fm td,.fm th{border:0;padding:0;text-align:center;font-size:11px}
+.fm th{padding:0 2px;font-weight:600}.fm td.f,.fm th.f{text-align:left;padding-right:10px;white-space:nowrap;
+position:sticky;left:0;background:var(--bg);font:11.5px ui-monospace,Menlo,monospace;
+max-width:380px;overflow:hidden;text-overflow:ellipsis}
+.fm td.cell{min-width:22px;height:20px;border-radius:3px}.fm td.fw{background:var(--c0);color:#fff;font-weight:700}
+.fm td.fe{background:var(--c1);color:#fff;font-weight:700}.fm td.fr{background:var(--read);color:var(--readfg)}
+.fm td.n{color:var(--muted);padding:0 6px}.fm tr.grp td{text-align:left;padding-top:8px;color:var(--muted);
+font-weight:600}
+.key{display:inline-block;min-width:18px;text-align:center;border-radius:3px;font-size:11px;margin-right:4px}
+.bar{display:inline-block;height:9px;border-radius:2px;vertical-align:0}
+
+pre{white-space:pre-wrap;word-break:break-word;background:var(--box);border:1px solid var(--line);border-radius:6px;
+padding:8px 10px;margin:4px 0;font:12px/1.45 ui-monospace,SFMono-Regular,Menlo,monospace;max-width:100%;overflow:auto}
+.step{border-top:1px solid var(--line);padding:6px 0}.step:target{background:var(--rowp)}
+.sid{font:12px ui-monospace,Menlo,monospace;color:var(--muted);margin-right:8px}.kind{font-weight:600;margin-right:8px}
+.err{color:var(--bad);font-weight:600}.hook{color:var(--bad);margin:4px 0 0 16px}.lbl{font-size:12px;color:var(--muted);margin-top:6px}
+details summary{cursor:pointer;color:var(--muted);font-size:12px}.head td:first-child{color:var(--muted)}
+.top{font-size:13px}.narr{list-style:none;padding-left:0}.narr li{margin:3px 0}
+</style></head>
+<body>
+<p class="top"><a href="../flow.html">← the run's flow chart</a></p>
+
+<h1>U10 · implementer · M1-T02 solo</h1>
+<table class="head"><tr><td>Type</td><td>implementer</td></tr><tr><td>Description</td><td>M1-T02 solo</td></tr><tr><td>Spawned by</td><td>driver at D107</td></tr><tr><td>Turn</td><td><a href="../turns/T06.html">T06</a></td></tr><tr><td>Model</td><td>claude-opus-5-5</td></tr><tr><td>Start</td><td>2026-10-19 08:19:38 UTC</td></tr><tr><td>Duration</td><td>2 min</td></tr><tr><td>Tool calls</td><td>36</td></tr><tr><td>Errors</td><td>1</td></tr><tr><td>Hook blocks</td><td>5</td></tr><tr><td>Tokens</td><td>13.4k out · 60.6k new in · 918k cached in · peak context 65.3k</td></tr><tr><td>Skills invoked</td><td>none</td></tr><tr><td>Files written or edited</td><td>.claude/worktrees/agent-a457a1c397186a75d/src/rllab/train/config.py, .claude/worktrees/agent-a457a1c397186a75d/tests/unit/rllab/test_config.py</td></tr><tr><td>Definition</td><td>none</td></tr><tr><td>Steps</td><td>40</td></tr><tr><td>Finished</td><td>yes</td></tr></table>
+
+
+<h2>Prompt</h2>
+<pre>You are the solo for M1-T02. Run `python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/plugin/dev-team/scripts/dt.py claim M1-T02 --role solo`, then read the packet it names.</pre>
+<h2>Files</h2>
+<table><tr><th>Op</th><th>File</th><th>Calls</th><th>By</th><th>Via</th><th>Steps</th></tr><tr><td>write</td><td><code>.claude/worktrees/agent-a457a1c397186a75d/src/rllab/train/config.py</code></td><td>1</td><td>U10</td><td>Write</td><td><a href="#25">U10.S25</a></td></tr><tr><td>write</td><td><code>.claude/worktrees/agent-a457a1c397186a75d/tests/unit/rllab/test_config.py</code></td><td>1</td><td>U10</td><td>Write</td><td><a href="#36">U10.S36</a></td></tr><tr><td>edit</td><td><code>.claude/worktrees/agent-a457a1c397186a75d/src/rllab/train/config.py</code></td><td>4</td><td>U10</td><td>Edit</td><td><a href="#27">U10.S27</a> <a href="#29">U10.S29</a> <a href="#30">U10.S30</a> <a href="#33">U10.S33</a></td></tr><tr><td>edit</td><td><code>.claude/worktrees/agent-a457a1c397186a75d/tests/unit/rllab/test_config.py</code></td><td>1</td><td>U10</td><td>Edit</td><td><a href="#37">U10.S37</a></td></tr><tr><td>read</td><td><code>.claude/worktrees/agent-a457a1c397186a75d/.claude/packet.md</code></td><td>1</td><td>U10</td><td>Read</td><td><a href="#3">U10.S3</a></td></tr><tr><td>read</td><td><code>.claude/worktrees/agent-a457a1c397186a75d/CONSTRAINTS.md</code></td><td>1</td><td>U10</td><td>Read</td><td><a href="#4">U10.S4</a></td></tr><tr><td>read</td><td><code>.claude/worktrees/agent-a457a1c397186a75d/src/rllab/core/types.py</code></td><td>1</td><td>U10</td><td>Read</td><td><a href="#6">U10.S6</a></td></tr><tr><td>read</td><td><code>.claude/worktrees/agent-a457a1c397186a75d/src/rllab/methods/factory.py</code></td><td>1</td><td>U10</td><td>Read</td><td><a href="#15">U10.S15</a></td></tr><tr><td>read</td><td><code>.claude/worktrees/agent-a457a1c397186a75d/src/rllab/methods/types.py</code></td><td>1</td><td>U10</td><td>Read</td><td><a href="#16">U10.S16</a></td></tr><tr><td>read</td><td><code>.claude/worktrees/agent-a457a1c397186a75d/src/rllab/train/config.py</code></td><td>4</td><td>U10</td><td>Read</td><td><a href="#5">U10.S5</a> <a href="#26">U10.S26</a> <a href="#28">U10.S28</a> <a href="#32">U10.S32</a></td></tr><tr><td>read</td><td><code>.claude/worktrees/agent-a457a1c397186a75d/tests/contracts/core.MethodConfig/samples/dqn_snake_defaults.json</code></td><td>1</td><td>U10</td><td>Read</td><td><a href="#10">U10.S10</a></td></tr><tr><td>read</td><td><code>.claude/worktrees/agent-a457a1c397186a75d/tests/contracts/core.MethodConfig/samples/ppo_one_lr.json</code></td><td>1</td><td>U10</td><td>Read</td><td><a href="#13">U10.S13</a></td></tr><tr><td>read</td><td><code>.claude/worktrees/agent-a457a1c397186a75d/tests/contracts/core.RunConfig/samples/prey_two_methods.json</code></td><td>1</td><td>U10</td><td>Read</td><td><a href="#12">U10.S12</a></td></tr><tr><td>read</td><td><code>.claude/worktrees/agent-a457a1c397186a75d/tests/contracts/train.load_run_configs/samples/snake_s1_s2.json</code></td><td>1</td><td>U10</td><td>Read</td><td><a href="#9">U10.S9</a></td></tr><tr><td>read</td><td><code>.claude/worktrees/agent-a457a1c397186a75d/tests/fixtures/rllab/TC-05/input.json</code></td><td>1</td><td>U10</td><td>Read</td><td><a href="#22">U10.S22</a></td></tr></table>
+<h2>Steps</h2>
+<div class="step" id="S1"><span class="sid">U10.S1</span><span class="kind">user</span>You are the solo for M1-T02. Run `python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/plugin/dev-team/scripts/dt.py claim M1-T02 --role solo`, then read the packet it names.<details><summary>full text</summary><pre>You are the solo for M1-T02. Run `python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/plugin/dev-team/scripts/dt.py claim M1-T02 --role solo`, then read the packet it names.</pre></details></div><div class="step" id="S2"><span class="sid">U10.S2</span><span class="kind">Bash</span>python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/plugin/dev-team/scripts/dt.py claim M1-T02 --role solo<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/plugin/dev-team/scripts/dt.py claim M1-T02 --role solo&quot;
+}</pre><div class="lbl">output</div><pre>packet: /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/project/.claude/worktrees/agent-a457a1c397186a75d/.claude/packet.md (133 lines; read it in full)
+task: M1-T02 load_run_configs spine (TOML with method defaults) · role solo · package rllab · kind spine
+writes: src/rllab/train/config.py, tests/unit/rllab/test_config.py
+done: Done when `scripts/check.sh gate` passes (the gate passes on your Writes); the Stop hook runs it. End with one line: `DONE M1-T02 solo`. If you can&#x27;t finish: `python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/plugin/dev-team/scripts/dt.py escalate &lt;TEST-WRONG|NEEDS-DEP&gt; &quot;&lt;why&gt;&quot;`, or `python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/plugin/dev-team/scripts/dt.py escalate CONTRACT-CHANGE &quot;&lt;why&gt;&quot; --type &lt;the contract symbol&gt;`, then end with one line: `STOPPED M1-T02 solo: see dt escalate`.
+packet problems: Read: train.RunConfig is retired (Retired 2026-10-19: moved to `core.RunConfig` so `runlog.RunRecord` and `runlog.RunWriter` can hold it (AD-12)) at docs/packages/rllab/contract.md:472; Read: methods.MethodConfig is retired (Retired 2026-10-19: moved to `core.MethodConfig` so `core.RunConfig` and `runlog.Checkpoint` can hold it (AD-12)) at docs/packages/rllab/contract.md:473</pre></details></div><div class="step" id="S3"><span class="sid">U10.S3</span><span class="kind">Read</span>/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/project/.claude/worktrees/agent-a457a1c397186a75d/.claude/packet.md<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/project/.claude/worktrees/agent-a457a1c397186a75d/.claude/packet.md&quot;
+}</pre><div class="lbl">output</div><pre>1	# Packet: M1-T02 solo
+2	You are the solo for M1-T02. Your edit boundary is your Writes below (`.claude/.task_writes`); the guard blocks everything else.
+3	
+4	Done when `scripts/check.sh gate` passes (the gate passes on your Writes); the Stop hook runs it. End with one line: `DONE M1-T02 solo`. If you can&#x27;t finish: `python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/plugin/dev-team/scripts/dt.py escalate &lt;TEST-WRONG|NEEDS-DEP&gt; &quot;&lt;why&gt;&quot;`, or `python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/plugin/dev-team/scripts/dt.py escalate CONTRACT-CHANGE &quot;&lt;why&gt;&quot; --type &lt;the contract symbol&gt;`, then end with one line: `STOPPED M1-T02 solo: see dt escalate`.
+5	
+6	# Context for M1-T02: package rllab · mode solo · kind spine
+7	Read only what is below, plus CONSTRAINTS.md and the files you edit. Your task is the last section.
+8	
+9	&lt;!-- docs/packages/rllab/pipelines.md:5 --&gt;
+10	## PL-01: Method check
+11	**Entry:** `src/rllab/train/pipelines/pl01_check.py::run_check` · **Trigger:** `rllab check &lt;config.toml&gt;`; also PL-03 rows 2–5
+12	**Covers:** TRAIN-06
+13	
+14	| # | Step | Owner | In → Out | Spine version | Covers |
+15	|---|---|---|---|---|---|
+16	| 1 | `load_run_configs` | train.config | config path, seeds → list[RunConfig] | `tomllib` into frozen dataclasses, method defaults filled, name `&lt;stem&gt;-s&lt;seed&gt;` | TRAIN-01 |
+17	| 2 | `check_plan` | train.check | list[RunConfig] → MethodConfig per method | each distinct team method with `check_settings` applied | TRAIN-06 |
+18	| 3 | `train_checks` | train.check | MethodConfig per method, seed → Learner per method | make the method&#x27;s check world and learner, step it for the fixed check budget | TRAIN-06 |
+19	| 4 | `CheckDiscrete` | worlds.checks | overrides → CheckWorld | 6-state corridor, exits left of 0 (0.8) and right of 5 (1.0), γ = 0.9 (AD-09) | TRAIN-06 |
+20	| 5 | `CheckContinuous` | worlds.checks | overrides → CheckWorld | 1-D point, reward −distance to the target | TRAIN-06 |
+21	| 6 | `score_checks` | train.check | Learner per method, MethodConfig per method → list[CheckResult] | share of `states()` where `policy().act` matches `best_actions()` | TRAIN-06 |
+22	
+23	### Entry sketch (pre-build — removed by spine task)
+24	```python
+25	def run_check(config_path: Path, seed: int = 0) -&gt; list[CheckResult]:
+26	    configs = load_run_configs(config_path, [seed])
+27	    plan = check_plan(configs)
+28	    learners = train_checks(plan, seed)
+29	    return score_checks(learners, plan)
+30	```
+31	
+32	&lt;!-- docs/packages/rllab/contract.md:202 --&gt;
+33	### train.load_run_configs: Config loader
+34	`def load_run_configs(path: Path, seeds: Sequence[int]) -&gt; list[RunConfig]`
+35	- **Invariants:** one config per seed, named `&lt;file stem&gt;-s&lt;seed&gt;`; method settings missing from the TOML take the method&#x27;s defaults
+36	- **Errors:** `FileNotFoundError` for a missing file; `ValueError` naming an unknown key, world, variant or method
+37	- **Boundary:** refcheck, cli · **Fixtures:** tests/contracts/train.load_run_configs/ · **Cases:** a fake returning snake configs for seeds 1 and 2
+38	- **Used by:** refcheck, cli; PL-01, PL-03, PL-09
+39	
+40	&lt;!-- docs/packages/rllab/contract.md:472 --&gt;
+41	- ~~train.RunConfig: type~~ Retired 2026-10-19: moved to `core.RunConfig` so `runlog.RunRecord` and `runlog.RunWriter` can hold it (AD-12)
+42	
+43	&lt;!-- docs/packages/rllab/contract.md:473 --&gt;
+44	- ~~methods.MethodConfig: type~~ Retired 2026-10-19: moved to `core.MethodConfig` so `core.RunConfig` and `runlog.Checkpoint` can hold it (AD-12)
+45	
+46	## Layout (`dt layout rllab`)
+47	src/rllab/
+48	  __init__.py — RL Lab: hand-written reinforcement learning on small simulated worlds.
+49	  baselines/
+50	    __init__.py — Random play, each world&#x27;s rule and their mean scores.
+51	    means.py — Rule lookup and the baselines&#x27; mean scores on the evaluation seeds.
+52	    random.py — Uniform random play for any action format (EVAL-01).
+53	    snake.py — The snake rule baseline (SNAKE-07).
+54	    types.py — Types of the baselines.
+55	  charts/
+56	    __init__.py — Charts drawn from run folders, following the `dataviz` skill.
+57	    curve.py — Learning curves with a min-max band and baseline lines (LOG-03 to LOG-05).
+58	    types.py — Types of the charts.
+59	  cli/
+60	    __init__.py — The `rllab` command (AD-10).
+61	    __main__.py — `python -m rllab.cli`: the `rllab` command.
+62	    command.py — The `rllab` command: parses a trigger, calls its pipeline entry and prints the result (AD-10).
+63	    pipelines/
+64	      __init__.py — The PL-04 to PL-12 entries (AD-10).
+65	      pl04_watch.py — PL-04: Watch a run.
+66	      pl05_chart.py — PL-05: Learning-curve chart.
+67	      pl06_evaluate.py — PL-06: Final evaluation.
+68	  core/
+69	    __init__.py — World and policy protocols, shared types, held-out seed sets and the episode loop.
+70	    episode.py — The one episode loop every component plays through (AD-04, AD-05).
+71	    types.py — Shared types of every component: specs, steps, episodes, protocols, configs, seed sets.
+72	  evaluate/
+73	    __init__.py — Final evaluation on the final seeds, permutation tests, verdicts and summaries.
+74	    types.py — Types of the final evaluation: comparisons, verdicts and summaries.
+75	    final/
+76	      __init__.py — The final evaluation and its statistics.
+77	      play.py — Final evaluation: final checkpoints and both baselines on the final seeds (EVAL-03).
+78	      stats.py — Paired permutation tests against each baseline, with Holm&#x27;s correction (EVAL-04).
+79	      verdict.py — The baseline verdict: both nulls rejected and every run beating the rule (EVAL-05).
+80	  methods/
+81	    __init__.py — Hand-written learners behind `Learner`, and checkpoint-to-policy loading.
+82	    factory.py — Learner construction and checkpoint-to-policy loading.
+83	    types.py — Types of the learning methods.
+84	  runlog/
+85	    __init__.py — Run folders: record, logs, checkpoints, live progress and lookup.
+86	    progress.py — A live view of one run&#x27;s progress (LOG-06).
+87	    read.py — Run lookup and opening run folders.
+88	    types.py — Types of run folders: record, evaluation points, checkpoints, the run view and progress.
+89	    writer.py — Writes one run folder: record, logs and checkpoints (AD-06).
+90	  train/
+91	    __init__.py — Training: the config loader, the method check and the PL-01 to PL-03 entries (AD-10).
+92	    batch.py — Runs one training run per config in a spawn process pool (TRAIN-05, AD-05).
+93	    check.py — The method check: each team method trained and scored on its check world (TRAIN-06, AD-09).
+94	    config.py — Run configs from a TOML file, one per seed, method defaults filled.
+95	    setup.py — One learner per team of a run (TRAIN-07).
+96	    types.py — Types of training: the method check&#x27;s result and its refusal.
+97	    loop/
+98	      __init__.py — The training loop of one run.
+99	      run.py — Steps a world to the budget, with checkpoints and evaluations, into a run folder.
+100	    pipelines/
+101	      __init__.py — The PL-01 to PL-03 entries (AD-10).
+102	      pl01_check.py — PL-01: Method check.
+103	      pl02_train.py — PL-02: Training run.
+104	      pl03_batch.py — PL-03: Training batch.
+105	  worlds/
+106	    __init__.py — The worlds, behind `make`.
+107	    checks.py — Check worlds with hand-derived best actions (TRAIN-06, AD-09).
+108	    make.py — The world factory: a world name and variant to a World.
+109	    snake.py — Snake: a 10 x 10 grid, relative turns, food, death and a hunger limit (SNAKE-01 to SNAKE-06).
+110	    types.py — Types the worlds add to the core World protocol.
+111	
+112	## Interfaces (frozen: build against these, never change them)
+113	&lt;!-- docs/packages/rllab/contract.md:110 --&gt;
+114	### core.RunConfig: type
+115	`@dataclass(frozen=True) class RunConfig: name: str; world: str; variant: str; methods: Mapping[str, MethodConfig]; seed: int; budget: int; check_settings: Mapping[str, Settings]; device: str = &quot;cpu&quot;`
+116	- **Invariants:** `methods` has one entry per team (TRAIN-07); `budget` counts world steps, not agent steps; `check_settings` overrides settings for the check world only (AD-09); owned by `core` so `runlog` can store it (AD-12)
+117	- **Boundary:** train, runlog, refcheck, cli · **Fixtures:** tests/contracts/core.RunConfig/ · **Cases:** a snake config from `configs/snake-default.toml`; a predator-prey config with two methods
+118	- **Used by:** train, runlog, refcheck, cli; PL-01, PL-02, PL-03, PL-09
+119	Sample: tests/contracts/core.RunConfig/ (exists)
+120	
+121	## Writes (edit only these files; the plan gives every other file to another task)
+122	- src/rllab/train/config.py (exists)
+123	- tests/unit/rllab/test_config.py (new)
+124	
+125	&lt;!-- tasks/plan.md:41 --&gt;
+126	### M1-T02: load_run_configs spine (TOML with method defaults)
+127	**Package:** rllab · **Step:** PL-01.load_run_configs · **Kind:** spine · **Covers:** TRAIN-01 · **Size:** XS · **Mode:** solo
+128	**Skills:** —
+129	**Read:** PL-01, train.load_run_configs, train.RunConfig, methods.MethodConfig
+130	**Acceptance:**
+131	- [ ] `load_run_configs` turns a two-seed snake TOML into two `RunConfig`s named `&lt;stem&gt;-s1`, `&lt;stem&gt;-s2` with method defaults filled; an unknown key raises `ValueError` naming it
+132	**Verify:** `pytest tests/unit/rllab -k load_run_configs` · `scripts/check.sh gate`
+133	**Depends on:** M1-T01 · **Writes:** src/rllab/train/config.py, tests/unit/rllab/test_config.py
+134	</pre></details></div><div class="step" id="S4"><span class="sid">U10.S4</span><span class="kind">Read</span>/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/project/.claude/worktrees/agent-a457a1c397186a75d/CONSTRAINTS.md<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/project/.claude/worktrees/agent-a457a1c397186a75d/CONSTRAINTS.md&quot;
+}</pre><div class="lbl">output</div><pre>1	# Constraints
+2	**Status:** Approved · **Last reviewed:** 2026-10-17 by @connor · **Ratcheted:** —
+3	
+4	The standing quality bar. `pyproject.toml` and `scripts/check.sh` enforce it; every number here names its config key, and `dt status` fails if the two disagree. Only `build-setup` changes this file, with the user: tightening is routine, loosening needs an explicit yes.
+5	
+6	## Floor
+7	- **CR-01** No new suppressions. Ruff runs with `--ignore-noqa` in gate and full, so a Ruff exception is a `per-file-ignores` entry in protected config with a row in Exceptions. `floor_guard.sh` catches the other suppressions on the diff
+8	- **CR-02** No stubs: `raise NotImplementedError` outside abstract methods, `pass`-only bodies, bare `except: pass`. One carve-out: the interface task&#x27;s step signatures, whose body is only `raise NotImplementedError(&quot;&lt;task id&gt;&quot;)` naming the open task that replaces it. `check.sh gate` fails on one naming a task that isn&#x27;t open in `tasks/todo.md`, and on a test that expects one (`stub-pinned`); `check.sh full --exit` fails on any
+9	- **CR-03** No skipped, deleted or assertion-free tests, unless a row in Exceptions names the test file
+10	- **CR-04** No secrets in source
+11	- **CR-05** Oracle files (`tests/fixtures/**/expected.json`) change only with the user&#x27;s approval
+12	- **CR-06** The implementer never changes `tests/intent/**`
+13	- **CR-07** This file, `pyproject.toml` tool config, `scripts/` and `.claude/agents/` are not weakened to make a change pass
+14	- **CR-08** Nothing imports from `references/` or `probes/`, or adds either to `sys.path` (or `PYTHONPATH`, pytest `pythonpath`). `floor_guard.sh` checks the diff for both. Code copied from either is project code and meets the same bar
+15	- **CR-09** A frozen interface (`tests/contracts/&lt;id&gt;.&lt;symbol&gt;/`: schema, samples, fake; and the types, signatures and exports the interface task wrote) is frozen once it exists at the task&#x27;s base. Only the interface task freezing it (`**Kind:** interface`) writes a new folder, and no other task&#x27;s `Writes:` names its `types.py` or `__init__.py`; a frozen interface changes only through `architecture-design` Revise, never to make a test pass
+16	
+17	## Readability
+18	- **CR-10** One entry function per pipeline; it reads top to bottom as its named steps (reviewer + `dt layout`)
+19	- **CR-11** No registries, plugin dispatch or config-driven wiring without an AD
+20	- **CR-12** New abstraction only with a second real implementation or a named seam
+21	- **CR-13** No global random state: every generator is spawned from a seed (`np.random.SeedSequence`, a `torch.Generator`), never `np.random.seed` or `torch.manual_seed` (AD-05)
+22	
+23	## Enforced with numbers
+24	| ID | Dimension | Rule | Checked by | Config key | Runs at |
+25	|---|---|---|---|---|---|
+26	| CR-20 | Lint | zero errors; standing per-file-ignores only for `tests/**` and `__init__.py` | ruff | `tool.ruff.lint.select` | edit, gate |
+27	| CR-21 | Complexity | ≤ 10 per function | ruff C901 | `tool.ruff.lint.mccabe.max-complexity` | gate |
+28	| CR-22 | Size | ≤ 500 lines/module, ≤ 60/function | check_size.py | `tool.size_limits` | edit, gate |
+29	| CR-23 | Types | zero errors, strict | mypy | `tool.mypy.strict` | gate |
+30	| CR-24 | Boundaries | import contracts hold | import-linter | `tool.importlinter.contracts` | gate |
+31	| CR-25 | Dependencies | none missing or unused | deptry | `tool.deptry` | gate |
+32	| CR-26 | Deps security | nothing known-vulnerable | pip-audit | — | full, CI nightly |
+33	| CR-27 | Reproducibility | same seed, same result: `repro` tests pass (TRAIN-02, WORLD-02, REPLAY-02) | pytest `-m repro` | `tool.pytest.ini_options.markers` | gate |
+34	
+35	## Measured, not yet enforced
+36	| ID | Metric | Today | Direction |
+37	|---|---|---|---|
+38	| CR-40 | Coverage (branch) | — (no code) (`tool.coverage.report.fail_under`, raised by Ratchet) | must not fall |
+39	| CR-41 | vulture findings at `min_confidence = 60` (`scripts/vulture_whitelist.py`) | 0 | must not grow by `full --exit` (earlier `full` runs report) |
+40	| CR-42 | Duplicate blocks of ≥ 8 similar source lines (pylint `duplicate-code`, `[tool.pylint.similarities]` in pyproject.toml) | 0 | must not grow |
+41	
+42	## Boundaries (generated from architecture — do not edit)
+43	- `rllab.core` imports nothing first-party · `worlds` → core · `runlog` → core · `baselines` → core, worlds · `methods` → core, runlog · `train`, `evaluate`, `replay` → core, worlds, baselines, methods, runlog · `charts` → runlog, evaluate · `refcheck` → core, worlds, train, evaluate, runlog · `notes` → nothing · `cli` → all · only `refcheck` imports Stable-Baselines3 or Gymnasium
+44	
+45	## Roles and protected paths
+46	| Role | May edit | May not edit | Stop gate |
+47	|---|---|---|---|
+48	| tester | `tests/intent/**`, within the task&#x27;s `Writes:` | everything else; reads no source | `check.sh collect` (lint, collect, red for the right reason) |
+49	| implementer / solo | `src/**`, `tests/unit/**`, within the task&#x27;s `Writes:`; an interface task also the `tests/contracts/&lt;id&gt;.&lt;symbol&gt;/` its `Writes:` names | the protected list; `tasks/` | `check.sh gate` + protected-path diff against the worktree&#x27;s base |
+50	| reviewer | its worktree, for the mutation check, and its findings file; nothing lands (the orchestrator records findings with `dt finding`) | everything else | runs `check.sh full` by hand |
+51	
+52	**Protected list** (`PROTECTED` in `scripts/check.sh`; `path_guard.sh deny --protected` reads the same list): `tests/intent/**`, `tests/fixtures/**`, `tests/conftest.py`, `pyproject.toml`, `uv.lock`, `CONSTRAINTS.md`, `scripts/**`, `.claude/agents/**`, `.claude/settings.json`, `references/**`, `probes/**`, `tests/contracts/**`. `tests/contracts/**` covers the contract folders that exist at the task&#x27;s base (CR-09). **`Writes:`**: `dt claim` writes the role&#x27;s share of the task&#x27;s `Writes:` to `.claude/.task_writes` and sets the worktree&#x27;s base; `path_guard.sh writes` blocks edits outside it, and builder edits before the claim. Only the orchestrator writes `tasks/` (`dt land`, `dt finding`).
+53	
+54	**Worktree links:** none
+55	
+56	## Review
+57	Run by the reviewer agent: the interface review after Phase 0, a phase review per package at each checkpoint, and the milestone exit. `dt land` already checked each landing&#x27;s `Writes:`, protected paths and gates; review judges what tools can&#x27;t.
+58	
+59	**Interface** (after Phase 0): the code is the contract, no more and no less.
+60	1. Types match `contract.md`: fields, types, invariants. Nothing a step&#x27;s In → Out needs is missing; no helper is frozen.
+61	2. Signatures match the step tables, in their owner modules. Each stub names the open task that owns its step; no logic beyond types and validation.
+62	3. One sample per case the contract names, valid and realistic, never holding a TC&#x27;s expected value. Replay doubles replay an interaction the Protocol allows. Each fake passes its contract&#x27;s cases; anything it does beyond echoing a fixture (filtering, ordering, an error) is a case the real provider must pass too. Contract tests check shape only, never a stub or other state a later task changes.
+63	4. `__init__.py` exports exactly the contract; each `Mitigated by` in the plan&#x27;s dependency graph exists; each split task&#x27;s tester can write its tests from the frozen interface and its `Read:`.
+64	
+65	**Each phase**, per package, tests before code:
+66	1. **Interfaces followed** (CR-09): no frozen type, signature or contract folder changed outside a Revise. Consumers use the declared types: no dict for a dataclass, no reaching into a provider&#x27;s internals, no local redefinition. A stub is replaced only by the task it names; no cross-package import outside the contract; spine tests run on samples and doubles, not another step&#x27;s code.
+67	2. **Tests prove something:** each intent test asserts its TC case or acceptance bullet, loading expected values and tolerances from fixtures; none is assertion-free or weakened; Hypothesis runs the `ci` profile. Unit tests are specific, never computing the expected value with the code under test or testing only a mock. **Mutation check** (`.claude/agents/reviewer.md`): per acceptance bullet, the smallest change that should break it; a mutation no test catches is a finding.
+68	3. **Correct to the spec:** each acceptance bullet truly met, not special-cased to the sample; the error paths the requirement names; seeding and determinism; numerical edge cases.
+69	4. **Simple** (CR-11, CR-12, CR-42): no abstraction with one implementation outside the contract or an AD; no forwarding wrapper, one-method class, or class where a function does; no parameter, flag or config key every caller sets the same; no `try/except` that only re-raises or swallows, no checks the types already guarantee; no loop the library already provides. No near-copies within or across the phase&#x27;s tasks: one concept is one function in its owner module (tests may repeat for readability). Each finding names the simpler form, with the same tests passing.
+70	5. **Pipelines** (CR-10): entry functions read as their step tables (`dt layout`); step owners respected; spine baselines still selectable.
+71	6. **The bar** (CR-07): diff this file, `pyproject.toml`, `scripts/` and `.claude/agents/` against the milestone&#x27;s Base. Any loosening is Critical; new exceptions need an owner and expiry.
+72	7. **Hidden and parallel risks:** where a real provider could act differently from its double; fixed output paths, global state, test-order dependence.
+73	8. **The rest:** readability, security, performance where a QR sets a number; reused reference or probe code has its Caveats handled and fits the contract; `dt lint` clean, pre-build sections replaced by `dt layout` pointers.
+74	
+75	**Milestone exit**, over the whole diff, adds: the Scope&#x27;s Exit holds; every Covers ID has a test; `check.sh full --exit` finds no stub; system tests use real providers; the same sample through a real provider and its double agrees; deferred requirements untouched; pip-audit ran.
+76	
+77	**Severity:** Critical: a frozen interface changed, a contract test pinning a transient state, a weakened test, an intent test that misses a mutation changing its TC&#x27;s expected output, a wrong answer, a loosened bar, a security hole, lost data; it stops the build. Important: a consumer bypassing a type, any other surviving mutation, an unneeded abstraction, a duplicate across tasks. Suggestion and Nit: local. Findings go under the checkpoint block in `tasks/plan.md` (`dt finding`), each with a fix task or a reason.
+78	
+79	## Done
+80	agent-skills `references/definition-of-done.md`, tailored once:
+81	- **Correctness and Quality:** checked per task by the gate.
+82	- **Integration and Documentation:** checked at each checkpoint.
+83	- **The full list:** checked at milestone exit.
+84	
+85	## Exceptions
+86	| ID | Rule | Path | Reason | Owner | Expires |
+87	|---|---|---|---|---|---|
+88	| EX-01 | CR-25 DEP002 | `numpy`, `torch`, `matplotlib` | M1 dependencies, declared before the code imports them | @connor | M1 exit |
+89	</pre></details></div><div class="step" id="S5"><span class="sid">U10.S5</span><span class="kind">Read</span>/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/project/.claude/worktrees/agent-a457a1c397186a75d/src/rllab/train/config.py<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/project/.claude/worktrees/agent-a457a1c397186a75d/src/rllab/train/config.py&quot;
+}</pre><div class="lbl">output</div><pre>1	&quot;&quot;&quot;Run configs from a TOML file, one per seed, method defaults filled.&quot;&quot;&quot;
+2	
+3	from collections.abc import Sequence
+4	from pathlib import Path
+5	
+6	from rllab.core import RunConfig
+7	
+8	
+9	def load_run_configs(path: Path, seeds: Sequence[int]) -&gt; list[RunConfig]:
+10	    raise NotImplementedError(&quot;M1-T02&quot;)
+11	</pre></details></div><div class="step" id="S6"><span class="sid">U10.S6</span><span class="kind">Read</span>/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/project/.claude/worktrees/agent-a457a1c397186a75d/src/rllab/core/types.py<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/project/.claude/worktrees/agent-a457a1c397186a75d/src/rllab/core/types.py&quot;
+}</pre><div class="lbl">output</div><pre>1	&quot;&quot;&quot;Shared types of every component: specs, steps, episodes, protocols, configs, seed sets.&quot;&quot;&quot;
+2	
+3	from __future__ import annotations
+4	
+5	from collections.abc import Mapping
+6	from dataclasses import dataclass
+7	from pathlib import Path
+8	from typing import Literal, Protocol
+9	
+10	import numpy as np
+11	from numpy.typing import NDArray
+12	
+13	Direction = Literal[&quot;higher&quot;, &quot;lower&quot;]
+14	Settings = Mapping[str, int | float | str | bool]
+15	Array = NDArray[np.generic]
+16	
+17	EVAL_SEEDS: tuple[int, ...] = tuple(range(1_000_000, 1_000_020))
+18	FINAL_SEEDS: tuple[int, ...] = tuple(range(2_000_000, 2_000_100))
+19	
+20	
+21	@dataclass(frozen=True)
+22	class Discrete:
+23	    &quot;&quot;&quot;Integer actions in `[0, n)`.&quot;&quot;&quot;
+24	
+25	    n: int
+26	
+27	
+28	@dataclass(frozen=True)
+29	class Box:
+30	    &quot;&quot;&quot;`dims` float actions, each in `[low, high]`.&quot;&quot;&quot;
+31	
+32	    dims: int
+33	    low: float
+34	    high: float
+35	
+36	
+37	ActionSpace = Discrete | Box
+38	
+39	
+40	@dataclass(frozen=True)
+41	class TeamSpec:
+42	    name: str
+43	    agents: tuple[int, ...]
+44	    score_name: str
+45	    direction: Direction
+46	
+47	
+48	@dataclass(frozen=True)
+49	class MeasureSpec:
+50	    name: str
+51	    team: str
+52	    direction: Direction
+53	
+54	
+55	@dataclass(frozen=True)
+56	class WorldSpec:
+57	    world: str
+58	    variant: str
+59	    agents: tuple[str, ...]
+60	    teams: tuple[TeamSpec, ...]
+61	    obs_len: int
+62	    action: ActionSpace
+63	    max_steps: int
+64	    measures: tuple[MeasureSpec, ...]
+65	    sight: float | None
+66	
+67	
+68	@dataclass(frozen=True)
+69	class Step:
+70	    obs: Array
+71	    rewards: Array
+72	    active: Array
+73	    done: bool
+74	    truncated: bool
+75	
+76	
+77	@dataclass(frozen=True)
+78	class EpisodeResult:
+79	    seed: int
+80	    length: int
+81	    scores: Mapping[str, float]
+82	    team_rewards: Mapping[str, float]
+83	    measures: Mapping[str, float]
+84	
+85	
+86	@dataclass(frozen=True)
+87	class Drawable:
+88	    kind: str
+89	    x: float
+90	    y: float
+91	    size: float
+92	    team: str | None
+93	    agent: int | None
+94	
+95	
+96	@dataclass(frozen=True)
+97	class DrawState:
+98	    width: float
+99	    height: float
+100	    objects: tuple[Drawable, ...]
+101	
+102	
+103	@dataclass(frozen=True)
+104	class Frame:
+105	    step: int
+106	    draw: DrawState
+107	    scores: Mapping[str, float]
+108	    rewards: Array
+109	
+110	
+111	@dataclass(frozen=True)
+112	class Episode:
+113	    result: EpisodeResult
+114	    frames: tuple[Frame, ...] | None
+115	    hit_step_limit: bool
+116	
+117	
+118	@dataclass(frozen=True)
+119	class Output:
+120	    path: Path
+121	    kind: Literal[&quot;chart&quot;, &quot;video&quot;, &quot;writeup&quot;]
+122	    made_from: tuple[str, ...]
+123	
+124	
+125	@dataclass(frozen=True)
+126	class MethodConfig:
+127	    method: Literal[&quot;dqn&quot;, &quot;ppo&quot;]
+128	    settings: Settings
+129	
+130	
+131	@dataclass(frozen=True)
+132	class RunConfig:
+133	    name: str
+134	    world: str
+135	    variant: str
+136	    methods: Mapping[str, MethodConfig]
+137	    seed: int
+138	    budget: int
+139	    check_settings: Mapping[str, Settings]
+140	    device: str = &quot;cpu&quot;
+141	
+142	
+143	@dataclass(frozen=True)
+144	class BaselineMeans:
+145	    world: str
+146	    variant: str
+147	    random: Mapping[str, float]
+148	    rule: Mapping[str, float]
+149	
+150	
+151	class ActionError(ValueError):
+152	    &quot;&quot;&quot;An action outside the world&#x27;s `ActionSpace`; the world never clips it.&quot;&quot;&quot;
+153	
+154	    def __init__(self, agent: str, value: object) -&gt; None:
+155	        super().__init__(f&quot;action {value!r} of agent {agent!r} is outside the action space&quot;)
+156	        self.agent = agent
+157	        self.value = value
+158	
+159	
+160	class World(Protocol):
+161	    spec: WorldSpec
+162	
+163	    def reset(self, seed: int) -&gt; Step: ...
+164	
+165	    def step(self, actions: Array) -&gt; Step: ...
+166	
+167	    def result(self) -&gt; EpisodeResult: ...
+168	
+169	    def draw(self) -&gt; DrawState: ...
+170	
+171	
+172	class Policy(Protocol):
+173	    def act(self, obs: Array, rng: np.random.Generator) -&gt; Array: ...
+174	</pre></details></div><div class="step" id="S7"><span class="sid">U10.S7</span><span class="kind">Bash</span>ls -R tests/contracts tests/unit tests/intent configs src/rllab/methods src/rllab/worlds <span class="err">error</span><details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;ls -R tests/contracts tests/unit tests/intent configs src/rllab/methods src/rllab/worlds&quot;
+}</pre><div class="lbl">output</div><pre>Exit code 1
+ls: configs: No such file or directory
+ls: tests/intent: No such file or directory
+ls: tests/unit: No such file or directory
+src/rllab/methods:
+__init__.py
+factory.py
+types.py
+
+src/rllab/worlds:
+__init__.py
+checks.py
+make.py
+snake.py
+types.py
+
+tests/contracts:
+baselines.RandomPolicy
+baselines.RulePolicy
+baselines.baseline_means
+baselines.rule_for
+charts.learning_curve
+conftest.py
+core.ActionSpace
+core.BaselineMeans
+core.DrawState
+core.EVAL_SEEDS
+core.Episode
+core.EpisodeResult
+core.FINAL_SEEDS
+core.Frame
+core.MethodConfig
+core.Output
+core.Policy
+core.RunConfig
+core.Step
+core.TeamSpec
+core.World
+core.WorldSpec
+core.play_episode
+evaluate.Comparison
+evaluate.Summary
+evaluate.final_evaluation
+kit.py
+make_samples.py
+methods.Learner
+methods.Transition
+methods.load_policy
+methods.make_learner
+runlog.Checkpoint
+runlog.EvalPoint
+runlog.Progress
+runlog.Run
+runlog.RunRecord
+runlog.RunWriter
+runlog.find_runs
+runlog.open_run
+test_baselines.py
+test_charts.py
+test_cli.py
+test_core.py
+test_evaluate.py
+test_interface.py
+test_methods.py
+test_runlog.py
+test_samples.py
+test_train.py
+test_worlds.py
+train.CheckResult
+train.load_run_configs
+train.run_batch
+train.run_check
+train.run_train
+worlds.CheckWorld
+worlds.make
+
+tests/contracts/baselines.RandomPolicy:
+samples
+schema.json
+
+tests/contracts/baselines.RandomPolicy/samples:
+fish_5.json
+snake_5.json
+
+tests/contracts/baselines.RulePolicy:
+double.py
+samples
+schema.json
+
+tests/contracts/baselines.RulePolicy/samples:
+fish_no_ball.json
+snake_rule.json
+
+tests/contracts/baselines.baseline_means:
+fake.py
+
+tests/contracts/baselines.rule_for:
+fake.py
+
+tests/contracts/charts.learning_curve:
+fake.py
+
+tests/contracts/core.ActionSpace:
+samples
+schema.json
+
+tests/contracts/core.ActionSpace/samples:
+fish_box.json
+snake_discrete.json
+
+tests/contracts/core.BaselineMeans:
+samples
+schema.json
+
+tests/contracts/core.BaselineMeans/samples:
+prey_both_teams.json
+snake.json
+
+tests/contracts/core.DrawState:
+samples
+schema.json
+
+tests/contracts/core.DrawState/samples:
+fish_tank_8.json
+snake_board.json
+
+tests/contracts/core.EVAL_SEEDS:
+samples
+schema.json
+
+tests/contracts/core.EVAL_SEEDS/samples:
+seeds.json
+
+tests/contracts/core.Episode:
+samples
+schema.json
+
+tests/contracts/core.Episode/samples:
+check_traced_3.json
+snake_untraced.json
+
+tests/contracts/core.EpisodeResult:
+samples
+schema.json
+
+tests/contracts/core.EpisodeResult/samples:
+prey_both_teams.json
+snake_12_food.json
+
+tests/contracts/core.FINAL_SEEDS:
+samples
+schema.json
+
+tests/contracts/core.FINAL_SEEDS/samples:
+seeds.json
+
+tests/contracts/core.Frame:
+samples
+schema.json
+
+tests/contracts/core.Frame/samples:
+snake_seed7_frame0.json
+snake_seed7_frame1.json
+
+tests/contracts/core.MethodConfig:
+samples
+schema.json
+
+tests/contracts/core.MethodConfig/samples:
+dqn_snake_defaults.json
+ppo_one_lr.json
+
+tests/contracts/core.Output:
+samples
+schema.json
+
+tests/contracts/core.Output/samples:
+snake_curve.json
+snake_video.json
+
+tests/contracts/core.Policy:
+double.py
+samples
+schema.json
+
+tests/contracts/core.Policy/samples:
+snake_rule.json
+
+tests/contracts/core.RunConfig:
+samples
+schema.json
+
+tests/contracts/core.RunConfig/samples:
+prey_two_methods.json
+snake_default.json
+
+tests/contracts/core.Step:
+samples
+schema.json
+
+tests/contracts/core.Step/samples:
+prey_one_caught.json
+snake_mid.json
+
+tests/contracts/core.TeamSpec:
+samples
+schema.json
+
+tests/contracts/core.TeamSpec/samples:
+predator.json
+prey.json
+snake.json
+
+tests/contracts/core.World:
+double.py
+samples
+schema.json
+
+tests/contracts/core.World/samples:
+snake_seed42.json
+
+tests/contracts/core.WorldSpec:
+samples
+schema.json
+
+tests/contracts/core.WorldSpec/samples:
+fish_local.json
+prey_default.json
+snake_default.json
+
+tests/contracts/core.play_episode:
+fake.py
+samples
+schema.json
+
+tests/contracts/core.play_episode/samples:
+snake_rule_seed7.json
+
+tests/contracts/evaluate.Comparison:
+samples
+schema.json
+
+tests/contracts/evaluate.Comparison/samples:
+snake_random_rejected.json
+snake_rule_kept.json
+
+tests/contracts/evaluate.Summary:
+samples
+schema.json
+
+tests/contracts/evaluate.Summary/samples:
+snake_failing_run.json
+snake_pass.json
+snake_three_runs.json
+
+tests/contracts/evaluate.final_evaluation:
+fake.py
+
+tests/contracts/methods.Learner:
+double.py
+samples
+schema.json
+
+tests/contracts/methods.Learner/samples:
+dqn_snake_10.json
+
+tests/contracts/methods.Transition:
+samples
+schema.json
+
+tests/contracts/methods.Transition/samples:
+fish_many_8.json
+snake.json
+
+tests/contracts/methods.load_policy:
+fake.py
+
+tests/contracts/methods.make_learner:
+fake.py
+
+tests/contracts/runlog.Checkpoint:
+samples
+schema.json
+
+tests/contracts/runlog.Checkpoint/samples:
+snake_0pct.json
+snake_100pct.json
+
+tests/contracts/runlog.EvalPoint:
+samples
+schema.json
+
+tests/contracts/runlog.EvalPoint/samples:
+prey_both_teams.json
+snake_50pct.json
+
+tests/contracts/runlog.Progress:
+fake.py
+samples
+schema.json
+
+tests/contracts/runlog.Progress/samples:
+snake_35pct.json
+
+tests/contracts/runlog.Run:
+double.py
+samples
+schema.json
+
+tests/contracts/runlog.Run/samples:
+snake_finished.json
+
+tests/contracts/runlog.RunRecord:
+samples
+schema.json
+
+tests/contracts/runlog.RunRecord/samples:
+snake_failed_nan.json
+snake_finished.json
+snake_incomplete.json
+
+tests/contracts/runlog.RunWriter:
+double.py
+samples
+schema.json
+
+tests/contracts/runlog.RunWriter/samples:
+snake_3_checkpoints.json
+
+tests/contracts/runlog.find_runs:
+fake.py
+samples
+schema.json
+
+tests/contracts/runlog.find_runs/samples:
+snake_5_plus_incomplete.json
+
+tests/contracts/runlog.open_run:
+fake.py
+
+tests/contracts/train.CheckResult:
+samples
+schema.json
+
+tests/contracts/train.CheckResult/samples:
+dqn_pass.json
+ppo_fail.json
+
+tests/contracts/train.load_run_configs:
+fake.py
+samples
+schema.json
+
+tests/contracts/train.load_run_configs/samples:
+snake_s1_s2.json
+
+tests/contracts/train.run_batch:
+fake.py
+samples
+schema.json
+
+tests/contracts/train.run_batch/samples:
+two_finished.json
+
+tests/contracts/train.run_check:
+fake.py
+
+tests/contracts/train.run_train:
+fake.py
+
+tests/contracts/worlds.CheckWorld:
+double.py
+samples
+schema.json
+
+tests/contracts/worlds.CheckWorld/samples:
+corridor.json
+target_point.json
+
+tests/contracts/worlds.make:
+fake.py</pre></details></div><div class="step" id="S8"><span class="sid">U10.S8</span><span class="kind">Bash</span>grep -rn &quot;load_run_configs\|default&quot; tests/contracts/test_train.py tests/contracts/train.load_run_configs/fake.py src/rllab/methods src/rllab/worlds src/rllab/train docs/packages/rllab/contract.md<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;grep -rn \&quot;load_run_configs\\|default\&quot; tests/contracts/test_train.py tests/contracts/train.load_run_configs/fake.py src/rllab/methods src/rllab/worlds src/rllab/train docs/packages/rllab/contract.md&quot;
+}</pre><div class="lbl">output</div><pre>tests/contracts/train.load_run_configs/fake.py:1:&quot;&quot;&quot;Fake of `train.load_run_configs`: the recorded snake configs for seeds 1 and 2.
+tests/contracts/train.load_run_configs/fake.py:4:`load_run_configs` must. A seed with no recorded config raises `LookupError`.
+tests/contracts/train.load_run_configs/fake.py:16:    def load_run_configs(path: Path, seeds: Sequence[int]) -&gt; list[RunConfig]:
+tests/contracts/train.load_run_configs/fake.py:20:            c.seed: c for c in kit.sample(&quot;train.load_run_configs&quot;, &quot;snake_s1_s2&quot;, list[RunConfig])
+tests/contracts/train.load_run_configs/fake.py:27:    return load_run_configs
+tests/contracts/test_train.py:1:&quot;&quot;&quot;train: CheckResult samples and the load_run_configs, run_check, run_train and run_batch fakes.&quot;&quot;&quot;
+tests/contracts/test_train.py:27:def test_load_run_configs_names_one_config_per_seed(kit: Any, tmp_path: Path) -&gt; None:
+tests/contracts/test_train.py:30:    configs: list[RunConfig] = kit.fake(&quot;train.load_run_configs&quot;)(path, [1, 2])
+tests/contracts/test_train.py:36:def test_load_run_configs_raises_for_a_missing_file(kit: Any, tmp_path: Path) -&gt; None:
+tests/contracts/test_train.py:38:        kit.fake(&quot;train.load_run_configs&quot;)(tmp_path / &quot;nowhere.toml&quot;, [1])
+tests/contracts/test_train.py:48:    config = kit.sample(&quot;core.RunConfig&quot;, &quot;snake_default&quot;)
+tests/contracts/test_train.py:50:    folder = tmp_path / &quot;snake&quot; / &quot;default&quot; / config.name
+tests/contracts/test_train.py:64:    config = kit.sample(&quot;core.RunConfig&quot;, &quot;snake_default&quot;)
+tests/contracts/test_train.py:67:    run_json = tmp_path / &quot;snake&quot; / &quot;default&quot; / config.name / &quot;run.json&quot;
+src/rllab/worlds/make.py:6:def make(world: str, variant: str = &quot;default&quot;, **overrides: int | float) -&gt; World:
+src/rllab/train/config.py:1:&quot;&quot;&quot;Run configs from a TOML file, one per seed, method defaults filled.&quot;&quot;&quot;
+src/rllab/train/config.py:9:def load_run_configs(path: Path, seeds: Sequence[int]) -&gt; list[RunConfig]:
+src/rllab/train/__init__.py:3:from rllab.train.config import load_run_configs
+src/rllab/train/__init__.py:12:    &quot;load_run_configs&quot;,
+docs/packages/rllab/contract.md:25:- **Boundary:** worlds, methods, runlog, replay, refcheck · **Fixtures:** tests/contracts/core.WorldSpec/ · **Cases:** snake default; fish local-sight (8 agents, sight set); predator-prey
+docs/packages/rllab/contract.md:106:- **Invariants:** `settings` holds only keys the method declares, checked by `train.load_run_configs`; missing keys take the method&#x27;s defaults, written back in full to the run record; owned by `core` so `runlog` can store it (AD-12)
+docs/packages/rllab/contract.md:107:- **Boundary:** methods, train, runlog, refcheck · **Fixtures:** tests/contracts/core.MethodConfig/ · **Cases:** snake DQN defaults; PPO with one overridden learning rate
+docs/packages/rllab/contract.md:113:- **Boundary:** train, runlog, refcheck, cli · **Fixtures:** tests/contracts/core.RunConfig/ · **Cases:** a snake config from `configs/snake-default.toml`; a predator-prey config with two methods
+docs/packages/rllab/contract.md:125:`def make(world: str, variant: str = &quot;default&quot;, **overrides: int | float) -&gt; World`
+docs/packages/rllab/contract.md:126:- **Invariants:** worlds `snake` (`default`), `fish` (`one`, `many`, `local`), `prey` (`default`), `check-discrete`, `check-continuous`; `overrides` change only the spec&#x27;s starting values (grid size, counts, step limits; spec Assumptions)
+docs/packages/rllab/contract.md:202:### train.load_run_configs: Config loader
+docs/packages/rllab/contract.md:203:`def load_run_configs(path: Path, seeds: Sequence[int]) -&gt; list[RunConfig]`
+docs/packages/rllab/contract.md:204:- **Invariants:** one config per seed, named `&lt;file stem&gt;-s&lt;seed&gt;`; method settings missing from the TOML take the method&#x27;s defaults
+docs/packages/rllab/contract.md:206:- **Boundary:** refcheck, cli · **Fixtures:** tests/contracts/train.load_run_configs/ · **Cases:** a fake returning snake configs for seeds 1 and 2
+docs/packages/rllab/contract.md:224:- **Invariants:** loads one config per seed, runs the method check with `check_seed` before any run, then one process per config up to `workers` (default: the core count), each with one torch thread (TRAIN-05, TRAIN-06, AD-05)
+docs/packages/rllab/contract.md:240:- **Invariants:** every LOG-01 field present once the run ends; `config` is a `core.RunConfig` (AD-12), so `runlog` imports only `core`; `config.methods` holds full settings, defaults included</pre></details></div><div class="step" id="S9"><span class="sid">U10.S9</span><span class="kind">Read</span>/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/project/.claude/worktrees/agent-a457a1c397186a75d/tests/contracts/train.load_run_configs/samples/snake_s1_s2.json<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/project/.claude/worktrees/agent-a457a1c397186a75d/tests/contracts/train.load_run_configs/samples/snake_s1_s2.json&quot;
+}</pre><div class="lbl">output</div><pre>1	[
+2	 {
+3	  &quot;name&quot;: &quot;snake-s1&quot;,
+4	  &quot;world&quot;: &quot;snake&quot;,
+5	  &quot;variant&quot;: &quot;default&quot;,
+6	  &quot;methods&quot;: {
+7	   &quot;snake&quot;: {
+8	    &quot;method&quot;: &quot;dqn&quot;,
+9	    &quot;settings&quot;: {
+10	     &quot;lr&quot;: 0.001,
+11	     &quot;gamma&quot;: 0.99,
+12	     &quot;epsilon&quot;: 0.1,
+13	     &quot;hidden&quot;: 64
+14	    }
+15	   }
+16	  },
+17	  &quot;seed&quot;: 1,
+18	  &quot;budget&quot;: 2000,
+19	  &quot;check_settings&quot;: {
+20	   &quot;dqn&quot;: {
+21	    &quot;hidden&quot;: 32
+22	   }
+23	  },
+24	  &quot;device&quot;: &quot;cpu&quot;
+25	 },
+26	 {
+27	  &quot;name&quot;: &quot;snake-s2&quot;,
+28	  &quot;world&quot;: &quot;snake&quot;,
+29	  &quot;variant&quot;: &quot;default&quot;,
+30	  &quot;methods&quot;: {
+31	   &quot;snake&quot;: {
+32	    &quot;method&quot;: &quot;dqn&quot;,
+33	    &quot;settings&quot;: {
+34	     &quot;lr&quot;: 0.001,
+35	     &quot;gamma&quot;: 0.99,
+36	     &quot;epsilon&quot;: 0.1,
+37	     &quot;hidden&quot;: 64
+38	    }
+39	   }
+40	  },
+41	  &quot;seed&quot;: 2,
+42	  &quot;budget&quot;: 2000,
+43	  &quot;check_settings&quot;: {
+44	   &quot;dqn&quot;: {
+45	    &quot;hidden&quot;: 32
+46	   }
+47	  },
+48	  &quot;device&quot;: &quot;cpu&quot;
+49	 }
+50	]
+51	</pre></details></div><div class="step" id="S10"><span class="sid">U10.S10</span><span class="kind">Read</span>/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/project/.claude/worktrees/agent-a457a1c397186a75d/tests/contracts/core.MethodConfig/samples/dqn_snake_defaults.json<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/project/.claude/worktrees/agent-a457a1c397186a75d/tests/contracts/core.MethodConfig/samples/dqn_snake_defaults.json&quot;
+}</pre><div class="lbl">output</div><pre>1	{
+2	 &quot;method&quot;: &quot;dqn&quot;,
+3	 &quot;settings&quot;: {
+4	  &quot;lr&quot;: 0.001,
+5	  &quot;gamma&quot;: 0.99,
+6	  &quot;epsilon&quot;: 0.1,
+7	  &quot;hidden&quot;: 64
+8	 }
+9	}
+10	</pre></details></div><div class="step" id="S11"><span class="sid">U10.S11</span><span class="kind">Bash</span>grep -rn -i &quot;toml\|DEFAULT\|epsilon\|clip&quot; src/rllab docs --include=*.py --include=*.md<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;grep -rn -i \&quot;toml\\|DEFAULT\\|epsilon\\|clip\&quot; src/rllab docs --include=*.py --include=*.md&quot;
+}</pre><div class="lbl">output</div><pre>(eval):1: no matches found: --include=*.py</pre></details></div><div class="step" id="S12"><span class="sid">U10.S12</span><span class="kind">Read</span>/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/project/.claude/worktrees/agent-a457a1c397186a75d/tests/contracts/core.RunConfig/samples/prey_two_methods.json<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/project/.claude/worktrees/agent-a457a1c397186a75d/tests/contracts/core.RunConfig/samples/prey_two_methods.json&quot;
+}</pre><div class="lbl">output</div><pre>1	{
+2	 &quot;name&quot;: &quot;prey-default-s1&quot;,
+3	 &quot;world&quot;: &quot;prey&quot;,
+4	 &quot;variant&quot;: &quot;default&quot;,
+5	 &quot;methods&quot;: {
+6	  &quot;prey&quot;: {
+7	   &quot;method&quot;: &quot;ppo&quot;,
+8	   &quot;settings&quot;: {
+9	    &quot;lr&quot;: 0.0003,
+10	    &quot;gamma&quot;: 0.99,
+11	    &quot;hidden&quot;: 64,
+12	    &quot;steps_per_update&quot;: 2048
+13	   }
+14	  },
+15	  &quot;predator&quot;: {
+16	   &quot;method&quot;: &quot;ppo&quot;,
+17	   &quot;settings&quot;: {
+18	    &quot;lr&quot;: 0.0003,
+19	    &quot;gamma&quot;: 0.99,
+20	    &quot;hidden&quot;: 64,
+21	    &quot;steps_per_update&quot;: 2048
+22	   }
+23	  }
+24	 },
+25	 &quot;seed&quot;: 1,
+26	 &quot;budget&quot;: 1000000,
+27	 &quot;check_settings&quot;: {
+28	  &quot;ppo&quot;: {
+29	   &quot;steps_per_update&quot;: 256
+30	  }
+31	 },
+32	 &quot;device&quot;: &quot;cpu&quot;
+33	}
+34	</pre></details></div><div class="step" id="S13"><span class="sid">U10.S13</span><span class="kind">Read</span>/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/project/.claude/worktrees/agent-a457a1c397186a75d/tests/contracts/core.MethodConfig/samples/ppo_one_lr.json<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/project/.claude/worktrees/agent-a457a1c397186a75d/tests/contracts/core.MethodConfig/samples/ppo_one_lr.json&quot;
+}</pre><div class="lbl">output</div><pre>1	{
+2	 &quot;method&quot;: &quot;ppo&quot;,
+3	 &quot;settings&quot;: {
+4	  &quot;lr&quot;: 0.001,
+5	  &quot;gamma&quot;: 0.99,
+6	  &quot;hidden&quot;: 64,
+7	  &quot;steps_per_update&quot;: 2048
+8	 }
+9	}
+10	</pre></details></div><div class="step" id="S14"><span class="sid">U10.S14</span><span class="kind">Bash</span>grep -rn -i &quot;toml\|method default\|defaults&quot; src/rllab docs<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;grep -rn -i \&quot;toml\\|method default\\|defaults\&quot; src/rllab docs&quot;
+}</pre><div class="lbl">output</div><pre>src/rllab/cli/command.py:66:    check.set_defaults(entry=_check)
+src/rllab/cli/command.py:72:    train.set_defaults(entry=_train)
+src/rllab/cli/command.py:79:    batch.set_defaults(entry=_batch)
+src/rllab/cli/command.py:83:    watch.set_defaults(entry=_watch)
+src/rllab/cli/command.py:87:    chart.set_defaults(entry=_chart)
+src/rllab/cli/command.py:91:    evaluate.set_defaults(entry=_evaluate)
+src/rllab/train/config.py:1:&quot;&quot;&quot;Run configs from a TOML file, one per seed, method defaults filled.&quot;&quot;&quot;
+docs/architecture.md:25:| Language, env | Python 3.12, uv, one `pyproject.toml` | AD-01 |
+docs/architecture.md:34:| Settings | TOML files in `configs/`, read with `tomllib` into frozen dataclasses | — |
+docs/architecture.md:80:configs/       → one TOML per world and variant: budget, per-team method settings
+docs/packages/rllab/pipelines.md:6:**Entry:** `src/rllab/train/pipelines/pl01_check.py::run_check` · **Trigger:** `rllab check &lt;config.toml&gt;`; also PL-03 rows 2–5
+docs/packages/rllab/pipelines.md:11:| 1 | `load_run_configs` | train.config | config path, seeds → list[RunConfig] | `tomllib` into frozen dataclasses, method defaults filled, name `&lt;stem&gt;-s&lt;seed&gt;` | TRAIN-01 |
+docs/packages/rllab/pipelines.md:28:**Entry:** `src/rllab/train/pipelines/pl02_train.py::run_train` · **Trigger:** PL-03 `run_parallel`, once per config (`rllab train &lt;config.toml&gt; --seed N` is a one-seed batch)
+docs/packages/rllab/pipelines.md:51:**Entry:** `src/rllab/train/pipelines/pl03_batch.py::run_batch` · **Trigger:** `rllab batch &lt;config.toml&gt; --seeds 1-5` (and `rllab train`, one seed)
+docs/packages/rllab/pipelines.md:170:**Entry:** `src/rllab/cli/pipelines/pl09_refcheck.py::run_refcheck` · **Trigger:** `rllab refcheck &lt;config.toml&gt; --seeds 1-5`
+docs/packages/rllab/tests.md:143:**Source:** spec model criteria SNAKE-08, EVAL-04, EVAL-05: metric mean food per episode; held-out seeds 2,000,000–2,000,099; baselines random and the SNAKE-07 rule; 5 runs, seeds 1–5, `configs/snake-default.toml`
+docs/packages/rllab/contract.md:106:- **Invariants:** `settings` holds only keys the method declares, checked by `train.load_run_configs`; missing keys take the method&#x27;s defaults, written back in full to the run record; owned by `core` so `runlog` can store it (AD-12)
+docs/packages/rllab/contract.md:107:- **Boundary:** methods, train, runlog, refcheck · **Fixtures:** tests/contracts/core.MethodConfig/ · **Cases:** snake DQN defaults; PPO with one overridden learning rate
+docs/packages/rllab/contract.md:113:- **Boundary:** train, runlog, refcheck, cli · **Fixtures:** tests/contracts/core.RunConfig/ · **Cases:** a snake config from `configs/snake-default.toml`; a predator-prey config with two methods
+docs/packages/rllab/contract.md:204:- **Invariants:** one config per seed, named `&lt;file stem&gt;-s&lt;seed&gt;`; method settings missing from the TOML take the method&#x27;s defaults
+docs/packages/rllab/contract.md:240:- **Invariants:** every LOG-01 field present once the run ends; `config` is a `core.RunConfig` (AD-12), so `runlog` imports only `core`; `config.methods` holds full settings, defaults included</pre></details></div><div class="step" id="S15"><span class="sid">U10.S15</span><span class="kind">Read</span>/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/project/.claude/worktrees/agent-a457a1c397186a75d/src/rllab/methods/factory.py<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/project/.claude/worktrees/agent-a457a1c397186a75d/src/rllab/methods/factory.py&quot;
+}</pre><div class="lbl">output</div><pre>1	&quot;&quot;&quot;Learner construction and checkpoint-to-policy loading.&quot;&quot;&quot;
+2	
+3	import numpy as np
+4	
+5	from rllab.core import MethodConfig, Policy, WorldSpec
+6	from rllab.methods.types import Learner
+7	from rllab.runlog import Checkpoint
+8	
+9	
+10	def make_learner(
+11	    config: MethodConfig, spec: WorldSpec, team: str, rng: np.random.Generator
+12	) -&gt; Learner:
+13	    raise NotImplementedError(&quot;M1-T08&quot;)
+14	
+15	
+16	def load_policy(ckpt: Checkpoint, team: str, spec: WorldSpec) -&gt; Policy:
+17	    raise NotImplementedError(&quot;M1-T08&quot;)
+18	</pre></details></div><div class="step" id="S16"><span class="sid">U10.S16</span><span class="kind">Read</span>/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/project/.claude/worktrees/agent-a457a1c397186a75d/src/rllab/methods/types.py<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/project/.claude/worktrees/agent-a457a1c397186a75d/src/rllab/methods/types.py&quot;
+}</pre><div class="lbl">output</div><pre>1	&quot;&quot;&quot;Types of the learning methods.&quot;&quot;&quot;
+2	
+3	from collections.abc import Sequence
+4	from dataclasses import dataclass
+5	from typing import Protocol
+6	
+7	import numpy as np
+8	
+9	from rllab.core import Array, Policy
+10	
+11	
+12	@dataclass(frozen=True)
+13	class Transition:
+14	    &quot;&quot;&quot;One world step for one team; rows follow `TeamSpec.agents` order.&quot;&quot;&quot;
+15	
+16	    obs: Array
+17	    actions: Array
+18	    rewards: Array
+19	    next_obs: Array
+20	    done: bool
+21	    truncated: bool
+22	    active: Array
+23	
+24	
+25	class Learner(Protocol):
+26	    def act(self, obs: Array, rng: np.random.Generator) -&gt; Array: ...
+27	
+28	    def observe(self, t: Transition) -&gt; None: ...
+29	
+30	    def policy(self) -&gt; Policy: ...
+31	
+32	    def state_dict(self) -&gt; dict[str, object]: ...
+33	
+34	
+35	class NonFiniteError(ArithmeticError):
+36	    &quot;&quot;&quot;A loss or parameter became NaN or infinite; raised before any parameter changes.&quot;&quot;&quot;
+37	
+38	    def __init__(self, value: float) -&gt; None:
+39	        super().__init__(f&quot;non-finite value {value}&quot;)
+40	        self.value = value
+41	
+42	
+43	class SpecMismatchError(ValueError):
+44	    &quot;&quot;&quot;A checkpoint&#x27;s world spec differs from the world it is loaded for.&quot;&quot;&quot;
+45	
+46	    def __init__(self, fields: Sequence[str]) -&gt; None:
+47	        super().__init__(f&quot;checkpoint spec differs in: {&#x27;, &#x27;.join(fields)}&quot;)
+48	        self.fields = tuple(fields)
+49	</pre></details></div><div class="step" id="S17"><span class="sid">U10.S17</span><span class="kind">Bash</span>grep -rn &quot;TRAIN-01\|TRAIN-07\|team&quot; docs/spec.md docs/architecture.md<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;grep -rn \&quot;TRAIN-01\\|TRAIN-07\\|team\&quot; docs/spec.md docs/architecture.md&quot;
+}</pre><div class="lbl">output</div><pre>docs/spec.md:45:- **WORLD-07** A world can hold more than one agent, each agent belonging to a named team.
+docs/spec.md:46:  - Given a world with agents on two teams, when a step is taken, then each agent receives its own observation and reward, labelled with its team.
+docs/spec.md:58:- **TRAIN-01** A training run is started from a world, a variant, the method&#x27;s settings and a seed, and runs for a stated budget of environment steps.
+docs/spec.md:70:- **TRAIN-07** In worlds with more than one team, each team has its own learning method and settings, and all teams learn during the same run.
+docs/spec.md:71:  - Given predator-prey with a learning method for each team, when a run proceeds, then both teams&#x27; agents change between consecutive checkpoints.
+docs/spec.md:86:- **LOG-02** Every run logs, for each training episode, the episode&#x27;s score, length and total reward per team.
+docs/spec.md:247:**Behavior:** A 2D arena with food pellets, a team of prey and a team of predators, all moving smoothly as fish do. Prey score by eating food and are removed when caught; predators score by catching prey. Both teams learn at the same time. The learner watches and explains how each side adapts to the other; it may never look &quot;solved&quot;, and that is acceptable.
+docs/spec.md:258:- **PREY-05** Each team has its own score: prey score = pellets eaten per prey (higher is better); predator score = prey caught per episode (higher is better).
+docs/spec.md:264:- **PREY-08** Each trained team is evaluated against fixed opponents: trained prey against the rule-based predators, compared with random and rule-based prey; trained predators against the rule-based prey, compared with random and rule-based predators. Each passes as in EVAL-04 and EVAL-05.
+docs/spec.md:265:  - Given 5 finished runs, when evaluated, then a separate verdict is shown for the prey team and the predator team.
+docs/spec.md:268:- **PREY-10** The learning curve shows both teams&#x27; scores on the same step axis, so the back-and-forth between them is visible.
+docs/spec.md:269:  - Given 5 finished runs, when the chart is made, then both teams&#x27; mean lines and bands appear against the same environment-steps axis.
+docs/spec.md:274:- One team stops improving or collapses during co-training (e.g. predators catch nothing for the last half of the budget) → the run still finishes and the summary flags the collapse with the step it began; it is a result to explain, not an error.
+docs/architecture.md:8:Every world implements one multi-agent `World` protocol (AD-04): it resets from a seed, steps on one action array for all agents, and reports per-team scores and a drawable state. `train` drives a hand-written learner per team (AD-03) over a world for a fixed step budget. It plays held-out evaluation episodes through `core.play_episode` and writes everything to a run folder through `runlog` (AD-06). `evaluate` replays final checkpoints and both baselines on the final seeds and runs the paired permutation test. `charts` draws learning curves from run folders. `replay` re-simulates any checkpoint or baseline from a seed into a `Trace`, then shows it in a pygame window or writes it to MP4 (AD-07). `refcheck` trains Stable-Baselines3 on the same world through an adapter, kept away from every training run (AD-08).
+docs/architecture.md:28:| Learning methods | Hand-written DQN (discrete) and PPO (continuous), one learner per team | AD-03 |
+docs/architecture.md:44:| `methods` | Hand-written DQN and PPO learners behind `Learner`; rebuilds a frozen `Policy` from a checkpoint | CHECK-01, TRAIN-07 | `core`, `runlog` |
+docs/architecture.md:45:| `train` | One run over the step budget: per-team learners, checkpoints, in-training evaluations, invalid-number stop; batches across cores; the check-world gate | TRAIN-01–TRAIN-07, QR-01–QR-03, TRAIN edge cases | `core`, `worlds`, `baselines`, `methods`, `runlog` |
+docs/architecture.md:47:| `charts` | Learning curves with range bands and baseline lines, extra measures, two-team curves, pairing heatmaps; follows the `dataviz` skill | LOG-03–LOG-05, PREY-10, PREY-09 (chart), LOG edge cases | `runlog`, `evaluate` |
+docs/architecture.md:48:| `evaluate` | Final evaluation on the final seeds, paired permutation tests run with the `null-hypothesis-testing` skill, verdicts, summaries, fixed-opponent team evaluation, pairing grids, collapse flags | EVAL-03–EVAL-06, SNAKE-08, FISH-10, PREY-08, PREY-09, QR-05, EVAL and PREY edge cases | `core`, `worlds`, `baselines`, `methods`, `runlog` |
+docs/architecture.md:61:- `checkpoints/ckpt_&lt;pct&gt;.pt`: 11 checkpoints, every 10% (TRAIN-03), each holding the `WorldSpec`, per-team method configs and state dicts.
+docs/architecture.md:69:- **Speed (QR-01, QR-02, QR-04, QR-05):** world physics is NumPy over all agents at once, learners batch every team&#x27;s observations into one forward pass, and evaluation spreads seeds over processes. `rllab` logs each run&#x27;s wall time against the 60-minute budget, and a timing test plays a 1,000-step replay headless.
+docs/architecture.md:80:configs/       → one TOML per world and variant: budget, per-team method settings
+docs/architecture.md:102:### AD-03: DQN for discrete actions, PPO for continuous ones, one learner per team
+docs/architecture.md:104:- **Context:** Snake has 3 discrete actions (SNAKE-02); fish and predator-prey push with two numbers in [−1, 1] (FISH-02, PREY-02). Many-fish has 8 agents (FISH-06), and predator-prey has two teams learning at once (TRAIN-07). The brief wants each world to teach one idea, and wants checking against a reference implementation (CHECK-02).
+docs/architecture.md:105:- **Decision:** `dqn` (replay buffer, target network, ε-greedy, Huber loss) for snake and the discrete check world. `ppo` (Gaussian policy, GAE, clipped objective) for fish, predator-prey and the continuous check world. All agents of a team share one learner (parameter sharing over a batch of agents). Teams have separate learners in the same run. Evaluation and replay act deterministically: greedy for DQN, the mean action for PPO.
+docs/architecture.md:107:- **Consequences:** Two methods to write, each with a check world (TRAIN-06) and a Stable-Baselines3 equivalent (AD-08). A prey that leaves the episode is masked out of its team&#x27;s batch.
+docs/architecture.md:111:- **Context:** WORLD-01–WORLD-07 need seeded resets, a declared spec, team-labelled agents, per-team scores with a direction, and a drawable state. The brief bets that one core serves a grid game, smooth movement and two teams.
+docs/architecture.md:112:- **Decision:** `core.World` is a small protocol. Observations, actions, rewards and active masks are NumPy arrays indexed by agent, teams map to agent indices in `WorldSpec`, and `draw()` returns a `DrawState`. &quot;Not seen&quot; entries are a 0/1 flag followed by zeros, so lengths stay fixed (WORLD-03, FISH-07, PREY-06).
+docs/architecture.md:113:- **Alternatives:** Gymnasium: single-agent, with no teams, score direction or drawable state, so all of those would be extras. PettingZoo parallel API: multi-agent, but dict-per-agent stepping is slow in Python and adds a dependency the learner didn&#x27;t write.
+docs/architecture.md:140:- **Decision:** `refcheck` wraps a world as a Gymnasium env (single agent) or as an SB3 `VecEnv` with one slot per agent of the learning team (many-fish: 8 slots stepping one world, matching parameter sharing). It trains SB3 `DQN` or `PPO` for 5 seeds and evaluates on `core.FINAL_SEEDS` through `core.play_episode`. In predator-prey, SB3 cannot co-train two models, so each team&#x27;s reference trains against the rule-based opponent, the same opponent PREY-08 evaluates against.
+docs/architecture.md:142:- **Consequences:** SB3&#x27;s default hyperparameters differ from ours; `refcheck` starts from the hand-written method&#x27;s settings where SB3 has the same knob. The predator-prey reference answers a narrower question than co-training, so CHECK-03&#x27;s 80% bar compares a fixed-opponent reference with a co-trained team there; the learner accepted this (2026-10-17).
+docs/architecture.md:147:- **Decision:** `train.run_check` trains each team method in a config on its check world: for DQN a 6-state corridor with two exits, left of state 0 (reward 0.8) and right of state 5 (reward 1.0), γ = 0.9, so the best action is left in states 0–1 and right in 2–5 and a learner biased to one action can&#x27;t pass; for PPO a 1-D point that is rewarded for reaching a target, where the best push is the sign of the offset. It needs ≥ 95% agreement over every check-world state. `train.run_batch` runs the same check steps with the batch&#x27;s method settings before starting any run and refuses the batch on failure. `rllab check &lt;config&gt;` runs it alone.</pre></details></div><div class="step" id="S18"><span class="sid">U10.S18</span><span class="kind">Bash</span>ls docs docs/packages/rllab tests<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;ls docs docs/packages/rllab tests&quot;
+}</pre><div class="lbl">output</div><pre>docs:
+architecture.md
+brief.md
+packages
+roadmap.md
+routes.md
+spec.md
+
+docs/packages/rllab:
+contract.md
+pipelines.md
+tests.md
+
+tests:
+conftest.py
+contracts
+fixtures</pre></details></div><div class="step" id="S19"><span class="sid">U10.S19</span><span class="kind">Bash</span>find tests/fixtures -maxdepth 3<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;find tests/fixtures -maxdepth 3&quot;
+}</pre><div class="lbl">output</div><pre>tests/fixtures
+tests/fixtures/rllab
+tests/fixtures/rllab/TC-10
+tests/fixtures/rllab/TC-28
+tests/fixtures/rllab/TC-17
+tests/fixtures/rllab/TC-21
+tests/fixtures/rllab/TC-19
+tests/fixtures/rllab/TC-26
+tests/fixtures/rllab/TC-18
+tests/fixtures/rllab/TC-27
+tests/fixtures/rllab/TC-20
+tests/fixtures/rllab/TC-29
+tests/fixtures/rllab/TC-16
+tests/fixtures/rllab/TC-11
+tests/fixtures/rllab/TC-33
+tests/fixtures/rllab/TC-02
+tests/fixtures/rllab/TC-05
+tests/fixtures/rllab/TC-04
+tests/fixtures/rllab/TC-03
+tests/fixtures/rllab/TC-32
+tests/fixtures/rllab/TC-14
+tests/fixtures/rllab/TC-13
+tests/fixtures/rllab/TC-25
+tests/fixtures/rllab/TC-22
+tests/fixtures/rllab/TC-23
+tests/fixtures/rllab/TC-24
+tests/fixtures/rllab/TC-12
+tests/fixtures/rllab/TC-15
+tests/fixtures/rllab/TC-08
+tests/fixtures/rllab/TC-30
+tests/fixtures/rllab/TC-06
+tests/fixtures/rllab/TC-01
+tests/fixtures/rllab/TC-07
+tests/fixtures/rllab/TC-31
+tests/fixtures/rllab/TC-09
+tests/fixtures/rllab/TC-09/expected.json
+tests/fixtures/rllab/TC-09/input.json
+tests/fixtures/rllab/TC-03/expected.json
+tests/fixtures/rllab/TC-03/input.json
+tests/fixtures/rllab/TC-32/broken
+tests/fixtures/rllab/TC-32/expected.json
+tests/fixtures/rllab/TC-32/complete
+tests/fixtures/rllab/TC-32/input.json
+tests/fixtures/rllab/TC-14/expected.json
+tests/fixtures/rllab/TC-14/input.json
+tests/fixtures/rllab/TC-14/run
+tests/fixtures/rllab/TC-13/expected.json
+tests/fixtures/rllab/TC-13/input.json
+tests/fixtures/rllab/TC-25/expected.json
+tests/fixtures/rllab/TC-25/input.json
+tests/fixtures/rllab/TC-22/expected.json
+tests/fixtures/rllab/TC-22/input.json
+tests/fixtures/rllab/TC-23/expected.json
+tests/fixtures/rllab/TC-23/input.json
+tests/fixtures/rllab/TC-23/collapse
+tests/fixtures/rllab/TC-24/expected.json
+tests/fixtures/rllab/TC-24/input.json
+tests/fixtures/rllab/TC-12/expected.json
+tests/fixtures/rllab/TC-12/input.json
+tests/fixtures/rllab/TC-15/expected.json
+tests/fixtures/rllab/TC-15/input.json
+tests/fixtures/rllab/TC-15/runs
+tests/fixtures/rllab/TC-08/expected.json
+tests/fixtures/rllab/TC-08/input.json
+tests/fixtures/rllab/TC-30/ratios.csv
+tests/fixtures/rllab/TC-30/expected.json
+tests/fixtures/rllab/TC-30/input.json
+tests/fixtures/rllab/TC-06/expected.json
+tests/fixtures/rllab/TC-06/input.json
+tests/fixtures/rllab/TC-01/expected.json
+tests/fixtures/rllab/TC-01/input.json
+tests/fixtures/rllab/TC-07/expected.json
+tests/fixtures/rllab/TC-07/input.json
+tests/fixtures/rllab/TC-31/expected.json
+tests/fixtures/rllab/TC-31/input.json
+tests/fixtures/rllab/TC-10/expected.json
+tests/fixtures/rllab/TC-10/input.json
+tests/fixtures/rllab/TC-28/expected.json
+tests/fixtures/rllab/TC-28/input.json
+tests/fixtures/rllab/TC-17/expected.json
+tests/fixtures/rllab/TC-17/input.json
+tests/fixtures/rllab/TC-21/expected.json
+tests/fixtures/rllab/TC-21/input.json
+tests/fixtures/rllab/TC-19/expected.json
+tests/fixtures/rllab/TC-19/input.json
+tests/fixtures/rllab/TC-26/expected.json
+tests/fixtures/rllab/TC-26/input.json
+tests/fixtures/rllab/TC-18/expected.json
+tests/fixtures/rllab/TC-18/input.json
+tests/fixtures/rllab/TC-27/expected.json
+tests/fixtures/rllab/TC-27/input.json
+tests/fixtures/rllab/TC-20/expected.json
+tests/fixtures/rllab/TC-20/input.json
+tests/fixtures/rllab/TC-29/expected.json
+tests/fixtures/rllab/TC-29/input.json
+tests/fixtures/rllab/TC-16/expected.json
+tests/fixtures/rllab/TC-16/input.json
+tests/fixtures/rllab/TC-11/expected.json
+tests/fixtures/rllab/TC-11/input.json
+tests/fixtures/rllab/TC-33/expected.json
+tests/fixtures/rllab/TC-33/input.json
+tests/fixtures/rllab/TC-02/expected.json
+tests/fixtures/rllab/TC-02/input.json
+tests/fixtures/rllab/TC-05/expected.json
+tests/fixtures/rllab/TC-05/input.json
+tests/fixtures/rllab/TC-04/expected.json
+tests/fixtures/rllab/TC-04/input.json</pre></details></div><div class="step" id="S20"><span class="sid">U10.S20</span><span class="kind">Bash</span>grep -n &quot;TRAIN-01\|TC-\b\|config&quot; docs/packages/rllab/tests.md<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;grep -n \&quot;TRAIN-01\\|TC-\\b\\|config\&quot; docs/packages/rllab/tests.md&quot;
+}</pre><div class="lbl">output</div><pre>8:| PL-01 | `rllab check --smoke` | train.config, train.check; worlds.checks; boundary: `worlds.CheckWorld`, `train.CheckResult` samples | TC-01 (MethodConfig → train_checks … score_checks → CheckResult), TC-02 (MethodConfig → train_checks … score_checks → CheckResult), TC-03 (CheckWorld → states, best_actions) | — |
+9:| PL-02 | `rllab train --smoke` | worlds.make, worlds.snake, worlds.fish, worlds.prey, train.setup, methods.dqn, methods.ppo, train.loop (schedule, NaN stop with a fault-injecting learner double), runlog.writer; boundary: `core.World`, `core.Step`, `methods.Learner`, `methods.Transition`, `runlog.RunRecord` samples | TC-04 (whole pipeline), TC-05 (whole pipeline), TC-06 (World (Snake) → EpisodeResult), TC-07 (World (FishTank) → EpisodeResult), TC-08 (World (FishTank, PredatorPrey) → Step), TC-09 (World (PredatorPrey) → EpisodeResult), TC-10 (World → ActionError), TC-11 (RunConfig → train_loop → RunExistsError), TC-12 (World → Step, DrawState) | — |
+10:| PL-03 | `rllab batch --smoke` | train.batch; `require_pass` raises `CheckFailedError` on the failing `CheckResult` sample before any run folder exists; boundary: `train.run_train` fake | TC-13 (whole pipeline) | — |
+11:| PL-04 | `rllab watch --smoke` | runlog.progress; boundary: `runlog.Progress` sample | TC-14 (run path → progress → Progress) | — |
+12:| PL-05 | `rllab chart --smoke` | runlog.read, baselines.means and each rule (SNAKE-07, FISH-09, PREY-07 one-step examples), baselines.random, charts.curve; boundary: `baselines.BaselineMeans`, `core.Output` samples | TC-15 (list[Run], BaselineMeans → learning_curve → Output) | — |
+13:| PL-06 | `rllab evaluate --smoke` | evaluate.final (play, compare, Holm, verdict, collapse, summary); boundary: `evaluate.Summary`, `evaluate.Comparison` samples | TC-16 (compare … Holm → Comparison), TC-17 (compare … Holm → Comparison), TC-18 (compare … Holm → Comparison), TC-19 (raw p-values → Holm → Comparison.p_holm), TC-20 (run means, Comparisons → Summary), TC-21 (list[Run] → final_evaluation → list[Summary]), TC-22 (list[Run] → final_evaluation → list[Summary]), TC-23 (list[Run] → final_evaluation → list[Summary]) | TC-24, TC-25, TC-26 |
+14:| PL-07 | `rllab replay --smoke` | replay.sources (side parsing, spec mismatch), replay.tracing, replay.viewer (headless keys); boundary: `replay.Trace`, `replay.Session` samples | TC-27 (list[Trace] → view → Session), TC-28 (list of sides → trace_sides → list[Trace] → view → Session) | — |
+15:| PL-08 | `rllab video --smoke` | replay.sources, core.episode, replay.tracing, replay.video | TC-29 (Trace → save_video → Output) | — |
+16:| PL-09 | `rllab refcheck --smoke` | refcheck.check (adapter spaces, ratio rule, missing `check` extra); boundary: `refcheck.CheckReport` sample | TC-30 (hand and reference means → CheckReport.outcome) | — |
+17:| PL-10 | `rllab notes new --smoke` | notes.scaffold | TC-31 (world → scaffold → Output) | — |
+18:| PL-11 | `rllab notes check --smoke` | notes.finish | TC-32 (world → finish_check → FinishReport) | — |
+19:| PL-12 | `rllab grid --smoke` | runlog.read, evaluate.grid, charts.heatmap; boundary: `evaluate.PairingGrid` sample | TC-33 (Run → pairing_grid → PairingGrid) | — |
+21:Smoke runs use a 2,000-step budget, seeds 1–2 and the snake world unless the pipeline needs another; each finishes in seconds. QR-01, QR-02 and QR-05 times are read from TC-24&#x27;s run logs; QR-04 is a timing test of a headless 1,000-step replay.
+23:### TC-01: DQN learns the two-exit corridor
+24:**Pipeline:** PL-01 · **Covers:** TRAIN-06 · **Kind:** closed form · **Fixture:** tests/fixtures/rllab/TC-01/
+25:**Source:** closed form (AD-09 check world): 6 states 0–5, exits left of 0 (reward 0.8) and right of 5 (reward 1.0), γ = 0.9, so Q*(s, left) = 0.8·0.9^s and Q*(s, right) = 0.9^(5−s); generator `check_config(method=&quot;dqn&quot;)` on seeds 0–4
+28:### TC-02: PPO learns to push toward the target
+29:**Pipeline:** PL-01 · **Covers:** TRAIN-06 · **Kind:** closed form · **Fixture:** tests/fixtures/rllab/TC-02/
+30:**Source:** closed form (AD-09 check world): 1-D point, target 0, reward −|x| per step, so the best push is −sign(x); check states x ∈ {−1, −0.6, −0.2, 0.2, 0.6, 1}; generator `check_config(method=&quot;ppo&quot;)` on seeds 0–4
+33:### TC-03: Check worlds state their hand-derived answers
+34:**Pipeline:** PL-01 · **Covers:** TRAIN-06 · **Kind:** closed form · **Fixture:** tests/fixtures/rllab/TC-03/
+38:### TC-04: Same config and seed give an identical run
+39:**Pipeline:** PL-02 · **Covers:** TRAIN-02, WORLD-02 · **Kind:** synthetic known-answer · **Fixture:** tests/fixtures/rllab/TC-04/
+40:**Source:** generator `snake_config(budget=2000, seed=1)`, run twice into two empty roots
+43:### TC-05: Budget, checkpoint and evaluation schedule
+44:**Pipeline:** PL-02 · **Covers:** TRAIN-01, TRAIN-03, TRAIN-04, LOG-01, LOG-02 · **Kind:** synthetic known-answer · **Fixture:** tests/fixtures/rllab/TC-05/
+45:**Source:** spec.md, the user&#x27;s worked example (TRAIN-01, TRAIN-03, TRAIN-04); generator `snake_config(budget=2000, seed=1)`
+48:### TC-06: Snake movement, growth, death and score
+49:**Pipeline:** PL-02 · **Covers:** SNAKE-01–SNAKE-05, WORLD-05 · **Kind:** synthetic known-answer · **Fixture:** tests/fixtures/rllab/TC-06/
+53:### TC-07: Fish score is hits per fish
+54:**Pipeline:** PL-02 · **Covers:** FISH-04, FISH-08 · **Kind:** synthetic known-answer · **Fixture:** tests/fixtures/rllab/TC-07/
+58:### TC-08: Ball, push and respawn physics
+59:**Pipeline:** PL-02 · **Covers:** FISH-01–FISH-03, PREY-02 · **Kind:** synthetic known-answer · **Fixture:** tests/fixtures/rllab/TC-08/
+63:### TC-09: Prey and predator scores
+64:**Pipeline:** PL-02 · **Covers:** PREY-01, PREY-03–PREY-05 · **Kind:** synthetic known-answer · **Fixture:** tests/fixtures/rllab/TC-09/
+68:### TC-10: Out-of-format actions are refused, never clipped
+69:**Pipeline:** PL-02 · **Covers:** WORLD-04 · **Kind:** closed form · **Fixture:** tests/fixtures/rllab/TC-10/
+73:### TC-11: A second run with the same name is refused
+74:**Pipeline:** PL-02 · **Covers:** TRAIN-01 · **Kind:** closed form · **Fixture:** tests/fixtures/rllab/TC-11/
+78:### TC-12: Seeded starts and fixed observation lengths
+79:**Pipeline:** PL-02 · **Covers:** WORLD-01, WORLD-03, WORLD-06, WORLD-07, FISH-05–FISH-07, PREY-06, SNAKE-06 · **Kind:** synthetic known-answer · **Fixture:** tests/fixtures/rllab/TC-12/
+83:### TC-13: Parallel runs match single runs
+84:**Pipeline:** PL-03 · **Covers:** TRAIN-05, TRAIN-02 · **Kind:** synthetic known-answer · **Fixture:** tests/fixtures/rllab/TC-13/
+85:**Source:** spec.md, the user&#x27;s worked example (TRAIN-05); generator `snake_config(budget=2000)` with seeds [1, 2], `workers=2`
+86:**Expected:** 2 `RunRecord`s, `&lt;stem&gt;-s1` and `&lt;stem&gt;-s2`, both `finished`; each run&#x27;s logs and checkpoints byte-identical to `run_train` alone with the same config · **Tolerance:** exact, one torch thread per process (AD-05)
+88:### TC-14: Live progress reads the latest evaluation point
+89:**Pipeline:** PL-04 · **Covers:** LOG-06 · **Kind:** synthetic known-answer · **Fixture:** tests/fixtures/rllab/TC-14/
+93:### TC-15: Mixed settings are refused; few runs are labelled
+94:**Pipeline:** PL-05 · **Covers:** LOG-03 · **Kind:** closed form · **Fixture:** tests/fixtures/rllab/TC-15/
+98:### TC-16: A planted improvement rejects both nulls
+99:**Pipeline:** PL-06 · **Covers:** EVAL-04 · **Kind:** synthetic known-answer · **Fixture:** tests/fixtures/rllab/TC-16/
+104:### TC-17: Pure noise keeps both nulls
+105:**Pipeline:** PL-06 · **Covers:** EVAL-04 · **Kind:** synthetic known-answer · **Fixture:** tests/fixtures/rllab/TC-17/
+110:### TC-18: Lower-is-better scores test in the right direction
+111:**Pipeline:** PL-06 · **Covers:** EVAL-04 · **Kind:** synthetic known-answer · **Fixture:** tests/fixtures/rllab/TC-18/
+116:### TC-19: Holm step-down on two p-values
+117:**Pipeline:** PL-06 · **Covers:** EVAL-04 · **Kind:** closed form · **Fixture:** tests/fixtures/rllab/TC-19/
+121:### TC-20: One run below the rule baseline fails the world
+122:**Pipeline:** PL-06 · **Covers:** EVAL-05, EVAL-06 · **Kind:** user example · **Fixture:** tests/fixtures/rllab/TC-20/
+126:### TC-21: Final evaluation plays 700 episodes on the final seeds
+127:**Pipeline:** PL-06 · **Covers:** EVAL-03, EVAL-01 · **Kind:** user example · **Fixture:** tests/fixtures/rllab/TC-21/
+131:### TC-22: Fewer than 5 runs skips the test
+132:**Pipeline:** PL-06 · **Covers:** EVAL-06 · **Kind:** closed form · **Fixture:** tests/fixtures/rllab/TC-22/
+136:### TC-23: Predator-prey teams face fixed opponents; collapse is flagged
+137:**Pipeline:** PL-06 · **Covers:** PREY-08, EVAL-06 · **Kind:** synthetic known-answer · **Fixture:** tests/fixtures/rllab/TC-23/
+141:### TC-24: Trained snake beats both baselines
+142:**Pipeline:** PL-06 · **Covers:** SNAKE-08, EVAL-04, EVAL-05, QR-01, QR-02, QR-05 · **Kind:** model evaluation · **Fixture:** tests/fixtures/rllab/TC-24/
+143:**Source:** spec model criteria SNAKE-08, EVAL-04, EVAL-05: metric mean food per episode; held-out seeds 2,000,000–2,000,099; baselines random and the SNAKE-07 rule; 5 runs, seeds 1–5, `configs/snake-default.toml`
+147:### TC-25: Trained fish beat both baselines in every variant
+148:**Pipeline:** PL-06 · **Covers:** FISH-10, EVAL-04, EVAL-05 · **Kind:** model evaluation · **Fixture:** tests/fixtures/rllab/TC-25/
+153:### TC-26: Trained prey and predators each beat their baselines
+154:**Pipeline:** PL-06 · **Covers:** PREY-08, EVAL-04, EVAL-05 · **Kind:** model evaluation · **Fixture:** tests/fixtures/rllab/TC-26/
+159:### TC-27: Pause and step forward and back
+160:**Pipeline:** PL-07 · **Covers:** REPLAY-03, REPLAY-05 · **Kind:** user example · **Fixture:** tests/fixtures/rllab/TC-27/
+164:### TC-28: Side by side starts together; the shorter holds its last frame
+165:**Pipeline:** PL-07 · **Covers:** REPLAY-01, REPLAY-02, REPLAY-04, REPLAY-06 · **Kind:** user example · **Fixture:** tests/fixtures/rllab/TC-28/
+169:### TC-29: A replay video plays at 1×
+170:**Pipeline:** PL-08 · **Covers:** REPLAY-07, QR-06 · **Kind:** synthetic known-answer · **Fixture:** tests/fixtures/rllab/TC-29/
+174:### TC-30: Reference ratio outcomes
+175:**Pipeline:** PL-09 · **Covers:** CHECK-03 · **Kind:** user example · **Fixture:** tests/fixtures/rllab/TC-30/
+179:### TC-31: A new write-up has only the three headings
+180:**Pipeline:** PL-10 · **Covers:** NOTES-01, NOTES-03 · **Kind:** closed form · **Fixture:** tests/fixtures/rllab/TC-31/
+184:### TC-32: Finish check finds empty parts and broken links
+185:**Pipeline:** PL-11 · **Covers:** NOTES-01, NOTES-02 · **Kind:** synthetic known-answer · **Fixture:** tests/fixtures/rllab/TC-32/
+189:### TC-33: Grid diagonal matches the in-training evaluations
+190:**Pipeline:** PL-12 · **Covers:** PREY-09 · **Kind:** synthetic known-answer · **Fixture:** tests/fixtures/rllab/TC-33/</pre></details></div><div class="step" id="S21"><span class="sid">U10.S21</span><span class="kind">Bash</span>grep -rln &quot;toml\|methods&quot; tests/fixtures tests/conftest.py tests/contracts/kit.py tests/contracts/conftest.py<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;grep -rln \&quot;toml\\|methods\&quot; tests/fixtures tests/conftest.py tests/contracts/kit.py tests/contracts/conftest.py&quot;
+}</pre><div class="lbl">output</div><pre>tests/fixtures/rllab/TC-26/input.json
+tests/fixtures/rllab/TC-05/expected.json
+tests/fixtures/rllab/TC-25/input.json
+tests/fixtures/rllab/TC-24/input.json
+tests/fixtures/rllab/TC-15/runs/c/run.json
+tests/fixtures/rllab/TC-15/runs/a/run.json
+tests/fixtures/rllab/TC-15/runs/b/run.json</pre></details></div><div class="step" id="S22"><span class="sid">U10.S22</span><span class="kind">Read</span>/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/project/.claude/worktrees/agent-a457a1c397186a75d/tests/fixtures/rllab/TC-05/input.json<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/project/.claude/worktrees/agent-a457a1c397186a75d/tests/fixtures/rllab/TC-05/input.json&quot;
+}</pre><div class="lbl">output</div><pre>1	{
+2	 &quot;generator&quot;: &quot;snake_config&quot;,
+3	 &quot;budget&quot;: 2000,
+4	 &quot;seed&quot;: 1,
+5	 &quot;name&quot;: &quot;sched&quot;
+6	}
+7	</pre></details></div><div class="step" id="S23"><span class="sid">U10.S23</span><span class="kind">Bash</span>grep -h -A12 -i &quot;toml\|methods&quot; tests/fixtures/rllab/TC-24/input.json tests/fixtures/rllab/TC-26/input.json tests/fixtures/rllab/TC-15/runs/a/run.json<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;grep -h -A12 -i \&quot;toml\\|methods\&quot; tests/fixtures/rllab/TC-24/input.json tests/fixtures/rllab/TC-26/input.json tests/fixtures/rllab/TC-15/runs/a/run.json&quot;
+}</pre><div class="lbl">output</div><pre> &quot;config&quot;: &quot;configs/snake-default.toml&quot;,
+ &quot;seeds&quot;: [
+  1,
+  2,
+  3,
+  4,
+  5
+ ]
+}
+ &quot;config&quot;: &quot;configs/prey-default.toml&quot;,
+ &quot;seeds&quot;: [
+  1,
+  2,
+  3,
+  4,
+  5
+ ]
+}
+  &quot;methods&quot;: {
+   &quot;snake&quot;: {
+    &quot;method&quot;: &quot;dqn&quot;,
+    &quot;settings&quot;: {
+     &quot;lr&quot;: 0.001
+    }
+   }
+  },
+  &quot;budget&quot;: 2000,
+  &quot;name&quot;: &quot;snake-s1&quot;,
+  &quot;seed&quot;: 1
+ },
+ &quot;status&quot;: &quot;finished&quot;</pre></details></div><div class="step" id="S24"><span class="sid">U10.S24</span><span class="kind">Bash</span>grep -rn &quot;&quot; src/rllab/worlds/__init__.py src/rllab/worlds/types.py src/rllab/worlds/make.py src/rllab/train/__init__.py src/rllab/methods/__init__.py<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;grep -rn \&quot;\&quot; src/rllab/worlds/__init__.py src/rllab/worlds/types.py src/rllab/worlds/make.py src/rllab/train/__init__.py src/rllab/methods/__init__.py&quot;
+}</pre><div class="lbl">output</div><pre>src/rllab/worlds/__init__.py:1:&quot;&quot;&quot;The worlds, behind `make`.&quot;&quot;&quot;
+src/rllab/worlds/__init__.py:2:
+src/rllab/worlds/__init__.py:3:from rllab.worlds.make import make
+src/rllab/worlds/__init__.py:4:from rllab.worlds.types import CheckWorld
+src/rllab/worlds/__init__.py:5:
+src/rllab/worlds/__init__.py:6:__all__ = [&quot;CheckWorld&quot;, &quot;make&quot;]
+src/rllab/worlds/make.py:1:&quot;&quot;&quot;The world factory: a world name and variant to a World.&quot;&quot;&quot;
+src/rllab/worlds/make.py:2:
+src/rllab/worlds/make.py:3:from rllab.core import World
+src/rllab/worlds/make.py:4:
+src/rllab/worlds/make.py:5:
+src/rllab/worlds/make.py:6:def make(world: str, variant: str = &quot;default&quot;, **overrides: int | float) -&gt; World:
+src/rllab/worlds/make.py:7:    raise NotImplementedError(&quot;M1-T05&quot;)
+src/rllab/worlds/types.py:1:&quot;&quot;&quot;Types the worlds add to the core World protocol.&quot;&quot;&quot;
+src/rllab/worlds/types.py:2:
+src/rllab/worlds/types.py:3:from typing import Protocol
+src/rllab/worlds/types.py:4:
+src/rllab/worlds/types.py:5:from rllab.core import Array, World
+src/rllab/worlds/types.py:6:
+src/rllab/worlds/types.py:7:
+src/rllab/worlds/types.py:8:class CheckWorld(World, Protocol):
+src/rllab/worlds/types.py:9:    &quot;&quot;&quot;A check world with a hand-derived best action for every state (TRAIN-06, AD-09).&quot;&quot;&quot;
+src/rllab/worlds/types.py:10:
+src/rllab/worlds/types.py:11:    def states(self) -&gt; Array: ...
+src/rllab/worlds/types.py:12:
+src/rllab/worlds/types.py:13:    def best_actions(self) -&gt; Array: ...
+src/rllab/methods/__init__.py:1:&quot;&quot;&quot;Hand-written learners behind `Learner`, and checkpoint-to-policy loading.&quot;&quot;&quot;
+src/rllab/methods/__init__.py:2:
+src/rllab/methods/__init__.py:3:from rllab.methods.factory import load_policy, make_learner
+src/rllab/methods/__init__.py:4:from rllab.methods.types import Learner, NonFiniteError, SpecMismatchError, Transition
+src/rllab/methods/__init__.py:5:
+src/rllab/methods/__init__.py:6:__all__ = [
+src/rllab/methods/__init__.py:7:    &quot;Learner&quot;,
+src/rllab/methods/__init__.py:8:    &quot;NonFiniteError&quot;,
+src/rllab/methods/__init__.py:9:    &quot;SpecMismatchError&quot;,
+src/rllab/methods/__init__.py:10:    &quot;Transition&quot;,
+src/rllab/methods/__init__.py:11:    &quot;load_policy&quot;,
+src/rllab/methods/__init__.py:12:    &quot;make_learner&quot;,
+src/rllab/methods/__init__.py:13:]
+src/rllab/train/__init__.py:1:&quot;&quot;&quot;Training: the config loader, the method check and the PL-01 to PL-03 entries (AD-10).&quot;&quot;&quot;
+src/rllab/train/__init__.py:2:
+src/rllab/train/__init__.py:3:from rllab.train.config import load_run_configs
+src/rllab/train/__init__.py:4:from rllab.train.pipelines.pl01_check import run_check
+src/rllab/train/__init__.py:5:from rllab.train.pipelines.pl02_train import run_train
+src/rllab/train/__init__.py:6:from rllab.train.pipelines.pl03_batch import run_batch
+src/rllab/train/__init__.py:7:from rllab.train.types import CheckFailedError, CheckResult
+src/rllab/train/__init__.py:8:
+src/rllab/train/__init__.py:9:__all__ = [
+src/rllab/train/__init__.py:10:    &quot;CheckFailedError&quot;,
+src/rllab/train/__init__.py:11:    &quot;CheckResult&quot;,
+src/rllab/train/__init__.py:12:    &quot;load_run_configs&quot;,
+src/rllab/train/__init__.py:13:    &quot;run_batch&quot;,
+src/rllab/train/__init__.py:14:    &quot;run_check&quot;,
+src/rllab/train/__init__.py:15:    &quot;run_train&quot;,
+src/rllab/train/__init__.py:16:]</pre></details></div><div class="step" id="S25"><span class="sid">U10.S25</span><span class="kind">Write</span>/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/project/.claude/worktrees/agent-a457a1c397186a75d/src/rllab/train/config.py (118 lines)<div class="lbl">wrote /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/project/.claude/worktrees/agent-a457a1c397186a75d/src/rllab/train/config.py</div><pre>&quot;&quot;&quot;Run configs from a TOML file, one per seed, method defaults filled.
+
+The file mirrors `core.RunConfig` without `name` and `seed`, which come from the file stem and
+each seed:
+
+    world = &quot;snake&quot;
+    variant = &quot;default&quot;        # optional, &quot;default&quot;
+    budget = 2000
+    device = &quot;cpu&quot;             # optional, &quot;cpu&quot;
+
+    [methods.snake]            # one table per team
+    method = &quot;dqn&quot;
+    settings = { lr = 0.001 }  # optional; missing settings take the method&#x27;s defaults
+
+    [check_settings.dqn]       # optional; check-world overrides per method (AD-09)
+    hidden = 32
+&quot;&quot;&quot;
+
+import tomllib
+from collections.abc import Mapping, Sequence
+from dataclasses import replace
+from pathlib import Path
+from typing import Literal
+
+from rllab.core import MethodConfig, RunConfig, Settings
+
+SettingValue = int | float | str | bool
+
+WORLD_VARIANTS: Mapping[str, tuple[str, ...]] = {
+    &quot;snake&quot;: (&quot;default&quot;,),
+    &quot;fish&quot;: (&quot;one&quot;, &quot;many&quot;, &quot;local&quot;),
+    &quot;prey&quot;: (&quot;default&quot;,),
+    &quot;check-discrete&quot;: (&quot;default&quot;,),
+    &quot;check-continuous&quot;: (&quot;default&quot;,),
+}
+
+METHOD_DEFAULTS: Mapping[str, Settings] = {
+    &quot;dqn&quot;: {&quot;lr&quot;: 0.001, &quot;gamma&quot;: 0.99, &quot;epsilon&quot;: 0.1, &quot;hidden&quot;: 64},
+    &quot;ppo&quot;: {&quot;lr&quot;: 0.0003, &quot;gamma&quot;: 0.99, &quot;hidden&quot;: 64, &quot;steps_per_update&quot;: 2048},
+}
+
+_RUN_KEYS = frozenset({&quot;world&quot;, &quot;variant&quot;, &quot;budget&quot;, &quot;device&quot;, &quot;methods&quot;, &quot;check_settings&quot;})
+_METHOD_KEYS = frozenset({&quot;method&quot;, &quot;settings&quot;})
+
+
+def load_run_configs(path: Path, seeds: Sequence[int]) -&gt; list[RunConfig]:
+    &quot;&quot;&quot;One `RunConfig` per seed from the TOML at `path`, named `&lt;stem&gt;-s&lt;seed&gt;`.&quot;&quot;&quot;
+    with path.open(&quot;rb&quot;) as file:
+        raw = tomllib.load(file)
+    template = _run_config(raw)
+    return [replace(template, name=f&quot;{path.stem}-s{seed}&quot;, seed=seed) for seed in seeds]
+
+
+def _run_config(raw: Mapping[str, object]) -&gt; RunConfig:
+    _check_keys(raw, _RUN_KEYS, &quot;the config&quot;)
+    world = _text(raw, &quot;world&quot;, &quot;the config&quot;)
+    if world not in WORLD_VARIANTS:
+        raise ValueError(f&quot;unknown world {world!r}&quot;)
+    variant = _text(raw, &quot;variant&quot;, &quot;the config&quot;, &quot;default&quot;)
+    if variant not in WORLD_VARIANTS[world]:
+        raise ValueError(f&quot;unknown variant {variant!r} of world {world!r}&quot;)
+    teams = _table(raw.get(&quot;methods&quot;), &quot;methods&quot;)
+    if not teams:
+        raise ValueError(&quot;the config names no team under &#x27;methods&#x27;&quot;)
+    checks = _table(raw.get(&quot;check_settings&quot;, {}), &quot;check_settings&quot;)
+    return RunConfig(
+        name=&quot;&quot;,
+        world=world,
+        variant=variant,
+        methods={team: _method_config(value, f&quot;methods.{team}&quot;) for team, value in teams.items()},
+        seed=0,
+        budget=_budget(raw.get(&quot;budget&quot;)),
+        check_settings={
+            method: _settings(value, _method_name(method), f&quot;check_settings.{method}&quot;)
+            for method, value in checks.items()
+        },
+        device=_text(raw, &quot;device&quot;, &quot;the config&quot;, &quot;cpu&quot;),
+    )
+
+
+def _method_config(raw: object, where: str) -&gt; MethodConfig:
+    table = _table(raw, where)
+    _check_keys(table, _METHOD_KEYS, where)
+    method = _method_name(_text(table, &quot;method&quot;, where))
+    overrides = _settings(table.get(&quot;settings&quot;, {}), method, f&quot;{where}.settings&quot;)
+    return MethodConfig(method=method, settings={**METHOD_DEFAULTS[method], **overrides})
+
+
+def _settings(raw: object, method: str, where: str) -&gt; dict[str, SettingValue]:
+    table = _table(raw, where)
+    _check_keys(table, METHOD_DEFAULTS[method].keys(), where)
+    settings: dict[str, SettingValue] = {}
+    for key, value in table.items():
+        if not isinstance(value, int | float | str | bool):
+            raise ValueError(f&quot;setting {key!r} in {where} must be a number, string or boolean&quot;)
+        settings[key] = value
+    return settings
+
+
+def _method_name(value: str) -&gt; Literal[&quot;dqn&quot;, &quot;ppo&quot;]:
+    if value == &quot;dqn&quot;:
+        return &quot;dqn&quot;
+    if value == &quot;ppo&quot;:
+        return &quot;ppo&quot;
+    raise ValueError(f&quot;unknown method {value!r}&quot;)
+
+
+def _budget(value: object) -&gt; int:
+    if isinstance(value, bool) or not isinstance(value, int) or value &lt;= 0:
+        raise ValueError(f&quot;&#x27;budget&#x27; must be a positive whole number of world steps, not {value!r}&quot;)
+    return value
+
+
+def _check_keys(table: Mapping[str, object], known: object, where: str) -&gt; None:
+    allowed = set(known) if isinstance(known, frozenset) else set(known)  # type narrowing below
+    unknown = sorted(set(table) - allowed)
+    if unknown:
+        raise ValueError(f&quot;unknown key {unknown[0]!r} in {where}&quot;)
+</pre><div class="hook">⛔ hook PostToolUse:Write blocked: [bash &quot;$CLAUDE_PROJECT_DIR&quot;/scripts/hooks/post_edit.sh]: -&gt; ruff check --fix --quiet /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/project/.claude/worktrees/agent-a457a1c397186a75d/src/rllab/train/config.py
+F821 Undefined name `_text`
+  --&gt; src/rllab/train/config.py:56:13
+   |
+54 | def _run_config(raw: Mapping[str, object]) -&gt; RunConfig:
+55 |     _check_keys(raw, _RUN_KEYS, &quot;the config&quot;)
+56 |     world = _text(raw, &quot;world&quot;, &quot;the config&quot;)
+   |             ^^^^^
+57 |     if world not in WORLD_VARIANTS:
+58 |         raise ValueError(f&quot;unknown world {world!r}&quot;)
+   |
+
+F821 Undefined name `_text`
+  --&gt; src/rllab/train/config.py:59:15
+   |
+57 |     if world not in WORLD_VARIANTS:
+58 |         raise ValueError(f&quot;unknown world {world!r}&quot;)
+59 |     variant = _text(raw, &quot;variant&quot;, &quot;the config&quot;, &quot;default&quot;)
+   |               ^^^^^
+60 |     if variant not in WORLD_VARIANTS[world]:
+61 |         raise ValueError(f&quot;unknown variant {variant!r} of world {world!r}&quot;)
+   |
+
+F821 Undefined name `_table`
+  --&gt; src/rllab/train/config.py:62:13
+   |
+60 |     if variant not in WORLD_VARIANTS[world]:
+61 |         raise ValueError(f&quot;unknown variant {variant!r} of world {world!r}&quot;)
+62 |     teams = _table(raw.get(&quot;methods&quot;), &quot;methods&quot;)
+   |             ^^^^^^
+63 |     if not teams:
+64 |         raise ValueError(&quot;the config names no team under &#x27;methods&#x27;&quot;)
+   |
+
+F821 Undefined name `_table`
+  --&gt; src/rllab/train/config.py:65:14
+   |
+63 |     if not teams:
+64 |         raise ValueError(&quot;the config names no team under &#x27;methods&#x27;&quot;)
+65 |     checks = _table(raw.get(&quot;check_settings&quot;, {}), &quot;check_settings&quot;)
+   |              ^^^^^^
+66 |     return RunConfig(
+67 |         name=&quot;&quot;,
+   |
+
+F821 Undefined name `_text`
+  --&gt; src/rllab/train/config.py:77:16
+   |
+75 |             for method, value in checks.items()
+76 |         },
+77 |         device=_text(raw, &quot;device&quot;, &quot;the config&quot;, &quot;cpu&quot;),
+   |                ^^^^^
+78 |     )
+   |
+
+F821 Undefined name `_table`
+  --&gt; src/rllab/train/config.py:82:13
+   |
+81 | def _method_config(raw: object, where: str) -&gt; MethodConfig:
+82 |     table = _table(raw, where)
+   |             ^^^^^^
+83 |     _check_keys(table, _METHOD_KEYS, where)
+84 |     method = _method_name(_text(table, &quot;method&quot;, where))
+   |
+
+F821 Undefined name `_text`
+  --&gt; src/rllab/train/config.py:84:27
+   |
+82 |     table = _table(raw, where)
+83 |     _check_keys(table, _METHOD_KEYS, where)
+84 |     method = _method_name(_text(table, &quot;method&quot;, where))
+   |                           ^^^^^
+85 |     overrides = _settings(table.get(&quot;settings&quot;, {}), method, f&quot;{where}.settings&quot;)
+86 |     return MethodConfig(method=method, settings={**METHOD_DEFAULTS[method], **overrides})
+   |
+
+F821 Undefined name `_table`
+  --&gt; src/rllab/train/config.py:90:13
+   |
+89 | def _settings(raw: object, method: str, where: str) -&gt; dict[str, SettingValue]:
+90 |     table = _table(raw, where)
+   |             ^^^^^^
+91 |     _check_keys(table, METHOD_DEFAULTS[method].keys(), where)
+92 |     settings: dict[str, SettingValue] = {}
+   |
+
+TRY004 Prefer `TypeError` exception for invalid type
+  --&gt; src/rllab/train/config.py:95:13
+   |
+93 |     for key, value in table.items():
+94 |         if not isinstance(value, int | float | str | bool):
+95 |             raise ValueError(f&quot;setting {key!r} in {where} must be a number, string or boolean&quot;)
+   |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+96 |         settings[key] = value
+97 |     return settings
+   |
+
+RUF034 Useless `if`-`else` condition
+   --&gt; src/rllab/train/config.py:115:15
+    |
+114 | def _check_keys(table: Mapping[str, object], known: object, where: str) -&gt; None:
+115 |     allowed = set(known) if isinstance(known, frozenset) else set(known)  # type narrowing below
+    |               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+116 |     unknown = sorted(set(table) - allowed)
+117 |     if unknown:
+    |
+
+-&gt; ruff format --quiet /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/project/.claude/worktrees/agent-a457a1c397186a75d/src/rllab/train/config.py
+-&gt; typos /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/project/.claude/worktrees/agent-a457a1c397186a75d/src/rllab/train/config.py
+-&gt; python scripts/check_size.py /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/project/.claude/worktrees/agent-a457a1c397186a75d/src/rllab/train/config.py
+FAILED: ruff check --fix --quiet /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/project/.claude/worktrees/agent-a457a1c397186a75d/src/rllab/train/config.py
+</div><details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/project/.claude/worktrees/agent-a457a1c397186a75d/src/rllab/train/config.py&quot;,
+  &quot;content&quot;: &quot;\&quot;\&quot;\&quot;Run configs from a TOML file, one per seed, method defaults filled.\n\nThe file mirrors `core.RunConfig` without `name` and `seed`, which come from the file stem and\neach seed:\n\n    world = \&quot;snake\&quot;\n    variant = \&quot;default\&quot;        # optional, \&quot;default\&quot;\n    budget = 2000\n    device = \&quot;cpu\&quot;             # optional, \&quot;cpu\&quot;\n\n    [methods.snake]            # one table per team\n    method = \&quot;dqn\&quot;\n    settings = { lr = 0.001 }  # optional; missing settings take the method&#x27;s defaults\n\n    [check_settings.dqn]       # optional; check-world overrides per method (AD-09)\n    hidden = 32\n\&quot;\&quot;\&quot;\n\nimport tomllib\nfrom collections.abc import Mapping, Sequence\nfrom dataclasses import replace\nfrom pathlib import Path\nfrom typing import Literal\n\nfrom rllab.core import MethodConfig, RunConfig, Settings\n\nSettingValue = int | float | str | bool\n\nWORLD_VARIANTS: Mapping[str, tuple[str, ...]] = {\n    \&quot;snake\&quot;: (\&quot;default\&quot;,),\n    \&quot;fish\&quot;: (\&quot;one\&quot;, \&quot;many\&quot;, \&quot;local\&quot;),\n    \&quot;prey\&quot;: (\&quot;default\&quot;,),\n    \&quot;check-discrete\&quot;: (\&quot;default\&quot;,),\n    \&quot;check-continuous\&quot;: (\&quot;default\&quot;,),\n}\n\nMETHOD_DEFAULTS: Mapping[str, Settings] = {\n    \&quot;dqn\&quot;: {\&quot;lr\&quot;: 0.001, \&quot;gamma\&quot;: 0.99, \&quot;epsilon\&quot;: 0.1, \&quot;hidden\&quot;: 64},\n    \&quot;ppo\&quot;: {\&quot;lr\&quot;: 0.0003, \&quot;gamma\&quot;: 0.99, \&quot;hidden\&quot;: 64, \&quot;steps_per_update\&quot;: 2048},\n}\n\n_RUN_KEYS = frozenset({\&quot;world\&quot;, \&quot;variant\&quot;, \&quot;budget\&quot;, \&quot;device\&quot;, \&quot;methods\&quot;, \&quot;check_settings\&quot;})\n_METHOD_KEYS = frozenset({\&quot;method\&quot;, \&quot;settings\&quot;})\n\n\ndef load_run_configs(path: Path, seeds: Sequence[int]) -&gt; list[RunConfig]:\n    \&quot;\&quot;\&quot;One `RunConfig` per seed from the TOML at `path`, named `&lt;stem&gt;-s&lt;seed&gt;`.\&quot;\&quot;\&quot;\n    with path.open(\&quot;rb\&quot;) as file:\n        raw = tomllib.load(file)\n    template = _run_config(raw)\n    return [replace(template, name=f\&quot;{path.stem}-s{seed}\&quot;, seed=seed) for seed in seeds]\n\n\ndef _run_config(raw: Mapping[str, object]) -&gt; RunConfig:\n    _check_keys(raw, _RUN_KEYS, \&quot;the config\&quot;)\n    world = _text(raw, \&quot;world\&quot;, \&quot;the config\&quot;)\n    if world not in WORLD_VARIANTS:\n        raise ValueError(f\&quot;unknown world {world!r}\&quot;)\n    variant = _text(raw, \&quot;variant\&quot;, \&quot;the config\&quot;, \&quot;default\&quot;)\n    if variant not in WORLD_VARIANTS[world]:\n        raise ValueError(f\&quot;unknown variant {variant!r} of world {world!r}\&quot;)\n    teams = _table(raw.get(\&quot;methods\&quot;), \&quot;methods\&quot;)\n    if not teams:\n        raise ValueError(\&quot;the config names no team under &#x27;methods&#x27;\&quot;)\n    checks = _table(raw.get(\&quot;check_settings\&quot;, {}), \&quot;check_settings\&quot;)\n    return RunConfig(\n        name=\&quot;\&quot;,\n        world=world,\n        variant=variant,\n        methods={team: _method_config(value, f\&quot;methods.{team}\&quot;) for team, value in teams.items()},\n        seed=0,\n        budget=_budget(raw.get(\&quot;budget\&quot;)),\n        check_settings={\n            method: _settings(value, _method_name(method), f\&quot;check_settings.{method}\&quot;)\n            for method, value in checks.items()\n        },\n        device=_text(raw, \&quot;device\&quot;, \&quot;the config\&quot;, \&quot;cpu\&quot;),\n    )\n\n\ndef _method_config(raw: object, where: str) -&gt; MethodConfig:\n    table = _table(raw, where)\n    _check_keys(table, _METHOD_KEYS, where)\n    method = _method_name(_text(table, \&quot;method\&quot;, where))\n    overrides = _settings(table.get(\&quot;settings\&quot;, {}), method, f\&quot;{where}.settings\&quot;)\n    return MethodConfig(method=method, settings={**METHOD_DEFAULTS[method], **overrides})\n\n\ndef _settings(raw: object, method: str, where: str) -&gt; dict[str, SettingValue]:\n    table = _table(raw, where)\n    _check_keys(table, METHOD_DEFAULTS[method].keys(), where)\n    settings: dict[str, SettingValue] = {}\n    for key, value in table.items():\n        if not isinstance(value, int | float | str | bool):\n            raise ValueError(f\&quot;setting {key!r} in {where} must be a number, string or boolean\&quot;)\n        settings[key] = value\n    return settings\n\n\ndef _method_name(value: str) -&gt; Literal[\&quot;dqn\&quot;, \&quot;ppo\&quot;]:\n    if value == \&quot;dqn\&quot;:\n        return \&quot;dqn\&quot;\n    if value == \&quot;ppo\&quot;:\n        return \&quot;ppo\&quot;\n    raise ValueError(f\&quot;unknown method {value!r}\&quot;)\n\n\ndef _budget(value: object) -&gt; int:\n    if isinstance(value, bool) or not isinstance(value, int) or value &lt;= 0:\n        raise ValueError(f\&quot;&#x27;budget&#x27; must be a positive whole number of world steps, not {value!r}\&quot;)\n    return value\n\n\ndef _check_keys(table: Mapping[str, object], known: object, where: str) -&gt; None:\n    allowed = set(known) if isinstance(known, frozenset) else set(known)  # type narrowing below\n    unknown = sorted(set(table) - allowed)\n    if unknown:\n        raise ValueError(f\&quot;unknown key {unknown[0]!r} in {where}\&quot;)\n&quot;
+}</pre><div class="lbl">output</div><pre>The file /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/project/.claude/worktrees/agent-a457a1c397186a75d/src/rllab/train/config.py has been updated successfully. (file state is current in your context — no need to Read it back)</pre></details></div><div class="step" id="S26"><span class="sid">U10.S26</span><span class="kind">Read</span>/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/project/.claude/worktrees/agent-a457a1c397186a75d/src/rllab/train/config.py offset=86<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/project/.claude/worktrees/agent-a457a1c397186a75d/src/rllab/train/config.py&quot;,
+  &quot;offset&quot;: 86
+}</pre><div class="lbl">output</div><pre>86	    return MethodConfig(method=method, settings={**METHOD_DEFAULTS[method], **overrides})
+87	
+88	
+89	def _settings(raw: object, method: str, where: str) -&gt; dict[str, SettingValue]:
+90	    table = _table(raw, where)
+91	    _check_keys(table, METHOD_DEFAULTS[method].keys(), where)
+92	    settings: dict[str, SettingValue] = {}
+93	    for key, value in table.items():
+94	        if not isinstance(value, int | float | str | bool):
+95	            raise ValueError(f&quot;setting {key!r} in {where} must be a number, string or boolean&quot;)
+96	        settings[key] = value
+97	    return settings
+98	
+99	
+100	def _method_name(value: str) -&gt; Literal[&quot;dqn&quot;, &quot;ppo&quot;]:
+101	    if value == &quot;dqn&quot;:
+102	        return &quot;dqn&quot;
+103	    if value == &quot;ppo&quot;:
+104	        return &quot;ppo&quot;
+105	    raise ValueError(f&quot;unknown method {value!r}&quot;)
+106	
+107	
+108	def _budget(value: object) -&gt; int:
+109	    if isinstance(value, bool) or not isinstance(value, int) or value &lt;= 0:
+110	        raise ValueError(f&quot;&#x27;budget&#x27; must be a positive whole number of world steps, not {value!r}&quot;)
+111	    return value
+112	
+113	
+114	def _check_keys(table: Mapping[str, object], known: object, where: str) -&gt; None:
+115	    allowed = set(known) if isinstance(known, frozenset) else set(known)  # type narrowing below
+116	    unknown = sorted(set(table) - allowed)
+117	    if unknown:
+118	        raise ValueError(f&quot;unknown key {unknown[0]!r} in {where}&quot;)
+119	</pre></details></div><div class="step" id="S27"><span class="sid">U10.S27</span><span class="kind">Edit</span>/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/project/.claude/worktrees/agent-a457a1c397186a75d/src/rllab/train/config.py | old: &#x27;def _settings(raw: object, method: str, where: str) -&gt; dict[str, SettingValue]: &#x27; | new: &#x27;def _settings(raw: object, method: str, where: str) -&gt; dict[str, SettingValue]: &#x27;<div class="lbl">edited /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/project/.claude/worktrees/agent-a457a1c397186a75d/src/rllab/train/config.py · old</div><pre>def _settings(raw: object, method: str, where: str) -&gt; dict[str, SettingValue]:
+    table = _table(raw, where)
+    _check_keys(table, METHOD_DEFAULTS[method].keys(), where)
+    settings: dict[str, SettingValue] = {}
+    for key, value in table.items():
+        if not isinstance(value, int | float | str | bool):
+            raise ValueError(f&quot;setting {key!r} in {where} must be a number, string or boolean&quot;)
+        settings[key] = value
+    return settings
+
+
+def _method_name(value: str) -&gt; Literal[&quot;dqn&quot;, &quot;ppo&quot;]:
+    if value == &quot;dqn&quot;:
+        return &quot;dqn&quot;
+    if value == &quot;ppo&quot;:
+        return &quot;ppo&quot;
+    raise ValueError(f&quot;unknown method {value!r}&quot;)
+
+
+def _budget(value: object) -&gt; int:
+    if isinstance(value, bool) or not isinstance(value, int) or value &lt;= 0:
+        raise ValueError(f&quot;&#x27;budget&#x27; must be a positive whole number of world steps, not {value!r}&quot;)
+    return value
+
+
+def _check_keys(table: Mapping[str, object], known: object, where: str) -&gt; None:
+    allowed = set(known) if isinstance(known, frozenset) else set(known)  # type narrowing below
+    unknown = sorted(set(table) - allowed)
+    if unknown:
+        raise ValueError(f&quot;unknown key {unknown[0]!r} in {where}&quot;)</pre><div class="lbl">new</div><pre>def _settings(raw: object, method: str, where: str) -&gt; dict[str, SettingValue]:
+    &quot;&quot;&quot;The settings in `raw`, each a key of `method`&#x27;s defaults and of its default&#x27;s type.&quot;&quot;&quot;
+    table = _table(raw, where)
+    defaults = METHOD_DEFAULTS[method]
+    _check_keys(table, defaults.keys(), where)
+    return {key: _setting(value, defaults[key], f&quot;{where}.{key}&quot;) for key, value in table.items()}
+
+
+def _setting(value: object, default: SettingValue, where: str) -&gt; SettingValue:
+    if isinstance(default, bool) or isinstance(value, bool):
+        return _typed(value, bool, where)
+    if isinstance(default, int):
+        return _typed(value, int, where)
+    if isinstance(default, float):
+        return float(_typed(value, int | float, where))
+    return _typed(value, str, where)
+
+
+def _typed[T](value: object, kind: type[T] | object, where: str) -&gt; T:
+    if not isinstance(value, kind):  # type: ignore[arg-type]
+        raise TypeError(f&quot;{where} has the wrong type: {value!r}&quot;)
+    return value</pre><div class="hook">⛔ hook PostToolUse:Edit blocked: [bash &quot;$CLAUDE_PROJECT_DIR&quot;/scripts/hooks/post_edit.sh]: -&gt; ruff check --fix --quiet /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/project/.claude/worktrees/agent-a457a1c397186a75d/src/rllab/train/config.py
+F821 Undefined name `_check_keys`
+  --&gt; src/rllab/train/config.py:54:5
+   |
+53 | def _run_config(raw: Mapping[str, object]) -&gt; RunConfig:
+54 |     _check_keys(raw, _RUN_KEYS, &quot;the config&quot;)
+   |     ^^^^^^^^^^^
+55 |     world = _text(raw, &quot;world&quot;, &quot;the config&quot;)
+56 |     if world not in WORLD_VARIANTS:
+   |
+
+F821 Undefined name `_text`
+  --&gt; src/rllab/train/config.py:55:13
+   |
+53 | def _run_config(raw: Mapping[str, object]) -&gt; RunConfig:
+54 |     _check_keys(raw, _RUN_KEYS, &quot;the config&quot;)
+55 |     world = _text(raw, &quot;world&quot;, &quot;the config&quot;)
+   |             ^^^^^
+56 |     if world not in WORLD_VARIANTS:
+57 |         raise ValueError(f&quot;unknown world {world!r}&quot;)
+   |
+
+F821 Undefined name `_text`
+  --&gt; src/rllab/train/config.py:58:15
+   |
+56 |     if world not in WORLD_VARIANTS:
+57 |         raise ValueError(f&quot;unknown world {world!r}&quot;)
+58 |     variant = _text(raw, &quot;variant&quot;, &quot;the config&quot;, &quot;default&quot;)
+   |               ^^^^^
+59 |     if variant not in WORLD_VARIANTS[world]:
+60 |         raise ValueError(f&quot;unknown variant {variant!r} of world {world!r}&quot;)
+   |
+
+F821 Undefined name `_table`
+  --&gt; src/rllab/train/config.py:61:13
+   |
+59 |     if variant not in WORLD_VARIANTS[world]:
+60 |         raise ValueError(f&quot;unknown variant {variant!r} of world {world!r}&quot;)
+61 |     teams = _table(raw.get(&quot;methods&quot;), &quot;methods&quot;)
+   |             ^^^^^^
+62 |     if not teams:
+63 |         raise ValueError(&quot;the config names no team under &#x27;methods&#x27;&quot;)
+   |
+
+F821 Undefined name `_table`
+  --&gt; src/rllab/train/config.py:64:14
+   |
+62 |     if not teams:
+63 |         raise ValueError(&quot;the config names no team under &#x27;methods&#x27;&quot;)
+64 |     checks = _table(raw.get(&quot;check_settings&quot;, {}), &quot;check_settings&quot;)
+   |              ^^^^^^
+65 |     return RunConfig(
+66 |         name=&quot;&quot;,
+   |
+
+F821 Undefined name `_budget`
+  --&gt; src/rllab/train/config.py:71:16
+   |
+69 |         methods={team: _method_config(value, f&quot;methods.{team}&quot;) for team, value in teams.items()},
+70 |         seed=0,
+71 |         budget=_budget(raw.get(&quot;budget&quot;)),
+   |                ^^^^^^^
+72 |         check_settings={
+73 |             method: _settings(value, _method_name(method), f&quot;check_settings.{method}&quot;)
+   |
+
+F821 Undefined name `_method_name`
+  --&gt; src/rllab/train/config.py:73:38
+   |
+71 |         budget=_budget(raw.get(&quot;budget&quot;)),
+72 |         check_settings={
+73 |             method: _settings(value, _method_name(method), f&quot;check_settings.{method}&quot;)
+   |                                      ^^^^^^^^^^^^
+74 |             for method, value in checks.items()
+75 |         },
+   |
+
+F821 Undefined name `_text`
+  --&gt; src/rllab/train/config.py:76:16
+   |
+74 |             for method, value in checks.items()
+75 |         },
+76 |         device=_text(raw, &quot;device&quot;, &quot;the config&quot;, &quot;cpu&quot;),
+   |                ^^^^^
+77 |     )
+   |
+
+F821 Undefined name `_table`
+  --&gt; src/rllab/train/config.py:81:13
+   |
+80 | def _method_config(raw: object, where: str) -&gt; MethodConfig:
+81 |     table = _table(raw, where)
+   |             ^^^^^^
+82 |     _check_keys(table, _METHOD_KEYS, where)
+83 |     method = _method_name(_text(table, &quot;method&quot;, where))
+   |
+
+F821 Undefined name `_check_keys`
+  --&gt; src/rllab/train/config.py:82:5
+   |
+80 | def _method_config(raw: object, where: str) -&gt; MethodConfig:
+81 |     table = _table(raw, where)
+82 |     _check_keys(table, _METHOD_KEYS, where)
+   |     ^^^^^^^^^^^
+83 |     method = _method_name(_text(table, &quot;method&quot;, where))
+84 |     overrides = _settings(table.get(&quot;settings&quot;, {}), method, f&quot;{where}.settings&quot;)
+   |
+
+F821 Undefined name `_method_name`
+  --&gt; src/rllab/train/config.py:83:14
+   |
+81 |     table = _table(raw, where)
+82 |     _check_keys(table, _METHOD_KEYS, where)
+83 |     method = _method_name(_text(table, &quot;method&quot;, where))
+   |              ^^^^^^^^^^^^
+84 |     overrides = _settings(table.get(&quot;settings&quot;, {}), method, f&quot;{where}.settings&quot;)
+85 |     return MethodConfig(method=method, settings={**METHOD_DEFAULTS[method], **overrides})
+   |
+
+F821 Undefined name `_text`
+  --&gt; src/rllab/train/config.py:83:27
+   |
+81 |     table = _table(raw, where)
+82 |     _check_keys(table, _METHOD_KEYS, where)
+83 |     method = _method_name(_text(table, &quot;method&quot;, where))
+   |                           ^^^^^
+84 |     overrides = _settings(table.get(&quot;settings&quot;, {}), method, f&quot;{where}.settings&quot;)
+85 |     return MethodConfig(method=method, settings={**METHOD_DEFAULTS[method], **overrides})
+   |
+
+F821 Undefined name `_table`
+  --&gt; src/rllab/train/config.py:90:13
+   |
+88 | def _settings(raw: object, method: str, where: str) -&gt; dict[str, SettingValue]:
+89 |     &quot;&quot;&quot;The settings in `raw`, each a key of `method`&#x27;s defaults and of its default&#x27;s type.&quot;&quot;&quot;
+90 |     table = _table(raw, where)
+   |             ^^^^^^
+91 |     defaults = METHOD_DEFAULTS[method]
+92 |     _check_keys(table, defaults.keys(), where)
+   |
+
+F821 Undefined name `_check_keys`
+  --&gt; src/rllab/train/config.py:92:5
+   |
+90 |     table = _table(raw, where)
+91 |     defaults = METHOD_DEFAULTS[method]
+92 |     _check_keys(table, defaults.keys(), where)
+   |     ^^^^^^^^^^^
+93 |     return {key: _setting(value, defaults[key], f&quot;{where}.{key}&quot;) for key, value in table.items()}
+   |
+
+-&gt; ruff format --quiet /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/project/.claude/worktrees/agent-a457a1c397186a75d/src/rllab/train/config.py
+-&gt; typos /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/project/.claude/worktrees/agent-a457a1c397186a75d/src/rllab/train/config.py
+-&gt; python scripts/check_size.py /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/project/.claude/worktrees/agent-a457a1c397186a75d/src/rllab/train/config.py
+FAILED: ruff check --fix --quiet /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/project/.claude/worktrees/agent-a457a1c397186a75d/src/rllab/train/config.py
+</div><details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;replace_all&quot;: false,
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/project/.claude/worktrees/agent-a457a1c397186a75d/src/rllab/train/config.py&quot;,
+  &quot;old_string&quot;: &quot;def _settings(raw: object, method: str, where: str) -&gt; dict[str, SettingValue]:\n    table = _table(raw, where)\n    _check_keys(table, METHOD_DEFAULTS[method].keys(), where)\n    settings: dict[str, SettingValue] = {}\n    for key, value in table.items():\n        if not isinstance(value, int | float | str | bool):\n            raise ValueError(f\&quot;setting {key!r} in {where} must be a number, string or boolean\&quot;)\n        settings[key] = value\n    return settings\n\n\ndef _method_name(value: str) -&gt; Literal[\&quot;dqn\&quot;, \&quot;ppo\&quot;]:\n    if value == \&quot;dqn\&quot;:\n        return \&quot;dqn\&quot;\n    if value == \&quot;ppo\&quot;:\n        return \&quot;ppo\&quot;\n    raise ValueError(f\&quot;unknown method {value!r}\&quot;)\n\n\ndef _budget(value: object) -&gt; int:\n    if isinstance(value, bool) or not isinstance(value, int) or value &lt;= 0:\n        raise ValueError(f\&quot;&#x27;budget&#x27; must be a positive whole number of world steps, not {value!r}\&quot;)\n    return value\n\n\ndef _check_keys(table: Mapping[str, object], known: object, where: str) -&gt; None:\n    allowed = set(known) if isinstance(known, frozenset) else set(known)  # type narrowing below\n    unknown = sorted(set(table) - allowed)\n    if unknown:\n        raise ValueError(f\&quot;unknown key {unknown[0]!r} in {where}\&quot;)&quot;,
+  &quot;new_string&quot;: &quot;def _settings(raw: object, method: str, where: str) -&gt; dict[str, SettingValue]:\n    \&quot;\&quot;\&quot;The settings in `raw`, each a key of `method`&#x27;s defaults and of its default&#x27;s type.\&quot;\&quot;\&quot;\n    table = _table(raw, where)\n    defaults = METHOD_DEFAULTS[method]\n    _check_keys(table, defaults.keys(), where)\n    return {key: _setting(value, defaults[key], f\&quot;{where}.{key}\&quot;) for key, value in table.items()}\n\n\ndef _setting(value: object, default: SettingValue, where: str) -&gt; SettingValue:\n    if isinstance(default, bool) or isinstance(value, bool):\n        return _typed(value, bool, where)\n    if isinstance(default, int):\n        return _typed(value, int, where)\n    if isinstance(default, float):\n        return float(_typed(value, int | float, where))\n    return _typed(value, str, where)\n\n\ndef _typed[T](value: object, kind: type[T] | object, where: str) -&gt; T:\n    if not isinstance(value, kind):  # type: ignore[arg-type]\n        raise TypeError(f\&quot;{where} has the wrong type: {value!r}\&quot;)\n    return value&quot;
+}</pre><div class="lbl">output</div><pre>The file /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/project/.claude/worktrees/agent-a457a1c397186a75d/src/rllab/train/config.py has been updated successfully.</pre></details></div><div class="step" id="S28"><span class="sid">U10.S28</span><span class="kind">Read</span>/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/project/.claude/worktrees/agent-a457a1c397186a75d/src/rllab/train/config.py offset=40<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/project/.claude/worktrees/agent-a457a1c397186a75d/src/rllab/train/config.py&quot;,
+  &quot;offset&quot;: 40
+}</pre><div class="lbl">output</div><pre>40	
+41	_RUN_KEYS = frozenset({&quot;world&quot;, &quot;variant&quot;, &quot;budget&quot;, &quot;device&quot;, &quot;methods&quot;, &quot;check_settings&quot;})
+42	_METHOD_KEYS = frozenset({&quot;method&quot;, &quot;settings&quot;})
+43	
+44	
+45	def load_run_configs(path: Path, seeds: Sequence[int]) -&gt; list[RunConfig]:
+46	    &quot;&quot;&quot;One `RunConfig` per seed from the TOML at `path`, named `&lt;stem&gt;-s&lt;seed&gt;`.&quot;&quot;&quot;
+47	    with path.open(&quot;rb&quot;) as file:
+48	        raw = tomllib.load(file)
+49	    template = _run_config(raw)
+50	    return [replace(template, name=f&quot;{path.stem}-s{seed}&quot;, seed=seed) for seed in seeds]
+51	
+52	
+53	def _run_config(raw: Mapping[str, object]) -&gt; RunConfig:
+54	    _check_keys(raw, _RUN_KEYS, &quot;the config&quot;)
+55	    world = _text(raw, &quot;world&quot;, &quot;the config&quot;)
+56	    if world not in WORLD_VARIANTS:
+57	        raise ValueError(f&quot;unknown world {world!r}&quot;)
+58	    variant = _text(raw, &quot;variant&quot;, &quot;the config&quot;, &quot;default&quot;)
+59	    if variant not in WORLD_VARIANTS[world]:
+60	        raise ValueError(f&quot;unknown variant {variant!r} of world {world!r}&quot;)
+61	    teams = _table(raw.get(&quot;methods&quot;), &quot;methods&quot;)
+62	    if not teams:
+63	        raise ValueError(&quot;the config names no team under &#x27;methods&#x27;&quot;)
+64	    checks = _table(raw.get(&quot;check_settings&quot;, {}), &quot;check_settings&quot;)
+65	    return RunConfig(
+66	        name=&quot;&quot;,
+67	        world=world,
+68	        variant=variant,
+69	        methods={team: _method_config(value, f&quot;methods.{team}&quot;) for team, value in teams.items()},
+70	        seed=0,
+71	        budget=_budget(raw.get(&quot;budget&quot;)),
+72	        check_settings={
+73	            method: _settings(value, _method_name(method), f&quot;check_settings.{method}&quot;)
+74	            for method, value in checks.items()
+75	        },
+76	        device=_text(raw, &quot;device&quot;, &quot;the config&quot;, &quot;cpu&quot;),
+77	    )
+78	
+79	
+80	def _method_config(raw: object, where: str) -&gt; MethodConfig:
+81	    table = _table(raw, where)
+82	    _check_keys(table, _METHOD_KEYS, where)
+83	    method = _method_name(_text(table, &quot;method&quot;, where))
+84	    overrides = _settings(table.get(&quot;settings&quot;, {}), method, f&quot;{where}.settings&quot;)
+85	    return MethodConfig(method=method, settings={**METHOD_DEFAULTS[method], **overrides})
+86	
+87	
+88	def _settings(raw: object, method: str, where: str) -&gt; dict[str, SettingValue]:
+89	    &quot;&quot;&quot;The settings in `raw`, each a key of `method`&#x27;s defaults and of its default&#x27;s type.&quot;&quot;&quot;
+90	    table = _table(raw, where)
+91	    defaults = METHOD_DEFAULTS[method]
+92	    _check_keys(table, defaults.keys(), where)
+93	    return {key: _setting(value, defaults[key], f&quot;{where}.{key}&quot;) for key, value in table.items()}
+94	
+95	
+96	def _setting(value: object, default: SettingValue, where: str) -&gt; SettingValue:
+97	    if isinstance(default, bool) or isinstance(value, bool):
+98	        return _typed(value, bool, where)
+99	    if isinstance(default, int):
+100	        return _typed(value, int, where)
+101	    if isinstance(default, float):
+102	        return float(_typed(value, int | float, where))
+103	    return _typed(value, str, where)
+104	
+105	
+106	def _typed[T](value: object, kind: type[T] | object, where: str) -&gt; T:
+107	    if not isinstance(value, kind):  # type: ignore[arg-type]
+108	        raise TypeError(f&quot;{where} has the wrong type: {value!r}&quot;)
+109	    return value
+110	</pre></details></div><div class="step" id="S29"><span class="sid">U10.S29</span><span class="kind">Edit</span>/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/project/.claude/worktrees/agent-a457a1c397186a75d/src/rllab/train/config.py | old: &#x27;def _setting(value: object, default: SettingValue, where: str) -&gt; SettingValue: &#x27; | new: &#x27;def _setting(value: object, default: SettingValue, where: str) -&gt; SettingValue: &#x27;<div class="lbl">edited /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/project/.claude/worktrees/agent-a457a1c397186a75d/src/rllab/train/config.py · old</div><pre>def _setting(value: object, default: SettingValue, where: str) -&gt; SettingValue:
+    if isinstance(default, bool) or isinstance(value, bool):
+        return _typed(value, bool, where)
+    if isinstance(default, int):
+        return _typed(value, int, where)
+    if isinstance(default, float):
+        return float(_typed(value, int | float, where))
+    return _typed(value, str, where)
+
+
+def _typed[T](value: object, kind: type[T] | object, where: str) -&gt; T:
+    if not isinstance(value, kind):  # type: ignore[arg-type]
+        raise TypeError(f&quot;{where} has the wrong type: {value!r}&quot;)
+    return value</pre><div class="lbl">new</div><pre>def _setting(value: object, default: SettingValue, where: str) -&gt; SettingValue:
+    &quot;&quot;&quot;`value` if it has the type of `default`; a whole number counts as a float.&quot;&quot;&quot;
+    if isinstance(default, float) and type(value) is int:
+        return float(value)
+    if isinstance(value, int | float | str | bool) and type(value) is type(default):
+        return value
+    raise TypeError(f&quot;{where} must be a {type(default).__name__}, not {value!r}&quot;)
+
+
+def _method_name(value: str) -&gt; Literal[&quot;dqn&quot;, &quot;ppo&quot;]:
+    if value == &quot;dqn&quot;:
+        return &quot;dqn&quot;
+    if value == &quot;ppo&quot;:
+        return &quot;ppo&quot;
+    raise ValueError(f&quot;unknown method {value!r}&quot;)
+
+
+def _budget(value: object) -&gt; int:
+    if type(value) is int and value &gt; 0:
+        return value
+    raise TypeError(f&quot;&#x27;budget&#x27; must be a positive whole number of world steps, not {value!r}&quot;)
+
+
+def _text(table: Mapping[str, object], key: str, where: str, default: str | None = None) -&gt; str:
+    value = table.get(key, default)
+    if isinstance(value, str):
+        return value
+    raise TypeError(f&quot;{key!r} in {where} must be a string, not {value!r}&quot;)
+
+
+def _table(value: object, where: str) -&gt; Mapping[str, object]:
+    if isinstance(value, dict):
+        return value
+    raise TypeError(f&quot;{where} must be a table, not {value!r}&quot;)
+
+
+def _check_keys(table: Mapping[str, object], known: AbstractSet[str], where: str) -&gt; None:
+    unknown = sorted(set(table) - known)
+    if unknown:
+        raise ValueError(f&quot;unknown key {unknown[0]!r} in {where}&quot;)</pre><div class="hook">⛔ hook PostToolUse:Edit blocked: [bash &quot;$CLAUDE_PROJECT_DIR&quot;/scripts/hooks/post_edit.sh]: -&gt; ruff check --fix --quiet /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/project/.claude/worktrees/agent-a457a1c397186a75d/src/rllab/train/config.py
+F821 Undefined name `Literal`
+   --&gt; src/rllab/train/config.py:105:33
+    |
+105 | def _method_name(value: str) -&gt; Literal[&quot;dqn&quot;, &quot;ppo&quot;]:
+    |                                 ^^^^^^^
+106 |     if value == &quot;dqn&quot;:
+107 |         return &quot;dqn&quot;
+    |
+
+F821 Undefined name `dqn`
+   --&gt; src/rllab/train/config.py:105:42
+    |
+105 | def _method_name(value: str) -&gt; Literal[&quot;dqn&quot;, &quot;ppo&quot;]:
+    |                                          ^^^
+106 |     if value == &quot;dqn&quot;:
+107 |         return &quot;dqn&quot;
+    |
+
+F821 Undefined name `ppo`
+   --&gt; src/rllab/train/config.py:105:49
+    |
+105 | def _method_name(value: str) -&gt; Literal[&quot;dqn&quot;, &quot;ppo&quot;]:
+    |                                                 ^^^
+106 |     if value == &quot;dqn&quot;:
+107 |         return &quot;dqn&quot;
+    |
+
+F821 Undefined name `AbstractSet`
+   --&gt; src/rllab/train/config.py:132:53
+    |
+132 | def _check_keys(table: Mapping[str, object], known: AbstractSet[str], where: str) -&gt; None:
+    |                                                     ^^^^^^^^^^^
+133 |     unknown = sorted(set(table) - known)
+134 |     if unknown:
+    |
+
+-&gt; ruff format --quiet /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/project/.claude/worktrees/agent-a457a1c397186a75d/src/rllab/train/config.py
+-&gt; typos /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/project/.claude/worktrees/agent-a457a1c397186a75d/src/rllab/train/config.py
+-&gt; python scripts/check_size.py /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/project/.claude/worktrees/agent-a457a1c397186a75d/src/rllab/train/config.py
+FAILED: ruff check --fix --quiet /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/project/.claude/worktrees/agent-a457a1c397186a75d/src/rllab/train/config.py
+</div><details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;replace_all&quot;: false,
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/project/.claude/worktrees/agent-a457a1c397186a75d/src/rllab/train/config.py&quot;,
+  &quot;old_string&quot;: &quot;def _setting(value: object, default: SettingValue, where: str) -&gt; SettingValue:\n    if isinstance(default, bool) or isinstance(value, bool):\n        return _typed(value, bool, where)\n    if isinstance(default, int):\n        return _typed(value, int, where)\n    if isinstance(default, float):\n        return float(_typed(value, int | float, where))\n    return _typed(value, str, where)\n\n\ndef _typed[T](value: object, kind: type[T] | object, where: str) -&gt; T:\n    if not isinstance(value, kind):  # type: ignore[arg-type]\n        raise TypeError(f\&quot;{where} has the wrong type: {value!r}\&quot;)\n    return value&quot;,
+  &quot;new_string&quot;: &quot;def _setting(value: object, default: SettingValue, where: str) -&gt; SettingValue:\n    \&quot;\&quot;\&quot;`value` if it has the type of `default`; a whole number counts as a float.\&quot;\&quot;\&quot;\n    if isinstance(default, float) and type(value) is int:\n        return float(value)\n    if isinstance(value, int | float | str | bool) and type(value) is type(default):\n        return value\n    raise TypeError(f\&quot;{where} must be a {type(default).__name__}, not {value!r}\&quot;)\n\n\ndef _method_name(value: str) -&gt; Literal[\&quot;dqn\&quot;, \&quot;ppo\&quot;]:\n    if value == \&quot;dqn\&quot;:\n        return \&quot;dqn\&quot;\n    if value == \&quot;ppo\&quot;:\n        return \&quot;ppo\&quot;\n    raise ValueError(f\&quot;unknown method {value!r}\&quot;)\n\n\ndef _budget(value: object) -&gt; int:\n    if type(value) is int and value &gt; 0:\n        return value\n    raise TypeError(f\&quot;&#x27;budget&#x27; must be a positive whole number of world steps, not {value!r}\&quot;)\n\n\ndef _text(table: Mapping[str, object], key: str, where: str, default: str | None = None) -&gt; str:\n    value = table.get(key, default)\n    if isinstance(value, str):\n        return value\n    raise TypeError(f\&quot;{key!r} in {where} must be a string, not {value!r}\&quot;)\n\n\ndef _table(value: object, where: str) -&gt; Mapping[str, object]:\n    if isinstance(value, dict):\n        return value\n    raise TypeError(f\&quot;{where} must be a table, not {value!r}\&quot;)\n\n\ndef _check_keys(table: Mapping[str, object], known: AbstractSet[str], where: str) -&gt; None:\n    unknown = sorted(set(table) - known)\n    if unknown:\n        raise ValueError(f\&quot;unknown key {unknown[0]!r} in {where}\&quot;)&quot;
+}</pre><div class="lbl">output</div><pre>The file /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/project/.claude/worktrees/agent-a457a1c397186a75d/src/rllab/train/config.py has been updated successfully.</pre></details></div><div class="step" id="S30"><span class="sid">U10.S30</span><span class="kind">Edit</span>/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/project/.claude/worktrees/agent-a457a1c397186a75d/src/rllab/train/config.py | old: &#x27;from collections.abc import Mapping, Sequence&#x27; | new: &#x27;from collections.abc import Mapping, Sequence ⏎ from collections.abc import Set &#x27;<div class="lbl">edited /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/project/.claude/worktrees/agent-a457a1c397186a75d/src/rllab/train/config.py · old</div><pre>from collections.abc import Mapping, Sequence</pre><div class="lbl">new</div><pre>from collections.abc import Mapping, Sequence
+from collections.abc import Set as AbstractSet</pre><div class="hook">⛔ hook PostToolUse:Edit blocked: [bash &quot;$CLAUDE_PROJECT_DIR&quot;/scripts/hooks/post_edit.sh]: -&gt; ruff check --fix --quiet /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/project/.claude/worktrees/agent-a457a1c397186a75d/src/rllab/train/config.py
+F821 Undefined name `Literal`
+   --&gt; src/rllab/train/config.py:106:33
+    |
+106 | def _method_name(value: str) -&gt; Literal[&quot;dqn&quot;, &quot;ppo&quot;]:
+    |                                 ^^^^^^^
+107 |     if value == &quot;dqn&quot;:
+108 |         return &quot;dqn&quot;
+    |
+
+F821 Undefined name `dqn`
+   --&gt; src/rllab/train/config.py:106:42
+    |
+106 | def _method_name(value: str) -&gt; Literal[&quot;dqn&quot;, &quot;ppo&quot;]:
+    |                                          ^^^
+107 |     if value == &quot;dqn&quot;:
+108 |         return &quot;dqn&quot;
+    |
+
+F821 Undefined name `ppo`
+   --&gt; src/rllab/train/config.py:106:49
+    |
+106 | def _method_name(value: str) -&gt; Literal[&quot;dqn&quot;, &quot;ppo&quot;]:
+    |                                                 ^^^
+107 |     if value == &quot;dqn&quot;:
+108 |         return &quot;dqn&quot;
+    |
+
+-&gt; ruff format --quiet /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/project/.claude/worktrees/agent-a457a1c397186a75d/src/rllab/train/config.py
+-&gt; typos /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/project/.claude/worktrees/agent-a457a1c397186a75d/src/rllab/train/config.py
+-&gt; python scripts/check_size.py /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/project/.claude/worktrees/agent-a457a1c397186a75d/src/rllab/train/config.py
+FAILED: ruff check --fix --quiet /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/project/.claude/worktrees/agent-a457a1c397186a75d/src/rllab/train/config.py
+</div><details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;replace_all&quot;: false,
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/project/.claude/worktrees/agent-a457a1c397186a75d/src/rllab/train/config.py&quot;,
+  &quot;old_string&quot;: &quot;from collections.abc import Mapping, Sequence&quot;,
+  &quot;new_string&quot;: &quot;from collections.abc import Mapping, Sequence\nfrom collections.abc import Set as AbstractSet&quot;
+}</pre><div class="lbl">output</div><pre>The file /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/project/.claude/worktrees/agent-a457a1c397186a75d/src/rllab/train/config.py has been updated successfully.</pre></details></div><div class="step" id="S31"><span class="sid">U10.S31</span><span class="kind">say</span>Ruff&#x27;s --fix removed the then-unused Literal import earlier; let me view the header.<details><summary>full text</summary><pre>Ruff&#x27;s --fix removed the then-unused Literal import earlier; let me view the header.</pre></details></div><div class="step" id="S32"><span class="sid">U10.S32</span><span class="kind">Read</span>/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/project/.claude/worktrees/agent-a457a1c397186a75d/src/rllab/train/config.py offset=18 limit=12<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/project/.claude/worktrees/agent-a457a1c397186a75d/src/rllab/train/config.py&quot;,
+  &quot;offset&quot;: 18,
+  &quot;limit&quot;: 12
+}</pre><div class="lbl">output</div><pre>18	
+19	import tomllib
+20	from collections.abc import Mapping, Sequence
+21	from collections.abc import Set as AbstractSet
+22	from dataclasses import replace
+23	from pathlib import Path
+24	
+25	from rllab.core import MethodConfig, RunConfig, Settings
+26	
+27	SettingValue = int | float | str | bool
+28	
+29	WORLD_VARIANTS: Mapping[str, tuple[str, ...]] = {</pre></details></div><div class="step" id="S33"><span class="sid">U10.S33</span><span class="kind">Edit</span>/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/project/.claude/worktrees/agent-a457a1c397186a75d/src/rllab/train/config.py | old: &#x27;from pathlib import Path&#x27; | new: &#x27;from pathlib import Path ⏎ from typing import Literal&#x27;<div class="lbl">edited /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/project/.claude/worktrees/agent-a457a1c397186a75d/src/rllab/train/config.py · old</div><pre>from pathlib import Path
+</pre><div class="lbl">new</div><pre>from pathlib import Path
+from typing import Literal
+</pre><details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;replace_all&quot;: false,
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/project/.claude/worktrees/agent-a457a1c397186a75d/src/rllab/train/config.py&quot;,
+  &quot;old_string&quot;: &quot;from pathlib import Path\n&quot;,
+  &quot;new_string&quot;: &quot;from pathlib import Path\nfrom typing import Literal\n&quot;
+}</pre><div class="lbl">output</div><pre>The file /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/project/.claude/worktrees/agent-a457a1c397186a75d/src/rllab/train/config.py has been updated successfully.</pre></details></div><div class="step" id="S34"><span class="sid">U10.S34</span><span class="kind">Bash</span>uv run mypy src/rllab/train/config.py<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;uv run mypy src/rllab/train/config.py&quot;
+}</pre><div class="lbl">output</div><pre>Success: no issues found in 1 source file</pre></details></div><div class="step" id="S35"><span class="sid">U10.S35</span><span class="kind">say</span>Now the unit tests.<details><summary>full text</summary><pre>Now the unit tests.</pre></details></div><div class="step" id="S36"><span class="sid">U10.S36</span><span class="kind">Write</span>/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/project/.claude/worktrees/agent-a457a1c397186a75d/tests/unit/rllab/test_config.py (149 lines)<div class="lbl">wrote /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/project/.claude/worktrees/agent-a457a1c397186a75d/tests/unit/rllab/test_config.py</div><pre>&quot;&quot;&quot;Unit tests of `train.load_run_configs`: TOML into one RunConfig per seed, defaults filled.&quot;&quot;&quot;
+
+from pathlib import Path
+
+import pytest
+
+from rllab.core import MethodConfig
+from rllab.train import load_run_configs
+
+SNAKE_TOML = &quot;&quot;&quot;
+world = &quot;snake&quot;
+variant = &quot;default&quot;
+budget = 2000
+
+[methods.snake]
+method = &quot;dqn&quot;
+settings = { lr = 0.005 }
+
+[check_settings.dqn]
+hidden = 32
+&quot;&quot;&quot;
+
+PREY_TOML = &quot;&quot;&quot;
+world = &quot;prey&quot;
+budget = 1000000
+
+[methods.prey]
+method = &quot;ppo&quot;
+
+[methods.predator]
+method = &quot;ppo&quot;
+settings = { gamma = 0.95 }
+&quot;&quot;&quot;
+
+
+def write(tmp_path: Path, text: str, name: str = &quot;snake-default.toml&quot;) -&gt; Path:
+    path = tmp_path / name
+    path.write_text(text)
+    return path
+
+
+def test_load_run_configs_makes_one_named_config_per_seed(tmp_path: Path) -&gt; None:
+    configs = load_run_configs(write(tmp_path, SNAKE_TOML), [1, 2])
+
+    assert [c.name for c in configs] == [&quot;snake-default-s1&quot;, &quot;snake-default-s2&quot;]
+    assert [c.seed for c in configs] == [1, 2]
+    assert all(c.world == &quot;snake&quot; and c.variant == &quot;default&quot; for c in configs)
+    assert all(c.budget == 2000 and c.device == &quot;cpu&quot; for c in configs)
+
+
+def test_load_run_configs_fills_missing_dqn_settings_with_defaults(tmp_path: Path) -&gt; None:
+    (config,) = load_run_configs(write(tmp_path, SNAKE_TOML), [7])
+
+    assert config.methods == {
+        &quot;snake&quot;: MethodConfig(
+            method=&quot;dqn&quot;, settings={&quot;lr&quot;: 0.005, &quot;gamma&quot;: 0.99, &quot;epsilon&quot;: 0.1, &quot;hidden&quot;: 64}
+        )
+    }
+    assert config.check_settings == {&quot;dqn&quot;: {&quot;hidden&quot;: 32}}
+
+
+def test_load_run_configs_gives_each_team_its_own_method(tmp_path: Path) -&gt; None:
+    (config,) = load_run_configs(write(tmp_path, PREY_TOML, &quot;prey.toml&quot;), [3])
+
+    assert config.name == &quot;prey-s3&quot;
+    assert config.variant == &quot;default&quot;
+    assert config.check_settings == {}
+    assert config.methods[&quot;prey&quot;].settings == {
+        &quot;lr&quot;: 0.0003,
+        &quot;gamma&quot;: 0.99,
+        &quot;hidden&quot;: 64,
+        &quot;steps_per_update&quot;: 2048,
+    }
+    assert config.methods[&quot;predator&quot;].settings[&quot;gamma&quot;] == 0.95
+
+
+def test_load_run_configs_reads_a_whole_number_as_a_float_setting(tmp_path: Path) -&gt; None:
+    text = SNAKE_TOML.replace(&quot;lr = 0.005&quot;, &quot;lr = 1&quot;)
+    (config,) = load_run_configs(write(tmp_path, text), [1])
+
+    lr = config.methods[&quot;snake&quot;].settings[&quot;lr&quot;]
+    assert lr == 1.0
+    assert isinstance(lr, float)
+
+
+def test_load_run_configs_with_no_seeds_returns_no_configs(tmp_path: Path) -&gt; None:
+    assert load_run_configs(write(tmp_path, SNAKE_TOML), []) == []
+
+
+def test_load_run_configs_raises_for_a_missing_file(tmp_path: Path) -&gt; None:
+    with pytest.raises(FileNotFoundError):
+        load_run_configs(tmp_path / &quot;nowhere.toml&quot;, [1])
+
+
+@pytest.mark.parametrize(
+    (&quot;old&quot;, &quot;new&quot;, &quot;named&quot;),
+    [
+        (&quot;budget = 2000&quot;, &quot;budget = 2000\nbudgett = 5&quot;, &quot;&#x27;budgett&#x27;&quot;),
+        (&quot;lr = 0.005&quot;, &quot;learning_rate = 0.005&quot;, &quot;&#x27;learning_rate&#x27;&quot;),
+        (&#x27;method = &quot;dqn&quot;&#x27;, &#x27;method = &quot;dqn&quot;\nsetting = 1&#x27;, &quot;&#x27;setting&#x27;&quot;),
+        (&quot;hidden = 32&quot;, &quot;steps_per_update = 32&quot;, &quot;&#x27;steps_per_update&#x27;&quot;),
+        (&#x27;world = &quot;snake&quot;&#x27;, &#x27;world = &quot;tetris&quot;&#x27;, &quot;&#x27;tetris&#x27;&quot;),
+        (&#x27;variant = &quot;default&quot;&#x27;, &#x27;variant = &quot;many&quot;&#x27;, &quot;&#x27;many&#x27;&quot;),
+        (&#x27;method = &quot;dqn&quot;&#x27;, &#x27;method = &quot;sac&quot;&#x27;, &quot;&#x27;sac&#x27;&quot;),
+        (&quot;[check_settings.dqn]&quot;, &quot;[check_settings.a2c]&quot;, &quot;&#x27;a2c&#x27;&quot;),
+    ],
+)
+def test_load_run_configs_names_what_is_unknown(
+    tmp_path: Path, old: str, new: str, named: str
+) -&gt; None:
+    path = write(tmp_path, SNAKE_TOML.replace(old, new))
+
+    with pytest.raises(ValueError, match=named):
+        load_run_configs(path, [1])
+
+
+def test_load_run_configs_refuses_a_config_without_teams(tmp_path: Path) -&gt; None:
+    path = write(tmp_path, &#x27;world = &quot;snake&quot;\nbudget = 2000\n[methods]\n&#x27;)
+
+    with pytest.raises(ValueError, match=&quot;no team&quot;):
+        load_run_configs(path, [1])
+
+
+@pytest.mark.parametrize(
+    (&quot;old&quot;, &quot;new&quot;, &quot;named&quot;),
+    [
+        (&quot;budget = 2000&quot;, &quot;budget = 0&quot;, &quot;budget&quot;),
+        (&quot;budget = 2000&quot;, &quot;budget = 2000.0&quot;, &quot;budget&quot;),
+        (&quot;budget = 2000&quot;, &quot;budget = true&quot;, &quot;budget&quot;),
+        (&quot;lr = 0.005&quot;, &#x27;lr = &quot;fast&quot;&#x27;, &quot;lr&quot;),
+        (&quot;hidden = 32&quot;, &quot;hidden = 32.5&quot;, &quot;hidden&quot;),
+        (&quot;hidden = 32&quot;, &quot;hidden = true&quot;, &quot;hidden&quot;),
+        (&#x27;world = &quot;snake&quot;&#x27;, &quot;world = 3&quot;, &quot;world&quot;),
+    ],
+)
+def test_load_run_configs_refuses_values_of_the_wrong_type(
+    tmp_path: Path, old: str, new: str, named: str
+) -&gt; None:
+    path = write(tmp_path, SNAKE_TOML.replace(old, new))
+
+    with pytest.raises(TypeError, match=named):
+        load_run_configs(path, [1])
+
+
+def test_load_run_configs_refuses_a_method_that_is_not_a_table(tmp_path: Path) -&gt; None:
+    path = write(tmp_path, &#x27;world = &quot;snake&quot;\nbudget = 2000\nmethods = { snake = &quot;dqn&quot; }\n&#x27;)
+
+    with pytest.raises(TypeError, match=&quot;methods.snake&quot;):
+        load_run_configs(path, [1])
+</pre><div class="hook">⛔ hook PostToolUse:Write blocked: [bash &quot;$CLAUDE_PROJECT_DIR&quot;/scripts/hooks/post_edit.sh]: -&gt; ruff check --fix --quiet /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/project/.claude/worktrees/agent-a457a1c397186a75d/tests/unit/rllab/test_config.py
+RUF043 Pattern passed to `match=` contains metacharacters but is neither escaped nor raw
+   --&gt; tests/unit/rllab/test_config.py:148:41
+    |
+146 |     path = write(tmp_path, &#x27;world = &quot;snake&quot;\nbudget = 2000\nmethods = { snake = &quot;dqn&quot; }\n&#x27;)
+147 |
+148 |     with pytest.raises(TypeError, match=&quot;methods.snake&quot;):
+    |                                         ^^^^^^^^^^^^^^^
+149 |         load_run_configs(path, [1])
+    |
+help: Use a raw string or `re.escape()` to make the intention explicit
+
+-&gt; ruff format --quiet /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/project/.claude/worktrees/agent-a457a1c397186a75d/tests/unit/rllab/test_config.py
+-&gt; typos /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/project/.claude/worktrees/agent-a457a1c397186a75d/tests/unit/rllab/test_config.py
+-&gt; python scripts/check_size.py /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/project/.claude/worktrees/agent-a457a1c397186a75d/tests/unit/rllab/test_config.py
+FAILED: ruff check --fix --quiet /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/project/.claude/worktrees/agent-a457a1c397186a75d/tests/unit/rllab/test_config.py
+</div><details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/project/.claude/worktrees/agent-a457a1c397186a75d/tests/unit/rllab/test_config.py&quot;,
+  &quot;content&quot;: &quot;\&quot;\&quot;\&quot;Unit tests of `train.load_run_configs`: TOML into one RunConfig per seed, defaults filled.\&quot;\&quot;\&quot;\n\nfrom pathlib import Path\n\nimport pytest\n\nfrom rllab.core import MethodConfig\nfrom rllab.train import load_run_configs\n\nSNAKE_TOML = \&quot;\&quot;\&quot;\nworld = \&quot;snake\&quot;\nvariant = \&quot;default\&quot;\nbudget = 2000\n\n[methods.snake]\nmethod = \&quot;dqn\&quot;\nsettings = { lr = 0.005 }\n\n[check_settings.dqn]\nhidden = 32\n\&quot;\&quot;\&quot;\n\nPREY_TOML = \&quot;\&quot;\&quot;\nworld = \&quot;prey\&quot;\nbudget = 1000000\n\n[methods.prey]\nmethod = \&quot;ppo\&quot;\n\n[methods.predator]\nmethod = \&quot;ppo\&quot;\nsettings = { gamma = 0.95 }\n\&quot;\&quot;\&quot;\n\n\ndef write(tmp_path: Path, text: str, name: str = \&quot;snake-default.toml\&quot;) -&gt; Path:\n    path = tmp_path / name\n    path.write_text(text)\n    return path\n\n\ndef test_load_run_configs_makes_one_named_config_per_seed(tmp_path: Path) -&gt; None:\n    configs = load_run_configs(write(tmp_path, SNAKE_TOML), [1, 2])\n\n    assert [c.name for c in configs] == [\&quot;snake-default-s1\&quot;, \&quot;snake-default-s2\&quot;]\n    assert [c.seed for c in configs] == [1, 2]\n    assert all(c.world == \&quot;snake\&quot; and c.variant == \&quot;default\&quot; for c in configs)\n    assert all(c.budget == 2000 and c.device == \&quot;cpu\&quot; for c in configs)\n\n\ndef test_load_run_configs_fills_missing_dqn_settings_with_defaults(tmp_path: Path) -&gt; None:\n    (config,) = load_run_configs(write(tmp_path, SNAKE_TOML), [7])\n\n    assert config.methods == {\n        \&quot;snake\&quot;: MethodConfig(\n            method=\&quot;dqn\&quot;, settings={\&quot;lr\&quot;: 0.005, \&quot;gamma\&quot;: 0.99, \&quot;epsilon\&quot;: 0.1, \&quot;hidden\&quot;: 64}\n        )\n    }\n    assert config.check_settings == {\&quot;dqn\&quot;: {\&quot;hidden\&quot;: 32}}\n\n\ndef test_load_run_configs_gives_each_team_its_own_method(tmp_path: Path) -&gt; None:\n    (config,) = load_run_configs(write(tmp_path, PREY_TOML, \&quot;prey.toml\&quot;), [3])\n\n    assert config.name == \&quot;prey-s3\&quot;\n    assert config.variant == \&quot;default\&quot;\n    assert config.check_settings == {}\n    assert config.methods[\&quot;prey\&quot;].settings == {\n        \&quot;lr\&quot;: 0.0003,\n        \&quot;gamma\&quot;: 0.99,\n        \&quot;hidden\&quot;: 64,\n        \&quot;steps_per_update\&quot;: 2048,\n    }\n    assert config.methods[\&quot;predator\&quot;].settings[\&quot;gamma\&quot;] == 0.95\n\n\ndef test_load_run_configs_reads_a_whole_number_as_a_float_setting(tmp_path: Path) -&gt; None:\n    text = SNAKE_TOML.replace(\&quot;lr = 0.005\&quot;, \&quot;lr = 1\&quot;)\n    (config,) = load_run_configs(write(tmp_path, text), [1])\n\n    lr = config.methods[\&quot;snake\&quot;].settings[\&quot;lr\&quot;]\n    assert lr == 1.0\n    assert isinstance(lr, float)\n\n\ndef test_load_run_configs_with_no_seeds_returns_no_configs(tmp_path: Path) -&gt; None:\n    assert load_run_configs(write(tmp_path, SNAKE_TOML), []) == []\n\n\ndef test_load_run_configs_raises_for_a_missing_file(tmp_path: Path) -&gt; None:\n    with pytest.raises(FileNotFoundError):\n        load_run_configs(tmp_path / \&quot;nowhere.toml\&quot;, [1])\n\n\n@pytest.mark.parametrize(\n    (\&quot;old\&quot;, \&quot;new\&quot;, \&quot;named\&quot;),\n    [\n        (\&quot;budget = 2000\&quot;, \&quot;budget = 2000\\nbudgett = 5\&quot;, \&quot;&#x27;budgett&#x27;\&quot;),\n        (\&quot;lr = 0.005\&quot;, \&quot;learning_rate = 0.005\&quot;, \&quot;&#x27;learning_rate&#x27;\&quot;),\n        (&#x27;method = \&quot;dqn\&quot;&#x27;, &#x27;method = \&quot;dqn\&quot;\\nsetting = 1&#x27;, \&quot;&#x27;setting&#x27;\&quot;),\n        (\&quot;hidden = 32\&quot;, \&quot;steps_per_update = 32\&quot;, \&quot;&#x27;steps_per_update&#x27;\&quot;),\n        (&#x27;world = \&quot;snake\&quot;&#x27;, &#x27;world = \&quot;tetris\&quot;&#x27;, \&quot;&#x27;tetris&#x27;\&quot;),\n        (&#x27;variant = \&quot;default\&quot;&#x27;, &#x27;variant = \&quot;many\&quot;&#x27;, \&quot;&#x27;many&#x27;\&quot;),\n        (&#x27;method = \&quot;dqn\&quot;&#x27;, &#x27;method = \&quot;sac\&quot;&#x27;, \&quot;&#x27;sac&#x27;\&quot;),\n        (\&quot;[check_settings.dqn]\&quot;, \&quot;[check_settings.a2c]\&quot;, \&quot;&#x27;a2c&#x27;\&quot;),\n    ],\n)\ndef test_load_run_configs_names_what_is_unknown(\n    tmp_path: Path, old: str, new: str, named: str\n) -&gt; None:\n    path = write(tmp_path, SNAKE_TOML.replace(old, new))\n\n    with pytest.raises(ValueError, match=named):\n        load_run_configs(path, [1])\n\n\ndef test_load_run_configs_refuses_a_config_without_teams(tmp_path: Path) -&gt; None:\n    path = write(tmp_path, &#x27;world = \&quot;snake\&quot;\\nbudget = 2000\\n[methods]\\n&#x27;)\n\n    with pytest.raises(ValueError, match=\&quot;no team\&quot;):\n        load_run_configs(path, [1])\n\n\n@pytest.mark.parametrize(\n    (\&quot;old\&quot;, \&quot;new\&quot;, \&quot;named\&quot;),\n    [\n        (\&quot;budget = 2000\&quot;, \&quot;budget = 0\&quot;, \&quot;budget\&quot;),\n        (\&quot;budget = 2000\&quot;, \&quot;budget = 2000.0\&quot;, \&quot;budget\&quot;),\n        (\&quot;budget = 2000\&quot;, \&quot;budget = true\&quot;, \&quot;budget\&quot;),\n        (\&quot;lr = 0.005\&quot;, &#x27;lr = \&quot;fast\&quot;&#x27;, \&quot;lr\&quot;),\n        (\&quot;hidden = 32\&quot;, \&quot;hidden = 32.5\&quot;, \&quot;hidden\&quot;),\n        (\&quot;hidden = 32\&quot;, \&quot;hidden = true\&quot;, \&quot;hidden\&quot;),\n        (&#x27;world = \&quot;snake\&quot;&#x27;, \&quot;world = 3\&quot;, \&quot;world\&quot;),\n    ],\n)\ndef test_load_run_configs_refuses_values_of_the_wrong_type(\n    tmp_path: Path, old: str, new: str, named: str\n) -&gt; None:\n    path = write(tmp_path, SNAKE_TOML.replace(old, new))\n\n    with pytest.raises(TypeError, match=named):\n        load_run_configs(path, [1])\n\n\ndef test_load_run_configs_refuses_a_method_that_is_not_a_table(tmp_path: Path) -&gt; None:\n    path = write(tmp_path, &#x27;world = \&quot;snake\&quot;\\nbudget = 2000\\nmethods = { snake = \&quot;dqn\&quot; }\\n&#x27;)\n\n    with pytest.raises(TypeError, match=\&quot;methods.snake\&quot;):\n        load_run_configs(path, [1])\n&quot;
+}</pre><div class="lbl">output</div><pre>File created successfully at: /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/project/.claude/worktrees/agent-a457a1c397186a75d/tests/unit/rllab/test_config.py (file state is current in your context — no need to Read it back)</pre></details></div><div class="step" id="S37"><span class="sid">U10.S37</span><span class="kind">Edit</span>/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/project/.claude/worktrees/agent-a457a1c397186a75d/tests/unit/rllab/test_config.py | old: &#x27;match=&quot;methods.snake&quot;):&#x27; | new: &#x27;match=r&quot;methods\\.snake&quot;):&#x27;<div class="lbl">edited /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/project/.claude/worktrees/agent-a457a1c397186a75d/tests/unit/rllab/test_config.py · old</div><pre>match=&quot;methods.snake&quot;):</pre><div class="lbl">new</div><pre>match=r&quot;methods\.snake&quot;):</pre><details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;replace_all&quot;: false,
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/project/.claude/worktrees/agent-a457a1c397186a75d/tests/unit/rllab/test_config.py&quot;,
+  &quot;old_string&quot;: &quot;match=\&quot;methods.snake\&quot;):&quot;,
+  &quot;new_string&quot;: &quot;match=r\&quot;methods\\.snake\&quot;):&quot;
+}</pre><div class="lbl">output</div><pre>The file /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-all-at-once-A3-r2/with_skill/project/.claude/worktrees/agent-a457a1c397186a75d/tests/unit/rllab/test_config.py has been updated successfully. (file state is current in your context — no need to Read it back)</pre></details></div><div class="step" id="S38"><span class="sid">U10.S38</span><span class="kind">Bash</span>uv run pytest tests/unit/rllab -q -k load_run_configs<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;uv run pytest tests/unit/rllab -q -k load_run_configs&quot;
+}</pre><div class="lbl">output</div><pre>.......................                                                  [100%]
+23 passed in 0.42s</pre></details></div><div class="step" id="S39"><span class="sid">U10.S39</span><span class="kind">Bash</span>scripts/check.sh gate<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;scripts/check.sh gate&quot;,
+  &quot;timeout&quot;: 600000
+}</pre><div class="lbl">output</div><pre>-&gt; ruff check --ignore-noqa .
+All checks passed!
+-&gt; ruff format --check .
+97 files already formatted
+-&gt; mypy
+Success: no issues found in 50 source files
+-&gt; python scripts/check_size.py src
+-&gt; deptry . --no-ansi
+Scanning 54 files...
+
+Success! No dependency issues found.
+-&gt; lint-imports --no-logo
+
+---------
+Contracts
+---------
+
+Analyzed 60 files, 138 dependencies.
+------------------------------------
+
+Layers: cli &gt; refcheck | charts | notes &gt; train | evaluate | replay &gt; baselines 
+| methods &gt; worlds | runlog &gt; core KEPT
+Independent: notes | refcheck | charts | replay KEPT
+Independent: notes | train | evaluate | replay KEPT
+Independent: charts | train KEPT
+Independent: notes | baselines | methods KEPT
+Independent: notes | worlds | runlog KEPT
+Independent: methods | worlds KEPT
+Independent: baselines | runlog KEPT
+Independent: notes | core KEPT
+Only refcheck imports Stable-Baselines3 or Gymnasium (CHECK-01, AD-08) KEPT
+
+Contracts: 10 kept, 0 broken.
+-&gt; pytest tests/unit tests/contracts --no-cov -q -x
+........................................................................ [ 25%]
+........................................................................ [ 50%]
+........................................................................ [ 76%]
+....................................................................     [100%]
+284 passed in 9.72s
+-&gt; bash scripts/floor_guard.sh
+floor_guard: clean
+-&gt; protected files unchanged since refs/worktree/checks-base</pre></details></div><div class="step" id="S40"><span class="sid">U10.S40</span><span class="kind">say</span>DONE M1-T02 solo<details><summary>full text</summary><pre>DONE M1-T02 solo</pre></details></div>
+<h2>Commits</h2>
+<p>None.</p>
+<h2>Returned</h2>
+<pre>DONE M1-T02 solo</pre>
+</body></html>

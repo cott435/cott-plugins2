@@ -181,6 +181,34 @@ def _layout_block(repo, pkg: str) -> str:
     return f"## Layout (`dt layout {pkg}`)\n{folder}/\n" + "".join(tree_lines(code.source_tree(root)))
 
 
+LONG_TABLE = 12        # step rows; past this, a task building some of a pipeline's steps sees only their rows
+
+
+def _section(task: model.Task, d) -> tuple[str, str | None]:
+    """A `Read:` section's text, and `k of n` when its step table was cut. A pipeline whose step table is over
+    `LONG_TABLE` rows keeps its header and the rows of the steps the task's `Step:` names (`PL-01.train_run`); a task
+    building the whole pipeline (`Step: PL-01`: wiring, system) or none of its steps gets every row."""
+    if d.how != "heading" or not re.fullmatch(r"PL-\d{2,}", d.id):
+        return d.text, None
+    p = next((x for x in model.pipelines(d.doc) if x.id == d.id), None)
+    if p is None or len(p.steps) <= LONG_TABLE:
+        return d.text, None
+    named = [m.group(1) for m in re.finditer(rf"{re.escape(p.id)}(?:\.(\w+))?\b", task.step)]
+    keep = {s.line for s in p.steps if s.name in named}
+    if not keep or None in named:
+        return d.text, None
+    rows = {s.line for s in p.steps}
+    last = max(rows)
+    out = []
+    for i in range(d.start, d.end):
+        if i not in rows or i in keep:
+            out.append(d.doc.lines[i])
+        if i == last:
+            out.append(f"({len(keep)} of {len(rows)} step rows: the ones {task.id} builds; the rest are other "
+                       f"tasks')")
+    return "\n".join(out).rstrip() + "\n", f"{len(keep)} of {len(rows)}"
+
+
 def interfaces(repo, task: model.Task, shown: set[str]) -> list[packet.Shown]:
     """The frozen interfaces the packet adds to what `Read:` shows: the contract types the task's steps' `In → Out`
     cells name, the contract symbols with a step's name (its signature), and every contract section those and the
@@ -254,8 +282,10 @@ def run(args, repo) -> int:
         if d is not None:
             if d.retired:
                 problems.append(f"Read: {ref} is retired ({d.retired_note}) at {d.where}")
-            reads.append({"ref": ref, "kind": "id", "where": d.where, "retired": d.retired})
-            blocks.append(f"<!-- {d.where} -->\n{d.text}")
+            text, rows = _section(task, d)
+            reads.append({"ref": ref, "kind": "id", "where": d.where, "retired": d.retired,
+                          **({"rows": rows} if rows else {})})
+            blocks.append(f"<!-- {d.where} -->\n{text}")
         elif packet.looks_like_path(repo, ref):
             block, exists = _file_block(repo, ref, task)
             reads.append({"ref": ref, "kind": "file", "exists": exists})

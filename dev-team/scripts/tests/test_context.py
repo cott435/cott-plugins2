@@ -113,6 +113,36 @@ class ContextCopyTest(FixtureCopy):
         self.assertIn("### src/quant/data/seams.py\n(not in the repo yet: M1-T01 writes it before this task starts)\n",
                       out)
 
+    def long_table(self, rows: int) -> None:
+        """PL-01 with `rows` step rows: read_raw, apply_universe, then helpers 3, 4, …"""
+        last = "| 2 | `apply_universe` | data | RawPrices, dates → Prices | static universe, no delistings | DATA-02 |"
+        extra = "".join(f"\n| {n} | `helper_{n}` | data | Prices → Prices | identity | DATA-01 |" for n in range(3, rows + 1))
+        self.replace("docs/packages/quant/pipelines.md", last, last + extra)
+
+    def test_long_step_table_keeps_the_tasks_own_rows(self):
+        self.long_table(13)
+        code, out, _ = self.dt("context", "M1-T10")          # Step: PL-01.apply_universe
+        self.assertEqual(code, 0)
+        self.assertIn("| # | Step | Owner | In → Out | Spine version | Covers |\n|---|---|---|---|---|---|\n"
+                      "| 2 | `apply_universe` | data | RawPrices, dates → Prices | static universe, no delistings | DATA-02 |\n"
+                      "(1 of 13 step rows: the ones M1-T10 builds; the rest are other tasks')\n", out)
+        self.assertNotIn("`read_raw`", out.split("## Interfaces")[0])
+        self.assertNotIn("helper_13", out)
+        data = json.loads(self.dt("context", "M1-T10", "--json")[1])
+        self.assertEqual(data["read"][0]["rows"], "1 of 13")
+
+    def test_wiring_task_gets_the_whole_table(self):
+        self.long_table(13)
+        _, out, _ = self.dt("context", "M1-T08")             # Step: PL-01, the wiring task
+        self.assertIn("helper_13", out)
+        self.assertNotIn("step rows: the ones", out)
+
+    def test_short_table_is_whole(self):
+        self.long_table(12)
+        _, out, _ = self.dt("context", "M1-T10")
+        self.assertIn("`read_raw`", out)
+        self.assertNotIn("step rows: the ones", out)
+
     def test_nested_types_are_pulled_until_closed(self):
         # Read names stats.CovReport; its signature names Factors, whose signature (edited) names Returns.
         self.set_read("PL-01, stats.CovReport")

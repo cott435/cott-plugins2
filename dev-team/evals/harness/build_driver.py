@@ -330,12 +330,15 @@ class Persona:
                and BAR_BLAME.search(e.get("why") or "") and not GOLDEN.search(e.get("why") or "")]
         tail = reply[-1500:]
         at_exit = st.get("all_landed") or any(str(r.get("review", "")).startswith("exit.") for r in st.get("reviews") or [])
-        if bar or (asks and not at_exit and not GOLDEN.search(tail) and "build-setup" in tail and BAR_BLAME.search(tail)):   # nothing else gets past it
+        open_cc = any(x.get("kind") == "CONTRACT-CHANGE" for e in escalations for x in (e, *e.get("earlier", [])))
+        if bar or (asks and not at_exit and not open_cc and not GOLDEN.search(tail) and "build-setup" in tail
+                   and BAR_BLAME.search(tail)):   # a contract change is fixed in the contract, not by loosening the bar   # nothing else gets past it
             task = bar[0]["task"] if bar else (re.findall(r"M\d+-T\d+", tail) or ["<task>"])[0]
             return "bar_fix", p["bar_fix"].format(task=task)
         if any((e.get("claim"), e.get("time")) not in self.cc_seen for e in cc):   # new ones, maybe several at once
             self.cc_seen |= {(e.get("claim"), e.get("time")) for e in cc}
-            types = {t for e in cc for t in (e.get("types") or [e.get("type") or "the contract"])}
+            types = {t.strip() for e in cc for t in (e.get("types") or re.split(r"[,;]\s*|\s+and\s+",
+                                                                                 e.get("type") or "the contract"))}
             tasks = " ".join(sorted({e["task"] for e in cc if e.get("task")}))
             if self.cc_type is not None and not self.cc_done and self.contract_revised():
                 self.cc_type = ", ".join(sorted(set(self.cc_type.split(", ")) | types))   # one draft waits: add to it

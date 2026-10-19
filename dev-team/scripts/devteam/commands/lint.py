@@ -46,7 +46,7 @@ SEVERITY = {
     "exit-cases-in-scope": "E", "kind-title": "E", "covers-vs-deferred": "E", "closed-open-question": "W",
     "process-narration": "E", "explain-stale": "W", "spine-claim": "W", "step-unplanned": "W",
     "interface-barrier": "W", "stale-row": "E",
-    "milestone-lopsided": "W",
+    "milestone-lopsided": "W", "read-unwritten": "E",
 }
 
 # Size budgets (planning-stage.md §3), in lines. Package docs are budgeted per unit (lines per unit × units +
@@ -1773,6 +1773,23 @@ def check_task_ref(ctx: Context):
                 yield _p(doc, e.line, "task-ref", f"graph row {e.src} → {e.dst} names {i}, which isn't a task")
 
 
+def check_read_unwritten(ctx: Context):
+    """A repo path in a task's `Read:` (one not checked in todo.md) that isn't in the repo and that no task writes before it starts
+    (a task it waits on, or an earlier milestone's): its `dt context` packet says "missing: not in the repo yet"
+    where the seam it builds against should be."""
+    done = model.todo_state(ctx.repo)
+    for doc in ctx.plan_docs:
+        for t in model.tasks(doc):
+            if done.get(t.id):
+                continue
+            for ref in packet.unwritten_reads(ctx.repo, t):
+                line = md.field_line(doc.lines, t.start + 1, t.end, "Read")
+                yield _p(doc, t.start if line is None else line, "read-unwritten",
+                         f"{t.id} Read: {ref} isn't in the repo and no task it waits on writes it, so its packet "
+                         f"shows \"missing: not in the repo yet\": put the seam in a task it depends on (the "
+                         f"interface stubs it), or drop the path")
+
+
 def _smoke_due(t: model.Task, pl: str, wired_before: dict[str, set[str]]) -> bool:
     """Whether the task's Verify must run pipeline `pl`'s smoke command. Wiring and system tasks do, and so does
     any other task whose `Depends on` reaches `pl`'s wiring task; interface and spine tasks, and thicken tasks
@@ -1873,7 +1890,7 @@ CHECKS = [
     check_budget, check_approved_edit, check_prebuild_left,
     check_task_fields, check_task_size, check_task_acceptance, check_task_title, check_task_step,
     check_depends, check_milestone_size, check_writes, check_parallel_step, check_spine_claim, check_edges, check_deprecated, check_verify_smoke,
-    check_step_io_types, check_packet_type_closure, check_type_cases, check_task_ref,
+    check_step_io_types, check_packet_type_closure, check_type_cases, check_task_ref, check_read_unwritten,
     check_todo_mismatch, check_finding_disposition, check_foreign_plan,
     check_ref_file, check_ref_hash, check_ref_large, check_ref_prefix, check_roadmap_skill, check_roadmap_stage,
     check_spec_stage, check_milestone_lines, check_milestone_order, check_milestone_lopsided, check_exit_cases_in_scope,

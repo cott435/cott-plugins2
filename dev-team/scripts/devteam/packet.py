@@ -17,7 +17,7 @@ import typing
 import uuid
 from dataclasses import dataclass
 
-from . import md, model
+from . import graph, md, model
 from .repo import Repo
 
 CODE_SPAN = re.compile(r"`([^`]+)`")
@@ -138,6 +138,51 @@ def outside_sections(doc) -> dict[str, int]:
         if i not in inside:
             for name in defined_names(_code(doc, i, i + 1, bullets=True)):
                 out.setdefault(name, i)
+    return out
+
+
+# A packet's fence language per file suffix; a `Read:` item ending in one of these (or .cfg, .ini, .lock) is a path.
+LANGS = {".py": "python", ".md": "markdown", ".json": "json", ".toml": "toml", ".yaml": "yaml", ".yml": "yaml",
+         ".sh": "bash", ".csv": "csv", ".sql": "sql", ".js": "javascript", ".ts": "typescript", ".txt": "text"}
+
+
+def read_ref(raw: str) -> str:
+    """A `Read:` item without backticks or a trailing `(reason)`."""
+    return re.sub(r"\s*\(.*\)\s*$", "", raw).strip().strip("`").strip()
+
+
+def looks_like_path(repo: Repo, ref: str) -> bool:
+    """A repo path rather than an ID: has a folder, exists, or ends in a file extension."""
+    suffix = ("." + ref.rsplit(".", 1)[1].lower()) if "." in ref else ""
+    return "/" in ref or (repo.root / ref).exists() or suffix in LANGS or suffix in (".cfg", ".ini", ".lock")
+
+
+def writers_before(repo: Repo, task: model.Task, path: str) -> list[str]:
+    """The tasks that write `path` before `task` starts: those of its plan it waits on (`Depends on`, directly or
+    not) and any task of an earlier milestone's plan, by their `Writes:` (a folder or glob claim counts)."""
+    own = model.tasks(task.doc)
+    up = graph.ancestors(own, task.id)
+    out = [t.id for t in own if t.id in up and any(model.writes_overlap(path, w) for w in t.writes)]
+    mine = model.milestone_of(task.doc)
+    n = int(mine[1:]) if mine else None
+    for doc in repo.docs("plan", "queued-plan"):
+        m = model.milestone_of(doc)
+        if doc.rel != task.doc.rel and n is not None and m and int(m[1:]) < n:
+            out += [t.id for t in model.tasks(doc) if any(model.writes_overlap(path, w) for w in t.writes)]
+    return out
+
+
+def unwritten_reads(repo: Repo, task: model.Task) -> list[str]:
+    """The repo paths in the task's `Read:` that aren't in the repo and that no task writes before it starts: its
+    packet can only say "missing: not in the repo yet" there."""
+    out = []
+    for raw in task.read:
+        ref = read_ref(raw)
+        rid = model.split_ref(ref)[0]
+        if repo.lookup(rid, archive=False) is not None or not looks_like_path(repo, ref):
+            continue
+        if not (repo.root / ref).exists() and not writers_before(repo, task, ref):
+            out.append(ref)
     return out
 
 

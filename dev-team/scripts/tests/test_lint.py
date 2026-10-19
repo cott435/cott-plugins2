@@ -68,7 +68,7 @@ class IdChecks(LintCase):
 
     def test_missing_ref_ignores_paths_in_read(self):
         self.p.edit(PLAN, "**Read:** PL-01, TC-01, DATA-02", "**Read:** PL-01, TC-01, pyproject.toml, src/x.py, DATA-02")
-        self.assertClean()
+        self.assertEqual({p.code for p in self.problems()}, {"read-unwritten"})     # paths, not IDs: neither exists
 
     def test_missing_ref_step_names_unknown_pipeline(self):
         self.p.edit(PLAN, "**Step:** PL-01.apply_universe", "**Step:** PL-07.apply_universe")
@@ -1214,6 +1214,28 @@ class StaleRowChecks(LintCase):
         self.assertEqual(self.messages(), [
             (25, "W", "PL-02.pca defers to the `dataviz` skill, which isn't installed (.claude/skills or the "
                       "plugin): state what the row does, from the decision that sets it")])
+
+
+class ReadUnwrittenChecks(LintCase):
+    """`read-unwritten`: a Read: path no task writes before the task starts."""
+    READ = "**Read:** PL-01, TC-01, DATA-02, data.Prices"
+
+    def messages(self):
+        return [(p.line, p.message) for p in self.problems() if p.code == "read-unwritten"]
+
+    def test_path_nobody_writes_fails(self):
+        self.p.edit(PLAN, self.READ, self.READ + ", src/quant/data/seams.py, src/quant/viz/seams.py")
+        self.assertEqual(self.messages(), [
+            (98, "M1-T10 Read: src/quant/viz/seams.py isn't in the repo and no task it waits on writes it, so its "
+                 "packet shows \"missing: not in the repo yet\": put the seam in a task it depends on (the interface "
+                 "stubs it), or drop the path")])     # data/seams.py: M1-T01 (data/**) writes it, upstream of M1-T10
+
+    def test_a_done_task_or_a_file_in_the_repo_passes(self):
+        self.p.edit(PLAN, self.READ, self.READ + ", src/quant/data/steps.py")
+        self.assertEqual(self.messages(), [])
+        self.p.edit(PLAN, ", src/quant/data/steps.py", ", src/quant/viz/seams.py")
+        self.p.edit(TODO, "- [ ] M1-T10", "- [x] M1-T10")
+        self.assertEqual(self.messages(), [])
 
 
 if __name__ == "__main__":

@@ -104,6 +104,15 @@ class ContextCopyTest(FixtureCopy):
         self.assertIn("### src/quant/data/steps.py\n```python\n\"\"\"PL-01 steps", out)
         self.assertIn("### missing/file.py\n(missing: not in the repo yet)\n", out)
 
+    def test_a_file_an_upstream_task_writes_names_it(self):
+        """M1-T10 waits on M1-T03, which waits on M1-T01, whose Writes claim src/quant/data/**: the seam is there
+        once the builder starts, so the packet says who writes it, not "missing"."""
+        self.set_read("PL-01, src/quant/data/seams.py")
+        code, out, _ = self.dt("context", "M1-T10")
+        self.assertEqual(code, 0)
+        self.assertIn("### src/quant/data/seams.py\n(not in the repo yet: M1-T01 writes it before this task starts)\n",
+                      out)
+
     def test_nested_types_are_pulled_until_closed(self):
         # Read names stats.CovReport; its signature names Factors, whose signature (edited) names Returns.
         self.set_read("PL-01, stats.CovReport")

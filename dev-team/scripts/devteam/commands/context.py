@@ -15,8 +15,7 @@ from .layout import tree_lines
 
 BUDGET = 2000          # lines; agent-skills context-engineering target for one builder
 PLAN_KINDS = ("plan", "queued-plan")
-LANGS = {".py": "python", ".md": "markdown", ".json": "json", ".toml": "toml", ".yaml": "yaml", ".yml": "yaml",
-         ".sh": "bash", ".csv": "csv", ".sql": "sql", ".js": "javascript", ".ts": "typescript", ".txt": "text"}
+LANGS = packet.LANGS
 
 
 def add_arguments(parser):
@@ -32,28 +31,22 @@ def _find_task(repo, task_id: str):
     return None
 
 
-def _ref(raw: str) -> str:
-    """A `Read:` item without backticks or a trailing `(reason)`."""
-    return re.sub(r"\s*\(.*\)\s*$", "", raw).strip().strip("`").strip()
-
-
-def _looks_like_path(repo, ref: str) -> bool:
-    """A repo path rather than an ID: has a folder, exists, or ends in a file extension."""
-    suffix = ("." + ref.rsplit(".", 1)[1].lower()) if "." in ref else ""
-    return "/" in ref or (repo.root / ref).exists() or suffix in LANGS or suffix in (".cfg", ".ini", ".lock")
-
-
 def _fence(text: str) -> str:
     longest = max((len(m) for m in re.findall(r"`{3,}", text)), default=0)
     return "`" * max(3, longest + 1)
 
 
-def _file_block(repo, rel: str) -> tuple[str, bool]:
-    """`### <path>` and the file in a fence; a one-line note if it can't be read."""
+def _file_block(repo, rel: str, task: model.Task) -> tuple[str, bool]:
+    """`### <path>` and the file in a fence; a one-line note if it can't be read: the task that writes it first
+    (an interface stub, a seam), or "missing" when none does (`dt lint` `read-unwritten`)."""
     path = repo.root / rel
     try:
         text = path.read_text(encoding="utf-8")
     except (OSError, UnicodeDecodeError):
+        by = packet.writers_before(repo, task, rel)
+        if by:
+            verb = "writes" if len(by) == 1 else "write"
+            return f"### {rel}\n(not in the repo yet: {', '.join(by)} {verb} it before this task starts)\n", False
         return f"### {rel}\n(missing: not in the repo yet)\n", False
     fence = _fence(text)
     lang = LANGS.get(path.suffix.lower(), "")
@@ -243,7 +236,7 @@ def run(args, repo) -> int:
     entries = {e.id: e for e in model.all_references(repo) + model.all_probes(repo)}
     shown: set[str] = set()
     for raw in task.read:
-        ref = _ref(raw)
+        ref = packet.read_ref(raw)
         rid, selector = model.split_ref(ref)
         if rid in entries:
             entry = entries[rid]
@@ -263,8 +256,8 @@ def run(args, repo) -> int:
                 problems.append(f"Read: {ref} is retired ({d.retired_note}) at {d.where}")
             reads.append({"ref": ref, "kind": "id", "where": d.where, "retired": d.retired})
             blocks.append(f"<!-- {d.where} -->\n{d.text}")
-        elif _looks_like_path(repo, ref):
-            block, exists = _file_block(repo, ref)
+        elif packet.looks_like_path(repo, ref):
+            block, exists = _file_block(repo, ref, task)
             reads.append({"ref": ref, "kind": "file", "exists": exists})
             blocks.append(block)
         else:

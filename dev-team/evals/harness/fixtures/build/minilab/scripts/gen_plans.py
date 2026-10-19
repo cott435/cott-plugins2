@@ -230,13 +230,16 @@ SPINE_EDGE = {("M1-T04", "M1-T03"): ("call", "none: integration: PL-03's spine r
 
 
 SPINE_UNIT = {"M1-T05": ["tests/unit/risk/test_risk_report.py"]}     # a system task writes unit tests too
+SPINE_DROP = {"M1-T05": ["packages/risk/src/risk/__init__.py"]}       # a shared module: the PL-03 skeleton writes it
+SPINE_SOURCE = {"M1-T05": ["packages/risk/src/risk/vol_pipeline.py"]}  # PL-02's entry, where the real PL-01 stands
 
 
 def spine_writes(tid, likely):
     """`Files likely`, plus every file the task writes (replay.json), plus a split task's intent test."""
     m = json.loads((FIX / "replay.json").read_text())["plan-spine"][tid]
-    files = likely + [f.split("@")[0] for f in m["files"] + m.get("tester", [])] + SPINE_UNIT.get(tid, [])
-    return list(dict.fromkeys(files))
+    files = (likely + [f.split("@")[0] for f in m["files"] + m.get("tester", [])] + SPINE_SOURCE.get(tid, [])
+             + SPINE_UNIT.get(tid, []))
+    return [f for f in dict.fromkeys(files) if f not in SPINE_DROP.get(tid, [])]
 
 
 def convert_spine():
@@ -246,8 +249,10 @@ def convert_spine():
     out, edges = [blocks[0]], []
     for b in blocks[1:]:
         tid = re.match(r"### (M1-T\d+):", b).group(1)
-        title = b.splitlines()[0].split(": ", 1)[1]
         kind = SPINE_KIND.get(tid, "thicken")
+        if kind == "interface":                     # a title saying "spine" must be a spine task (`kind-title`)
+            b = b.replace(" spine ", " skeleton ", 1)
+        title = b.splitlines()[0].split(": ", 1)[1]
         b = re.sub(r"(\*\*Step:\*\* [^·\n]+?) ·", rf"\1 · **Kind:** {kind} ·", b, count=1)
         b = re.sub(r" · \*\*Parallel:\*\* G\d+", "", b)
         b = re.sub(r"(- \[ \] `pytest tests/unit/\w+/test_pl0\d_smoke\.py` runs [^\n]*)", r"\1\n- [ ] " + SMOKE_SHAPE, b)
@@ -260,13 +265,21 @@ def convert_spine():
                 continue
             k, why = SPINE_EDGE.get((tid, d), ("code", "none: thickens the step the spine built"))
             edges.append(f"| {tid} {title.lower()} | {d} | {k} | {why} |")
-        if tid == "M1-T01":
-            b = b.rstrip("\n") + "\n\n" + "\n".join(checkpoint("T01", BARRIER, barrier=True)) + "\n"
+        if tid in ("M1-T01", "M1-T04"):             # a barrier after the contract task and after the last skeleton
+            b = b.rstrip("\n") + "\n\n" + "\n".join(checkpoint(tid[3:], BARRIER, barrier=True)) + "\n"
         out.append(b)
     plan = "".join(out)
     graph = ["## Dependency graph", "| From | To | Kind | Mitigated by |", "|---|---|---|---|", *edges, ""]
     plan = plan.replace("## Risks\n", "\n".join(graph) + "\n## Risks\n", 1)
-    return {"plan.md": plan, "todo.md": (FIX / "plan-spine" / "legacy" / "todo.md").read_text()}
+    # The legacy cut builds these two steps inside their pipeline's spine, with no task of their own
+    # (`step-unplanned`): the Scope says so by name.
+    plan = plan.replace("**Deferred:** none", "**Deferred:** PL-01.read_csv (to M1-T02: built inside the PL-01 "
+                        "skeleton), PL-03.write_report (to M1-T04: built inside the PL-03 skeleton)", 1)
+    todo = (FIX / "plan-spine" / "legacy" / "todo.md").read_text()
+    todo = "\n".join(l.replace(" spine ", " skeleton ", 1) if any(f" {t} " in l for t, k in SPINE_KIND.items()
+                                                                   if k == "interface") else l
+                      for l in todo.splitlines()) + "\n"
+    return {"plan.md": plan, "todo.md": todo}
 
 
 def outputs():

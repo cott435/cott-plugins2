@@ -4,7 +4,7 @@
 
 ## Scope
 **Exit:** `risk.risk_report` writes the report for a prices CSV; TC-01–TC-08 pass.
-**Covers:** DATA-01–DATA-04, RISK-01–RISK-05, REP-01, QR-01 · **Deferred:** none
+**Covers:** DATA-01–DATA-04, RISK-01–RISK-05, REP-01, QR-01 · **Deferred:** PL-01.read_csv (to M1-T02: built inside the PL-01 skeleton), PL-03.write_report (to M1-T04: built inside the PL-03 skeleton)
 
 ## Phase 0: Spine
 
@@ -22,7 +22,7 @@
 - [ ] Every split task's tester can write its tests from what is frozen
 - [ ] `scripts/check.sh full` passes; Review checklist done; every finding has a disposition
 
-### M1-T02: PL-01 spine on a synthetic CSV
+### M1-T02: PL-01 skeleton on a synthetic CSV
 **Package:** mdata · **Step:** PL-01 · **Kind:** interface · **Covers:** DATA-01 · **Size:** M · **Mode:** solo
 **Read:** PL-01, mdata.load_prices, mdata.read_csv, mdata.validate_rows, mdata.align_calendar, DATA-01
 **Acceptance:**
@@ -31,7 +31,7 @@
 **Verify:** `pytest tests/unit/mdata/test_pl01_smoke.py` · `scripts/check.sh gate --pkg mdata`
 **Depends on:** M1-T01 · **Writes:** packages/mdata/src/mdata/__init__.py, packages/mdata/src/mdata/io.py, packages/mdata/src/mdata/validate.py, packages/mdata/src/mdata/calendar.py, packages/mdata/src/mdata/pipeline.py, tests/unit/mdata/test_io.py, tests/unit/mdata/test_validate.py, tests/unit/mdata/test_calendar.py, tests/unit/mdata/test_pl01_smoke.py
 
-### M1-T03: PL-02 spine against the load_prices fake
+### M1-T03: PL-02 skeleton against the load_prices fake
 **Package:** risk · **Step:** PL-02 · **Kind:** interface · **Covers:** — · **Size:** M · **Mode:** solo
 **Read:** PL-02, mdata.load_prices, risk.vol_series, risk.log_returns, risk.rolling_vol, risk.annualize
 **Acceptance:**
@@ -40,14 +40,19 @@
 **Verify:** `pytest tests/unit/risk/test_pl02_smoke.py` · `scripts/check.sh gate --pkg risk`
 **Depends on:** M1-T01 · **Writes:** packages/risk/src/risk/types.py, packages/risk/src/risk/returns.py, packages/risk/src/risk/vol.py, packages/risk/src/risk/annualize.py, packages/risk/src/risk/vol_pipeline.py, tests/unit/risk/test_returns.py, tests/unit/risk/test_vol.py, tests/unit/risk/test_annualize.py, tests/unit/risk/test_pl02_smoke.py, tests/contracts/risk.Returns/sample.json, tests/contracts/risk.VolSeries/sample.json
 
-### M1-T04: PL-03 spine on PL-02
+### M1-T04: PL-03 skeleton on PL-02
 **Package:** risk · **Step:** PL-03 · **Kind:** interface · **Covers:** REP-01 · **Size:** M · **Mode:** solo
 **Read:** PL-03, risk.risk_report, risk.summary_stats, risk.max_drawdown, risk.write_report, REP-01
 **Acceptance:**
 - [ ] `pytest tests/unit/risk/test_pl03_smoke.py` runs PL-03 end to end on PL-02 as built, every step at its spine version, and writes the JSON report
 - [ ] The smoke test checks that the pipeline runs and its output's shape (type, tickers, lengths), never a value a thicken changes: the golden cases check values
 **Verify:** `pytest tests/unit/risk/test_pl03_smoke.py` · `scripts/check.sh gate --pkg risk`
-**Depends on:** M1-T03 · **Writes:** packages/risk/src/risk/summary.py, packages/risk/src/risk/drawdown.py, packages/risk/src/risk/report.py, packages/risk/src/risk/report_pipeline.py, tests/unit/risk/test_summary.py, tests/unit/risk/test_drawdown.py, tests/unit/risk/test_report.py, tests/unit/risk/test_pl03_smoke.py, tests/contracts/risk.TickerSummary/sample.json, tests/contracts/risk.Drawdown/sample.json, tests/contracts/risk.Report/sample.json, tests/contracts/risk.vol_series/fake.py, tests/contracts/test_risk_contracts.py
+**Depends on:** M1-T03 · **Writes:** packages/risk/src/risk/summary.py, packages/risk/src/risk/drawdown.py, packages/risk/src/risk/report.py, packages/risk/src/risk/report_pipeline.py, packages/risk/src/risk/__init__.py, tests/unit/risk/test_summary.py, tests/unit/risk/test_drawdown.py, tests/unit/risk/test_report.py, tests/unit/risk/test_pl03_smoke.py, tests/contracts/risk.TickerSummary/sample.json, tests/contracts/risk.Drawdown/sample.json, tests/contracts/risk.Report/sample.json, tests/contracts/risk.vol_series/fake.py, tests/contracts/test_risk_contracts.py
+
+### Checkpoint after M1-T04 (barrier)
+- [ ] The interface code is the contract: types, signatures, stubs, samples, fakes and exports match contract.md, no more and no less
+- [ ] Every split task's tester can write its tests from what is frozen
+- [ ] `scripts/check.sh full` passes; Review checklist done; every finding has a disposition
 
 ### M1-T05: PL-02 on the real PL-01
 **Package:** risk · **Step:** PL-02 · **Kind:** system · **Covers:** — · **Size:** S · **Mode:** solo
@@ -57,7 +62,7 @@
 - [ ] `risk.risk_report` runs PL-03 → PL-02 → PL-01 on a CSV with the real `load_prices`; the fake is used only by smoke and contract tests
 - [ ] The real `load_prices` output still builds the `tests/contracts/mdata.Prices/` sample's type
 **Verify:** `pytest tests/unit/risk/test_pl02_smoke.py` · `pytest tests/unit/risk/test_pl03_smoke.py` · `pytest tests/system` · `scripts/check.sh gate --pkg mdata`
-**Depends on:** M1-T02, M1-T04 · **Writes:** packages/risk/src/risk/__init__.py, tests/system/test_e2e.py, tests/unit/risk/test_risk_report.py
+**Depends on:** M1-T02, M1-T04 · **Writes:** tests/system/test_e2e.py, packages/risk/src/risk/vol_pipeline.py, tests/unit/risk/test_risk_report.py
 
 ### Checkpoint after M1-T05
 - [ ] Every pipeline in the milestone runs end to end (smoke commands)

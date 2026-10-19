@@ -39,7 +39,7 @@
 `def vol_series(path: str | Path, *, window: int = 20, tickers: Sequence[str] | None = None) -> VolSeries`
 - **Invariants:** RISK-01–RISK-03 hold; `annualized` is True
 - **Errors:** as `mdata.load_prices`; `ValueError` if `window` < 2
-- **Fixtures:** tests/contracts/risk.vol_series/ · **Cases:** two tickers, window 2
+- **Boundary:** PL-03 · **Fixtures:** tests/contracts/risk.vol_series/ · **Cases:** two tickers, window 2
 - **Used by:** PL-02, PL-03
 
 ### risk.risk_report: The JSON risk report

@@ -10,7 +10,7 @@ wave 2  wiring T08 PL-01 · T09 PL-02 (on the load_readings fake); implementers 
 wave 3  T14  system: PL-02 on the real PL-01
 ```
 
-14 tasks, critical path 4 (T01 → T05 → T11 → T14, or any other four-task chain), 10 agents in wave 1, every spine and thicken XS or S. No fold: each step's spine is a real baseline worth testing alone.
+14 tasks, critical path 4 (T01 → T05 → T11 → T14, or any other four-task chain), 10 agents in wave 1, every spine and thicken XS or S. Checkpoints after T01 (barrier) and T13, and the milestone exit after T14. No fold: each step's spine is a real baseline worth testing alone.
 
 ```markdown
 ### M1-T01: M1 interface
@@ -18,8 +18,8 @@ wave 3  T14  system: PL-02 on the real PL-01
 **Read:** PL-01, PL-02, data.RawReadings, data.Readings, profile.Load, profile.Profile, profile.Spectrum, profile.SeasonalityReport, data.load_readings
 **Acceptance:**
 - [ ] Each type is code in `data/types.py` or `profile/types.py`; each `tests/contracts/<id>.<Type>/` sample validates against its schema
-- [ ] Every step and entry function imports with its contract signature, body `raise NotImplementedError("<its spine or wiring task>")`; each `__init__.py` exports its contract; `__main__.py` dispatches each trigger
-- [ ] The `data.load_readings` fake serves its fixtures
+- [ ] Every step and entry function imports and matches its contract signature (its body is the CR-02 stub naming its task; no test checks the body); each `__init__.py` exports its contract; `__main__.py` dispatches each trigger
+- [ ] The `data.load_readings` fake passes its contract's cases, written as one test that takes the provider
 **Verify:** `pytest tests/contracts` · `scripts/check.sh gate`
 **Depends on:** — · **Writes:** src/gridload/data/**, src/gridload/profile/**, tests/contracts/**
 
@@ -35,8 +35,7 @@ wave 3  T14  system: PL-02 on the real PL-01
 **Package:** gridload · **Step:** PL-02 · **Kind:** wiring · **Covers:** QR-02 · **Size:** S · **Mode:** solo
 **Read:** PL-02, data.load_readings
 **Acceptance:**
-- [ ] `python -m gridload.profile seasonality-report --smoke` runs end to end on the `data.load_readings` fake; committed as PL-02's smoke test
-- [ ] PL-02 pre-build sections replaced by a `dt layout` pointer
+- [ ] `python -m gridload.profile seasonality-report --smoke` runs end to end on the `data.load_readings` fake; committed as PL-02's smoke test, which checks the report's shape, not its values
 **Verify:** `python -m gridload.profile seasonality-report --smoke` · `scripts/check.sh gate`
 **Depends on:** M1-T04, M1-T05, M1-T06, M1-T07 · **Writes:** src/gridload/profile/pipeline.py, tests/unit/gridload/test_pl02_smoke.py
 
@@ -53,13 +52,13 @@ wave 3  T14  system: PL-02 on the real PL-01
 **Package:** gridload · **Step:** PL-02 · **Kind:** system · **Covers:** — · **Size:** XS · **Mode:** solo
 **Read:** PL-01, PL-02, data.load_readings, TC-01, TC-02, TC-03
 **Acceptance:**
-- [ ] PL-02 calls the real `load_readings`; the fake stays for the contract tests
+- [ ] PL-02 calls the real `load_readings`; each fake's contract cases pass on the real provider
 - [ ] Both smoke commands pass; TC-01–TC-03 pass on the real chain
 **Verify:** `python -m gridload.data load --smoke` · `python -m gridload.profile seasonality-report --smoke` · `scripts/check.sh gate`
-**Depends on:** M1-T08, M1-T09, M1-T10, M1-T11, M1-T12, M1-T13 · **Writes:** src/gridload/profile/pipeline.py
+**Depends on:** M1-T08, M1-T09, M1-T10, M1-T11, M1-T12, M1-T13 · **Writes:** src/gridload/profile/pipeline.py, tests/unit/gridload/test_load_readings_conformance.py
 ```
 
-T11's tester starts in wave 1: it tests `spectrum` as T01 declares it and fails on `NotImplementedError("M1-T05")`. Its implementer follows its tester and T05, nothing else. Wiring T09 waits on PL-02's spines because its smoke runs them, but not on PL-01: the fake stands in.
+T11's tester starts in wave 1: it tests `spectrum` as T01 declares it and fails on `NotImplementedError("M1-T05")`. Its implementer follows its tester and T05, nothing else. Wiring T09 waits on PL-02's spines because its smoke runs them, but not on PL-01: the fake stands in. The `load_readings` cases are named in T08's acceptance too, since PL-01's wiring builds the real function, so a drift fails there before T14.
 
 The graph, excerpted (one row per `Depends on` other than on T01, 16, plus the mitigated edges):
 

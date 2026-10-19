@@ -10,4 +10,4 @@
 6. **build-setup Extend** for new packages, dependencies or Grow; it sets `Base` with `dt base` once approved and committed. [gate, run by build-setup]
 7. Build. Not this skill.
 
-Whenever `dt status` names a `stage_to_cut`, cut it, rows only (`extend.md` step 1). No next milestone: plan the first milestone of the stage just cut; with no stage to cut, leave the stub, say so, and name the skill that comes next (`idea-refine` for a new stage, or the first upstream skill whose doc isn't Approved).
+Whenever `dt status` names a `stage_to_cut`, cut it, rows only (`extend.md` step 1). No next milestone: plan the first milestone of the stage just cut; with no stage to cut, leave the stub, say so, and go on to the next run (`SKILL.md`, Modes).

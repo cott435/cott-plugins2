@@ -25,6 +25,9 @@ A queued plan (`tasks/queued/M<n>-<slug>.md`) uses the same skeleton and has no 
 ### M<n>-T01: <the milestone's interface>
 …
 
+### Checkpoint after M<n>-T01 (barrier)
+…
+
 ## Phase 1: Step spines
 
 ### M<n>-T02: <step> spine (<baseline>)
@@ -117,7 +120,14 @@ Title rule: no " and " (`task-title`). Required fields: Package, Step, Kind, Siz
 
 ### Checkpoint blocks
 
-At the end of a wave:
+After the interface task(s), the barrier:
+
+```markdown
+### Checkpoint after M2-T01 (barrier)
+- [ ] Interface review passed: the code is the contract, no more and no less (CONSTRAINTS.md Review, Interface)
+```
+
+At the end of a later wave:
 
 ```markdown
 ### Checkpoint after M2-T06

@@ -37,10 +37,10 @@ Read when writing thicken tasks, the dependency graph and the files. Templates: 
 |---|---|---|
 | `data` | One step's output feeds another's input | The type and its sample |
 | `call` | A step calls a function another task builds | Across pipelines or packages, its fixture-backed fake; in the caller's own pipeline and package, its replay double (`phase0.md` a), never a fake |
-| `file` | Two tasks must write one file | Move the shared part to the interface task; else serial. Two wiring tasks never share a file: each writes its own entry module. Two steps' thicken tasks on one module: the interface task's layout splits it (each step its own file, the old module re-exporting); never chain them |
-| `code` | A task changes code another task wrote (a thicken after its step's spine or an earlier thicken of that step) | None: serial |
+| `file` | Two tasks must write one file | Move the shared part to the interface task; else serial. Two wiring tasks never share a file: each writes its own entry module. Thicken tasks on one module, of two steps or of one step's concerns (memory, targets, exploration): the interface task's layout splits it (each its own file, the old module re-exporting), or one step's thickens fold into one; never chain them |
+| `code` | A task changes code another task wrote (a thicken after its step's spine; never after another thicken of that step: `file`) | None: serial |
 | `contract-change` | A task changes a frozen interface | None: serial, plus a new interface task |
-| `order` | Integration (a wiring or system task runs the steps it wires: `none: integration: the smoke runs it`), or risk or learning ("do X first to learn Y"; never a human approval: `phase0.md` a) | None: reason required |
+| `order` | Integration (a wiring task runs the steps its pipeline builds, never one it only calls, `phase0.md` c; a system task the providers it swaps in: `none: integration: the smoke runs it`), or risk or learning ("do X first to learn Y"; never a human approval: `phase0.md` a) | None: reason required |
 
 A spine never has an edge to another step's task: it builds against the interface's samples and doubles. A mitigated edge documents why two tasks run side by side and never appears in `Depends on`; an unmitigated one must (`edges`). Every `Depends on` has its row, except a dependency on the interface task, which every task has and needs none. The table is the reviewable argument for every serial step.
 - **Width.** `dt status` gives `critical_path`, `waves`, `width` and `parallelism`; on the fresh plan `dt ready` lists only the interface task(s). Mostly width-1 waves mean an edge an interface could mitigate is ordering tasks.

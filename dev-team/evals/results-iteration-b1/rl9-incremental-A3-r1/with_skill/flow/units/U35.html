@@ -1,0 +1,1321 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1"><title>U35 implementer</title>
+<style>
+:root{--bg:#fbfbfa;--fg:#1d1d1f;--muted:#6b6b70;--line:#d9d9de;--box:#fff;--rowp:#eef3fb;--band:#fff4d6;
+--ok:#2e7d32;--bad:#c62828;--warn:#b26a00;--idle:#6b6b70}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#17171a;--fg:#ececf0;--muted:#9a9aa3;
+--line:#34343a;--box:#222227;--rowp:#1d2433;--band:#3a3015;--ok:#6fcf73;--bad:#ff6b6b;--warn:#f0b35a;--idle:#9a9aa3}}
+:root[data-theme="dark"]{--bg:#17171a;--fg:#ececf0;--muted:#9a9aa3;--line:#34343a;--box:#222227;--rowp:#1d2433;
+--band:#3a3015;--ok:#6fcf73;--bad:#ff6b6b;--warn:#f0b35a;--idle:#9a9aa3}
+body{margin:0;padding:16px;background:var(--bg);color:var(--fg);font:14px/1.45 -apple-system,system-ui,sans-serif}
+h1{font-size:18px;margin:0 0 4px}h2{font-size:15px;margin:22px 0 8px}.sub{color:var(--muted)}
+table{border-collapse:collapse;margin:4px 0 8px}td,th{border-bottom:1px solid var(--line);padding:4px 10px;text-align:left;
+vertical-align:top}th{color:var(--muted);font-weight:600}.chips span{display:inline-block;margin:0 4px 2px 0}
+.legend span{margin-right:14px;white-space:nowrap}.sw{display:inline-block;width:10px;height:10px;border-radius:2px;
+margin-right:4px;vertical-align:-1px}.scroll{overflow:auto;max-height:88vh;border:1px solid var(--line);border-radius:8px}
+.chart{display:grid;width:max-content}.chart>div{line-height:0}.corner{position:sticky;top:0;left:0;z-index:3}
+.colhead{position:sticky;top:0;z-index:2}.rowhead{position:sticky;left:0;z-index:2}
+svg.bg{background:var(--bg)}.colhead svg{border-bottom:1px solid var(--line)}.rowhead svg{border-right:1px solid var(--line)}
+.ok{color:var(--ok);fill:var(--ok)}.bad{color:var(--bad);fill:var(--bad)}.warn{color:var(--warn);fill:var(--warn)}
+.idle{color:var(--idle);fill:var(--idle)}
+svg text{fill:var(--fg);font-family:-apple-system,system-ui,sans-serif}
+.box{fill:var(--box);stroke:var(--line)}.unit:hover .box{stroke:var(--fg)}
+.role{font-size:12px;font-weight:600}.uid,.wmeta,.lmeta,.meta{font-size:10px;fill:var(--muted)}
+.sub{font-size:10.5px;fill:var(--muted)}.badge{font-size:11px;font-weight:600}
+.meta.bad{fill:var(--bad);font-weight:600}.lane{font-size:13px;font-weight:700}.wave{font-size:13px;font-weight:700}
+.par{fill:#4e79a7}.ser{fill:var(--muted)}.rowp{fill:var(--rowp)}.rows{fill:transparent}.band{fill:var(--band)}
+.bandt{font-size:11.5px}.grid{stroke:var(--line)}.link{stroke:var(--muted);stroke-width:1.2;opacity:.55}
+.arrowhead{fill:var(--muted)}.marks{font-size:10.5px}.audit{stroke:var(--box);stroke-width:2}.auditn{font-size:10px;font-weight:700;fill:#fff}
+a{color:inherit}svg a .box{cursor:pointer}
+
+:root{--c0:#2a78d6;--c1:#eb6834;--c2:#1baf7a;--c3:#eda100;--c4:#e87ba4;--c5:#008300;--c6:#6250d6;--c7:#e34948;
+--cx:#8a8985;--main:#52514e;--read:#dcdbd5;--readfg:#1d1d1f}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--c0:#3987e5;--c1:#d95926;--c2:#199e70;
+--c3:#c98500;--c4:#d55181;--c5:#008300;--c6:#9085e9;--c7:#e66767;--cx:#77766f;--main:#c3c2b7;--read:#3b3b40;
+--readfg:#ececf0}}
+:root[data-theme="dark"]{--c0:#3987e5;--c1:#d95926;--c2:#199e70;--c3:#c98500;--c4:#d55181;--c5:#008300;
+--c6:#9085e9;--c7:#e66767;--cx:#77766f;--main:#c3c2b7;--read:#3b3b40;--readfg:#ececf0}
+.c0{fill:var(--c0);background:var(--c0)}.c1{fill:var(--c1);background:var(--c1)}.c2{fill:var(--c2);background:var(--c2)}
+.c3{fill:var(--c3);background:var(--c3)}.c4{fill:var(--c4);background:var(--c4)}.c5{fill:var(--c5);background:var(--c5)}
+.c6{fill:var(--c6);background:var(--c6)}.c7{fill:var(--c7);background:var(--c7)}.cx{fill:var(--cx);background:var(--cx)}
+.cmain{fill:var(--main)}.sc0{stroke:var(--c0)}.sc1{stroke:var(--c1)}.sc2{stroke:var(--c2)}
+.tl text,.sm text,.lc text{font-size:10.5px;fill:var(--muted)}.tl .lbl-in,.sm .lbl-in{fill:#fff;font-size:10.5px;font-weight:600}
+.tl .rowl,.sm .rowl,.lc .rowl{fill:var(--fg);font-size:11.5px;font-weight:600}.tl .band{fill:var(--rowp)}
+.tl .brk{stroke:var(--muted);stroke-dasharray:2 3}.tl a:hover rect,.sm a:hover rect{stroke:var(--fg);stroke-width:1.5}
+.axis{stroke:var(--line)}.sm .val{fill:var(--fg);font-weight:600}.lc path.ln{fill:none;stroke-width:2}
+.lc circle{stroke:var(--bg);stroke-width:2}.lc .end{font-weight:600;fill:var(--fg)}
+.tiles{display:flex;flex-wrap:wrap;gap:10px;margin:12px 0}.tile{border:1px solid var(--line);border-radius:8px;
+padding:8px 12px;min-width:110px;background:var(--box)}.tile b{display:block;font-size:20px;line-height:1.2}
+.tile span{font-size:12px;color:var(--muted)}.tile i{font-style:normal;font-size:12px;margin-left:6px}
+.fm{border-collapse:separate;border-spacing:2px}.fm td,.fm th{border:0;padding:0;text-align:center;font-size:11px}
+.fm th{padding:0 2px;font-weight:600}.fm td.f,.fm th.f{text-align:left;padding-right:10px;white-space:nowrap;
+position:sticky;left:0;background:var(--bg);font:11.5px ui-monospace,Menlo,monospace;
+max-width:380px;overflow:hidden;text-overflow:ellipsis}
+.fm td.cell{min-width:22px;height:20px;border-radius:3px}.fm td.fw{background:var(--c0);color:#fff;font-weight:700}
+.fm td.fe{background:var(--c1);color:#fff;font-weight:700}.fm td.fr{background:var(--read);color:var(--readfg)}
+.fm td.n{color:var(--muted);padding:0 6px}.fm tr.grp td{text-align:left;padding-top:8px;color:var(--muted);
+font-weight:600}
+.key{display:inline-block;min-width:18px;text-align:center;border-radius:3px;font-size:11px;margin-right:4px}
+.bar{display:inline-block;height:9px;border-radius:2px;vertical-align:0}
+
+pre{white-space:pre-wrap;word-break:break-word;background:var(--box);border:1px solid var(--line);border-radius:6px;
+padding:8px 10px;margin:4px 0;font:12px/1.45 ui-monospace,SFMono-Regular,Menlo,monospace;max-width:100%;overflow:auto}
+.step{border-top:1px solid var(--line);padding:6px 0}.step:target{background:var(--rowp)}
+.sid{font:12px ui-monospace,Menlo,monospace;color:var(--muted);margin-right:8px}.kind{font-weight:600;margin-right:8px}
+.err{color:var(--bad);font-weight:600}.hook{color:var(--bad);margin:4px 0 0 16px}.lbl{font-size:12px;color:var(--muted);margin-top:6px}
+details summary{cursor:pointer;color:var(--muted);font-size:12px}.head td:first-child{color:var(--muted)}
+.top{font-size:13px}.narr{list-style:none;padding-left:0}.narr li{margin:3px 0}
+</style></head>
+<body>
+<p class="top"><a href="../flow.html">← the run's flow chart</a></p>
+
+<h1>U35 · implementer · M1-T22 solo</h1>
+<table class="head"><tr><td>Type</td><td>implementer</td></tr><tr><td>Description</td><td>M1-T22 solo</td></tr><tr><td>Spawned by</td><td>driver at D265</td></tr><tr><td>Turn</td><td><a href="../turns/T09.html">T09</a></td></tr><tr><td>Model</td><td>claude-opus-5-5</td></tr><tr><td>Start</td><td>2026-10-18 22:26:31 UTC</td></tr><tr><td>Duration</td><td>2 min</td></tr><tr><td>Tool calls</td><td>18</td></tr><tr><td>Errors</td><td>2</td></tr><tr><td>Hook blocks</td><td>0</td></tr><tr><td>Tokens</td><td>5.2k out · 31.0k new in · 382k cached in · peak context 35.6k</td></tr><tr><td>Skills invoked</td><td>none</td></tr><tr><td>Files written or edited</td><td>.claude/worktrees/agent-a58d61e5dbb140c32/settings/smoke-reference.toml, .claude/worktrees/agent-a58d61e5dbb140c32/src/rllab/lab/pipelines/pl02_train_reference.py, .claude/worktrees/agent-a58d61e5dbb140c32/tests/unit/rllab/test_pl02_smoke.py</td></tr><tr><td>Definition</td><td>none</td></tr><tr><td>Steps</td><td>21</td></tr><tr><td>Finished</td><td>yes</td></tr></table>
+
+
+<h2>Prompt</h2>
+<pre>You are the solo for M1-T22. Run `python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r1/with_skill/plugin/dev-team/scripts/dt.py claim M1-T22 --role solo`, then read the packet it names.</pre>
+<h2>Files</h2>
+<table><tr><th>Op</th><th>File</th><th>Calls</th><th>By</th><th>Via</th><th>Steps</th></tr><tr><td>write</td><td><code>.claude/worktrees/agent-a58d61e5dbb140c32/settings/smoke-reference.toml</code></td><td>1</td><td>U35</td><td>Write</td><td><a href="#14">U35.S14</a></td></tr><tr><td>write</td><td><code>.claude/worktrees/agent-a58d61e5dbb140c32/src/rllab/lab/pipelines/pl02_train_reference.py</code></td><td>1</td><td>U35</td><td>Write</td><td><a href="#13">U35.S13</a></td></tr><tr><td>write</td><td><code>.claude/worktrees/agent-a58d61e5dbb140c32/tests/unit/rllab/test_pl02_smoke.py</code></td><td>1</td><td>U35</td><td>Write</td><td><a href="#18">U35.S18</a></td></tr><tr><td>read</td><td><code>.claude/worktrees/agent-a58d61e5dbb140c32/.claude/packet.md</code></td><td>1</td><td>U35</td><td>Read</td><td><a href="#3">U35.S3</a></td></tr><tr><td>read</td><td><code>.claude/worktrees/agent-a58d61e5dbb140c32/CONSTRAINTS.md</code></td><td>1</td><td>U35</td><td>Read</td><td><a href="#4">U35.S4</a></td></tr><tr><td>read</td><td><code>.claude/worktrees/agent-a58d61e5dbb140c32/src/rllab/core/__init__.py</code></td><td>1</td><td>U35</td><td>Bash</td><td><a href="#8">U35.S8</a></td></tr><tr><td>read</td><td><code>.claude/worktrees/agent-a58d61e5dbb140c32/src/rllab/core/settings.py</code></td><td>1</td><td>U35</td><td>Bash</td><td><a href="#8">U35.S8</a></td></tr><tr><td>read</td><td><code>.claude/worktrees/agent-a58d61e5dbb140c32/src/rllab/lab/__main__.py</code></td><td>1</td><td>U35</td><td>Bash</td><td><a href="#10">U35.S10</a></td></tr><tr><td>read</td><td><code>.claude/worktrees/agent-a58d61e5dbb140c32/src/rllab/lab/cli.py</code></td><td>1</td><td>U35</td><td>Bash</td><td><a href="#5">U35.S5</a></td></tr><tr><td>read</td><td><code>.claude/worktrees/agent-a58d61e5dbb140c32/src/rllab/lab/pipelines/pl01_train.py</code></td><td>1</td><td>U35</td><td>Bash</td><td><a href="#5">U35.S5</a></td></tr><tr><td>read</td><td><code>.claude/worktrees/agent-a58d61e5dbb140c32/src/rllab/lab/pipelines/pl02_train_reference.py</code></td><td>1</td><td>U35</td><td>Bash</td><td><a href="#5">U35.S5</a></td></tr><tr><td>read</td><td><code>.claude/worktrees/agent-a58d61e5dbb140c32/src/rllab/reference/__init__.py</code></td><td>1</td><td>U35</td><td>Bash</td><td><a href="#8">U35.S8</a></td></tr><tr><td>read</td><td><code>.claude/worktrees/agent-a58d61e5dbb140c32/src/rllab/reference/train/__init__.py</code></td><td>1</td><td>U35</td><td>Bash</td><td><a href="#8">U35.S8</a></td></tr><tr><td>read</td><td><code>.claude/worktrees/agent-a58d61e5dbb140c32/src/rllab/reference/train/trainer.py</code></td><td>1</td><td>U35</td><td>Bash</td><td><a href="#8">U35.S8</a></td></tr><tr><td>read</td><td><code>.claude/worktrees/agent-a58d61e5dbb140c32/tests/contracts/core.load_settings/files/dqn_compact.toml</code></td><td>1</td><td>U35</td><td>Bash</td><td><a href="#10">U35.S10</a></td></tr><tr><td>read</td><td><code>.claude/worktrees/agent-a58d61e5dbb140c32/tests/unit/rllab/test_train_reference.py</code></td><td>1</td><td>U35</td><td>Bash</td><td><a href="#8">U35.S8</a></td></tr></table>
+<h2>Steps</h2>
+<div class="step" id="S1"><span class="sid">U35.S1</span><span class="kind">user</span>You are the solo for M1-T22. Run `python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r1/with_skill/plugin/dev-team/scripts/dt.py claim M1-T22 --role solo`, then read the packet it names.<details><summary>full text</summary><pre>You are the solo for M1-T22. Run `python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r1/with_skill/plugin/dev-team/scripts/dt.py claim M1-T22 --role solo`, then read the packet it names.</pre></details></div><div class="step" id="S2"><span class="sid">U35.S2</span><span class="kind">Bash</span>python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r1/with_skill/plugin/dev-team/scripts/dt.py claim M1-T22 --role solo<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r1/with_skill/plugin/dev-team/scripts/dt.py claim M1-T22 --role solo&quot;,
+  &quot;description&quot;: &quot;Claim task M1-T22 as solo&quot;
+}</pre><div class="lbl">output</div><pre>packet: /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r1/with_skill/project/.claude/worktrees/agent-a58d61e5dbb140c32/.claude/packet.md (150 lines; read it in full)
+task: M1-T22 Wire PL-02 · role solo · package rllab · kind wiring
+writes: src/rllab/lab/pipelines/pl02_train_reference.py, settings/smoke-reference.toml, tests/unit/rllab/test_pl02_smoke.py
+done: Done when `scripts/check.sh gate` passes (the gate passes on your Writes); the Stop hook runs it. End with one line: `DONE M1-T22 solo`. If you can&#x27;t finish: `python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r1/with_skill/plugin/dev-team/scripts/dt.py escalate &lt;TEST-WRONG|NEEDS-DEP&gt; &quot;&lt;why&gt;&quot;`, or `python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r1/with_skill/plugin/dev-team/scripts/dt.py escalate CONTRACT-CHANGE &quot;&lt;why&gt;&quot; --type &lt;the contract symbol&gt;`, then end with one line: `STOPPED M1-T22 solo: see dt escalate`.</pre></details></div><div class="step" id="S3"><span class="sid">U35.S3</span><span class="kind">Read</span>/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r1/with_skill/project/.claude/worktrees/agent-a58d61e5dbb140c32/.claude/packet.md<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r1/with_skill/project/.claude/worktrees/agent-a58d61e5dbb140c32/.claude/packet.md&quot;
+}</pre><div class="lbl">output</div><pre>1	# Packet: M1-T22 solo
+2	You are the solo for M1-T22. Your edit boundary is your Writes below (`.claude/.task_writes`); the guard blocks everything else.
+3	
+4	Done when `scripts/check.sh gate` passes (the gate passes on your Writes); the Stop hook runs it. End with one line: `DONE M1-T22 solo`. If you can&#x27;t finish: `python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r1/with_skill/plugin/dev-team/scripts/dt.py escalate &lt;TEST-WRONG|NEEDS-DEP&gt; &quot;&lt;why&gt;&quot;`, or `python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r1/with_skill/plugin/dev-team/scripts/dt.py escalate CONTRACT-CHANGE &quot;&lt;why&gt;&quot; --type &lt;the contract symbol&gt;`, then end with one line: `STOPPED M1-T22 solo: see dt escalate`.
+5	
+6	# Context for M1-T22: package rllab · mode solo · kind wiring
+7	Read only what is below, plus CONSTRAINTS.md and the files you edit. Your task is the last section.
+8	
+9	&lt;!-- docs/packages/rllab/pipelines.md:38 --&gt;
+10	## PL-02: Train the reference
+11	**Entry:** `src/rllab/lab/pipelines/pl02_train_reference.py::run_train_reference` · **Trigger:** `python -m rllab.lab train &lt;reference.toml&gt; --seeds 0-4`, dispatched here when `agent = &quot;reference&quot;`
+12	**Covers:** REF-01, QR-02, QR-06
+13	
+14	| # | Step | Owner | In → Out | Spine version | Covers |
+15	|---|---|---|---|---|---|
+16	| 1 | `load_settings` | core.settings | path → RunSettings | PL-01 as built | RUN-01 |
+17	| 2 | `train_reference` | reference.train | RunSettings → RunRecord | Stable-Baselines3 DQN on Snake (AD-04), or PPO on the single-fish tank (AD-10) or the predator against scripted prey (AD-15), `MlpPolicy` on the one-learner adapter, one-to-one mapping, `device=&quot;cpu&quot;`; a callback calls `evaluate.evaluate` every `eval_every` | REF-01, QR-06 |
+18	
+19	### Entry sketch (pre-build — removed by spine task)
+20	```python
+21	def run_train_reference(settings_path: Path, seed: int) -&gt; RunRecord:
+22	    settings = load_settings(settings_path)
+23	    settings = with_seed(settings, seed)
+24	    return train_reference(settings)
+25	```
+26	
+27	&lt;!-- docs/packages/rllab/contract.md:97 --&gt;
+28	### core.load_settings: Read run settings
+29	`def load_settings(path: Path) -&gt; RunSettings`
+30	- **Invariants:** unspecified fields take the dataclass defaults. The result is fully resolved, so no other input is needed (RUN-01).
+31	- **Errors:** `ValueError` naming the key for an unknown environment, view, agent, ablation, or an out-of-range value. `FileNotFoundError` if the file is missing.
+32	- **Boundary:** lab · **Fixtures:** tests/contracts/core.load_settings/ · **Cases:** the dqn-compact ladder file; a file naming an unknown agent
+33	- **Used by:** lab; PL-01, PL-02
+34	
+35	&lt;!-- docs/packages/rllab/contract.md:351 --&gt;
+36	### reference.train_reference: Library agent training
+37	`def train_reference(settings: RunSettings, *, root: Path = Path(&quot;runs&quot;)) -&gt; RunRecord`
+38	- **Invariants:** `settings.agent == &quot;reference&quot;`. Trains Stable-Baselines3 DQN on Snake (AD-04), or PPO on the single-fish tank or on the predator-prey predator against scripted prey (AD-10, AD-15), through the AD-03 adapter with `device=&quot;cpu&quot;` and the matching one-to-one settings mapping. Curve points use `evaluate.evaluate` at the same `eval_every`. The checkpoint loads into `ReferencePlayer`.
+39	- **Errors:** `ValueError` unless the settings are Snake with the compact view, the tank with one fish and the full view, or predator-prey with `opponents == {&quot;predator&quot;: &quot;learn&quot;, &quot;prey&quot;: &quot;scripted&quot;}`
+40	- **Boundary:** lab · **Fixtures:** tests/contracts/reference.train_reference/ · **Cases:** a fake returning a complete 3-point reference RunRecord
+41	- **Used by:** lab; PL-02
+42	
+43	## Layout (`dt layout rllab`)
+44	src/rllab/
+45	  __init__.py — rllab: a reinforcement-learning lab for Snake, the fish tank and predator-prey.
+46	  agents/
+47	    __init__.py — The hand-written learners: a table-based and a neural value learner.
+48	    tabular.py — The table-based value learner (AGENT-01, AGENT-02, ABL-03).
+49	    dqn/
+50	      __init__.py — The DQN learner.
+51	      agent.py — The neural value learner: memory, target network, Huber loss (AGENT-03-AGENT-05, AD-05).
+52	  baselines/
+53	    __init__.py — The fixed baselines: a random and a scripted Snake player.
+54	    random.py — The random baseline: a uniform action from a seeded generator (BASE-01).
+55	    scripted.py — The scripted baseline: toward food if safe, else any safe move, else straight (BASE-02).
+56	  compare/
+57	    __init__.py — Statistical comparison of players.
+58	    claims.py — Claims tested with one correction over all of them, and the report (EVAL-02-EVAL-05).
+59	    types.py — Claims to test and their results (EVAL-02-EVAL-05, REF-02).
+60	  core/
+61	    __init__.py — The core: environment and agent protocols, teams, transitions and run settings.
+62	    protocols.py — The two behaviours every pipeline passes around: an environment and an agent (AD-03, AD-09).
+63	    settings.py — Run settings from TOML (RUN-01, AD-06).
+64	    types.py — The core&#x27;s data types: teams, actions, steps, transitions and run settings (AD-09, AD-13).
+65	  envs/
+66	    __init__.py — The environments: Snake and the corridor.
+67	    corridor.py — A 1-D corridor: walk right to the goal before the step cap (CORE-03).
+68	    snake.py — Snake on a square grid, one team of one agent (SNAKE-01-SNAKE-09).
+69	    types.py — Observation layouts the environments publish to their consumers.
+70	  evaluate/
+71	    __init__.py — Greedy evaluation on held-out seeds.
+72	    protocol.py — The held-out greedy evaluation protocol (EVAL-01, DATA-01, AGENT-07).
+73	    types.py — Evaluation results and options (AD-17).
+74	  lab/
+75	    __init__.py — The lab: building runs from settings, the pipelines and the command line.
+76	    __main__.py — `python -m rllab.lab train | eval | report | replay`.
+77	    build.py — The environment and the agents a run&#x27;s settings name (CORE-01, DATA-02).
+78	    cli.py — The command line: one entry call per seed or target, bad input returns 2.
+79	    players.py — Players from run folders or baseline names, their scores and their curves (RUN-05).
+80	    printing.py — Scores printed on one line (EVAL-01, BASE-03).
+81	    replay.py — The game a replay shows: recorded, or newly played (REPLAY-01, REPLAY-03).
+82	    report_spec.py — The report TOML: players, claims and charts (EVAL-02).
+83	    types.py — What a report names: its players, their roles on the charts, and the runs it plots.
+84	    pipelines/
+85	      __init__.py — One entry module per pipeline.
+86	      pl01_train.py — PL-01: Train a run.
+87	      pl02_train_reference.py — PL-02: Train the reference.
+88	      pl03_evaluate.py — PL-03: Evaluate.
+89	      pl04_report.py — PL-04: Report.
+90	      pl05_replay.py — PL-05: Replay.
+91	  reference/
+92	    __init__.py — The library reference agent: training and playing it.
+93	    player.py — A trained library model played as a core Agent (REF-01).
+94	    train/
+95	      __init__.py — Reference training.
+96	      trainer.py — The library reference agent, trained through the Gymnasium adapter (REF-01, AD-03, AD-04).
+97	  runs/
+98	    __init__.py — Run folders: writing them during training and reading them back.
+99	    store.py — One folder per run: settings.json, curve.csv, checkpoints, games.npz, status (AD-06).
+100	    types.py — What a run folder holds: its curve, its recorded games and the run record (AD-06).
+101	  train/
+102	    __init__.py — The training loop.
+103	    loop.py — The training loop: every team stepped batch-first, every learner fed (CORE-02, CORE-07).
+104	  viz/
+105	    __init__.py — Charts and the replay viewer.
+106	    curves.py — Learning curves: mean over seeds, a min-max band, baseline lines (EVAL-06, ABL-04).
+107	    replay.py — The interactive replay viewer (REPLAY-01, REPLAY-02, AD-07).
+108	    types.py — What a chart drew.
+109	
+110	## Interfaces (frozen: build against these, never change them)
+111	&lt;!-- docs/packages/rllab/contract.md:63 --&gt;
+112	### core.RunSettings: type
+113	```python
+114	@dataclass(frozen=True)
+115	class RunSettings:
+116	    name: str; env: Literal[&quot;snake&quot;, &quot;corridor&quot;, &quot;tank&quot;, &quot;predprey&quot;]; view: Literal[&quot;compact&quot;, &quot;grid&quot;, &quot;index&quot;, &quot;full&quot;, &quot;limited&quot;]
+117	    agent: Literal[&quot;tabular&quot;, &quot;dqn&quot;, &quot;reinforce&quot;, &quot;ppo&quot;, &quot;random&quot;, &quot;scripted&quot;, &quot;reference&quot;]; n_agents: int
+118	    opponents: Mapping[str, Literal[&quot;learn&quot;, &quot;scripted&quot;, &quot;random&quot;]]; self_play: Literal[&quot;none&quot;, &quot;latest&quot;, &quot;pool&quot;]
+119	    pool_latest: float; generations: int
+120	    ablation: Literal[&quot;none&quot;, &quot;no_memory&quot;, &quot;no_target&quot;, &quot;no_explore&quot;]
+121	    rewards: Rewards; exploration: Exploration; params: AgentParams
+122	    steps: int; seed: int; eval_every: int; eval_games: int
+123	```
+124	- **Invariants:** `seed` in `[0, 1_000_000)`. `steps` &gt; 0. `view` belongs to `env` (Snake `compact`/`grid`, corridor `index`, tank `full`/`limited`). `n_agents` is 1 except for the tank (1–16, FISH-07). `reinforce` and `ppo` only with the tank; `tabular` and `dqn` only with Snake or the corridor. `reference` on the tank needs `n_agents == 1` and `full`. For `predprey`, `view` is `limited`, `agent` is `ppo` or `reference`, and `opponents` names both teams (`predator`, `prey`): `learn` teams train with `agent`; `self_play` is `latest` or `pool` only when both learn (rung 2, rung 3), `none` otherwise; `generations` is 10 when any team learns, else 0; `pool_latest` defaults to 0.5 (SELF-03). Single-team runs have `opponents == {}`. `ablation` matches `agent` (`no_memory` and `no_target` with `dqn`, `no_explore` with `tabular`).
+125	- **Boundary:** lab, train, runs, reference · **Fixtures:** tests/contracts/core.RunSettings/ · **Cases:** the dqn-compact ladder settings; a corridor tabular settings; a no_target ablation; the rung-3 tank settings (ppo, 8 fish, full view); the tank reference settings; predator-prey rung 1 (prey learn, scripted predator); rung 3 (both learn, pool)
+126	- **Used by:** lab, train, runs, reference, agents; PL-01, PL-02, PL-03, PL-04, PL-06
+127	Sample: tests/contracts/core.RunSettings/ (exists)
+128	
+129	&lt;!-- docs/packages/rllab/contract.md:282 --&gt;
+130	### runs.RunRecord: type
+131	`@dataclass(frozen=True) class RunRecord: path: Path; settings: RunSettings; curve: tuple[CurvePoint, ...]; status: Literal[&quot;running&quot;, &quot;complete&quot;, &quot;incomplete&quot;]; checkpoints: dict[str, Path]; generations: dict[str, tuple[Path, ...]]; games: tuple[GameRecording, ...]`
+132	- **Invariants:** `settings` round-trips through `settings.json` unchanged. `checkpoints` holds one final checkpoint per learning team (single-team runs: `SOLO`), present when `status` is `complete`. `generations` holds each learning team&#x27;s numbered generations in order (10 when `settings.generations == 10`, else empty) (RUN-02, SELF-04).
+133	- **Boundary:** train, reference, evaluate, viz, lab · **Fixtures:** tests/contracts/runs.RunRecord/ · **Cases:** a complete tabular corridor run; an incomplete Snake run with 3 curve points; a complete predator-prey rung-3 run with 10 generations per team
+134	- **Used by:** train, reference, evaluate, viz, lab, selfplay; PL-01, PL-02, PL-03, PL-04, PL-05, PL-06
+135	Sample: tests/contracts/runs.RunRecord/ (exists)
+136	
+137	## Writes (edit only these files; the plan gives every other file to another task)
+138	- src/rllab/lab/pipelines/pl02_train_reference.py (exists)
+139	- settings/smoke-reference.toml (new)
+140	- tests/unit/rllab/test_pl02_smoke.py (new)
+141	
+142	&lt;!-- tasks/plan.md:207 --&gt;
+143	### M1-T22: Wire PL-02
+144	**Package:** rllab · **Step:** PL-02 · **Kind:** wiring · **Covers:** REF-01 · **Size:** S · **Mode:** solo
+145	**Read:** PL-02, core.load_settings, reference.train_reference
+146	**Acceptance:**
+147	- [ ] `python -m rllab.lab train settings/smoke-reference.toml --smoke` runs end to end; committed as PL-02&#x27;s smoke test
+148	- [ ] PL-02 pre-build sections replaced by a `dt layout` pointer
+149	**Verify:** `python -m rllab.lab train settings/smoke-reference.toml --smoke` · `scripts/check.sh gate`
+150	**Depends on:** M1-T02, M1-T03, M1-T07, M1-T13, M1-T18 · **Writes:** src/rllab/lab/pipelines/pl02_train_reference.py, settings/smoke-reference.toml, tests/unit/rllab/test_pl02_smoke.py
+151	</pre></details></div><div class="step" id="S4"><span class="sid">U35.S4</span><span class="kind">Read</span>/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r1/with_skill/project/.claude/worktrees/agent-a58d61e5dbb140c32/CONSTRAINTS.md<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r1/with_skill/project/.claude/worktrees/agent-a58d61e5dbb140c32/CONSTRAINTS.md&quot;
+}</pre><div class="lbl">output</div><pre>1	# Constraints
+2	**Status:** Approved · **Last reviewed:** 2026-10-18 by @connorott · **Ratcheted:** —
+3	
+4	The standing quality bar. `pyproject.toml` and `scripts/check.sh` enforce it; every number here names its config key, and `dt status` fails if the two disagree. Only `build-setup` changes this file, with the user: tightening is routine, loosening needs an explicit yes.
+5	
+6	## Floor
+7	- **CR-01** No new suppressions. Ruff runs with `--ignore-noqa` in gate and full, so a Ruff exception is a `per-file-ignores` entry in protected config with a row in Exceptions. `# type: ignore`, `pyright:` comments and `pragma: no cover` are caught by `floor_guard.sh` on the diff
+8	- **CR-02** No stubs: `raise NotImplementedError` outside abstract methods, `pass`-only bodies, bare `except: pass`. One carve-out: the interface task&#x27;s step signatures, whose body is only `raise NotImplementedError(&quot;&lt;task id&gt;&quot;)` naming the open task that replaces it. `check.sh gate` fails on one naming a task that isn&#x27;t open in `tasks/todo.md`; `check.sh full --exit` (the milestone exit) fails on any
+9	- **CR-03** No skipped, deleted or assertion-free tests, unless a row in Exceptions names the test file
+10	- **CR-04** No secrets in source
+11	- **CR-05** Oracle files (`tests/fixtures/**/expected.json`) change only with the user&#x27;s approval
+12	- **CR-06** The implementer never changes `tests/intent/**`
+13	- **CR-07** This file, `pyproject.toml` tool config, `scripts/` and `.claude/agents/` are not weakened to make a change pass
+14	- **CR-08** Nothing imports from `references/` or `probes/`, or adds either to `sys.path` (or `PYTHONPATH`, pytest `pythonpath`). References and probe scripts are outside the tooling, so imported code would bypass the bar; `floor_guard.sh` checks the diff for both. Code copied from either is project code and meets the same bar
+15	- **CR-09** A frozen interface (`tests/contracts/&lt;id&gt;.&lt;symbol&gt;/`: schema, samples, fake; and the types, signatures and exports the interface task wrote) is frozen once it exists at the task&#x27;s base. Only the interface task freezing it (`**Kind:** interface`) writes a new folder, and no other task&#x27;s `Writes:` names its `types.py` or `__init__.py`; a frozen interface changes only through `architecture-design` Revise, never to make a test pass
+16	
+17	## Readability
+18	- **CR-10** One entry function per pipeline; it reads top to bottom as its named steps (reviewer + `dt layout`)
+19	- **CR-11** No registries, plugin dispatch or config-driven wiring without an AD
+20	- **CR-12** New abstraction only with a second real implementation or a named seam
+21	
+22	
+23	## Enforced with numbers
+24	| ID | Dimension | Rule | Checked by | Config key | Runs at |
+25	|---|---|---|---|---|---|
+26	| CR-20 | Lint | zero errors; standing per-file-ignores only for `tests/**` and `__init__.py` | ruff | `tool.ruff.lint.select` | edit, gate |
+27	| CR-21 | Complexity | ≤ 10 per function | ruff C901 | `tool.ruff.lint.mccabe.max-complexity` | gate |
+28	| CR-22 | Size | ≤ 500 lines/module, ≤ 60/function | check_size.py | `tool.size_limits` | edit, gate |
+29	| CR-23 | Types | zero errors, strict | mypy | `tool.mypy.strict` | gate |
+30	| CR-24 | Boundaries | import contracts hold | import-linter | `tool.importlinter.contracts` | gate |
+31	| CR-25 | Dependencies | none missing or unused | deptry | `tool.deptry` | gate |
+32	| CR-26 | Deps security | nothing known-vulnerable | pip-audit | — | full, CI nightly |
+33	| CR-27 | Reproducibility | same settings and seed give the same run (RUN-03, AD-08) | pytest `-m repro` | `tool.pytest.ini_options.markers` | gate |
+34	
+35	## Measured, not yet enforced
+36	| ID | Metric | Today | Direction |
+37	|---|---|---|---|
+38	| CR-40 | Coverage (branch) | — (no code) (`tool.coverage.report.fail_under`, raised by Ratchet) | must not fall |
+39	| CR-41 | vulture findings at `min_confidence = 60` (`scripts/vulture_whitelist.py`) | 0 | must not grow by `full --exit` (earlier `full` runs report) |
+40	| CR-42 | Duplicate blocks of ≥ 8 similar source lines (pylint `duplicate-code`, `[tool.pylint.similarities]` in pyproject.toml) | 0 | must not grow |
+41	
+42	## Boundaries (generated from architecture — do not edit)
+43	- `rllab.core` imports nothing first-party · `envs`, `agents`, `runs` → core · `evaluate` → core, runs · `baselines` → core, envs · `train` → core, runs, evaluate · `reference` → core, envs, runs, evaluate · `compare` → evaluate · `viz` → runs, evaluate · `lab` → all
+44	- Only `rllab.reference` imports `stable_baselines3` or `gymnasium`; only `rllab.agents` imports `torch`
+45	
+46	## Roles and protected paths
+47	| Role | May edit | May not edit | Stop gate |
+48	|---|---|---|---|
+49	| tester | `tests/intent/**`, within the task&#x27;s `Writes:` | everything else; reads no source | `check.sh collect` (lint, collect, red for the right reason) |
+50	| implementer / solo | `src/**`, `tests/unit/**`, within the task&#x27;s `Writes:`; an interface task also the `tests/contracts/&lt;id&gt;.&lt;symbol&gt;/` its `Writes:` names | the protected list; `tasks/` | `check.sh gate` + protected-path diff against the worktree&#x27;s base |
+51	| reviewer | its worktree, for the mutation check, and its findings file; nothing lands (the orchestrator records findings with `dt finding`) | everything else | runs `check.sh full` by hand |
+52	
+53	**Protected list** (`PROTECTED` in `scripts/check.sh`; `path_guard.sh deny --protected` reads the same list): `tests/intent/**`, `tests/fixtures/**`, `tests/conftest.py`, `pyproject.toml`, `uv.lock`, `CONSTRAINTS.md`, `scripts/**`, `.claude/agents/**`, `.claude/settings.json`, `references/**`, `probes/**`, `tests/contracts/**`. `tests/contracts/**` covers the contract folders that exist at the task&#x27;s base (CR-09). **`Writes:`**: `dt claim`, in the builder&#x27;s worktree, writes the role&#x27;s share of the task&#x27;s `Writes:` to `.claude/.task_writes` and sets the worktree&#x27;s base (`refs/worktree/checks-base`); `path_guard.sh writes` blocks edits outside the list, and a tester&#x27;s or implementer&#x27;s edits before the claim. Only the orchestrator writes `tasks/` (`dt land`, `dt finding`).
+54	
+55	**Worktree links:** none
+56	
+57	## Review
+58	Run by the reviewer agent over what it is given (base, package, tasks, paths): the interface review after Phase 0, a phase review per package at each checkpoint, and the milestone exit. `dt land` already checked each landing&#x27;s `Writes:`, protected paths and gates; review judges what tools can&#x27;t.
+59	
+60	**Interface** (after Phase 0): the code is the contract, no more and no less.
+61	1. Types match `contract.md`: fields, types, invariants. Nothing a step&#x27;s In → Out needs is missing; no helper is frozen.
+62	2. Signatures match the step tables, in their owner modules. Each stub names the open task that owns its step; no logic beyond types and validation.
+63	3. One sample per case the contract names, valid and realistically shaped, never carrying a TC&#x27;s expected value. Replay doubles replay an interaction the Protocol allows; fakes serve their fixtures.
+64	4. `__init__.py` exports exactly the contract; each `Mitigated by` in the plan&#x27;s dependency graph exists; each split task&#x27;s tester can write its tests from the frozen interface and its `Read:`.
+65	
+66	**Each phase**, per package, tests before code:
+67	1. **Interfaces followed** (CR-09): no frozen type, signature or contract folder changed outside a Revise. Consumers use the declared types: no dict for a dataclass, no reaching into a provider&#x27;s internals, no local redefinition. A stub is replaced only by the task it names; no cross-package import outside the contract; spine tests run on samples and doubles, not another step&#x27;s code.
+68	2. **Tests prove something:** each intent test asserts its TC case or acceptance bullet, loading expected values and tolerances from fixtures; none is assertion-free or weakened; Hypothesis runs the `ci` profile. Unit tests are specific, never computing the expected value with the code under test or testing only a mock. **Mutation check** (`.claude/agents/reviewer.md`): per acceptance bullet, the smallest change that should break it; a mutation no test catches is a finding.
+69	3. **Correct to the spec:** each acceptance bullet truly met, not special-cased to the sample; the error paths the requirement names; seeding and determinism; numerical edge cases.
+70	4. **Simple** (CR-11, CR-12, CR-42): no abstraction with one implementation outside the contract or an AD; no forwarding wrapper, one-method class, or class where a function does; no parameter, flag or config key every caller sets the same; no `try/except` that only re-raises or swallows, no checks the types already guarantee; no loop the library already provides. No near-copies within or across the phase&#x27;s tasks: one concept is one function in its owner module (tests may repeat for readability). Each finding names the simpler form, with the same tests passing.
+71	5. **Pipelines** (CR-10): entry functions read as their step tables (`dt layout`); step owners respected; spine baselines still selectable.
+72	6. **The bar** (CR-07): diff this file, `pyproject.toml`, `scripts/` and `.claude/agents/` against the milestone&#x27;s Base. Any loosening is Critical; new exceptions need an owner and expiry.
+73	7. **Hidden and parallel risks:** where a real provider could act differently from its double (flagged for the system phase); fixed output paths, global state, test-order dependence.
+74	8. **The rest:** readability, security, performance where a QR sets a number; reused reference or probe code has its Caveats handled and fits the contract; `dt lint` clean, pre-build sections replaced by `dt layout` pointers.
+75	
+76	**Milestone exit**, over the whole diff, adds: the Scope&#x27;s Exit holds; every Covers ID has a test; `check.sh full --exit` finds no stub; system tests use real providers; the same sample through a real provider and its double agrees; deferred requirements untouched; pip-audit ran.
+77	
+78	**Severity:** Critical: a frozen interface changed, a weakened test, an intent test that misses a mutation changing its TC&#x27;s expected output, a wrong answer, a loosened bar, a security hole, lost data; it stops the build. Important: a consumer bypassing a type, any other surviving mutation, an unneeded abstraction, a duplicate across tasks. Suggestion and Nit: local. Findings go under the checkpoint block in `tasks/plan.md` (`dt finding`), each with a fix task or a reason.
+79	
+80	## Done
+81	agent-skills `references/definition-of-done.md`, tailored once:
+82	- **Correctness and Quality:** checked per task by the gate.
+83	- **Integration and Documentation:** checked at each checkpoint.
+84	- **The full list:** checked at milestone exit.
+85	
+86	## Exceptions
+87	| ID | Rule | Path | Reason | Owner | Expires |
+88	|---|---|---|---|---|---|
+89	| EX-01 | CR-25 DEP002 | `numpy`, `torch`, `matplotlib`, `stable-baselines3`, `gymnasium` | M1 dependencies, declared before the code imports them | @connorott | M1 exit |
+90	</pre></details></div><div class="step" id="S5"><span class="sid">U35.S5</span><span class="kind">Bash</span>cat src/rllab/lab/pipelines/pl02_train_reference.py src/rllab/lab/pipelines/pl01_train.py src/rllab/lab/cli.py; ls settings tests/unit/rllab; cat settings/*smoke* <span class="err">error</span><details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;cat src/rllab/lab/pipelines/pl02_train_reference.py src/rllab/lab/pipelines/pl01_train.py src/rllab/lab/cli.py; ls settings tests/unit/rllab; cat settings/*smoke*&quot;,
+  &quot;description&quot;: &quot;Show pipeline, cli and settings files&quot;
+}</pre><div class="lbl">output</div><pre>Exit code 1
+&quot;&quot;&quot;PL-02: Train the reference.&quot;&quot;&quot;
+
+from pathlib import Path
+
+from rllab.runs import RunRecord
+
+
+def run_train_reference(settings_path: Path, seed: int) -&gt; RunRecord:
+    &quot;&quot;&quot;Settings, then the library agent&#x27;s training.&quot;&quot;&quot;
+    raise NotImplementedError(&quot;M1-T22&quot;)
+&quot;&quot;&quot;PL-01: Train a run.&quot;&quot;&quot;
+
+from pathlib import Path
+
+from rllab.runs import RunRecord
+
+
+def run_train(settings_path: Path, seed: int) -&gt; RunRecord:
+    &quot;&quot;&quot;Settings, then the environment and its agents, then the training loop.&quot;&quot;&quot;
+    raise NotImplementedError(&quot;M1-T21&quot;)
+&quot;&quot;&quot;The command line: one entry call per seed or target, bad input returns 2.&quot;&quot;&quot;
+
+import argparse
+import os
+import sys
+from collections.abc import Sequence
+from pathlib import Path
+
+from rllab.core import SOLO, load_settings
+from rllab.lab.pipelines.pl01_train import run_train
+from rllab.lab.pipelines.pl02_train_reference import run_train_reference
+from rllab.lab.pipelines.pl03_evaluate import run_evaluate
+from rllab.lab.pipelines.pl04_report import run_report
+from rllab.lab.pipelines.pl05_replay import run_replay
+
+_BAD_INPUT = 2
+
+
+def main(argv: Sequence[str] | None = None) -&gt; int:
+    &quot;&quot;&quot;Parse `argv` and run its subcommand; 0 on success, 2 on bad input.&quot;&quot;&quot;
+    try:
+        args = _parser().parse_args(argv)
+    except SystemExit as exc:
+        return 0 if exc.code == 0 else _BAD_INPUT
+    if args.smoke:
+        os.environ[&quot;MPLBACKEND&quot;] = &quot;Agg&quot;  # headless: the committed smoke tests open no window
+    try:
+        _dispatch(args)
+    except (ValueError, FileNotFoundError) as exc:
+        print(exc, file=sys.stderr)
+        return _BAD_INPUT
+    return 0
+
+
+def _dispatch(args: argparse.Namespace) -&gt; None:
+    match args.command:
+        case &quot;train&quot;:
+            reference = load_settings(args.settings).agent == &quot;reference&quot;
+            for seed in args.seeds:
+                if reference:
+                    run_train_reference(args.settings, seed)
+                else:
+                    run_train(args.settings, seed)
+        case &quot;eval&quot;:
+            for target in args.targets:
+                run_evaluate(target, args.seed, env=args.env, team=args.team, vs=args.vs)
+        case &quot;report&quot;:
+            run_report(args.spec, args.spec.parent / args.spec.stem)
+        case &quot;replay&quot;:
+            pair = (args.pair[0], args.pair[1]) if args.pair else None
+            run_replay(args.run, args.game, args.seed if args.new else None, pair)
+
+
+def _seeds(text: str) -&gt; list[int]:
+    &quot;&quot;&quot;`0-4` for seeds 0 to 4 inclusive, or one seed.&quot;&quot;&quot;
+    first, _, last = text.partition(&quot;-&quot;)
+    return list(range(int(first), int(last or first) + 1))
+
+
+def _parser() -&gt; argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(prog=&quot;python -m rllab.lab&quot;)
+    sub = parser.add_subparsers(dest=&quot;command&quot;, required=True)
+
+    train = sub.add_parser(&quot;train&quot;, help=&quot;train a run per seed (PL-01, or PL-02 for reference)&quot;)
+    train.add_argument(&quot;settings&quot;, type=Path)
+    train.add_argument(&quot;--seeds&quot;, type=_seeds, default=[0])
+
+    evaluate = sub.add_parser(&quot;eval&quot;, help=&quot;evaluate players on held-out seeds (PL-03)&quot;)
+    evaluate.add_argument(&quot;targets&quot;, nargs=&quot;+&quot;, help=&quot;run folders, &#x27;random&#x27; or &#x27;scripted&#x27;&quot;)
+    evaluate.add_argument(&quot;--env&quot;, choices=(&quot;snake&quot;, &quot;tank&quot;, &quot;predprey&quot;), default=&quot;snake&quot;)
+    evaluate.add_argument(&quot;--team&quot;, default=SOLO)
+    evaluate.add_argument(&quot;--vs&quot;, default=&quot;scripted&quot;)
+    evaluate.add_argument(&quot;--seed&quot;, type=int, default=0)
+
+    report = sub.add_parser(&quot;report&quot;, help=&quot;test the claims and draw the charts (PL-04)&quot;)
+    report.add_argument(&quot;spec&quot;, type=Path)
+
+    replay = sub.add_parser(&quot;replay&quot;, help=&quot;watch a game of a run (PL-05)&quot;)
+    replay.add_argument(&quot;run&quot;, type=Path)
+    which = replay.add_mutually_exclusive_group()
+    which.add_argument(&quot;--game&quot;, type=int, default=0)
+    which.add_argument(&quot;--new&quot;, action=&quot;store_true&quot;, help=&quot;play a new game on --seed&quot;)
+    which.add_argument(&quot;--pair&quot;, type=int, nargs=2, metavar=(&quot;PREDATOR_GEN&quot;, &quot;PREY_GEN&quot;))
+    replay.add_argument(&quot;--seed&quot;, type=int, default=0)
+
+    for command in (train, evaluate, report, replay):
+        command.add_argument(&quot;--smoke&quot;, action=&quot;store_true&quot;, help=&quot;headless, for the smoke tests&quot;)
+    return parser
+ls: settings: No such file or directory
+tests/unit/rllab:
+test_corridor.py
+test_curves.py
+test_dqn.py
+test_evaluate.py
+test_players.py
+test_random_player.py
+test_reference_player.py
+test_report_spec.py
+test_settings.py
+test_snake.py
+test_store.py
+test_train_loop.py
+test_train_reference.py
+(eval):1: no matches found: settings/*smoke*</pre></details></div><div class="step" id="S6"><span class="sid">U35.S6</span><span class="kind">Bash</span>grep -rn &quot;with_seed\|def load_settings\|def train_reference\|replace(&quot; src/rllab --include=*.py<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;grep -rn \&quot;with_seed\\|def load_settings\\|def train_reference\\|replace(\&quot; src/rllab --include=*.py&quot;,
+  &quot;description&quot;: &quot;Find seed helpers and step functions&quot;
+}</pre><div class="lbl">output</div><pre>(eval):1: no matches found: --include=*.py</pre></details></div><div class="step" id="S7"><span class="sid">U35.S7</span><span class="kind">Bash</span>grep -rn -e with_seed -e &quot;def load_settings&quot; -e &quot;def train_reference&quot; -e &quot;replace(&quot; src/rllab<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;grep -rn -e with_seed -e \&quot;def load_settings\&quot; -e \&quot;def train_reference\&quot; -e \&quot;replace(\&quot; src/rllab&quot;,
+  &quot;description&quot;: &quot;Find seed helpers and step functions&quot;
+}</pre><div class="lbl">output</div><pre>src/rllab/core/settings.py:33:def load_settings(path: Path) -&gt; RunSettings:
+src/rllab/core/settings.py:41:    values[&quot;rewards&quot;] = dataclasses.replace(base_rewards, **_table(raw, &quot;rewards&quot;, Rewards))
+src/rllab/core/settings.py:47:def with_seed(settings: RunSettings, seed: int) -&gt; RunSettings:
+src/rllab/core/settings.py:49:    return dataclasses.replace(settings, seed=seed)
+src/rllab/lab/players.py:80:        return {SOLO: ScriptedPlayer()}, dataclasses.replace(_BASELINE_SETTINGS, seed=seed)
+src/rllab/lab/players.py:81:    settings = dataclasses.replace(_BASELINE_SETTINGS, name=name, agent=&quot;random&quot;, seed=seed)
+src/rllab/reference/train/trainer.py:23:def train_reference(settings: RunSettings, *, root: Path = Path(&quot;runs&quot;)) -&gt; RunRecord:</pre></details></div><div class="step" id="S8"><span class="sid">U35.S8</span><span class="kind">Bash</span>cat src/rllab/core/settings.py src/rllab/core/__init__.py src/rllab/reference/__init__.py src/rllab/reference/train/__init__.py src/rllab/reference/train/trainer.py tests/unit/rllab/test_train_reference.py<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;cat src/rllab/core/settings.py src/rllab/core/__init__.py src/rllab/reference/__init__.py src/rllab/reference/train/__init__.py src/rllab/reference/train/trainer.py tests/unit/rllab/test_train_reference.py&quot;,
+  &quot;description&quot;: &quot;Read settings and trainer sources&quot;
+}</pre><div class="lbl">output</div><pre>&quot;&quot;&quot;Run settings from TOML (RUN-01, AD-06).&quot;&quot;&quot;
+
+import dataclasses
+import tomllib
+from pathlib import Path
+from typing import Any, get_args, get_type_hints
+
+from rllab.core.types import (
+    Ablation,
+    AgentName,
+    AgentParams,
+    EnvName,
+    Exploration,
+    OpponentMode,
+    Rewards,
+    RunSettings,
+    SelfPlay,
+    ViewName,
+)
+
+_SECTIONS = (&quot;rewards&quot;, &quot;exploration&quot;, &quot;params&quot;)
+_CHOICES: dict[str, tuple[str, ...]] = {
+    &quot;env&quot;: get_args(EnvName),
+    &quot;view&quot;: get_args(ViewName),
+    &quot;agent&quot;: get_args(AgentName),
+    &quot;self_play&quot;: get_args(SelfPlay),
+    &quot;ablation&quot;: get_args(Ablation),
+}
+_NETS: tuple[str, ...] = get_args(get_type_hints(AgentParams)[&quot;net&quot;])
+_TANK_REWARDS = Rewards(death=0.0, step=1.0)
+
+
+def load_settings(path: Path) -&gt; RunSettings:
+    &quot;&quot;&quot;Read a settings TOML into a fully resolved RunSettings.&quot;&quot;&quot;
+    with path.open(&quot;rb&quot;) as file:
+        raw = tomllib.load(file)
+    _check_top_level(raw)
+    values = {key: raw[key] for key in _top_level_names()}
+    values[&quot;opponents&quot;] = _opponents(raw[&quot;opponents&quot;])
+    base_rewards = _TANK_REWARDS if raw[&quot;env&quot;] == &quot;tank&quot; else Rewards()
+    values[&quot;rewards&quot;] = dataclasses.replace(base_rewards, **_table(raw, &quot;rewards&quot;, Rewards))
+    values[&quot;exploration&quot;] = Exploration(**_table(raw, &quot;exploration&quot;, Exploration))
+    values[&quot;params&quot;] = _params(_table(raw, &quot;params&quot;, AgentParams))
+    return RunSettings(**values)
+
+
+def with_seed(settings: RunSettings, seed: int) -&gt; RunSettings:
+    &quot;&quot;&quot;The same settings with only the seed replaced.&quot;&quot;&quot;
+    return dataclasses.replace(settings, seed=seed)
+
+
+def _top_level_names() -&gt; tuple[str, ...]:
+    return tuple(f.name for f in dataclasses.fields(RunSettings) if f.name not in _SECTIONS)
+
+
+def _check_top_level(raw: dict[str, Any]) -&gt; None:
+    known = {f.name for f in dataclasses.fields(RunSettings)}
+    for key in raw:
+        if key not in known:
+            raise ValueError(f&quot;{key}: unknown setting&quot;)
+    for key in _top_level_names():
+        if key not in raw:
+            raise ValueError(f&quot;{key}: missing setting&quot;)
+    for key, allowed in _CHOICES.items():
+        if raw[key] not in allowed:
+            raise ValueError(f&quot;{key}: unknown value {raw[key]!r}, expected one of {allowed}&quot;)
+
+
+def _opponents(table: dict[str, Any]) -&gt; dict[str, Any]:
+    allowed = get_args(OpponentMode)
+    for team, mode in table.items():
+        if mode not in allowed:
+            raise ValueError(f&quot;opponents.{team}: unknown value {mode!r}, expected one of {allowed}&quot;)
+    return dict(table)
+
+
+def _table(raw: dict[str, Any], key: str, cls: type[Any]) -&gt; dict[str, Any]:
+    &quot;&quot;&quot;The `[key]` table, empty if absent; a name `cls` lacks raises naming it.&quot;&quot;&quot;
+    table: dict[str, Any] = raw.get(key, {})
+    known = {f.name for f in dataclasses.fields(cls)}
+    for name in table:
+        if name not in known:
+            raise ValueError(f&quot;{key}.{name}: unknown setting&quot;)
+    return table
+
+
+def _params(table: dict[str, Any]) -&gt; AgentParams:
+    for name in (&quot;lr&quot;, &quot;gamma&quot;):
+        if name not in table:
+            raise ValueError(f&quot;params.{name}: missing setting&quot;)
+    if table.get(&quot;net&quot;, &quot;mlp&quot;) not in _NETS:
+        raise ValueError(f&quot;params.net: unknown value {table[&#x27;net&#x27;]!r}, expected one of {_NETS}&quot;)
+    return AgentParams(**table)
+&quot;&quot;&quot;The core: environment and agent protocols, teams, transitions and run settings.&quot;&quot;&quot;
+
+from rllab.core.protocols import Agent, Env
+from rllab.core.settings import load_settings
+from rllab.core.types import (
+    SOLO,
+    ActionSpace,
+    AgentParams,
+    Exploration,
+    Rewards,
+    RunSettings,
+    StepResult,
+    TeamSpec,
+    Transition,
+)
+
+__all__ = [
+    &quot;SOLO&quot;,
+    &quot;ActionSpace&quot;,
+    &quot;Agent&quot;,
+    &quot;AgentParams&quot;,
+    &quot;Env&quot;,
+    &quot;Exploration&quot;,
+    &quot;Rewards&quot;,
+    &quot;RunSettings&quot;,
+    &quot;StepResult&quot;,
+    &quot;TeamSpec&quot;,
+    &quot;Transition&quot;,
+    &quot;load_settings&quot;,
+]
+&quot;&quot;&quot;The library reference agent: training and playing it.&quot;&quot;&quot;
+
+from rllab.reference.player import ReferencePlayer
+from rllab.reference.train import train_reference
+
+__all__ = [&quot;ReferencePlayer&quot;, &quot;train_reference&quot;]
+&quot;&quot;&quot;Reference training.&quot;&quot;&quot;
+
+from rllab.reference.train.trainer import train_reference
+
+__all__ = [&quot;train_reference&quot;]
+&quot;&quot;&quot;The library reference agent, trained through the Gymnasium adapter (REF-01, AD-03, AD-04).&quot;&quot;&quot;
+
+import time
+from collections.abc import Callable
+from functools import partial
+from pathlib import Path
+from typing import Any, SupportsFloat
+
+import gymnasium as gym
+import numpy as np
+from stable_baselines3 import DQN
+from stable_baselines3.common.base_class import BaseAlgorithm
+from stable_baselines3.common.callbacks import BaseCallback
+
+from rllab.core import SOLO, Env, RunSettings, Transition
+from rllab.envs import Snake
+from rllab.evaluate import EvalOptions, evaluate
+from rllab.runs import CurvePoint, RunRecord, RunWriter, create_run
+
+_TRAIN_SEEDS = 1_000_000  # training games draw seeds below the held-out evaluation seeds
+
+
+def train_reference(settings: RunSettings, *, root: Path = Path(&quot;runs&quot;)) -&gt; RunRecord:
+    &quot;&quot;&quot;Train Stable-Baselines3 on `settings` with `device=&quot;cpu&quot;`, into a run folder.&quot;&quot;&quot;
+    _check_supported(settings)
+    writer = create_run(settings, root=root)
+    adapter = OneLearnerAdapter(_env_factory(settings)())
+    model = DQN(&quot;MlpPolicy&quot;, adapter, **dqn_kwargs(settings))
+    model.learn(total_timesteps=settings.steps, callback=_CurveCallback(writer, settings, adapter))
+    writer.save_checkpoint(ModelPlayer(model))
+    return writer.finish(&quot;complete&quot;)
+
+
+def _check_supported(settings: RunSettings) -&gt; None:
+    if settings.agent != &quot;reference&quot;:
+        raise ValueError(f&quot;agent: train_reference needs &#x27;reference&#x27;, got {settings.agent!r}&quot;)
+    if settings.env != &quot;snake&quot; or settings.view != &quot;compact&quot;:
+        raise ValueError(
+            f&quot;train_reference trains Snake with the compact view, got {settings.env!r} &quot;
+            f&quot;with {settings.view!r}&quot;
+        )
+
+
+def _env_factory(settings: RunSettings) -&gt; Callable[[], Env]:
+    snake: Callable[..., Env] = Snake
+    return partial(snake, view=&quot;compact&quot;, rewards=settings.rewards)
+
+
+def dqn_kwargs(settings: RunSettings) -&gt; dict[str, Any]:
+    &quot;&quot;&quot;The one-to-one mapping from the hand-written DQN&#x27;s settings to Stable-Baselines3 (AD-04).&quot;&quot;&quot;
+    p, e = settings.params, settings.exploration
+    return {
+        &quot;learning_rate&quot;: p.lr,
+        &quot;gamma&quot;: p.gamma,
+        &quot;batch_size&quot;: p.batch_size,
+        &quot;buffer_size&quot;: p.memory_size,
+        &quot;target_update_interval&quot;: p.target_every,
+        &quot;learning_starts&quot;: p.learn_start,
+        &quot;exploration_initial_eps&quot;: e.start,
+        &quot;exploration_final_eps&quot;: e.end,
+        &quot;exploration_fraction&quot;: min(1.0, e.decay_steps / settings.steps),
+        &quot;train_freq&quot;: 1,
+        &quot;gradient_steps&quot;: 1,
+        &quot;policy_kwargs&quot;: {&quot;net_arch&quot;: [p.hidden, p.hidden]},
+        &quot;seed&quot;: settings.seed,
+        &quot;device&quot;: &quot;cpu&quot;,
+        &quot;verbose&quot;: 0,
+    }
+
+
+class OneLearnerAdapter(gym.Env[np.ndarray, np.int64]):
+    &quot;&quot;&quot;The single agent of a one-team `core.Env` as a `gymnasium.Env` (AD-03).&quot;&quot;&quot;
+
+    def __init__(self, env: Env) -&gt; None:
+        team = env.teams[SOLO]
+        self._env = env
+        self.observation_space = gym.spaces.Box(-np.inf, np.inf, team.obs_shape, np.float32)
+        self.action_space = gym.spaces.Discrete(team.actions.n)
+        self.games = 0
+
+    def reset(
+        self, *, seed: int | None = None, options: dict[str, Any] | None = None
+    ) -&gt; tuple[np.ndarray, dict[str, Any]]:
+        super().reset(seed=seed)
+        obs, info = self._env.reset(int(self.np_random.integers(_TRAIN_SEEDS)))
+        return obs[SOLO][0], dict(info)
+
+    def step(
+        self, action: np.int64
+    ) -&gt; tuple[np.ndarray, SupportsFloat, bool, bool, dict[str, Any]]:
+        result = self._env.step({SOLO: np.array([action], dtype=np.int64)})
+        if result.terminated or result.truncated:
+            self.games += 1
+        reward = float(result.reward[SOLO][0])
+        return result.obs[SOLO][0], reward, result.terminated, result.truncated, dict(result.info)
+
+
+class ModelPlayer:
+    &quot;&quot;&quot;The model in training as a `core.Agent`: greedy unless exploring; it learns only in SB3.&quot;&quot;&quot;
+
+    def __init__(self, model: BaseAlgorithm) -&gt; None:
+        self._model = model
+
+    def act(self, obs: np.ndarray, *, explore: bool) -&gt; np.ndarray:
+        actions, _ = self._model.predict(obs, deterministic=not explore)
+        return np.asarray(actions, dtype=np.int64)
+
+    def learn(self, t: Transition) -&gt; None:
+        raise RuntimeError(&quot;the reference model learns only inside Stable-Baselines3&quot;)
+
+    def save(self, path: Path) -&gt; None:
+        self._model.save(path)
+
+    def load(self, path: Path) -&gt; None:
+        self._model.set_parameters(str(path))
+
+
+class _CurveCallback(BaseCallback):
+    &quot;&quot;&quot;Adds a curve point from `evaluate.evaluate` at step 0, every `eval_every` and the end.&quot;&quot;&quot;
+
+    def __init__(
+        self, writer: RunWriter, settings: RunSettings, adapter: OneLearnerAdapter
+    ) -&gt; None:
+        super().__init__()
+        self._writer = writer
+        self._settings = settings
+        self._adapter = adapter
+        self._started = 0.0
+
+    def _on_training_start(self) -&gt; None:
+        self._started = time.perf_counter()
+        self._add_point()
+
+    def _on_step(self) -&gt; bool:
+        if self.num_timesteps % self._settings.eval_every == 0:
+            self._add_point()
+        return True
+
+    def _on_training_end(self) -&gt; None:
+        if self.num_timesteps % self._settings.eval_every:
+            self._add_point()
+
+    def _add_point(self) -&gt; None:
+        s = self._settings
+        scores = evaluate(
+            _env_factory(s),
+            {SOLO: ModelPlayer(self.model)},
+            player=s.name,
+            train_seed=s.seed,
+            options=EvalOptions(n_games=s.eval_games),
+        )
+        point = CurvePoint(
+            step=self.num_timesteps,
+            games=self._adapter.games,
+            mean_score=float(np.mean(scores.scores)),
+            elapsed_s=time.perf_counter() - self._started,
+        )
+        self._writer.add_point(point)
+&quot;&quot;&quot;Unit tests for reference.train_reference: SB3 DQN through the adapter, on doubles (M1-T07).&quot;&quot;&quot;
+
+import dataclasses
+import importlib.util
+import sys
+import warnings
+from collections.abc import Mapping
+from pathlib import Path
+from typing import Any
+
+import numpy as np
+import pytest
+from stable_baselines3 import DQN
+from stable_baselines3.common.env_checker import check_env
+
+from rllab.core import SOLO, ActionSpace, RunSettings, StepResult, TeamSpec, Transition
+from rllab.reference import train_reference
+from rllab.reference.train import trainer
+
+KIT_PATH = Path(__file__).resolve().parents[2] / &quot;contracts&quot; / &quot;kit.py&quot;
+_spec = importlib.util.spec_from_file_location(&quot;contract_kit&quot;, KIT_PATH)
+assert _spec is not None
+assert _spec.loader is not None
+kit = importlib.util.module_from_spec(_spec)
+sys.modules[&quot;contract_kit&quot;] = kit
+_spec.loader.exec_module(kit)
+
+GAME_LENGTH = 5
+N_ACTIONS = 3
+OBS_SIZE = 11
+
+
+class FakeSnake:
+    &quot;&quot;&quot;A one-team grid env: random binary observations, reward 1 for action 0, truncated at 5.&quot;&quot;&quot;
+
+    def __init__(self, *, view: str, rewards: Any) -&gt; None:
+        self.teams = {SOLO: TeamSpec(1, (OBS_SIZE,), ActionSpace(&quot;discrete&quot;, n=N_ACTIONS))}
+        self.board = &quot;grid&quot;
+        self.view = view
+        self.reset_seeds: list[int] = []
+        self._rng = np.random.default_rng(0)
+        self._t = 0
+
+    def _obs(self) -&gt; dict[str, np.ndarray]:
+        return {SOLO: self._rng.integers(0, 2, (1, OBS_SIZE)).astype(np.float32)}
+
+    def reset(self, seed: int) -&gt; tuple[dict[str, np.ndarray], dict[str, float]]:
+        self.reset_seeds.append(seed)
+        self._rng = np.random.default_rng(seed)
+        self._t = 0
+        return self._obs(), {&quot;steps&quot;: 0.0, &quot;score&quot;: 0.0, f&quot;score:{SOLO}&quot;: 0.0}
+
+    def step(self, actions: Mapping[str, np.ndarray]) -&gt; StepResult:
+        self._t += 1
+        action = actions[SOLO]
+        assert action.shape == (1,)
+        assert action.dtype == np.int64
+        over = self._t &gt;= GAME_LENGTH
+        return StepResult(
+            obs=self._obs(),
+            reward={SOLO: np.array([1.0 if action[0] == 0 else 0.0], dtype=np.float32)},
+            done={SOLO: np.array([over])},
+            terminated=False,
+            truncated=over,
+            info={&quot;steps&quot;: float(self._t), &quot;score&quot;: 0.0, f&quot;score:{SOLO}&quot;: 0.0},
+        )
+
+    def frame(self) -&gt; np.ndarray:
+        return np.zeros((3, 3), dtype=np.int8)
+
+
+def _reference_settings(**changes: Any) -&gt; RunSettings:
+    raw = kit.raw_sample(&quot;reference.train_reference&quot;, &quot;complete_reference&quot;)[&quot;record&quot;][&quot;settings&quot;]
+    settings: RunSettings = kit.decode(RunSettings, raw)
+    small = {
+        &quot;steps&quot;: 120,
+        &quot;eval_every&quot;: 50,
+        &quot;eval_games&quot;: 7,
+        &quot;params&quot;: dataclasses.replace(
+            settings.params, batch_size=8, memory_size=200, learn_start=20, hidden=16
+        ),
+    }
+    return dataclasses.replace(settings, **(small | changes))
+
+
+@pytest.fixture
+def doubles(monkeypatch: pytest.MonkeyPatch) -&gt; Any:
+    fake_eval = kit.fake(&quot;evaluate.evaluate&quot;)
+    fake_eval.calls.clear()
+    fake_run = kit.fake(&quot;runs.create_run&quot;)
+    writers: list[Any] = []
+
+    def create_run(settings: RunSettings, *, root: Path) -&gt; Any:
+        writer = fake_run.create_run(settings, root=root)
+        writers.append(writer)
+        return writer
+
+    monkeypatch.setattr(trainer, &quot;Snake&quot;, FakeSnake)
+    monkeypatch.setattr(trainer, &quot;evaluate&quot;, fake_eval.evaluate)
+    monkeypatch.setattr(trainer, &quot;create_run&quot;, create_run)
+    return fake_eval.calls, writers
+
+
+def test_train_reference_writes_a_complete_run_with_points_from_evaluate(
+    doubles: Any, tmp_path: Path
+) -&gt; None:
+    eval_calls, writers = doubles
+    settings = _reference_settings()
+
+    record = train_reference(settings, root=tmp_path)
+
+    assert record.status == &quot;complete&quot;
+    assert record.settings == settings
+    assert record.path.parent == tmp_path
+    assert [p.step for p in record.curve] == [0, 50, 100, 120]
+    assert [p.games for p in record.curve] == [0, 10, 20, 24]
+    scripted = kit.decode(
+        np.ndarray, kit.raw_sample(&quot;evaluate.evaluate&quot;, &quot;scripted_seed0&quot;)[&quot;scores&quot;][&quot;scores&quot;]
+    )
+    assert record.curve[1].mean_score == pytest.approx(float(np.mean(scripted[:7])))
+    assert len(eval_calls) == 4
+    assert all(c[&quot;options&quot;].n_games == 7 for c in eval_calls)
+    assert all(c[&quot;teams&quot;] == [SOLO] for c in eval_calls)
+    assert all(c[&quot;train_seed&quot;] == 0 and c[&quot;player&quot;] == &quot;reference-compact&quot; for c in eval_calls)
+    assert set(record.checkpoints) == {SOLO}
+    assert [c[&quot;method&quot;] for c in writers[0].calls][-2:] == [&quot;save_checkpoint&quot;, &quot;finish&quot;]
+
+
+def test_train_reference_point_on_the_last_step_is_not_repeated(
+    doubles: Any, tmp_path: Path
+) -&gt; None:
+    record = train_reference(_reference_settings(steps=100), root=tmp_path)
+
+    assert [p.step for p in record.curve] == [0, 50, 100]
+
+
+@pytest.mark.parametrize(
+    &quot;case&quot;,
+    [&quot;tank_reference&quot;, &quot;dqn_compact&quot;],
+)
+def test_train_reference_rejects_settings_it_cannot_train(case: str, tmp_path: Path) -&gt; None:
+    settings = kit.sample(&quot;core.RunSettings&quot;, case, RunSettings)
+
+    with pytest.raises(ValueError, match=&quot;train_reference&quot;):
+        train_reference(settings, root=tmp_path)
+
+    assert not tmp_path.joinpath(&quot;runs&quot;).exists()
+    assert list(tmp_path.iterdir()) == []
+
+
+def test_train_reference_rejects_the_grid_view(tmp_path: Path) -&gt; None:
+    with pytest.raises(ValueError, match=&quot;compact&quot;):
+        train_reference(_reference_settings(view=&quot;grid&quot;), root=tmp_path)
+
+
+def test_dqn_kwargs_map_the_settings_one_to_one() -&gt; None:
+    settings = _reference_settings(steps=200_000)
+
+    kwargs = trainer.dqn_kwargs(settings)
+
+    assert kwargs == {
+        &quot;learning_rate&quot;: 0.0001,
+        &quot;gamma&quot;: 0.99,
+        &quot;batch_size&quot;: 8,
+        &quot;buffer_size&quot;: 200,
+        &quot;target_update_interval&quot;: 1000,
+        &quot;learning_starts&quot;: 20,
+        &quot;exploration_initial_eps&quot;: 1.0,
+        &quot;exploration_final_eps&quot;: 0.05,
+        &quot;exploration_fraction&quot;: 0.25,
+        &quot;train_freq&quot;: 1,
+        &quot;gradient_steps&quot;: 1,
+        &quot;policy_kwargs&quot;: {&quot;net_arch&quot;: [16, 16]},
+        &quot;seed&quot;: 0,
+        &quot;device&quot;: &quot;cpu&quot;,
+        &quot;verbose&quot;: 0,
+    }
+
+
+def test_dqn_kwargs_cap_the_exploration_fraction_at_one() -&gt; None:
+    assert trainer.dqn_kwargs(_reference_settings(steps=1000))[&quot;exploration_fraction&quot;] == 1.0
+
+
+def test_adapter_passes_the_gymnasium_env_checker() -&gt; None:
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter(&quot;always&quot;)
+        check_env(trainer.OneLearnerAdapter(FakeSnake(view=&quot;compact&quot;, rewards=None)), warn=True)
+
+    assert [str(w.message) for w in caught] == []
+
+
+def test_adapter_plays_the_single_agent_and_counts_games() -&gt; None:
+    env = FakeSnake(view=&quot;compact&quot;, rewards=None)
+    adapter = trainer.OneLearnerAdapter(env)
+
+    obs, info = adapter.reset(seed=3)
+    rewards = []
+    for _ in range(GAME_LENGTH):
+        obs, reward, terminated, truncated, info = adapter.step(np.int64(0))
+        rewards.append(reward)
+
+    assert obs.shape == (OBS_SIZE,)
+    assert rewards == [1.0] * GAME_LENGTH
+    assert (terminated, truncated) == (False, True)
+    assert info[&quot;steps&quot;] == GAME_LENGTH
+    assert adapter.games == 1
+    assert 0 &lt;= env.reset_seeds[0] &lt; 1_000_000
+
+
+def test_adapter_game_seeds_follow_the_reset_seed() -&gt; None:
+    first, second = (FakeSnake(view=&quot;compact&quot;, rewards=None) for _ in range(2))
+    for env in (first, second):
+        adapter = trainer.OneLearnerAdapter(env)
+        adapter.reset(seed=11)
+        adapter.reset()
+
+    assert first.reset_seeds == second.reset_seeds
+    assert first.reset_seeds[0] != first.reset_seeds[1]
+
+
+def test_model_player_acts_batch_first_and_round_trips_its_checkpoint(tmp_path: Path) -&gt; None:
+    adapter = trainer.OneLearnerAdapter(FakeSnake(view=&quot;compact&quot;, rewards=None))
+    model = DQN(&quot;MlpPolicy&quot;, adapter, seed=0, device=&quot;cpu&quot;, learning_starts=0)
+    player = trainer.ModelPlayer(model)
+    obs = np.ones((1, OBS_SIZE), dtype=np.float32)
+
+    action = player.act(obs, explore=False)
+    player.save(tmp_path / &quot;checkpoint.zip&quot;)
+    other = trainer.ModelPlayer(DQN(&quot;MlpPolicy&quot;, adapter, seed=1, device=&quot;cpu&quot;))
+    other.load(tmp_path / &quot;checkpoint.zip&quot;)
+
+    assert action.shape == (1,)
+    assert action.dtype == np.int64
+    assert 0 &lt;= action[0] &lt; N_ACTIONS
+    q = model.q_net(model.q_net.obs_to_tensor(obs)[0])
+    assert action[0] == int(q.argmax())
+    assert np.array_equal(other.act(obs, explore=False), action)
+    with pytest.raises(RuntimeError, match=&quot;Stable-Baselines3&quot;):
+        player.learn(kit.sample(&quot;core.Transition&quot;, &quot;food&quot;, Transition))</pre></details></div><div class="step" id="S9"><span class="sid">U35.S9</span><span class="kind">Bash</span>grep -rln -e &quot;core.settings import&quot; -e &quot;with_seed&quot; src tests; find . -name &quot;*.toml&quot; -not -path &quot;./.venv/*&quot; -not -path &quot;./.claude/*&quot;; ls tests tests/intent tests/intent/* 2&gt;/dev/null | head -50<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;grep -rln -e \&quot;core.settings import\&quot; -e \&quot;with_seed\&quot; src tests; find . -name \&quot;*.toml\&quot; -not -path \&quot;./.venv/*\&quot; -not -path \&quot;./.claude/*\&quot;; ls tests tests/intent tests/intent/* 2&gt;/dev/null | head -50&quot;,
+  &quot;description&quot;: &quot;Find with_seed users and toml files&quot;
+}</pre><div class="lbl">output</div><pre>src/rllab/core/__init__.py
+src/rllab/core/settings.py
+tests/unit/rllab/test_settings.py
+tests/contracts/test_interface.py
+./pyproject.toml
+./tests/contracts/core.RunSettings/samples/predprey_rung1.toml
+./tests/contracts/core.RunSettings/samples/no_target.toml
+./tests/contracts/core.RunSettings/samples/tank_rung3.toml
+./tests/contracts/core.RunSettings/samples/corridor_tabular.toml
+./tests/contracts/core.RunSettings/samples/dqn_compact.toml
+./tests/contracts/core.RunSettings/samples/predprey_rung3.toml
+./tests/contracts/core.RunSettings/samples/tank_reference.toml
+./tests/contracts/core.load_settings/files/unknown_agent.toml
+./tests/contracts/core.load_settings/files/dqn_compact.toml
+tests:
+conftest.py
+contracts
+fixtures
+intent
+unit
+
+tests/intent:
+rllab
+
+tests/intent/rllab:
+test_corridor.py
+test_evaluate.py
+test_random_player.py
+test_snake.py</pre></details></div><div class="step" id="S10"><span class="sid">U35.S10</span><span class="kind">Bash</span>cat tests/contracts/core.load_settings/files/dqn_compact.toml; grep -n &quot;with_seed&quot; tests/contracts/test_interface.py tests/unit/rllab/test_settings.py; ls tests/contracts/reference.train_reference/samples; cat src/rllab/lab/__main__.py<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;cat tests/contracts/core.load_settings/files/dqn_compact.toml; grep -n \&quot;with_seed\&quot; tests/contracts/test_interface.py tests/unit/rllab/test_settings.py; ls tests/contracts/reference.train_reference/samples; cat src/rllab/lab/__main__.py&quot;,
+  &quot;description&quot;: &quot;Show dqn_compact settings and with_seed use&quot;
+}</pre><div class="lbl">output</div><pre>name = &quot;dqn-compact&quot;
+env = &quot;snake&quot;
+view = &quot;compact&quot;
+agent = &quot;dqn&quot;
+n_agents = 1
+opponents = {}
+self_play = &quot;none&quot;
+pool_latest = 0.5
+generations = 0
+ablation = &quot;none&quot;
+steps = 200000
+seed = 0
+eval_every = 10000
+eval_games = 50
+
+[params]
+lr = 0.0005
+gamma = 0.99
+tests/contracts/test_interface.py:20:from rllab.core.settings import with_seed
+tests/contracts/test_interface.py:59:    (with_seed, &quot;settings, seed&quot;),
+tests/contracts/test_interface.py:112:    (with_seed, RunSettings),
+tests/unit/rllab/test_settings.py:9:from rllab.core.settings import load_settings, with_seed
+tests/unit/rllab/test_settings.py:129:def test_with_seed_swaps_only_the_seed() -&gt; None:
+tests/unit/rllab/test_settings.py:131:    reseeded = with_seed(settings, 4)
+complete_reference.json
+&quot;&quot;&quot;`python -m rllab.lab train | eval | report | replay`.&quot;&quot;&quot;
+
+from rllab.lab.cli import main
+
+raise SystemExit(main())</pre></details></div><div class="step" id="S11"><span class="sid">U35.S11</span><span class="kind">Bash</span>grep -n -A14 &quot;class AgentParams\|class Exploration\|class Rewards&quot; src/rllab/core/types.py<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;grep -n -A14 \&quot;class AgentParams\\|class Exploration\\|class Rewards\&quot; src/rllab/core/types.py&quot;,
+  &quot;description&quot;: &quot;Show settings dataclass defaults&quot;
+}</pre><div class="lbl">output</div><pre>106:class Rewards:
+107-    &quot;&quot;&quot;Reward sizes: food (or the corridor goal), death (or a catch) and every step.&quot;&quot;&quot;
+108-
+109-    food: float = 1.0
+110-    death: float = -1.0
+111-    step: float = 0.0
+112-
+113-
+114-@dataclass(frozen=True)
+115:class Exploration:
+116-    &quot;&quot;&quot;A linear decay from `start` to `end` over `decay_steps`, then flat (AGENT-02).&quot;&quot;&quot;
+117-
+118-    start: float = 1.0
+119-    end: float = 0.05
+120-    decay_steps: int = 50_000
+121-
+122-    def __post_init__(self) -&gt; None:
+123-        if not 0 &lt;= self.end &lt;= self.start &lt;= 1:
+124-            raise ValueError(f&quot;exploration needs 0 &lt;= end &lt;= start &lt;= 1, got {self}&quot;)
+125-
+126-
+127-@dataclass(frozen=True)
+128:class AgentParams:
+129-    &quot;&quot;&quot;Learner hyperparameters; each agent reads only its own (AD-11).&quot;&quot;&quot;
+130-
+131-    lr: float
+132-    gamma: float
+133-    batch_size: int = 64
+134-    memory_size: int = 50_000
+135-    target_every: int = 1_000
+136-    learn_start: int = 1_000
+137-    hidden: int = 128
+138-    net: Literal[&quot;mlp&quot;, &quot;cnn&quot;] = &quot;mlp&quot;
+139-    rollout_steps: int = 2048
+140-    epochs: int = 10
+141-    clip: float = 0.2
+142-    gae_lambda: float = 0.95</pre></details></div><div class="step" id="S12"><span class="sid">U35.S12</span><span class="kind">say</span>Now write the pipeline, the settings file and the smoke test.<details><summary>full text</summary><pre>Now write the pipeline, the settings file and the smoke test.</pre></details></div><div class="step" id="S13"><span class="sid">U35.S13</span><span class="kind">Write</span>/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r1/with_skill/project/.claude/worktrees/agent-a58d61e5dbb140c32/src/rllab/lab/pipelines/pl02_train_reference.py (15 lines)<div class="lbl">wrote /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r1/with_skill/project/.claude/worktrees/agent-a58d61e5dbb140c32/src/rllab/lab/pipelines/pl02_train_reference.py</div><pre>&quot;&quot;&quot;PL-02: Train the reference.&quot;&quot;&quot;
+
+from pathlib import Path
+
+from rllab.core import load_settings
+from rllab.core.settings import with_seed
+from rllab.reference import train_reference
+from rllab.runs import RunRecord
+
+
+def run_train_reference(settings_path: Path, seed: int) -&gt; RunRecord:
+    &quot;&quot;&quot;Settings, then the library agent&#x27;s training.&quot;&quot;&quot;
+    settings = load_settings(settings_path)
+    settings = with_seed(settings, seed)
+    return train_reference(settings)
+</pre><details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r1/with_skill/project/.claude/worktrees/agent-a58d61e5dbb140c32/src/rllab/lab/pipelines/pl02_train_reference.py&quot;,
+  &quot;content&quot;: &quot;\&quot;\&quot;\&quot;PL-02: Train the reference.\&quot;\&quot;\&quot;\n\nfrom pathlib import Path\n\nfrom rllab.core import load_settings\nfrom rllab.core.settings import with_seed\nfrom rllab.reference import train_reference\nfrom rllab.runs import RunRecord\n\n\ndef run_train_reference(settings_path: Path, seed: int) -&gt; RunRecord:\n    \&quot;\&quot;\&quot;Settings, then the library agent&#x27;s training.\&quot;\&quot;\&quot;\n    settings = load_settings(settings_path)\n    settings = with_seed(settings, seed)\n    return train_reference(settings)\n&quot;
+}</pre><div class="lbl">output</div><pre>The file /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r1/with_skill/project/.claude/worktrees/agent-a58d61e5dbb140c32/src/rllab/lab/pipelines/pl02_train_reference.py has been updated successfully. (file state is current in your context — no need to Read it back)</pre></details></div><div class="step" id="S14"><span class="sid">U35.S14</span><span class="kind">Write</span>/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r1/with_skill/project/.claude/worktrees/agent-a58d61e5dbb140c32/settings/smoke-reference.toml (27 lines)<div class="lbl">wrote /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r1/with_skill/project/.claude/worktrees/agent-a58d61e5dbb140c32/settings/smoke-reference.toml</div><pre># PL-02&#x27;s smoke run: the library DQN on Snake, small enough to finish in seconds.
+name = &quot;smoke-reference&quot;
+env = &quot;snake&quot;
+view = &quot;compact&quot;
+agent = &quot;reference&quot;
+n_agents = 1
+opponents = {}
+self_play = &quot;none&quot;
+pool_latest = 0.5
+generations = 0
+ablation = &quot;none&quot;
+steps = 300
+seed = 0
+eval_every = 100
+eval_games = 3
+
+[exploration]
+decay_steps = 200
+
+[params]
+lr = 0.0005
+gamma = 0.99
+batch_size = 16
+memory_size = 500
+target_every = 100
+learn_start = 50
+hidden = 16
+</pre><details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r1/with_skill/project/.claude/worktrees/agent-a58d61e5dbb140c32/settings/smoke-reference.toml&quot;,
+  &quot;content&quot;: &quot;# PL-02&#x27;s smoke run: the library DQN on Snake, small enough to finish in seconds.\nname = \&quot;smoke-reference\&quot;\nenv = \&quot;snake\&quot;\nview = \&quot;compact\&quot;\nagent = \&quot;reference\&quot;\nn_agents = 1\nopponents = {}\nself_play = \&quot;none\&quot;\npool_latest = 0.5\ngenerations = 0\nablation = \&quot;none\&quot;\nsteps = 300\nseed = 0\neval_every = 100\neval_games = 3\n\n[exploration]\ndecay_steps = 200\n\n[params]\nlr = 0.0005\ngamma = 0.99\nbatch_size = 16\nmemory_size = 500\ntarget_every = 100\nlearn_start = 50\nhidden = 16\n&quot;
+}</pre><div class="lbl">output</div><pre>File created successfully at: /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r1/with_skill/project/.claude/worktrees/agent-a58d61e5dbb140c32/settings/smoke-reference.toml (file state is current in your context — no need to Read it back)</pre></details></div><div class="step" id="S15"><span class="sid">U35.S15</span><span class="kind">Bash</span>grep -n &quot;def \|status\|curve.csv\|checkpoint&quot; src/rllab/runs/store.py<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;grep -n \&quot;def \\|status\\|curve.csv\\|checkpoint\&quot; src/rllab/runs/store.py&quot;,
+  &quot;description&quot;: &quot;Inspect run store layout&quot;
+}</pre><div class="lbl">output</div><pre>1:&quot;&quot;&quot;One folder per run: settings.json, curve.csv, checkpoints, games.npz, status (AD-06).&quot;&quot;&quot;
+20:_CURVE = &quot;curve.csv&quot;
+22:_STATUS = &quot;status&quot;
+32:    def __init__(self, path: Path, settings: RunSettings) -&gt; None:
+36:    def add_point(self, p: CurvePoint) -&gt; None:
+40:    def save_checkpoint(self, agent: Agent, *, team: str = SOLO) -&gt; None:
+41:        stem = &quot;checkpoint&quot; if team == SOLO else f&quot;checkpoint-{team}&quot;
+44:    def save_generation(self, agent: Agent, *, team: str, index: int) -&gt; Path:
+50:    def save_games(self, games: Sequence[GameRecording]) -&gt; None:
+61:    def finish(self, status: Literal[&quot;complete&quot;, &quot;incomplete&quot;]) -&gt; RunRecord:
+62:        (self._path / _STATUS).write_text(status, encoding=&quot;utf-8&quot;)
+66:def create_run(settings: RunSettings, *, root: Path = Path(&quot;runs&quot;)) -&gt; RunWriter:
+67:    &quot;&quot;&quot;Start a uniquely named run folder holding settings.json and status=running.&quot;&quot;&quot;
+76:def open_run(path: Path) -&gt; RunRecord:
+85:        status=_read_status(path / _STATUS),
+86:        checkpoints=_find_checkpoints(path),
+92:def _new_folder(root: Path, base: str) -&gt; Path:
+105:def _settings_json(settings: RunSettings) -&gt; dict[str, Any]:
+111:def _read_settings(path: Path) -&gt; RunSettings:
+126:def _read_curve(path: Path) -&gt; tuple[CurvePoint, ...]:
+145:def _read_status(path: Path) -&gt; Status:
+148:        raise ValueError(f&quot;{path}: unknown status {text!r}&quot;)
+152:def _find_checkpoints(path: Path) -&gt; dict[str, Path]:
+154:    for file in sorted(path.glob(&quot;checkpoint*&quot;)):
+155:        team = file.stem.removeprefix(&quot;checkpoint&quot;).removeprefix(&quot;-&quot;)
+160:def _find_generations(path: Path) -&gt; dict[str, tuple[Path, ...]]:
+170:def _read_games(path: Path) -&gt; tuple[GameRecording, ...]:
+180:def _decode_games(arrays: Mapping[str, np.ndarray]) -&gt; tuple[GameRecording, ...]:</pre></details></div><div class="step" id="S16"><span class="sid">U35.S16</span><span class="kind">Bash</span>grep -n &quot;def \|class &quot; src/rllab/reference/player.py; ls tests/unit/rllab/ | xargs -I{} echo {} ; grep -rn &quot;smoke&quot; tests/unit | head <span class="err">error</span><details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;grep -n \&quot;def \\|class \&quot; src/rllab/reference/player.py; ls tests/unit/rllab/ | xargs -I{} echo {} ; grep -rn \&quot;smoke\&quot; tests/unit | head&quot;,
+  &quot;description&quot;: &quot;Inspect ReferencePlayer and existing smoke tests&quot;
+}</pre><div class="lbl">output</div><pre>Permission to use Bash has been denied. IMPORTANT: You *may* attempt to accomplish this action using other tools that might naturally be used to accomplish this goal, e.g. using head instead of cat. But you *should not* attempt to work around this denial in malicious ways, e.g. do not use your ability to run tests to execute non-test actions. You should only try to work around this restriction in reasonable ways that do not attempt to bypass the intent behind this denial. If you believe this capability is essential to complete the user&#x27;s request, STOP and explain to the user what you were trying to do and why you need this permission. Let the user decide how to proceed.</pre></details></div><div class="step" id="S17"><span class="sid">U35.S17</span><span class="kind">Bash</span>grep -n -e &quot;def &quot; -e &quot;class &quot; src/rllab/reference/player.py<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;grep -n -e \&quot;def \&quot; -e \&quot;class \&quot; src/rllab/reference/player.py&quot;,
+  &quot;description&quot;: &quot;Inspect ReferencePlayer API&quot;
+}</pre><div class="lbl">output</div><pre>11:class ReferencePlayer(Agent):
+14:    def __init__(self, checkpoint: Path) -&gt; None:
+17:    def act(self, obs: np.ndarray, *, explore: bool) -&gt; np.ndarray:
+22:    def learn(self, t: Transition) -&gt; None:
+26:    def save(self, path: Path) -&gt; None:
+29:    def load(self, path: Path) -&gt; None:</pre></details></div><div class="step" id="S18"><span class="sid">U35.S18</span><span class="kind">Write</span>/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r1/with_skill/project/.claude/worktrees/agent-a58d61e5dbb140c32/tests/unit/rllab/test_pl02_smoke.py (47 lines)<div class="lbl">wrote /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r1/with_skill/project/.claude/worktrees/agent-a58d61e5dbb140c32/tests/unit/rllab/test_pl02_smoke.py</div><pre>&quot;&quot;&quot;PL-02&#x27;s smoke test: `python -m rllab.lab train settings/smoke-reference.toml --smoke` (M1-T22).&quot;&quot;&quot;
+
+from pathlib import Path
+
+import numpy as np
+import pytest
+
+from rllab.core import SOLO
+from rllab.lab.cli import main
+from rllab.reference import ReferencePlayer
+from rllab.runs import open_run
+
+SMOKE = Path(__file__).resolve().parents[3] / &quot;settings&quot; / &quot;smoke-reference.toml&quot;
+COMPACT_OBS = 11
+
+
+def test_train_smoke_reference_runs_end_to_end(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -&gt; None:
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv(&quot;MPLBACKEND&quot;, &quot;Agg&quot;)
+
+    code = main([&quot;train&quot;, str(SMOKE), &quot;--seeds&quot;, &quot;0-1&quot;, &quot;--smoke&quot;])
+
+    assert code == 0
+    folders = sorted((tmp_path / &quot;runs&quot;).iterdir())
+    assert len(folders) == 2
+    records = [open_run(folder) for folder in folders]
+    assert sorted(r.settings.seed for r in records) == [0, 1]
+    for record in records:
+        assert record.status == &quot;complete&quot;
+        assert record.settings.agent == &quot;reference&quot;
+        assert [p.step for p in record.curve] == [0, 100, 200, 300]
+        assert set(record.checkpoints) == {SOLO}
+        player = ReferencePlayer(record.checkpoints[SOLO])
+        action = player.act(np.zeros((1, COMPACT_OBS), dtype=np.float32), explore=False)
+        assert action.shape == (1,)
+        assert 0 &lt;= action[0] &lt; 3
+
+
+def test_train_smoke_reference_rejects_a_missing_file(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -&gt; None:
+    monkeypatch.chdir(tmp_path)
+
+    assert main([&quot;train&quot;, str(tmp_path / &quot;missing.toml&quot;), &quot;--smoke&quot;]) == 2
+    assert not (tmp_path / &quot;runs&quot;).exists()
+</pre><details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r1/with_skill/project/.claude/worktrees/agent-a58d61e5dbb140c32/tests/unit/rllab/test_pl02_smoke.py&quot;,
+  &quot;content&quot;: &quot;\&quot;\&quot;\&quot;PL-02&#x27;s smoke test: `python -m rllab.lab train settings/smoke-reference.toml --smoke` (M1-T22).\&quot;\&quot;\&quot;\n\nfrom pathlib import Path\n\nimport numpy as np\nimport pytest\n\nfrom rllab.core import SOLO\nfrom rllab.lab.cli import main\nfrom rllab.reference import ReferencePlayer\nfrom rllab.runs import open_run\n\nSMOKE = Path(__file__).resolve().parents[3] / \&quot;settings\&quot; / \&quot;smoke-reference.toml\&quot;\nCOMPACT_OBS = 11\n\n\ndef test_train_smoke_reference_runs_end_to_end(\n    tmp_path: Path, monkeypatch: pytest.MonkeyPatch\n) -&gt; None:\n    monkeypatch.chdir(tmp_path)\n    monkeypatch.setenv(\&quot;MPLBACKEND\&quot;, \&quot;Agg\&quot;)\n\n    code = main([\&quot;train\&quot;, str(SMOKE), \&quot;--seeds\&quot;, \&quot;0-1\&quot;, \&quot;--smoke\&quot;])\n\n    assert code == 0\n    folders = sorted((tmp_path / \&quot;runs\&quot;).iterdir())\n    assert len(folders) == 2\n    records = [open_run(folder) for folder in folders]\n    assert sorted(r.settings.seed for r in records) == [0, 1]\n    for record in records:\n        assert record.status == \&quot;complete\&quot;\n        assert record.settings.agent == \&quot;reference\&quot;\n        assert [p.step for p in record.curve] == [0, 100, 200, 300]\n        assert set(record.checkpoints) == {SOLO}\n        player = ReferencePlayer(record.checkpoints[SOLO])\n        action = player.act(np.zeros((1, COMPACT_OBS), dtype=np.float32), explore=False)\n        assert action.shape == (1,)\n        assert 0 &lt;= action[0] &lt; 3\n\n\ndef test_train_smoke_reference_rejects_a_missing_file(\n    tmp_path: Path, monkeypatch: pytest.MonkeyPatch\n) -&gt; None:\n    monkeypatch.chdir(tmp_path)\n\n    assert main([\&quot;train\&quot;, str(tmp_path / \&quot;missing.toml\&quot;), \&quot;--smoke\&quot;]) == 2\n    assert not (tmp_path / \&quot;runs\&quot;).exists()\n&quot;
+}</pre><div class="lbl">output</div><pre>File created successfully at: /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r1/with_skill/project/.claude/worktrees/agent-a58d61e5dbb140c32/tests/unit/rllab/test_pl02_smoke.py (file state is current in your context — no need to Read it back)</pre></details></div><div class="step" id="S19"><span class="sid">U35.S19</span><span class="kind">Bash</span>uv run pytest tests/unit/rllab/test_pl02_smoke.py -q<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;uv run pytest tests/unit/rllab/test_pl02_smoke.py -q&quot;,
+  &quot;description&quot;: &quot;Run the smoke unit test&quot;
+}</pre><div class="lbl">output</div><pre>..                                                                       [100%]
+2 passed in 16.94s</pre></details></div><div class="step" id="S20"><span class="sid">U35.S20</span><span class="kind">Bash</span>scripts/check.sh gate<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;scripts/check.sh gate&quot;,
+  &quot;description&quot;: &quot;Run the quality gate&quot;,
+  &quot;timeout&quot;: 600000
+}</pre><div class="lbl">output</div><pre>-&gt; ruff check --ignore-noqa .
+All checks passed!
+-&gt; ruff format --check .
+90 files already formatted
+-&gt; mypy
+Success: no issues found in 50 source files
+-&gt; python scripts/check_size.py src
+-&gt; deptry . --no-ansi
+Scanning 54 files...
+
+Success! No dependency issues found.
+-&gt; lint-imports --no-logo
+
+---------
+Contracts
+---------
+
+Analyzed 71 files, 178 dependencies.
+------------------------------------
+
+Layers: lab &gt; train | reference | compare | viz | baselines &gt; evaluate | envs | 
+agents &gt; runs &gt; core KEPT
+Hand-written code stays free of the reference library (AGENT-06, AD-04) KEPT
+Only agents imports PyTorch (AD-02) KEPT
+envs → core only KEPT
+agents → core only KEPT
+baselines → core, envs KEPT
+train → core, runs, evaluate KEPT
+reference → core, envs, runs, evaluate KEPT
+compare → evaluate KEPT
+viz → runs, evaluate KEPT
+
+Contracts: 10 kept, 0 broken.
+-&gt; pytest tests/intent tests/unit tests/contracts --no-cov -q -x
+........................................................................ [ 13%]
+........................................................................ [ 26%]
+........................................................................ [ 39%]
+........................................................................ [ 53%]
+........................................................................ [ 66%]
+........................................................................ [ 79%]
+........................................................................ [ 92%]
+......................................                                   [100%]
+542 passed in 7.96s
+-&gt; bash scripts/floor_guard.sh
+floor_guard: clean
+-&gt; protected files unchanged since refs/worktree/checks-base</pre></details></div><div class="step" id="S21"><span class="sid">U35.S21</span><span class="kind">say</span>I&#x27;ve wired PL-02 and the gate passes. Training the reference now runs end to end: `python -m rllab.lab train settings/smoke-reference.toml --smoke` trains, evaluates as it goes, and writes a complete run folder. ⏎ - The pipeline: `run_train_reference` in `/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r1/with_skill/project/.claude/worktrees/agent-a58d61e5dbb140c32/src/rllab/lab/pipelines/pl02_train_reference.py` now reads as its steps: load the settings, set the seed, then train the reference. ⏎ - The smoke settings: `/Users/connorott/plugins/dev-team-works …[+1178 chars]<details><summary>full text</summary><pre>I&#x27;ve wired PL-02 and the gate passes. Training the reference now runs end to end: `python -m rllab.lab train settings/smoke-reference.toml --smoke` trains, evaluates as it goes, and writes a complete run folder.
+
+- **The pipeline:** `run_train_reference` in `/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r1/with_skill/project/.claude/worktrees/agent-a58d61e5dbb140c32/src/rllab/lab/pipelines/pl02_train_reference.py` now reads as its steps: load the settings, set the seed, then train the reference.
+- **The smoke settings:** `/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r1/with_skill/project/.claude/worktrees/agent-a58d61e5dbb140c32/settings/smoke-reference.toml` is the library DQN on Snake with the compact view, cut down to 300 steps with an evaluation every 100.
+- **The smoke test:** `/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r1/with_skill/project/.claude/worktrees/agent-a58d61e5dbb140c32/tests/unit/rllab/test_pl02_smoke.py` calls the command line&#x27;s `main` in a temporary folder with seeds 0 and 1. It checks for two complete runs with curve points at steps 0, 100, 200 and 300, and that each checkpoint loads into `ReferencePlayer` and picks a valid action. A second test checks that a missing settings file returns exit code 2 and creates no run folder.
+
+The test calls `main` in the same process. I didn&#x27;t run the `python -m` command itself, because it would have left a `runs/` folder in the worktree.
+
+The task&#x27;s second acceptance item isn&#x27;t done: replacing PL-02&#x27;s pre-build sections in `docs/packages/rllab/pipelines.md` with a `dt layout` pointer. That file isn&#x27;t in my Writes, so someone with access to it will need to make that change.
+
+DONE M1-T22 solo</pre></details></div>
+<h2>Commits</h2>
+<p>None.</p>
+<h2>Returned</h2>
+<pre>I&#x27;ve wired PL-02 and the gate passes. Training the reference now runs end to end: `python -m rllab.lab train settings/smoke-reference.toml --smoke` trains, evaluates as it goes, and writes a complete run folder.
+
+- **The pipeline:** `run_train_reference` in `/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r1/with_skill/project/.claude/worktrees/agent-a58d61e5dbb140c32/src/rllab/lab/pipelines/pl02_train_reference.py` now reads as its steps: load the settings, set the seed, then train the reference.
+- **The smoke settings:** `/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r1/with_skill/project/.claude/worktrees/agent-a58d61e5dbb140c32/settings/smoke-reference.toml` is the library DQN on Snake with the compact view, cut down to 300 steps with an evaluation every 100.
+- **The smoke test:** `/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r1/with_skill/project/.claude/worktrees/agent-a58d61e5dbb140c32/tests/unit/rllab/test_pl02_smoke.py` calls the command line&#x27;s `main` in a temporary folder with seeds 0 and 1. It checks for two complete runs with curve points at steps 0, 100, 200 and 300, and that each checkpoint loads into `ReferencePlayer` and picks a valid action. A second test checks that a missing settings file returns exit code 2 and creates no run folder.
+
+The test calls `main` in the same process. I didn&#x27;t run the `python -m` command itself, because it would have left a `runs/` folder in the worktree.
+
+The task&#x27;s second acceptance item isn&#x27;t done: replacing PL-02&#x27;s pre-build sections in `docs/packages/rllab/pipelines.md` with a `dt layout` pointer. That file isn&#x27;t in my Writes, so someone with access to it will need to make that change.
+
+DONE M1-T22 solo</pre>
+</body></html>

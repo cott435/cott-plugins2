@@ -1,0 +1,1222 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1"><title>U45 implementer</title>
+<style>
+:root{--bg:#fbfbfa;--fg:#1d1d1f;--muted:#6b6b70;--line:#d9d9de;--box:#fff;--rowp:#eef3fb;--band:#fff4d6;
+--ok:#2e7d32;--bad:#c62828;--warn:#b26a00;--idle:#6b6b70}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#17171a;--fg:#ececf0;--muted:#9a9aa3;
+--line:#34343a;--box:#222227;--rowp:#1d2433;--band:#3a3015;--ok:#6fcf73;--bad:#ff6b6b;--warn:#f0b35a;--idle:#9a9aa3}}
+:root[data-theme="dark"]{--bg:#17171a;--fg:#ececf0;--muted:#9a9aa3;--line:#34343a;--box:#222227;--rowp:#1d2433;
+--band:#3a3015;--ok:#6fcf73;--bad:#ff6b6b;--warn:#f0b35a;--idle:#9a9aa3}
+body{margin:0;padding:16px;background:var(--bg);color:var(--fg);font:14px/1.45 -apple-system,system-ui,sans-serif}
+h1{font-size:18px;margin:0 0 4px}h2{font-size:15px;margin:22px 0 8px}.sub{color:var(--muted)}
+table{border-collapse:collapse;margin:4px 0 8px}td,th{border-bottom:1px solid var(--line);padding:4px 10px;text-align:left;
+vertical-align:top}th{color:var(--muted);font-weight:600}.chips span{display:inline-block;margin:0 4px 2px 0}
+.legend span{margin-right:14px;white-space:nowrap}.sw{display:inline-block;width:10px;height:10px;border-radius:2px;
+margin-right:4px;vertical-align:-1px}.scroll{overflow:auto;max-height:88vh;border:1px solid var(--line);border-radius:8px}
+.chart{display:grid;width:max-content}.chart>div{line-height:0}.corner{position:sticky;top:0;left:0;z-index:3}
+.colhead{position:sticky;top:0;z-index:2}.rowhead{position:sticky;left:0;z-index:2}
+svg.bg{background:var(--bg)}.colhead svg{border-bottom:1px solid var(--line)}.rowhead svg{border-right:1px solid var(--line)}
+.ok{color:var(--ok);fill:var(--ok)}.bad{color:var(--bad);fill:var(--bad)}.warn{color:var(--warn);fill:var(--warn)}
+.idle{color:var(--idle);fill:var(--idle)}
+svg text{fill:var(--fg);font-family:-apple-system,system-ui,sans-serif}
+.box{fill:var(--box);stroke:var(--line)}.unit:hover .box{stroke:var(--fg)}
+.role{font-size:12px;font-weight:600}.uid,.wmeta,.lmeta,.meta{font-size:10px;fill:var(--muted)}
+.sub{font-size:10.5px;fill:var(--muted)}.badge{font-size:11px;font-weight:600}
+.meta.bad{fill:var(--bad);font-weight:600}.lane{font-size:13px;font-weight:700}.wave{font-size:13px;font-weight:700}
+.par{fill:#4e79a7}.ser{fill:var(--muted)}.rowp{fill:var(--rowp)}.rows{fill:transparent}.band{fill:var(--band)}
+.bandt{font-size:11.5px}.grid{stroke:var(--line)}.link{stroke:var(--muted);stroke-width:1.2;opacity:.55}
+.arrowhead{fill:var(--muted)}.marks{font-size:10.5px}.audit{stroke:var(--box);stroke-width:2}.auditn{font-size:10px;font-weight:700;fill:#fff}
+a{color:inherit}svg a .box{cursor:pointer}
+
+:root{--c0:#2a78d6;--c1:#eb6834;--c2:#1baf7a;--c3:#eda100;--c4:#e87ba4;--c5:#008300;--c6:#6250d6;--c7:#e34948;
+--cx:#8a8985;--main:#52514e;--read:#dcdbd5;--readfg:#1d1d1f}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--c0:#3987e5;--c1:#d95926;--c2:#199e70;
+--c3:#c98500;--c4:#d55181;--c5:#008300;--c6:#9085e9;--c7:#e66767;--cx:#77766f;--main:#c3c2b7;--read:#3b3b40;
+--readfg:#ececf0}}
+:root[data-theme="dark"]{--c0:#3987e5;--c1:#d95926;--c2:#199e70;--c3:#c98500;--c4:#d55181;--c5:#008300;
+--c6:#9085e9;--c7:#e66767;--cx:#77766f;--main:#c3c2b7;--read:#3b3b40;--readfg:#ececf0}
+.c0{fill:var(--c0);background:var(--c0)}.c1{fill:var(--c1);background:var(--c1)}.c2{fill:var(--c2);background:var(--c2)}
+.c3{fill:var(--c3);background:var(--c3)}.c4{fill:var(--c4);background:var(--c4)}.c5{fill:var(--c5);background:var(--c5)}
+.c6{fill:var(--c6);background:var(--c6)}.c7{fill:var(--c7);background:var(--c7)}.cx{fill:var(--cx);background:var(--cx)}
+.cmain{fill:var(--main)}.sc0{stroke:var(--c0)}.sc1{stroke:var(--c1)}.sc2{stroke:var(--c2)}
+.tl text,.sm text,.lc text{font-size:10.5px;fill:var(--muted)}.tl .lbl-in,.sm .lbl-in{fill:#fff;font-size:10.5px;font-weight:600}
+.tl .rowl,.sm .rowl,.lc .rowl{fill:var(--fg);font-size:11.5px;font-weight:600}.tl .band{fill:var(--rowp)}
+.tl .brk{stroke:var(--muted);stroke-dasharray:2 3}.tl a:hover rect,.sm a:hover rect{stroke:var(--fg);stroke-width:1.5}
+.axis{stroke:var(--line)}.sm .val{fill:var(--fg);font-weight:600}.lc path.ln{fill:none;stroke-width:2}
+.lc circle{stroke:var(--bg);stroke-width:2}.lc .end{font-weight:600;fill:var(--fg)}
+.tiles{display:flex;flex-wrap:wrap;gap:10px;margin:12px 0}.tile{border:1px solid var(--line);border-radius:8px;
+padding:8px 12px;min-width:110px;background:var(--box)}.tile b{display:block;font-size:20px;line-height:1.2}
+.tile span{font-size:12px;color:var(--muted)}.tile i{font-style:normal;font-size:12px;margin-left:6px}
+.fm{border-collapse:separate;border-spacing:2px}.fm td,.fm th{border:0;padding:0;text-align:center;font-size:11px}
+.fm th{padding:0 2px;font-weight:600}.fm td.f,.fm th.f{text-align:left;padding-right:10px;white-space:nowrap;
+position:sticky;left:0;background:var(--bg);font:11.5px ui-monospace,Menlo,monospace;
+max-width:380px;overflow:hidden;text-overflow:ellipsis}
+.fm td.cell{min-width:22px;height:20px;border-radius:3px}.fm td.fw{background:var(--c0);color:#fff;font-weight:700}
+.fm td.fe{background:var(--c1);color:#fff;font-weight:700}.fm td.fr{background:var(--read);color:var(--readfg)}
+.fm td.n{color:var(--muted);padding:0 6px}.fm tr.grp td{text-align:left;padding-top:8px;color:var(--muted);
+font-weight:600}
+.key{display:inline-block;min-width:18px;text-align:center;border-radius:3px;font-size:11px;margin-right:4px}
+.bar{display:inline-block;height:9px;border-radius:2px;vertical-align:0}
+
+pre{white-space:pre-wrap;word-break:break-word;background:var(--box);border:1px solid var(--line);border-radius:6px;
+padding:8px 10px;margin:4px 0;font:12px/1.45 ui-monospace,SFMono-Regular,Menlo,monospace;max-width:100%;overflow:auto}
+.step{border-top:1px solid var(--line);padding:6px 0}.step:target{background:var(--rowp)}
+.sid{font:12px ui-monospace,Menlo,monospace;color:var(--muted);margin-right:8px}.kind{font-weight:600;margin-right:8px}
+.err{color:var(--bad);font-weight:600}.hook{color:var(--bad);margin:4px 0 0 16px}.lbl{font-size:12px;color:var(--muted);margin-top:6px}
+details summary{cursor:pointer;color:var(--muted);font-size:12px}.head td:first-child{color:var(--muted)}
+.top{font-size:13px}.narr{list-style:none;padding-left:0}.narr li{margin:3px 0}
+</style></head>
+<body>
+<p class="top"><a href="../flow.html">← the run's flow chart</a></p>
+
+<h1>U45 · implementer · M1-T27 implementer</h1>
+<table class="head"><tr><td>Type</td><td>implementer</td></tr><tr><td>Description</td><td>M1-T27 implementer</td></tr><tr><td>Spawned by</td><td>driver at D404</td></tr><tr><td>Turn</td><td><a href="../turns/T16.html">T16</a></td></tr><tr><td>Model</td><td>claude-opus-5-5</td></tr><tr><td>Start</td><td>2026-10-18 22:36:58 UTC</td></tr><tr><td>Duration</td><td>1 min</td></tr><tr><td>Tool calls</td><td>16</td></tr><tr><td>Errors</td><td>1</td></tr><tr><td>Hook blocks</td><td>1</td></tr><tr><td>Tokens</td><td>4.4k out · 39.4k new in · 342k cached in · peak context 44.0k</td></tr><tr><td>Skills invoked</td><td>none</td></tr><tr><td>Files written or edited</td><td>.claude/worktrees/agent-ad74f5d3fa3914963/src/rllab/agents/dqn/networks.py, .claude/worktrees/agent-ad74f5d3fa3914963/tests/unit/rllab/test_networks.py</td></tr><tr><td>Definition</td><td>none</td></tr><tr><td>Steps</td><td>19</td></tr><tr><td>Finished</td><td>yes</td></tr></table>
+
+
+<h2>Prompt</h2>
+<pre>You are the implementer for M1-T27. Run `python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r1/with_skill/plugin/dev-team/scripts/dt.py claim M1-T27 --role implementer`, then read the packet it names.</pre>
+<h2>Files</h2>
+<table><tr><th>Op</th><th>File</th><th>Calls</th><th>By</th><th>Via</th><th>Steps</th></tr><tr><td>write</td><td><code>.claude/worktrees/agent-ad74f5d3fa3914963/src/rllab/agents/dqn/networks.py</code></td><td>1</td><td>U45</td><td>Write</td><td><a href="#13">U45.S13</a></td></tr><tr><td>write</td><td><code>.claude/worktrees/agent-ad74f5d3fa3914963/tests/unit/rllab/test_networks.py</code></td><td>1</td><td>U45</td><td>Write</td><td><a href="#14">U45.S14</a></td></tr><tr><td>edit</td><td><code>.claude/worktrees/agent-ad74f5d3fa3914963/src/rllab/agents/dqn/networks.py</code></td><td>1</td><td>U45</td><td>Edit</td><td><a href="#15">U45.S15</a></td></tr><tr><td>read</td><td><code>.claude/worktrees/agent-ad74f5d3fa3914963/.claude/.task_writes</code></td><td>1</td><td>U45</td><td>Bash</td><td><a href="#8">U45.S8</a></td></tr><tr><td>read</td><td><code>.claude/worktrees/agent-ad74f5d3fa3914963/.claude/packet.md</code></td><td>1</td><td>U45</td><td>Read</td><td><a href="#3">U45.S3</a></td></tr><tr><td>read</td><td><code>.claude/worktrees/agent-ad74f5d3fa3914963/CONSTRAINTS.md</code></td><td>1</td><td>U45</td><td>Read</td><td><a href="#4">U45.S4</a></td></tr><tr><td>read</td><td><code>.claude/worktrees/agent-ad74f5d3fa3914963/src/rllab/agents/dqn/agent.py</code></td><td>1</td><td>U45</td><td>Read</td><td><a href="#6">U45.S6</a></td></tr><tr><td>read</td><td><code>.claude/worktrees/agent-ad74f5d3fa3914963/tasks/plan.md</code></td><td>1</td><td>U45</td><td>Read</td><td><a href="#10">U45.S10</a></td></tr><tr><td>read</td><td><code>.claude/worktrees/agent-ad74f5d3fa3914963/tests/intent/rllab/test_cnn.py</code></td><td>1</td><td>U45</td><td>Read</td><td><a href="#7">U45.S7</a></td></tr></table>
+<h2>Steps</h2>
+<div class="step" id="S1"><span class="sid">U45.S1</span><span class="kind">user</span>You are the implementer for M1-T27. Run `python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r1/with_skill/plugin/dev-team/scripts/dt.py claim M1-T27 --role implementer`, then read the packet it names.<details><summary>full text</summary><pre>You are the implementer for M1-T27. Run `python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r1/with_skill/plugin/dev-team/scripts/dt.py claim M1-T27 --role implementer`, then read the packet it names.</pre></details></div><div class="step" id="S2"><span class="sid">U45.S2</span><span class="kind">Bash</span>python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r1/with_skill/plugin/dev-team/scripts/dt.py claim M1-T27 --role implementer<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r1/with_skill/plugin/dev-team/scripts/dt.py claim M1-T27 --role implementer&quot;
+}</pre><div class="lbl">output</div><pre>packet: /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r1/with_skill/project/.claude/worktrees/agent-ad74f5d3fa3914963/.claude/packet.md (185 lines; read it in full)
+task: M1-T27 Full-grid convolutional network · role implementer · package rllab · kind thicken
+writes: src/rllab/agents/dqn/networks.py, tests/unit/rllab/test_networks.py
+done: Done when `scripts/check.sh gate` passes (the gate passes on your Writes); the Stop hook runs it. End with one line: `DONE M1-T27 implementer`. If you can&#x27;t finish: `python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r1/with_skill/plugin/dev-team/scripts/dt.py escalate &lt;TEST-WRONG|NEEDS-DEP&gt; &quot;&lt;why&gt;&quot;`, or `python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r1/with_skill/plugin/dev-team/scripts/dt.py escalate CONTRACT-CHANGE &quot;&lt;why&gt;&quot; --type &lt;the contract symbol&gt;`, then end with one line: `STOPPED M1-T27 implementer: see dt escalate`.</pre></details></div><div class="step" id="S3"><span class="sid">U45.S3</span><span class="kind">Read</span>/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r1/with_skill/project/.claude/worktrees/agent-ad74f5d3fa3914963/.claude/packet.md<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r1/with_skill/project/.claude/worktrees/agent-ad74f5d3fa3914963/.claude/packet.md&quot;
+}</pre><div class="lbl">output</div><pre>1	# Packet: M1-T27 implementer
+2	You are the implementer for M1-T27. Your edit boundary is your Writes below (`.claude/.task_writes`); the guard blocks everything else.
+3	
+4	Done when `scripts/check.sh gate` passes (the gate passes on your Writes); the Stop hook runs it. End with one line: `DONE M1-T27 implementer`. If you can&#x27;t finish: `python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r1/with_skill/plugin/dev-team/scripts/dt.py escalate &lt;TEST-WRONG|NEEDS-DEP&gt; &quot;&lt;why&gt;&quot;`, or `python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r1/with_skill/plugin/dev-team/scripts/dt.py escalate CONTRACT-CHANGE &quot;&lt;why&gt;&quot; --type &lt;the contract symbol&gt;`, then end with one line: `STOPPED M1-T27 implementer: see dt escalate`.
+5	
+6	# Context for M1-T27: package rllab · mode split · kind thicken
+7	Read only what is below, plus CONSTRAINTS.md and the files you edit. Your task is the last section.
+8	
+9	&lt;!-- docs/packages/rllab/pipelines.md:5 --&gt;
+10	## PL-01: Train a run
+11	**Entry:** `src/rllab/lab/pipelines/pl01_train.py::run_train` · **Trigger:** `python -m rllab.lab train &lt;settings.toml&gt; --seeds 0-4`
+12	**Covers:** SNAKE-01–SNAKE-09, FISH-01–FISH-10, HUNT-01–HUNT-09, CORE-01–CORE-07, AGENT-01–AGENT-06, PG-01–PG-05, SELF-01–SELF-04, BASE-06–BASE-08, ABL-01–ABL-03, RUN-01–RUN-04, DATA-02, QR-01–QR-03, QR-05–QR-07
+13	
+14	| # | Step | Owner | In → Out | Spine version | Covers |
+15	|---|---|---|---|---|---|
+16	| 1 | `load_settings` | core.settings | path → RunSettings | TOML into the frozen dataclasses; unknown names raise `ValueError` naming the key | RUN-01 |
+17	| 2 | `make_env` | lab.build | RunSettings → Env | `if` on `settings.env`: Snake, Corridor, FishTank (with `n_agents` fish) or PredatorPrey, returned as a zero-argument factory | CORE-01, DATA-02 |
+18	| 3 | `Snake` | envs.snake | view, Rewards → Env | full rules on 10×10, compact and grid views | SNAKE-01–SNAKE-09 |
+19	| 4 | `Corridor` | envs.corridor | length, Rewards → Env | 10 cells, one-hot position, 50-step cap | CORE-03 |
+20	| 5 | `FishTank` | envs.tank | view, n_fish, Rewards → Env | vectorised ball reflection, shortened swim vectors, wall stop, catches, 1,000-step cap, full view (AD-12) | FISH-01–FISH-09 |
+21	| 6 | `PredatorPrey` | envs.predprey | Rewards → Env | the tank&#x27;s movement functions (AD-16) plus pellets, catches, 50-step prey respawns, both teams&#x27; limited views, 1,000-step cap | HUNT-01–HUNT-09 |
+22	| 7 | `make_agent` | lab.build | RunSettings, Env → Agent | one agent per team of `env.teams`: learners from `settings.agent` (tabular, dqn, reinforce or ppo) sized from the team&#x27;s `TeamSpec`, other teams scripted or random per `settings.opponents`; ablation switches from `settings.ablation` | ABL-01–ABL-03, PG-05, HUNT-07, SELF-02 |
+23	| 8 | `TabularAgent` | agents.tabular | AgentParams, Exploration → Agent | dict of NumPy rows keyed on observation bytes; linear exploration decay | AGENT-01, AGENT-02, AGENT-06, ABL-03 |
+24	| 9 | `DQNAgent` | agents.dqn | AgentParams, Exploration → Agent | 128×128 MLP, uniform memory, hard target refresh, Huber loss, gradient clip 10 | AGENT-02–AGENT-06, ABL-01, ABL-02 |
+25	| 10 | `ReinforceAgent` | agents.reinforce | ActionSpace, AgentParams → Agent | Gaussian 64×64 Tanh policy with a learned log-std; one update per `games_per_update` games on normalised returns-to-go (AD-11) | PG-01, PG-02, AGENT-06 |
+26	| 11 | `PPOAgent` | agents.ppo | ActionSpace, AgentParams → Agent | the same policy plus a 64×64 value net; GAE, clipped objective, `epochs` passes over minibatches, one instance for every fish (AD-11) | PG-01, PG-03, PG-04, AGENT-06, SELF-01 |
+27	| 12 | `ScriptedPredator` | baselines.scripted_predator | () → Agent | length-1 vector toward the nearest visible prey, else toward the centre | BASE-06 |
+28	| 13 | `ScriptedPrey` | baselines.scripted_prey | () → Agent | flee within 0.3, else toward the nearest visible pellet, else still | BASE-07 |
+29	| 14 | `RandomSwimmer` | baselines.random_swimmer | n_agents, seed → Agent | uniform over the unit disc, for either team | BASE-08 |
+30	| 15 | `train` | train.loop | Env, Agent, RunSettings → RunRecord | batch-first step loop over every team, building one Transition per learning team and calling its `learn` after each step; each learner&#x27;s generation every tenth of the run (SELF-04); `evaluate.evaluate` every `eval_every` into a CurvePoint; progress line every 30 s; checkpoints and 5 recorded games at the end | CORE-02, CORE-07, RUN-02–RUN-04, SELF-01, SELF-04, QR-01–QR-03, QR-07 |
+31	| 16 | `OpponentPool` | selfplay.pool | Agent, latest_share, seed → OpponentPool | always the latest policy (rung 2&#x27;s behaviour) | SELF-03 |
+32	
+33	### Entry sketch (pre-build — removed by spine task)
+34	```python
+35	def run_train(settings_path: Path, seed: int) -&gt; RunRecord:
+36	    settings = load_settings(settings_path)
+37	    settings = with_seed(settings, seed)
+38	    make = make_env(settings)
+39	    agents = make_agent(settings, make())
+40	    return train(make, agents, settings)
+41	```
+42	
+43	&lt;!-- docs/packages/rllab/contract.md:232 --&gt;
+44	### agents.DQNAgent: Neural value learner
+45	```python
+46	class DQNAgent(Agent):
+47	    def __init__(self, team: TeamSpec, params: AgentParams, exploration: Exploration, *, seed: int, ablation: Literal[&quot;none&quot;, &quot;no_memory&quot;, &quot;no_target&quot;] = &quot;none&quot;) -&gt; None: ...
+48	    online: torch.nn.Module; target: torch.nn.Module; updates: int; last_batch: tuple[int, ...]  # read-only
+49	```
+50	- **Invariants:** single-agent (batches of 1), its observation shape and action count from `team` (AD-18). AGENT-03–AGENT-05 and AD-05. No updates happen before `learn_start` transitions; after that, each `learn` takes one update and adds 1 to `updates`. `last_batch` numbers the transitions the latest update used, by `learn` call (0 for the first). `target` is refreshed from `online` after every `target_every`-th update and is otherwise unchanged (AGENT-04). With `ablation=&quot;no_memory&quot;`, `last_batch` is only the latest transition (ABL-01). With `&quot;no_target&quot;`, `target` is `online` (ABL-02). The checkpoint is a PyTorch state dict with keys `online` and `target`.
+51	- **Errors:** `ValueError` if `team` has more than one agent or continuous actions, or if `net=&quot;cnn&quot;` and `team.obs_shape` is not 3-D
+52	- **Boundary:** lab · **Fixtures:** tests/contracts/agents.DQNAgent/ · **Cases:** a replay double of 5 act/learn calls on the compact view after `learn_start`
+53	- **Used by:** lab; PL-01, PL-03
+54	
+55	&lt;!-- docs/packages/rllab/contract.md:106 --&gt;
+56	### envs.Snake: Snake game
+57	```python
+58	class Snake(Env):
+59	    def __init__(self, *, view: Literal[&quot;compact&quot;, &quot;grid&quot;], rewards: Rewards = Rewards(), size: int = 10) -&gt; None: ...
+60	    def reset_to(self, body: Sequence[tuple[int, int]], heading: Literal[&quot;up&quot;, &quot;right&quot;, &quot;down&quot;, &quot;left&quot;], food: tuple[int, int]) -&gt; tuple[dict[str, np.ndarray], dict[str, float]]: ...
+61	```
+62	- **Invariants:** SNAKE-01–SNAKE-09. `reset_to` starts a game from a given board (cells are `(row, col)`, row 0 at the top, body head first), with score 0 and the step count at 0, and returns what `reset` does (AD-13); later food is seeded as after `reset`. One team, `SOLO`, of 1 agent; `board == &quot;grid&quot;`. Actions: discrete 3, 0 straight, 1 turn left, 2 turn right. The compact observation has per-agent shape `(11,)`, laid out as `COMPACT_FIELDS`. The grid observation has per-agent shape `(3, size, size)`: head, body and food channels. Filling the board ends the game with `terminated=True` and no death reward.
+63	- **Errors:** as `core.Env`; `reset_to` raises `ValueError` if the body is not contiguous, leaves the grid, or the food is on the snake
+64	- **Boundary:** lab, reference, baselines · **Fixtures:** tests/contracts/envs.Snake/ · **Cases:** a recorded compact-view game ending at a wall; a recorded grid-view game eating twice then hitting itself
+65	- **Used by:** lab, reference, baselines; PL-01, PL-03
+66	
+67	&lt;!-- docs/architecture.md:114 --&gt;
+68	### AD-05: An MLP for the compact view, a small CNN for the full grid
+69	**Status:** Accepted · **Date:** 2026-10-17 · **Scope:** `agents`
+70	- **Context:** AGENT-03 takes an 11-value compact view. AGENT-05 takes the full grid. QR-02 and QR-03 give each 60 CPU minutes.
+71	- **Decision:** Compact view: two hidden layers of 128 units, the same shape the reference uses. Full grid: two 3×3 convolution layers (16 and 32 channels) and one 128-unit hidden layer, over a 3×10×10 head/body/food grid.
+72	- **Alternatives:** An MLP on the flattened grid — cheaper per step but slower to learn spatial patterns. It stays the fallback if the CNN misses QR-03.
+73	- **Consequences:** The network is chosen in settings (`net = &quot;mlp&quot;` or `&quot;cnn&quot;`), so the fallback is a settings change, not a code change.
+74	
+75	## Layout (`dt layout rllab`)
+76	src/rllab/
+77	  __init__.py — rllab: a reinforcement-learning lab for Snake, the fish tank and predator-prey.
+78	  agents/
+79	    __init__.py — The hand-written learners: a table-based and a neural value learner.
+80	    tabular.py — The table-based value learner (AGENT-01, AGENT-02, ABL-03).
+81	    dqn/
+82	      __init__.py — The DQN learner.
+83	      agent.py — The neural value learner: memory, target network, Huber loss (AGENT-03-AGENT-05, AD-05).
+84	  baselines/
+85	    __init__.py — The fixed baselines: a random and a scripted Snake player.
+86	    random.py — The random baseline: a uniform action from a seeded generator (BASE-01).
+87	    scripted.py — The scripted baseline: toward food if safe, else any safe move, else straight (BASE-02).
+88	  compare/
+89	    __init__.py — Statistical comparison of players.
+90	    claims.py — Claims tested with one correction over all of them, and the report (EVAL-02-EVAL-05).
+91	    types.py — Claims to test and their results (EVAL-02-EVAL-05, REF-02).
+92	  core/
+93	    __init__.py — The core: environment and agent protocols, teams, transitions and run settings.
+94	    protocols.py — The two behaviours every pipeline passes around: an environment and an agent (AD-03, AD-09).
+95	    settings.py — Run settings from TOML (RUN-01, AD-06).
+96	    types.py — The core&#x27;s data types: teams, actions, steps, transitions and run settings (AD-09, AD-13).
+97	  envs/
+98	    __init__.py — The environments: Snake and the corridor.
+99	    corridor.py — A 1-D corridor: walk right to the goal before the step cap (CORE-03).
+100	    snake.py — Snake on a square grid, one team of one agent (SNAKE-01-SNAKE-09).
+101	    types.py — Observation layouts the environments publish to their consumers.
+102	  evaluate/
+103	    __init__.py — Greedy evaluation on held-out seeds.
+104	    protocol.py — The held-out greedy evaluation protocol (EVAL-01, DATA-01, AGENT-07).
+105	    types.py — Evaluation results and options (AD-17).
+106	  lab/
+107	    __init__.py — The lab: building runs from settings, the pipelines and the command line.
+108	    __main__.py — `python -m rllab.lab train | eval | report | replay`.
+109	    build.py — The environment and the agents a run&#x27;s settings name (CORE-01, DATA-02).
+110	    cli.py — The command line: one entry call per seed or target, bad input returns 2.
+111	    players.py — Players from run folders or baseline names, their scores and their curves (RUN-05).
+112	    printing.py — Scores printed on one line (EVAL-01, BASE-03).
+113	    replay.py — The game a replay shows: recorded, or newly played (REPLAY-01, REPLAY-03).
+114	    report_spec.py — The report TOML: players, claims and charts (EVAL-02).
+115	    types.py — What a report names: its players, their roles on the charts, and the runs it plots.
+116	    pipelines/
+117	      __init__.py — One entry module per pipeline.
+118	      pl01_train.py — PL-01: Train a run.
+119	      pl02_train_reference.py — PL-02: Train the reference.
+120	      pl03_evaluate.py — PL-03: Evaluate.
+121	      pl04_report.py — PL-04: Report.
+122	      pl05_replay.py — PL-05: Replay.
+123	  reference/
+124	    __init__.py — The library reference agent: training and playing it.
+125	    player.py — A trained library model played as a core Agent (REF-01).
+126	    train/
+127	      __init__.py — Reference training.
+128	      trainer.py — The library reference agent, trained through the Gymnasium adapter (REF-01, AD-03, AD-04).
+129	  runs/
+130	    __init__.py — Run folders: writing them during training and reading them back.
+131	    store.py — One folder per run: settings.json, curve.csv, checkpoints, games.npz, status (AD-06).
+132	    types.py — What a run folder holds: its curve, its recorded games and the run record (AD-06).
+133	  train/
+134	    __init__.py — The training loop.
+135	    loop.py — The training loop: every team stepped batch-first, every learner fed (CORE-02, CORE-07).
+136	  viz/
+137	    __init__.py — Charts and the replay viewer.
+138	    curves.py — Learning curves: mean over seeds, a min-max band, baseline lines (EVAL-06, ABL-04).
+139	    replay.py — The interactive replay viewer (REPLAY-01, REPLAY-02, AD-07).
+140	    types.py — What a chart drew.
+141	
+142	## Interfaces (frozen: build against these, never change them)
+143	&lt;!-- docs/packages/rllab/contract.md:91 --&gt;
+144	### core.AgentParams: type
+145	`@dataclass(frozen=True) class AgentParams: lr: float; gamma: float; batch_size: int = 64; memory_size: int = 50_000; target_every: int = 1_000; learn_start: int = 1_000; hidden: int = 128; net: Literal[&quot;mlp&quot;, &quot;cnn&quot;] = &quot;mlp&quot;; rollout_steps: int = 2048; epochs: int = 10; clip: float = 0.2; gae_lambda: float = 0.95; games_per_update: int = 10`
+146	- **Invariants:** `0 &lt; gamma ≤ 1`. The table-based agent reads only `lr` (its step size) and `gamma`. Policy-gradient agents read `lr`, `gamma`, `hidden` and `batch_size`; PPO also `rollout_steps`, `epochs`, `clip`, `gae_lambda`; REINFORCE also `games_per_update` (AD-11).
+147	- **Boundary:** agents, reference · **Fixtures:** tests/contracts/core.AgentParams/ · **Cases:** the dqn-compact defaults; tabular `lr=0.1, gamma=0.9`; the ppo defaults (`lr=3e-4, gamma=0.99, hidden=64`)
+148	- **Used by:** agents, reference; PL-01, PL-02
+149	Sample: tests/contracts/core.AgentParams/ (exists)
+150	
+151	&lt;!-- docs/packages/rllab/contract.md:85 --&gt;
+152	### core.Exploration: type
+153	`@dataclass(frozen=True) class Exploration: start: float = 1.0; end: float = 0.05; decay_steps: int = 50_000`
+154	- **Invariants:** `0 ≤ end ≤ start ≤ 1`. The rate falls linearly to `end` at `decay_steps`, then stays there (AGENT-02).
+155	- **Boundary:** agents, reference · **Fixtures:** tests/contracts/core.Exploration/ · **Cases:** defaults; no decay (`start == end`)
+156	- **Used by:** agents, reference; PL-01, PL-02
+157	Sample: tests/contracts/core.Exploration/ (exists)
+158	
+159	&lt;!-- docs/packages/rllab/contract.md:51 --&gt;
+160	### core.Agent: type
+161	```python
+162	class Agent(Protocol):
+163	    def act(self, obs: np.ndarray, *, explore: bool) -&gt; np.ndarray: ...
+164	    def learn(self, t: Transition) -&gt; None: ...
+165	    def save(self, path: Path) -&gt; None: ...
+166	    def load(self, path: Path) -&gt; None: ...
+167	```
+168	- **Invariants:** one agent acts for one team: `act` takes that team&#x27;s `(n_agents, *obs_shape)` and returns one action per agent, shaped by the team&#x27;s `ActionSpace`. `explore=False` never samples or takes a random action (AGENT-07): value learners take the best-valued action and policy learners the policy&#x27;s mean. Players that don&#x27;t learn make `learn` a no-op. `save` then `load` gives the same `act` outputs.
+169	- **Boundary:** train, evaluate, lab · **Fixtures:** tests/contracts/core.Agent/ · **Cases:** a replay double recording 5 act/learn calls of a tabular agent
+170	- **Used by:** agents, baselines, reference (providers); train, evaluate, lab; PL-01, PL-03, PL-04, PL-05
+171	Sample: tests/contracts/core.Agent/ (exists)
+172	
+173	## Writes (edit only these files; the plan gives every other file to another task)
+174	- src/rllab/agents/dqn/networks.py (new)
+175	- tests/unit/rllab/test_networks.py (new)
+176	
+177	&lt;!-- tasks/plan.md:254 --&gt;
+178	### M1-T27: Full-grid convolutional network
+179	**Package:** rllab · **Step:** PL-01.DQNAgent · **Kind:** thicken · **Covers:** AGENT-05 · **Size:** XS · **Mode:** split
+180	**Read:** PL-01, agents.DQNAgent, envs.Snake, AD-05
+181	**Acceptance:**
+182	- [ ] Given `net=&quot;cnn&quot;` and a `(3,10,10)` observation, when the agent acts, then it returns one of 3 actions from two 3×3 convolutions (16, 32) and a 128-unit layer; a non-3-D `obs_shape` raises `ValueError`
+183	- [ ] Given a full-grid run, when training starts, then the agent receives only the grid view (AGENT-05)
+184	**Verify:** `pytest tests/intent/rllab tests/unit/rllab -k cnn` · `scripts/check.sh gate`
+185	**Depends on:** M1-T05 · **Writes:** src/rllab/agents/dqn/networks.py, tests/intent/rllab/test_cnn.py, tests/unit/rllab/test_networks.py
+186	</pre></details></div><div class="step" id="S4"><span class="sid">U45.S4</span><span class="kind">Read</span>/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r1/with_skill/project/.claude/worktrees/agent-ad74f5d3fa3914963/CONSTRAINTS.md<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r1/with_skill/project/.claude/worktrees/agent-ad74f5d3fa3914963/CONSTRAINTS.md&quot;
+}</pre><div class="lbl">output</div><pre>1	# Constraints
+2	**Status:** Approved · **Last reviewed:** 2026-10-18 by @connorott · **Ratcheted:** —
+3	
+4	The standing quality bar. `pyproject.toml` and `scripts/check.sh` enforce it; every number here names its config key, and `dt status` fails if the two disagree. Only `build-setup` changes this file, with the user: tightening is routine, loosening needs an explicit yes.
+5	
+6	## Floor
+7	- **CR-01** No new suppressions. Ruff runs with `--ignore-noqa` in gate and full, so a Ruff exception is a `per-file-ignores` entry in protected config with a row in Exceptions. `# type: ignore`, `pyright:` comments and `pragma: no cover` are caught by `floor_guard.sh` on the diff
+8	- **CR-02** No stubs: `raise NotImplementedError` outside abstract methods, `pass`-only bodies, bare `except: pass`. One carve-out: the interface task&#x27;s step signatures, whose body is only `raise NotImplementedError(&quot;&lt;task id&gt;&quot;)` naming the open task that replaces it. `check.sh gate` fails on one naming a task that isn&#x27;t open in `tasks/todo.md`; `check.sh full --exit` (the milestone exit) fails on any
+9	- **CR-03** No skipped, deleted or assertion-free tests, unless a row in Exceptions names the test file
+10	- **CR-04** No secrets in source
+11	- **CR-05** Oracle files (`tests/fixtures/**/expected.json`) change only with the user&#x27;s approval
+12	- **CR-06** The implementer never changes `tests/intent/**`
+13	- **CR-07** This file, `pyproject.toml` tool config, `scripts/` and `.claude/agents/` are not weakened to make a change pass
+14	- **CR-08** Nothing imports from `references/` or `probes/`, or adds either to `sys.path` (or `PYTHONPATH`, pytest `pythonpath`). References and probe scripts are outside the tooling, so imported code would bypass the bar; `floor_guard.sh` checks the diff for both. Code copied from either is project code and meets the same bar
+15	- **CR-09** A frozen interface (`tests/contracts/&lt;id&gt;.&lt;symbol&gt;/`: schema, samples, fake; and the types, signatures and exports the interface task wrote) is frozen once it exists at the task&#x27;s base. Only the interface task freezing it (`**Kind:** interface`) writes a new folder, and no other task&#x27;s `Writes:` names its `types.py` or `__init__.py`; a frozen interface changes only through `architecture-design` Revise, never to make a test pass
+16	
+17	## Readability
+18	- **CR-10** One entry function per pipeline; it reads top to bottom as its named steps (reviewer + `dt layout`)
+19	- **CR-11** No registries, plugin dispatch or config-driven wiring without an AD
+20	- **CR-12** New abstraction only with a second real implementation or a named seam
+21	
+22	
+23	## Enforced with numbers
+24	| ID | Dimension | Rule | Checked by | Config key | Runs at |
+25	|---|---|---|---|---|---|
+26	| CR-20 | Lint | zero errors; standing per-file-ignores only for `tests/**` and `__init__.py` | ruff | `tool.ruff.lint.select` | edit, gate |
+27	| CR-21 | Complexity | ≤ 10 per function | ruff C901 | `tool.ruff.lint.mccabe.max-complexity` | gate |
+28	| CR-22 | Size | ≤ 500 lines/module, ≤ 60/function | check_size.py | `tool.size_limits` | edit, gate |
+29	| CR-23 | Types | zero errors, strict | mypy | `tool.mypy.strict` | gate |
+30	| CR-24 | Boundaries | import contracts hold | import-linter | `tool.importlinter.contracts` | gate |
+31	| CR-25 | Dependencies | none missing or unused | deptry | `tool.deptry` | gate |
+32	| CR-26 | Deps security | nothing known-vulnerable | pip-audit | — | full, CI nightly |
+33	| CR-27 | Reproducibility | same settings and seed give the same run (RUN-03, AD-08) | pytest `-m repro` | `tool.pytest.ini_options.markers` | gate |
+34	
+35	## Measured, not yet enforced
+36	| ID | Metric | Today | Direction |
+37	|---|---|---|---|
+38	| CR-40 | Coverage (branch) | — (no code) (`tool.coverage.report.fail_under`, raised by Ratchet) | must not fall |
+39	| CR-41 | vulture findings at `min_confidence = 60` (`scripts/vulture_whitelist.py`) | 0 | must not grow by `full --exit` (earlier `full` runs report) |
+40	| CR-42 | Duplicate blocks of ≥ 8 similar source lines (pylint `duplicate-code`, `[tool.pylint.similarities]` in pyproject.toml) | 0 | must not grow |
+41	
+42	## Boundaries (generated from architecture — do not edit)
+43	- `rllab.core` imports nothing first-party · `envs`, `agents`, `runs` → core · `evaluate` → core, runs · `baselines` → core, envs · `train` → core, runs, evaluate · `reference` → core, envs, runs, evaluate · `compare` → evaluate · `viz` → runs, evaluate · `lab` → all
+44	- Only `rllab.reference` imports `stable_baselines3` or `gymnasium`; only `rllab.agents` imports `torch`
+45	
+46	## Roles and protected paths
+47	| Role | May edit | May not edit | Stop gate |
+48	|---|---|---|---|
+49	| tester | `tests/intent/**`, within the task&#x27;s `Writes:` | everything else; reads no source | `check.sh collect` (lint, collect, red for the right reason) |
+50	| implementer / solo | `src/**`, `tests/unit/**`, within the task&#x27;s `Writes:`; an interface task also the `tests/contracts/&lt;id&gt;.&lt;symbol&gt;/` its `Writes:` names | the protected list; `tasks/` | `check.sh gate` + protected-path diff against the worktree&#x27;s base |
+51	| reviewer | its worktree, for the mutation check, and its findings file; nothing lands (the orchestrator records findings with `dt finding`) | everything else | runs `check.sh full` by hand |
+52	
+53	**Protected list** (`PROTECTED` in `scripts/check.sh`; `path_guard.sh deny --protected` reads the same list): `tests/intent/**`, `tests/fixtures/**`, `tests/conftest.py`, `pyproject.toml`, `uv.lock`, `CONSTRAINTS.md`, `scripts/**`, `.claude/agents/**`, `.claude/settings.json`, `references/**`, `probes/**`, `tests/contracts/**`. `tests/contracts/**` covers the contract folders that exist at the task&#x27;s base (CR-09). **`Writes:`**: `dt claim`, in the builder&#x27;s worktree, writes the role&#x27;s share of the task&#x27;s `Writes:` to `.claude/.task_writes` and sets the worktree&#x27;s base (`refs/worktree/checks-base`); `path_guard.sh writes` blocks edits outside the list, and a tester&#x27;s or implementer&#x27;s edits before the claim. Only the orchestrator writes `tasks/` (`dt land`, `dt finding`).
+54	
+55	**Worktree links:** none
+56	
+57	## Review
+58	Run by the reviewer agent over what it is given (base, package, tasks, paths): the interface review after Phase 0, a phase review per package at each checkpoint, and the milestone exit. `dt land` already checked each landing&#x27;s `Writes:`, protected paths and gates; review judges what tools can&#x27;t.
+59	
+60	**Interface** (after Phase 0): the code is the contract, no more and no less.
+61	1. Types match `contract.md`: fields, types, invariants. Nothing a step&#x27;s In → Out needs is missing; no helper is frozen.
+62	2. Signatures match the step tables, in their owner modules. Each stub names the open task that owns its step; no logic beyond types and validation.
+63	3. One sample per case the contract names, valid and realistically shaped, never carrying a TC&#x27;s expected value. Replay doubles replay an interaction the Protocol allows; fakes serve their fixtures.
+64	4. `__init__.py` exports exactly the contract; each `Mitigated by` in the plan&#x27;s dependency graph exists; each split task&#x27;s tester can write its tests from the frozen interface and its `Read:`.
+65	
+66	**Each phase**, per package, tests before code:
+67	1. **Interfaces followed** (CR-09): no frozen type, signature or contract folder changed outside a Revise. Consumers use the declared types: no dict for a dataclass, no reaching into a provider&#x27;s internals, no local redefinition. A stub is replaced only by the task it names; no cross-package import outside the contract; spine tests run on samples and doubles, not another step&#x27;s code.
+68	2. **Tests prove something:** each intent test asserts its TC case or acceptance bullet, loading expected values and tolerances from fixtures; none is assertion-free or weakened; Hypothesis runs the `ci` profile. Unit tests are specific, never computing the expected value with the code under test or testing only a mock. **Mutation check** (`.claude/agents/reviewer.md`): per acceptance bullet, the smallest change that should break it; a mutation no test catches is a finding.
+69	3. **Correct to the spec:** each acceptance bullet truly met, not special-cased to the sample; the error paths the requirement names; seeding and determinism; numerical edge cases.
+70	4. **Simple** (CR-11, CR-12, CR-42): no abstraction with one implementation outside the contract or an AD; no forwarding wrapper, one-method class, or class where a function does; no parameter, flag or config key every caller sets the same; no `try/except` that only re-raises or swallows, no checks the types already guarantee; no loop the library already provides. No near-copies within or across the phase&#x27;s tasks: one concept is one function in its owner module (tests may repeat for readability). Each finding names the simpler form, with the same tests passing.
+71	5. **Pipelines** (CR-10): entry functions read as their step tables (`dt layout`); step owners respected; spine baselines still selectable.
+72	6. **The bar** (CR-07): diff this file, `pyproject.toml`, `scripts/` and `.claude/agents/` against the milestone&#x27;s Base. Any loosening is Critical; new exceptions need an owner and expiry.
+73	7. **Hidden and parallel risks:** where a real provider could act differently from its double (flagged for the system phase); fixed output paths, global state, test-order dependence.
+74	8. **The rest:** readability, security, performance where a QR sets a number; reused reference or probe code has its Caveats handled and fits the contract; `dt lint` clean, pre-build sections replaced by `dt layout` pointers.
+75	
+76	**Milestone exit**, over the whole diff, adds: the Scope&#x27;s Exit holds; every Covers ID has a test; `check.sh full --exit` finds no stub; system tests use real providers; the same sample through a real provider and its double agrees; deferred requirements untouched; pip-audit ran.
+77	
+78	**Severity:** Critical: a frozen interface changed, a weakened test, an intent test that misses a mutation changing its TC&#x27;s expected output, a wrong answer, a loosened bar, a security hole, lost data; it stops the build. Important: a consumer bypassing a type, any other surviving mutation, an unneeded abstraction, a duplicate across tasks. Suggestion and Nit: local. Findings go under the checkpoint block in `tasks/plan.md` (`dt finding`), each with a fix task or a reason.
+79	
+80	## Done
+81	agent-skills `references/definition-of-done.md`, tailored once:
+82	- **Correctness and Quality:** checked per task by the gate.
+83	- **Integration and Documentation:** checked at each checkpoint.
+84	- **The full list:** checked at milestone exit.
+85	
+86	## Exceptions
+87	| ID | Rule | Path | Reason | Owner | Expires |
+88	|---|---|---|---|---|---|
+89	| EX-01 | CR-25 DEP002 | `numpy`, `torch`, `matplotlib`, `stable-baselines3`, `gymnasium` | M1 dependencies, declared before the code imports them | @connorott | M1 exit |
+90	</pre></details></div><div class="step" id="S5"><span class="sid">U45.S5</span><span class="kind">Bash</span>ls src/rllab/agents/dqn tests/intent/rllab tests/unit/rllab<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;ls src/rllab/agents/dqn tests/intent/rllab tests/unit/rllab&quot;
+}</pre><div class="lbl">output</div><pre>src/rllab/agents/dqn:
+__init__.py
+agent.py
+
+tests/intent/rllab:
+test_claims.py
+test_cnn.py
+test_corridor.py
+test_evaluate.py
+test_random_player.py
+test_scripted.py
+test_snake.py
+
+tests/unit/rllab:
+test_claims.py
+test_corridor.py
+test_curves.py
+test_dqn.py
+test_evaluate.py
+test_pick_game.py
+test_pl02_smoke.py
+test_players.py
+test_random_player.py
+test_reference_player.py
+test_report_spec.py
+test_scripted.py
+test_settings.py
+test_snake.py
+test_store.py
+test_train_loop.py
+test_train_reference.py</pre></details></div><div class="step" id="S6"><span class="sid">U45.S6</span><span class="kind">Read</span>/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r1/with_skill/project/.claude/worktrees/agent-ad74f5d3fa3914963/src/rllab/agents/dqn/agent.py<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r1/with_skill/project/.claude/worktrees/agent-ad74f5d3fa3914963/src/rllab/agents/dqn/agent.py&quot;
+}</pre><div class="lbl">output</div><pre>1	&quot;&quot;&quot;The neural value learner: memory, target network, Huber loss (AGENT-03-AGENT-05, AD-05).&quot;&quot;&quot;
+2	
+3	import math
+4	from pathlib import Path
+5	from typing import Literal
+6	
+7	import numpy as np
+8	import torch
+9	from torch import nn
+10	
+11	from rllab.core import Agent, AgentParams, Exploration, TeamSpec, Transition
+12	
+13	GRAD_CLIP = 10.0
+14	
+15	
+16	def mlp(n_inputs: int, hidden: int, n_actions: int) -&gt; nn.Sequential:
+17	    &quot;&quot;&quot;Two ReLU hidden layers of `hidden` units over the flattened observation (AD-05).&quot;&quot;&quot;
+18	    return nn.Sequential(
+19	        nn.Flatten(),
+20	        nn.Linear(n_inputs, hidden),
+21	        nn.ReLU(),
+22	        nn.Linear(hidden, hidden),
+23	        nn.ReLU(),
+24	        nn.Linear(hidden, n_actions),
+25	    )
+26	
+27	
+28	def epsilon(exploration: Exploration, step: int) -&gt; float:
+29	    &quot;&quot;&quot;The exploration rate after `step` transitions: linear to `end`, then flat (AGENT-02).&quot;&quot;&quot;
+30	    if exploration.decay_steps &lt;= 0:
+31	        return exploration.end
+32	    frac = min(step / exploration.decay_steps, 1.0)
+33	    return exploration.start + frac * (exploration.end - exploration.start)
+34	
+35	
+36	class Memory:
+37	    &quot;&quot;&quot;A uniform ring buffer of single-agent transitions.&quot;&quot;&quot;
+38	
+39	    def __init__(self, size: int, obs_shape: tuple[int, ...]) -&gt; None:
+40	        self.obs = np.zeros((size, *obs_shape), dtype=np.float32)
+41	        self.next_obs = np.zeros((size, *obs_shape), dtype=np.float32)
+42	        self.actions = np.zeros(size, dtype=np.int64)
+43	        self.reward = np.zeros(size, dtype=np.float32)
+44	        self.terminated = np.zeros(size, dtype=np.float32)
+45	        self.count = 0
+46	
+47	    def add(self, t: Transition) -&gt; None:
+48	        &quot;&quot;&quot;Store agent 0&#x27;s step in the next slot, overwriting the oldest when full.&quot;&quot;&quot;
+49	        i = self.count % len(self.actions)
+50	        self.obs[i] = t.obs[0]
+51	        self.next_obs[i] = t.next_obs[0]
+52	        self.actions[i] = t.actions[0]
+53	        self.reward[i] = t.reward[0]
+54	        self.terminated[i] = float(t.terminated[0])
+55	        self.count += 1
+56	
+57	    def sample(self, rng: np.random.Generator, n: int) -&gt; tuple[torch.Tensor, ...]:
+58	        &quot;&quot;&quot;`n` stored steps drawn uniformly with replacement, as tensors.&quot;&quot;&quot;
+59	        idx = rng.integers(0, min(self.count, len(self.actions)), size=n)
+60	        arrays = (self.obs, self.actions, self.reward, self.next_obs, self.terminated)
+61	        return tuple(torch.from_numpy(a[idx]) for a in arrays)
+62	
+63	
+64	class DQNAgent(Agent):
+65	    &quot;&quot;&quot;A single-agent DQN sized from its team&#x27;s observation shape and action count (AD-18).&quot;&quot;&quot;
+66	
+67	    def __init__(
+68	        self,
+69	        team: TeamSpec,
+70	        params: AgentParams,
+71	        exploration: Exploration,
+72	        *,
+73	        seed: int,
+74	        ablation: Literal[&quot;none&quot;, &quot;no_memory&quot;, &quot;no_target&quot;] = &quot;none&quot;,
+75	    ) -&gt; None:
+76	        if team.n_agents != 1:
+77	            raise ValueError(f&quot;DQNAgent is single-agent, got n_agents={team.n_agents}&quot;)
+78	        if team.actions.kind != &quot;discrete&quot;:
+79	            raise ValueError(&quot;DQNAgent needs discrete actions, got continuous&quot;)
+80	        if params.net == &quot;cnn&quot; and len(team.obs_shape) != 3:
+81	            raise ValueError(f&quot;net &#x27;cnn&#x27; needs a 3-D obs_shape, got {team.obs_shape}&quot;)
+82	        torch.set_num_threads(1)
+83	        torch.use_deterministic_algorithms(True)
+84	        torch.manual_seed(seed)
+85	        self._params = params
+86	        self._exploration = exploration
+87	        self._ablation = ablation
+88	        self._n_actions = team.actions.n
+89	        self._rng = np.random.default_rng(seed)
+90	        self._online = mlp(math.prod(team.obs_shape), params.hidden, team.actions.n)
+91	        self._target = mlp(math.prod(team.obs_shape), params.hidden, team.actions.n)
+92	        self._target.load_state_dict(self._online.state_dict())
+93	        self._optimizer = torch.optim.Adam(self._online.parameters(), lr=params.lr)
+94	        self._memory = Memory(params.memory_size, team.obs_shape)
+95	        self._updates = 0
+96	
+97	    def act(self, obs: np.ndarray, *, explore: bool) -&gt; np.ndarray:
+98	        &quot;&quot;&quot;Agent 0&#x27;s action: random with the current exploration rate if exploring, else argmax.&quot;&quot;&quot;
+99	        if explore and self._rng.random() &lt; epsilon(self._exploration, self._memory.count):
+100	            return np.array([self._rng.integers(self._n_actions)], dtype=np.int64)
+101	        with torch.no_grad():
+102	            q = self._online(torch.as_tensor(obs, dtype=torch.float32))
+103	        best: np.ndarray = q.argmax(dim=1).numpy()
+104	        return best.astype(np.int64)
+105	
+106	    def learn(self, t: Transition) -&gt; None:
+107	        &quot;&quot;&quot;Remember the step, then once past `learn_start` fit one random batch of memory.&quot;&quot;&quot;
+108	        if not t.active[0]:
+109	            return
+110	        self._memory.add(t)
+111	        if self._memory.count &lt; self._params.learn_start:
+112	            return
+113	        self._update(self._memory.sample(self._rng, self._params.batch_size))
+114	        self._updates += 1
+115	        if self._updates % self._params.target_every == 0:
+116	            self._target.load_state_dict(self._online.state_dict())
+117	
+118	    def _update(self, batch: tuple[torch.Tensor, ...]) -&gt; None:
+119	        obs, actions, reward, next_obs, terminated = batch
+120	        with torch.no_grad():
+121	            next_q = self._target(next_obs).max(dim=1).values
+122	            target = reward + self._params.gamma * (1.0 - terminated) * next_q
+123	        q = self._online(obs).gather(1, actions.unsqueeze(1)).squeeze(1)
+124	        loss = nn.functional.smooth_l1_loss(q, target)
+125	        self._optimizer.zero_grad()
+126	        torch.autograd.backward(loss)
+127	        nn.utils.clip_grad_norm_(self._online.parameters(), GRAD_CLIP)
+128	        self._optimizer.step()
+129	
+130	    def save(self, path: Path) -&gt; None:
+131	        &quot;&quot;&quot;Write the online network&#x27;s PyTorch state dict.&quot;&quot;&quot;
+132	        torch.save(self._online.state_dict(), path)
+133	
+134	    def load(self, path: Path) -&gt; None:
+135	        &quot;&quot;&quot;Read a state dict into both the online and the target network.&quot;&quot;&quot;
+136	        state = torch.load(path, weights_only=True)
+137	        self._online.load_state_dict(state)
+138	        self._target.load_state_dict(state)
+139	</pre></details></div><div class="step" id="S7"><span class="sid">U45.S7</span><span class="kind">Read</span>/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r1/with_skill/project/.claude/worktrees/agent-ad74f5d3fa3914963/tests/intent/rllab/test_cnn.py<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r1/with_skill/project/.claude/worktrees/agent-ad74f5d3fa3914963/tests/intent/rllab/test_cnn.py&quot;
+}</pre><div class="lbl">output</div><pre>1	&quot;&quot;&quot;Intent tests for M1-T27: the full-grid convolutional network of the DQN agent (AGENT-05, AD-05).
+2	
+3	AD-05: with `net=&quot;cnn&quot;` the agent&#x27;s network is two 3x3 convolutions (16 then 32 channels) and one
+4	128-unit hidden layer over the 3x10x10 head/body/food grid. The checkpoint is a PyTorch state dict,
+5	so the layer shapes are read back from `save`.
+6	&quot;&quot;&quot;
+7	
+8	import dataclasses
+9	import importlib.util
+10	import sys
+11	from collections.abc import Iterator, Mapping
+12	from pathlib import Path
+13	from typing import Any
+14	
+15	import numpy as np
+16	import pytest
+17	import torch
+18	
+19	from rllab.agents import DQNAgent
+20	from rllab.core import SOLO, ActionSpace, AgentParams, Exploration, TeamSpec, Transition
+21	
+22	KIT_PATH = Path(__file__).resolve().parents[2] / &quot;contracts&quot; / &quot;kit.py&quot;
+23	_spec = importlib.util.spec_from_file_location(&quot;contract_kit&quot;, KIT_PATH)
+24	assert _spec is not None
+25	assert _spec.loader is not None
+26	kit = importlib.util.module_from_spec(_spec)
+27	sys.modules[&quot;contract_kit&quot;] = kit
+28	_spec.loader.exec_module(kit)
+29	
+30	GRID_GAME = &quot;grid_self_collision&quot;
+31	CONVS = {(16, 3, 3, 3), (32, 16, 3, 3)}
+32	SHAPE_ERROR = r&quot;(?i)cnn|3-?d|obs_shape|shape&quot;
+33	
+34	
+35	def _cnn_params(**changes: Any) -&gt; AgentParams:
+36	    base = kit.sample(&quot;core.AgentParams&quot;, &quot;dqn_compact&quot;, AgentParams)
+37	    return dataclasses.replace(base, net=&quot;cnn&quot;, **changes)
+38	
+39	
+40	def _exploration() -&gt; Exploration:
+41	    return kit.sample(&quot;core.Exploration&quot;, &quot;defaults&quot;, Exploration)
+42	
+43	
+44	def _grid_env() -&gt; Any:
+45	    return kit.env_double(&quot;envs.Snake&quot;, GRID_GAME)
+46	
+47	
+48	def _grid_team() -&gt; TeamSpec:
+49	    return _grid_env().teams[SOLO]
+50	
+51	
+52	def _cnn_agent(**changes: Any) -&gt; DQNAgent:
+53	    return DQNAgent(_grid_team(), _cnn_params(**changes), _exploration(), seed=0)
+54	
+55	
+56	def _tensors(state: Any) -&gt; Iterator[torch.Tensor]:
+57	    if isinstance(state, torch.Tensor):
+58	        yield state
+59	    elif isinstance(state, Mapping):
+60	        for value in state.values():
+61	            yield from _tensors(value)
+62	
+63	
+64	def _weight_shapes(agent: DQNAgent, tmp_path: Path) -&gt; list[tuple[int, ...]]:
+65	    path = tmp_path / &quot;architecture.pt&quot;
+66	    agent.save(path)
+67	    state = torch.load(path, map_location=&quot;cpu&quot;, weights_only=True)
+68	    return [tuple(t.shape) for t in _tensors(state)]
+69	
+70	
+71	def _assert_cnn(agent: DQNAgent, tmp_path: Path) -&gt; None:
+72	    shapes = _weight_shapes(agent, tmp_path)
+73	    conv = {s for s in shapes if len(s) == 4}
+74	    assert conv == CONVS
+75	    linear = {s for s in shapes if len(s) == 2}
+76	    hidden = {s for s in linear if s[0] == 128}
+77	    assert len(hidden) == 1
+78	    assert (3, 128) in linear
+79	    assert linear == hidden | {(3, 128)}
+80	
+81	
+82	def _grid_transitions() -&gt; list[Transition]:
+83	    env = _grid_env()
+84	    obs, _ = env.reset(env.seed)
+85	    out = []
+86	    for actions in env.recorded_actions:
+87	        result = env.step(actions)
+88	        done = np.asarray(result.done[SOLO], dtype=bool)
+89	        out.append(
+90	            Transition(
+91	                obs=obs[SOLO],
+92	                actions=actions[SOLO],
+93	                reward=np.asarray(result.reward[SOLO], dtype=np.float32),
+94	                next_obs=result.obs[SOLO],
+95	                terminated=done if result.terminated else np.zeros_like(done),
+96	                active=np.ones_like(done),
+97	                truncated=bool(result.truncated),
+98	            )
+99	        )
+100	        obs = result.obs
+101	    return out
+102	
+103	
+104	@pytest.mark.intent
+105	def test_cnn_agent_on_grid_returns_one_of_three_actions_from_the_cnn(tmp_path: Path) -&gt; None:
+106	    env = _grid_env()
+107	    obs, _ = env.reset(env.seed)
+108	    grid = obs[SOLO]
+109	    assert grid.shape == (1, 3, 10, 10)
+110	    agent = _cnn_agent()
+111	    for explore in (False, True):
+112	        out = np.asarray(agent.act(grid, explore=explore))
+113	        assert out.shape == (1,)
+114	        assert np.issubdtype(out.dtype, np.integer)
+115	        assert 0 &lt;= int(out[0]) &lt; 3
+116	    _assert_cnn(agent, tmp_path)
+117	
+118	
+119	@pytest.mark.intent
+120	def test_cnn_greedy_action_is_deterministic(tmp_path: Path) -&gt; None:
+121	    env = _grid_env()
+122	    obs, _ = env.reset(env.seed)
+123	    agent = _cnn_agent()
+124	    first = [int(np.asarray(agent.act(obs[SOLO], explore=False))[0]) for _ in range(5)]
+125	    assert len(set(first)) == 1
+126	    _assert_cnn(agent, tmp_path)
+127	
+128	
+129	@pytest.mark.intent
+130	def test_cnn_has_two_3x3_convolutions_of_16_and_32_channels(tmp_path: Path) -&gt; None:
+131	    shapes = _weight_shapes(_cnn_agent(), tmp_path)
+132	    assert (16, 3, 3, 3) in shapes
+133	    assert (32, 16, 3, 3) in shapes
+134	    assert {s for s in shapes if len(s) == 4} == CONVS
+135	
+136	
+137	@pytest.mark.intent
+138	def test_cnn_has_one_128_unit_hidden_layer_and_three_outputs(tmp_path: Path) -&gt; None:
+139	    shapes = _weight_shapes(_cnn_agent(), tmp_path)
+140	    linear = {s for s in shapes if len(s) == 2}
+141	    hidden = {s for s in linear if s[0] == 128}
+142	    assert len(hidden) == 1
+143	    assert linear == hidden | {(3, 128)}
+144	
+145	
+146	@pytest.mark.intent
+147	@pytest.mark.parametrize(
+148	    &quot;obs_shape&quot;,
+149	    [(11,), (3, 10), (1, 3, 10, 10)],
+150	    ids=[&quot;compact-1d&quot;, &quot;2d&quot;, &quot;4d&quot;],
+151	)
+152	def test_cnn_takes_only_a_3d_obs_shape(obs_shape: tuple[int, ...], tmp_path: Path) -&gt; None:
+153	    team = TeamSpec(n_agents=1, obs_shape=obs_shape, actions=ActionSpace(&quot;discrete&quot;, 3, 0))
+154	    with pytest.raises(ValueError, match=SHAPE_ERROR):
+155	        DQNAgent(team, _cnn_params(), _exploration(), seed=0)
+156	    _assert_cnn(_cnn_agent(), tmp_path)
+157	
+158	
+159	@pytest.mark.intent
+160	def test_cnn_rejects_the_compact_team_and_builds_on_the_grid_team(tmp_path: Path) -&gt; None:
+161	    team = kit.sample(&quot;core.TeamSpec&quot;, &quot;snake_compact&quot;, TeamSpec)
+162	    with pytest.raises(ValueError, match=SHAPE_ERROR):
+163	        DQNAgent(team, _cnn_params(), _exploration(), seed=0)
+164	    _assert_cnn(_cnn_agent(), tmp_path)
+165	
+166	
+167	@pytest.mark.intent
+168	def test_cnn_agent_trains_on_grid_transitions_only(tmp_path: Path) -&gt; None:
+169	    transitions = _grid_transitions()
+170	    assert transitions
+171	    for t in transitions:
+172	        assert t.obs.shape == (1, 3, 10, 10)
+173	        assert t.next_obs.shape == (1, 3, 10, 10)
+174	    agent = _cnn_agent(learn_start=2, batch_size=2, target_every=2)
+175	    for t in transitions * 3:
+176	        out = np.asarray(agent.act(t.obs, explore=True))
+177	        assert 0 &lt;= int(out[0]) &lt; 3
+178	        agent.learn(t)
+179	    greedy = int(np.asarray(agent.act(transitions[0].obs, explore=False))[0])
+180	    assert 0 &lt;= greedy &lt; 3
+181	    _assert_cnn(agent, tmp_path)
+182	
+183	
+184	@pytest.mark.intent
+185	def test_cnn_save_then_load_gives_same_greedy_actions(tmp_path: Path) -&gt; None:
+186	    transitions = _grid_transitions()
+187	    agent = _cnn_agent(learn_start=2, batch_size=2)
+188	    for t in transitions:
+189	        agent.learn(t)
+190	    path = tmp_path / &quot;cnn.pt&quot;
+191	    agent.save(path)
+192	    other = DQNAgent(_grid_team(), _cnn_params(learn_start=2, batch_size=2), _exploration(), seed=9)
+193	    other.load(path)
+194	    for t in transitions:
+195	        a = np.asarray(agent.act(t.obs, explore=False))
+196	        b = np.asarray(other.act(t.obs, explore=False))
+197	        assert np.array_equal(a, b)
+198	    _assert_cnn(other, tmp_path)
+199	</pre></details></div><div class="step" id="S8"><span class="sid">U45.S8</span><span class="kind">Bash</span>cat .claude/.task_writes<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;cat .claude/.task_writes&quot;
+}</pre><div class="lbl">output</div><pre>src/rllab/agents/dqn/networks.py
+tests/unit/rllab/test_networks.py</pre></details></div><div class="step" id="S9"><span class="sid">U45.S9</span><span class="kind">Bash</span>grep -n &quot;networks\|dqn/agent.py&quot; tasks/plan.md tasks/todo.md<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;grep -n \&quot;networks\\|dqn/agent.py\&quot; tasks/plan.md tasks/todo.md&quot;
+}</pre><div class="lbl">output</div><pre>tasks/plan.md:252:**Depends on:** M1-T05 · **Writes:** src/rllab/agents/dqn/agent.py, tests/intent/rllab/test_dqn_switches.py, tests/unit/rllab/test_dqn.py
+tasks/plan.md:261:**Depends on:** M1-T05 · **Writes:** src/rllab/agents/dqn/networks.py, tests/intent/rllab/test_cnn.py, tests/unit/rllab/test_networks.py</pre></details></div><div class="step" id="S10"><span class="sid">U45.S10</span><span class="kind">Read</span>/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r1/with_skill/project/.claude/worktrees/agent-ad74f5d3fa3914963/tasks/plan.md offset=200 limit=120<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r1/with_skill/project/.claude/worktrees/agent-ad74f5d3fa3914963/tasks/plan.md&quot;,
+  &quot;offset&quot;: 200,
+  &quot;limit&quot;: 120
+}</pre><div class="lbl">output</div><pre>200	**Acceptance:**
+201	- [ ] `python -m rllab.lab train settings/smoke-corridor.toml --smoke` runs end to end; committed as PL-01&#x27;s smoke test
+202	- [ ] TC-15 passes on the corridor (same settings and seed, same run)
+203	- [ ] PL-01 pre-build sections replaced by a `dt layout` pointer
+204	**Verify:** `python -m rllab.lab train settings/smoke-corridor.toml --smoke` · `scripts/check.sh gate`
+205	**Depends on:** M1-T02, M1-T03, M1-T04, M1-T05, M1-T06, M1-T13, M1-T14, M1-T15, M1-T18 · **Writes:** src/rllab/lab/pipelines/pl01_train.py, settings/smoke-corridor.toml, tests/unit/rllab/test_pl01_smoke.py, tests/intent/rllab/test_tc15_determinism.py
+206	
+207	### M1-T22: Wire PL-02
+208	**Package:** rllab · **Step:** PL-02 · **Kind:** wiring · **Covers:** REF-01 · **Size:** S · **Mode:** solo
+209	**Read:** PL-02, core.load_settings, reference.train_reference
+210	**Acceptance:**
+211	- [ ] `python -m rllab.lab train settings/smoke-reference.toml --smoke` runs end to end; committed as PL-02&#x27;s smoke test
+212	- [ ] PL-02 pre-build sections replaced by a `dt layout` pointer
+213	**Verify:** `python -m rllab.lab train settings/smoke-reference.toml --smoke` · `scripts/check.sh gate`
+214	**Depends on:** M1-T02, M1-T03, M1-T07, M1-T13, M1-T18 · **Writes:** src/rllab/lab/pipelines/pl02_train_reference.py, settings/smoke-reference.toml, tests/unit/rllab/test_pl02_smoke.py
+215	
+216	### M1-T23: Wire PL-03
+217	**Package:** rllab · **Step:** PL-03 · **Kind:** wiring · **Covers:** BASE-03, EVAL-01 · **Size:** S · **Mode:** solo
+218	**Reason:** `print_scores` is trivial, so this task builds it (fold)
+219	**Read:** PL-03, evaluate.evaluate, evaluate.ScoreSet
+220	**Acceptance:**
+221	- [ ] `python -m rllab.lab eval scripted --seed 0 --smoke` runs end to end, printing mean, spread, min and max; committed as PL-03&#x27;s smoke test
+222	- [ ] PL-03 pre-build sections replaced by a `dt layout` pointer
+223	**Verify:** `python -m rllab.lab eval scripted --seed 0 --smoke` · `scripts/check.sh gate`
+224	**Depends on:** M1-T03, M1-T04, M1-T08, M1-T09, M1-T13, M1-T16, M1-T17, M1-T18 · **Writes:** src/rllab/lab/pipelines/pl03_evaluate.py, src/rllab/lab/printing.py, tests/unit/rllab/test_pl03_smoke.py
+225	
+226	### M1-T24: Wire PL-04
+227	**Package:** rllab · **Step:** PL-04 · **Kind:** wiring · **Covers:** EVAL-06 · **Size:** S · **Mode:** solo
+228	**Skills:** null-hypothesis-testing
+229	**Read:** PL-04, compare.run_claims, viz.plot_curves
+230	**Acceptance:**
+231	- [ ] `python -m rllab.lab report reports/smoke.toml --smoke` runs end to end, writing `report.md`, `ladder.png` and `ablations.png`; committed as PL-04&#x27;s smoke test
+232	- [ ] PL-04 pre-build sections replaced by a `dt layout` pointer
+233	**Verify:** `python -m rllab.lab report reports/smoke.toml --smoke` · `scripts/check.sh gate`
+234	**Depends on:** M1-T03, M1-T04, M1-T09, M1-T10, M1-T11, M1-T13, M1-T16, M1-T17, M1-T18, M1-T19 · **Writes:** src/rllab/lab/pipelines/pl04_report.py, reports/smoke.toml, tests/unit/rllab/test_pl04_smoke.py
+235	
+236	### M1-T25: Wire PL-05
+237	**Package:** rllab · **Step:** PL-05 · **Kind:** wiring · **Covers:** REPLAY-01 · **Size:** XS · **Mode:** solo
+238	**Read:** PL-05, runs.open_run, viz.Replay
+239	**Acceptance:**
+240	- [ ] `python -m rllab.lab replay runs/&lt;smoke run&gt; --smoke` runs end to end headless on a run folder written from the `runs.RunRecord` sample; committed as PL-05&#x27;s smoke test
+241	- [ ] PL-05 pre-build sections replaced by a `dt layout` pointer
+242	**Verify:** `python -m rllab.lab replay runs/&lt;smoke run&gt; --smoke` · `scripts/check.sh gate`
+243	**Depends on:** M1-T03, M1-T12, M1-T20 · **Writes:** src/rllab/lab/pipelines/pl05_replay.py, tests/unit/rllab/test_pl05_smoke.py
+244	
+245	### M1-T26: Memory, target-copy ablation switches
+246	**Package:** rllab · **Step:** PL-01.DQNAgent · **Kind:** thicken · **Covers:** AGENT-04, ABL-01, ABL-02 · **Size:** XS · **Mode:** split
+247	**Read:** PL-01, agents.DQNAgent, core.Transition, TC-14
+248	**Acceptance:**
+249	- [ ] TC-14 passes (target unchanged through update 4, equal to online after 5; `use_target=False` uses the online network)
+250	- [ ] With `use_memory=False`, every update uses only the latest transition (ABL-01)
+251	**Verify:** `pytest tests/intent/rllab tests/unit/rllab -k dqn` · `scripts/check.sh gate`
+252	**Depends on:** M1-T05 · **Writes:** src/rllab/agents/dqn/agent.py, tests/intent/rllab/test_dqn_switches.py, tests/unit/rllab/test_dqn.py
+253	
+254	### M1-T27: Full-grid convolutional network
+255	**Package:** rllab · **Step:** PL-01.DQNAgent · **Kind:** thicken · **Covers:** AGENT-05 · **Size:** XS · **Mode:** split
+256	**Read:** PL-01, agents.DQNAgent, envs.Snake, AD-05
+257	**Acceptance:**
+258	- [ ] Given `net=&quot;cnn&quot;` and a `(3,10,10)` observation, when the agent acts, then it returns one of 3 actions from two 3×3 convolutions (16, 32) and a 128-unit layer; a non-3-D `obs_shape` raises `ValueError`
+259	- [ ] Given a full-grid run, when training starts, then the agent receives only the grid view (AGENT-05)
+260	**Verify:** `pytest tests/intent/rllab tests/unit/rllab -k cnn` · `scripts/check.sh gate`
+261	**Depends on:** M1-T05 · **Writes:** src/rllab/agents/dqn/networks.py, tests/intent/rllab/test_cnn.py, tests/unit/rllab/test_networks.py
+262	
+263	### M1-T28: Interrupted run kept as incomplete
+264	**Package:** rllab · **Step:** PL-01.train · **Kind:** thicken · **Covers:** RUN-02 · **Size:** XS · **Mode:** split
+265	**Read:** PL-01, train.train, runs.RunWriter, AD-06
+266	**Acceptance:**
+267	- [ ] Given a run interrupted by `KeyboardInterrupt` after 3 curve points, when its folder is opened, then status is `incomplete`, the 3 points are kept, and the interrupt is re-raised
+268	**Verify:** `pytest tests/intent/rllab tests/unit/rllab -k interrupt` · `scripts/check.sh gate`
+269	**Depends on:** M1-T06 · **Writes:** src/rllab/train/loop.py, tests/intent/rllab/test_interrupt.py, tests/unit/rllab/test_interrupt.py
+270	
+271	### M1-T32: Re-freeze reference.train_reference (adapter, DQN mapping)
+272	**Package:** rllab · **Step:** contract · **Kind:** interface · **Covers:** — · **Size:** S · **Mode:** solo · **Reason:** contract-change: M1-T29&#x27;s tester found the adapter and AD-04 mapping unfrozen
+273	**Read:** PL-02, reference.train_reference, reference.make_adapter, reference.dqn_kwargs, core.Env, core.Agent, core.TeamSpec, core.RunSettings, core.AgentParams, core.Exploration, AD-03, AD-04, AD-15
+274	**Acceptance:**
+275	- [ ] `reference.make_adapter` and `reference.dqn_kwargs` import from `rllab.reference` with their contract signatures, M1-T07&#x27;s working adapter and mapping behind them unchanged (`train_reference` and the PL-02 smoke still pass); `reference/__init__.py` exports only the reference contract
+276	- [ ] `tests/contracts/reference.make_adapter/` holds the Snake compact-view case (`Box((11,))` float32, `Discrete(3)`) and `tests/contracts/reference.dqn_kwargs/` the reference-compact ladder mapping, each sample valid against its schema
+277	**Verify:** `pytest tests/contracts` · `scripts/check.sh gate`
+278	**Depends on:** M1-T07 · **Writes:** src/rllab/reference/__init__.py, src/rllab/reference/train/**, tests/contracts/reference.make_adapter/**, tests/contracts/reference.dqn_kwargs/**
+279	
+280	### M1-T29: One-to-one reference settings mapping
+281	**Package:** rllab · **Step:** PL-02.train_reference · **Kind:** thicken · **Covers:** REF-01 · **Size:** XS · **Mode:** split
+282	**Read:** PL-02, reference.train_reference, reference.make_adapter, reference.dqn_kwargs, core.AgentParams, core.Exploration, TC-17, AD-04
+283	**Acceptance:**
+284	- [ ] TC-17 passes on `reference.make_adapter(Snake(view=&quot;compact&quot;))` (`check_env` clean; Box (11,), Discrete(3))
+285	- [ ] `reference.dqn_kwargs` maps every `AgentParams` and `Exploration` field to its library parameter as AD-04 lists (`train_freq=1`, `gradient_steps=1`, `exploration_fraction = decay_steps / steps`, `max_grad_norm=10`, `device=&quot;cpu&quot;`)
+286	**Verify:** `pytest tests/intent/rllab tests/unit/rllab -k reference_mapping` · `scripts/check.sh gate`
+287	**Depends on:** M1-T07, M1-T32 · **Writes:** src/rllab/reference/train/mapping.py, tests/intent/rllab/test_reference_mapping.py, tests/unit/rllab/test_reference_mapping.py
+288	
+289	### M1-T30: Mismatched ablations refused
+290	**Package:** rllab · **Step:** PL-04.open_curve_runs · **Kind:** thicken · **Covers:** ABL-04 · **Size:** XS · **Mode:** split
+291	**Read:** PL-04, runs.open_run, runs.RunRecord, TC-25
+292	**Acceptance:**
+293	- [ ] TC-25 passes (steps mismatch and seeds mismatch raise `ValueError` naming them; an exact match passes)
+294	**Verify:** `pytest tests/intent/rllab tests/unit/rllab -k ablation_pairs` · `scripts/check.sh gate`
+295	**Depends on:** M1-T09 · **Writes:** src/rllab/lab/players.py, tests/intent/rllab/test_ablation_pairs.py, tests/unit/rllab/test_ablation_pairs.py
+296	
+297	### Checkpoint after M1-T30
+298	- [ ] Every pipeline in the milestone runs end to end (smoke commands)
+299	- [ ] All golden cases pass
+300	- [ ] Entry functions still read top to bottom as the step table says (Sync if not)
+301	- [ ] No new abstraction without a second implementation or an AD
+302	- [ ] contract.md matches the contract code (`dt status` freshness check)
+303	- [ ] `dt layout` output reviewed; Definition of Done holds
+304	- [ ] `scripts/check.sh full` passes; Review checklist done; every finding has a disposition
+305	
+306	## Phase 3: System
+307	
+308	### M1-T31: Real ladder runs with the reference
+309	**Package:** rllab · **Step:** PL-04 · **Kind:** system · **Covers:** CORE-04, CORE-06, EVAL-02, EVAL-03, EVAL-04, EVAL-05, REF-02, REF-03, QR-01, QR-02, QR-03, QR-04, QR-05 · **Size:** S · **Mode:** solo
+310	**Skills:** null-hypothesis-testing
+311	**Read:** PL-01, PL-02, PL-04, TC-16, TC-26, TC-27, QR-01, QR-02, QR-03, QR-04, QR-05, AD-05
+312	**Acceptance:**
+313	- [ ] All five smoke commands pass; TC-01–TC-28 pass on the batch-first core with unchanged expected values (CORE-06), and TC-16 passes on real corridor runs (seeds 0–4)
+314	- [ ] TC-26 and TC-27 pass on the real ladder, ablation and reference runs (seeds 0–4, 200 held-out games per seed), with the report and both charts in `reports/`
+315	- [ ] QR-01–QR-04 hold, read from the runs&#x27; own elapsed-time logs; any rented-hardware spend is recorded against QR-05&#x27;s $5
+316	**Verify:** `python -m rllab.lab train settings/smoke-corridor.toml --smoke` · `python -m rllab.lab train settings/smoke-reference.toml --smoke` · `python -m rllab.lab eval scripted --seed 0 --smoke` · `python -m rllab.lab report reports/smoke.toml --smoke` · `python -m rllab.lab replay runs/&lt;smoke run&gt; --smoke` · `scripts/check.sh full`
+317	**Depends on:** M1-T21, M1-T22, M1-T23, M1-T24, M1-T25, M1-T26, M1-T27, M1-T28, M1-T29, M1-T30 · **Writes:** settings/**, reports/**, tests/intent/rllab/test_model_eval.py, tests/unit/rllab/test_model_eval.py
+318	
+319	### Checkpoint: milestone exit</pre></details></div><div class="step" id="S11"><span class="sid">U45.S11</span><span class="kind">Bash</span>grep -n &quot;intent\|pytest&quot; scripts/check.sh<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;grep -n \&quot;intent\\|pytest\&quot; scripts/check.sh&quot;
+}</pre><div class="lbl">output</div><pre>20:# collect runs the intent tests changed since the base and fails unless they are red for the right
+36:PROTECTED=(&#x27;tests/intent/**&#x27; &#x27;tests/fixtures/**&#x27; &#x27;tests/conftest.py&#x27; &#x27;pyproject.toml&#x27; &#x27;uv.lock&#x27; &#x27;CONSTRAINTS.md&#x27; &#x27;scripts/**&#x27; &#x27;.claude/agents/**&#x27; &#x27;.claude/settings.json&#x27; &#x27;references/**&#x27; &#x27;probes/**&#x27; &#x27;tests/contracts/**&#x27;)
+107:# pytest exits 5 when it collects nothing. That is fine for gate and full on a project with no
+108:# tests yet; collect calls pytest through run() so an empty tests/intent fails.
+110:  echo &quot;-&gt; pytest $*&quot; &gt;&amp;2
+111:  uv run --frozen --quiet pytest &quot;$@&quot;
+114:  [ &quot;$status&quot; -eq 0 ] || { rc=1; failed+=(&quot;pytest $*&quot;); }
+176:# The tester may change tests/intent only. Docs and plans are the plugin&#x27;s business, not this check&#x27;s.
+177:only_intent_changed() {
+180:  unchanged_since_base &quot;files outside tests/intent&quot; &quot;${specs[@]}&quot; &#x27;:(exclude)tests/intent&#x27;
+183:# The intent test files the tester changed since the base, committed or not.
+184:changed_intent_tests() {
+187:  { git diff --relative --name-only --diff-filter=d &quot;$base&quot; -- &#x27;tests/intent/*.py&#x27;
+188:    git ls-files --others --exclude-standard -- &#x27;tests/intent/*.py&#x27;; } | sort -u |
+196:  for d in tests/intent tests/unit; do
+245:    if [ ! -d tests/intent ]; then
+246:      echo &quot;tests/intent does not exist: write the intent tests there&quot; &gt;&amp;2
+249:    run ruff check --ignore-noqa tests/intent
+250:    run ruff format --check tests/intent
+251:    run typos tests/intent
+252:    run pytest tests/intent --collect-only -q --no-cov
+254:    while IFS= read -r f; do changed+=(&quot;$f&quot;); done &lt; &lt;(changed_intent_tests)
+257:    only_intent_changed</pre></details></div><div class="step" id="S12"><span class="sid">U45.S12</span><span class="kind">Bash</span>python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r1/with_skill/plugin/dev-team/scripts/dt.py escalate --help<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r1/with_skill/plugin/dev-team/scripts/dt.py escalate --help&quot;
+}</pre><div class="lbl">output</div><pre>usage: dt escalate [-h] [--type SYMBOL]
+                   {TEST-WRONG,CONTRACT-CHANGE,NEEDS-DEP} why
+
+positional arguments:
+  {TEST-WRONG,CONTRACT-CHANGE,NEEDS-DEP}
+  why                   one line: what is wrong and what would fix it
+
+options:
+  -h, --help            show this help message and exit
+  --type SYMBOL         CONTRACT-CHANGE: the contract symbol that can&#x27;t
+                        express what the task needs (risk.Drawdown)</pre></details></div><div class="step" id="S13"><span class="sid">U45.S13</span><span class="kind">Write</span>/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r1/with_skill/project/.claude/worktrees/agent-ad74f5d3fa3914963/src/rllab/agents/dqn/networks.py (23 lines)<div class="lbl">wrote /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r1/with_skill/project/.claude/worktrees/agent-ad74f5d3fa3914963/src/rllab/agents/dqn/networks.py</div><pre>&quot;&quot;&quot;The full-grid convolutional value network of the DQN learner (AGENT-05, AD-05).&quot;&quot;&quot;
+
+from torch import nn
+
+CONV_CHANNELS = (16, 32)
+
+
+def cnn(obs_shape: tuple[int, ...], hidden: int, n_actions: int) -&gt; nn.Sequential:
+    &quot;&quot;&quot;Two 3x3 ReLU convolutions (16, 32 channels) and one `hidden`-unit layer over a C×H×W grid.&quot;&quot;&quot;
+    if len(obs_shape) != 3:
+        raise ValueError(f&quot;net &#x27;cnn&#x27; needs a 3-D obs_shape, got {obs_shape}&quot;)
+    channels, height, width = obs_shape
+    first, second = CONV_CHANNELS
+    return nn.Sequential(
+        nn.Conv2d(channels, first, kernel_size=3, padding=1),
+        nn.ReLU(),
+        nn.Conv2d(first, second, kernel_size=3, padding=1),
+        nn.ReLU(),
+        nn.Flatten(),
+        nn.Linear(second * height * width, hidden),
+        nn.ReLU(),
+        nn.Linear(hidden, n_actions),
+    )
+</pre><div class="hook">⛔ hook PostToolUse:Write blocked: [bash &quot;$CLAUDE_PROJECT_DIR&quot;/scripts/hooks/post_edit.sh]: -&gt; ruff check --fix --quiet /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r1/with_skill/project/.claude/worktrees/agent-ad74f5d3fa3914963/src/rllab/agents/dqn/networks.py
+RUF002 Docstring contains ambiguous `×` (MULTIPLICATION SIGN). Did you mean `x` (LATIN SMALL LETTER X)?
+  --&gt; src/rllab/agents/dqn/networks.py:9:88
+   |
+ 8 | def cnn(obs_shape: tuple[int, ...], hidden: int, n_actions: int) -&gt; nn.Sequential:
+ 9 |     &quot;&quot;&quot;Two 3x3 ReLU convolutions (16, 32 channels) and one `hidden`-unit layer over a C×H×W grid.&quot;&quot;&quot;
+   |                                                                                        ^
+10 |     if len(obs_shape) != 3:
+11 |         raise ValueError(f&quot;net &#x27;cnn&#x27; needs a 3-D obs_shape, got {obs_shape}&quot;)
+   |
+
+RUF002 Docstring contains ambiguous `×` (MULTIPLICATION SIGN). Did you mean `x` (LATIN SMALL LETTER X)?
+  --&gt; src/rllab/agents/dqn/networks.py:9:90
+   |
+ 8 | def cnn(obs_shape: tuple[int, ...], hidden: int, n_actions: int) -&gt; nn.Sequential:
+ 9 |     &quot;&quot;&quot;Two 3x3 ReLU convolutions (16, 32 channels) and one `hidden`-unit layer over a C×H×W grid.&quot;&quot;&quot;
+   |                                                                                          ^
+10 |     if len(obs_shape) != 3:
+11 |         raise ValueError(f&quot;net &#x27;cnn&#x27; needs a 3-D obs_shape, got {obs_shape}&quot;)
+   |
+
+-&gt; ruff format --quiet /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r1/with_skill/project/.claude/worktrees/agent-ad74f5d3fa3914963/src/rllab/agents/dqn/networks.py
+-&gt; typos /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r1/with_skill/project/.claude/worktrees/agent-ad74f5d3fa3914963/src/rllab/agents/dqn/networks.py
+-&gt; python scripts/check_size.py /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r1/with_skill/project/.claude/worktrees/agent-ad74f5d3fa3914963/src/rllab/agents/dqn/networks.py
+FAILED: ruff check --fix --quiet /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r1/with_skill/project/.claude/worktrees/agent-ad74f5d3fa3914963/src/rllab/agents/dqn/networks.py
+</div><details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r1/with_skill/project/.claude/worktrees/agent-ad74f5d3fa3914963/src/rllab/agents/dqn/networks.py&quot;,
+  &quot;content&quot;: &quot;\&quot;\&quot;\&quot;The full-grid convolutional value network of the DQN learner (AGENT-05, AD-05).\&quot;\&quot;\&quot;\n\nfrom torch import nn\n\nCONV_CHANNELS = (16, 32)\n\n\ndef cnn(obs_shape: tuple[int, ...], hidden: int, n_actions: int) -&gt; nn.Sequential:\n    \&quot;\&quot;\&quot;Two 3x3 ReLU convolutions (16, 32 channels) and one `hidden`-unit layer over a C×H×W grid.\&quot;\&quot;\&quot;\n    if len(obs_shape) != 3:\n        raise ValueError(f\&quot;net &#x27;cnn&#x27; needs a 3-D obs_shape, got {obs_shape}\&quot;)\n    channels, height, width = obs_shape\n    first, second = CONV_CHANNELS\n    return nn.Sequential(\n        nn.Conv2d(channels, first, kernel_size=3, padding=1),\n        nn.ReLU(),\n        nn.Conv2d(first, second, kernel_size=3, padding=1),\n        nn.ReLU(),\n        nn.Flatten(),\n        nn.Linear(second * height * width, hidden),\n        nn.ReLU(),\n        nn.Linear(hidden, n_actions),\n    )\n&quot;
+}</pre><div class="lbl">output</div><pre>File created successfully at: /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r1/with_skill/project/.claude/worktrees/agent-ad74f5d3fa3914963/src/rllab/agents/dqn/networks.py (file state is current in your context — no need to Read it back)</pre></details></div><div class="step" id="S14"><span class="sid">U45.S14</span><span class="kind">Write</span>/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r1/with_skill/project/.claude/worktrees/agent-ad74f5d3fa3914963/tests/unit/rllab/test_networks.py (34 lines)<div class="lbl">wrote /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r1/with_skill/project/.claude/worktrees/agent-ad74f5d3fa3914963/tests/unit/rllab/test_networks.py</div><pre>&quot;&quot;&quot;Unit tests for the full-grid convolutional network (AD-05).&quot;&quot;&quot;
+
+import pytest
+import torch
+from torch import nn
+
+from rllab.agents.dqn.networks import cnn
+
+
+def test_cnn_layers_match_ad05() -&gt; None:
+    net = cnn((3, 10, 10), 128, 3)
+    convs = [m for m in net if isinstance(m, nn.Conv2d)]
+    linears = [m for m in net if isinstance(m, nn.Linear)]
+    assert [tuple(c.weight.shape) for c in convs] == [(16, 3, 3, 3), (32, 16, 3, 3)]
+    assert [tuple(lin.weight.shape) for lin in linears] == [(128, 3200), (3, 128)]
+
+
+def test_cnn_maps_a_batch_of_grids_to_one_value_per_action() -&gt; None:
+    net = cnn((3, 10, 10), 128, 3)
+    out = net(torch.zeros((4, 3, 10, 10)))
+    assert out.shape == (4, 3)
+
+
+def test_cnn_sizes_the_hidden_layer_from_a_non_square_grid() -&gt; None:
+    net = cnn((2, 5, 7), 8, 4)
+    assert net(torch.zeros((1, 2, 5, 7))).shape == (1, 4)
+    linears = [m for m in net if isinstance(m, nn.Linear)]
+    assert tuple(linears[0].weight.shape) == (8, 32 * 5 * 7)
+
+
+@pytest.mark.parametrize(&quot;obs_shape&quot;, [(11,), (3, 10), (1, 3, 10, 10)])
+def test_cnn_rejects_a_non_3d_obs_shape(obs_shape: tuple[int, ...]) -&gt; None:
+    with pytest.raises(ValueError, match=&quot;3-D obs_shape&quot;):
+        cnn(obs_shape, 128, 3)
+</pre><details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r1/with_skill/project/.claude/worktrees/agent-ad74f5d3fa3914963/tests/unit/rllab/test_networks.py&quot;,
+  &quot;content&quot;: &quot;\&quot;\&quot;\&quot;Unit tests for the full-grid convolutional network (AD-05).\&quot;\&quot;\&quot;\n\nimport pytest\nimport torch\nfrom torch import nn\n\nfrom rllab.agents.dqn.networks import cnn\n\n\ndef test_cnn_layers_match_ad05() -&gt; None:\n    net = cnn((3, 10, 10), 128, 3)\n    convs = [m for m in net if isinstance(m, nn.Conv2d)]\n    linears = [m for m in net if isinstance(m, nn.Linear)]\n    assert [tuple(c.weight.shape) for c in convs] == [(16, 3, 3, 3), (32, 16, 3, 3)]\n    assert [tuple(lin.weight.shape) for lin in linears] == [(128, 3200), (3, 128)]\n\n\ndef test_cnn_maps_a_batch_of_grids_to_one_value_per_action() -&gt; None:\n    net = cnn((3, 10, 10), 128, 3)\n    out = net(torch.zeros((4, 3, 10, 10)))\n    assert out.shape == (4, 3)\n\n\ndef test_cnn_sizes_the_hidden_layer_from_a_non_square_grid() -&gt; None:\n    net = cnn((2, 5, 7), 8, 4)\n    assert net(torch.zeros((1, 2, 5, 7))).shape == (1, 4)\n    linears = [m for m in net if isinstance(m, nn.Linear)]\n    assert tuple(linears[0].weight.shape) == (8, 32 * 5 * 7)\n\n\n@pytest.mark.parametrize(\&quot;obs_shape\&quot;, [(11,), (3, 10), (1, 3, 10, 10)])\ndef test_cnn_rejects_a_non_3d_obs_shape(obs_shape: tuple[int, ...]) -&gt; None:\n    with pytest.raises(ValueError, match=\&quot;3-D obs_shape\&quot;):\n        cnn(obs_shape, 128, 3)\n&quot;
+}</pre><div class="lbl">output</div><pre>File created successfully at: /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r1/with_skill/project/.claude/worktrees/agent-ad74f5d3fa3914963/tests/unit/rllab/test_networks.py (file state is current in your context — no need to Read it back)</pre></details></div><div class="step" id="S15"><span class="sid">U45.S15</span><span class="kind">Edit</span>/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r1/with_skill/project/.claude/worktrees/agent-ad74f5d3fa3914963/src/rllab/agents/dqn/networks.py | old: &#x27;over a C×H×W grid.&quot;&quot;&quot;&#x27; | new: &#x27;over a CxHxW grid.&quot;&quot;&quot;&#x27;<div class="lbl">edited /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r1/with_skill/project/.claude/worktrees/agent-ad74f5d3fa3914963/src/rllab/agents/dqn/networks.py · old</div><pre>over a C×H×W grid.&quot;&quot;&quot;</pre><div class="lbl">new</div><pre>over a CxHxW grid.&quot;&quot;&quot;</pre><details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;replace_all&quot;: false,
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r1/with_skill/project/.claude/worktrees/agent-ad74f5d3fa3914963/src/rllab/agents/dqn/networks.py&quot;,
+  &quot;old_string&quot;: &quot;over a C×H×W grid.\&quot;\&quot;\&quot;&quot;,
+  &quot;new_string&quot;: &quot;over a CxHxW grid.\&quot;\&quot;\&quot;&quot;
+}</pre><div class="lbl">output</div><pre>The file /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r1/with_skill/project/.claude/worktrees/agent-ad74f5d3fa3914963/src/rllab/agents/dqn/networks.py has been updated successfully. (file state is current in your context — no need to Read it back)</pre></details></div><div class="step" id="S16"><span class="sid">U45.S16</span><span class="kind">Bash</span>uv run --frozen --quiet pytest tests/intent/rllab/test_cnn.py tests/unit/rllab/test_networks.py -q --no-cov <span class="err">error</span><details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;uv run --frozen --quiet pytest tests/intent/rllab/test_cnn.py tests/unit/rllab/test_networks.py -q --no-cov&quot;
+}</pre><div class="lbl">output</div><pre>Exit code 1
+FFFFFFFFFF......                                                         [100%]
+=================================== FAILURES ===================================
+_______ test_cnn_agent_on_grid_returns_one_of_three_actions_from_the_cnn _______
+
+tmp_path = PosixPath(&#x27;/private/var/folders/dm/ppw06s61351dpntgs0g04bg80000gn/T/pytest-of-connorott/pytest-34896/test_cnn_agent_on_grid_returns0&#x27;)
+
+    @pytest.mark.intent
+    def test_cnn_agent_on_grid_returns_one_of_three_actions_from_the_cnn(tmp_path: Path) -&gt; None:
+        env = _grid_env()
+        obs, _ = env.reset(env.seed)
+        grid = obs[SOLO]
+        assert grid.shape == (1, 3, 10, 10)
+        agent = _cnn_agent()
+        for explore in (False, True):
+            out = np.asarray(agent.act(grid, explore=explore))
+            assert out.shape == (1,)
+            assert np.issubdtype(out.dtype, np.integer)
+            assert 0 &lt;= int(out[0]) &lt; 3
+&gt;       _assert_cnn(agent, tmp_path)
+
+tests/intent/rllab/test_cnn.py:116: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+agent = &lt;rllab.agents.dqn.agent.DQNAgent object at 0x109e00ef0&gt;
+tmp_path = PosixPath(&#x27;/private/var/folders/dm/ppw06s61351dpntgs0g04bg80000gn/T/pytest-of-connorott/pytest-34896/test_cnn_agent_on_grid_returns0&#x27;)
+
+    def _assert_cnn(agent: DQNAgent, tmp_path: Path) -&gt; None:
+        shapes = _weight_shapes(agent, tmp_path)
+        conv = {s for s in shapes if len(s) == 4}
+&gt;       assert conv == CONVS
+E       assert set() == {(16, 3, 3, 3...32, 16, 3, 3)}
+E         
+E         Extra items in the right set:
+E         (32, 16, 3, 3)
+E         (16, 3, 3, 3)
+E         Use -v to get more diff
+
+tests/intent/rllab/test_cnn.py:74: AssertionError
+___________________ test_cnn_greedy_action_is_deterministic ____________________
+
+tmp_path = PosixPath(&#x27;/private/var/folders/dm/ppw06s61351dpntgs0g04bg80000gn/T/pytest-of-connorott/pytest-34896/test_cnn_greedy_action_is_dete0&#x27;)
+
+    @pytest.mark.intent
+    def test_cnn_greedy_action_is_deterministic(tmp_path: Path) -&gt; None:
+        env = _grid_env()
+        obs, _ = env.reset(env.seed)
+        agent = _cnn_agent()
+        first = [int(np.asarray(agent.act(obs[SOLO], explore=False))[0]) for _ in range(5)]
+        assert len(set(first)) == 1
+&gt;       _assert_cnn(agent, tmp_path)
+
+tests/intent/rllab/test_cnn.py:126: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+agent = &lt;rllab.agents.dqn.agent.DQNAgent object at 0x10ed1c620&gt;
+tmp_path = PosixPath(&#x27;/private/var/folders/dm/ppw06s61351dpntgs0g04bg80000gn/T/pytest-of-connorott/pytest-34896/test_cnn_greedy_action_is_dete0&#x27;)
+
+    def _assert_cnn(agent: DQNAgent, tmp_path: Path) -&gt; None:
+        shapes = _weight_shapes(agent, tmp_path)
+        conv = {s for s in shapes if len(s) == 4}
+&gt;       assert conv == CONVS
+E       assert set() == {(16, 3, 3, 3...32, 16, 3, 3)}
+E         
+E         Extra items in the right set:
+E         (32, 16, 3, 3)
+E         (16, 3, 3, 3)
+E         Use -v to get more diff
+
+tests/intent/rllab/test_cnn.py:74: AssertionError
+___________ test_cnn_has_two_3x3_convolutions_of_16_and_32_channels ____________
+
+tmp_path = PosixPath(&#x27;/private/var/folders/dm/ppw06s61351dpntgs0g04bg80000gn/T/pytest-of-connorott/pytest-34896/test_cnn_has_two_3x3_convoluti0&#x27;)
+
+    @pytest.mark.intent
+    def test_cnn_has_two_3x3_convolutions_of_16_and_32_channels(tmp_path: Path) -&gt; None:
+        shapes = _weight_shapes(_cnn_agent(), tmp_path)
+&gt;       assert (16, 3, 3, 3) in shapes
+E       assert (16, 3, 3, 3) in [(128, 300), (128,), (128, 128), (128,), (3, 128), (3,)]
+
+tests/intent/rllab/test_cnn.py:132: AssertionError
+___________ test_cnn_has_one_128_unit_hidden_layer_and_three_outputs ___________
+
+tmp_path = PosixPath(&#x27;/private/var/folders/dm/ppw06s61351dpntgs0g04bg80000gn/T/pytest-of-connorott/pytest-34896/test_cnn_has_one_128_unit_hidd0&#x27;)
+
+    @pytest.mark.intent
+    def test_cnn_has_one_128_unit_hidden_layer_and_three_outputs(tmp_path: Path) -&gt; None:
+        shapes = _weight_shapes(_cnn_agent(), tmp_path)
+        linear = {s for s in shapes if len(s) == 2}
+        hidden = {s for s in linear if s[0] == 128}
+&gt;       assert len(hidden) == 1
+E       assert 2 == 1
+E        +  where 2 = len({(128, 128), (128, 300)})
+
+tests/intent/rllab/test_cnn.py:142: AssertionError
+________________ test_cnn_takes_only_a_3d_obs_shape[compact-1d] ________________
+
+obs_shape = (11,)
+tmp_path = PosixPath(&#x27;/private/var/folders/dm/ppw06s61351dpntgs0g04bg80000gn/T/pytest-of-connorott/pytest-34896/test_cnn_takes_only_a_3d_obs_s0&#x27;)
+
+    @pytest.mark.intent
+    @pytest.mark.parametrize(
+        &quot;obs_shape&quot;,
+        [(11,), (3, 10), (1, 3, 10, 10)],
+        ids=[&quot;compact-1d&quot;, &quot;2d&quot;, &quot;4d&quot;],
+    )
+    def test_cnn_takes_only_a_3d_obs_shape(obs_shape: tuple[int, ...], tmp_path: Path) -&gt; None:
+        team = TeamSpec(n_agents=1, obs_shape=obs_shape, actions=ActionSpace(&quot;discrete&quot;, 3, 0))
+        with pytest.raises(ValueError, match=SHAPE_ERROR):
+            DQNAgent(team, _cnn_params(
+
+... [4605 characters truncated] ...
+
+ _ _ _ 
+
+agent = &lt;rllab.agents.dqn.agent.DQNAgent object at 0x10ef1ac30&gt;
+tmp_path = PosixPath(&#x27;/private/var/folders/dm/ppw06s61351dpntgs0g04bg80000gn/T/pytest-of-connorott/pytest-34896/test_cnn_rejects_the_compact_t0&#x27;)
+
+    def _assert_cnn(agent: DQNAgent, tmp_path: Path) -&gt; None:
+        shapes = _weight_shapes(agent, tmp_path)
+        conv = {s for s in shapes if len(s) == 4}
+&gt;       assert conv == CONVS
+E       assert set() == {(16, 3, 3, 3...32, 16, 3, 3)}
+E         
+E         Extra items in the right set:
+E         (32, 16, 3, 3)
+E         (16, 3, 3, 3)
+E         Use -v to get more diff
+
+tests/intent/rllab/test_cnn.py:74: AssertionError
+________________ test_cnn_agent_trains_on_grid_transitions_only ________________
+
+tmp_path = PosixPath(&#x27;/private/var/folders/dm/ppw06s61351dpntgs0g04bg80000gn/T/pytest-of-connorott/pytest-34896/test_cnn_agent_trains_on_grid_0&#x27;)
+
+    @pytest.mark.intent
+    def test_cnn_agent_trains_on_grid_transitions_only(tmp_path: Path) -&gt; None:
+        transitions = _grid_transitions()
+        assert transitions
+        for t in transitions:
+            assert t.obs.shape == (1, 3, 10, 10)
+            assert t.next_obs.shape == (1, 3, 10, 10)
+        agent = _cnn_agent(learn_start=2, batch_size=2, target_every=2)
+        for t in transitions * 3:
+            out = np.asarray(agent.act(t.obs, explore=True))
+            assert 0 &lt;= int(out[0]) &lt; 3
+            agent.learn(t)
+        greedy = int(np.asarray(agent.act(transitions[0].obs, explore=False))[0])
+        assert 0 &lt;= greedy &lt; 3
+&gt;       _assert_cnn(agent, tmp_path)
+
+tests/intent/rllab/test_cnn.py:181: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+agent = &lt;rllab.agents.dqn.agent.DQNAgent object at 0x1077119a0&gt;
+tmp_path = PosixPath(&#x27;/private/var/folders/dm/ppw06s61351dpntgs0g04bg80000gn/T/pytest-of-connorott/pytest-34896/test_cnn_agent_trains_on_grid_0&#x27;)
+
+    def _assert_cnn(agent: DQNAgent, tmp_path: Path) -&gt; None:
+        shapes = _weight_shapes(agent, tmp_path)
+        conv = {s for s in shapes if len(s) == 4}
+&gt;       assert conv == CONVS
+E       assert set() == {(16, 3, 3, 3...32, 16, 3, 3)}
+E         
+E         Extra items in the right set:
+E         (32, 16, 3, 3)
+E         (16, 3, 3, 3)
+E         Use -v to get more diff
+
+tests/intent/rllab/test_cnn.py:74: AssertionError
+______________ test_cnn_save_then_load_gives_same_greedy_actions _______________
+
+tmp_path = PosixPath(&#x27;/private/var/folders/dm/ppw06s61351dpntgs0g04bg80000gn/T/pytest-of-connorott/pytest-34896/test_cnn_save_then_load_gives_0&#x27;)
+
+    @pytest.mark.intent
+    def test_cnn_save_then_load_gives_same_greedy_actions(tmp_path: Path) -&gt; None:
+        transitions = _grid_transitions()
+        agent = _cnn_agent(learn_start=2, batch_size=2)
+        for t in transitions:
+            agent.learn(t)
+        path = tmp_path / &quot;cnn.pt&quot;
+        agent.save(path)
+        other = DQNAgent(_grid_team(), _cnn_params(learn_start=2, batch_size=2), _exploration(), seed=9)
+        other.load(path)
+        for t in transitions:
+            a = np.asarray(agent.act(t.obs, explore=False))
+            b = np.asarray(other.act(t.obs, explore=False))
+            assert np.array_equal(a, b)
+&gt;       _assert_cnn(other, tmp_path)
+
+tests/intent/rllab/test_cnn.py:198: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+agent = &lt;rllab.agents.dqn.agent.DQNAgent object at 0x10f221070&gt;
+tmp_path = PosixPath(&#x27;/private/var/folders/dm/ppw06s61351dpntgs0g04bg80000gn/T/pytest-of-connorott/pytest-34896/test_cnn_save_then_load_gives_0&#x27;)
+
+    def _assert_cnn(agent: DQNAgent, tmp_path: Path) -&gt; None:
+        shapes = _weight_shapes(agent, tmp_path)
+        conv = {s for s in shapes if len(s) == 4}
+&gt;       assert conv == CONVS
+E       assert set() == {(16, 3, 3, 3...32, 16, 3, 3)}
+E         
+E         Extra items in the right set:
+E         (32, 16, 3, 3)
+E         (16, 3, 3, 3)
+E         Use -v to get more diff
+
+tests/intent/rllab/test_cnn.py:74: AssertionError
+=========================== short test summary info ============================
+FAILED tests/intent/rllab/test_cnn.py::test_cnn_agent_on_grid_returns_one_of_three_actions_from_the_cnn
+FAILED tests/intent/rllab/test_cnn.py::test_cnn_greedy_action_is_deterministic
+FAILED tests/intent/rllab/test_cnn.py::test_cnn_has_two_3x3_convolutions_of_16_and_32_channels
+FAILED tests/intent/rllab/test_cnn.py::test_cnn_has_one_128_unit_hidden_layer_and_three_outputs
+FAILED tests/intent/rllab/test_cnn.py::test_cnn_takes_only_a_3d_obs_shape[compact-1d]
+FAILED tests/intent/rllab/test_cnn.py::test_cnn_takes_only_a_3d_obs_shape[2d]
+FAILED tests/intent/rllab/test_cnn.py::test_cnn_takes_only_a_3d_obs_shape[4d]
+FAILED tests/intent/rllab/test_cnn.py::test_cnn_rejects_the_compact_team_and_builds_on_the_grid_team
+FAILED tests/intent/rllab/test_cnn.py::test_cnn_agent_trains_on_grid_transitions_only
+FAILED tests/intent/rllab/test_cnn.py::test_cnn_save_then_load_gives_same_greedy_actions
+10 failed, 6 passed in 9.71s</pre></details></div><div class="step" id="S17"><span class="sid">U45.S17</span><span class="kind">think</span>The network is built and its unit tests pass, but the intent tests fail because `DQNAgent.__init__` in `agent.py` always calls `mlp(...)`, and that file is outside my write scope (owned by M1-T26). I&#x27;m escalating this issue.<details><summary>full text</summary><pre>The network is built and its unit tests pass, but the intent tests fail because `DQNAgent.__init__` in `agent.py` always calls `mlp(...)`, and that file is outside my write scope (owned by M1-T26). I&#x27;m escalating this issue.
+
+</pre></details></div><div class="step" id="S18"><span class="sid">U45.S18</span><span class="kind">Bash</span>python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r1/with_skill/plugin/dev-team/scripts/dt.py escalate CONTRACT-CHANGE &quot;M1-T27 Writes omit src/rllab/agents/dqn/agent.py: DQNAgent.__init__ always builds mlp(), so test_cnn.py (10 tests) cannot pass from networks.py alone. cnn(obs_shape, hidden, n_actions) is ready in networks.py with unit tests green; fix: add agent.py to M1-T27 Writes (or sequence after M1-T26, which owns it) so online/target use cnn() when param …[+38 chars]<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r1/with_skill/plugin/dev-team/scripts/dt.py escalate CONTRACT-CHANGE \&quot;M1-T27 Writes omit src/rllab/agents/dqn/agent.py: DQNAgent.__init__ always builds mlp(), so test_cnn.py (10 tests) cannot pass from networks.py alone. cnn(obs_shape, hidden, n_actions) is ready in networks.py with unit tests green; fix: add agent.py to M1-T27 Writes (or sequence after M1-T26, which owns it) so online/target use cnn() when params.net == &#x27;cnn&#x27;\&quot; --type agents.DQNAgent&quot;
+}</pre><div class="lbl">output</div><pre>escalated: M1-T27.implementer CONTRACT-CHANGE. End now with one line: STOPPED M1-T27 implementer: see dt escalate</pre></details></div><div class="step" id="S19"><span class="sid">U45.S19</span><span class="kind">say</span>STOPPED M1-T27 implementer: see dt escalate<details><summary>full text</summary><pre>STOPPED M1-T27 implementer: see dt escalate</pre></details></div>
+<h2>Commits</h2>
+<p>None.</p>
+<h2>Returned</h2>
+<pre>STOPPED M1-T27 implementer: see dt escalate</pre>
+</body></html>

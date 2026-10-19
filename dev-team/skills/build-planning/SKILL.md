@@ -25,7 +25,7 @@ Once a stage's pipelines are approved, this skill cuts it into milestones (`M<n>
 
 ## Modes
 
-Run `dt status --skill build-planning` first. Read the mode's file and only the references it names.
+Run `dt status --skill build-planning` first; read the mode's file and only what it names.
 
 | Mode | When | Do |
 |---|---|---|
@@ -34,14 +34,14 @@ Run `dt status --skill build-planning` first. Read the mode's file and only the 
 | **foreign** | `tasks/plan.md` has no `**Milestone:**` header and unchecked tasks | **Stop and ask.** Never overwrite, rename or delete it |
 | **New** | No active or archived plan; the roadmap has stages | `references/new.md` |
 | **Extend** | A stage is newly designed (`stage_to_cut`), or the next milestone needs a plan | `references/extend.md` |
-| **Replan** | A task is `Blocked`, or a revised doc was re-approved (`changed_since_plan`) | `references/replan.md` |
+| **Replan** | A task is `Blocked`, or a doc changed after the plan (`changed_since_plan`); before the next cut if nothing is ticked | `references/replan.md` |
 | **Advance** | All todo items and the exit checkpoint are ticked | `references/advance.md`, one gate per turn |
 
 A foreign plan's question: `references/examples-foreign.md`. **Next run:** with nothing left for this skill, go on to the run `dt next` names; never end on "say the word".
 
 ## Asking
 
-- **Interview one question at a time**, with a guess and a default, only on the user's decisions: the cut, scope and deferrals, the exit, queued plans, a missing skill, a mode override. Infer the rest as ASSUMPTIONS. For a choice from a list, show it, then ask once.
+- **Interview one question at a time**, with a guess and a default, only on the user's decisions: the cut, scope and deferrals, the exit, queued plans, a missing skill, a mode override. Infer the rest as ASSUMPTIONS. List a choice's options, then ask once.
 - **The user's words:** record them and honour yours (`requests_open`) per `../idea-refine/references/requests.md`.
 - **No live user:** open decisions go under Open questions; leave Draft.
 
@@ -54,7 +54,7 @@ Before presenting the Draft:
 - Every plan header field is set.
 
 Then present:
-1. **What was written:** files; any cut; scope, exit, phases with task counts, critical path, widest wave, checkpoints.
+1. **What was written:** files; any cut; scope, exit, phases, critical path, widest wave, checkpoints.
 2. **ASSUMPTIONS:** interfaces frozen, every unmitigated edge with its reason, folds, sizes, modes and overrides, skill and reference routing, `Read:` choices.
 3. **Open questions:** missing skills, overrides to confirm, routed fixes.
 4. **Uncovered:** each Deferred ID with its target.

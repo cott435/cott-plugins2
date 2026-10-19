@@ -11,7 +11,7 @@ Choose multi-package only for a real boundary: separate install, versioning or d
 
 ## Grow triggers
 
-A single package grows into several when the user asks, or when one of these arrives and no recorded shape says otherwise:
+A single package grows into several when the user asks, or when one of these arrives and no recorded shape says otherwise (`grow_held` in `dt status`: while it is set, raise no Grow):
 
 - New requirements bring a dependency stack the rest shouldn't carry (torch, torchvision).
 - A part runs or deploys on its own (a day-ahead forecast service), or needs its own install, release or owner.

@@ -2,7 +2,7 @@
 
 `dt status` says `new`: no active or archived plan, and the roadmap has stages. Cut every designed stage, plan M1 and its todo, and write the AGENTS.md doc map. Example: `examples-new.md`.
 
-1. **Every stage designed first.** When the stages come from the brief (Source `brief`, planned up front), a stage below Designed stops New: `dt status` reports `blocked`, naming the packages with no Approved `pipelines.md`. Route to `pipeline-design`, or the first upstream skill whose doc isn't Approved.
+1. **Every stage designed first.** When the stages come from the brief (Source `brief`, planned up front), a stage below Designed stops New: `dt status` reports `blocked`, naming each stage's gap: packages with no Approved `pipelines.md`, or spec IDs on no step (a QR- limit included). Route to `pipeline-design`, or the first upstream skill whose doc isn't Approved.
 2. **Grow check, cut the stage, scope the milestone:** `cut.md`. Up front, cut every designed stage, not only the first.
 3. **Milestone shape** (interface task, one spine per step, wiring per pipeline, system task, folds): `phase0.md`.
 4. **Thicken, route skills and references, build modes, checkpoints, `Writes:`, the dependency graph, write:** `tasks.md`.

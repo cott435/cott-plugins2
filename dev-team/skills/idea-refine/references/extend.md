@@ -9,15 +9,17 @@
 
 **Phases 1-2** per `ideation.md`. Before Phase 1, restate the new idea in terms of the existing project: "This adds [X] so that [existing user] can [outcome]." Note which existing features and requirement IDs it touches.
 
-**Fit check (during Phase 2) — answer one of these out loud. It decides whether the brief changes:**
+**Fit check (during Phase 2) — answer one of these out loud. With the stage sweep below, it decides whether the brief changes:**
 
 | Finding | Idea file | Brief |
 |---|---|---|
-| Serves an existing goal. Every new stage of the same project does | Write it | **No change.** This is the common case. A new stage never adds a goal, even when the user asks for one: the stage is its roadmap row and the idea's *Serves* line. |
+| Serves an existing goal. Every new stage of the same project does | Write it | **No new goal.** This is the common case. A new stage never adds a goal, even when the user asks for one: the stage is its roadmap row and the idea's *Serves* line. |
 | Needs a new goal: the project's outcome itself widens, same problem and user | Write it | Add the goal with the next number. If that makes more than five, merge before writing: propose which goals fold together, your merge as the default, and write the merged set. Never write a sixth goal. |
 | Changes a constraint (deadline, budget, a rule) | Write it | Update Constraints. |
 | Contradicts the Not Doing list | Write it only if the user reverses that decision | Remove the item, with the user's agreement. Otherwise park the idea. |
 | Different problem or different user | Don't write it | Push back: this may be a separate project with its own brief. |
+
+**Stage sweep (every new stage, whatever the fit check found).** Read every brief line against the project as it stands with this stage added. A line framed around one stage, or around a stage nobody has planned, is rewritten so it holds for the whole project: "The first environment, Snake, beats both baselines" becomes "Every environment's agent beats both baselines"; "The second environment, whatever it is, plugs into the shared core" becomes "Each new environment plugs into the shared core with small changes". Cut "only the first stage is decided", "not in this first stage" and lines that list or count the stages (the roadmap holds them). A goal or success sign that covers only earlier stages is widened in place to the outcome this stage now shares, and the goal keeps its number. The lines still name no stage, and the brief stays within `new.md`'s budget. List each rewritten section under *Brief changes*.
 
 **Phase 3: write `docs/ideas/<idea-slug>.md`** (kebab-case slug, e.g. `shared-editing.md`):
 
@@ -38,7 +40,7 @@
 ## How it fits
 - **Serves:** Goal 2 (and new Goal 4, if added)
 - **Touches:** [existing features and spec IDs this changes or depends on, e.g. EDIT-03]
-- **Brief changes:** [None — or the sections edited, in one line: "Goal 4 added; Not doing narrowed"]
+- **Brief changes:** [None — or the sections edited, in one line: "Goal 4 added; Not doing narrowed; success signs widened to every environment"]
 - **Stage:** [New S3 (roadmap stage on acceptance) — or "joins S2", when the user puts it in a stage not yet being built]
 
 ## Recommended direction
@@ -70,7 +72,7 @@
 - **One idea per file.** If the conversation produced two separable ideas, write two files (ask the user which to do first).
 - **Write it as a record, in the brief's voice.** The file outlives the review. Notes to the user ("my proposed limit, for you to check") belong in the conversation. Questions belong under *Open questions*.
 - **Tool preferences live here, not in the spec.** If the user names a library, dataset or service ("hand-write the CNN, then compare with a torchvision model"), record it under *Recommended direction* or *Data*. `spec-writing` writes the behavior without the name, and `architecture-design` reads the name from here.
-- **Never paste the idea into the brief.** Brief edits are limited to the fit-check table above, and leave `brief_words` within `new.md`'s budget: pay for each addition with a cut. A stage's content belongs in the roadmap, never in a brief line listing the stages. Goal numbers stay stable; new goals take the next number, and a merged goal keeps the lower one. If a goal is dropped or merged away, tell the user which spec requirements referenced it.
+- **Never paste the idea into the brief.** Brief edits are limited to the fit-check table and the stage sweep above, and leave `brief_words` within `new.md`'s budget: pay for each addition with a cut. A stage's content belongs in the roadmap, never in a brief line listing the stages. Goal numbers stay stable; new goals take the next number, and a merged goal keeps the lower one. If a goal is dropped or merged away, tell the user which spec requirements referenced it.
 
 **Review Gate** (`../SKILL.md`): also say whether the brief changed and which sections.
 

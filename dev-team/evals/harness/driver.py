@@ -1,17 +1,19 @@
 #!/usr/bin/env python3
 """Multi-turn trajectory driver for the dev-team planning skills, idea through build-setup.
 
-Agent sessions (claude -p) work in a fresh project dir with the whole dev-team plugin loaded via --plugin-dir
-(skills, scripts/dt.py, hooks), staged into <out>/plugin/. As a user opens a new chat per skill, each skill run gets
-its own session (`session_step`): a fresh one, `/dev-team:<skill> <message>` for the run `dt next --json` names, opens
-after the user approves a gate, for a new stage (idea-refine), and when the user reports a probe run (api-probe);
-every other message resumes the session, so answers go back to the session that asked. A fresh session that starts
-right after a question gets the end of that message first ("From the previous session:"). The simulated user's
-approvals carry no "and continue", so the agent stops at each gate.
-Each session's id, skill and turns go into turns.json (`session`) and summary.json (`sessions`). A simulated user (separate
-claude -p, no tools) answers questions, approves drafts, and — in incremental mode — reveals the next stage
-only after the current one is fully planned (pipelines approved and milestone rows on the roadmap; for the first
-stage, also an approved build plan and build setup).
+Agent sessions (claude -p) work in a fresh project dir with the whole dev-team plugin loaded via --plugin-dir (skills,
+scripts/dt.py, hooks), staged into <out>/plugin/. As a user opens a new chat per skill, each skill run gets its own
+session (`session_step`): a fresh one, `/dev-team:<skill> <message>` for the run `dt next --json` names, opens after
+the user approves a gate, for a new stage (idea-refine), and when the user reports a probe run (api-probe, unless
+another skill's gate is open); every other message resumes the session, so answers go back to the session that asked.
+A fresh session that starts right after a question gets the end of that message first ("From the previous session:").
+The simulated user's approvals carry no "and continue", so the agent stops at each gate. Each session's id, opening
+skill and turns go into turns.json (`session`) and summary.json (`sessions`), and each turn's working skill
+(`working_skill`, from its Skill calls, slash opening, `dt status --skill` calls, skills/ reads or the files it
+changed) into turns.json and summary.json's `turns_by_skill`. A simulated user (separate claude -p, no tools) answers
+questions, approves drafts, and — in incremental mode — reveals the next stage only after the current one is fully
+planned (pipelines approved and milestone rows on the roadmap; for the first stage, also an approved build plan and
+build setup).
 
 Project skill stubs (scenarios.json `project_skills`) are installed in the project's .claude/skills/. Reference files
 (scenarios.json `references`, from references/<project>/) are copied into the project's references/ when the stage
@@ -24,23 +26,23 @@ The scenario as this run sees it (project facts, persona, stages, fake vendors) 
 the grader can tell which checks the run's user could meet. Each turn's stream in agent_stream.jsonl starts with a
 `{"type": "driver_turn", "turn": N}` line, which numbers the turns for the grader.
 
-The simulated user answers in JSON: `action`, `message`, `ran` (true when the message says it ran the scripts the
-assistant asked for) and `approves` (true when it approves what the assistant presented). Readiness skips a Draft
-the message approves. The closing message only approves; if a doc is still Draft after it, one more approve-only turn
-is sent.
+The simulated user answers in JSON (claude -p --json-schema; prose is taken as its message): `action`, `message`,
+`ran` (true when the message says it ran the scripts the assistant asked for) and `approves` (true when it approves
+what the assistant presented). Readiness skips a Draft the message approves. The closing message only approves; if a
+doc is still Draft after it, one more approve-only turn is sent.
 
-Probes (design/probes.md §10.1): a project's `fake_vendors` (scenarios.json) are served on 127.0.0.1 for the
-whole run (fakevendor/), and the agent is never told where. A vendor's real API hosts (`proxy_hosts`: Yahoo, whose
-client takes no base URL, and Sharadar's `api.sharadar.com`) are served behind an HTTPS proxy whose environment the
-whole run gets (`start_vendors`). User runs, and every public.py run the agent starts, go through a second, closed
-proxy that refuses every live host but the package indexes. When the simulated user says it ran the scripts (`ran`),
-the driver runs each Ready probe as the user would: it writes the probe's .env from its .env.example (keys get the
-canary `sk-canary-<run id>`, base URLs the fake vendor), runs public.py only where the README gives it to the user
-(as given: `uv run public.py <step>`), with no environment but the closed proxy's, then each probe.py step its README
-gives with the fake vendors' environment, logs them to <out>/user_runs.jsonl and
-commits "user run before turn N". The simulated user is then told which steps ran and each one's exit code (no
-output) and rewrites its message to match. When the user would move on while `dt next` says build-planning waits for
-Ready probes it never ran, readiness asks it to run them.
+Probes (design/probes.md §10.1): a project's `fake_vendors` (scenarios.json) are served for the whole run
+(fakevendor/) on their real API hosts (`proxy_hosts`: Yahoo's, Sharadar's `api.sharadar.com` and
+`data.nasdaq.com/api/`), behind an HTTPS proxy whose environment the whole run gets (`start_vendors`); no base URL
+names a fake, so nothing the agent sees points at 127.0.0.1. User runs, and every public.py run the agent starts, go
+through a second, closed proxy that refuses every live host but the package indexes. When the simulated user says it
+ran the scripts (`ran`), the driver runs each Ready probe as the user would: it writes the probe's .env from its
+.env.example (keys get the canary `sk-canary-<run id>`; a proxied vendor gets no base URL), runs public.py only where
+the README gives it to the user (as given: `uv run [--script] public.py <step>`), with no environment but the closed
+proxy's, then each probe.py step its README gives with the closed proxy's environment and the keys, logs them to
+<out>/user_runs.jsonl and commits "user run before turn N". The simulated user is then told which steps ran and each
+one's exit code (no output) and rewrites its message to match. When the user would move on while `dt next` says
+build-planning waits for Ready probes it never ran, readiness asks it to run them.
 
 A failed simulated-user call is retried twice and logged to <out>/sim_errors.jsonl. After that the fallback asks the
 agent to repeat its questions when it asked any, and approves only when it didn't; a failed rewrite after a user run
@@ -59,7 +61,7 @@ Agent frontmatter hooks (the .claude/agents/*.md files build-setup writes) don't
 untrusted folder (checked live: skipped silently) unless the agents are passed with --agents or installed
 user-level; planning never runs those agents, so this harness doesn't need them.
 """
-import json, os, re, subprocess, sys, time, uuid, shutil, pathlib
+import collections, json, os, re, subprocess, sys, time, uuid, shutil, pathlib
 
 HERE = pathlib.Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
@@ -249,7 +251,6 @@ def mcp_args(out):
     return args + (["--permission-prompt-tool", "mcp__evalperm__approve"] if PERMISSION_PROMPTS else [])
 
 
-STATUS_SKILL = re.compile(r"status\s+--skill[\s=]+([a-z-]+)")
 SLASH = re.compile(r"^/dev-team:([a-z-]+)")
 
 
@@ -268,6 +269,30 @@ SKILLS = ("idea-refine", "spec-writing", "architecture-design", "reference-intak
 # A skill named as the next step ("Yes, start with api-probe on PB-01"), not one mentioned in passing.
 NAMED_SKILL = re.compile(r"\b(?:start|begin|go|move|switch|run|use|do|continue|proceed|open|first)\b[^.?!\n]{0,40}?"
                          r"\b(" + "|".join(SKILLS) + r")\b", re.I)
+
+
+# The skill a changed file is the work of, when the turn's calls name none. Files several skills write
+# (docs/probes.md, docs/references.md, docs/roadmap.md, docs/requests.md) name none.
+FILE_SKILL = [(re.compile(p), s) for p, s in [
+    (r"^docs/ideas/|^docs/brief\.md$", "idea-refine"), (r"^docs/spec\.md$", "spec-writing"),
+    (r"^docs/(?:packages/[^/]+/)?(?:architecture|contract)\.md$", "architecture-design"), (r"^probes/", "api-probe"),
+    (r"^docs/(?:packages/[^/]+/)?pipelines\.md$|^docs/explained/", "pipeline-design"),
+    (r"^docs/(?:packages/[^/]+/)?tests\.md$|^tests/", "test-planning"), (r"^tasks/(?:plan\.md|queued/)", "build-planning"),
+    (r"^CONSTRAINTS\.md$|^scripts/|^\.claude/agents/", "build-setup")]]
+
+
+def working_skill(seen, changed, prev=None, opening=None):
+    """The dev-team skill a turn worked in, and from what: (skill, "calls" | "files" | "carried" | "opening").
+    "calls": the last its slash opening and tool calls show (`seen`, in order); "files": the owner of most of the
+    files it changed (`changed`, git paths); "carried": the session's previous turn's (`prev`); else the session's
+    opening skill. summary.json's per-skill turn counts are of this, not of the skill a session opened with."""
+    dev = [s for s in seen if s in SKILLS]
+    if dev:
+        return dev[-1], "calls"
+    owners = [s for f in changed for p, s in FILE_SKILL if p.search(f)]
+    if owners:
+        return max(dict.fromkeys(owners), key=owners.count), "files"
+    return (prev, "carried") if prev else (opening, "opening")
 
 
 def named_skill(msg):
@@ -291,16 +316,19 @@ def session_step(nxt, before, sess, last=None, now=None, msg=""):
     messages, not by the skill dt next names (iteration 9's flow-F5). A fresh one opens
     - after an approved gate: dt next was at a gate before the last message, and that message approved;
     - for a new stage (`next_stage`): idea-refine, which owns the new idea until it is written down;
-    - when the user ran probes (`ran`) and the session isn't api-probe's: their Record is.
+    - when the user ran probes (`ran`) and the session isn't api-probe's: their Record is, unless another skill's
+      gate is open (dt next names its `gate`), which keeps its session until the user approves it (iteration 10's H3:
+      five sessions for one build-planning approval).
     Otherwise the session resumes, whatever dt next names now, so an answer goes back to the session that asked.
     A fresh session's message names no other skill, or it opens with the message alone, as that skill's run."""
     last, now = last or {}, now or {}
     skill = nxt.get("skill")
+    gate_open = nxt.get("mode") == "gate" and skill not in (None, "api-probe")
     if now.get("action") == "next_stage":
         skill = "idea-refine"
     elif sess is None:
         skill = skill or "idea-refine"
-    elif now.get("ran") and sess["skill"] != "api-probe":
+    elif now.get("ran") and sess["skill"] != "api-probe" and not gate_open:
         skill = "api-probe"
     elif not (skill and (before or {}).get("mode") == "gate" and last.get("approves")):
         return False, sess["skill"], False
@@ -339,8 +367,7 @@ def agent_turn(proj, sid, msg, first, log_path, plugin_root, extra, turn=None):
                     tools.append(c["name"])
                     if c["name"] == "Skill":
                         skills.append(dtrun.skill_name(c["input"].get("skill")))
-                    if c["name"] == "Bash":
-                        seen += STATUS_SKILL.findall(str((c.get("input") or {}).get("command", "")))
+                    seen += dtrun.call_skills(c)  # a Skill call, `dt status --skill X`, a read of skills/X/
                     if c["name"] in ("Agent", "Task") and not d.get("parent_tool_use_id"):
                         # Top-level subagent launches (reference-intake sends one per file); graded per file name.
                         inp = c.get("input") or {}
@@ -359,7 +386,7 @@ def agent_turn(proj, sid, msg, first, log_path, plugin_root, extra, turn=None):
     if not result and r.returncode != 0:
         result = f"[agent error rc={r.returncode}] {r.stderr[-500:]}"
     m = SLASH.match(msg)
-    seen = list(dict.fromkeys(([m.group(1)] if m else []) + skills + seen))
+    seen = list(dict.fromkeys(([m.group(1)] if m else []) + seen))  # in the order the turn worked in them
     return result, usage, tools, skills, dt, errors, hooks, init, agents, seen
 
 
@@ -369,6 +396,47 @@ PLANNING_CHAIN = """For each stage the assistant takes you through several plann
 SIM_TRIES = 3  # one call and two retries before the fallback
 FALLBACK_APPROVE = "Looks good, approved."
 FALLBACK_ASKED = "Sorry, I lost track: could you list your open questions again, briefly and numbered? I'll answer each one."
+# The simulated user can only talk and, through the driver, run the probes' steps (iteration 10's H4: "I unset
+# SHARADAR_BASE_URL", which it can't do, so the agent chased a change that never happened).
+SIM_LIMITS = ("You have no shell, editor or settings of your own: you only write messages, and when you say you ran the "
+              "scripts, the eval runs each probe's steps for you exactly as its README gives them, in a fixed "
+              "environment you can't change. Never say you changed your environment or setup (set, unset or exported a "
+              "variable, edited a file or profile, installed something, used another terminal or a different command); "
+              "if the assistant asks you to, say you can't change that here and can only run the steps as the README "
+              "gives them.")
+# claude -p --json-schema: the answer comes back in `structured_output` (iteration 10's H4: 42 prose replies).
+SIM_SCHEMA = {"type": "object", "required": ["action", "message", "ran", "approves"], "additionalProperties": False,
+              "properties": {"action": {"type": "string", "enum": ["reply", "next_stage", "finish"]},
+                             "message": {"type": "string"}, "ran": {"type": "boolean"}, "approves": {"type": "boolean"}}}
+PROSE_RAN = re.compile(r"\b(?:ran it|I(?:'ve| have)? ran|I (?:re-?)?ran|ran (?:the|PB-\d+|both|all|each|steps?))\b", re.I)
+PROSE_APPROVES = re.compile(r"\b(?:approved?|looks good|lgtm)\b", re.I)
+PROSE_NOT = re.compile(r"\b(?:not|n't|don't|can't|before I)\b[^.?!\n]{0,20}\bapprov", re.I)
+
+
+def sim_answer(out):
+    """The simulated user's answer from claude -p's JSON output, or None: `structured_output`, else a JSON object in
+    `result`, else `result` as prose taken as the message (`prose`: action "reply", `ran` and `approves` read off its
+    words), so a reply never falls back to a canned one only because it wasn't JSON."""
+    u = out.get("structured_output")
+    txt = out.get("result") or ""
+    if not isinstance(u, dict):
+        m = re.search(r"\{.*\}", txt, re.S)
+        try:
+            u = json.loads(m.group(0)) if m else None
+        except ValueError:
+            u = None
+    if isinstance(u, dict) and isinstance(u.get("message"), str) and u["message"].strip():
+        return u
+    txt = txt.strip()
+    if not txt or json_like(txt):
+        return None
+    return {"action": "reply", "message": txt, "ran": bool(PROSE_RAN.search(txt)),
+            "approves": bool(PROSE_APPROVES.search(txt)) and not PROSE_NOT.search(txt), "prose": True}
+
+
+def json_like(txt):
+    """Whether `txt` is a JSON fragment with no message (a broken object, not prose)."""
+    return txt[0] in "{[" or txt.startswith("```")
 
 
 def sim_user(scn, traj, revealed, next_stage, history_tail, agent_msg, status, refs, note="", errlog=None, turn=None):
@@ -414,18 +482,16 @@ ASSISTANT'S LATEST MESSAGE:
 {agent_msg[-9000:]}
 >>>
 {note_txt}
-Decide your reply. If the assistant asked questions, answer them all briefly and consistently with your facts. If it presented a draft for review, approve it explicitly (or request one specific fix if it contradicts your facts). If it offers golden test cases or a test plan, say yes. If it asks which stage or milestone a reference file serves, or which skills to route to a stage, answer from your facts. If it offers to commit approved documents, say yes. If it asks you to choose options or defaults (for example for tooling), take its recommendation. An approval says only that you approve, plus your answers to any questions: never add "and continue", "then move on to the next step" or what should come next, and never name a step or skill; the assistant stops after each approval, and you tell it to go on in your next message. If it is waiting with nothing to approve or answer, tell it to continue. Never instruct it which skill to use, and never write code, documents or tests yourself. Never ask it to write code or tests or to start building. {build_rule} When you approve something and also introduce the next stage, put the approval first in the same message ("Approved. Next idea: ...").
+Decide your reply. If the assistant asked questions, answer them all briefly and consistently with your facts. If it presented a draft for review, approve it explicitly (or request one specific fix if it contradicts your facts). If it offers golden test cases or a test plan, say yes. If it asks which stage or milestone a reference file serves, or which skills to route to a stage, answer from your facts. If it offers to commit approved documents, say yes. If it asks you to choose options or defaults (for example for tooling), take its recommendation. An approval says only that you approve, plus your answers to any questions: never add "and continue", "then move on to the next step" or what should come next, and never name a step or skill; the assistant stops after each approval, and you tell it to go on in your next message. If it is waiting with nothing to approve or answer, tell it to continue. Never instruct it which skill to use, and never write code, documents or tests yourself. Never ask it to write code or tests or to start building. {SIM_LIMITS} {build_rule} When you approve something and also introduce the next stage, put the approval first in the same message ("Approved. Next idea: ...").
 Return ONLY a JSON object: {{"action": "reply" | "next_stage" | "finish", "message": "<what you say to the assistant>", "ran": true | false, "approves": true | false}}
 "ran" is true only when your message tells the assistant you ran the scripts it asked you to run (you run them as you send it); saying you will run them later is false. "approves" is true when your message approves what the assistant presented for approval."""
     for attempt in range(1, SIM_TRIES + 1):
         r = sh([CLAUDE_BIN, "-p", prompt, "--model", USER_MODEL, "--tools", "", "--output-format", "json",
-                "--no-session-persistence", *ISOLATE], HERE, timeout=600)
+                "--json-schema", json.dumps(SIM_SCHEMA), "--no-session-persistence", *ISOLATE], HERE, timeout=600)
         try:
-            txt = json.loads(r.stdout)["result"]
-            u = json.loads(re.search(r"\{.*\}", txt, re.S).group(0))
-            if isinstance(u, dict) and isinstance(u.get("message"), str) and u["message"].strip():
+            u, err = sim_answer(json.loads(r.stdout)), "no message in the JSON"
+            if u:
                 return u
-            err = "no message in the JSON"
         except Exception as e:
             err = repr(e)
         if errlog:
@@ -497,24 +563,26 @@ def start_vendors(out, project, run_id):
     """The project's fake vendors, each logging to <out>/vendor_<name>.jsonl: ({name: {url, server, key, cfg,
     run_env}}, every server started).
 
-    A vendor with a key (`key_env`) is served on 127.0.0.1 with the canary as its key, for the base URL its .env
-    names. A vendor's `proxy_hosts` (`host` or `host/path-prefix`: yahooquery's Yahoo hosts, Sharadar's own API host)
-    are served by the same fake behind one HTTPS proxy (fakevendor/proxy.py) for the whole run: its environment goes
-    into ENV, so the agent and the simulated user use it, and shims for python3, python, uv and curl lead PATH, so
-    `env -i PATH="$PATH" python3 public.py` still does. A second, closed proxy serves the same routes and refuses
-    every other live host: user runs get its environment (`run_env`), and so does every public.py the agent runs
-    (the shims). A vendor with proxy hosts and no key (Yahoo) has no base URL."""
+    A vendor with a key (`key_env`) expects the canary `sk-canary-<run id>` as its key. A vendor's `proxy_hosts`
+    (`host` or `host/path-prefix`: yahooquery's Yahoo hosts, Sharadar's `api.sharadar.com` and `data.nasdaq.com/api/`)
+    are its real hosts, served by its fake behind one HTTPS proxy (fakevendor/proxy.py) for the whole run, and it has
+    no base URL: nothing the agent or the user sees points at 127.0.0.1, so evidence names the vendor's own host
+    (iteration 10's H1). The proxy's environment goes into ENV, so the agent and the simulated user use it, and shims
+    for python3, python, uv and curl lead PATH, so `env -i PATH="$PATH" python3 public.py` still does. A second,
+    closed proxy serves the same routes and refuses every other live host: user runs get its environment
+    (`run_env`), and so does every public.py the agent runs (the shims). Only a vendor with no proxy hosts (a
+    base-URL fake, as probe_skill.py's Plaid) is served on 127.0.0.1, for the base URL its .env names (`base_env`)."""
     vendors, routes, servers = {}, {}, []
     for name, cfg in project.get("fake_vendors", {}).items():
-        if cfg.get("key_env") or not cfg.get("proxy_hosts"):
-            key = f"sk-canary-{run_id}"
+        key = f"sk-canary-{run_id}" if cfg.get("key_env") or not cfg.get("proxy_hosts") else None
+        if cfg.get("proxy_hosts"):
+            handler = fakevendor.handler_class(name, out / f"vendor_{name}.jsonl", expect_key=key)
+            vendors[name] = {"url": None, "server": None, "key": key, "cfg": cfg}
+        else:
             url, server = fakevendor.start(name, out / f"vendor_{name}.jsonl", expect_key=key)
             vendors[name] = {"url": url + cfg.get("path", ""), "server": server, "key": key, "cfg": cfg}
             servers.append(server)
-            handler = server.RequestHandlerClass  # one fake per vendor: the same log and state behind the proxy
-        else:
-            handler = fakevendor.handler_class(name, out / f"vendor_{name}.jsonl")
-            vendors[name] = {"url": None, "server": None, "key": None, "cfg": cfg}
+            handler = server.RequestHandlerClass
         routes.update({h: handler for h in cfg.get("proxy_hosts", [])})
     if routes:
         certs = str(out / "proxy" / "certs")
@@ -530,20 +598,21 @@ def start_vendors(out, project, run_id):
 
 
 def vendor_env(names, vendors):
-    """What the user puts in .env for these variable names: keys → the canary, base URLs → the fake vendor.
+    """What the user puts in .env for these variable names: keys → the canary, base URLs → a base-URL fake.
     A name goes to the vendor it names (or one of its aliases), or to none: a variable has to say whose it is. A
-    proxied vendor (no key, no base URL) gets nothing here."""
+    proxied vendor gets its key only: never a base URL, so its scripts call the vendor's real host."""
     env = {}
     vendors = {k: v for k, v in vendors.items() if v.get("key")}
     for v in vendors.values():
-        env.update({n: v["url"] for n in v["cfg"].get("base_env", [])})
+        env.update({n: v["url"] for n in v["cfg"].get("base_env", []) if v["url"]})
         env.update({n: v["key"] for n in v["cfg"].get("key_env", [])})
     for n in names:
         v = next((v for k, v in vendors.items() if any(a.upper() in n.upper() for a in [k, *v["cfg"].get("aliases", [])])), None)
         if v is None:
             continue
         if re.search(r"URL|HOST|BASE", n, re.I):
-            env[n] = v["url"]
+            if v["url"]:
+                env[n] = v["url"]
         elif re.search(r"KEY|TOKEN|SECRET|PASSWORD", n, re.I):
             env[n] = v["key"]
         elif re.search(r"CLIENT_ID", n, re.I):
@@ -554,7 +623,10 @@ def vendor_env(names, vendors):
 
 
 def script_cmd(script):
-    return re.compile(r"(?:uv run|python3?)\s+(?:[^\s`]*/)?" + re.escape(script) + r"((?:[ \t]+[^\s`&|;<>]+)*)")
+    """`uv run` or `python` running `script`, its options skipped (`uv run --script <path>`, `--with <pkg>`,
+    `python3 -B`; an option's value is never a .py path), with the step arguments after it in group 1."""
+    opt = r"(?:\s+-[\w-]+(?:=[^\s`]+|\s+(?!-)(?![^\s`]*\.py\b)[^\s`]+)??)*"
+    return re.compile(r"(?:uv run|python3?)" + opt + r"\s+(?:[^\s`]*/)?" + re.escape(script) + r"((?:[ \t]+[^\s`&|;<>]+)*)")
 
 
 AGENT_ROW = re.compile(r"^\|[^|\n]*\|\s*agent\b[^\n]*$", re.M | re.I)
@@ -687,7 +759,7 @@ def run_loop(scn, traj, project, stages, out, proj, plugin_root, dt, extra, msg,
         # A fresh session right after a question gets the question's end, so the answer still has its question.
         carried = fresh and sess is not None and asked(reply)
         if fresh:
-            sess = {"n": len(sessions) + 1, "id": str(uuid.uuid4()), "skill": skill, "seen": [skill], "turns": [],
+            sess = {"n": len(sessions) + 1, "id": str(uuid.uuid4()), "skill": skill, "seen": [skill], "turns": [], "by_turn": [],
                     "cost_usd": 0.0, "output_tokens": 0}
             sessions.append(sess)
         before, last = nxt, pending
@@ -703,8 +775,13 @@ def run_loop(scn, traj, project, stages, out, proj, plugin_root, dt, extra, msg,
         sess["output_tokens"] += (usage.get("usage") or {}).get("output_tokens") or 0
         commit(proj, f"turn {t}")
         changed = sh(["git", "diff", "--stat", base, "HEAD"], proj).stdout.strip()
+        changed_docs = sh(["git", "diff", "--name-only", base, "HEAD"], proj).stdout.split()
+        work, work_from = working_skill(seen, changed_docs, sess.get("working"), sess["skill"])
+        sess["working"] = work
+        sess["by_turn"].append(work)
         facts, status = snapshot(proj, dt, keep=out / "plans" / f"T{t:03d}.json")
         rec = {"turn": t, "user": sent, "assistant": reply, "skills": skills, "tools": tools,
+               "working_skill": work, "working_from": work_from,
                "seconds": round(dt_s, 1), "usage": usage, "docs_changed": changed, "status": status,
                "stage": stage_log[-1]["stage"], "tool_errors": errors, "hook_events": hooks, "agents": agents,
                "session": {"n": sess["n"], "id": sess["id"], "skill": skill, "new": fresh, "slash": slash,
@@ -721,7 +798,7 @@ def run_loop(scn, traj, project, stages, out, proj, plugin_root, dt, extra, msg,
         turns.append(rec)
         history.append(f"USER: {msg[:1500]}\nASSISTANT: {reply[:1500]}")
         (out / "turns.json").write_text(json.dumps(turns, indent=1))
-        print(f"[{tid}] turn {t} stage={rec['stage']} session={sess['n']}{'*' if fresh else ''}:{skill} {dt_s:.0f}s "
+        print(f"[{tid}] turn {t} stage={rec['stage']} session={sess['n']}{'*' if fresh else ''}:{skill} working={work} {dt_s:.0f}s "
               f"skills={skills} changed={changed.splitlines()[-1] if changed else '-'}", flush=True)
 
         if closing:
@@ -748,7 +825,6 @@ def run_loop(scn, traj, project, stages, out, proj, plugin_root, dt, extra, msg,
                                        errlog=out / "sim_errors.jsonl", turn=t)
         u = ask()
         dnext = dt_next(proj, dt)  # what dt says after this turn
-        changed_docs = sh(["git", "diff", "--name-only", base, "HEAD"], proj).stdout.split()
         blocked = readiness(facts, n_revealed, traj["mode"], dnext, probes_run, approved_docs(u, dnext, changed_docs))
         why = [r for r, _ in blocked]
         rec["readiness"] = why
@@ -810,6 +886,8 @@ def run_loop(scn, traj, project, stages, out, proj, plugin_root, dt, extra, msg,
         rec["sim_ran"], rec["sim_approves"] = bool(u.get("ran")), bool(u.get("approves"))
         if u.get("fallback"):
             rec["sim_fallback"] = u["message"]
+        if u.get("prose"):
+            rec["sim_prose"] = True
         if vendors and u.get("ran"):
             user_run = run_user_checks(proj, vendors, out / "user_runs.jsonl")
             probes_run |= {r_["probe"] for r_ in user_run}
@@ -833,8 +911,11 @@ def run_loop(scn, traj, project, stages, out, proj, plugin_root, dt, extra, msg,
                # Each session's cost is its last cumulative total_cost_usd; the run's is their sum.
                "agent_cost_usd": round(sum(s["cost_usd"] for s in sessions), 3),
                "agent_output_tokens": sum(s["output_tokens"] for s in sessions),
+               # Per skill, the turns that worked in it (working_skill), whatever skill their session opened with.
+               "turns_by_skill": dict(collections.Counter(w for s in sessions for w in s["by_turn"]).most_common()),
                "sessions": [{k: s[k] for k in ("n", "id", "skill", "seen", "turns")} | {"cost_usd": round(s["cost_usd"], 3),
-                            "output_tokens": s["output_tokens"]} for s in sessions],
+                            "output_tokens": s["output_tokens"], "working": dict(collections.Counter(s["by_turn"]))}
+                            for s in sessions],
                "finished": any("sim_user_final" in x for x in turns), "stop_reason": stop_reason,
                "fake_vendors": sorted(vendors), "probe_canary": next((v["key"] for v in vendors.values() if v.get("key")), None),
                "user_runs": sum(1 for x in turns if x.get("user_run") is not None),

@@ -134,7 +134,7 @@ def plan_facts(doc, done):
     return {
         "doc": doc.rel, "kind": doc.kind, "status": doc.status, "lines": len(doc.lines),
         "milestone": roadmap_cmd._plan_milestone(doc), "dev_team": model.is_dev_team_plan(doc),
-        "covers": md.expand_refs(scope.get("Covers", "")), "deferred": md.expand_refs(scope.get("Deferred", "")),
+        "covers": md.expand_refs(scope.get("Covers", "")), "deferred": md.expand_refs(scope.get("Deferred", "")) + dtrun.named_steps(scope.get("Deferred", "")),
         "tasks": facts, "graph": graph_rows(doc), "interface_tasks": [t.id for t in iface],
         "interface_symbols": sorted(declared), "dt_graph": dtg,
     }

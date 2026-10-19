@@ -515,6 +515,13 @@ def wiring_folds(pl, s, tasks, packages=()):
 
 
 PROBE_WAIT = re.compile(r"\bwaits? on (PB-\d{2,})", re.I)
+STEP_REF = re.compile(r"\bPL-\d{2,}(?:\.[A-Za-z_]\w*)+")
+
+
+def named_steps(text):
+    """Step IDs a plan's Deferred cell names (`PL-07.raise_finding (to M2: …)`). dt's expand_refs reads only the
+    pipeline ID out of them (it10 G4), so dtprobe adds these to the plan's `deferred` list."""
+    return list(dict.fromkeys(STEP_REF.findall(text or "")))
 
 
 def outside_milestone(m_pls, m_tasks, deferred=(), declared_names=(), packages=()):
@@ -527,19 +534,26 @@ def outside_milestone(m_pls, m_tasks, deferred=(), declared_names=(), packages=(
         (a spined stand-in, design §6.2);
     (c) the interface doesn't declare it, no task names it, and every one of its Covers is covered by a step this
         milestone builds (it adds no requirement of its own).
-    A step with no Covers is never outside: nothing says it is someone else's."""
+    A step with no Covers is never outside: nothing says it is someone else's. A step the Deferred list names by its
+    ID (`PL-09.useReport`) is outside unless a task's Step cell names it, even when the spine of a step sharing its
+    owner module would build it (it10 G4)."""
     units = step_units(m_pls)
     dfr = set(deferred)
+    own_steps = {x for t in m_tasks for x in step_ids(t.get("step"))}
     text = " ".join(json.dumps({k: t.get(k) for k in ("title", "acceptance", "reason", "step", "read_symbols", "read")})
                     for t in m_tasks)
     built, unbuilt = [], []
+    out = {}
     for pl in m_pls:
         for s in pl["steps"]:
+            sid = f"{pl['id']}.{s['name']}"
+            if sid in dfr and sid not in own_steps:
+                out[sid] = "Deferred by name"
+                continue
             by = [] if call_step(pl, s, packages) else covering_tasks(pl, s, m_tasks, units, packages) + wiring_folds(pl, s, m_tasks, packages)
             (built if by else unbuilt).append((pl, s))
     built_covers = {c for _, s in built for c in s.get("covers") or []}
     built_out = {x for _, s in built for x in type_names(s.get("out_type"))}
-    out = {}
     for pl, s in unbuilt:
         covers = set(s.get("covers") or [])
         sid = f"{pl['id']}.{s['name']}"
@@ -998,9 +1012,29 @@ def crosscheck_facts(entries, design, planted):
     return bool(answered and not m["missing_not_named"] and m["adjusted_only"] and m["reused"]), m
 
 
+# spec_classical: both classical portfolios named; "risk-parity" is the same portfolio (it10 G1).
+MIN_VARIANCE = re.compile(r"min(imum)?[- ]variance", re.I)
+RISK_PARITY = re.compile(r"risk[- ]parity", re.I)
+
+
+def spec_classical(spec):
+    return bool(MIN_VARIANCE.search(spec or "")) and bool(RISK_PARITY.search(spec or ""))
+
+
+# probe_not_guess: a decision that only suggests a source for a later stage (`**Scope:** later stage`, or a heading
+# "… for a later stage") chooses nothing this stage builds, so it isn't the data-source decision (it10 G2, quant
+# inc AD-11 "Suggested fundamentals source for a later stage: Sharadar Core US Fundamentals").
+LATER_STAGE = re.compile(r"\b(later|future|next) stages?\b", re.I)
+
+
+def later_stage_decision(d):
+    scope = re.search(r"\*\*Scope:\*\*\s*([^·\n]*)", d.get("text") or "")
+    return bool(LATER_STAGE.search(d.get("title") or "")) or bool(scope and LATER_STAGE.search(scope.group(1)))
+
+
 # spec_ml_beats_classical: the ML bar names the classical portfolios or the earlier stage's named benchmark.
 ML_BEATS_CLASSICAL = re.compile(
-    r"(PPO|agent|forecast[- ]driven|ML[- ]driven).{0,600}(min(imum)?[- ]variance|classical|HRP|risk parity|"
+    r"(PPO|agent|forecast[- ]driven|ML[- ]driven).{0,600}(min(imum)?[- ]variance|classical|HRP|risk[- ]parity|"
     r"S2'?s? (best|named|benchmark)|best (classical|strategy)|benchmark)", re.S | re.I)
 
 

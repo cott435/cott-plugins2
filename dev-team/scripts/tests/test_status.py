@@ -602,6 +602,20 @@ class BuildPlanningModesTest(Base):
         d = self.status("build-planning")
         self.assertEqual((d["mode"], d["stage_to_cut"]), ("extend", "S2 Classical portfolios"))
 
+    def test_stale_unbuilt_plan_replans_before_the_cut(self):
+        # iteration 10 D4: M1 is unbuilt and its docs changed after it was planned: Replan before cutting S2.
+        self.staged()
+        self.edit("docs/roadmap.md", "| M1 | S1 | Prices to covariance | quant | PL-01, PL-02 | — | Building |",
+                  "| M1 | S1 | Prices to covariance | quant | PL-01, PL-02 | — | Planned |")
+        todo = self.root / "tasks/todo.md"
+        todo.write_text(todo.read_text(encoding="utf-8").replace("- [x]", "- [ ]"), encoding="utf-8")
+        self.edit("docs/packages/quant/pipelines.md", "**Last updated:** 2026-10-16", "**Last updated:** 2026-10-20")
+        d = self.status("build-planning")
+        self.assertEqual((d["mode"], d["stage_to_cut"]), ("replan", "S2 Classical portfolios"))
+        # Once building, the cut goes first and the replan follows.
+        todo.write_text(todo.read_text(encoding="utf-8").replace("- [ ]", "- [x]", 1), encoding="utf-8")
+        self.assertEqual(self.status("build-planning")["mode"], "extend")
+
     def test_stage_with_ids_off_approved_pipelines_is_not_cut(self):
         # flow-F1b: PL-03 is Approved, but the PORT-03 S2 adds is on no pipeline yet.
         self.staged()

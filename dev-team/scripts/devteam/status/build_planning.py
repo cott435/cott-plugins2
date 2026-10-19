@@ -350,6 +350,8 @@ def build_planning(repo: Repo, r: Report) -> None:
         blocked = (f"{', '.join(undesigned)} below Designed: every stage comes from the brief, so all are "
                    f"designed before the first cut; {stage_gaps(repo, undesigned)}"
                    + (f"; no pipelines.md for {', '.join(no_pl)}" if no_pl else "") + "; run pipeline-design")
+    elif active and (changed or moved) and not any(i.checked for i in items):
+        mode = "replan"     # an unbuilt plan the docs moved under is replanned before the next stage is cut
     elif cut is not None:
         if not active and not queued and never_planned:
             # New plans the first unit and cuts every designed stage; the first unit must be Designed too.

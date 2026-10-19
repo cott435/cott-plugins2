@@ -44,7 +44,8 @@ through a second, closed proxy that refuses every live host but the package inde
 ran the scripts (`ran`), the driver runs each Ready probe as the user would: it writes the probe's .env from its
 .env.example (keys get the canary `sk-canary-<run id>`; a proxied vendor gets no base URL), runs public.py only where
 the README gives it to the user (as given: `uv run [--script] public.py <step>`), with no environment but the closed
-proxy's, then each probe.py step its README gives with the closed proxy's environment and the keys, logs them to
+proxy's, then each probe.py step its README gives with the closed proxy's environment and the keys, each within the time its
+README states for it (`step_limit`; a step still running then is stopped and reported as such), logs them to
 <out>/user_runs.jsonl and commits "user run before turn N". The simulated user then drops its own account of the run
 from its message, and the driver appends which steps ran and each one's exit code, never output (`ran_said`). When the user would move on while `dt next` says
 build-planning waits for Ready probes it never ran, readiness asks it to run them.
@@ -58,6 +59,8 @@ Usage: driver.py <trajectory-id> <out-dir>
 Env: PLUGIN_SRC / SKILLS_SRC (see plugin.py), CLAUDE_BIN (default: claude; fake_claude.py for a no-cost
 loop test), AGENT_MODEL, USER_MODEL, COST_CAP_USD (stop once the agent sessions together have cost this much;
 default none), MAX_TURNS (override the scenario's turn budget, e.g. 1 for a smoke run), TURN_TIMEOUT_S (above),
+USER_STEP_TIMEOUT_S / USER_STEP_MAX_S (a user's probe step's limit with no stated time, default 600 s, and its ceiling,
+default 7,200 s),
 PERMISSION_PROMPTS=0 (don't answer the oracle guard's "ask" prompts; see permission_mcp.py). Both sessions load
 project/local settings only, no CLAUDE.md files and no MCP servers but the eval's own, so the host's user-level instructions, skills,
 plugins and MCP servers don't leak into the trajectory.
@@ -85,6 +88,12 @@ PERMISSION_PROMPTS = os.environ.get("PERMISSION_PROMPTS", "1") != "0"
 # TIMEOUT_LIMIT timed-out turns in a row.
 TURN_TIMEOUT = int(os.environ.get("TURN_TIMEOUT_S") or 1800)
 TIMEOUT_LIMIT = 3
+# A user's probe step (run_user_checks) gets the time its README states for it, plus a quarter and a minute
+# (`step_limit`): at least USER_STEP_TIMEOUT_S, which is also the limit of a step with no stated time, and at most
+# USER_STEP_MAX_S. Iteration 12: api-probe gives a long paced batch to the user with its time stated (smoke-14's PB-02
+# `pace`, "≤ 30 min"), and a flat 600 s cut it off with nothing recorded but "exit code timeout".
+USER_STEP_TIMEOUT = int(os.environ.get("USER_STEP_TIMEOUT_S") or 600)
+USER_STEP_MAX = int(os.environ.get("USER_STEP_MAX_S") or 7200)
 STALL_LIMIT = 4  # blocked moves in a row with nothing changed in the turn (the agent's own commits count) before the run stops as stalled
 
 STRIP_ENV = ["CLAUDE_CODE_SESSION_ID", "CLAUDE_CODE_REMOTE_SESSION_ID", "CLAUDE_CODE_TEE_SDK_STDOUT",
@@ -240,14 +249,24 @@ def approved_docs(u, nxt, changed):
 
 
 def run_report(runs):
-    """What the user's run did, per step and without output: the simulated user reports from this."""
+    """What the user's run did, per step and without output: the simulated user reports from this. A step stopped at
+    its limit says how long it ran and the time its README gives it."""
     if not runs:
         return "nothing ran: no probe was Ready"
     out = []
     for r in runs:
         step = " ".join([r["script"].split("/")[-1], *r.get("args", [])]) if r.get("script") else "(no folder)"
+        if r.get("rc") == "timeout":
+            gave = (f"its README gives it {duration(r['stated_s'])}" if r.get("stated_s")
+                    else "its README gives it no time")
+            out.append(f"{r['probe']} {step}: still running after {duration(r['seconds'])}, so I stopped it ({gave})")
+            continue
         out.append(f"{r['probe']} {step}: " + (r.get("error") or ("exit code " + str(r["rc"]))))
     return "; ".join(out)
+
+
+def duration(seconds):
+    return f"{round(seconds / 60)} minutes" if seconds >= 120 else f"{round(seconds)} seconds"
 
 
 def ran_said(report):
@@ -458,7 +477,7 @@ def last_call(stdout):
 def timeout_note(seconds, call):
     """The next message after a timed-out turn: what happened, in a user's words, then "carry on"."""
     what = f" (the last thing it ran: {call['name']} {call['input'][:200]})" if call else ""
-    took = f"{round(seconds / 60)} minutes" if seconds >= 120 else f"{round(seconds)} seconds"
+    took = duration(seconds)
     return (f"Your last turn was still running after {took}, so it was stopped{what}. Whatever "
             "it was running was killed and its output is lost. Please carry on from where you were.")
 
@@ -477,6 +496,13 @@ SIM_LIMITS = ("You have no shell, editor or settings of your own: you only write
               "variable, edited a file or profile, installed something, used another terminal or a different command); "
               "if the assistant asks you to, say you can't change that here and can only run the steps as the README "
               "gives them.")
+# Iteration 11's rl user said "matching the scripted baseline counts as passing" against its facts' "beats a random and
+# a simple scripted baseline", and the judges marked the plan down for it.
+SIM_BARS = ("The success bars and constraints your facts set (what counts as success, and limits on time, hardware, "
+            "money and scope) stay as your facts state them: never lower or relax one, on your own or when the "
+            "assistant asks or proposes it (a weaker pass bar, a check that no longer blocks, a larger limit, part of a "
+            "stage dropped from the project). If it asks, say no and keep the fact. Answering a question your facts leave open is "
+            "fine.")
 # claude -p --json-schema: the answer comes back in `structured_output` (iteration 10's H4: 42 prose replies).
 SIM_SCHEMA = {"type": "object", "required": ["action", "message", "ran", "approves"], "additionalProperties": False,
               "properties": {"action": {"type": "string", "enum": ["reply", "next_stage", "finish"]},
@@ -555,7 +581,7 @@ ASSISTANT'S LATEST MESSAGE:
 {agent_msg[-9000:]}
 >>>
 {note_txt}
-Decide your reply. If the assistant asked questions, answer them all briefly and consistently with your facts. If it presented a draft for review, approve it explicitly (or request one specific fix if it contradicts your facts). If it offers golden test cases or a test plan, say yes. If it asks which stage or milestone a reference file serves, or which skills to route to a stage, answer from your facts. If it offers to commit approved documents, say yes. If it asks you to choose options or defaults (for example for tooling), take its recommendation. An approval says only that you approve, plus your answers to any questions: never add "and continue", "then move on to the next step" or what should come next, and never name a step or skill; the assistant stops after each approval, and you tell it to go on in your next message. If it is waiting with nothing to approve or answer, tell it to continue. Never instruct it which skill to use, and never write code, documents or tests yourself. Never ask it to write code or tests or to start building. {SIM_LIMITS} {build_rule} When you approve something and also introduce the next stage, put the approval first in the same message ("Approved. Next idea: ...").
+Decide your reply. If the assistant asked questions, answer them all briefly and consistently with your facts. If it presented a draft for review, approve it explicitly (or request one specific fix if it contradicts your facts). If it offers golden test cases or a test plan, say yes. If it asks which stage or milestone a reference file serves, or which skills to route to a stage, answer from your facts. If it offers to commit approved documents, say yes. If it asks you to choose options or defaults (for example for tooling), take its recommendation. An approval says only that you approve, plus your answers to any questions: never add "and continue", "then move on to the next step" or what should come next, and never name a step or skill; the assistant stops after each approval, and you tell it to go on in your next message. If it is waiting with nothing to approve or answer, tell it to continue. Never instruct it which skill to use, and never write code, documents or tests yourself. Never ask it to write code or tests or to start building. {SIM_BARS} {SIM_LIMITS} {build_rule} When you approve something and also introduce the next stage, put the approval first in the same message ("Approved. Next idea: ...").
 Return ONLY a JSON object: {{"action": "reply" | "next_stage" | "finish", "message": "<what you say to the assistant>", "ran": true | false, "approves": true | false}}
 "ran" is true only when your message tells the assistant you ran the scripts it asked you to run (you run them as you send it); saying you will run them later is false. "approves" is true when your message approves what the assistant presented for approval."""
     for attempt in range(1, SIM_TRIES + 1):
@@ -724,11 +750,60 @@ def user_steps(readme, script="probe.py"):
     return out or ([[]] if script == "probe.py" else [])
 
 
-def run_user_checks(proj, vendors, log_path, ids=None, timeout=600):
+STATED_TIME = re.compile(r"\b(\d+(?:\.\d+)?|an?)\s*(h|hours?|hrs?|min|mins|minutes?|s|secs?|seconds?)\b", re.I)
+
+
+def stated_seconds(readme, script, args):
+    """The longest time the README states on its line for this step ("≤ 30 min", "~1 min", "an hour"), in
+    seconds, or None. The step's line is a list item or table row (with its wrapped lines) naming `script` with
+    exactly these arguments."""
+    cmd, best = script_cmd(script), None
+    for item in re.split(r"\n(?=[ \t]*(?:\d+\.|[-*]|\|)\s)|\n[ \t]*\n", readme):
+        if not any(m.group(1).split() == list(args) for span in re.findall(r"`([^`]+)`", item) for m in cmd.finditer(span)):
+            continue
+        for n, unit in STATED_TIME.findall(re.sub(r"`[^`]*`", "", item)):
+            secs = (1 if n.lower() in ("a", "an") else float(n)) * {"h": 3600, "m": 60, "s": 1}[unit[0].lower()]
+            best = secs if best is None else max(best, secs)
+    return best
+
+
+def step_limit(stated):
+    """A user step's limit in seconds: its stated time plus a quarter and a minute, within USER_STEP_TIMEOUT and
+    USER_STEP_MAX; USER_STEP_TIMEOUT when the README states none."""
+    if stated is None:
+        return USER_STEP_TIMEOUT
+    return min(USER_STEP_MAX, max(USER_STEP_TIMEOUT, int(stated * 1.25) + 60))
+
+
+def run_step(cmd, cwd, env, limit):
+    """(rc, stdout, stderr) of one user step. Past `limit` seconds its whole process group is stopped (TERM, then
+    KILL), with whatever it started (uv's python included), and rc is "timeout"; the output so far is kept."""
+    p = subprocess.Popen(cmd, cwd=cwd, env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+                         start_new_session=True)
+    try:
+        so, se = p.communicate(timeout=limit)
+        return p.returncode, so, se
+    except subprocess.TimeoutExpired:
+        so = se = ""
+        for sig, wait in ((signal.SIGTERM, 10), (signal.SIGKILL, 30)):
+            try:
+                os.killpg(p.pid, sig)
+                so, se = p.communicate(timeout=wait)
+                break
+            except ProcessLookupError:
+                so, se = p.communicate()
+                break
+            except subprocess.TimeoutExpired:
+                pass
+        return "timeout", so or "", se or ""
+
+
+def run_user_checks(proj, vendors, log_path, ids=None):
     """The user's "ran it": every Ready probe (or just `ids`) is run as the user would run it, through the closed
     proxy: public.py with no other environment, then each probe.py step its README gives (`user_steps`), in order,
-    stopping at the first that fails. Returns one record per run; the canary is scrubbed from what is kept, and
-    `printed_key` says whether a script printed it."""
+    stopping at the first that fails. Each step runs within `step_limit` of the time its README states for it
+    (`stated_seconds`). Returns one record per run; the canary is scrubbed from what is kept, and `printed_key` says
+    whether a script printed it."""
     text = (proj / "docs" / "probes.md").read_text(errors="ignore") if (proj / "docs" / "probes.md").exists() else ""
     runs, keys = [], [v["key"] for v in vendors.values() if v.get("key")]
     proxied = next((v["run_env"] for v in vendors.values() if v.get("run_env")), {})  # no secret: the closed proxy and its CA
@@ -762,14 +837,13 @@ def run_user_checks(proj, vendors, log_path, ids=None, timeout=600):
             if uv:  # as the README gives it: `uv run <script> <step>`; uv itself needs PATH and HOME
                 script_env = {**base_env, **script_env}
             cmd = ([uv, "run", script] if uv else [sys.executable, "-B", script]) + args
+            stated = stated_seconds(readme, script, args)
+            limit = step_limit(stated)
             t0 = time.time()
-            try:
-                r = subprocess.run(cmd, cwd=folder, env=script_env, capture_output=True, text=True, timeout=timeout)
-                rc, so, se = r.returncode, r.stdout, r.stderr
-            except subprocess.TimeoutExpired as ex:
-                rc, so, se = "timeout", str(ex.stdout or ""), str(ex.stderr or "")
+            rc, so, se = run_step(cmd, folder, script_env, limit)
             runs.append({"probe": e["id"], "script": f"{folder.relative_to(proj)}/{script}", "args": args, "rc": rc,
-                         "seconds": round(time.time() - t0, 1), "env": sorted(script_env) if script_env else [],
+                         "seconds": round(time.time() - t0, 1), "stated_s": stated, "limit_s": limit,
+                         "env": sorted(script_env) if script_env else [],
                          "printed_key": any(k in so + se for k in keys), "stdout_tail": scrub(so)[-600:],
                          "stderr_tail": scrub(se)[-600:]})
     with open(log_path, "a") as f:

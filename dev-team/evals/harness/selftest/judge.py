@@ -56,6 +56,9 @@ def check_prompts(root):
     case("prompts: no mode word anywhere", not jp.MODE_WORDS.search(ab + ba), jp.MODE_WORDS.findall(ab + ba))
     case("prompts: process files left out of the sets", not list(pdir.rglob("transcript.md")))
     case("prompts: the shared scale is in", "5 = you checked it and found no defect" in ab)
+    # Iteration 11: both orders cited the GPU spend and the fish bar the user had approved, against the facts.
+    case("prompts: a set is checked against its user's requests where they differ from the facts",
+         "check that set against its requests, not the fact" in ab and "superseded by UR-NN" in ab)
     for item in ANCHORED:
         line = next((ln for ln in ab.splitlines() if ln.startswith(f'- "{item}"')), "")
         case(f"prompts: {item} has anchors for 4, 3 and 2", all(f" {s}: " in line for s in (4, 3, 2)))

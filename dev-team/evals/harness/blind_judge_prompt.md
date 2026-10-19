@@ -3,6 +3,8 @@ You are a blind judge comparing two sets of planning documents for the same proj
 ## The user and project (ground truth)
 {FACTS}
 
+These are the user's facts as planning began; the user's words during planning win over them. Each set's `requests.md` keeps that user's words verbatim: a line ending `→ changed: … (approved "…")` is a change the user agreed to, their words quoted, and one ending `→ superseded by UR-NN` gave way to that later request. Where a set's requests differ from a fact above, check that set against its requests, not the fact: following the user's words, or a change they approved, is not a defect. Departing from a request without such a change is one, and so is departing from a fact no request touches.
+
 ## The documents
 - Set A: {DIR_A}
 - Set B: {DIR_B}
@@ -10,7 +12,7 @@ You are a blind judge comparing two sets of planning documents for the same proj
 The folder names carry no meaning; call the sets A and B. Judge only the files in these two folders.
 
 Each set is a folder of files named `final__<path>.md` (`/` written as `__`) plus `context__<task>.md` files:
-- Define and design: `brief.md`, `roadmap.md`, `spec.md`, `architecture.md`, and possibly `ideas__*.md` and `packages__<pkg>__architecture.md`.
+- Define and design: `requests.md` (the user's words), `brief.md`, `roadmap.md`, `spec.md`, `architecture.md`, and possibly `ideas__*.md` and `packages__<pkg>__architecture.md`.
 - Per package: `packages__<pkg>__contract.md` (public API), `packages__<pkg>__pipelines.md` (workflows as entry functions calling named steps, plus a planned file layout), and possibly `packages__<pkg>__tests.md` (test strategy and golden cases; `fixtures.txt` lists the fixture files).
 - Build: `tasks__plan.md` and `tasks__todo.md` (the next milestone's tasks), possibly `tasks__queued__*.md` (later milestones), `CONSTRAINTS.md` (the quality bar) and `AGENTS.md`.
 - References (if any): `references.md` indexes the user's own reference code, and each file is copied as `reference__<name>`.

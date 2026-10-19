@@ -5,7 +5,9 @@ public.py steps a probe's README gives the user, run in order on "ran it"), driv
 clauses, run_report (what the simulated user is told after its run), sim_user's fallback when every call fails and
 sim_answer's when it answers in prose, working_skill (the skill a turn worked in), start_vendors' proxied Sharadar
 (no base URL; the closed proxy serves api.sharadar.com with the canary key), and agent_turn past the turn limit (a
-hanging CLI killed with its child, its stream kept, the run told and going on). No dt, no model calls; the dry run
+hanging CLI killed with its child, its stream kept, the run told and going on), the sim user's rule that its facts' bars
+and constraints stay, and a user's probe step's time limit (the time its README states, `stated_seconds` and
+`step_limit`; a step past it killed with its child and reported in plain words). No dt, no model calls; the dry run
 runs this too.
 
 Usage: sessions.py   prints one line per case; exit 1 if any case comes out wrong
@@ -16,7 +18,8 @@ HERE = pathlib.Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(HERE))
 import driver  # noqa: E402
 from driver import (FALLBACK_APPROVE, FALLBACK_ASKED, approved_docs, asked, readiness, run_report,  # noqa: E402
-                    ran_said, session_step, sim_answer, sim_user, timeout_note, user_steps, vendor_env, working_skill)
+                    ran_said, session_step, sim_answer, sim_user, stated_seconds, step_limit, timeout_note, user_steps,
+                    vendor_env, working_skill)
 
 
 def sess(skill, *seen):
@@ -192,6 +195,33 @@ ASKED_U, ASKED_LOG = sim_fallback("Two questions before I write it.\n\n1. Which 
 DRAFT_U, _ = sim_fallback("The spec is ready for review: docs/spec.md (Draft).")
 
 
+# A CLI that keeps the prompt it is given and answers with a structured reply.
+ECHO_CLI = textwrap.dedent("""\
+    #!/usr/bin/env python3
+    import json, pathlib, sys
+    pathlib.Path(__file__).with_name("prompt.txt").write_text(sys.argv[sys.argv.index("-p") + 1])
+    print(json.dumps({"structured_output": {"action": "reply", "message": "No.", "ran": False, "approves": False}}))
+    """)
+
+
+def sim_prompt():
+    """The prompt sim_user sends, with the rl scenario's facts."""
+    d = pathlib.Path(tempfile.mkdtemp(prefix="sim-prompt-"))
+    (d / "claude").write_text(ECHO_CLI)
+    (d / "claude").chmod(0o755)
+    scn = json.loads((HERE / "scenarios.json").read_text())
+    saved, driver.CLAUDE_BIN = driver.CLAUDE_BIN, str(d / "claude")
+    try:
+        sim_user(scn, {"project": "rl", "mode": "all_at_once"}, scn["projects"]["rl"]["stages"], None, "",
+                 "Would matching the scripted fish count as passing?", "", [])
+    finally:
+        driver.CLAUDE_BIN = saved
+    return (d / "prompt.txt").read_text()
+
+
+SIM_PROMPT = sim_prompt()
+
+
 # Iteration 10's sim user, in prose (H4): taken as the message, with `ran` and `approves` read off its words.
 PROSE_RAN = sim_answer({"result": "No, I didn't intend the local address. I re-ran PB-01, PB-02 and the PB-03 compare "
                                   "step. Ran it."})
@@ -271,6 +301,58 @@ def hung_turn():
 HUNG_REPLY, HUNG_USAGE, HUNG_SECS, HUNG_STREAM, HUNG_CHILD = hung_turn()
 
 
+# Smoke 14's PB-02 README (iteration 12): a paced keyless batch is the user's step, its time stated.
+PACED_README = """## Who runs what
+
+| Check | Runner | Command |
+|---|---|---|
+| C1 | agent (and you, as a second network) | `uv run probes/PB-02-yahoo-crosscheck/public.py sample` |
+| C2 | agent | `uv run probes/PB-02-yahoo-crosscheck/public.py members` |
+| C3 | user | `uv run probes/PB-02-yahoo-crosscheck/public.py pace` |
+
+## What it spends
+
+Nothing paid, no key. `pace` makes about 21 batched history requests for 210 symbols from your IP over
+up to 30 minutes.
+
+## Steps, in order
+
+1. `uv run probes/PB-02-yahoo-crosscheck/public.py sample`: ~1 min. This is the agent's check, run again
+   from your network: on 2026-10-19 the agent's network got odd answers from Yahoo.
+2. `uv run probes/PB-02-yahoo-crosscheck/public.py pace`: ≤ 30 min (it's timed; that's the check).
+3. `python3 probes/PB-02-yahoo-crosscheck/probe.py bulk`: an hour, paced
+   over 2 hours on a slow network.
+"""
+# A step that starts a child and outlives its limit.
+SLOW_STEP = textwrap.dedent("""\
+    import subprocess, sys, time
+    child = subprocess.Popen(["sleep", "60"])
+    open(sys.argv[1], "w").write(str(child.pid))
+    print("started", flush=True)
+    time.sleep(60)
+    """)
+
+
+def slow_step():
+    """run_step on SLOW_STEP with a 2 s limit: (rc, stdout, seconds, whether the child still runs)."""
+    d = pathlib.Path(tempfile.mkdtemp(prefix="slow-step-"))
+    (d / "slow.py").write_text(SLOW_STEP)
+    t0 = time.time()
+    rc, so, _ = driver.run_step([sys.executable, "-B", "slow.py", str(d / "child.pid")], d,
+                                {"PATH": os.environ.get("PATH", "")}, 2)
+    secs = time.time() - t0
+    pid = int((d / "child.pid").read_text()) if (d / "child.pid").exists() else None
+    time.sleep(0.2)
+    alive = pid is not None and subprocess.run(["ps", "-o", "stat=", "-p", str(pid)], capture_output=True,
+                                               text=True).stdout.strip() not in ("", "Z")
+    return rc, so, secs, alive
+
+
+SLOW_RC, SLOW_OUT, SLOW_SECS, SLOW_CHILD = slow_step()
+PACED = {"probe": "PB-02", "script": "probes/PB-02-y/public.py", "args": ["pace"], "rc": "timeout", "seconds": 2312.4,
+         "stated_s": 1800.0, "limit_s": 2310}
+
+
 RUNS = [{"probe": "PB-01", "script": "probes/PB-01-x/public.py", "args": [], "rc": 0, "stdout_tail": "secret rows"},
         {"probe": "PB-01", "script": "probes/PB-01-x/probe.py", "args": ["bulk"], "rc": 1, "stderr_tail": "Traceback"},
         {"probe": "PB-02", "script": None, "rc": None, "error": "no folder PB-02"}]
@@ -310,6 +392,28 @@ DECISIONS = [
     ("structured output wins over the result text", (STRUCTURED["action"], STRUCTURED["message"]), ("finish", "Done.")),
     ("a broken JSON object is no answer (retried, then the fallback)", sim_answer({"result": '{"action": "reply", '}), None),
     ("the sim user is told it can't change its environment (H4)", "unset or exported a variable" in driver.SIM_LIMITS, True),
+    # Iteration 11's rl user: "Fish tank: matching the scripted baseline counts as passing."
+    ("the sim user keeps its facts' success bars and constraints, even when asked to relax one",
+     (driver.SIM_BARS in SIM_PROMPT, "never lower or relax one" in driver.SIM_BARS, "If it asks, say no and keep the fact"
+      in driver.SIM_BARS, "beats a random and a simple scripted baseline" in SIM_PROMPT), (True, True, True, True)),
+    ("the rl facts agree with the persona on a rented GPU",
+     ("rent a cloud GPU for a few dollars" in SIM_PROMPT, "rented cloud GPU for a few dollars" in SIM_PROMPT,
+      "no budget" in SIM_PROMPT), (True, True, False)),
+    ("a user step's stated time is read off its own line: ~1 min, ≤ 30 min, the longest of a wrapped item, none",
+     [stated_seconds(PACED_README, s, a) for s, a in (("public.py", ["sample"]), ("public.py", ["pace"]),
+                                                      ("probe.py", ["bulk"]), ("public.py", ["members"]))],
+     [60.0, 1800.0, 7200.0, None]),
+    ("a user step's limit: its stated time plus a quarter and a minute, within the default and the ceiling",
+     (step_limit(None), step_limit(60.0), step_limit(1800.0), step_limit(4 * 3600.0)),
+     (driver.USER_STEP_TIMEOUT, driver.USER_STEP_TIMEOUT, 2310, driver.USER_STEP_MAX)),
+    ("the default limit is 600 s and the ceiling two hours", (driver.USER_STEP_TIMEOUT, driver.USER_STEP_MAX), (600, 7200)),
+    ("a user step past its limit is stopped, its output so far kept", (SLOW_RC, SLOW_OUT, SLOW_SECS < 20),
+     ("timeout", "started\n", True)),
+    ("what the stopped step started is stopped with it", SLOW_CHILD, False),
+    ("a stopped step is reported with how long it ran and the time its README gives it",
+     (run_report([PACED]), run_report([dict(PACED, stated_s=None, seconds=601)])),
+     ("PB-02 public.py pace: still running after 39 minutes, so I stopped it (its README gives it 30 minutes)",
+      "PB-02 public.py pace: still running after 10 minutes, so I stopped it (its README gives it no time)")),
     ("Sharadar is served on its real hosts only: no base URL, no 127.0.0.1 server (H1)",
      (SHARADAR["url"], SHARADAR["server"], N_SERVERS), (None, None, 2)),
     ("a user run's .env gets the canary key and no base URL", SHARADAR_ENV, {"SHARADAR_API_KEY": "sk-canary-selftest",

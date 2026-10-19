@@ -1,7 +1,9 @@
 # Contract-gap proposals for build-planning
 
-**For:** the owner of `skills/build-planning`. **From:** the contract-first gap review of build eval b1
+**For:** the owner of `skills/build-planning` (proposal 6b is architecture-design's). **From:** the
+contract-first gap review of build eval b1 and the b1 findings
 ([contract-first-gaps.html](../evals/results-iteration-b1/contract-first-gaps.html),
+[findings-stage4.md](../evals/results-iteration-b1/findings-stage4.md),
 [findings-stage5.md](../evals/results-iteration-b1/findings-stage5.md),
 [findings-stage5b.md](../evals/results-iteration-b1/findings-stage5b.md)). **Date:** 2026-10-18.
 
@@ -111,6 +113,39 @@ Not done here, and why it needs a decision:
 
 A cheaper alternative to try first: when a milestone's pipeline reads an external source and no `PB-NN` sample
 backs its record type, build-planning asks for an `api-probe` before the plan, rather than adding a slice task.
+
+## 6. Other plan-phase findings from b1
+
+Not contract gaps, but found by the same runs and not yet fixed in the planning skills.
+
+**a. Smoke tests that pin spine values** (build-planning). Stage 4, A1's first full run stalled at 15/21: the
+wiring tasks' smoke tests asserted the spine's output, the thickens must change that output and can't edit those
+files, and `--test-stands` left no way through. The minilab fixture plans were fixed (3bfadbe), the skill wasn't.
+Proposed: `phase0.md` §c, the wiring Acceptance, and `tasks.md:50`: "a smoke test checks that the pipeline runs
+and the shape of what it writes, never a value a thicken changes". This is the same rule as proposal 1 (check
+shape, never a transient state), applied to smoke tests.
+
+**b. One-sided invariants in a type section** (architecture-design, `references/contracts.md`). Stage 5,
+A2-r3: `risk.VolSeries` said only "None until `window` earlier returns exist" and never said a later value may
+be None too. One spine agent read it as two-sided and added a validator, which made golden case TC-07 (a gap
+after the window) impossible to build, and the run stalled at 11/12. Proposed, in the type-section bullet: "an
+invariant on a field's values says what holds on both sides of its condition (`None until window returns exist;
+later values may be None after a gap`)". This is a one-sentence change to a skill this branch already edits, but
+it changes how every contract is written, so it waits for the owner's yes.
+
+**c. A wiring acceptance bullet that asks for a file outside `Writes:`** (build-planning). Stage 5: both minilab
+plans asked the wiring tasks to replace `pipelines.md`'s pre-build sections with a `dt layout` pointer, but
+`pipelines.md` wasn't in their `Writes:`. Most agents skipped the bullet; A2-r3's M1-T02 and M1-T03 did it and
+were rejected for writes. `dt land` already runs `dt prebuild-clear` when a wiring task lands (`phase0.md:28`),
+so the bullet asks the builder for work dt does. Proposed: drop that bullet from `phase0.md` §c's Acceptance and
+from `examples-phase0.md:39` and `examples-advance.md:75`, or reword it as a check on dt's result, not an edit.
+
+**d. Outside the plan phase, for the build skill's owner.** Stage 5, A2-r3: when a tester escalated the TC-07
+clash, the main session recommended editing the golden input. That runs against test-planning's rule that
+expected outputs come from outside the agent. The build skill's escalation table
+(`skills/build/references/escalation.md`) could say that a clash between a golden case and a contract is
+answered with a contract Revise or the user's oracle change through `test-planning`, never a recommendation to
+change the fixture.
 
 ## Release level for the branch
 

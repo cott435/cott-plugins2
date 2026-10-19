@@ -1,0 +1,548 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1"><title>T04 turn</title>
+<style>
+:root{--bg:#fbfbfa;--fg:#1d1d1f;--muted:#6b6b70;--line:#d9d9de;--box:#fff;--rowp:#eef3fb;--band:#fff4d6;
+--ok:#2e7d32;--bad:#c62828;--warn:#b26a00;--idle:#6b6b70}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#17171a;--fg:#ececf0;--muted:#9a9aa3;
+--line:#34343a;--box:#222227;--rowp:#1d2433;--band:#3a3015;--ok:#6fcf73;--bad:#ff6b6b;--warn:#f0b35a;--idle:#9a9aa3}}
+:root[data-theme="dark"]{--bg:#17171a;--fg:#ececf0;--muted:#9a9aa3;--line:#34343a;--box:#222227;--rowp:#1d2433;
+--band:#3a3015;--ok:#6fcf73;--bad:#ff6b6b;--warn:#f0b35a;--idle:#9a9aa3}
+body{margin:0;padding:16px;background:var(--bg);color:var(--fg);font:14px/1.45 -apple-system,system-ui,sans-serif}
+h1{font-size:18px;margin:0 0 4px}h2{font-size:15px;margin:22px 0 8px}.sub{color:var(--muted)}
+table{border-collapse:collapse;margin:4px 0 8px}td,th{border-bottom:1px solid var(--line);padding:4px 10px;text-align:left;
+vertical-align:top}th{color:var(--muted);font-weight:600}.chips span{display:inline-block;margin:0 4px 2px 0}
+.legend span{margin-right:14px;white-space:nowrap}.sw{display:inline-block;width:10px;height:10px;border-radius:2px;
+margin-right:4px;vertical-align:-1px}.scroll{overflow:auto;max-height:88vh;border:1px solid var(--line);border-radius:8px}
+.chart{display:grid;width:max-content}.chart>div{line-height:0}.corner{position:sticky;top:0;left:0;z-index:3}
+.colhead{position:sticky;top:0;z-index:2}.rowhead{position:sticky;left:0;z-index:2}
+svg.bg{background:var(--bg)}.colhead svg{border-bottom:1px solid var(--line)}.rowhead svg{border-right:1px solid var(--line)}
+.ok{color:var(--ok);fill:var(--ok)}.bad{color:var(--bad);fill:var(--bad)}.warn{color:var(--warn);fill:var(--warn)}
+.idle{color:var(--idle);fill:var(--idle)}
+svg text{fill:var(--fg);font-family:-apple-system,system-ui,sans-serif}
+.box{fill:var(--box);stroke:var(--line)}.unit:hover .box{stroke:var(--fg)}
+.role{font-size:12px;font-weight:600}.uid,.wmeta,.lmeta,.meta{font-size:10px;fill:var(--muted)}
+.sub{font-size:10.5px;fill:var(--muted)}.badge{font-size:11px;font-weight:600}
+.meta.bad{fill:var(--bad);font-weight:600}.lane{font-size:13px;font-weight:700}.wave{font-size:13px;font-weight:700}
+.par{fill:#4e79a7}.ser{fill:var(--muted)}.rowp{fill:var(--rowp)}.rows{fill:transparent}.band{fill:var(--band)}
+.bandt{font-size:11.5px}.grid{stroke:var(--line)}.link{stroke:var(--muted);stroke-width:1.2;opacity:.55}
+.arrowhead{fill:var(--muted)}.marks{font-size:10.5px}.audit{stroke:var(--box);stroke-width:2}.auditn{font-size:10px;font-weight:700;fill:#fff}
+a{color:inherit}svg a .box{cursor:pointer}
+
+:root{--c0:#2a78d6;--c1:#eb6834;--c2:#1baf7a;--c3:#eda100;--c4:#e87ba4;--c5:#008300;--c6:#6250d6;--c7:#e34948;
+--cx:#8a8985;--main:#52514e;--read:#dcdbd5;--readfg:#1d1d1f}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--c0:#3987e5;--c1:#d95926;--c2:#199e70;
+--c3:#c98500;--c4:#d55181;--c5:#008300;--c6:#9085e9;--c7:#e66767;--cx:#77766f;--main:#c3c2b7;--read:#3b3b40;
+--readfg:#ececf0}}
+:root[data-theme="dark"]{--c0:#3987e5;--c1:#d95926;--c2:#199e70;--c3:#c98500;--c4:#d55181;--c5:#008300;
+--c6:#9085e9;--c7:#e66767;--cx:#77766f;--main:#c3c2b7;--read:#3b3b40;--readfg:#ececf0}
+.c0{fill:var(--c0);background:var(--c0)}.c1{fill:var(--c1);background:var(--c1)}.c2{fill:var(--c2);background:var(--c2)}
+.c3{fill:var(--c3);background:var(--c3)}.c4{fill:var(--c4);background:var(--c4)}.c5{fill:var(--c5);background:var(--c5)}
+.c6{fill:var(--c6);background:var(--c6)}.c7{fill:var(--c7);background:var(--c7)}.cx{fill:var(--cx);background:var(--cx)}
+.cmain{fill:var(--main)}.sc0{stroke:var(--c0)}.sc1{stroke:var(--c1)}.sc2{stroke:var(--c2)}
+.tl text,.sm text,.lc text{font-size:10.5px;fill:var(--muted)}.tl .lbl-in,.sm .lbl-in{fill:#fff;font-size:10.5px;font-weight:600}
+.tl .rowl,.sm .rowl,.lc .rowl{fill:var(--fg);font-size:11.5px;font-weight:600}.tl .band{fill:var(--rowp)}
+.tl .brk{stroke:var(--muted);stroke-dasharray:2 3}.tl a:hover rect,.sm a:hover rect{stroke:var(--fg);stroke-width:1.5}
+.axis{stroke:var(--line)}.sm .val{fill:var(--fg);font-weight:600}.lc path.ln{fill:none;stroke-width:2}
+.lc circle{stroke:var(--bg);stroke-width:2}.lc .end{font-weight:600;fill:var(--fg)}
+.tiles{display:flex;flex-wrap:wrap;gap:10px;margin:12px 0}.tile{border:1px solid var(--line);border-radius:8px;
+padding:8px 12px;min-width:110px;background:var(--box)}.tile b{display:block;font-size:20px;line-height:1.2}
+.tile span{font-size:12px;color:var(--muted)}.tile i{font-style:normal;font-size:12px;margin-left:6px}
+.fm{border-collapse:separate;border-spacing:2px}.fm td,.fm th{border:0;padding:0;text-align:center;font-size:11px}
+.fm th{padding:0 2px;font-weight:600}.fm td.f,.fm th.f{text-align:left;padding-right:10px;white-space:nowrap;
+position:sticky;left:0;background:var(--bg);font:11.5px ui-monospace,Menlo,monospace;
+max-width:380px;overflow:hidden;text-overflow:ellipsis}
+.fm td.cell{min-width:22px;height:20px;border-radius:3px}.fm td.fw{background:var(--c0);color:#fff;font-weight:700}
+.fm td.fe{background:var(--c1);color:#fff;font-weight:700}.fm td.fr{background:var(--read);color:var(--readfg)}
+.fm td.n{color:var(--muted);padding:0 6px}.fm tr.grp td{text-align:left;padding-top:8px;color:var(--muted);
+font-weight:600}
+.key{display:inline-block;min-width:18px;text-align:center;border-radius:3px;font-size:11px;margin-right:4px}
+.bar{display:inline-block;height:9px;border-radius:2px;vertical-align:0}
+
+pre{white-space:pre-wrap;word-break:break-word;background:var(--box);border:1px solid var(--line);border-radius:6px;
+padding:8px 10px;margin:4px 0;font:12px/1.45 ui-monospace,SFMono-Regular,Menlo,monospace;max-width:100%;overflow:auto}
+.step{border-top:1px solid var(--line);padding:6px 0}.step:target{background:var(--rowp)}
+.sid{font:12px ui-monospace,Menlo,monospace;color:var(--muted);margin-right:8px}.kind{font-weight:600;margin-right:8px}
+.err{color:var(--bad);font-weight:600}.hook{color:var(--bad);margin:4px 0 0 16px}.lbl{font-size:12px;color:var(--muted);margin-top:6px}
+details summary{cursor:pointer;color:var(--muted);font-size:12px}.head td:first-child{color:var(--muted)}
+.top{font-size:13px}.narr{list-style:none;padding-left:0}.narr li{margin:3px 0}
+</style></head>
+<body>
+<p class="top"><a href="../flow.html">← the run's flow chart</a></p>
+<p class="top"><a href="../plan/T03.html">The plan as of T04</a>: unchanged since T03 · <a href="../plan/index.html">plan map</a></p>
+<h1>T04 · turn · /dev-team:spec-writing From the previous session:</h1>
+<table class="head"><tr><td>Type</td><td>turn</td></tr><tr><td>Description</td><td>/dev-team:spec-writing From the previous session:</td></tr><tr><td>Spawned by</td><td>user</td></tr><tr><td>Model</td><td>claude-opus-5-5</td></tr><tr><td>Start</td><td>2026-10-18 19:22:48 UTC</td></tr><tr><td>Duration</td><td>1 min</td></tr><tr><td>Tool calls</td><td>5</td></tr><tr><td>Errors</td><td>0</td></tr><tr><td>Hook blocks</td><td>0</td></tr><tr><td>Tokens</td><td>5.9k out · 23.6k new in · 226k cached in · peak context 48.1k</td></tr><tr><td>Skills invoked</td><td>none</td></tr><tr><td>Files written or edited</td><td>none</td></tr><tr><td>Definition</td><td>none</td></tr><tr><td>Steps</td><td>8</td></tr><tr><td>Finished</td><td>yes</td></tr></table>
+
+
+<h2>Prompt</h2>
+<pre>/dev-team:spec-writing From the previous session:
+&lt;&lt;&lt;
+The brief is accepted and S1 is on the roadmap.
+
+- **`docs/brief.md`** is now Accepted (2026-10-18).
+- **`docs/roadmap.md`** is new. It has stage **S1: Trusted daily data** with status Idea, and its Skills line is `data-analysis, dataviz, frontend-design`, as you approved.
+- **`docs/requests.md`** now holds 24 of your statements, word for word. The three about the brief are matched to brief sections. The rest are waiting for the spec, architecture and build plan.
+
+**One warning:** the project&#x27;s checker flags `dataviz` as not installed in the project or the dev-team plugin. It&#x27;s available in this session, but the agents that build later may not have it. I&#x27;ve kept it because you approved it. If you want those agents to have it for sure, install it into `.claude/skills/`; otherwise build-planning will flag it when it gives out tasks.
+
+Should I commit these three files (`docs/brief.md`, `docs/roadmap.md`, `docs/requests.md`) on a new branch?
+
+The spec comes next. I&#x27;ll write `docs/spec.md` for S1, drawing on your requests about scope, the ten delisted names, 1998 onward, S&amp;P 500 membership as of each date, and live run progress.
+&gt;&gt;&gt;
+
+Approved. Yes, commit those three files on a new branch. I&#x27;ll leave dataviz as is for now.</pre>
+<h2>Files</h2>
+<table><tr><th>Op</th><th>File</th><th>Calls</th><th>By</th><th>Via</th><th>Steps</th></tr><tr><td>read</td><td><code>../plugin/dev-team/skills/idea-refine/references/requests.md</code></td><td>1</td><td>main</td><td>Bash</td><td><a href="#D29">D29</a></td></tr><tr><td>read</td><td><code>../plugin/dev-team/skills/spec-writing/references/new.md</code></td><td>1</td><td>main</td><td>Bash</td><td><a href="#D29">D29</a></td></tr><tr><td>read</td><td><code>../plugin/dev-team/skills/spec-writing/references/spec.md</code></td><td>1</td><td>main</td><td>Bash</td><td><a href="#D29">D29</a></td></tr><tr><td>read</td><td><code>docs/brief.md</code></td><td>1</td><td>main</td><td>Bash</td><td><a href="#D28">D28</a></td></tr><tr><td>read</td><td><code>docs/requests.md</code></td><td>1</td><td>main</td><td>Bash</td><td><a href="#D28">D28</a></td></tr><tr><td>read</td><td><code>docs/roadmap.md</code></td><td>1</td><td>main</td><td>Bash</td><td><a href="#D28">D28</a></td></tr></table>
+<h2>Steps</h2>
+<div class="step" id="SD25"><span class="sid">D25</span><span class="kind">command</span>USER TYPED `/dev-team:spec-writing From the previous session:
+&lt;&lt;&lt;
+The brief is accepted and S1 is on the roadmap.
+
+- `docs/brief.md` is now Accepted (2026-10-18).
+- `docs/roadmap.md` is new. It has stage S1: Trusted daily data with status Idea, and its Skills line is `data-analysis, dataviz, frontend-design`, as you approved.
+- `docs/requests.md` now holds 24 of your statements, word for word. The three about the brief are matched to brief sections. The rest are waiting for the spec, architecture and build plan.
+
+One warning: the project&#x27;s checker flags `dataviz` as not installed in the project or the dev-team plugin. It&#x27;s available in this session, but the agents that build later may not have it. I&#x27;ve kept it because you approved it. If you want those agents to have it for sure, install it into `.claude/skills/`; otherwise build-planning will flag it when it gives out tasks.
+
+Should I commit these three files (`docs/brief.md`, `docs/roadmap.md`, `docs/requests.md`) on a new branch?
+
+The spec comes next. I&#x27;ll write `docs/spec.md` for S1, drawing on your requests about scope, the ten delisted names, 1998 onward, S&amp;P 500 membership as of each date, and live run progress.
+&gt;&gt;&gt;
+
+Approved. Yes, commit those three files on a new branch. I&#x27;ll leave dataviz as is for now.`</div><div class="step" id="SD26"><span class="sid">D26</span><span class="kind">skill-body</span>skill loaded from `/Users/connorott/plugins/dev-team-workspace/iteration-10/quant-incremental/with_skill/plugin/dev-team/skills/spec-writing`</div><div class="step" id="SD27"><span class="sid">D27</span><span class="kind">Bash</span>git status --short &amp;&amp; git log --oneline -3 &amp;&amp; python3 /Users/connorott/plugins/dev-team-workspace/iteration-10/quant-incremental/with_skill/plugin/dev-team/scripts/dt.py status --skill spec-writing<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;git status --short &amp;&amp; git log --oneline -3 &amp;&amp; python3 /Users/connorott/plugins/dev-team-workspace/iteration-10/quant-incremental/with_skill/plugin/dev-team/scripts/dt.py status --skill spec-writing&quot;,
+  &quot;description&quot;: &quot;Check git state and run dev-team status&quot;
+}</pre><div class="lbl">output</div><pre>2f7920f turn 3
+c64c8a1 turn 2
+68c1c9c turn 1
+skill: spec-writing
+mode: new
+docs: brief Accepted · spec missing · architecture missing · roadmap ok · plan missing · constraints missing
+next ids: AD-01 PL-01 TC-01 S2 M1
+references_unindexed: none
+references_changed: none
+references_missing: none
+ideas_ready: none
+prefixes: none
+reserved_prefixes: AD, CR, EX, PB, PL, RF, TC, UR
+skills: data-analysis, frontend-design, null-hypothesis-testing
+routed_changes: none
+requests_open: UR-03 &quot;a reliable daily US equity dataset and loader (prices, returns, corporate actions, point-in-time universe)&quot; [Stage 1 contents], UR-06 &quot;with scripts to download, clean, validate, and store it&quot; [Stage 1 dataset], UR-07 &quot;plus basic exploratory analysis&quot; [Stage 1 dataset], UR-08 &quot;a data-viz app to explore it&quot; [Stage 1 dataset], UR-10 &quot;Go with 2 + 4 + 5.&quot; [Stage 1 direction: 2 = as-of loader (universe and returns as known on date D is the core interface); 4 = viz app as a data-quality cockpit (per-ticker prices/adjustments, Sharadar-vs-Yahoo diffs, corporate-action timelines, universe size over time); 5 = Yahoo as targeted spot-check, not a full mirror], UR-12 &quot;Done means I can pull trustworthy total-return series for every stock that was investable on any past date, validated against Yahoo&quot; [Stage 1 done criterion], UR-13 &quot;the 10 delisted former S&amp;P 500 names I have (BUD, DNA, WB, LEH, BSC, CFC, MER, SGP, WYE, EK) are present with correct end dates.&quot; [Stage 1 done criterion], UR-16 &quot;1998 onward is fine.&quot; [history start], UR-17 &quot;S&amp;P 500 history with point-in-time membership, delisted names included.&quot; [universe], UR-18 &quot;A smaller universe is fine.&quot; [universe (S&amp;P 500 rather than all US stocks)], UR-19 &quot;No ETFs, OTC or preferreds needed.&quot; [universe exclusions], UR-20 &quot;Not in Stage 1.&quot; [fundamentals (balance sheet, earnings) in Stage 1?], UR-22 &quot;The WebSocket is for live progress of download and validation runs.&quot;</pre></details></div><div class="step" id="SD28"><span class="sid">D28</span><span class="kind">Bash</span>git branch -a &amp;&amp; git show --stat HEAD | head -20 &amp;&amp; ls docs &amp;&amp; cat docs/brief.md docs/roadmap.md docs/requests.md<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;git branch -a &amp;&amp; git show --stat HEAD | head -20 &amp;&amp; ls docs &amp;&amp; cat docs/brief.md docs/roadmap.md docs/requests.md&quot;,
+  &quot;description&quot;: &quot;Inspect last commit and docs contents&quot;
+}</pre><div class="lbl">output</div><pre>* master
+commit 2f7920f669352858c049c77a7c7ef42f98c77429
+Author: eval &lt;e@e&gt;
+Date:   Sun Oct 18 15:22:40 2026 -0400
+
+    turn 3
+
+ docs/brief.md    |  2 +-
+ docs/requests.md |  1 +
+ docs/roadmap.md  | 13 +++++++++++++
+ 3 files changed, 15 insertions(+), 1 deletion(-)
+brief.md
+requests.md
+roadmap.md
+# US Equity Research Platform
+
+**Status:** Accepted · **Last updated:** 2026-10-18
+
+## The problem
+Equity research is only as good as its price history. Most mistakes that flatter a strategy start in the data: failed companies go missing, splits and dividends are applied wrongly, and today&#x27;s index members are treated as if they always were. Without data I can check, I can&#x27;t trust any result built on it, so data comes first.
+
+## Who it&#x27;s for
+Me: one person doing personal research on US stocks, building the platform in stages.
+
+## Goals
+1. For any past date, get the stocks that were investable on that date and their total returns, using only what was known then.
+2. Know where the data might be wrong: every disagreement with an independent source is flagged, then explained or accepted.
+3. See the data and its quality issues visually, without writing code.
+
+## Constraints
+- One person, built in stages. Only the first stage (data) is decided.
+- My existing Sharadar subscription is the main source. Yahoo Finance is used only as an independent cross-check.
+- Daily data from 1998 onward.
+- The universe is S&amp;P 500 members as of each date, including companies that later left or were delisted.
+
+## What success looks like
+- I can pull total-return series for every S&amp;P 500 member on any date since 1998.
+- Ten delisted former members (Anheuser-Busch, Genentech, Wachovia, Lehman Brothers, Bear Stearns, Countrywide, Merrill Lynch, Schering-Plough, Wyeth, Eastman Kodak) are present with correct end dates.
+- Where Yahoo has the same stock, the two sources agree, or each difference has a recorded explanation.
+- I can watch download and validation runs progress live.
+
+## What we&#x27;re betting on
+- Sharadar&#x27;s history includes delisted companies and correct index entry and exit dates back to 1998.
+- Yahoo is a useful check for the stocks it still carries, though it lacks most delisted names and adjusts dividends its own way.
+- A stock&#x27;s identity can follow the company rather than the ticker symbol. Several of the ten tickers (BUD, DNA, WB) now belong to different companies.
+
+## Not doing
+- Company fundamentals such as earnings and balance sheets: a later stage, with its own as-of problems.
+- ETFs, over-the-counter stocks, preferred shares, or stocks outside the S&amp;P 500: a smaller universe is enough.
+- Intraday data or live market feeds: the research works on daily data.
+- Making Yahoo a second full copy of the data: it spot-checks, it doesn&#x27;t replace.
+- Screeners or research views in the app: in this stage it is a data-quality tool.
+- Signals, backtests or models: later stages, not yet decided.
+
+## Open questions
+- Where do fundamentals come from when that stage arrives? (Chosen in that stage&#x27;s architecture.)
+- How are delisted names checked, given that Yahoo mostly doesn&#x27;t carry them?
+# US Equity Research Platform — Roadmap
+
+**Last updated:** 2026-10-18
+
+| Stage | Name | Source | Status* |
+|---|---|---|---|
+| S1 | Trusted daily data | brief | Idea |
+
+*Written by `dt roadmap` from doc statuses and todo checkboxes; never hand-edited.
+
+## S1: Trusted daily data
+**Outline:** Pull S&amp;P 500 members as of any date since 1998 with validated total returns, and inspect prices, corporate actions, source differences and run progress in a browser app.
+**Skills:** data-analysis, dataviz, frontend-design
+# User requests
+
+**Last updated:** 2026-10-18
+
+The user&#x27;s words, verbatim: one line per fact, constraint, tool, choice or answer, with the skill that heard it and the date. The words never change; only the trace after → does. Written with `dt request`.
+
+- **UR-01** brief · &quot;I want to start a personal quant research platform for market research on US equities, built in stages.&quot; · idea-refine 2026-10-18 → §Who it&#x27;s for
+- **UR-02** brief · &quot;I&#x27;m starting with just the first piece: Stage 1 — Data&quot; · idea-refine 2026-10-18 → §Constraints
+- **UR-03** spec · &quot;a reliable daily US equity dataset and loader (prices, returns, corporate actions, point-in-time universe)&quot; [Stage 1 contents] · idea-refine 2026-10-18
+- **UR-04** architecture · &quot;from my Sharadar subscription&quot; [Stage 1 primary data source] · idea-refine 2026-10-18
+- **UR-05** architecture · &quot;cross-checked against Yahoo Finance through yahooquery&quot; [Stage 1 cross-check source] · idea-refine 2026-10-18
+- **UR-06** spec · &quot;with scripts to download, clean, validate, and store it&quot; [Stage 1 dataset] · idea-refine 2026-10-18
+- **UR-07** spec · &quot;plus basic exploratory analysis&quot; [Stage 1 dataset] · idea-refine 2026-10-18
+- **UR-08** spec · &quot;a data-viz app to explore it&quot; [Stage 1 dataset] · idea-refine 2026-10-18
+- **UR-09** architecture · &quot;a TypeScript + React browser frontend over a Python backend (HTTP and WebSocket)&quot; [Stage 1 data-viz app] · idea-refine 2026-10-18
+- **UR-10** spec · &quot;Go with 2 + 4 + 5.&quot; [Stage 1 direction: 2 = as-of loader (universe and returns as known on date D is the core interface); 4 = viz app as a data-quality cockpit (per-ticker prices/adjustments, Sharadar-vs-Yahoo diffs, corporate-action timelines, universe size over time); 5 = Yahoo as targeted spot-check, not a full mirror] · idea-refine 2026-10-18
+- **UR-11** brief · &quot;I&#x27;m focusing on Stage 1 for now and haven&#x27;t decided what comes next.&quot; [what comes after Stage 1] · idea-refine 2026-10-18 → §Constraints
+- **UR-12** spec · &quot;Done means I can pull trustworthy total-return series for every stock that was investable on any past date, validated against Yahoo&quot; [Stage 1 done criterion] · idea-refine 2026-10-18
+- **UR-13** spec · &quot;the 10 delisted former S&amp;P 500 names I have (BUD, DNA, WB, LEH, BSC, CFC, MER, SGP, WYE, EK) are present with correct end dates.&quot; [Stage 1 done criterion] · idea-refine 2026-10-18
+- **UR-14** architecture · &quot;I already subscribe to Sharadar for prices, and it&#x27;s the primary source.&quot; · idea-refine 2026-10-18
+- **UR-15** architecture · &quot;Use whichever of its tables cover prices, corporate actions, tickers and S&amp;P 500 membership.&quot; [which Sharadar tables] · idea-refine 2026-10-18
+- **UR-16** spec · &quot;1998 onward is fine.&quot; [history start] · idea-refine 2026-10-18
+- **UR-17** spec · &quot;S&amp;P 500 history with point-in-time membership, delisted names included.&quot; [universe] · idea-refine 2026-10-18
+- **UR-18** spec · &quot;A smaller universe is fine.&quot; [universe (S&amp;P 500 rather than all US stocks)] · idea-refine 2026-10-18
+- **UR-19** spec · &quot;No ETFs, OTC or preferreds needed.&quot; [universe exclusions] · idea-refine 2026-10-18
+- **UR-20** spec · &quot;Not in Stage 1.&quot; [fundamentals (balance sheet, earnings) in Stage 1?] · idea-refine 2026-10-18
+- **UR-21** architecture · &quot;I haven&#x27;t picked a fundamentals source, so I&#x27;d like your suggestion for one.&quot; [fundamentals source for a later stage] · idea-refine 2026-10-18
+- **UR-22** spec · &quot;The WebSocket is for live progress of download and validation runs.&quot; · idea-refine 2026-10-18
+- **UR-23** architecture · &quot;Queries go over plain HTTP.&quot; [viz app data queries] · idea-refine 2026-10-18
+- **UR-24** plan · &quot;Yes, route those skills to S1.&quot; [S1 Skills: data-analysis, dataviz, frontend-design] · idea-refine 2026-10-18</pre></details></div><div class="step" id="SD29"><span class="sid">D29</span><span class="kind">Bash</span>cd /Users/connorott/plugins/dev-team-workspace/iteration-10/quant-incremental/with_skill/plugin/dev-team/skills &amp;&amp; cat spec-writing/references/new.md spec-writing/references/spec.md idea-refine/references/requests.md; ls ../scripts; python3 ../scripts/dt.py --help 2&gt;&amp;1 | head -40<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;cd /Users/connorott/plugins/dev-team-workspace/iteration-10/quant-incremental/with_skill/plugin/dev-team/skills &amp;&amp; cat spec-writing/references/new.md spec-writing/references/spec.md idea-refine/references/requests.md; ls ../scripts; python3 ../scripts/dt.py --help 2&gt;&amp;1 | head -40&quot;,
+  &quot;description&quot;: &quot;Read spec-writing mode and template references&quot;
+}</pre><div class="lbl">output</div><pre># New mode: writing the spec from the brief
+
+Read when `dt status` reports `mode: new`: there is no `docs/spec.md`, and the accepted brief is the input.
+
+```
+READ BRIEF ─→ SURFACE ASSUMPTIONS ─→ CLARIFY ─→ WRITE SPEC ─→ [user approves] ─→ architecture-design
+```
+
+## Step 1: Map goals to features
+
+From the brief&#x27;s numbered goals, propose features and show the mapping before writing:
+
+```
+Goal 1 (regulars reorder in &lt; 30s)     → Saved orders (S1), Text reorder (S2)
+Goal 2 (no extra daily work for owner) → Regulars setup (S1), Order notifications (S2)
+```
+
+Every goal has a feature, and every feature names its roadmap stage (`references/spec.md`). **Every stage the brief and roadmap list is specced in full**: features, requirements, criteria and edge cases for all of them, never &quot;S1 in full, the rest outlined&quot;. Later skills design only what the spec holds.
+
+## Steps 2-3: Surface assumptions, then clarify
+
+As SKILL.md&#x27;s Asking section says.
+
+## Step 4: Write the spec
+
+Read `references/spec.md` and write `docs/spec.md` from its template, following its writing rules (and its data and ML rules where they apply).
+
+## Step 5: Review Gate
+
+SKILL.md&#x27;s Review Gate. This mode adds no gate steps and no on-approval step.
+# The spec: template, writing rules, hygiene check
+
+Read before writing or extending `docs/spec.md`, and again for the hygiene check at the Review Gate.
+
+## Template
+
+```markdown
+# [Project Name] — Spec
+
+**Status:** Draft · **Last updated:** YYYY-MM-DD · **Brief:** [brief.md](brief.md)
+
+## Summary
+[2-3 sentences: what is being built. Link to the brief for why — don&#x27;t repeat it.]
+
+## Users
+| User | What they need to do |
+|---|---|
+| [Primary user] | [...] |
+
+## Scope
+**In scope:** [features, by name]
+**Out of scope:** [what we&#x27;re not building — include everything on the brief&#x27;s Not Doing list, plus anything decided during clarification]
+
+## Features
+
+### [Feature name] (`CODE`)
+**Serves:** Goal 1, Goal 3
+**Stage:** S2
+**Source:** [ideas/&lt;slug&gt;.md](ideas/&lt;slug&gt;.md) *(extend mode only — omit for features from the original brief)*
+**Behavior:** [2-4 sentences or a short numbered flow describing what the user experiences.]
+
+**Requirements**
+- **CODE-01** [One testable statement of what the system does.]
+  - Given [context], when [action], then [observable result].
+  - Given [...], when [...], then [...].
+- **CODE-02** [...]
+  - Given [...], when [...], then [...].
+
+**Edge cases &amp; errors**
+- [Situation] → [expected behavior]
+
+## Data requirements
+*(Data and ML projects only — omit otherwise.)*
+- **DATA-01** [What data the system needs: content, coverage, history, frequency, freshness — not which vendor.]
+  - Given [...], when [...], then [...].
+
+## Quality requirements
+- **QR-01** [Measurable non-functional requirement: speed, reliability, accessibility, privacy, security, cost, licence.]
+  - [How it&#x27;s checked.]
+
+## Assumptions
+- [Assumptions the user confirmed]
+
+## Open questions
+- [Unresolved items, each with who can answer it. Omit if none. A question about what an external source really returns is &quot;answered by a probe during architecture&quot;.]
+
+## Changelog
+| Date | Change | Source | IDs |
+|---|---|---|---|
+| YYYY-MM-DD | Initial spec | brief.md | all |
+```
+
+**Writing rules:**
+
+- **One requirement, one behavior.** If a requirement contains &quot;and&quot;, it&#x27;s probably two.
+- **Every requirement has at least one acceptance criterion** in Given/When/Then form. If you can&#x27;t write one, the requirement isn&#x27;t clear yet.
+- **Describe behavior, not implementation.** &quot;The customer sees their usual order&quot; — not &quot;the app queries the orders table.&quot;
+- **Use exact numbers.** &quot;≤ 2 seconds&quot;, &quot;up to 50 regulars&quot;, never &quot;fast&quot; or &quot;many&quot;.
+- **Every feature names one stage.** Its `**Stage:**` line holds only the ID of the roadmap stage that first builds it. `dt lint` fails a feature with no stage, or one naming no stage row.
+- **Requirement IDs are permanent.** `CODE-NN`, numbered within the feature, never reused or renumbered.
+- **Quality requirements only when measurable.** Leave out generic wishes (&quot;should be secure&quot;); keep checkable ones (&quot;passwords are never shown in full&quot;). Cost, licence and budget limits are `QR-` items (&quot;data costs ≤ $50 a month&quot;), never `DATA-` or feature requirements.
+- **No tech stack, libraries, vendors, schemas, endpoints, or file structure, even when the user names them.** Write the behavior the name stands for. The name itself belongs to `architecture-design`, which reads it in `docs/requests.md`.
+- **Describe the product as it is now, not how it got here.** Requirement text, scope lists and assumptions carry no change notes, provenance tags (&quot;from the field-photo idea&quot;, &quot;UR-03&quot;) or process notes (&quot;numbers chosen for review&quot;). History goes in one Changelog row per round, and in git; which requirement honours which request goes in `docs/requests.md` (`dt request trace`).
+- **The user&#x27;s words win over the brief&#x27;s.** Where a `spec` request is more specific than the brief or idea file (&quot;circular tank&quot;, &quot;one predator&quot;), the requirement says what the request says, or the user approves the change.
+
+**Data and ML projects — extra rules:**
+
+- **Specify the data, not the source.** `DATA-NN` requirements say what the data must contain and guarantee (&quot;hourly readings for every meter in the service area, including decommissioned ones, since 2015&quot;; &quot;every record is stamped with the date it became known&quot;). Which API, vendor, or dataset meets them is an architecture decision, made by checking candidates against these requirements. Name a source only when the brief makes it a fixed constraint (our own database, a required benchmark).
+- **Write data guarantees as testable criteria.** Leakage, look-ahead, selection bias, and coverage gaps are requirements, not hopes: &quot;Given a forecast issued at time T, when the model requests weather, then no value published after T is returned.&quot;
+- **Model quality is a requirement with a baseline.** Acceptance criteria name the metric, the held-out data, the threshold, and the baseline to beat: &quot;Given the most recent 6 months of plates (never trained on), when ranked, then reviewing the top 20% catches ≥ 90% of scientist-failed plates, and beats ranking by Z′ alone.&quot; Never &quot;the model is accurate&quot;.
+- **No model types or libraries.** &quot;Gradient boosting&quot; or &quot;PyTorch&quot; are architecture decisions; the spec says what the model must achieve.
+- **Learning projects: &quot;build it by hand, then compare with a library&quot; is a valid requirement. Write it without the names.** &quot;The hand-written CNN reaches ≥ 90% of the accuracy of an established reference implementation on the same dataset.&quot; &quot;The logistic regression is written from basic array operations; a reference library is used only to check its output.&quot; The architecture picks the reference.
+
+## Hygiene check
+
+Run on everything above the Changelog before presenting a Draft.
+
+- **The user&#x27;s words.** `dt request --open --owner spec` is empty, or each one left is a change you ask the user about.
+
+- **Implementation names.** Search for library, framework, vendor, dataset, file-format, database and model-type names, file and function names (a reference&#x27;s included), including names the user, the brief or the idea file used. Rewrite each one as the behavior or guarantee it stands for: &quot;within 10% of torchvision&#x27;s ResNet-18&quot; becomes &quot;within 10% of an established reference implementation&quot;, and &quot;NumPy only&quot; becomes &quot;written from basic array operations&quot;. The only exception is a source the brief makes a fixed constraint.
+# The user&#x27;s words: `docs/requests.md`
+
+Every planning skill follows this. The brief and the spec compress, and the next skill often runs in a fresh session that sees only the docs. `docs/requests.md` keeps what the user actually said, word for word, so the skill whose doc must honour it can. `dt request` writes every line; never edit the file by hand.
+
+## What goes in
+
+One request (`UR-NN`) per concrete statement you could check a doc against:
+
+- facts about the domain, the data or the world (&quot;the tank is circular&quot;), numbers, limits, deadlines, budgets
+- tools, libraries, vendors, protocols and data sources the user names (&quot;stream prices over a WebSocket&quot;, &quot;use yahooquery&quot;)
+- choices: an option picked from yours (&quot;Go with A&quot;), and the answer to any question a skill asked
+- a block acceptance (&quot;assumptions 1–7 are fine&quot;): one request, its `--about` listing what was accepted
+- scope: what must be in, or left out
+
+Not: approval of a whole doc (&quot;approved&quot;, &quot;looks good&quot;), wishes with nothing to check (&quot;make it nice&quot;), your own proposals the user hasn&#x27;t picked, or words already recorded (`dt request` lists them).
+
+## Recording
+
+As you hear it, before you write any doc:
+
+```
+dt request add &lt;owner&gt; &quot;&lt;their words&gt;&quot; --skill &lt;this skill&gt; [--about &quot;&lt;what it answers&gt;&quot;] [--replaces UR-NN]
+```
+
+- **Verbatim.** Quote the shortest span of their message that carries the fact. Never paraphrase, translate, correct or merge. A message stating three facts is three requests.
+- **`--about`** whenever the words don&#x27;t stand alone: &quot;Go with A&quot; → `--about &quot;AD-22 price source: A = Sharadar, B = yfinance&quot;`; &quot;yes, 3&quot; → what was asked. A bare letter means nothing to the next session, and the same words can pick opposite options in two rounds.
+- **Owner** is the doc that must honour it: `brief` (who the user is, their time, budget or experience: context no later doc carries), `spec` (behaviour, numbers, scope the user can observe), `architecture` (tools, libraries, vendors, protocols, data sources, an option for a decision), `pipelines`, `tests`, `plan`, or `constraints` (the quality bar, tooling rules).
+- **The user changes their mind:** record the new words with `--replaces` the old UR. A line is never edited or deleted.
+- The request that started the run is the user&#x27;s first message: record it too.
+
+## Honouring
+
+Before you write your doc, read `docs/requests.md` whole; `requests_open` in `dt status` lists the open requests your doc owns. For each:
+
+- **Honour it:** write the requirement, decision, step, case or rule that does what the words say, then `dt request trace UR-NN &lt;ID&gt;…` with the IDs that do it (spec: requirement IDs; architecture: `AD-NN` or a contract ID; the others: their IDs). Honoured by a section with no ID (Out of scope, Assumptions, Constraints): trace its heading, `§Out of scope`.
+- **Does what the words say** means the same shape, count, number, tool and goal, and for a named method or concept its mechanism, not its name: &quot;self-play&quot; is training against the opponent&#x27;s past versions, not two learners at once. A number the words state must appear in the traced text (`request-number` warns).
+- **Or change it, with the user&#x27;s yes:** when it conflicts with another request or can&#x27;t be met, say so at your gate with your alternative. Only after the user agrees, write the change into every ID it touches, the ones that honoured the old words included (a test case restating the old value too), then `dt request change UR-NN &quot;&lt;what instead&gt;&quot; --approved &quot;&lt;their words&gt;&quot; --skill &lt;this skill&gt; --into &lt;those IDs&gt;`. A doc that cites the request from another ID gets `request-cite`: bring it in line and add it with `dt request change UR-NN --into &lt;ID&gt;`. Never override a request silently, and never record an approval the user didn&#x27;t give. Headless: leave it open under Open questions and the doc Draft.
+- **A value from the user&#x27;s words** (a golden case&#x27;s expected output, a limit) cites the request as its Source: `**Source:** UR-04`. A number worked out from their words is not theirs; its Source says how it was derived (`request-source` warns).
+- A request another doc owns waits for that doc&#x27;s skill. Don&#x27;t copy it into yours (the spec names no tools, even when a request does).
+
+## At the gate
+
+Before asking for approval, `dt request --open --owner &lt;yours&gt;` is empty, except requests whose change you are asking the user about. The summary lists them in one line:
+
+&gt; **Your words:** &quot;circular tank&quot; UR-01 → TANK-02 &quot;the tank is a circle&quot;; &quot;use yahooquery&quot; UR-03 → AD-04 &quot;yahooquery&quot;; change proposed: UR-05 one predator → two (yes?); open: none.
+
+Quote the words and the traced text side by side, so the user sees whether one does the other.
+
+Once the spec or architecture is Approved, `dt lint` fails it for every open request it owns, and `dt next` sends the run back to its skill.
+README.md
+devteam
+dt
+dt.py
+usage: dt [-h] [--root ROOT]
+          {status,next,next-id,section,explain,context,ready,plan,layout,outline,references,probes,lint,roadmap,guard,prebuild-clear,archive,finding,route,request,tick,base} ...
+
+dt: dev-team&#x27;s doc tool. One parser for every planning doc; see
+scripts/README.md for the commands.
+
+positional arguments:
+  {status,next,next-id,section,explain,context,ready,plan,layout,outline,references,probes,lint,roadmap,guard,prebuild-clear,archive,finding,route,request,tick,base}
+    status              What a skill needs before it starts: mode, upstream
+                        gates, gaps and next IDs. `--summary` for
+                        SessionStart.
+    next                Name the next skill run and its mode, and why: a Draft
+                        waiting for approval, references or probes waiting, a
+    next-id             Print the next free ID for a prefix (PL, TC, AD, CR,
+                        S, M, M2-T, M2-R, or a spec prefix), retired IDs
+                        counted.
+    section             Print the sections that define the given IDs,
+                        searching every doc (the archive last).
+    explain             Explain the pipelines in plain words: what each is
+                        for, how it runs and what each step does, from
+                        pipelines.md.
+    context             Print a task&#x27;s whole builder context packet: its Read:
+                        sections and files, the package layout, the frozen
+    ready               Every task of the active plan that can start now, with
+                        its Writes:, so an orchestrator fans out in one turn.
+    plan                The plan as one snapshot for workflow-analyzer&#x27;s plan
+                        map (`plan-map/2`, interface-first-design.md §8.3):
+                        goals,
+    layout              Print a package&#x27;s real source tree with module
+                        docstrings, and flag entry functions that drift from
+                        their step tables.
+    outline             Print a file&#x27;s outline: defs and classes with
+                        signatures and docstring first lines (`.py`, via ast;
+                        never
+    references          Reference files against docs/references.md: list each
+                        entry&#x27;s state, or `--stamp` its Hash (mechanical).
+    probes              Probe folders against docs/probes.md: list each
+                        probe&#x27;s state, `--stamp` its Hash (mechanical), or
+                        `--scan` its
+    lint                Check the planning docs: IDs, references, size
+Shell cwd was reset to /Users/connorott/plugins/dev-team-workspace/iteration-10/quant-incremental/with_skill/project</pre></details></div><div class="step" id="SD30"><span class="sid">D30</span><span class="kind">Bash</span>python3 /Users/connorott/plugins/dev-team-workspace/iteration-10/quant-incremental/with_skill/plugin/dev-team/scripts/dt.py request add plan &quot;I&#x27;ll leave dataviz as is for now.&quot; --skill spec-writing --about &quot;install dataviz into .claude/skills/ so build agents have it? (checker flags it not installed)&quot; &amp;&amp; git switch -c s1-spec &amp;&amp; git status --short<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;python3 /Users/connorott/plugins/dev-team-workspace/iteration-10/quant-incremental/with_skill/plugin/dev-team/scripts/dt.py request add plan \&quot;I&#x27;ll leave dataviz as is for now.\&quot; --skill spec-writing --about \&quot;install dataviz into .claude/skills/ so build agents have it? (checker flags it not installed)\&quot; &amp;&amp; git switch -c s1-spec &amp;&amp; git status --short&quot;,
+  &quot;description&quot;: &quot;Record user&#x27;s dataviz choice and create spec branch&quot;
+}</pre><div class="lbl">output</div><pre>UR-25 plan: &quot;I&#x27;ll leave dataviz as is for now.&quot;
+Switched to a new branch &#x27;s1-spec&#x27;
+ M docs/requests.md</pre></details></div><div class="step" id="SD31"><span class="sid">D31</span><span class="kind">Bash</span>git add docs/requests.md &amp;&amp; git commit -q -m &quot;Record dataviz decision in requests
+
+Co-Authored-By: Claude Opus 5.5 &lt;noreply@anthropic.com&gt;&quot; &amp;&amp; git log --oneline -3<div class="lbl">commit 75d2eb6 (unconfirmed): Record dataviz decision in requests</div><details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;git add docs/requests.md &amp;&amp; git commit -q -m \&quot;Record dataviz decision in requests\n\nCo-Authored-By: Claude Opus 5.5 &lt;noreply@anthropic.com&gt;\&quot; &amp;&amp; git log --oneline -3&quot;,
+  &quot;description&quot;: &quot;Commit requests update on new branch&quot;
+}</pre><div class="lbl">output</div><pre>75d2eb6 Record dataviz decision in requests
+2f7920f turn 3
+c64c8a1 turn 2</pre></details></div><div class="step" id="SD32"><span class="sid">D32</span><span class="kind">say</span>The three files were already committed, so there was nothing new to commit. `docs/brief.md`, `docs/roadmap.md` and `docs/requests.md` are in commit `2f7920f` (&quot;turn 3&quot;), which sits directly on `master`. I made a new branch, `s1-spec`, from there. On it I committed one small change: `docs/requests.md` now records &quot;I&#x27;ll leave dataviz as is for now&quot; as UR-25. The S1 spec will go on this branch too. If you also want `master` moved back so those three files exist only on the branch, I can do that, but it rewrites `master`&#x27;s history, so I&#x27;ll wait for your yes. ⏎ ## Spec for S1: plan before I wri …[+3540 chars]<details><summary>full text</summary><pre>The three files were already committed, so there was nothing new to commit. `docs/brief.md`, `docs/roadmap.md` and `docs/requests.md` are in commit `2f7920f` (&quot;turn 3&quot;), which sits directly on `master`. I made a new branch, **`s1-spec`**, from there. On it I committed one small change: `docs/requests.md` now records &quot;I&#x27;ll leave dataviz as is for now&quot; as UR-25. The S1 spec will go on this branch too. If you also want `master` moved back so those three files exist only on the branch, I can do that, but it rewrites `master`&#x27;s history, so I&#x27;ll wait for your yes.
+
+## Spec for S1: plan before I write it
+
+**How each brief goal maps to an S1 feature:**
+```
+Goal 1 (who was investable on any date, and their returns, known-then only)
+    → Universe as of a date (UNIV), Total returns as of a date (RET), Data refresh (SYNC)
+Goal 2 (every disagreement flagged, then explained or accepted)
+    → Cross-check and findings (CHECK), Exploratory analysis (EDA)
+Goal 3 (see the data and its problems without writing code)
+    → Data-quality app (VIEW), Live run progress (RUNS)
+```
+EDA will name the `data-analysis` skill. VIEW will name `dataviz` and `frontend-design`.
+
+**ASSUMPTIONS I&#x27;M MAKING. Correct me now or I&#x27;ll go ahead with these:**
+1. **Membership:** a stock counts as a member on date D if it was in the S&amp;P 500 during D, judged by when changes took effect, not when they were announced.
+2. **Identity:** a stock&#x27;s identity follows the company. Asking for &quot;BUD&quot; on a 2005 date returns Anheuser-Busch, not today&#x27;s AB InBev. Ticker changes don&#x27;t break a series.
+3. **No look-ahead:** total returns for a past date never use information from after that date. If you ask for price levels, they are either unadjusted or adjusted only for events up to D.
+4. **Final days:** a member&#x27;s returns run through its last trading day, including the last day itself. Lehman&#x27;s crash on 2008-09-15 is in, and so is the cash-out return on an acquisition. No member drops out before its final loss shows up.
+5. **Refresh:** you start updates yourself, and a refresh only fetches what&#x27;s new. Afterwards the data runs through the last completed trading day.
+6. **Speed:** the members and returns for one date come back in ≤ 2 s. Full 1998-to-today series for one date&#x27;s ~500 members come back in ≤ 30 s.
+7. **Cost:** no paid data beyond your current subscription. Yahoo is used only within its free access.
+
+**Questions. Each one changes the requirements:**
+1. **Which date is the &quot;correct end date&quot; for the ten names?** It&#x27;s not the same date for all of them. Kodak left the index in Dec 2010 but traded until 2012. Lehman left in Sep 2008 and then traded OTC. **My proposal:** record two dates per name, the index exit date and the last trading day on a major exchange, and check both.
+2. **Where should the expected dates come from?** The test cases need answers that come from outside my own work. Can you give me the 10 × 2 dates, or name a source you trust for them? The other option is for me to draft them and have you verify each one.
+3. **How close counts as &quot;agrees with Yahoo&quot;?** **My proposal:**
+   - splits match on date and ratio exactly
+   - dividends match on ex-date and amount to within $0.001
+   - daily total returns match to within 5 basis points (0.05 percentage points)
+   - unadjusted closes match to within 0.5%
+
+   Anything outside these is flagged.
+4. **How big is a spot-check?** **My proposal:** each validation run checks 100 members still on Yahoo, sampled across the years 1998 to today, plus every split and special dividend those stocks had. A full check of every member is available on demand.
+5. **How should delisted names be checked, given Yahoo mostly doesn&#x27;t carry them?** **My proposal:** run internal checks instead:
+   - there are no gaps before the end date
+   - the last day&#x27;s price matches the deal terms, for example a cash buyout price
+   - the stock&#x27;s membership ends no later than its trading does
+
+   Anything that fails is flagged like a Yahoo disagreement.
+
+Once you answer, I&#x27;ll write `docs/spec.md` and bring it back to you for approval.</pre></details></div>
+<h2>Commits</h2>
+<table><tr><th>Commit</th><th>Message</th><th>Files</th></tr><tr><td><code>75d2eb6</code> <span class=err>unconfirmed</span></td><td>Record dataviz decision in requests</td><td>docs/requests.md</td></tr></table>
+<h2>Returned</h2>
+<pre>The three files were already committed, so there was nothing new to commit. `docs/brief.md`, `docs/roadmap.md` and `docs/requests.md` are in commit `2f7920f` (&quot;turn 3&quot;), which sits directly on `master`. I made a new branch, **`s1-spec`**, from there. On it I committed one small change: `docs/requests.md` now records &quot;I&#x27;ll leave dataviz as is for now&quot; as UR-25. The S1 spec will go on this branch too. If you also want `master` moved back so those three files exist only on the branch, I can do that, but it rewrites `master`&#x27;s history, so I&#x27;ll wait for your yes.
+
+## Spec for S1: plan before I write it
+
+**How each brief goal maps to an S1 feature:**
+```
+Goal 1 (who was investable on any date, and their returns, known-then only)
+    → Universe as of a date (UNIV), Total returns as of a date (RET), Data refresh (SYNC)
+Goal 2 (every disagreement flagged, then explained or accepted)
+    → Cross-check and findings (CHECK), Exploratory analysis (EDA)
+Goal 3 (see the data and its problems without writing code)
+    → Data-quality app (VIEW), Live run progress (RUNS)
+```
+EDA will name the `data-analysis` skill. VIEW will name `dataviz` and `frontend-design`.
+
+**ASSUMPTIONS I&#x27;M MAKING. Correct me now or I&#x27;ll go ahead with these:**
+1. **Membership:** a stock counts as a member on date D if it was in the S&amp;P 500 during D, judged by when changes took effect, not when they were announced.
+2. **Identity:** a stock&#x27;s identity follows the company. Asking for &quot;BUD&quot; on a 2005 date returns Anheuser-Busch, not today&#x27;s AB InBev. Ticker changes don&#x27;t break a series.
+3. **No look-ahead:** total returns for a past date never use information from after that date. If you ask for price levels, they are either unadjusted or adjusted only for events up to D.
+4. **Final days:** a member&#x27;s returns run through its last trading day, including the last day itself. Lehman&#x27;s crash on 2008-09-15 is in, and so is the cash-out return on an acquisition. No member drops out before its final loss shows up.
+5. **Refresh:** you start updates yourself, and a refresh only fetches what&#x27;s new. Afterwards the data runs through the last completed trading day.
+6. **Speed:** the members and returns for one date come back in ≤ 2 s. Full 1998-to-today series for one date&#x27;s ~500 members come back in ≤ 30 s.
+7. **Cost:** no paid data beyond your current subscription. Yahoo is used only within its free access.
+
+**Questions. Each one changes the requirements:**
+1. **Which date is the &quot;correct end date&quot; for the ten names?** It&#x27;s not the same date for all of them. Kodak left the index in Dec 2010 but traded until 2012. Lehman left in Sep 2008 and then traded OTC. **My proposal:** record two dates per name, the index exit date and the last trading day on a major exchange, and check both.
+2. **Where should the expected dates come from?** The test cases need answers that come from outside my own work. Can you give me the 10 × 2 dates, or name a source you trust for them? The other option is for me to draft them and have you verify each one.
+3. **How close counts as &quot;agrees with Yahoo&quot;?** **My proposal:**
+   - splits match on date and ratio exactly
+   - dividends match on ex-date and amount to within $0.001
+   - daily total returns match to within 5 basis points (0.05 percentage points)
+   - unadjusted closes match to within 0.5%
+
+   Anything outside these is flagged.
+4. **How big is a spot-check?** **My proposal:** each validation run checks 100 members still on Yahoo, sampled across the years 1998 to today, plus every split and special dividend those stocks had. A full check of every member is available on demand.
+5. **How should delisted names be checked, given Yahoo mostly doesn&#x27;t carry them?** **My proposal:** run internal checks instead:
+   - there are no gaps before the end date
+   - the last day&#x27;s price matches the deal terms, for example a cash buyout price
+   - the stock&#x27;s membership ends no later than its trading does
+
+   Anything that fails is flagged like a Yahoo disagreement.
+
+Once you answer, I&#x27;ll write `docs/spec.md` and bring it back to you for approval.</pre>
+</body></html>

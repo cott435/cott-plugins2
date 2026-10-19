@@ -1,0 +1,108 @@
+# Driver segment 29 · `/dev-team:build-planning Continue.`
+
+- **Steps:** D1329–D1366 · **definition:** `/Users/connorott/plugins/dev-team-workspace/iteration-10/quant-incremental/with_skill/plugin/dev-team/skills/build-planning/SKILL.md`
+- **Units spawned here:** none
+
+## Steps
+
+- `D1329` **USER TYPED** `/dev-team:build-planning Continue.`
+- `D1330` skill loaded from `/Users/connorott/plugins/dev-team-workspace/iteration-10/quant-incremental/with_skill/plugin/dev-team/skills/build-planning`
+- `D1331` **Bash** python3 ../plugin/dev-team/scripts/dt.py status --skill build-planning
+      ↳ …[2471 chars] ps the protected tests/conftest.py from its Writes; build-planning's edit], UR-65 "Build and test on synthetic data, and run the real comparison once PB-01 is answered and the sources are real." [Stage 2 real-data comparison timing], UR-69 "yes, add S2 with data-analysis, null-hypothesis-testing and dataviz, and assign RF-01 to S2." [S2 Return structure and portfolios: stage skills and references]
+- `D1332` **Bash** cd /Users/connorott/plugins/dev-team-workspace/iteration-10/quant-incremental/with_skill/plugin/dev-team/skills/build-planning && cat references/extend.md; ls references
+      ↳ …[550 chars] its tasks and files (`tasks.md`). ⏎ 3. Run the Review Gate. ⏎ advance.md ⏎ cut.md ⏎ examples-advance.md ⏎ examples-cut.md ⏎ examples-foreign.md ⏎ examples-new.md ⏎ examples-phase0.md ⏎ examples-replan.md ⏎ examples-routing.md ⏎ extend.md ⏎ new.md ⏎ phase0.md ⏎ replan.md ⏎ tasks.md ⏎ Shell cwd was reset to /Users/connorott/plugins/dev-team-workspace/iteration-10/quant-incremental/with_skill/project
+- `D1333` **Bash** git log --oneline -8 && git show --stat HEAD HEAD~1 | head -40
+      ↳ …[584 chars] C-18, TC-23, ⏎     TC-33 for AD-15's one report store; add server TC-55 and web TC-56. ⏎     Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com> ⏎  docs/packages/eqdata/tests.md | 2 +- ⏎  docs/packages/server/tests.md | 2 +- ⏎  docs/packages/study/tests.md  | 2 +- ⏎  docs/packages/web/tests.md    | 2 +- ⏎  docs/routes.md                | 2 +- ⏎  5 files changed, 5 insertions(+), 5 deletions(-)
+- `D1334` **Bash** cd /Users/connorott/plugins/dev-team-workspace/iteration-10/quant-incremental/with_skill/plugin/dev-team/skills/build-planning && cat references/cut.md references/examples-cut.md
+      ↳ …[9195 chars] and M4 again because those slices thicken it. Every pipeline of S1 lands in some milestone, and only M1 gets a plan; `dt roadmap` shows S1 Planned. At the gate, the cut is the first thing presented: the four slices, why each line falls where it does, and the boundaries M1 freezes. ⏎ Shell cwd was reset to /Users/connorott/plugins/dev-team-workspace/iteration-10/quant-incremental/with_skill/project
+- `D1335` **Bash** cat docs/roadmap.md && cat docs/routes.md | tail -60
+      ↳ …[10501 chars] me (from pipeline-design, 2026-10-18) ⏎ - [x] architecture-design · study contract (PL-13): add `study.ReportParams: type` (Mapping[str, str] with exactly known_on, first_rebalance, last_rebalance as ISO dates) and `study.report_params(panel: Panel) -> ReportParams` in `report`, so run_study's entry passes it to eqdata.save_report without building the dict itself (from pipeline-design, 2026-10-18)
+- `D1336` **Bash** ls docs docs/packages/*; grep -n "^### AD-\|^## AD\|AD-1[0-9]" docs/architecture.md | head -40; cat docs/ideas/return-structure-portfolios.md | head -80
+      ↳ …[14350 chars] s or machine learning — that's the point of the order: variance first. ⏎ - Shorting, leverage or transaction costs — the rules are long-only, fully invested and cost-free. ⏎ - Tuning estimator settings in a nested walk-forward — the plain comparison comes first. ⏎ - Interactive research views — the app opens the report; it doesn't become a research tool. ⏎ ## Open questions ⏎ Resolved in the spec.
+- `D1337` **Bash** grep -rn -i "grow\|stay single\|stays single\|4 pipelines\|four pipelines" docs/architecture.md docs/packages/eqdata/architecture.md tasks/plan.md docs/requests.md | head -30
+      ↳ …[2592 chars] isk (next cut sources, later round) or split again now] · architecture-design 2026-10-18 → §Risks and open questions ⏎ tasks/plan.md:396:- **The `eqdata` Grow trigger (4 pipelines > 3) still fires.** Planning goes ahead on UR-47 ("Go with your recommendation on leaving the eqdata contract size as a risk for now.") and AD-13's Consequences, which record that the trigger still fires after the split.
+- `D1338` _said:_ Cutting stage S2 into milestone rows now; M1 is still active, so S2 gets roadmap rows only and no plan. Next I'm reading the study pipelines and tests.
+- `D1339` **Bash** wc -l docs/packages/*/pipelines.md docs/packages/*/tests.md && sed -n 1,200p docs/packages/study/pipelines.md
+      ↳ …[5414 chars] nit__.py (estimate)  sample.py  shrinkage.py  denoised.py  factor.py ⏎   rules/           __init__.py (form)  min_var.py  risk_parity.py  hrp.py  equal.py ⏎   backtest/        hold.py ⏎   compare/         league.py  significance.py ⏎   report/          sections.py ⏎   cli/             pipeline.py (PL-13)  rebalances.py ⏎ tests/intent/study/  tests/unit/study/ ⏎ ``` ⏎ ## Open questions ⏎ ## Retired
+- `D1340` **Bash** grep -n "PL-12\|PL-01\b\|^## PL\|Covers\|PORT-19\|VIEW-08\|report" docs/packages/web/pipelines.md docs/packages/server/pipelines.md docs/packages/eqdata/pipelines.md | head -60; grep -n "PL-12" -A20 docs/architecture.md | head -40
+      ↳ …[7020 chars] ⏎ -- ⏎ 257:| 2026-10-18 | Extend: S2 portfolio study as the `study` package, one report store, PL-12 | ideas/return-structure-portfolios.md | AD-14–AD-18; PL-12 | ⏎ 258-| 2026-10-18 | Revise: pipeline-design's routed `study` types `HoldingReturns`, `ReportParams` and `report_params`; `holding_returns` and `hold` use them | routes.md | study.HoldingReturns, study.ReportParams, study.report_params |
+- `D1341` **Bash** sed -n 1,40p tasks/plan.md; grep -n "Deferred\|EDA-03\|VIEW-08" tasks/plan.md | head -20; cat docs/packages/study/tests.md | sed -n 1,60p
+      ↳ …[17210 chars] en `Estimate`s: (a) ids 4301 and 4302, `cov` = diag(1, 4); (b) ids 4303–4306, every variance 1, correlation 0.9 within the pairs (4303, 4304) and (4305, 4306), 0 across them ⏎ **Expected:** (a) `w` = (0.8, 0.2); (b) w₄₃₀₃ + w₄₃₀₄ = 0.5 and w₄₃₀₅ + w₄₃₀₆ = 0.5; each weight ≥ 0, the sum 1, `failure` None · **Tolerance:** 1e-12, no solver, only closed-form splits; the sum within 1e-9, PORT-09's bound
+- `D1342` **Bash** grep -n "latest_day\|members_between" docs/packages/eqdata/pipelines.md tasks/plan.md | head; grep -n "VIEW-08\|PORT-19\|PORT-20\|STRUC-0[15]" docs/spec.md | head; grep -n "^## PL-01\|^### PL-01" -A8 docs/architecture.md | head -12; grep -n "PL-12\|PL-01\b" docs/packages/*/tests.md | head
+      ↳ …[2583 chars] t` → `eqdata.latest_report` for the EDA report ⏎ 46- ⏎ 47-### PL-02: Review and resolve findings ⏎ docs/packages/web/tests.md:10:| PL-01 | `pnpm --filter web e2e pl01 --smoke` | — (system pipeline: its steps are PL-08 and PL-09, unit-tested in `server` and here) | — (end to end on a store loaded by `eqdata refresh --smoke`; the oracles are TC-19–TC-23 on PL-09 and the `server.api_*` samples) | — |
+- `D1343` **Bash** grep -n "### TC-5[3-6]" -A3 docs/packages/*/tests.md; grep -n "PORT-20\|benchmark\|Open questions" -A2 docs/packages/study/tests.md | head -30
+      ↳ …[5648 chars] estimate against sample with Holm across all of them, or by a max-statistic null? That is the spec's call (spec-writing), routed only on your say. ⏎ 123-- **Shrinkage intensity has no oracle.** TC-38 checks the convex form and 0 ≤ δ ≤ 1, which the spine's δ = 0 also passes. Ledoit and Wolf's (2004) δ value needs a known output (a paper table or your own run) to pin it; until then, unit tests only.
+- `D1344` **Bash** python3 ../plugin/dev-team/scripts/dt.py next-id M; grep -n "UR-6[5-9]\|UR-8" docs/requests.md | head -20
+      ↳ …[2399 chars] , TC-47, TC-48, TC-49, TC-50, TC-51, TC-52, TC-53, TC-54 ⏎ 89:- **UR-83** tests · "None. All synthetic is fine, and nothing from RF-01's output." [trusted study input/output pairs (notebook outputs, paper tables, RF-01 runs)] · test-planning 2026-10-18 → TC-34, TC-35, TC-36, TC-37, TC-38, TC-39, TC-40, TC-41, TC-42, TC-43, TC-44, TC-45, TC-46, TC-47, TC-48, TC-49, TC-50, TC-51, TC-52, TC-53, TC-54
+- `D1345` _said:_ Writing the M4 roadmap row and section next, then running the lint.
+- `D1346` **Bash** python3 - <<'EOF'
+p='docs/roadmap.md'
+s=open(p).read()
+row_after='| M3 | S1 | Live runs and EDA report | eqdata, server, web | PL-01, PL-03, PL-06, PL-08, PL-09, PL-11 | M1 (eqdata.Run, PL-04 output), M2 (eqdata.Finding, eqdata.raise_finding) | Designed |\n'
+assert row_after in s
+s=s.replace(row_after,row_after+'| M4 | S2 | Portfolio study | study, eqdata, server, web | PL-01, PL-07, PL-08, PL-09, PL-12, PL-13 | M1 (eqdata.universe, eqdata.total_returns, PL-07 output), M3 (eqdata.Report, eqdata. …[+909 chars]  ❌ ERROR
+      ↳ Exit code 1 ⏎ S2: Idea → Split ⏎ M4: — → Designed ⏎ roadmap: updated 2 ⏎ docs/roadmap.md:21: roadmap-skill S1 Skills names dataviz: not installed (.claude/skills or the plugin) ⏎ docs/roadmap.md:25: roadmap-skill S2 Skills names dataviz: not installed (.claude/skills or the plugin) ⏎ docs/roadmap.md:29: roadmap-skill M1 Skills names dataviz: not installed (.claude/skills or the plugin) ⏎ docs/roadmap.md:36: roadmap-skill M2 Skills names dataviz: not installed (.claude/skills or the plugin) ⏎ docs/roadmap.md:42: roadmap-skill M3 Skills names dataviz: not installed (.claude/skills or the plugin) ⏎ docs/roadmap.md:48: roadmap-skill M4 Skills names dataviz: not installed (.claude/skills or the plugin) ⏎ tasks/plan.md:326: verify-smoke M1-T35 Verify lacks PL-01's smoke command `pnpm --filter we …[+41 chars]
+- `D1347` **Bash** sed -n 324,340p tasks/plan.md; git stash -q && python3 ../plugin/dev-team/scripts/dt.py lint tasks/ 2>&1 | tail -3; git stash pop -q
+      ↳ …[1507 chars] /inspect.tsx, tests/intent/web/pl01.spec.ts ⏎ ### Checkpoint: milestone exit ⏎ - [ ] Every pipeline in the milestone runs end to end (smoke commands) ⏎ - [ ] All golden cases pass ⏎ - [ ] Entry functions still read top to bottom as the step table says (Sync if not) ⏎ tasks/plan.md:326: verify-smoke M1-T35 Verify lacks PL-01's smoke command `pnpm --filter web e2e pl01 --smoke` ⏎ 1 error, 0 warnings
+- `D1348` **Bash** python3 - <<'EOF'
+p='tasks/plan.md'
+s=open(p).read()
+old='**Reason:** system task; PL-01 has no runnable smoke command yet (`dt lint` verify-smoke), routed to `test-planning` in `docs/routes.md`, so Verify runs `pnpm --filter web e2e pl01` until it lands\n'
+assert old in s
+s=s.replace(old,'**Reason:** system task\n')
+old2='`pnpm --filter web e2e pl01` · `scripts/check.sh gate --pkg web`'
+assert old2 in s
+s=s.replace(old2,'`pnpm --filter web e2e pl01 --smoke` · `scripts/check.sh gate --pkg web`') …[+999 chars]
+      ↳ …[168 chars] moke` on a store loaded by `eqdata refresh --smoke`, then `pnpm --filter web e2e pl12 --smoke` opening /report/study through eqdata-server); M4's system task and exit need it (PL-12) ⏎ 0 errors, 6 warnings ⏎ mode: replan ⏎ milestone: M1 Approved ⏎ uncovered: none ⏎ no_spine: none ⏎ mode_violations: none ⏎ stage_to_cut: none ⏎ references_unrouted: none ⏎ skills_unrouted: none ⏎ stage_unrouted: none
+- `D1349` **Bash** python3 ../plugin/dev-team/scripts/dt.py status --skill build-planning | grep -E "changed_since_plan|blocked|interfaces_changed|requests_open|mode"
+      ↳ …[619 chars] ps the protected tests/conftest.py from its Writes; build-planning's edit], UR-65 "Build and test on synthetic data, and run the real comparison once PB-01 is answered and the sources are real." [Stage 2 real-data comparison timing], UR-69 "yes, add S2 with data-analysis, null-hypothesis-testing and dataviz, and assign RF-01 to S2." [S2 Return structure and portfolios: stage skills and references]
+- `D1350` **Bash** cd /Users/connorott/plugins/dev-team-workspace/iteration-10/quant-incremental/with_skill/plugin/dev-team/skills/build-planning && cat references/replan.md; sed -n 1,60p ../idea-refine/references/requests.md
+      ↳ …[5911 chars] 05 one predator → two (yes?); open: none. ⏎ Quote the words and the traced text side by side, so the user sees whether one does the other. ⏎ Once the spec or architecture is Approved, `dt lint` fails it for every open request it owns, and `dt next` sends the run back to its skill. ⏎ Shell cwd was reset to /Users/connorott/plugins/dev-team-workspace/iteration-10/quant-incremental/with_skill/project
+- `D1351` **Bash** git log --oneline -- tasks/plan.md | head -3; P=$(git log -1 --format=%h -- tasks/plan.md); echo plan=$P; git diff $P HEAD -- docs/packages/eqdata/contract.md | head -150
+      ↳ …[13009 chars] `class ReportTable(columns: list[str], rows: list[list[str | float | int | None]])`, `class ReportSeries(name: str, x: list[str], y: list[float | None])` ⏎ +- **Invariants:** every row has one cell per column; every series has `len(x) == len(y)` ⏎ +- **Boundary:** eda, study, web · **Fixtures:** tests/contracts/eqdata.ReportSection/ · **Cases:** one table and one series, a section with only series
+- `D1352` _said:_ Contract changes since M1's plan only add `study` as a consumer, plus `latest_day` and the report-store rename. Applying the small M1 replan now: UR-53's Writes fix and the deferred-name updates.
+- `D1353` **Bash** grep -n "conftest\|latest_eda_report\|EdaReport\|## Replan notes" -A0 tasks/plan.md tasks/todo.md; sed -n '/## Replan notes/,$p' tasks/plan.md | head -20
+      ↳ …[1306 chars] ckages/server/src/eqdata_server/**, packages/web/src/**, tests/contracts/**, tests/support/**, tests/conftest.py ⏎ tasks/plan.md:399:## Replan notes ⏎ ## Replan notes ⏎ - 2026-10-18: PL-07 now owns `prices` (row 6, RET-04, RET-05, DATA-05). M1-T12 moves from PL-08.prices (VIEW-01) to PL-07.prices with those IDs, and M1-T11 drops RET-05. VIEW-01 stays on M1-T22. No task added, dropped or reordered.
+- `D1354` **Bash** python3 - <<'EOF'
+p='tasks/plan.md'
+s=open(p).read()
+for a,b in [
+ ('tests/contracts/**, tests/support/**, tests/conftest.py\n','tests/contracts/**, tests/support/**\n'),
+ ('PL-08.latest_eda_report,','PL-08.latest_report,'),
+ ('**Status:** Approved · **Base:** 4d781b4','**Status:** Draft · **Base:** 4d781b4'),
+]:
+    assert s.count(a)==1,a; s=s.replace(a,b)
+a='the golden-case store builder loads a fixture\'s `input.json` into a temporary store\n'
+assert s.count(a)==1
+s=s.replace(a,'the golden-ca …[+1431 chars]
+      ↳ …[1896 chars]  the sources are real." [Stage 2 real-data comparison timing], UR-69 "yes, add S2 with data-analysis, null-hypothesis-testing and dataviz, and assign RF-01 to S2." [S2 Return structure and portfolios: stage skills and references] ⏎ M1-T01 [interface] M1 interface · writes: packages/eqdata/src/eqdata/**, packages/server/src/eqdata_server/**, packages/web/src/**, tests/contracts/**, tests/support/**
+- `D1355` **Bash** grep -n "interfaces_changed" ../plugin/dev-team/scripts/*.py ../plugin/dev-team/scripts/**/*.py 2>/dev/null | head -5; tail -c 300 tasks/plan.md | cat -A | tail -5; grep -c '^$' tasks/plan.md
+      ↳ …[258 chars] (repo: Repo, plan: Doc, tasks: list[model.Task], changed: list[str]) -> list[str]: ⏎ ../plugin/dev-team/scripts/devteam/status/build_planning.py:311:    moved = interfaces_changed(repo, active, tasks, changed) if active else [] ⏎ ../plugin/dev-team/scripts/devteam/status/build_planning.py:394:    r.add("interfaces_changed", moved) ⏎ cat: illegal option -- A ⏎ usage: cat [-belnstuv] [file ...] ⏎ 47
+- `D1356` **Bash** sed -n 180,230p ../plugin/dev-team/scripts/devteam/status/build_planning.py; sed -n 300,315p ../plugin/dev-team/scripts/devteam/status/build_planning.py
+      ↳ …[3135 chars] changed_since_plan(repo, active, pkgs) if active else [] ⏎     moved = interfaces_changed(repo, active, tasks, changed) if active else [] ⏎     queued = sorted(f"{roadmap_cmd._plan_milestone(d) or '?'} ({d.rel})" for d in repo.docs("queued-plan")) ⏎     available = available_skills(repo) ⏎     # The next milestone that still needs a plan, or the next stage that still needs cutting into milestones;
+- `D1357` **Bash** awk 'prev=="" && $0=="" {print NR} {prev=$0}' tasks/plan.md; sed -n 380,401p tasks/plan.md
+      ↳ …[2752 chars] ers keep their acceptance). New `eqdata.latest_day` (PL-07 row 7) and PORT-19 Deferred to M4; AD-15 renames PL-08.latest_eda_report to PL-08.latest_report (still Deferred to M3). M1-T01 drops the protected `tests/conftest.py` from its Writes; shared fixtures go in `tests/support/` (UR-53). M1-T35 Verify now runs PL-01's smoke command, which test-planning added. No task added, dropped or reordered.
+- `D1358` **Bash** python3 - <<'EOF'
+p='tasks/plan.md'
+s=open(p).read()
+a='No task added, dropped or reordered.\n- 2026-10-18: AD-14–AD-16 add'
+assert s.count(a)==1
+s=s.replace(a,'Later the same day, AD-14–AD-16 add')
+open(p,'w').write(s)
+EOF
+python3 ../plugin/dev-team/scripts/dt.py lint tasks/ docs/roadmap.md AGENTS.md 2>&1 | grep -v dataviz; for t in M1-T01 M1-T35; do python3 ../plugin/dev-team/scripts/dt.py context $t | wc -l; done; git status --short
+      ↳ 0 errors, 6 warnings ⏎      814 ⏎      245 ⏎  M docs/requests.md ⏎  M docs/roadmap.md ⏎  M docs/routes.md ⏎  M tasks/plan.md
+- `D1359` _said:_ I've cut Stage S2 into one milestone, M4, and re-synced the M1 plan with the docs that changed after it was approved. **The M1 plan is back to Draft and needs your approval.** ⏎ ## What was written ⏎ **`docs/roadmap.md`: S2 is now one milestone.** S2 is marked Split. ⏎ | Milestone | Stage | Name | Packages | Pipelines | Depends | ⏎ |---|---|---|---|---|---| ⏎ | M4 | S2 | Portfolio study | study, eqdata, server, web | PL-01, PL-07, PL-08, PL-09, PL-12, PL-13 | M1 (as-of `universe` and `total_returns`), M3 (the report store, `members_between`) | ⏎ - **Skills:** data-analysis, null-hypothesis-tes …[+2949 chars]
+- `D1360` HOOK Stop said: {"systemMessage": "dt lint: 10 problems\ndocs/requests.md:16: request-number UR-10 says '4', which RET-04, VIEW-01, VIEW-02, VIEW-03, VIEW-04, CHECK-01, QR-04 doesn't state: honour the number, or change it with the user's yes\ndocs/requests.md:16: request-number UR-10 says '5', which RET-04, VIEW-01, VIEW-02, VIEW-03, VIEW-04, CHECK-01, QR-04 doesn't state: honour the number, or change it with the user's yes\ndocs/requests.md:46: request-number UR-40 says 'six', which eqdata.fail_run, eqdata.Settings, eqdata.Sample, eqdata.finish_run, eqdata.StagedBatch, AD-12 doesn't state: honour the number, or change it with the user's yes\ndocs/roadmap.md:21: roadmap-skill S1 Skills names dataviz: not installed (.claude/skills or the plugin)\ndocs/roadmap.md:25: roadmap-skill S2 Skills names dataviz: n …[+550 chars]
+- `D1361` HOOK SessionStart:resume said: milestone: M1 Walking skeleton · plan Draft ⏎ progress: 0/35 · next: M1-T01 M1 interface ⏎ blocked: none ⏎ draft (waiting for approval): tasks/plan.md ⏎ dt: /Users/connorott/plugins/dev-team-workspace/iteration-10/quant-incremental/with_skill/plugin/dev-team/scripts/dt
+- `D1362` **USER:** Approved. The M1 plan and the M4 cut both look good. Set M1 back to Approved. Yes, commit.
+- `D1363` **Bash** sed -i '' 's/^\*\*Milestone:\*\* M1 · \*\*Status:\*\* Draft · /**Milestone:** M1 · **Status:** Approved · /' tasks/plan.md && head -3 tasks/plan.md | tail -1 && D=../plugin/dev-team/scripts/dt.py && python3 $D roadmap && python3 $D lint tasks/ docs/roadmap.md AGENTS.md 2>&1 | tail -1 && git add tasks/plan.md docs/roadmap.md docs/routes.md docs/requests.md && git commit -q -F - <<'EOF'
+Cut S2 into M4 Portfolio study; sync M1 plan with AD-14–AD-16
+
+S2 becomes one milestone, M4 (study, eqdata, serv …[+438 chars]
+      ↳ COMMIT UNCONFIRMED — HEAD after the call was 9b8a1d6; check `git show --stat 9b8a1d6`
+      ↳ …[33 chars] pproved · **Base:** 4d781b4 · **Last updated:** 2026-10-18 · **Roadmap:** [../docs/roadmap.md](../docs/roadmap.md) ⏎ roadmap: ok ⏎ 0 errors, 6 warnings ⏎ 9b8a1d6 Cut S2 into M4 Portfolio study; sync M1 plan with AD-14–AD-16 ⏎ mode: blocked ⏎ docs: brief Accepted · spec Approved · architecture Approved (Multi-package) · roadmap ok · plan M1 Approved · constraints Approved ⏎ interfaces_changed: none
+- `D1364` **Bash** python3 ../plugin/dev-team/scripts/dt.py status --skill build-planning | grep -iE "block|draft|revis|route|next"
+      ↳ …[15 chars]  blocked: waiting for PB-01, PB-02, PB-03 ⏎ next ids: AD-19 PL-14 TC-57 S3 M5 M1-T36 ⏎ next_task: M1-T01 M1 interface ⏎ blocked_tasks: none ⏎ draft_pipelines: none ⏎ probes_blocking: PB-01 → eqdata, eqdata.PrimarySource (M2), PB-02 → eqdata, eqdata.CompanyId (M2), PB-03 → eqdata, eqdata.CheckSource, eqdata.YahooHistory (M2) ⏎ references_unrouted: none ⏎ skills_unrouted: none ⏎ stage_unrouted: none
+- `D1365` _said:_ The M1 plan is Approved again, and the M4 cut and the M1 plan changes are committed as `9b8a1d6` on `s1-spec`. ⏎ - **M1:** the plan changes are cleared and M1 is ready to build. Next is `build-setup` (New, for the first milestone), then M1-T01, the interface task. ⏎ - **M4:** it's on the roadmap as Designed with no plan yet. It gets one when M4's turn comes. ⏎ - **Planning for the next milestone (M2) is blocked** until PB-01, PB-02 and PB-03 are answered. That doesn't stop M1's build, but `api-probe` needs to run those probes before M2 can be planned. ⏎ - **Still open:** test-planning hasn't a …[+139 chars]
+- `D1366` HOOK SessionStart:startup said: milestone: M1 Walking skeleton · plan Approved ⏎ progress: 0/35 · next: M1-T01 M1 interface ⏎ blocked: none ⏎ dt: /Users/connorott/plugins/dev-team-workspace/iteration-10/quant-incremental/with_skill/plugin/dev-team/scripts/dt

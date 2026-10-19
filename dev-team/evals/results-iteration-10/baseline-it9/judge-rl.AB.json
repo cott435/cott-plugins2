@@ -1,0 +1,117 @@
+{
+ "winner": "A",
+ "reasoning": "Set A is closer to the ground truth and better built. It plans all three stages as the user described them: a circular tank where fish survive as long as possible with limited vision, REINFORCE then PPO, and a single learning predator. It gets the self-play concept right with an opponent pool, saved generations, a cross-play table and ratings, and its RL details are careful (truncation kept separate from termination for bootstrapping, the library PPO's defaults matched). Its roadmap has one milestone per stage with correct Depends cells. M1 is a full Snake vertical slice: training, evaluation, the reference, ablations and replay. Its dependency graph is clean. Its main weaknesses are leftover migration text ('adopted before M1 is built', CORE-06's 'after the core's interface revision', 'TC-01\u2013TC-49 don't change', Replan notes), a brief that says 'Not doing: Designing future environments now' while the spec designs all three, and some packets that leave out types the task needs. Set B departs from the ground truth. Its tank is a square, fish respawn and score 'hits per fish' (lower is better) instead of survival time, predator-prey has 2 predators, and it drops the opponent pool, so the self-play concept is never taught. Its M1 ships a DQN spine with 'no replay buffer or target net'. Replay, the reference check and 'snake beats baselines' are pushed into a carved-off M2 ('See, check and explain'), which is the kind of leftover milestone the rubric penalizes. Spines also write other owners' modules (train_loop builds runlog.RunWriter; the DQN spine builds methods.factory), and the PL-03 wiring task runs on a fake until the system task swaps it out. B's contract and replay design are solid, but it scores lower on content and layout.",
+ "rubric": {
+  "A": {
+   "content": {
+    "rl_soundness": 4,
+    "stage_completeness": 5,
+    "internal_consistency": 3,
+    "right_sizing": 3,
+    "milestone_quality": 4,
+    "pipeline_clarity": 3,
+    "interface_quality": 4,
+    "dependency_graph_soundness": 4,
+    "task_buildability": 3
+   },
+   "structure": {
+    "organization": 3,
+    "readability_for_solo_learner": 4,
+    "ease_of_finding_next_build_step": 4,
+    "layout_sensibility": 4
+   },
+   "content_score": 3.7,
+   "structure_score": 3.8,
+   "overall_score": 7.5
+  },
+  "B": {
+   "content": {
+    "rl_soundness": 3,
+    "stage_completeness": 3,
+    "internal_consistency": 3,
+    "right_sizing": 4,
+    "milestone_quality": 2,
+    "pipeline_clarity": 3,
+    "interface_quality": 4,
+    "dependency_graph_soundness": 3,
+    "task_buildability": 3
+   },
+   "structure": {
+    "organization": 3,
+    "readability_for_solo_learner": 4,
+    "ease_of_finding_next_build_step": 4,
+    "layout_sensibility": 3
+   },
+   "content_score": 3.1,
+   "structure_score": 3.5,
+   "overall_score": 6.6
+  }
+ },
+ "output_quality": {
+  "A": {
+   "score": 8,
+   "strengths": [
+    "All three stages match the user's description: circular tank, survival score, limited vision, a single learning predator, self-play with an opponent pool and cross-play",
+    "Careful RL design: tabular then DQN then CNN ladder, ablations, REINFORCE vs PPO, truncation vs termination handled correctly, settings mapped to the reference library",
+    "One milestone per stage with correct dependencies; M1 is a complete Snake slice including replay and the library comparison",
+    "Thorough golden cases (TC-01\u2013TC-71) with exact expected values; the Snake packet is fully self-contained"
+   ],
+   "weaknesses": [
+    "Leftover migration narration in design docs (AD-09/AD-13 titles, CORE-06, risk 'TC-01\u2013TC-49 don't change', Replan notes)",
+    "Brief's 'Not doing: Designing future environments now' contradicts the spec and roadmap",
+    "The PL-01 step table lists every alternative environment and agent constructor as steps, so it doesn't read as a call path",
+    "The train spine packet leaves out core.Transition, core.StepResult and runs.create_run"
+   ]
+  },
+  "B": {
+   "score": 6,
+   "strengths": [
+    "Clean contract with good replay design (re-simulated Trace, side by side, sight overlay, video)",
+    "Method check worlds as a safety net against silent RL bugs",
+    "A detailed, well-specified permutation test with Holm correction",
+    "Write-up scaffolding supports the 'explain why it works' goal"
+   ],
+   "weaknesses": [
+    "Fish tank is square, fish respawn, and score is hits (lower is better), not survival in a circular tank",
+    "Predator-prey has 2 predators and no opponent pool or past-generation self-play, so the stage's concept is weakened",
+    "M1 has no replay and a DQN without replay buffer or target network; 'beats baselines' and replay are pushed to a carved-off M2",
+    "Spines write other owners' modules (runlog/writer.py, methods/factory.py)",
+    "Stale 'routed to architecture-design; assumed' open questions left in pipelines.md"
+   ]
+  }
+ },
+ "unbuildable_tasks": {
+  "A": [
+   "M1-T06: packet omits core.Transition, core.StepResult, core.TeamSpec and runs.create_run, so the loop can't build Transitions or open a RunWriter without guessing"
+  ],
+  "B": [
+   "M1-T09: packet omits methods.Transition, core.Step, core.WorldSpec, core.EpisodeResult and runlog.Checkpoint, yet must build transitions, checkpoints and the RunWriter",
+   "M1-T06: packet omits core.WorldSpec and core.ActionSpace, and SNAKE-06 gives no field layout or length for the observation"
+  ]
+ },
+ "defects": {
+  "A": [
+   "final__brief.md: 'Designing future environments now. Each gets refined in its turn.' \u2014 contradicts the spec, which fully specifies the fish tank and predator-prey",
+   "final__architecture.md: 'AD-09: A batch-first environment interface over agents, adopted before M1 is built' \u2014 process narration kept in a design doc",
+   "final__architecture.md: 'the expected values of TC-01\u2013TC-49 don't change' \u2014 superseded migration framing",
+   "final__spec.md: 'CORE-06 Snake and the corridor behave exactly as before after the core's interface revision' \u2014 nothing is built yet, so there is no 'before'",
+   "final__tasks__plan.md: 'TC-01\u2013TC-28 pass on the batch-first core with unchanged expected values (CORE-06)' \u2014 stale migration acceptance",
+   "final__packages__rllab__pipelines.md PL-01: steps 3\u201314 are alternative constructors (Snake, Corridor, FishTank, PredatorPrey, agents, baselines) that the entry never calls in order",
+   "context__M1-T06.md: lacks core.Transition and runs.create_run although the task builds Transitions and writes through a RunWriter",
+   "final__tasks__plan.md M1-T27: CNN selection via net='cnn' likely needs agents/dqn/agent.py, which M1-T26 writes in parallel; only networks.py is listed"
+  ],
+  "B": [
+   "final__spec.md: 'FISH-01 The tank is a square with walls' \u2014 the project's tank is circular",
+   "final__spec.md: 'FISH-04 ... the score is hits per fish per episode (lower is better)' with respawn \u2014 the goal is to survive as long as possible",
+   "final__spec.md: 'PREY-01 ... 6 prey, 2 predators' \u2014 ground truth is one learning predator; no opponent pool or past-generation self-play anywhere",
+   "final__roadmap.md: 'M2: See, check and explain the snake' \u2014 a leftover milestone carrying replay, the reference check and the snake actually beating baselines",
+   "final__tasks__plan.md M1-T08: 'no replay buffer or target net' while AD-03 says dqn has a 'replay buffer, target network'; the M2 outline never mentions finishing the DQN",
+   "final__tasks__plan.md M1-T09: 'also builds runlog.RunWriter' \u2014 a spine writing another owner's module (runlog/writer.py)",
+   "final__tasks__plan.md M1-T08: 'also builds the methods factory (make_learner, load_policy)' \u2014 owner folded into the DQN spine",
+   "final__tasks__plan.md M1-T21: PL-03 wiring 'runs end to end on the train.run_train fake' \u2014 a fake inside the pipeline until M1-T30 swaps it",
+   "final__packages__rllab__pipelines.md: 'New contract types ... routed to architecture-design (assumed: as written in each step row)' \u2014 stale, since routes.md shows them done",
+   "final__tasks__plan.md M1-T20: 'Covers: TRAIN-01\u2013TRAIN-04, TRAIN-02' \u2014 repeated ID",
+   "final__tasks__plan.md M1-T28/M1-T29: write charts/check.py and charts/style.py, which the planned layout doesn't list"
+  ]
+ }
+}

@@ -1,0 +1,113 @@
+{
+ "winner": "A",
+ "reasoning": "Set A follows the ground truth much more closely. It has a circular tank where fish survive as long as possible, a single learning predator, and a self-play rung with a proper opponent pool. It builds a ladder of tabular Q-learning, DQN and CNN-DQN for value learning, includes ablations, and compares REINFORCE with PPO. Its golden cases are precise known-answer cases, and the ones I checked by hand (TD update, GAE, clipped objective, reflection, catch distances) are correct. A's main weaknesses are leftover process text in the architecture ('adopted before M1 is built', 'TC-01\u2013TC-49 don't change' when there are 71 cases), Exit wording that differs between the roadmap and the plan, and a very large M1. Set B has cleaner docs, a good check-world gate and a strong replay viewer design, but it drifts from the brief. Its tank is square, fish are hit and respawn with a lower-is-better score instead of surviving, it has 2 predators, and S3 is naive co-learning with no opponent pool. B's S1 split carves 'See, check and explain' (replay, reference check, write-up, plus an unmentioned DQN thicken) into M2. That leaves M1 with no replay viewer and no requirement that the snake actually learns. B's spines also fold in other components' modules (the train_loop spine builds runlog/writer.py; the DQN spine builds methods/factory.py). In both sets, the spine packets I sampled leave out types they need.",
+ "rubric": {
+  "A": {
+   "content": {
+    "rl_soundness": 5,
+    "stage_completeness": 5,
+    "internal_consistency": 3,
+    "right_sizing": 3,
+    "milestone_quality": 4,
+    "pipeline_clarity": 4,
+    "interface_quality": 4,
+    "dependency_graph_soundness": 4,
+    "task_buildability": 3
+   },
+   "structure": {
+    "organization": 3,
+    "readability_for_solo_learner": 4,
+    "ease_of_finding_next_build_step": 4,
+    "layout_sensibility": 4
+   },
+   "content_score": 3.9,
+   "structure_score": 3.8,
+   "overall_score": 7.7
+  },
+  "B": {
+   "content": {
+    "rl_soundness": 3,
+    "stage_completeness": 3,
+    "internal_consistency": 4,
+    "right_sizing": 4,
+    "milestone_quality": 3,
+    "pipeline_clarity": 4,
+    "interface_quality": 4,
+    "dependency_graph_soundness": 3,
+    "task_buildability": 3
+   },
+   "structure": {
+    "organization": 4,
+    "readability_for_solo_learner": 4,
+    "ease_of_finding_next_build_step": 4,
+    "layout_sensibility": 3
+   },
+   "content_score": 3.4,
+   "structure_score": 3.8,
+   "overall_score": 7.2
+  }
+ },
+ "output_quality": {
+  "A": {
+   "score": 8,
+   "strengths": [
+    "Faithful to all three stages: circular tank with survival score, one predator, rung-3 self-play from an opponent pool with cross-play and ratings",
+    "Precise golden cases with hand-checkable numbers (TC-12, TC-41\u2013TC-43, TC-29, TC-52, TC-58)",
+    "Separates truncation from termination so learning targets bootstrap correctly; ablations teach exploration, replay memory and the target network",
+    "Comparison with a reference library implementation at each stage, with the settings mapped one to one"
+   ],
+   "weaknesses": [
+    "Process narration and stale counts left in the architecture",
+    "M1 is very large (31 tasks: three agents, corridor, reference, ablations, report, replay)",
+    "Exit criteria differ slightly between roadmap and plan",
+    "Spine packet T06 leaves out core.Transition and runs.create_run"
+   ]
+  },
+  "B": {
+   "score": 7,
+   "strengths": [
+    "Check-world gate (two-exit corridor) catches silent RL bugs before any batch runs",
+    "Clean, well-scoped contracts; the replay design (Trace re-simulation, side by side, sight overlay, video) is strong",
+    "Paired permutation test with Holm correction specified exactly; write-up support for the learner's own explanations"
+   ],
+   "weaknesses": [
+    "Tank is square, fish respawn and are scored on hits; 2 predators; no opponent-pool self-play in S3",
+    "M2 is a carved-off 'replay + reference + notes' milestone; M1 has no replay and doesn't require the snake to learn",
+    "Spines write other components' modules (runlog/writer.py, methods/factory.py)",
+    "Golden cases for Snake are weak property checks, and the observation layout is unspecified"
+   ]
+  }
+ },
+ "unbuildable_tasks": {
+  "A": [
+   "M1-T06: packet omits core.Transition (which the loop must build), runs.create_run (to obtain a RunWriter), core.TeamSpec/SOLO and runs.GameRecording",
+   "M1-T13: packet omits core.TeamSpec/ActionSpace/SOLO, which Env.teams needs"
+  ],
+  "B": [
+   "M1-T09: packet omits methods.Transition (needed to call observe), runlog.Checkpoint, core.WorldSpec/TeamSpec (agent-to-team mapping) and NonFiniteError's definition",
+   "M1-T06: packet omits core.WorldSpec/ActionSpace for World.spec; SNAKE-06 gives no exact observation layout or encoding, so the observation can't be checked"
+  ]
+ },
+ "defects": {
+  "A": [
+   "architecture.md AD-09: 'adopted before M1 is built ... M1's plan is approved but no code exists yet' \u2014 process narration in a design doc",
+   "architecture.md Risks: 'the expected values of TC-01\u2013TC-49 don't change' \u2014 stale count; tests.md has TC-01\u2013TC-71",
+   "roadmap.md M1 Exit: 'TC-01\u2013TC-25 and TC-28 pass' vs plan M1-T31: 'TC-01\u2013TC-28 pass' \u2014 Exit criteria disagree",
+   "pipelines.md PL-01 make_env: 'RunSettings \u2192 Env' while the spine says it returns 'a zero-argument factory'",
+   "pipelines.md PL-06 cross_play: 'RunRecord, Env \u2192 CrossPlay' but the sketch passes load_generation from lab, a third argument the table doesn't list",
+   "plan.md M1-T26/M1-T27: both thicken agents/dqn in parallel; net='cnn' selection likely touches agent.py, which T26 owns",
+   "plan.md Replan notes: superseded-decision history kept in the plan"
+  ],
+  "B": [
+   "spec.md FISH-01: 'The tank is a square with walls' \u2014 the brief specifies a circular tank",
+   "spec.md FISH-03/04: 'the fish reappears ... score is hits per fish (lower is better)' \u2014 the brief asks fish to survive as long as possible",
+   "spec.md PREY-01: '6 prey, 2 predators' \u2014 the brief says one learning predator; S3 has no opponent-pool self-play",
+   "roadmap.md M2: 'See, check and explain the snake' \u2014 a carve-off of replay, reference and notes; M1 ships without replay",
+   "plan.md M1-T08: 'online one-step Q-learning ... no replay buffer or target net' with 'M2's DQN thicken adds replay and a target net' \u2014 not in M2's Outline",
+   "plan.md M1-T09: 'also builds runlog.RunWriter' \u2014 a spine writes another component's module (runlog/writer.py)",
+   "plan.md M1-T08: 'also builds the methods factory' \u2014 a spine folds in another component's factory",
+   "pipelines.md Open questions: 'routed to architecture-design; assumed...' \u2014 stale; routes.md marks these done",
+   "plan.md M1-T20 Covers: 'TRAIN-01\u2013TRAIN-04, TRAIN-02' \u2014 duplicate ID"
+  ]
+ }
+}

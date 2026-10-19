@@ -1,0 +1,118 @@
+{
+ "winner": "A",
+ "reasoning": "I read the core docs, contracts, pipelines, tests and plans of both sets, plus three to four packets per set. That sample included one interface-heavy spine, one split thicken task and one system task in each set. On content the two sets tie. Set B has the deeper RL design: a corridor proof of the core, a ladder from tabular to DQN to CNN, ablations, REINFORCE against PPO, self-play with an opponent pool and cross-play. It also stays faithful to the ground truth (a circular tank and one learning predator), and its golden cases are exact and hand-checkable. Set B's design docs carry stale and process text, though. The brief still says 'Not doing: Designing future environments now' and its success criteria cover only Snake. The architecture keeps 'adopted before M1 is built', 'TC-01\u2013TC-49 don't change' and 'pipeline-design \u2026 revisit M1's types'. TC-42 contradicts the gae contract on the length of the values array. M1 packs the whole Snake stage, including ablations, the CNN and the reference, into one 31-task milestone, and its 'S'-sized system task trains the full ladder for real. Set A is leaner and better organised. It splits Snake along a real dependency line (M1 train/evaluate, then M2 replay/refcheck/notes), its spec and roadmap agree, and it has a clean single-entry pipeline per command. But A changes the user's circular tank into a square one and uses 2 predators. Its TC-17 noise tolerance would make the test flaky. Two of its spines build modules that belong to another component (the methods factory and runlog.RunWriter), and evaluate.compare is frozen as a helper. Both sets have packets that leave out needed types. Set A wins narrowly on structure: it is clearer to read, has less superseded text, and its layout and organisation are sounder.",
+ "rubric": {
+  "A": {
+   "content": {
+    "rl_soundness": 4,
+    "stage_completeness": 3,
+    "internal_consistency": 4,
+    "right_sizing": 4,
+    "milestone_quality": 4,
+    "pipeline_clarity": 4,
+    "interface_quality": 3,
+    "dependency_graph_soundness": 3,
+    "task_buildability": 3
+   },
+   "structure": {
+    "organization": 3,
+    "readability_for_solo_learner": 4,
+    "ease_of_finding_next_build_step": 5,
+    "layout_sensibility": 3
+   },
+   "content_score": 3.6,
+   "structure_score": 3.8,
+   "overall_score": 7.4
+  },
+  "B": {
+   "content": {
+    "rl_soundness": 5,
+    "stage_completeness": 5,
+    "internal_consistency": 3,
+    "right_sizing": 3,
+    "milestone_quality": 3,
+    "pipeline_clarity": 4,
+    "interface_quality": 3,
+    "dependency_graph_soundness": 3,
+    "task_buildability": 3
+   },
+   "structure": {
+    "organization": 2,
+    "readability_for_solo_learner": 3,
+    "ease_of_finding_next_build_step": 5,
+    "layout_sensibility": 4
+   },
+   "content_score": 3.6,
+   "structure_score": 3.5,
+   "overall_score": 7.1
+  }
+ },
+ "output_quality": {
+  "A": {
+   "score": 7,
+   "strengths": [
+    "Snake stage split along a real dependency line (M1 train/evaluate, M2 replay/refcheck/notes)",
+    "Precise spec with a clear statistical plan (paired permutation test, Holm correction, every run must beat the rule baseline)",
+    "Two-exit check corridor whose answers can be worked out by hand and which defeats a learner biased to one action",
+    "Each pipeline is one command with one entry; todo, plan and roadmap agree on what to build next"
+   ],
+   "weaknesses": [
+    "Square tank where the user asked for a circular one; 2 predators where the user asked for one learning predator",
+    "TC-17 tolerance is statistically wrong, so the test would be flaky",
+    "Spines build modules owned by another component (methods factory, runlog.RunWriter)",
+    "S3 only co-trains the two teams; there is no self-play against past opponents",
+    "Packets leave out some needed types"
+   ]
+  },
+  "B": {
+   "score": 7,
+   "strengths": [
+    "Rich RL learning design: ladders, ablations, REINFORCE vs PPO, opponent-pool self-play, cross-play tables",
+    "Faithful to the user's environments (circular tank, one predator, prey foraging for pellets)",
+    "Exact, hand-checkable golden cases (TC-12, TC-29, TC-31, TC-42, TC-43, TC-53)",
+    "Careful mapping of Stable-Baselines3 settings so the hand-written agents can be compared fairly with the library"
+   ],
+   "weaknesses": [
+    "Brief is stale against the spec and ideas docs",
+    "Process narration and replan history kept in the architecture and plan",
+    "M1 covers the whole Snake stage (31 tasks); the system task trains every rung, ablation and reference for real but is sized S",
+    "TC-42 disagrees with the gae contract on the length of the values array",
+    "Frozen helper functions exposed as test seams (returns_to_go, gae, clipped_objective)"
+   ]
+  }
+ },
+ "unbuildable_tasks": {
+  "A": [
+   "M1-T09: packet lacks methods.Transition (the loop must build transitions), runlog.Checkpoint and Failure (which RunWriter returns and stores), and core.WorldSpec/EpisodeResult",
+   "M1-T06: packet lacks core.WorldSpec, ActionSpace and TeamSpec, yet Snake must expose `spec: WorldSpec`; the observation layout is not fixed"
+  ],
+  "B": [
+   "M1-T06: packet lacks core.Transition, core.StepResult and runs.create_run, so train cannot build transitions or open its run folder from the packet alone",
+   "M1-T31: sized S but has to train and evaluate the whole ladder, all ablations and the reference over 5 seeds; too big for one session"
+  ]
+ },
+ "defects": {
+  "A": [
+   "spec.md FISH-01: \"The tank is a square with walls\" \u2014 contradicts the user's circular tank",
+   "spec.md PREY-01: \"6 prey, 2 predators\" \u2014 the user described one learning predator",
+   "tests.md TC-17: \"at most 1 of the 20 seeds rejects either null\" \u2014 at a family-wise \u03b1 of 0.05, 2 or more false rejections in 20 happen about 26% of the time, so the test is flaky",
+   "tasks/plan.md M1-T09: \"also builds `runlog.RunWriter`\" \u2014 a spine writes another owner's module (runlog/writer.py)",
+   "tasks/plan.md M1-T08: \"also builds the methods factory\" \u2014 the spine folds in the factory, a separate step owner",
+   "contract.md evaluate.compare: a frozen helper with no Boundary line, internal to final_evaluation",
+   "pipelines.md Open questions: \"routed to architecture-design; assumed: \u2026\" \u2014 process narration left in a design doc",
+   "tasks/plan.md M1-T20 Covers: \"TRAIN-01\u2013TRAIN-04, TRAIN-02\" \u2014 repeats an ID already in the range",
+   "contract.md: \"## Retired\" keeps superseded symbols"
+  ],
+  "B": [
+   "brief.md: \"Not doing: Designing future environments now\" \u2014 the spec and ideas docs fully design the fish tank and predator-prey stages",
+   "brief.md success section covers only Snake, though the ideas docs say \"Brief changes: none\"",
+   "architecture.md AD-09: \"adopted before M1 is built \u2026 M1's plan is approved but no code exists yet\" \u2014 process narration in a design doc",
+   "architecture.md Risks: \"the expected values of TC-01\u2013TC-49 don't change\" \u2014 stale, refers to the replan process",
+   "tests.md TC-42: \"values [0.5, 0.5]\" for 2 rewards, but contract agents.gae says \"values has one more entry than rewards\"",
+   "roadmap.md M1: the whole Snake stage (tabular, DQN, CNN, ablations, reference, replay) in one 31-task milestone",
+   "tasks/plan.md M1-T31: \"Size: S\", yet it trains the real 5-seed ladder, ablations and reference",
+   "tasks/plan.md M1-T26/M1-T27: both thicken DQNAgent at once; selecting the CNN by `net` likely needs agents/dqn/agent.py, which only T26 lists in Writes",
+   "contract.md agents.returns_to_go/gae/clipped_objective: internal helpers frozen as contract (\"Boundary: agents\")"
+  ]
+ }
+}

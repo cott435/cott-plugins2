@@ -1,0 +1,480 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1"><title>T06 turn</title>
+<style>
+:root{--bg:#fbfbfa;--fg:#1d1d1f;--muted:#6b6b70;--line:#d9d9de;--box:#fff;--rowp:#eef3fb;--band:#fff4d6;
+--ok:#2e7d32;--bad:#c62828;--warn:#b26a00;--idle:#6b6b70}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#17171a;--fg:#ececf0;--muted:#9a9aa3;
+--line:#34343a;--box:#222227;--rowp:#1d2433;--band:#3a3015;--ok:#6fcf73;--bad:#ff6b6b;--warn:#f0b35a;--idle:#9a9aa3}}
+:root[data-theme="dark"]{--bg:#17171a;--fg:#ececf0;--muted:#9a9aa3;--line:#34343a;--box:#222227;--rowp:#1d2433;
+--band:#3a3015;--ok:#6fcf73;--bad:#ff6b6b;--warn:#f0b35a;--idle:#9a9aa3}
+body{margin:0;padding:16px;background:var(--bg);color:var(--fg);font:14px/1.45 -apple-system,system-ui,sans-serif}
+h1{font-size:18px;margin:0 0 4px}h2{font-size:15px;margin:22px 0 8px}.sub{color:var(--muted)}
+table{border-collapse:collapse;margin:4px 0 8px}td,th{border-bottom:1px solid var(--line);padding:4px 10px;text-align:left;
+vertical-align:top}th{color:var(--muted);font-weight:600}.chips span{display:inline-block;margin:0 4px 2px 0}
+.legend span{margin-right:14px;white-space:nowrap}.sw{display:inline-block;width:10px;height:10px;border-radius:2px;
+margin-right:4px;vertical-align:-1px}.scroll{overflow:auto;max-height:88vh;border:1px solid var(--line);border-radius:8px}
+.chart{display:grid;width:max-content}.chart>div{line-height:0}.corner{position:sticky;top:0;left:0;z-index:3}
+.colhead{position:sticky;top:0;z-index:2}.rowhead{position:sticky;left:0;z-index:2}
+svg.bg{background:var(--bg)}.colhead svg{border-bottom:1px solid var(--line)}.rowhead svg{border-right:1px solid var(--line)}
+.ok{color:var(--ok);fill:var(--ok)}.bad{color:var(--bad);fill:var(--bad)}.warn{color:var(--warn);fill:var(--warn)}
+.idle{color:var(--idle);fill:var(--idle)}
+svg text{fill:var(--fg);font-family:-apple-system,system-ui,sans-serif}
+.box{fill:var(--box);stroke:var(--line)}.unit:hover .box{stroke:var(--fg)}
+.role{font-size:12px;font-weight:600}.uid,.wmeta,.lmeta,.meta{font-size:10px;fill:var(--muted)}
+.sub{font-size:10.5px;fill:var(--muted)}.badge{font-size:11px;font-weight:600}
+.meta.bad{fill:var(--bad);font-weight:600}.lane{font-size:13px;font-weight:700}.wave{font-size:13px;font-weight:700}
+.par{fill:#4e79a7}.ser{fill:var(--muted)}.rowp{fill:var(--rowp)}.rows{fill:transparent}.band{fill:var(--band)}
+.bandt{font-size:11.5px}.grid{stroke:var(--line)}.link{stroke:var(--muted);stroke-width:1.2;opacity:.55}
+.arrowhead{fill:var(--muted)}.marks{font-size:10.5px}.audit{stroke:var(--box);stroke-width:2}.auditn{font-size:10px;font-weight:700;fill:#fff}
+a{color:inherit}svg a .box{cursor:pointer}
+
+:root{--c0:#2a78d6;--c1:#eb6834;--c2:#1baf7a;--c3:#eda100;--c4:#e87ba4;--c5:#008300;--c6:#6250d6;--c7:#e34948;
+--cx:#8a8985;--main:#52514e;--read:#dcdbd5;--readfg:#1d1d1f}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--c0:#3987e5;--c1:#d95926;--c2:#199e70;
+--c3:#c98500;--c4:#d55181;--c5:#008300;--c6:#9085e9;--c7:#e66767;--cx:#77766f;--main:#c3c2b7;--read:#3b3b40;
+--readfg:#ececf0}}
+:root[data-theme="dark"]{--c0:#3987e5;--c1:#d95926;--c2:#199e70;--c3:#c98500;--c4:#d55181;--c5:#008300;
+--c6:#9085e9;--c7:#e66767;--cx:#77766f;--main:#c3c2b7;--read:#3b3b40;--readfg:#ececf0}
+.c0{fill:var(--c0);background:var(--c0)}.c1{fill:var(--c1);background:var(--c1)}.c2{fill:var(--c2);background:var(--c2)}
+.c3{fill:var(--c3);background:var(--c3)}.c4{fill:var(--c4);background:var(--c4)}.c5{fill:var(--c5);background:var(--c5)}
+.c6{fill:var(--c6);background:var(--c6)}.c7{fill:var(--c7);background:var(--c7)}.cx{fill:var(--cx);background:var(--cx)}
+.cmain{fill:var(--main)}.sc0{stroke:var(--c0)}.sc1{stroke:var(--c1)}.sc2{stroke:var(--c2)}
+.tl text,.sm text,.lc text{font-size:10.5px;fill:var(--muted)}.tl .lbl-in,.sm .lbl-in{fill:#fff;font-size:10.5px;font-weight:600}
+.tl .rowl,.sm .rowl,.lc .rowl{fill:var(--fg);font-size:11.5px;font-weight:600}.tl .band{fill:var(--rowp)}
+.tl .brk{stroke:var(--muted);stroke-dasharray:2 3}.tl a:hover rect,.sm a:hover rect{stroke:var(--fg);stroke-width:1.5}
+.axis{stroke:var(--line)}.sm .val{fill:var(--fg);font-weight:600}.lc path.ln{fill:none;stroke-width:2}
+.lc circle{stroke:var(--bg);stroke-width:2}.lc .end{font-weight:600;fill:var(--fg)}
+.tiles{display:flex;flex-wrap:wrap;gap:10px;margin:12px 0}.tile{border:1px solid var(--line);border-radius:8px;
+padding:8px 12px;min-width:110px;background:var(--box)}.tile b{display:block;font-size:20px;line-height:1.2}
+.tile span{font-size:12px;color:var(--muted)}.tile i{font-style:normal;font-size:12px;margin-left:6px}
+.fm{border-collapse:separate;border-spacing:2px}.fm td,.fm th{border:0;padding:0;text-align:center;font-size:11px}
+.fm th{padding:0 2px;font-weight:600}.fm td.f,.fm th.f{text-align:left;padding-right:10px;white-space:nowrap;
+position:sticky;left:0;background:var(--bg);font:11.5px ui-monospace,Menlo,monospace;
+max-width:380px;overflow:hidden;text-overflow:ellipsis}
+.fm td.cell{min-width:22px;height:20px;border-radius:3px}.fm td.fw{background:var(--c0);color:#fff;font-weight:700}
+.fm td.fe{background:var(--c1);color:#fff;font-weight:700}.fm td.fr{background:var(--read);color:var(--readfg)}
+.fm td.n{color:var(--muted);padding:0 6px}.fm tr.grp td{text-align:left;padding-top:8px;color:var(--muted);
+font-weight:600}
+.key{display:inline-block;min-width:18px;text-align:center;border-radius:3px;font-size:11px;margin-right:4px}
+.bar{display:inline-block;height:9px;border-radius:2px;vertical-align:0}
+
+pre{white-space:pre-wrap;word-break:break-word;background:var(--box);border:1px solid var(--line);border-radius:6px;
+padding:8px 10px;margin:4px 0;font:12px/1.45 ui-monospace,SFMono-Regular,Menlo,monospace;max-width:100%;overflow:auto}
+.step{border-top:1px solid var(--line);padding:6px 0}.step:target{background:var(--rowp)}
+.sid{font:12px ui-monospace,Menlo,monospace;color:var(--muted);margin-right:8px}.kind{font-weight:600;margin-right:8px}
+.err{color:var(--bad);font-weight:600}.hook{color:var(--bad);margin:4px 0 0 16px}.lbl{font-size:12px;color:var(--muted);margin-top:6px}
+details summary{cursor:pointer;color:var(--muted);font-size:12px}.head td:first-child{color:var(--muted)}
+.top{font-size:13px}.narr{list-style:none;padding-left:0}.narr li{margin:3px 0}
+</style></head>
+<body>
+<p class="top"><a href="../flow.html">← the run's flow chart</a></p>
+<p class="top"><a href="../plan/T06.html">The plan as of T06</a>: this turn changed the plan (+60 ~0 −0) · <a href="../plan/index.html">plan map</a></p>
+<h1>T06 · turn · Assumptions 1-9 are fine. Answers: 1. 5 seeds is fine. 2. Yes, ±0.1 toward/away from food is the sha</h1>
+<table class="head"><tr><td>Type</td><td>turn</td></tr><tr><td>Description</td><td>Assumptions 1-9 are fine. Answers: 1. 5 seeds is fine. 2. Yes, ±0.1 toward/away from food is the sha</td></tr><tr><td>Spawned by</td><td>user</td></tr><tr><td>Model</td><td>claude-opus-5-5</td></tr><tr><td>Start</td><td>2026-10-18 19:24:28 UTC</td></tr><tr><td>Duration</td><td>3 min</td></tr><tr><td>Tool calls</td><td>6</td></tr><tr><td>Errors</td><td>1</td></tr><tr><td>Hook blocks</td><td>0</td></tr><tr><td>Tokens</td><td>18.7k out · 21.6k new in · 316k cached in · peak context 66.0k</td></tr><tr><td>Skills invoked</td><td>none</td></tr><tr><td>Files written or edited</td><td>docs/spec.md</td></tr><tr><td>Definition</td><td>none</td></tr><tr><td>Steps</td><td>10</td></tr><tr><td>Finished</td><td>yes</td></tr></table>
+
+
+<h2>Prompt</h2>
+<pre>Assumptions 1-9 are fine. Answers: 1. 5 seeds is fine. 2. Yes, ±0.1 toward/away from food is the shaping I meant. 3. Yes, show the agent&#x27;s score for each of the 3 moves at every step. 4. Any measured result counts, including &#x27;no difference, explained&#x27;. Go ahead and write the spec.</pre>
+<h2>Files</h2>
+<table><tr><th>Op</th><th>File</th><th>Calls</th><th>By</th><th>Via</th><th>Steps</th></tr><tr><td>write</td><td><code>docs/spec.md</code></td><td>1</td><td>main</td><td>Write</td><td><a href="#D42">D42</a></td></tr><tr><td>edit</td><td><code>docs/spec.md</code></td><td>1</td><td>main</td><td>Edit</td><td><a href="#D43">D43</a></td></tr></table>
+<h2>Steps</h2>
+<div class="step" id="SD39"><span class="sid">D39</span><span class="kind">user</span>Assumptions 1-9 are fine. Answers: 1. 5 seeds is fine. 2. Yes, ±0.1 toward/away from food is the shaping I meant. 3. Yes, show the agent&#x27;s score for each of the 3 moves at every step. 4. Any measured result counts, including &#x27;no difference, explained&#x27;. Go ahead and write the spec.<details><summary>full text</summary><pre>Assumptions 1-9 are fine. Answers: 1. 5 seeds is fine. 2. Yes, ±0.1 toward/away from food is the shaping I meant. 3. Yes, show the agent&#x27;s score for each of the 3 moves at every step. 4. Any measured result counts, including &#x27;no difference, explained&#x27;. Go ahead and write the spec.</pre></details></div><div class="step" id="SD40"><span class="sid">D40</span><span class="kind">Bash</span>D=&quot;python3 /Users/connorott/plugins/dev-team-workspace/iteration-10/rl-incremental/with_skill/plugin/dev-team/scripts/dt.py&quot;
+$D request add spec &quot;Assumptions 1-9 are fine.&quot; --skill spec-writing --about &quot;spec assumptions: 1 10x10 board, walls at edge, one food, snake starts length 3, fixed size; 2 state = 11 yes/no facts (danger straight/left/right, heading, food direction), 3 relative moves; 3 plain reward +1 food, -1 death, 0 otherwise, game ends after 100 moves without food; 4 scripted bot gre …[+1289 chars] <span class="err">error</span><details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;D=\&quot;python3 /Users/connorott/plugins/dev-team-workspace/iteration-10/rl-incremental/with_skill/plugin/dev-team/scripts/dt.py\&quot;\n$D request add spec \&quot;Assumptions 1-9 are fine.\&quot; --skill spec-writing --about \&quot;spec assumptions: 1 10x10 board, walls at edge, one food, snake starts length 3, fixed size; 2 state = 11 yes/no facts (danger straight/left/right, heading, food direction), 3 relative moves; 3 plain reward +1 food, -1 death, 0 otherwise, game ends after 100 moves without food; 4 scripted bot greedy toward food, avoids immediately fatal moves when another exists; 5 score = mean food per game over 100 fixed-seed test games never trained on; 6 beats = higher, significant at 5% across 5 training seeds, tie = not significantly different, tie counts if written explanation saved with evidence; 7 one-hour limit is per training run (one method, one seed); 8 every run saves settings, seed, learning curve, final agent, test games, enough to recreate; 9 learning curve = test score vs training steps with random and scripted baselines as lines\&quot;\n$D request add spec \&quot;5 seeds is fine.\&quot; --skill spec-writing --about \&quot;Q1 number of training seeds per method\&quot;\n$D request add spec \&quot;Yes, ±0.1 toward/away from food is the shaping I meant.\&quot; --skill spec-writing --about \&quot;Q2 shaped reward: +0.1 moving toward food, -0.1 moving away\&quot;\n$D request add spec \&quot;Yes, show the agent&#x27;s score for each of the 3 moves at every step.\&quot; --skill spec-writing --about \&quot;Q3 replay: play/pause, step, speed, plus per-move scores at every step\&quot;\n$D request add spec \&quot;Any measured result counts, including &#x27;no difference, explained&#x27;.\&quot; --skill spec-writing --about \&quot;Q4 each DQN ladder step&#x27;s before/after comparison: need not beat the previous step\&quot;\n$D request add spec \&quot;Go ahead and write the spec.\&quot; --skill spec-writing&quot;,
+  &quot;description&quot;: &quot;Record the user&#x27;s answers as requests&quot;
+}</pre><div class="lbl">output</div><pre>Exit code 127
+(eval):2: no such file or directory: python3 /Users/connorott/plugins/dev-team-workspace/iteration-10/rl-incremental/with_skill/plugin/dev-team/scripts/dt.py
+(eval):3: no such file or directory: python3 /Users/connorott/plugins/dev-team-workspace/iteration-10/rl-incremental/with_skill/plugin/dev-team/scripts/dt.py
+(eval):4: no such file or directory: python3 /Users/connorott/plugins/dev-team-workspace/iteration-10/rl-incremental/with_skill/plugin/dev-team/scripts/dt.py
+(eval):5: no such file or directory: python3 /Users/connorott/plugins/dev-team-workspace/iteration-10/rl-incremental/with_skill/plugin/dev-team/scripts/dt.py
+(eval):6: no such file or directory: python3 /Users/connorott/plugins/dev-team-workspace/iteration-10/rl-incremental/with_skill/plugin/dev-team/scripts/dt.py
+(eval):7: no such file or directory: python3 /Users/connorott/plugins/dev-team-workspace/iteration-10/rl-incremental/with_skill/plugin/dev-team/scripts/dt.py</pre></details></div><div class="step" id="SD41"><span class="sid">D41</span><span class="kind">Bash</span>cd /Users/connorott/plugins/dev-team-workspace/iteration-10/rl-incremental/with_skill/project
+python3 /Users/connorott/plugins/dev-team-workspace/iteration-10/rl-incremental/with_skill/plugin/dev-team/scripts/dt.py request add spec &quot;Assumptions 1-9 are fine.&quot; --skill spec-writing --about &quot;spec assumptions: 1 10x10 board, walls at edge, one food, snake starts length 3, fixed size; 2 state = 11 yes/no facts (danger straight/left/right, heading, food direction), 3 relative moves; 3 plain reward +1  …[+1776 chars]<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;cd /Users/connorott/plugins/dev-team-workspace/iteration-10/rl-incremental/with_skill/project\npython3 /Users/connorott/plugins/dev-team-workspace/iteration-10/rl-incremental/with_skill/plugin/dev-team/scripts/dt.py request add spec \&quot;Assumptions 1-9 are fine.\&quot; --skill spec-writing --about \&quot;spec assumptions: 1 10x10 board, walls at edge, one food, snake starts length 3, fixed size; 2 state = 11 yes/no facts (danger straight/left/right, heading, food direction), 3 relative moves; 3 plain reward +1 food, -1 death, 0 otherwise, game ends after 100 moves without food; 4 scripted bot greedy toward food, avoids immediately fatal moves when another exists; 5 score = mean food per game over 100 fixed-seed test games never trained on; 6 beats = higher, significant at 5% across 5 training seeds, tie = not significantly different, tie counts if written explanation saved with evidence; 7 one-hour limit is per training run (one method, one seed); 8 every run saves settings, seed, learning curve, final agent, test games, enough to recreate; 9 learning curve = test score vs training steps with random and scripted baselines as lines\&quot;\npython3 /Users/connorott/plugins/dev-team-workspace/iteration-10/rl-incremental/with_skill/plugin/dev-team/scripts/dt.py request add spec \&quot;5 seeds is fine.\&quot; --skill spec-writing --about \&quot;Q1 number of training seeds per method\&quot;\npython3 /Users/connorott/plugins/dev-team-workspace/iteration-10/rl-incremental/with_skill/plugin/dev-team/scripts/dt.py request add spec \&quot;Yes, ±0.1 toward/away from food is the shaping I meant.\&quot; --skill spec-writing --about \&quot;Q2 shaped reward: +0.1 moving toward food, -0.1 moving away\&quot;\npython3 /Users/connorott/plugins/dev-team-workspace/iteration-10/rl-incremental/with_skill/plugin/dev-team/scripts/dt.py request add spec \&quot;Yes, show the agent&#x27;s score for each of the 3 moves at every step.\&quot; --skill spec-writing --about \&quot;Q3 replay: play/pause, step, speed, plus per-move scores at every step\&quot;\npython3 /Users/connorott/plugins/dev-team-workspace/iteration-10/rl-incremental/with_skill/plugin/dev-team/scripts/dt.py request add spec \&quot;Any measured result counts, including &#x27;no difference, explained&#x27;.\&quot; --skill spec-writing --about \&quot;Q4 each DQN ladder step&#x27;s before/after comparison: need not beat the previous step\&quot;&quot;,
+  &quot;description&quot;: &quot;Record the user&#x27;s answers as requests&quot;
+}</pre><div class="lbl">output</div><pre>UR-25 spec: &quot;Assumptions 1-9 are fine.&quot;
+UR-26 spec: &quot;5 seeds is fine.&quot;
+UR-27 spec: &quot;Yes, ±0.1 toward/away from food is the shaping I meant.&quot;
+UR-28 spec: &quot;Yes, show the agent&#x27;s score for each of the 3 moves at every step.&quot;
+UR-29 spec: &quot;Any measured result counts, including &#x27;no difference, explained&#x27;.&quot;</pre></details></div><div class="step" id="SD42"><span class="sid">D42</span><span class="kind">Write</span>/Users/connorott/plugins/dev-team-workspace/iteration-10/rl-incremental/with_skill/project/docs/spec.md (256 lines)<div class="lbl">wrote /Users/connorott/plugins/dev-team-workspace/iteration-10/rl-incremental/with_skill/project/docs/spec.md</div><pre># RL Lab — Spec
+
+**Status:** Draft · **Last updated:** 2026-10-18 · **Brief:** [brief.md](brief.md)
+
+## Summary
+A classic Snake game on a fixed 10×10 board, and a ladder of hand-written learners trained on it: table-based Q-learning, then a deep Q-network (a learned function that scores each move) built one piece at a time, then plain versus shaped rewards. Every learner is scored against a random player and a scripted bot on the same held-out games, every added piece gets a before-and-after comparison, every run saves its evidence, and any saved agent can be watched in a replay that shows how it scored each move. See the [brief](brief.md) for why.
+
+## Users
+| User | What they need to do |
+|---|---|
+| The learner (sole user) | Train each learner on Snake in under an hour, compare it with the baselines and with the previous rung of the ladder, explain each result from saved evidence, and watch any trained agent play |
+
+## Scope
+**In scope:** Snake environment, Baselines, Table-based Q-learning, DQN ladder, Reward shaping, Training runs, Evaluation &amp; comparison, Replay viewer.
+
+**Out of scope:**
+- 3D worlds.
+- Learning from pixels or from a picture of the board, and Atari games; the agent sees only the compact hand-made facts in SNAKE-06. A grid-view learner is a possible later follow-up.
+- Reproducing research papers or chasing benchmark scores.
+- Web deployment.
+- Ready-made learning algorithms from libraries; a comparison against one comes in a later stage.
+- A general framework beyond what Snake needs.
+- Changing the board size during training, or between runs.
+- Outside data of any kind.
+- Stepping backwards in a replay.
+
+## Features
+
+### Snake environment (`SNAKE`)
+**Serves:** Goal 1, Goal 5
+**Stage:** S1
+**Behavior:** Classic Snake on a grid. The snake moves one cell per move, turning left, turning right or going straight. Eating food makes it longer; hitting a wall or itself ends the game. The game hands the agent a short list of yes/no facts about its surroundings, and the reward for each move.
+
+**Requirements**
+- **SNAKE-01** The game is played on a fixed 10×10 board of open cells surrounded by walls.
+  - Given any game, when it starts, then the board has 10×10 open cells, walls on all four sides, a snake of length 3 in the middle row heading right, and exactly one food on an empty cell.
+  - Given any training run or test game, when the board size is read, then it is 10×10.
+- **SNAKE-02** On each move the agent chooses one of 3 moves relative to its heading: straight, turn left, turn right.
+  - Given a snake heading right, when it turns left, then its head moves up one cell and its heading becomes up.
+  - Given any heading, when any of the 3 moves is chosen, then the snake never reverses into its own neck.
+- **SNAKE-03** Eating food makes the snake 1 cell longer, gives a reward of +1, and places a new food on an empty cell.
+  - Given food directly ahead, when the snake moves straight, then its length goes up by 1, the move&#x27;s plain reward is +1, and one new food appears on a cell not covered by the snake.
+- **SNAKE-04** Moving into a wall or into the snake&#x27;s own body ends the game with a reward of −1.
+  - Given the head next to a wall, when the snake moves into the wall, then the game ends and the move&#x27;s reward is −1.
+  - Given the head next to a body cell that will still be occupied after the move, when the snake moves into it, then the game ends and the move&#x27;s reward is −1.
+- **SNAKE-05** Every move that neither eats nor kills has a plain reward of 0.
+  - Given a move into an empty cell, when it is made, then its plain reward is 0.
+- **SNAKE-06** At every move the agent sees exactly 11 yes/no facts: danger straight, danger left, danger right; heading up, down, left, right; food is up, down, left, right of the head.
+  - Given the head next to the top wall while heading up, when the facts are read, then &quot;danger straight&quot; is yes and &quot;heading up&quot; is yes.
+  - Given food above and to the left of the head, when the facts are read, then &quot;food is up&quot; and &quot;food is left&quot; are yes and &quot;food is down&quot; and &quot;food is right&quot; are no.
+  - Given a cell occupied by the body or a wall next to the head on its left, when the facts are read, then &quot;danger left&quot; is yes.
+- **SNAKE-07** A game ends after 100 moves in a row without eating.
+  - Given a snake that has gone 100 moves since its last food (or since the start), when the 100th move is made without eating, then the game ends and that move&#x27;s plain reward is 0.
+- **SNAKE-08** The same game seed and the same moves always give the same game.
+  - Given a game seed and a list of moves, when the game is played twice, then every board, food position, reward and ending is identical.
+
+**Edge cases &amp; errors**
+- The head moves into the cell the tail is leaving on that move → allowed; the game goes on.
+- The snake fills every cell, so no food can be placed → the game ends as a full-board finish, with no −1.
+- The food appears directly ahead of a turning snake → nothing special; food is only eaten when the head enters its cell.
+
+### Baselines (`BASE`)
+**Serves:** Goal 2
+**Stage:** S1
+**Behavior:** Two non-learning players set the bar every learner must clear: one picks moves at random, the other follows a simple rule. Both play the same test games as the learners.
+
+**Requirements**
+- **BASE-01** The random player picks each move uniformly at random from the 3 moves.
+  - Given 30,000 random-player moves, when the share of each move is counted, then each is between 32% and 35%.
+- **BASE-02** The scripted bot moves toward the food, never making a move that kills it immediately when a safe move exists.
+  - Given food to the left and the left cell free, when the bot moves, then it turns left.
+  - Given food straight ahead and a wall straight ahead with the right cell free, when the bot moves, then it turns right.
+  - Given several safe moves equally close to the food, when the bot moves, then it prefers straight, then left, then right.
+- **BASE-03** When every move kills it, the scripted bot goes straight.
+  - Given danger straight, left and right, when the bot moves, then it goes straight and the game ends.
+
+**Edge cases &amp; errors**
+- No safe move gets closer to the food → the bot takes the safe move that leaves it closest to the food, using the same preference order on ties.
+
+### Table-based Q-learning (`TAB`)
+**Serves:** Goal 1
+**Stage:** S1
+**Behavior:** The first learner keeps a table with a score for each of the 3 moves in every combination of the 11 facts, and improves the table after every move from the reward and the best score of the next situation.
+
+**Requirements**
+- **TAB-01** The table learner updates the score of the move it just made from the reward plus the discounted best score of the situation it reached (a one-step Q-learning update), after every move.
+  - Given a known table, situation, move, reward and next situation, when one update is applied, then the new score equals the hand-computed Q-learning update for the run&#x27;s learning rate and discount.
+  - Given a move that ended the game, when the update is applied, then the next situation contributes nothing.
+- **TAB-02** While training, the table learner sometimes picks a random move instead of its best one, at a rate that falls over the run from a starting rate to a floor saved with the run&#x27;s settings.
+  - Given a run&#x27;s exploration settings, when the rate is read at the start, the middle and the end of training, then it matches the saved schedule at each point.
+- **TAB-03** During test games the table learner always picks its highest-scored move.
+  - Given a trained table, when a test game is played twice from the same seed, then both games are identical.
+- **TAB-04** The learning update is written in the project; no ready-made learning algorithm is used.
+  - Given the trained table learner, when its learning steps are traced, then each one is code written in the project.
+
+**Edge cases &amp; errors**
+- A situation never seen in training comes up in a test game → all 3 moves score equal and the learner picks by the order straight, left, right.
+
+### DQN ladder (`DQN`)
+**Serves:** Goal 1, Goal 3
+**Stage:** S1
+**Behavior:** The second learner replaces the table with a small learned function that scores the 3 moves from the 11 facts. It is built in four rungs, each adding one piece to the one before, so each piece&#x27;s effect can be measured on its own:
+1. Plain: learns from each move as it happens.
+2. + Replay buffer: learns from random samples of stored past moves.
+3. + Target network: its learning targets come from a frozen copy of itself, refreshed at a fixed interval.
+4. + Double DQN: the learner picks the best next move, and the frozen copy scores it.
+
+**Requirements**
+- **DQN-01** The plain rung learns from each move right after it is made, using that move&#x27;s reward plus the discounted best score of the next situation as its target.
+  - Given a known function, move, reward and next situation, when one update is applied, then the target equals the hand-computed value and the function&#x27;s score for that move moves toward it.
+- **DQN-02** The replay-buffer rung stores past moves and learns from batches drawn at random from that store.
+  - Given a store of past moves and a seed, when a batch is drawn, then every move in it comes from the store and the same seed draws the same batch.
+  - Given a store at its saved capacity, when a new move is added, then the oldest move is dropped.
+- **DQN-03** The target-network rung computes its targets from a frozen copy of the learner, refreshed every fixed number of updates saved with the run&#x27;s settings.
+  - Given the refresh interval, when updates run between two refreshes, then the copy does not change; when the interval is reached, the copy equals the learner.
+- **DQN-04** The Double DQN rung chooses the next situation&#x27;s best move with the learner, and scores that move with the frozen copy.
+  - Given a learner and a copy that disagree on the next situation&#x27;s best move, when the target is computed, then it uses the copy&#x27;s score for the learner&#x27;s chosen move.
+- **DQN-05** Each rung differs from the rung before only by the piece it adds; every other setting is the same.
+  - Given the saved settings of two neighbouring rungs, when they are compared, then the only differences are the added piece and its own settings.
+- **DQN-06** While training, each rung explores with the same falling random-move rate as TAB-02; during test games it always picks its highest-scored move.
+  - Given a trained rung, when a test game is played twice from the same seed, then both games are identical.
+- **DQN-07** The learning updates of every rung are written in the project; no ready-made learning algorithm is used.
+  - Given any trained rung, when its learning steps are traced, then each one is code written in the project.
+
+**Edge cases &amp; errors**
+- A move that ended the game is learned from → the next situation contributes nothing to its target.
+- The replay-buffer store holds fewer moves than one batch → learning waits until it holds a full batch.
+- Scores grow without bound (training diverges) → the run keeps going and saves its curve; the comparison reports the result, and the divergence is visible in the curve.
+
+### Reward shaping (`SHAPE`)
+**Serves:** Goal 1, Goal 3
+**Stage:** S1
+**Behavior:** A second reward adds a small nudge toward the food on top of the plain reward, so the learner can be trained on either and the two compared.
+
+**Requirements**
+- **SHAPE-01** The shaped reward is the plain reward plus 0.1 for a move that brings the head closer to the food and minus 0.1 for a move that takes it further away, measured in grid steps to the food that was on the board before the move.
+  - Given a move that cuts the distance to the food from 5 to 4, when it is made, then the shaped reward is +0.1.
+  - Given a move that raises the distance from 4 to 5, when it is made, then the shaped reward is −0.1.
+  - Given a move that eats the food, when it is made, then the shaped reward is +1.1.
+- **SHAPE-02** A move that ends the game by collision has a shaped reward of −1, with no nudge.
+  - Given a move into a wall, when it is made, then the shaped reward is −1.
+- **SHAPE-03** Every run uses either the plain or the shaped reward for training, and saves which.
+  - Given a finished run, when its saved settings are read, then they name its reward.
+- **SHAPE-04** Test scores never use the shaped reward; they always count food eaten.
+  - Given the same agent tested once after plain training and once after shaped training, when the scores are read, then both are food eaten per game.
+- **SHAPE-05** The plain-versus-shaped comparison trains the Double DQN rung on each reward, with every other setting the same.
+  - Given the plain and shaped runs of that comparison, when their saved settings are compared, then the only difference is the reward.
+
+### Training runs (`RUN`)
+**Serves:** Goal 3, Goal 5
+**Stage:** S1
+**Behavior:** One training run trains one learner, with one reward, from one seed. The learner starts the run with one action, watches its progress, and afterwards finds everything the run produced saved together, enough to recreate it.
+
+**Requirements**
+- **RUN-01** A training run trains one learner (the table learner or one DQN rung) with one reward from one training seed.
+  - Given a learner, a reward and a seed, when a run is started with one action, then it trains that learner with that reward and seed and nothing else.
+- **RUN-02** Each run saves its settings, seed, learning curve, final agent and test games.
+  - Given a finished run, when its saved evidence is opened, then all five are there.
+- **RUN-03** Rerunning from a run&#x27;s saved settings and seed gives the same result.
+  - Given a finished run, when it is run again on the same laptop from its saved settings and seed, then the test score at every curve point is identical.
+- **RUN-04** While a run trains, it shows the moves trained so far, the latest test score and the time elapsed.
+  - Given a run in progress, when a curve point is reached, then the display updates all three.
+- **RUN-05** A run never overwrites another run&#x27;s evidence.
+  - Given two runs with the same learner, reward and seed, when both finish, then both sets of evidence are kept.
+- **RUN-06** A run that stops before it finishes is marked incomplete and is left out of every comparison.
+  - Given a run stopped by hand partway through, when comparisons are made, then it is listed as incomplete and its numbers are not used.
+- **RUN-07** A run still training at 60 minutes stops, saves what it has, and is marked over the time limit.
+  - Given a run that reaches 60 minutes, when the limit passes, then training stops, its evidence so far is saved, it is marked over the time limit, and it is left out of every comparison.
+- **RUN-08** Training, testing, saving evidence and replay work for a second environment without changes to them.
+  - Given a minimal second environment used only for this check, when it is trained, tested and replayed, then none of the training, testing, saving or replay behavior had to change.
+
+**Edge cases &amp; errors**
+- A run is started with a learner or reward that doesn&#x27;t exist → it does not start, and the message lists the valid choices.
+- The disk fills while saving → the run is marked incomplete and says which evidence is missing.
+
+### Evaluation &amp; comparison (`EVAL`)
+**Serves:** Goal 2, Goal 3
+**Stage:** S1
+**Behavior:** Every learner and baseline is scored on the same 100 held-out test games. Learning curves show progress against the baselines. Comparison reports say, from 5 training seeds per learner, whether each learner beats the baselines, and what each added piece changed. Each result carries a written explanation, so a tie counts.
+
+**Requirements**
+- **EVAL-01** Every agent is scored on the same 100 test games, each started from a fixed test seed that is never used in training.
+  - Given any two agents, when they are tested, then they play games from the same 100 test seeds.
+  - Given any training run, when its game seeds are compared with the test seeds, then none match.
+- **EVAL-02** An agent&#x27;s test score is the mean food eaten per game over the 100 test games.
+  - Given 100 test games with known food eaten, when the score is computed, then it equals their mean.
+- **EVAL-03** Each run&#x27;s learning curve is its test score against moves trained, at 20 evenly spaced points, with the random player&#x27;s and the scripted bot&#x27;s scores drawn as lines on the same chart; the chart follows the `dataviz` skill.
+  - Given a finished run, when its curve is opened, then it shows 20 test scores in order of moves trained, plus both baseline lines.
+  - Given the 5 seeds of one learner, when their combined curve is opened, then it shows the mean across seeds at each point with the spread across seeds.
+- **EVAL-04** Each learner&#x27;s final agent is compared with each baseline using the `null-hypothesis-testing` skill. It is given the 100 test-game scores of each of the learner&#x27;s 5 seed runs, and the baseline&#x27;s scores on the same 100 games. The learner beats the baseline when its score is higher and the difference is significant at 5% after correcting for the number of comparisons in the report; it ties when the difference is not significant; otherwise it loses.
+  - Given 5 complete seed runs of a learner, when the comparison is made, then the report states beats, ties or loses against each baseline, with the test&#x27;s result.
+  - Given fewer than 5 complete seed runs, when the comparison is requested, then it is not made, and the report lists the missing seeds.
+- **EVAL-05** Each added piece gets a before-and-after comparison with the rung below it, made the same way as EVAL-04: table learner → plain DQN, plain → + replay buffer, + replay buffer → + target network, + target network → + Double DQN, and plain reward → shaped reward. Every outcome counts: better, worse, or no difference.
+  - Given 5 complete seed runs of both rungs, when the comparison is made, then the report states better, worse or no difference, with the test&#x27;s result and both rungs&#x27; combined curves on one chart.
+- **EVAL-06** Every comparison result holds a written explanation; a result with no explanation is shown as unexplained.
+  - Given a comparison result with an empty explanation, when the report is opened, then that result is marked unexplained.
+  - Given a tie or a no-difference result with an explanation, when the report is opened, then it is marked explained.
+- **EVAL-07** Snake is done when the Double DQN agent beats the random player, beats or ties the scripted bot, every comparison in EVAL-04 and EVAL-05 has a result, and every tie and no-difference result is explained.
+  - Given a Double DQN agent that beats both baselines and all comparisons made and explained, when the done check runs, then it reports done.
+  - Given a Double DQN agent that ties the scripted bot with the tie explained, when the done check runs, then it reports done.
+  - Given a tie with the scripted bot left unexplained, when the done check runs, then it reports not done and names the missing explanation.
+  - Given a Double DQN agent that ties or loses to the random player, when the done check runs, then it reports not done.
+
+**Edge cases &amp; errors**
+- Every seed of a learner scores exactly the same as a baseline → the result is a tie.
+- A run marked incomplete or over the time limit is among a learner&#x27;s runs → it is left out, and the comparison waits for 5 complete runs.
+
+### Replay viewer (`REPLAY`)
+**Serves:** Goal 3, Goal 4, Goal 5
+**Stage:** S1
+**Behavior:** The learner picks a saved agent and one of its test games, or a fresh game seed, and watches it play move by move. Next to the board, the viewer shows how the agent scored each of its 3 moves, so its choices can be explained.
+
+**Requirements**
+- **REPLAY-01** Any saved test game of any saved agent, the baselines included, can be watched as a replay.
+  - Given a finished run, when one of its test games is chosen, then the replay plays it from the first move to the end.
+- **REPLAY-02** The replay shows the board, the snake, the food, the move number, the food eaten so far, and how the game ended.
+  - Given a replay at any move, when it is shown, then all of these are visible; at the end, the ending (wall, body, 100 moves without food, full board) is shown.
+- **REPLAY-03** At every move of a learner&#x27;s game, the replay shows the agent&#x27;s score for each of the 3 moves, with the chosen move marked.
+  - Given a table learner or DQN replay at any move, when it is shown, then 3 scores are visible and the chosen one is marked.
+  - Given a baseline replay, when it is shown, then the move scores are shown as not applicable.
+- **REPLAY-04** The replay can be paused, resumed, and stepped forward one move at a time.
+  - Given a paused replay, when &quot;step&quot; is chosen, then it advances exactly one move and stays paused.
+- **REPLAY-05** The replay speed can be set from 1 to 30 moves per second.
+  - Given a speed of 5 moves per second, when it plays for 10 seconds, then it advances 50 moves (±2).
+- **REPLAY-06** A replay of a saved test game is identical to the game that was scored.
+  - Given a saved test game, when it is replayed, then every board, move and food count matches the saved game.
+- **REPLAY-07** A saved agent can play and be watched on a fresh game from any seed chosen at the time.
+  - Given a saved agent and a new seed, when the game is watched twice, then both games are identical.
+
+**Edge cases &amp; errors**
+- The chosen agent or game can&#x27;t be found or read → the viewer opens nothing and names the missing item.
+- A game ends on its first move → the replay shows that one move and the ending.
+
+## Data requirements
+- **DATA-01** All training and test experience comes from the agents playing Snake; no outside data is used.
+  - Given any run, when its inputs are listed, then the only source of games is the Snake environment, started from the run&#x27;s own seeds.
+
+## Quality requirements
+- **QR-01** Each training run, including its test games, finishes in under 1 hour (60 minutes) on the laptop&#x27;s processor.
+  - Checked by the elapsed time saved with each run; RUN-07 stops any run that reaches 60 minutes.
+- **QR-02** Training, testing and replay run on the Apple Silicon laptop with no NVIDIA graphics card.
+  - Checked by running every learner&#x27;s training, a comparison and a replay on that laptop.
+
+## Assumptions
+- One learner uses the lab on one Apple Silicon laptop, evenings and weekends.
+- The full ladder (6 learner runs × 5 seeds, plus the plain-reward runs) takes many hours in total; only each single run has the 1-hour limit.
+- The done check in EVAL-07 judges the Double DQN agent, the top of the ladder; the table learner and other rungs are reported but don&#x27;t gate it.
+
+## Open questions
+- 20 curve points per run (EVAL-03) and replay speeds of 1–30 moves per second (REPLAY-05) were chosen without your input. Are they right? (The user can answer.)
+- The table learner&#x27;s and DQN rungs&#x27; tuning settings (learning rate, discount, exploration schedule, store size, refresh interval) are saved per run but not fixed by the spec. They are found during the build within the 1-hour limit. (The user can answer.)
+
+## Changelog
+| Date | Change | Source | IDs |
+|---|---|---|---|
+| 2026-10-18 | Initial spec | brief.md | all |
+</pre><details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-10/rl-incremental/with_skill/project/docs/spec.md&quot;,
+  &quot;content&quot;: &quot;# RL Lab — Spec\n\n**Status:** Draft · **Last updated:** 2026-10-18 · **Brief:** [brief.md](brief.md)\n\n## Summary\nA classic Snake game on a fixed 10×10 board, and a ladder of hand-written learners trained on it: table-based Q-learning, then a deep Q-network (a learned function that scores each move) built one piece at a time, then plain versus shaped rewards. Every learner is scored against a random player and a scripted bot on the same held-out games, every added piece gets a before-and-after comparison, every run saves its evidence, and any saved agent can be watched in a replay that shows how it scored each move. See the [brief](brief.md) for why.\n\n## Users\n| User | What they need to do |\n|---|---|\n| The learner (sole user) | Train each learner on Snake in under an hour, compare it with the baselines and with the previous rung of the ladder, explain each result from saved evidence, and watch any trained agent play |\n\n## Scope\n**In scope:** Snake environment, Baselines, Table-based Q-learning, DQN ladder, Reward shaping, Training runs, Evaluation &amp; comparison, Replay viewer.\n\n**Out of scope:**\n- 3D worlds.\n- Learning from pixels or from a picture of the board, and Atari games; the agent sees only the compact hand-made facts in SNAKE-06. A grid-view learner is a possible later follow-up.\n- Reproducing research papers or chasing benchmark scores.\n- Web deployment.\n- Ready-made learning algorithms from libraries; a comparison against one comes in a later stage.\n- A general framework beyond what Snake needs.\n- Changing the board size during training, or between runs.\n- Outside data of any kind.\n- Stepping backwards in a replay.\n\n## Features\n\n### Snake environment (`SNAKE`)\n**Serves:** Goal 1, Goal 5\n**Stage:** S1\n**Behavior:** Classic Snake on a grid. The snake moves one cell per move, turning left, turning right or going straight. Eating food makes it longer; hitting a wall or itself ends the game. The game hands the agent a short list of yes/no facts about its surroundings, and the reward for each move.\n\n**Requirements**\n- **SNAKE-01** The game is played on a fixed 10×10 board of open cells surrounded by walls.\n  - Given any game, when it starts, then the board has 10×10 open cells, walls on all four sides, a snake of length 3 in the middle row heading right, and exactly one food on an empty cell.\n  - Given any training run or test game, when the board size is read, then it is 10×10.\n- **SNAKE-02** On each move the agent chooses one of 3 moves relative to its heading: straight, turn left, turn right.\n  - Given a snake heading right, when it turns left, then its head moves up one cell and its heading becomes up.\n  - Given any heading, when any of the 3 moves is chosen, then the snake never reverses into its own neck.\n- **SNAKE-03** Eating food makes the snake 1 cell longer, gives a reward of +1, and places a new food on an empty cell.\n  - Given food directly ahead, when the snake moves straight, then its length goes up by 1, the move&#x27;s plain reward is +1, and one new food appears on a cell not covered by the snake.\n- **SNAKE-04** Moving into a wall or into the snake&#x27;s own body ends the game with a reward of −1.\n  - Given the head next to a wall, when the snake moves into the wall, then the game ends and the move&#x27;s reward is −1.\n  - Given the head next to a body cell that will still be occupied after the move, when the snake moves into it, then the game ends and the move&#x27;s reward is −1.\n- **SNAKE-05** Every move that neither eats nor kills has a plain reward of 0.\n  - Given a move into an empty cell, when it is made, then its plain reward is 0.\n- **SNAKE-06** At every move the agent sees exactly 11 yes/no facts: danger straight, danger left, danger right; heading up, down, left, right; food is up, down, left, right of the head.\n  - Given the head next to the top wall while heading up, when the facts are read, then \&quot;danger straight\&quot; is yes and \&quot;heading up\&quot; is yes.\n  - Given food above and to the left of the head, when the facts are read, then \&quot;food is up\&quot; and \&quot;food is left\&quot; are yes and \&quot;food is down\&quot; and \&quot;food is right\&quot; are no.\n  - Given a cell occupied by the body or a wall next to the head on its left, when the facts are read, then \&quot;danger left\&quot; is yes.\n- **SNAKE-07** A game ends after 100 moves in a row without eating.\n  - Given a snake that has gone 100 moves since its last food (or since the start), when the 100th move is made without eating, then the game ends and that move&#x27;s plain reward is 0.\n- **SNAKE-08** The same game seed and the same moves always give the same game.\n  - Given a game seed and a list of moves, when the game is played twice, then every board, food position, reward and ending is identical.\n\n**Edge cases &amp; errors**\n- The head moves into the cell the tail is leaving on that move → allowed; the game goes on.\n- The snake fills every cell, so no food can be placed → the game ends as a full-board finish, with no −1.\n- The food appears directly ahead of a turning snake → nothing special; food is only eaten when the head enters its cell.\n\n### Baselines (`BASE`)\n**Serves:** Goal 2\n**Stage:** S1\n**Behavior:** Two non-learning players set the bar every learner must clear: one picks moves at random, the other follows a simple rule. Both play the same test games as the learners.\n\n**Requirements**\n- **BASE-01** The random player picks each move uniformly at random from the 3 moves.\n  - Given 30,000 random-player moves, when the share of each move is counted, then each is between 32% and 35%.\n- **BASE-02** The scripted bot moves toward the food, never making a move that kills it immediately when a safe move exists.\n  - Given food to the left and the left cell free, when the bot moves, then it turns left.\n  - Given food straight ahead and a wall straight ahead with the right cell free, when the bot moves, then it turns right.\n  - Given several safe moves equally close to the food, when the bot moves, then it prefers straight, then left, then right.\n- **BASE-03** When every move kills it, the scripted bot goes straight.\n  - Given danger straight, left and right, when the bot moves, then it goes straight and the game ends.\n\n**Edge cases &amp; errors**\n- No safe move gets closer to the food → the bot takes the safe move that leaves it closest to the food, using the same preference order on ties.\n\n### Table-based Q-learning (`TAB`)\n**Serves:** Goal 1\n**Stage:** S1\n**Behavior:** The first learner keeps a table with a score for each of the 3 moves in every combination of the 11 facts, and improves the table after every move from the reward and the best score of the next situation.\n\n**Requirements**\n- **TAB-01** The table learner updates the score of the move it just made from the reward plus the discounted best score of the situation it reached (a one-step Q-learning update), after every move.\n  - Given a known table, situation, move, reward and next situation, when one update is applied, then the new score equals the hand-computed Q-learning update for the run&#x27;s learning rate and discount.\n  - Given a move that ended the game, when the update is applied, then the next situation contributes nothing.\n- **TAB-02** While training, the table learner sometimes picks a random move instead of its best one, at a rate that falls over the run from a starting rate to a floor saved with the run&#x27;s settings.\n  - Given a run&#x27;s exploration settings, when the rate is read at the start, the middle and the end of training, then it matches the saved schedule at each point.\n- **TAB-03** During test games the table learner always picks its highest-scored move.\n  - Given a trained table, when a test game is played twice from the same seed, then both games are identical.\n- **TAB-04** The learning update is written in the project; no ready-made learning algorithm is used.\n  - Given the trained table learner, when its learning steps are traced, then each one is code written in the project.\n\n**Edge cases &amp; errors**\n- A situation never seen in training comes up in a test game → all 3 moves score equal and the learner picks by the order straight, left, right.\n\n### DQN ladder (`DQN`)\n**Serves:** Goal 1, Goal 3\n**Stage:** S1\n**Behavior:** The second learner replaces the table with a small learned function that scores the 3 moves from the 11 facts. It is built in four rungs, each adding one piece to the one before, so each piece&#x27;s effect can be measured on its own:\n1. Plain: learns from each move as it happens.\n2. + Replay buffer: learns from random samples of stored past moves.\n3. + Target network: its learning targets come from a frozen copy of itself, refreshed at a fixed interval.\n4. + Double DQN: the learner picks the best next move, and the frozen copy scores it.\n\n**Requirements**\n- **DQN-01** The plain rung learns from each move right after it is made, using that move&#x27;s reward plus the discounted best score of the next situation as its target.\n  - Given a known function, move, reward and next situation, when one update is applied, then the target equals the hand-computed value and the function&#x27;s score for that move moves toward it.\n- **DQN-02** The replay-buffer rung stores past moves and learns from batches drawn at random from that store.\n  - Given a store of past moves and a seed, when a batch is drawn, then every move in it comes from the store and the same seed draws the same batch.\n  - Given a store at its saved capacity, when a new move is added, then the oldest move is dropped.\n- **DQN-03** The target-network rung computes its targets from a frozen copy of the learner, refreshed every fixed number of updates saved with the run&#x27;s settings.\n  - Given the refresh interval, when updates run between two refreshes, then the copy does not change; when the interval is reached, the copy equals the learner.\n- **DQN-04** The Double DQN rung chooses the next situation&#x27;s best move with the learner, and scores that move with the frozen copy.\n  - Given a learner and a copy that disagree on the next situation&#x27;s best move, when the target is computed, then it uses the copy&#x27;s score for the learner&#x27;s chosen move.\n- **DQN-05** Each rung differs from the rung before only by the piece it adds; every other setting is the same.\n  - Given the saved settings of two neighbouring rungs, when they are compared, then the only differences are the added piece and its own settings.\n- **DQN-06** While training, each rung explores with the same falling random-move rate as TAB-02; during test games it always picks its highest-scored move.\n  - Given a trained rung, when a test game is played twice from the same seed, then both games are identical.\n- **DQN-07** The learning updates of every rung are written in the project; no ready-made learning algorithm is used.\n  - Given any trained rung, when its learning steps are traced, then each one is code written in the project.\n\n**Edge cases &amp; errors**\n- A move that ended the game is learned from → the next situation contributes nothing to its target.\n- The replay-buffer store holds fewer moves than one batch → learning waits until it holds a full batch.\n- Scores grow without bound (training diverges) → the run keeps going and saves its curve; the comparison reports the result, and the divergence is visible in the curve.\n\n### Reward shaping (`SHAPE`)\n**Serves:** Goal 1, Goal 3\n**Stage:** S1\n**Behavior:** A second reward adds a small nudge toward the food on top of the plain reward, so the learner can be trained on either and the two compared.\n\n**Requirements**\n- **SHAPE-01** The shaped reward is the plain reward plus 0.1 for a move that brings the head closer to the food and minus 0.1 for a move that takes it further away, measured in grid steps to the food that was on the board before the move.\n  - Given a move that cuts the distance to the food from 5 to 4, when it is made, then the shaped reward is +0.1.\n  - Given a move that raises the distance from 4 to 5, when it is made, then the shaped reward is −0.1.\n  - Given a move that eats the food, when it is made, then the shaped reward is +1.1.\n- **SHAPE-02** A move that ends the game by collision has a shaped reward of −1, with no nudge.\n  - Given a move into a wall, when it is made, then the shaped reward is −1.\n- **SHAPE-03** Every run uses either the plain or the shaped reward for training, and saves which.\n  - Given a finished run, when its saved settings are read, then they name its reward.\n- **SHAPE-04** Test scores never use the shaped reward; they always count food eaten.\n  - Given the same agent tested once after plain training and once after shaped training, when the scores are read, then both are food eaten per game.\n- **SHAPE-05** The plain-versus-shaped comparison trains the Double DQN rung on each reward, with every other setting the same.\n  - Given the plain and shaped runs of that comparison, when their saved settings are compared, then the only difference is the reward.\n\n### Training runs (`RUN`)\n**Serves:** Goal 3, Goal 5\n**Stage:** S1\n**Behavior:** One training run trains one learner, with one reward, from one seed. The learner starts the run with one action, watches its progress, and afterwards finds everything the run produced saved together, enough to recreate it.\n\n**Requirements**\n- **RUN-01** A training run trains one learner (the table learner or one DQN rung) with one reward from one training seed.\n  - Given a learner, a reward and a seed, when a run is started with one action, then it trains that learner with that reward and seed and nothing else.\n- **RUN-02** Each run saves its settings, seed, learning curve, final agent and test games.\n  - Given a finished run, when its saved evidence is opened, then all five are there.\n- **RUN-03** Rerunning from a run&#x27;s saved settings and seed gives the same result.\n  - Given a finished run, when it is run again on the same laptop from its saved settings and seed, then the test score at every curve point is identical.\n- **RUN-04** While a run trains, it shows the moves trained so far, the latest test score and the time elapsed.\n  - Given a run in progress, when a curve point is reached, then the display updates all three.\n- **RUN-05** A run never overwrites another run&#x27;s evidence.\n  - Given two runs with the same learner, reward and seed, when both finish, then both sets of evidence are kept.\n- **RUN-06** A run that stops before it finishes is marked incomplete and is left out of every comparison.\n  - Given a run stopped by hand partway through, when comparisons are made, then it is listed as incomplete and its numbers are not used.\n- **RUN-07** A run still training at 60 minutes stops, saves what it has, and is marked over the time limit.\n  - Given a run that reaches 60 minutes, when the limit passes, then training stops, its evidence so far is saved, it is marked over the time limit, and it is left out of every comparison.\n- **RUN-08** Training, testing, saving evidence and replay work for a second environment without changes to them.\n  - Given a minimal second environment used only for this check, when it is trained, tested and replayed, then none of the training, testing, saving or replay behavior had to change.\n\n**Edge cases &amp; errors**\n- A run is started with a learner or reward that doesn&#x27;t exist → it does not start, and the message lists the valid choices.\n- The disk fills while saving → the run is marked incomplete and says which evidence is missing.\n\n### Evaluation &amp; comparison (`EVAL`)\n**Serves:** Goal 2, Goal 3\n**Stage:** S1\n**Behavior:** Every learner and baseline is scored on the same 100 held-out test games. Learning curves show progress against the baselines. Comparison reports say, from 5 training seeds per learner, whether each learner beats the baselines, and what each added piece changed. Each result carries a written explanation, so a tie counts.\n\n**Requirements**\n- **EVAL-01** Every agent is scored on the same 100 test games, each started from a fixed test seed that is never used in training.\n  - Given any two agents, when they are tested, then they play games from the same 100 test seeds.\n  - Given any training run, when its game seeds are compared with the test seeds, then none match.\n- **EVAL-02** An agent&#x27;s test score is the mean food eaten per game over the 100 test games.\n  - Given 100 test games with known food eaten, when the score is computed, then it equals their mean.\n- **EVAL-03** Each run&#x27;s learning curve is its test score against moves trained, at 20 evenly spaced points, with the random player&#x27;s and the scripted bot&#x27;s scores drawn as lines on the same chart; the chart follows the `dataviz` skill.\n  - Given a finished run, when its curve is opened, then it shows 20 test scores in order of moves trained, plus both baseline lines.\n  - Given the 5 seeds of one learner, when their combined curve is opened, then it shows the mean across seeds at each point with the spread across seeds.\n- **EVAL-04** Each learner&#x27;s final agent is compared with each baseline using the `null-hypothesis-testing` skill. It is given the 100 test-game scores of each of the learner&#x27;s 5 seed runs, and the baseline&#x27;s scores on the same 100 games. The learner beats the baseline when its score is higher and the difference is significant at 5% after correcting for the number of comparisons in the report; it ties when the difference is not significant; otherwise it loses.\n  - Given 5 complete seed runs of a learner, when the comparison is made, then the report states beats, ties or loses against each baseline, with the test&#x27;s result.\n  - Given fewer than 5 complete seed runs, when the comparison is requested, then it is not made, and the report lists the missing seeds.\n- **EVAL-05** Each added piece gets a before-and-after comparison with the rung below it, made the same way as EVAL-04: table learner → plain DQN, plain → + replay buffer, + replay buffer → + target network, + target network → + Double DQN, and plain reward → shaped reward. Every outcome counts: better, worse, or no difference.\n  - Given 5 complete seed runs of both rungs, when the comparison is made, then the report states better, worse or no difference, with the test&#x27;s result and both rungs&#x27; combined curves on one chart.\n- **EVAL-06** Every comparison result holds a written explanation; a result with no explanation is shown as unexplained.\n  - Given a comparison result with an empty explanation, when the report is opened, then that result is marked unexplained.\n  - Given a tie or a no-difference result with an explanation, when the report is opened, then it is marked explained.\n- **EVAL-07** Snake is done when the Double DQN agent beats the random player, beats or ties the scripted bot, every comparison in EVAL-04 and EVAL-05 has a result, and every tie and no-difference result is explained.\n  - Given a Double DQN agent that beats both baselines and all comparisons made and explained, when the done check runs, then it reports done.\n  - Given a Double DQN agent that ties the scripted bot with the tie explained, when the done check runs, then it reports done.\n  - Given a tie with the scripted bot left unexplained, when the done check runs, then it reports not done and names the missing explanation.\n  - Given a Double DQN agent that ties or loses to the random player, when the done check runs, then it reports not done.\n\n**Edge cases &amp; errors**\n- Every seed of a learner scores exactly the same as a baseline → the result is a tie.\n- A run marked incomplete or over the time limit is among a learner&#x27;s runs → it is left out, and the comparison waits for 5 complete runs.\n\n### Replay viewer (`REPLAY`)\n**Serves:** Goal 3, Goal 4, Goal 5\n**Stage:** S1\n**Behavior:** The learner picks a saved agent and one of its test games, or a fresh game seed, and watches it play move by move. Next to the board, the viewer shows how the agent scored each of its 3 moves, so its choices can be explained.\n\n**Requirements**\n- **REPLAY-01** Any saved test game of any saved agent, the baselines included, can be watched as a replay.\n  - Given a finished run, when one of its test games is chosen, then the replay plays it from the first move to the end.\n- **REPLAY-02** The replay shows the board, the snake, the food, the move number, the food eaten so far, and how the game ended.\n  - Given a replay at any move, when it is shown, then all of these are visible; at the end, the ending (wall, body, 100 moves without food, full board) is shown.\n- **REPLAY-03** At every move of a learner&#x27;s game, the replay shows the agent&#x27;s score for each of the 3 moves, with the chosen move marked.\n  - Given a table learner or DQN replay at any move, when it is shown, then 3 scores are visible and the chosen one is marked.\n  - Given a baseline replay, when it is shown, then the move scores are shown as not applicable.\n- **REPLAY-04** The replay can be paused, resumed, and stepped forward one move at a time.\n  - Given a paused replay, when \&quot;step\&quot; is chosen, then it advances exactly one move and stays paused.\n- **REPLAY-05** The replay speed can be set from 1 to 30 moves per second.\n  - Given a speed of 5 moves per second, when it plays for 10 seconds, then it advances 50 moves (±2).\n- **REPLAY-06** A replay of a saved test game is identical to the game that was scored.\n  - Given a saved test game, when it is replayed, then every board, move and food count matches the saved game.\n- **REPLAY-07** A saved agent can play and be watched on a fresh game from any seed chosen at the time.\n  - Given a saved agent and a new seed, when the game is watched twice, then both games are identical.\n\n**Edge cases &amp; errors**\n- The chosen agent or game can&#x27;t be found or read → the viewer opens nothing and names the missing item.\n- A game ends on its first move → the replay shows that one move and the ending.\n\n## Data requirements\n- **DATA-01** All training and test experience comes from the agents playing Snake; no outside data is used.\n  - Given any run, when its inputs are listed, then the only source of games is the Snake environment, started from the run&#x27;s own seeds.\n\n## Quality requirements\n- **QR-01** Each training run, including its test games, finishes in under 1 hour (60 minutes) on the laptop&#x27;s processor.\n  - Checked by the elapsed time saved with each run; RUN-07 stops any run that reaches 60 minutes.\n- **QR-02** Training, testing and replay run on the Apple Silicon laptop with no NVIDIA graphics card.\n  - Checked by running every learner&#x27;s training, a comparison and a replay on that laptop.\n\n## Assumptions\n- One learner uses the lab on one Apple Silicon laptop, evenings and weekends.\n- The full ladder (6 learner runs × 5 seeds, plus the plain-reward runs) takes many hours in total; only each single run has the 1-hour limit.\n- The done check in EVAL-07 judges the Double DQN agent, the top of the ladder; the table learner and other rungs are reported but don&#x27;t gate it.\n\n## Open questions\n- 20 curve points per run (EVAL-03) and replay speeds of 1–30 moves per second (REPLAY-05) were chosen without your input. Are they right? (The user can answer.)\n- The table learner&#x27;s and DQN rungs&#x27; tuning settings (learning rate, discount, exploration schedule, store size, refresh interval) are saved per run but not fixed by the spec. They are found during the build within the 1-hour limit. (The user can answer.)\n\n## Changelog\n| Date | Change | Source | IDs |\n|---|---|---|---|\n| 2026-10-18 | Initial spec | brief.md | all |\n&quot;
+}</pre><div class="lbl">output</div><pre>File created successfully at: /Users/connorott/plugins/dev-team-workspace/iteration-10/rl-incremental/with_skill/project/docs/spec.md (file state is current in your context — no need to Read it back)</pre></details></div><div class="step" id="SD43"><span class="sid">D43</span><span class="kind">Edit</span>/Users/connorott/plugins/dev-team-workspace/iteration-10/rl-incremental/with_skill/project/docs/spec.md | old: &#x27;- The full ladder (6 learner runs × 5 seeds, plus the plain-reward runs) takes m&#x27; | new: &#x27;- The full ladder (6 learner setups: the table learner, 4 DQN rungs and the shap&#x27;<div class="lbl">edited /Users/connorott/plugins/dev-team-workspace/iteration-10/rl-incremental/with_skill/project/docs/spec.md · old</div><pre>- The full ladder (6 learner runs × 5 seeds, plus the plain-reward runs) takes many hours in total; only each single run has the 1-hour limit.</pre><div class="lbl">new</div><pre>- The full ladder (6 learner setups: the table learner, 4 DQN rungs and the shaped-reward Double DQN, × 5 seeds = 30 runs) takes many hours in total; only each single run has the 1-hour limit.</pre><details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;replace_all&quot;: false,
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-10/rl-incremental/with_skill/project/docs/spec.md&quot;,
+  &quot;old_string&quot;: &quot;- The full ladder (6 learner runs × 5 seeds, plus the plain-reward runs) takes many hours in total; only each single run has the 1-hour limit.&quot;,
+  &quot;new_string&quot;: &quot;- The full ladder (6 learner setups: the table learner, 4 DQN rungs and the shaped-reward Double DQN, × 5 seeds = 30 runs) takes many hours in total; only each single run has the 1-hour limit.&quot;
+}</pre><div class="lbl">output</div><pre>The file /Users/connorott/plugins/dev-team-workspace/iteration-10/rl-incremental/with_skill/project/docs/spec.md has been updated successfully. (file state is current in your context — no need to Read it back)</pre></details></div><div class="step" id="SD44"><span class="sid">D44</span><span class="kind">Bash</span>cd /Users/connorott/plugins/dev-team-workspace/iteration-10/rl-incremental/with_skill/project
+python3 /Users/connorott/plugins/dev-team-workspace/iteration-10/rl-incremental/with_skill/plugin/dev-team/scripts/dt.py request trace UR-04 SNAKE-01 SNAKE-02
+python3 /Users/connorott/plugins/dev-team-workspace/iteration-10/rl-incremental/with_skill/plugin/dev-team/scripts/dt.py request trace UR-05 SNAKE-03 SNAKE-04
+python3 /Users/connorott/plugins/dev-team-workspace/iteration-10/rl-incremental/with_ski …[+2145 chars]<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;cd /Users/connorott/plugins/dev-team-workspace/iteration-10/rl-incremental/with_skill/project\npython3 /Users/connorott/plugins/dev-team-workspace/iteration-10/rl-incremental/with_skill/plugin/dev-team/scripts/dt.py request trace UR-04 SNAKE-01 SNAKE-02\npython3 /Users/connorott/plugins/dev-team-workspace/iteration-10/rl-incremental/with_skill/plugin/dev-team/scripts/dt.py request trace UR-05 SNAKE-03 SNAKE-04\npython3 /Users/connorott/plugins/dev-team-workspace/iteration-10/rl-incremental/with_skill/plugin/dev-team/scripts/dt.py request trace UR-12 QR-01 RUN-07\npython3 /Users/connorott/plugins/dev-team-workspace/iteration-10/rl-incremental/with_skill/plugin/dev-team/scripts/dt.py request trace UR-13 EVAL-03 EVAL-04 EVAL-07\npython3 /Users/connorott/plugins/dev-team-workspace/iteration-10/rl-incremental/with_skill/plugin/dev-team/scripts/dt.py request trace UR-14 REPLAY-01\npython3 /Users/connorott/plugins/dev-team-workspace/iteration-10/rl-incremental/with_skill/plugin/dev-team/scripts/dt.py request trace UR-18 TAB-01 DQN-02 DQN-03 DQN-04 BASE-02 SHAPE-01\npython3 /Users/connorott/plugins/dev-team-workspace/iteration-10/rl-incremental/with_skill/plugin/dev-team/scripts/dt.py request trace UR-20 BASE-01 BASE-02 TAB-01 DQN-01 DQN-02 DQN-03 DQN-04 DQN-05 SHAPE-05 SNAKE-06 \&quot;§Out of scope\&quot;\npython3 /Users/connorott/plugins/dev-team-workspace/iteration-10/rl-incremental/with_skill/plugin/dev-team/scripts/dt.py request trace UR-21 EVAL-06 EVAL-07\npython3 /Users/connorott/plugins/dev-team-workspace/iteration-10/rl-incremental/with_skill/plugin/dev-team/scripts/dt.py request trace UR-25 SNAKE-01 SNAKE-03 SNAKE-04 SNAKE-05 SNAKE-06 SNAKE-07 BASE-02 EVAL-01 EVAL-02 EVAL-03 EVAL-04 EVAL-06 RUN-02 RUN-03 QR-01 \&quot;§Assumptions\&quot;\npython3 /Users/connorott/plugins/dev-team-workspace/iteration-10/rl-incremental/with_skill/plugin/dev-team/scripts/dt.py request trace UR-26 EVAL-04\npython3 /Users/connorott/plugins/dev-team-workspace/iteration-10/rl-incremental/with_skill/plugin/dev-team/scripts/dt.py request trace UR-27 SHAPE-01\npython3 /Users/connorott/plugins/dev-team-workspace/iteration-10/rl-incremental/with_skill/plugin/dev-team/scripts/dt.py request trace UR-28 REPLAY-03 REPLAY-04 REPLAY-05\npython3 /Users/connorott/plugins/dev-team-workspace/iteration-10/rl-incremental/with_skill/plugin/dev-team/scripts/dt.py request trace UR-29 EVAL-05\npython3 /Users/connorott/plugins/dev-team-workspace/iteration-10/rl-incremental/with_skill/plugin/dev-team/scripts/dt.py request --open --owner spec\npython3 /Users/connorott/plugins/dev-team-workspace/iteration-10/rl-incremental/with_skill/plugin/dev-team/scripts/dt.py lint 2&gt;&amp;1 | tail -30&quot;,
+  &quot;description&quot;: &quot;Trace requests to requirements and lint the docs&quot;
+}</pre><div class="lbl">output</div><pre>UR-04 → SNAKE-01, SNAKE-02
+UR-05 → SNAKE-03, SNAKE-04
+UR-12 → QR-01, RUN-07
+UR-13 → EVAL-03, EVAL-04, EVAL-07
+UR-14 → REPLAY-01
+UR-18 → TAB-01, DQN-02, DQN-03, DQN-04, BASE-02, SHAPE-01
+dt request: not defined: §Out of scope
+usage: dt request add &lt;owner&gt; &quot;&lt;words&gt;&quot; --skill S [--about TEXT] [--replaces UR-NN] · dt request trace UR-NN ID… · dt request change UR-NN &quot;&lt;what instead&gt;&quot; --approved &quot;&lt;words&gt;&quot; --skill S --into ID… · dt request change UR-NN --into ID… (add IDs to a change) · dt request [list] [--open] [--owner O] [--json]
+UR-21 → EVAL-06, EVAL-07
+UR-25 → SNAKE-01, SNAKE-03, SNAKE-04, SNAKE-05, SNAKE-06, SNAKE-07, BASE-02, EVAL-01, EVAL-02, EVAL-03, EVAL-04, EVAL-06, RUN-02, RUN-03, QR-01, §Assumptions
+UR-26 → EVAL-04
+UR-27 → SHAPE-01
+UR-28 → REPLAY-03, REPLAY-04, REPLAY-05
+UR-29 → EVAL-05
+UR-20 &quot;A.&quot; [Direction for Snake: A = full ladder (random + scripted baselines, tabular Q-learning, DQN built piece by piece: plain net, replay buffer, target network, Double DQN, then plain vs shaped rewards), compact hand-made state only; grid view only a possible follow-up. B = A plus grid-view DQN. C = shorter ladder] · spec · open
+docs/requests.md:24: request-number UR-18 says &#x27;7&#x27;, which TAB-01, DQN-02, DQN-03, DQN-04, BASE-02, SHAPE-01 doesn&#x27;t state: honour the number, or change it with the user&#x27;s yes
+docs/roadmap.md:13: roadmap-skill S1 Skills names dataviz: not installed (.claude/skills or the plugin)
+0 errors, 2 warnings</pre></details></div><div class="step" id="SD45"><span class="sid">D45</span><span class="kind">Bash</span>cd /Users/connorott/plugins/dev-team-workspace/iteration-10/rl-incremental/with_skill/project
+python3 /Users/connorott/plugins/dev-team-workspace/iteration-10/rl-incremental/with_skill/plugin/dev-team/scripts/dt.py request trace UR-20 BASE-01 BASE-02 TAB-01 DQN-01 DQN-02 DQN-03 DQN-04 DQN-05 SHAPE-05 SNAKE-06 &quot;§Scope&quot;
+python3 /Users/connorott/plugins/dev-team-workspace/iteration-10/rl-incremental/with_skill/plugin/dev-team/scripts/dt.py request --open --owner spec; python3 /Users/connorott/plugi …[+216 chars]<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;cd /Users/connorott/plugins/dev-team-workspace/iteration-10/rl-incremental/with_skill/project\npython3 /Users/connorott/plugins/dev-team-workspace/iteration-10/rl-incremental/with_skill/plugin/dev-team/scripts/dt.py request trace UR-20 BASE-01 BASE-02 TAB-01 DQN-01 DQN-02 DQN-03 DQN-04 DQN-05 SHAPE-05 SNAKE-06 \&quot;§Scope\&quot;\npython3 /Users/connorott/plugins/dev-team-workspace/iteration-10/rl-incremental/with_skill/plugin/dev-team/scripts/dt.py request --open --owner spec; python3 /Users/connorott/plugins/dev-team-workspace/iteration-10/rl-incremental/with_skill/plugin/dev-team/scripts/dt.py lint 2&gt;&amp;1 | tail -4\ngrep -niE \&quot;pytorch|numpy|torch|python|json|csv|file|folder|matplotlib|plotly|pygame|gym|sql\&quot; docs/spec.md&quot;,
+  &quot;description&quot;: &quot;Trace UR-20, recheck lint and scan for implementation names&quot;
+}</pre><div class="lbl">output</div><pre>UR-20 → BASE-01, BASE-02, TAB-01, DQN-01, DQN-02, DQN-03, DQN-04, DQN-05, SHAPE-05, SNAKE-06, §Scope
+requests: none
+docs/requests.md:24: request-number UR-18 says &#x27;7&#x27;, which TAB-01, DQN-02, DQN-03, DQN-04, BASE-02, SHAPE-01 doesn&#x27;t state: honour the number, or change it with the user&#x27;s yes
+docs/roadmap.md:13: roadmap-skill S1 Skills names dataviz: not installed (.claude/skills or the plugin)
+0 errors, 2 warnings</pre></details></div><div class="step" id="SD46"><span class="sid">D46</span><span class="kind">say</span>The spec draft is written at `docs/spec.md` and is ready for your review. It is still a Draft and not committed. ⏎ Size: 8 features with 48 requirements, plus 1 data requirement (DATA-01) and 2 quality requirements (QR-01, QR-02). Everything is in stage S1. ⏎ Goals → features ⏎ - Goal 1 (write the algorithms yourself): Snake environment (`SNAKE`), table-based Q-learning (`TAB`), the DQN ladder (`DQN`), reward shaping (`SHAPE`). ⏎ - Goal 2 (beat random and the scripted bot): baselines (`BASE`), evaluation &amp; comparison (`EVAL`). ⏎ - Goal 3 (explain results from saved evidence …[+2757 chars]<details><summary>full text</summary><pre>The spec draft is written at `docs/spec.md` and is ready for your review. It is still a Draft and not committed.
+
+**Size:** 8 features with 48 requirements, plus 1 data requirement (DATA-01) and 2 quality requirements (QR-01, QR-02). Everything is in stage S1.
+
+**Goals → features**
+- **Goal 1** (write the algorithms yourself): Snake environment (`SNAKE`), table-based Q-learning (`TAB`), the DQN ladder (`DQN`), reward shaping (`SHAPE`).
+- **Goal 2** (beat random and the scripted bot): baselines (`BASE`), evaluation &amp; comparison (`EVAL`).
+- **Goal 3** (explain results from saved evidence): `DQN`, `SHAPE`, training runs (`RUN`), `EVAL`, replay viewer (`REPLAY`).
+- **Goal 4** (watch a replay): `REPLAY`.
+- **Goal 5** (shared core): `SNAKE`, `RUN`, `REPLAY`. RUN-08 checks that a tiny second environment can be trained, tested and replayed without changing those parts.
+
+**Things I decided that you haven&#x27;t seen yet**
+- **The done check (EVAL-07) judges the Double DQN agent**, the top of the ladder. It must beat random, and beat or tie the scripted bot, and every comparison must have an explained result. The table learner and the other rungs are reported but don&#x27;t decide it.
+- **Plain vs shaped reward is compared on the Double DQN rung** (SHAPE-05).
+- **Before/after pairs (EVAL-05):** table → plain DQN, then plain → + replay buffer, + replay buffer → + target network, + target network → + Double DQN, and plain → shaped reward.
+- **A run that reaches 60 minutes stops** (RUN-07). It saves what it has, is marked over the time limit, and is left out of comparisons.
+- **The scripted bot breaks ties** in the order straight, left, right. When every move kills it, it goes straight.
+- **Shaped reward edge cases:** a move that eats scores +1.1; a death scores just −1.
+
+**Your words:** every open request is now traced to a requirement. For example:
+- &quot;classic Snake on a grid&quot; → SNAKE-01 &quot;a fixed 10×10 board&quot;.
+- &quot;under ~1 hour&quot; → QR-01 &quot;under 1 hour (60 minutes)&quot;.
+- &quot;±0.1 toward/away from food&quot; → SHAPE-01 &quot;plus 0.1 … minus 0.1&quot;.
+- &quot;if it only ties the scripted bot … as long as I can explain the tie&quot; → EVAL-07 &quot;beats or ties the scripted bot … every tie … explained&quot;.
+- &quot;show the agent&#x27;s score for each of the 3 moves at every step&quot; → REPLAY-03.
+- &quot;Any measured result counts, including &#x27;no difference, explained&#x27;&quot; → EVAL-05 &quot;Every outcome counts: better, worse, or no difference&quot;.
+- &quot;5 seeds is fine&quot; → EVAL-04.
+
+Nothing was changed and nothing is left open.
+
+The project check reports 0 errors and 2 warnings:
+- **dataviz:** the warning you said to keep.
+- **&quot;7&quot; in UR-18:** it doesn&#x27;t appear in the requirements traced to it. That 7 is the number of an option you picked from my list (reward shaping), not a quantity, so no requirement needs to state it.
+
+**Open questions**
+1. **Curve points and replay speed:** are 20 test-score points per learning curve (EVAL-03) and replay speeds of 1–30 moves per second (REPLAY-05) right?
+2. **Tuning settings:** learning rate, discount, exploration schedule, replay-buffer size and target-network refresh interval are saved with each run but not set by the spec. I&#x27;d find them during the build, within the one-hour limit. OK?
+
+Approve it as is, or tell me what to change. Once it&#x27;s approved, I&#x27;ll offer to commit, and the architecture comes next.</pre></details></div><div class="step" id="SD47"><span class="sid">D47</span><span class="kind">hook</span><span class="hook">Stop said: {&quot;systemMessage&quot;: &quot;dt lint: 1 problem\ndocs/requests.md:24: request-number UR-18 says &#x27;7&#x27;, which TAB-01, DQN-02, DQN-03, DQN-04, BASE-02, SHAPE-01 doesn&#x27;t state: honour the number, or change it with the user&#x27;s yes&quot;}
+</span></div><div class="step" id="SD48"><span class="sid">D48</span><span class="kind">hook</span><span class="hook">SessionStart:resume said: milestone: none (no tasks/plan.md)
+draft (waiting for approval): docs/spec.md
+dt: /Users/connorott/plugins/dev-team-workspace/iteration-10/rl-incremental/with_skill/plugin/dev-team/scripts/dt
+</span></div>
+<h2>Commits</h2>
+<p>None.</p>
+<h2>Returned</h2>
+<pre>The spec draft is written at `docs/spec.md` and is ready for your review. It is still a Draft and not committed.
+
+**Size:** 8 features with 48 requirements, plus 1 data requirement (DATA-01) and 2 quality requirements (QR-01, QR-02). Everything is in stage S1.
+
+**Goals → features**
+- **Goal 1** (write the algorithms yourself): Snake environment (`SNAKE`), table-based Q-learning (`TAB`), the DQN ladder (`DQN`), reward shaping (`SHAPE`).
+- **Goal 2** (beat random and the scripted bot): baselines (`BASE`), evaluation &amp; comparison (`EVAL`).
+- **Goal 3** (explain results from saved evidence): `DQN`, `SHAPE`, training runs (`RUN`), `EVAL`, replay viewer (`REPLAY`).
+- **Goal 4** (watch a replay): `REPLAY`.
+- **Goal 5** (shared core): `SNAKE`, `RUN`, `REPLAY`. RUN-08 checks that a tiny second environment can be trained, tested and replayed without changing those parts.
+
+**Things I decided that you haven&#x27;t seen yet**
+- **The done check (EVAL-07) judges the Double DQN agent**, the top of the ladder. It must beat random, and beat or tie the scripted bot, and every comparison must have an explained result. The table learner and the other rungs are reported but don&#x27;t decide it.
+- **Plain vs shaped reward is compared on the Double DQN rung** (SHAPE-05).
+- **Before/after pairs (EVAL-05):** table → plain DQN, then plain → + replay buffer, + replay buffer → + target network, + target network → + Double DQN, and plain → shaped reward.
+- **A run that reaches 60 minutes stops** (RUN-07). It saves what it has, is marked over the time limit, and is left out of comparisons.
+- **The scripted bot breaks ties** in the order straight, left, right. When every move kills it, it goes straight.
+- **Shaped reward edge cases:** a move that eats scores +1.1; a death scores just −1.
+
+**Your words:** every open request is now traced to a requirement. For example:
+- &quot;classic Snake on a grid&quot; → SNAKE-01 &quot;a fixed 10×10 board&quot;.
+- &quot;under ~1 hour&quot; → QR-01 &quot;under 1 hour (60 minutes)&quot;.
+- &quot;±0.1 toward/away from food&quot; → SHAPE-01 &quot;plus 0.1 … minus 0.1&quot;.
+- &quot;if it only ties the scripted bot … as long as I can explain the tie&quot; → EVAL-07 &quot;beats or ties the scripted bot … every tie … explained&quot;.
+- &quot;show the agent&#x27;s score for each of the 3 moves at every step&quot; → REPLAY-03.
+- &quot;Any measured result counts, including &#x27;no difference, explained&#x27;&quot; → EVAL-05 &quot;Every outcome counts: better, worse, or no difference&quot;.
+- &quot;5 seeds is fine&quot; → EVAL-04.
+
+Nothing was changed and nothing is left open.
+
+The project check reports 0 errors and 2 warnings:
+- **dataviz:** the warning you said to keep.
+- **&quot;7&quot; in UR-18:** it doesn&#x27;t appear in the requirements traced to it. That 7 is the number of an option you picked from my list (reward shaping), not a quantity, so no requirement needs to state it.
+
+**Open questions**
+1. **Curve points and replay speed:** are 20 test-score points per learning curve (EVAL-03) and replay speeds of 1–30 moves per second (REPLAY-05) right?
+2. **Tuning settings:** learning rate, discount, exploration schedule, replay-buffer size and target-network refresh interval are saved with each run but not set by the spec. I&#x27;d find them during the build, within the one-hour limit. OK?
+
+Approve it as is, or tell me what to change. Once it&#x27;s approved, I&#x27;ll offer to commit, and the architecture comes next.</pre>
+</body></html>

@@ -1,0 +1,872 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1"><title>T01 turn</title>
+<style>
+:root{--bg:#fbfbfa;--fg:#1d1d1f;--muted:#6b6b70;--line:#d9d9de;--box:#fff;--rowp:#eef3fb;--band:#fff4d6;
+--ok:#2e7d32;--bad:#c62828;--warn:#b26a00;--idle:#6b6b70}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#17171a;--fg:#ececf0;--muted:#9a9aa3;
+--line:#34343a;--box:#222227;--rowp:#1d2433;--band:#3a3015;--ok:#6fcf73;--bad:#ff6b6b;--warn:#f0b35a;--idle:#9a9aa3}}
+:root[data-theme="dark"]{--bg:#17171a;--fg:#ececf0;--muted:#9a9aa3;--line:#34343a;--box:#222227;--rowp:#1d2433;
+--band:#3a3015;--ok:#6fcf73;--bad:#ff6b6b;--warn:#f0b35a;--idle:#9a9aa3}
+body{margin:0;padding:16px;background:var(--bg);color:var(--fg);font:14px/1.45 -apple-system,system-ui,sans-serif}
+h1{font-size:18px;margin:0 0 4px}h2{font-size:15px;margin:22px 0 8px}.sub{color:var(--muted)}
+table{border-collapse:collapse;margin:4px 0 8px}td,th{border-bottom:1px solid var(--line);padding:4px 10px;text-align:left;
+vertical-align:top}th{color:var(--muted);font-weight:600}.chips span{display:inline-block;margin:0 4px 2px 0}
+.legend span{margin-right:14px;white-space:nowrap}.sw{display:inline-block;width:10px;height:10px;border-radius:2px;
+margin-right:4px;vertical-align:-1px}.scroll{overflow:auto;max-height:88vh;border:1px solid var(--line);border-radius:8px}
+.chart{display:grid;width:max-content}.chart>div{line-height:0}.corner{position:sticky;top:0;left:0;z-index:3}
+.colhead{position:sticky;top:0;z-index:2}.rowhead{position:sticky;left:0;z-index:2}
+svg.bg{background:var(--bg)}.colhead svg{border-bottom:1px solid var(--line)}.rowhead svg{border-right:1px solid var(--line)}
+.ok{color:var(--ok);fill:var(--ok)}.bad{color:var(--bad);fill:var(--bad)}.warn{color:var(--warn);fill:var(--warn)}
+.idle{color:var(--idle);fill:var(--idle)}
+svg text{fill:var(--fg);font-family:-apple-system,system-ui,sans-serif}
+.box{fill:var(--box);stroke:var(--line)}.unit:hover .box{stroke:var(--fg)}
+.role{font-size:12px;font-weight:600}.uid,.wmeta,.lmeta,.meta{font-size:10px;fill:var(--muted)}
+.sub{font-size:10.5px;fill:var(--muted)}.badge{font-size:11px;font-weight:600}
+.meta.bad{fill:var(--bad);font-weight:600}.lane{font-size:13px;font-weight:700}.wave{font-size:13px;font-weight:700}
+.par{fill:#4e79a7}.ser{fill:var(--muted)}.rowp{fill:var(--rowp)}.rows{fill:transparent}.band{fill:var(--band)}
+.bandt{font-size:11.5px}.grid{stroke:var(--line)}.link{stroke:var(--muted);stroke-width:1.2;opacity:.55}
+.arrowhead{fill:var(--muted)}.marks{font-size:10.5px}.audit{stroke:var(--box);stroke-width:2}.auditn{font-size:10px;font-weight:700;fill:#fff}
+a{color:inherit}svg a .box{cursor:pointer}
+
+:root{--c0:#2a78d6;--c1:#eb6834;--c2:#1baf7a;--c3:#eda100;--c4:#e87ba4;--c5:#008300;--c6:#6250d6;--c7:#e34948;
+--cx:#8a8985;--main:#52514e;--read:#dcdbd5;--readfg:#1d1d1f}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--c0:#3987e5;--c1:#d95926;--c2:#199e70;
+--c3:#c98500;--c4:#d55181;--c5:#008300;--c6:#9085e9;--c7:#e66767;--cx:#77766f;--main:#c3c2b7;--read:#3b3b40;
+--readfg:#ececf0}}
+:root[data-theme="dark"]{--c0:#3987e5;--c1:#d95926;--c2:#199e70;--c3:#c98500;--c4:#d55181;--c5:#008300;
+--c6:#9085e9;--c7:#e66767;--cx:#77766f;--main:#c3c2b7;--read:#3b3b40;--readfg:#ececf0}
+.c0{fill:var(--c0);background:var(--c0)}.c1{fill:var(--c1);background:var(--c1)}.c2{fill:var(--c2);background:var(--c2)}
+.c3{fill:var(--c3);background:var(--c3)}.c4{fill:var(--c4);background:var(--c4)}.c5{fill:var(--c5);background:var(--c5)}
+.c6{fill:var(--c6);background:var(--c6)}.c7{fill:var(--c7);background:var(--c7)}.cx{fill:var(--cx);background:var(--cx)}
+.cmain{fill:var(--main)}.sc0{stroke:var(--c0)}.sc1{stroke:var(--c1)}.sc2{stroke:var(--c2)}
+.tl text,.sm text,.lc text{font-size:10.5px;fill:var(--muted)}.tl .lbl-in,.sm .lbl-in{fill:#fff;font-size:10.5px;font-weight:600}
+.tl .rowl,.sm .rowl,.lc .rowl{fill:var(--fg);font-size:11.5px;font-weight:600}.tl .band{fill:var(--rowp)}
+.tl .brk{stroke:var(--muted);stroke-dasharray:2 3}.tl a:hover rect,.sm a:hover rect{stroke:var(--fg);stroke-width:1.5}
+.axis{stroke:var(--line)}.sm .val{fill:var(--fg);font-weight:600}.lc path.ln{fill:none;stroke-width:2}
+.lc circle{stroke:var(--bg);stroke-width:2}.lc .end{font-weight:600;fill:var(--fg)}
+.tiles{display:flex;flex-wrap:wrap;gap:10px;margin:12px 0}.tile{border:1px solid var(--line);border-radius:8px;
+padding:8px 12px;min-width:110px;background:var(--box)}.tile b{display:block;font-size:20px;line-height:1.2}
+.tile span{font-size:12px;color:var(--muted)}.tile i{font-style:normal;font-size:12px;margin-left:6px}
+.fm{border-collapse:separate;border-spacing:2px}.fm td,.fm th{border:0;padding:0;text-align:center;font-size:11px}
+.fm th{padding:0 2px;font-weight:600}.fm td.f,.fm th.f{text-align:left;padding-right:10px;white-space:nowrap;
+position:sticky;left:0;background:var(--bg);font:11.5px ui-monospace,Menlo,monospace;
+max-width:380px;overflow:hidden;text-overflow:ellipsis}
+.fm td.cell{min-width:22px;height:20px;border-radius:3px}.fm td.fw{background:var(--c0);color:#fff;font-weight:700}
+.fm td.fe{background:var(--c1);color:#fff;font-weight:700}.fm td.fr{background:var(--read);color:var(--readfg)}
+.fm td.n{color:var(--muted);padding:0 6px}.fm tr.grp td{text-align:left;padding-top:8px;color:var(--muted);
+font-weight:600}
+.key{display:inline-block;min-width:18px;text-align:center;border-radius:3px;font-size:11px;margin-right:4px}
+.bar{display:inline-block;height:9px;border-radius:2px;vertical-align:0}
+
+pre{white-space:pre-wrap;word-break:break-word;background:var(--box);border:1px solid var(--line);border-radius:6px;
+padding:8px 10px;margin:4px 0;font:12px/1.45 ui-monospace,SFMono-Regular,Menlo,monospace;max-width:100%;overflow:auto}
+.step{border-top:1px solid var(--line);padding:6px 0}.step:target{background:var(--rowp)}
+.sid{font:12px ui-monospace,Menlo,monospace;color:var(--muted);margin-right:8px}.kind{font-weight:600;margin-right:8px}
+.err{color:var(--bad);font-weight:600}.hook{color:var(--bad);margin:4px 0 0 16px}.lbl{font-size:12px;color:var(--muted);margin-top:6px}
+details summary{cursor:pointer;color:var(--muted);font-size:12px}.head td:first-child{color:var(--muted)}
+.top{font-size:13px}.narr{list-style:none;padding-left:0}.narr li{margin:3px 0}
+</style></head>
+<body>
+<p class="top"><a href="../flow.html">← the run's flow chart</a></p>
+
+<h1>T01 · turn · /dev-team:idea-refine I want to start a personal quant research platform for market research on US e</h1>
+<table class="head"><tr><td>Type</td><td>turn</td></tr><tr><td>Description</td><td>/dev-team:idea-refine I want to start a personal quant research platform for market research on US e</td></tr><tr><td>Spawned by</td><td>user</td></tr><tr><td>Model</td><td>claude-opus-5-5</td></tr><tr><td>Start</td><td>2026-10-18 19:20:01 UTC</td></tr><tr><td>Duration</td><td>1 min</td></tr><tr><td>Tool calls</td><td>5</td></tr><tr><td>Errors</td><td>0</td></tr><tr><td>Hook blocks</td><td>0</td></tr><tr><td>Tokens</td><td>3.9k out · 30.4k new in · 227k cached in · peak context 53.1k</td></tr><tr><td>Skills invoked</td><td>none</td></tr><tr><td>Files written or edited</td><td>none</td></tr><tr><td>Definition</td><td>none</td></tr><tr><td>Steps</td><td>8</td></tr><tr><td>Finished</td><td>yes</td></tr></table>
+
+
+<h2>Prompt</h2>
+<pre>/dev-team:idea-refine I want to start a personal quant research platform for market research on US equities, built in stages. Let&#x27;s refine the idea and plan it until it&#x27;s ready to build.
+
+I&#x27;m starting with just the first piece: Stage 1 — Data: a reliable daily US equity dataset and loader (prices, returns, corporate actions, point-in-time universe), from my Sharadar subscription and cross-checked against Yahoo Finance through yahooquery, with scripts to download, clean, validate, and store it, plus basic exploratory analysis, and a data-viz app to explore it: a TypeScript + React browser frontend over a Python backend (HTTP and WebSocket).</pre>
+<h2>Files</h2>
+<table><tr><th>Op</th><th>File</th><th>Calls</th><th>By</th><th>Via</th><th>Steps</th></tr><tr><td>read</td><td><code>~/.claude/projects/-Users-connorott-plugins-dev-team-workspace-iteration-10-quant-incremental-with-skill-project/036aa980-2727-49d4-baed-0fd76853b5f9/tool-results/b3tka6s29.txt</code></td><td>1</td><td>main</td><td>Read</td><td><a href="#D5">D5</a></td></tr><tr><td>read</td><td><code>../plugin/dev-team/skills/idea-refine/references/examples-data.md</code></td><td>1</td><td>main</td><td>Bash</td><td><a href="#D4">D4</a></td></tr><tr><td>read</td><td><code>../plugin/dev-team/skills/idea-refine/references/examples-new.md</code></td><td>1</td><td>main</td><td>Bash</td><td><a href="#D4">D4</a></td></tr><tr><td>read</td><td><code>../plugin/dev-team/skills/idea-refine/references/ideation.md</code></td><td>1</td><td>main</td><td>Bash</td><td><a href="#D4">D4</a></td></tr><tr><td>read</td><td><code>../plugin/dev-team/skills/idea-refine/references/new.md</code></td><td>1</td><td>main</td><td>Bash</td><td><a href="#D4">D4</a></td></tr><tr><td>read</td><td><code>../plugin/dev-team/skills/idea-refine/references/refinement-criteria.md</code></td><td>1</td><td>main</td><td>Bash</td><td><a href="#D4">D4</a></td></tr><tr><td>read</td><td><code>../plugin/dev-team/skills/idea-refine/references/requests.md</code></td><td>1</td><td>main</td><td>Bash</td><td><a href="#D4">D4</a></td></tr><tr><td>read</td><td><code>../plugin/dev-team/skills/idea-refine/references/roadmap.md</code></td><td>1</td><td>main</td><td>Bash</td><td><a href="#D4">D4</a></td></tr></table>
+<h2>Steps</h2>
+<div class="step" id="SD1"><span class="sid">D1</span><span class="kind">command</span>USER TYPED `/dev-team:idea-refine I want to start a personal quant research platform for market research on US equities, built in stages. Let&#x27;s refine the idea and plan it until it&#x27;s ready to build.
+
+I&#x27;m starting with just the first piece: Stage 1 — Data: a reliable daily US equity dataset and loader (prices, returns, corporate actions, point-in-time universe), from my Sharadar subscription and cross-checked against Yahoo Finance through yahooquery, with scripts to download, clean, validate, and store it, plus basic exploratory analysis, and a data-viz app to explore it: a TypeScript + React browser frontend over a Python backend (HTTP and WebSocket).`</div><div class="step" id="SD2"><span class="sid">D2</span><span class="kind">skill-body</span>skill loaded from `/Users/connorott/plugins/dev-team-workspace/iteration-10/quant-incremental/with_skill/plugin/dev-team/skills/idea-refine`</div><div class="step" id="SD3"><span class="sid">D3</span><span class="kind">Bash</span>python3 ../plugin/dev-team/scripts/dt.py status --skill idea-refine; ls -R | head -50; ls ../plugin/dev-team/skills/idea-refine/references<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;python3 ../plugin/dev-team/scripts/dt.py status --skill idea-refine; ls -R | head -50; ls ../plugin/dev-team/skills/idea-refine/references&quot;,
+  &quot;description&quot;: &quot;Check project status and skill references&quot;
+}</pre><div class="lbl">output</div><pre>skill: idea-refine
+mode: new
+docs: brief missing · spec missing · architecture missing · roadmap missing · plan missing · constraints missing
+next ids: AD-01 PL-01 TC-01 M1
+references_unindexed: none
+references_changed: none
+references_missing: none
+brief_words: 0
+brief_goals: 0
+ideas: none
+roadmap_rows: none
+references_unassigned: none
+requests_open: none
+examples-data.md
+examples-extend.md
+examples-ml.md
+examples-new.md
+examples-process.md
+extend.md
+frameworks.md
+ideation.md
+new.md
+refinement-criteria.md
+requests.md
+roadmap.md</pre></details></div><div class="step" id="SD4"><span class="sid">D4</span><span class="kind">Bash</span>cd /Users/connorott/plugins/dev-team-workspace/iteration-10/quant-incremental/with_skill/plugin/dev-team/skills/idea-refine/references &amp;&amp; cat new.md requests.md roadmap.md ideation.md refinement-criteria.md examples-data.md examples-new.md<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;cd /Users/connorott/plugins/dev-team-workspace/iteration-10/quant-incremental/with_skill/plugin/dev-team/skills/idea-refine/references &amp;&amp; cat new.md requests.md roadmap.md ideation.md refinement-criteria.md examples-data.md examples-new.md&quot;,
+  &quot;description&quot;: &quot;Read New mode and supporting references&quot;
+}</pre><div class="lbl">output</div><pre>&lt;persisted-output&gt;
+Output too large (37.1KB). Full output saved to: /Users/connorott/.claude/projects/-Users-connorott-plugins-dev-team-workspace-iteration-10-quant-incremental-with-skill-project/036aa980-2727-49d4-baed-0fd76853b5f9/tool-results/b3tka6s29.txt
+
+Preview (first 2KB):
+# New mode: the brief
+
+No `docs/brief.md` yet. Examples: `examples-new.md` (all phases), `examples-process.md` (a non-product idea), `examples-data.md` (a data-dependent brief).
+
+1. **Phases 1-2** per `ideation.md`.
+2. **Phase 3: write the brief** from the template below. Check the word count (`wc -w docs/brief.md`) before presenting it.
+3. **Stages** per `roadmap.md`: one per outcome the user agreed in conversation, Source `brief`. If only the first is known, add just that one.
+
+## The brief
+
+Write `docs/brief.md` (create `docs/` if needed) from this template. The brief answers **why**, not **how** or **what exactly** — no requirements lists, no tech choices, no screens.
+
+```markdown
+# [Project Name]
+
+**Status:** Draft · **Last updated:** YYYY-MM-DD
+
+## The problem
+[2-4 sentences. Who has the problem, what it costs them today, and why it matters now.]
+
+## Who it&#x27;s for
+[The specific people this serves. Name a primary user; mention a secondary one only if it matters.]
+
+## Goals
+1. [An outcome for the user, not a feature — &quot;Regulars can reorder in under 30 seconds&quot;]
+2. [...]
+3. [...]
+
+## Constraints
+- [Real limits: deadline, budget, team, existing systems, rules or regulations]
+
+## What success looks like
+- [Observable signs it worked — numbers where you have them]
+
+## What we&#x27;re betting on
+- [The 2-3 assumptions that must be true, in plain words]
+
+## Not doing
+- [Tempting thing we&#x27;re deliberately leaving out] — [one-line reason]
+
+## Open questions
+- [Only questions that could change the direction. Omit the section if none.]
+```
+
+**Writing rules — the brief must pass all of these:**
+
+- **One page or less.** Aim for 250-450 words. If it&#x27;s longer, cut — don&#x27;t shrink the font.
+- **Plain English.** Write for a smart person outside the team. No acronyms without a definition, no jargon, no code, no file paths.
+- **Short sentences, short bullets.** One idea per bullet. No bullet longer than two lines.
+...
+&lt;/persisted-output&gt;
+Shell cwd was reset to /Users/connorott/plugins/dev-team-workspace/iteration-10/quant-incremental/with_skill/project</pre></details></div><div class="step" id="SD5"><span class="sid">D5</span><span class="kind">Read</span>/Users/connorott/.claude/projects/-Users-connorott-plugins-dev-team-workspace-iteration-10-quant-incremental-with-skill-project/036aa980-2727-49d4-baed-0fd76853b5f9/tool-results/b3tka6s29.txt<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;file_path&quot;: &quot;/Users/connorott/.claude/projects/-Users-connorott-plugins-dev-team-workspace-iteration-10-quant-incremental-with-skill-project/036aa980-2727-49d4-baed-0fd76853b5f9/tool-results/b3tka6s29.txt&quot;
+}</pre><div class="lbl">output</div><pre>1	# New mode: the brief
+2	
+3	No `docs/brief.md` yet. Examples: `examples-new.md` (all phases), `examples-process.md` (a non-product idea), `examples-data.md` (a data-dependent brief).
+4	
+5	1. **Phases 1-2** per `ideation.md`.
+6	2. **Phase 3: write the brief** from the template below. Check the word count (`wc -w docs/brief.md`) before presenting it.
+7	3. **Stages** per `roadmap.md`: one per outcome the user agreed in conversation, Source `brief`. If only the first is known, add just that one.
+8	
+9	## The brief
+10	
+11	Write `docs/brief.md` (create `docs/` if needed) from this template. The brief answers **why**, not **how** or **what exactly** — no requirements lists, no tech choices, no screens.
+12	
+13	```markdown
+14	# [Project Name]
+15	
+16	**Status:** Draft · **Last updated:** YYYY-MM-DD
+17	
+18	## The problem
+19	[2-4 sentences. Who has the problem, what it costs them today, and why it matters now.]
+20	
+21	## Who it&#x27;s for
+22	[The specific people this serves. Name a primary user; mention a secondary one only if it matters.]
+23	
+24	## Goals
+25	1. [An outcome for the user, not a feature — &quot;Regulars can reorder in under 30 seconds&quot;]
+26	2. [...]
+27	3. [...]
+28	
+29	## Constraints
+30	- [Real limits: deadline, budget, team, existing systems, rules or regulations]
+31	
+32	## What success looks like
+33	- [Observable signs it worked — numbers where you have them]
+34	
+35	## What we&#x27;re betting on
+36	- [The 2-3 assumptions that must be true, in plain words]
+37	
+38	## Not doing
+39	- [Tempting thing we&#x27;re deliberately leaving out] — [one-line reason]
+40	
+41	## Open questions
+42	- [Only questions that could change the direction. Omit the section if none.]
+43	```
+44	
+45	**Writing rules — the brief must pass all of these:**
+46	
+47	- **One page or less.** Aim for 250-450 words. If it&#x27;s longer, cut — don&#x27;t shrink the font.
+48	- **Plain English.** Write for a smart person outside the team. No acronyms without a definition, no jargon, no code, no file paths.
+49	- **Short sentences, short bullets.** One idea per bullet. No bullet longer than two lines.
+50	- **Data needs, not data vendors.** For ML and data projects, say what data the project depends on in plain terms (&quot;10 years of hourly meter readings, including meters since decommissioned&quot;) as a constraint or a bet. Name a specific source only if it&#x27;s fixed (our own data, a required benchmark). Choosing APIs and datasets happens in the architecture, after the spec.
+51	- **Goals are numbered** so `spec-writing` can trace requirements back to them (&quot;serves Goal 2&quot;).
+52	- **3-5 goals, project-level and stage-neutral.** A goal is an outcome of the whole project (&quot;Forecast errors we can trust&quot;), never a stage (&quot;Stage 2: the seasonal fit works&quot;). If the user describes the project in stages, the stages become roadmap stage rows (`roadmap.md`), and every goal stays true whichever stage is being built. More than five goals means the project isn&#x27;t focused yet — go back to Phase 2.
+53	- **The Not Doing list is mandatory.** It is the most valuable part: it makes trade-offs explicit.
+54	# The user&#x27;s words: `docs/requests.md`
+55	
+56	Every planning skill follows this. The brief and the spec compress, and the next skill often runs in a fresh session that sees only the docs. `docs/requests.md` keeps what the user actually said, word for word, so the skill whose doc must honour it can. `dt request` writes every line; never edit the file by hand.
+57	
+58	## What goes in
+59	
+60	One request (`UR-NN`) per concrete statement you could check a doc against:
+61	
+62	- facts about the domain, the data or the world (&quot;the tank is circular&quot;), numbers, limits, deadlines, budgets
+63	- tools, libraries, vendors, protocols and data sources the user names (&quot;stream prices over a WebSocket&quot;, &quot;use yahooquery&quot;)
+64	- choices: an option picked from yours (&quot;Go with A&quot;), and the answer to any question a skill asked
+65	- a block acceptance (&quot;assumptions 1–7 are fine&quot;): one request, its `--about` listing what was accepted
+66	- scope: what must be in, or left out
+67	
+68	Not: approval of a whole doc (&quot;approved&quot;, &quot;looks good&quot;), wishes with nothing to check (&quot;make it nice&quot;), your own proposals the user hasn&#x27;t picked, or words already recorded (`dt request` lists them).
+69	
+70	## Recording
+71	
+72	As you hear it, before you write any doc:
+73	
+74	```
+75	dt request add &lt;owner&gt; &quot;&lt;their words&gt;&quot; --skill &lt;this skill&gt; [--about &quot;&lt;what it answers&gt;&quot;] [--replaces UR-NN]
+76	```
+77	
+78	- **Verbatim.** Quote the shortest span of their message that carries the fact. Never paraphrase, translate, correct or merge. A message stating three facts is three requests.
+79	- **`--about`** whenever the words don&#x27;t stand alone: &quot;Go with A&quot; → `--about &quot;AD-22 price source: A = Sharadar, B = yfinance&quot;`; &quot;yes, 3&quot; → what was asked. A bare letter means nothing to the next session, and the same words can pick opposite options in two rounds.
+80	- **Owner** is the doc that must honour it: `brief` (who the user is, their time, budget or experience: context no later doc carries), `spec` (behaviour, numbers, scope the user can observe), `architecture` (tools, libraries, vendors, protocols, data sources, an option for a decision), `pipelines`, `tests`, `plan`, or `constraints` (the quality bar, tooling rules).
+81	- **The user changes their mind:** record the new words with `--replaces` the old UR. A line is never edited or deleted.
+82	- The request that started the run is the user&#x27;s first message: record it too.
+83	
+84	## Honouring
+85	
+86	Before you write your doc, read `docs/requests.md` whole; `requests_open` in `dt status` lists the open requests your doc owns. For each:
+87	
+88	- **Honour it:** write the requirement, decision, step, case or rule that does what the words say, then `dt request trace UR-NN &lt;ID&gt;…` with the IDs that do it (spec: requirement IDs; architecture: `AD-NN` or a contract ID; the others: their IDs). Honoured by a section with no ID (Out of scope, Assumptions, Constraints): trace its heading, `§Out of scope`.
+89	- **Does what the words say** means the same shape, count, number, tool and goal, and for a named method or concept its mechanism, not its name: &quot;self-play&quot; is training against the opponent&#x27;s past versions, not two learners at once. A number the words state must appear in the traced text (`request-number` warns).
+90	- **Or change it, with the user&#x27;s yes:** when it conflicts with another request or can&#x27;t be met, say so at your gate with your alternative. Only after the user agrees, write the change into every ID it touches, the ones that honoured the old words included (a test case restating the old value too), then `dt request change UR-NN &quot;&lt;what instead&gt;&quot; --approved &quot;&lt;their words&gt;&quot; --skill &lt;this skill&gt; --into &lt;those IDs&gt;`. A doc that cites the request from another ID gets `request-cite`: bring it in line and add it with `dt request change UR-NN --into &lt;ID&gt;`. Never override a request silently, and never record an approval the user didn&#x27;t give. Headless: leave it open under Open questions and the doc Draft.
+91	- **A value from the user&#x27;s words** (a golden case&#x27;s expected output, a limit) cites the request as its Source: `**Source:** UR-04`. A number worked out from their words is not theirs; its Source says how it was derived (`request-source` warns).
+92	- A request another doc owns waits for that doc&#x27;s skill. Don&#x27;t copy it into yours (the spec names no tools, even when a request does).
+93	
+94	## At the gate
+95	
+96	Before asking for approval, `dt request --open --owner &lt;yours&gt;` is empty, except requests whose change you are asking the user about. The summary lists them in one line:
+97	
+98	&gt; **Your words:** &quot;circular tank&quot; UR-01 → TANK-02 &quot;the tank is a circle&quot;; &quot;use yahooquery&quot; UR-03 → AD-04 &quot;yahooquery&quot;; change proposed: UR-05 one predator → two (yes?); open: none.
+99	
+100	Quote the words and the traced text side by side, so the user sees whether one does the other.
+101	
+102	Once the spec or architecture is Approved, `dt lint` fails it for every open request it owns, and `dt next` sends the run back to its skill.
+103	# Roadmap stages
+104	
+105	Read when proposing stages at the Review Gate and when adding them on acceptance; the mode file says which stages to propose. An example: `examples-data.md`.
+106	
+107	Stages live in `docs/roadmap.md`. A stage is an outcome the user agreed: what they can do when it&#x27;s done, such as &quot;Data + stats&quot; or &quot;See my spending&quot;. It is coarse and unsized. **Don&#x27;t size it:** no task estimates, no pipeline counts, no splitting a stage because it looks big. Two stages differ by outcome, never by size. Once a stage&#x27;s pipelines are approved, `build-planning` cuts it into build-sized milestones (`M&lt;n&gt;`), each a vertical slice it can run end to end, and owns those rows.
+108	
+109	**Add stages only when the user accepts** (Phase 4). Each stage takes its ID from `dt next-id S` (`dt` as defined in `../SKILL.md`), a short name, and its Source. Leave the Status* cell empty, then run `dt roadmap`, which fills it. Under the tables, add a `## S&lt;n&gt;: &lt;Name&gt;` section with one plain-English `**Outline:**` line (what the user can do when the stage is done) and one `**Skills:**` line.
+110	
+111	**Stage skills and references.** The `**Skills:**` line is the one record of which skills serve a stage; later skills start from it and `build-planning` checks each one lands on a milestone and then a task. Propose the skills whose descriptions fit the stage (project `.claude/skills/*/SKILL.md` and the installed skills in your context), and ask once: &quot;Route profile-report and significance-check to S2? [yes / edit]&quot;. None fit → `**Skills:** —`. Also offer each `references_unassigned` entry that serves the stage (&quot;RF-02 and RF-03 (boosting) → S3? [yes / edit]&quot;). On acceptance, write the line and set `**Milestones:**` on each RF entry the user assigned to the stage ID (`—` becomes `S3`; otherwise append). Those two fields are all you write in the roadmap sections and `docs/references.md`.
+112	
+113	If `docs/roadmap.md` doesn&#x27;t exist, create it:
+114	
+115	```markdown
+116	# [Project Name] — Roadmap
+117	
+118	**Last updated:** YYYY-MM-DD
+119	
+120	| Stage | Name | Source | Status* |
+121	|---|---|---|---|
+122	| S1 | [Name] | brief | |
+123	
+124	*Written by `dt roadmap` from doc statuses and todo checkboxes; never hand-edited.
+125	
+126	## S1: [Name]
+127	**Outline:** [What the user can do when this stage is done, in one sentence.]
+128	**Skills:** [skill names routed to this stage, comma-separated, or —]
+129	```
+130	
+131	Add stages; never renumber, reorder or edit existing ones. A roadmap from before stages has only a milestone table (with a Source column): add the stage table above it for the first new stage, and leave the old rows as they are.
+132	# Ideation: understand, expand, converge
+133	
+134	Phases 1 and 2 of every run, New and Extend alike. The mode file says what to read before Phase 1 and what Phase 2 must also settle. Throughout, record the user&#x27;s words as `requests.md` says: their first message, each answer, each direction they pick.
+135	
+136	## Phase 1: Understand &amp; expand
+137	
+138	1. **Restate the idea** as a &quot;How Might We&quot; problem statement.
+139	2. **Ask 3-5 sharpening questions**, no more, with `AskUserQuestion`: who it&#x27;s for, what success looks like, real constraints, what&#x27;s been tried, why now. Don&#x27;t proceed until you know who it&#x27;s for and what success looks like.
+140	3. **Generate 5-8 variations**, each with a one-line reason it exists. Lenses: inversion, constraint removal, audience shift, combination, simplification, 10x version, expert lens. `frameworks.md` has more; pick what fits.
+141	
+142	In a codebase, ground variations in what exists and cite files. Read `docs/references.md` too; an idea cites a reference as prior art by `RF-NN`, never its path.
+143	
+144	## Phase 2: Evaluate &amp; converge
+145	
+146	1. **Cluster** what resonated into 2-3 meaningfully different directions.
+147	2. **Stress-test** each: user value (painkiller or vitamin?), feasibility (cost, hardest part), differentiation (would someone switch?), and for ML and data projects, data: does usable data exist, can we use it, what&#x27;s the non-ML baseline? &quot;No usable data&quot; is a feasibility failure, not an open question. Rubric: `refinement-criteria.md`.
+148	3. **Surface hidden assumptions:** what you&#x27;re betting is true, what could kill it, what you&#x27;re ignoring for now.
+149	4. **Get a decision** on a direction before writing anything.
+150	# Refinement &amp; Evaluation Criteria
+151	
+152	Use this rubric during Phase 2 (Evaluate &amp; Converge) to stress-test idea directions. Not every criterion applies to every idea — use judgment about which dimensions matter most for the specific context.
+153	
+154	## Core Evaluation Dimensions
+155	
+156	### 1. User Value
+157	
+158	The most important dimension. If the value isn&#x27;t clear, nothing else matters.
+159	
+160	**Painkiller vs. Vitamin:**
+161	- **Painkiller:** Solves an acute, frequent problem. Users will actively seek this out. They&#x27;ll switch from their current solution. Signs: people describe the problem with emotion, they&#x27;ve built workarounds, they&#x27;ll pay for a solution.
+162	- **Vitamin:** Nice to have. Makes something marginally better. Users won&#x27;t go out of their way. Signs: people nod politely, say &quot;that&#x27;s cool,&quot; then don&#x27;t change behavior.
+163	
+164	**Questions to ask:**
+165	- Can you name 3 specific people who have this problem right now?
+166	- What are they doing today instead? (The real competitor is always the current workaround.)
+167	- Would they switch from their current approach? What would make them switch?
+168	- How often do they encounter this problem? (Daily problems &gt; monthly problems)
+169	- Is this a &quot;pull&quot; problem (users are asking for this) or a &quot;push&quot; problem (you think they should want this)?
+170	
+171	**Red flags:**
+172	- &quot;Everyone could use this&quot; — if you can&#x27;t name a specific user, the value isn&#x27;t clear
+173	- &quot;It&#x27;s like X but better&quot; — marginal improvements rarely drive adoption
+174	- The problem is real but rare — high intensity but low frequency rarely justifies a product
+175	
+176	### 2. Feasibility
+177	
+178	Can you actually build this? Not just technically, but practically.
+179	
+180	**Technical feasibility:**
+181	- Does the core technology exist and work reliably?
+182	- What&#x27;s the hardest technical problem? Is it a known-hard problem or a novel one?
+183	- Are there dependencies on third parties, APIs, or data sources you don&#x27;t control?
+184	- What&#x27;s the minimum technical stack needed? (If the answer is &quot;a lot,&quot; that&#x27;s a signal.)
+185	
+186	**Resource feasibility:**
+187	- What&#x27;s the minimum team/effort to build an MVP?
+188	- Does it require specialized expertise you don&#x27;t have?
+189	- Are there regulatory, legal, or compliance requirements?
+190	
+191	**Time-to-value:**
+192	- How quickly can you get something in front of users?
+193	- Is there a version that delivers value in days/weeks, not months?
+194	- What&#x27;s the critical path? What has to happen first?
+195	
+196	**Red flags:**
+197	- &quot;We just need to solve [very hard research problem] first&quot;
+198	- Multiple dependencies that all need to work simultaneously
+199	- MVP still requires months of work — likely not minimal enough
+200	
+201	### 3. Differentiation
+202	
+203	What makes this genuinely different? Not better — *different*.
+204	
+205	**Questions to ask:**
+206	- If a user described this to a friend, what would they say? Is that description compelling?
+207	- What&#x27;s the one thing this does that nothing else does? (If you can&#x27;t name one, that&#x27;s a problem.)
+208	- Is this differentiation durable? Can a competitor copy it in a week?
+209	- Is the difference something users actually care about, or just something builders find interesting?
+210	
+211	**Types of differentiation (strongest to weakest):**
+212	1. **New capability:** Does something that was previously impossible
+213	2. **10x improvement:** So much better on a key dimension that it changes behavior
+214	3. **New audience:** Brings an existing capability to people who were excluded
+215	4. **New context:** Works in a situation where existing solutions fail
+216	5. **Better UX:** Same capability, dramatically simpler experience
+217	6. **Cheaper:** Same thing, lower cost (weakest — easily competed away)
+218	
+219	**Red flags:**
+220	- Differentiation is entirely about technology, not user experience
+221	- &quot;We&#x27;re faster/cheaper/prettier&quot; without a structural reason why
+222	- The feature that differentiates is not the feature users care most about
+223	
+224	**Internal tools, research code, and personal projects:** &quot;would someone switch?&quot; becomes &quot;is this better than the notebook/spreadsheet/script we use today?&quot; For forecasting work, differentiation is the accuracy gain itself — and the question is whether it survives held-out data and inputs known at forecast time, not whether it&#x27;s novel.
+225	
+226	### 4. Data &amp; ML Feasibility
+227	
+228	Apply this when the idea depends on data or a learned model. For these projects it is often the dimension that decides everything — a great idea with no usable data is not feasible.
+229	
+230	**Do we need ML at all?**
+231	- What&#x27;s the simplest non-ML baseline (a rule, a threshold, a heuristic, a linear model)? How good is it?
+232	- How much better than the baseline does the model need to be to matter? If nobody can say, the value isn&#x27;t clear.
+233	- What does a wrong prediction cost, and who catches it?
+234	
+235	**Does the data exist?**
+236	- Where would the data come from — data we own, a public dataset, a paid API? (Name candidates to test feasibility, checked from their public docs and pricing pages only; the final choice is made in the architecture. A risk that could kill the idea and that the docs can&#x27;t settle goes under Open questions, for the architecture to probe.)
+237	- Is there enough history and coverage (time span, entities, classes, regions)?
+238	- For supervised learning: are there labels? Who made them, and would two people agree?
+239	- Can we legally use it for this purpose? Licensing, terms of service, personal or patient data?
+240	- What does it cost, now and at the scale we&#x27;d need?
+241	
+242	**Is the data trustworthy for this use?**
+243	- **Leakage / look-ahead:** would the model or its evaluation see anything that wasn&#x27;t known at decision time?
+244	- **Selection bias:** does the data quietly drop the failures (decommissioned meters, churned users, failed runs)?
+245	- **Drift:** is the past a good guide to the future here? How fast does it go stale?
+246	- **Point-in-time:** for time series especially, can we reconstruct what was known *at each time*, including later corrections?
+247	
+248	**Can we tell if it works?**
+249	- What metric, on what held-out data, compared to what baseline?
+250	- Can it be tested before it&#x27;s trusted — offline evaluation, replay on history, shadow mode, human review?
+251	
+252	**Red flags:**
+253	- &quot;We&#x27;ll figure out the data later&quot; — for ML, the data *is* the project
+254	- No baseline, so any result looks like success
+255	- Labels that nobody has checked for consistency
+256	- Offline results that look too good (usually leakage, look-ahead, or unrealistic costs)
+257	- Data you can&#x27;t legally use for this purpose, or that costs more than the project&#x27;s budget
+258	
+259	## Assumption Audit
+260	
+261	For every idea direction, explicitly list assumptions in three categories:
+262	
+263	### Must Be True (Dealbreakers)
+264	Assumptions that, if wrong, kill the idea entirely. These need validation before building.
+265	
+266	Example: &quot;Users will share their data with us&quot; — if they won&#x27;t, the entire product doesn&#x27;t work.
+267	
+268	### Should Be True (Important)
+269	Assumptions that significantly impact success but don&#x27;t kill the idea. You can adjust the approach if these are wrong.
+270	
+271	Example: &quot;Users prefer self-serve over talking to a person&quot; — if wrong, you need a different go-to-market, but the core product can still work.
+272	
+273	### Might Be True (Nice to Have)
+274	Assumptions about secondary features or optimizations. Don&#x27;t validate these until the core is proven.
+275	
+276	Example: &quot;Users will want to share their results with teammates&quot; — a growth feature, not a core value proposition.
+277	
+278	## Decision Framework
+279	
+280	When choosing between directions, rank on this matrix:
+281	
+282	|                    | High Feasibility | Low Feasibility |
+283	|--------------------|-------------------|-----------------|
+284	| **High Value**     | Do this first     | Worth the risk   |
+285	| **Low Value**      | Only if trivial   | Don&#x27;t do this    |
+286	
+287	Then use differentiation as the tiebreaker between options in the same quadrant.
+288	
+289	## MVP Scoping Principles
+290	
+291	When defining MVP scope for the chosen direction:
+292	
+293	1. **One job, done well.** The MVP should nail exactly one user job. Not three jobs done partially.
+294	2. **The riskiest assumption first.** The MVP&#x27;s primary purpose is to test the assumption most likely to be wrong.
+295	3. **Time-box, not feature-list.** &quot;What can we build and test in [timeframe]?&quot; is better than &quot;What features do we need?&quot;
+296	4. **The &#x27;Not Doing&#x27; list is mandatory.** Explicitly name what you&#x27;re cutting and why. This prevents scope creep and forces honest prioritization.
+297	5. **If it&#x27;s not embarrassing, you waited too long.** The first version should feel incomplete to the builder. If it doesn&#x27;t, you over-built.
+298	# Example: a demand-forecasting package
+299	
+300	A data-dependent New project with its first roadmap stages, then a later idea routing stage skills and references.
+301	
+302	## GridLoad (New Project, Data-Dependent)
+303	
+304	**User invokes:** `/ideate a Python package for forecasting our utility&#x27;s electricity demand — I keep rewriting the same notebook code`
+305	
+306	### Phase 1: Understand &amp; Expand
+307	
+308	**Skill response:**
+309	
+310	&gt; **How might we** get from a forecast idea to an evaluation we can actually trust, without rebuilding the data and scoring plumbing every time?
+311	
+312	Before expanding:
+313	
+314	1. **Who uses it?** Just you, or a small team that needs to compare each other&#x27;s results?
+315	2. **What horizon and resolution?** Day-ahead? Hourly? By region?
+316	3. **What data do you have today, and what&#x27;s the budget?** Free sources, an existing subscription, or room to pay?
+317	4. **Research only, or does this end up feeding operations?**
+318	
+319	**User responds:** &quot;Me and two analysts. Hourly by region, day-ahead is what matters. We have the utility&#x27;s meter export and pull weather from a free public weather API. Budget maybe $100/month. Research only for now.&quot;
+320	
+321	**Skill continues:**
+322	
+323	&quot;Rewriting notebook code&quot; is the symptom. The expensive problem is **not trusting the results**. One-off notebooks are where look-ahead and missing history creep in, and a forecast that only scores well because of a bug is worse than no forecast.
+324	
+325	Here are 5 variations:
+326	
+327	1. **Model Engine First:** A clean training and scoring loop. Forecasts plug in. Data is the user&#x27;s problem.
+328	2. **Data Layer First (Inversion):** Start from trustworthy data, not the engine: a local store of readings and weather as known at any time, with one interface. Any simple model is fine once the data is right.
+329	3. **Simplification — Tabular Only:** No sequence models. A forecast is a function from a region-by-hour feature table to predictions. Fast and enough for day-ahead.
+330	4. **Combination — Notebook Kit:** Keep notebooks, but ship the pieces as a library: data loader, scoring function, standard error report.
+331	5. **10x — Full Platform:** Scheduled data pulls, experiment tracking, and a model registry. Clearly too much for three people.
+332	
+333	### Phase 2: Evaluate &amp; Converge
+334	
+335	**Data feasibility decides this one.** Today&#x27;s readings are easy: they are the utility&#x27;s own export. **Meter history including decommissioned meters** is not: the export lists today&#x27;s registry, so every regional total quietly drops removed meters and past load looks wrong. Scoring with weather actuals where only the forecast was known has the same effect on errors. That&#x27;s the dealbreaker to check first: can both be had within $100/month?
+336	
+337	**Direction (2 + 3): Trustworthy data layer + tabular forecasts.** It attacks the real problem (trust). It fits day-ahead hourly forecasts. Hiding the weather source behind one interface keeps the provider decision open.
+338	
+339	**Direction (1): Model engine.** More flexible training, but none of your forecasts need it yet. Pushing back: this is where these projects usually sink months.
+340	
+341	The user picks (2 + 3).
+342	
+343	### Phase 3: Write the Brief
+344	
+345	```markdown
+346	# GridLoad
+347	
+348	**Status:** Draft · **Last updated:** 2026-10-14
+349	
+350	## The problem
+351	Testing a forecast idea takes about a week of one-off notebook code: pulling readings and weather, cleaning them, and writing the scoring from scratch. Results can&#x27;t be compared across ideas. Worse, subtle mistakes, like using weather that wasn&#x27;t known at forecast time, make forecasts look better than they are.
+352	
+353	## Who it&#x27;s for
+354	A small forecasting team (1-3 people) testing day-ahead hourly demand forecasts for one utility&#x27;s service area.
+355	
+356	## Goals
+357	1. Go from a forecast idea to an evaluation report in under a day.
+358	2. Trust the results: no peeking at weather that wasn&#x27;t forecast yet, and no silently dropping meters that were decommissioned.
+359	3. Compare any two forecasts side by side on the same data and held-out weeks.
+360	4. Change weather providers without rewriting forecasts.
+361	
+362	## Constraints
+363	- Python, running on a laptop.
+364	- Hourly readings by region, one service area only.
+365	- Data budget: free sources to start, under $100/month at most.
+366	
+367	## What success looks like
+368	- Three of our past notebook forecasts re-run in the package, with matching results or explained differences.
+369	- A new forecast takes under a day from idea to report.
+370	
+371	## What we&#x27;re betting on
+372	- Hourly regional data is enough for the forecasts we care about.
+373	- Affordable weather data is good enough for research (not for operations).
+374	- We can get history that includes decommissioned meters, and weather forecasts as issued, within budget. If not, Goal 2 needs rethinking.
+375	
+376	## Not doing
+377	- Feeding the operational forecast — research only.
+378	- Sub-hourly data, single-customer forecasts, or prices.
+379	- A model engine — day-ahead tabular forecasts don&#x27;t need one yet.
+380	- A user interface — notebooks and a command line are enough.
+381	
+382	## Open questions
+383	- Which weather provider? (Decided in the architecture, against the data requirements in the spec.)
+384	```
+385	
+386	*Notice what&#x27;s **not** in the brief: a weather API. The brief records data **needs** (hourly, by region, includes decommissioned meters, forecasts as issued, under budget) as constraints and bets. `spec-writing` turns them into data requirements, and the provider is chosen in the architecture against those requirements.*
+387	
+388	**On acceptance.** In Phase 2 the user agreed to build in two stages: the trustworthy data layer first, then tabular forecasts. The stages are not goals: Goals 1-4 hold whichever stage is being built. The skill sets the brief to Accepted, creates `docs/roadmap.md` with a stage row per stage (IDs from `dt next-id S`), and runs `dt roadmap` to fill Status:
+389	
+390	```markdown
+391	| Stage | Name | Source | Status* |
+392	|---|---|---|---|
+393	| S1 | As-of data | brief | Idea |
+394	| S2 | Tabular forecasts | brief | Idea |
+395	
+396	## S1: As-of data
+397	**Outline:** Load hourly readings and weather as they were known at any time, including meters that were later decommissioned.
+398	**Skills:** —
+399	
+400	## S2: Tabular forecasts
+401	**Outline:** Turn a region-by-hour feature table into a scored day-ahead forecast report, comparable across forecasts.
+402	**Skills:** —
+403	```
+404	
+405	The project has no skills installed yet, so the gate asked &quot;No installed skill fits either stage, so both get `Skills: —`. OK?&quot; and the user said yes.
+406	
+407	Neither stage is sized. S1 may need one milestone or three; that is `build-planning`&#x27;s call once S1&#x27;s pipelines are approved, when it cuts S1 into milestone rows (`M1`, `M2`, …) under a milestone table of its own.
+408	
+409	## Stage Skills and References (GridLoad, Extend Mode)
+410	
+411	**State:** A GridLoad roadmap split differently: stage S1 Ingest &amp; clean, cut into milestone M1. The project has two skills, `profile-report` and `significance-check`. `docs/references.md` indexes RF-01 (seasonal profile, `Milestones: S2`, assigned during intake while S2&#x27;s row was being drafted) and RF-02, RF-03 (holiday calendar and boosting windows, `Milestones: —`).
+412	
+413	```
+414	$ python3 ../../scripts/dt.py status --skill idea-refine
+415	…
+416	references_unindexed: none
+417	references_changed: none
+418	references_missing: none
+419	references_unassigned: RF-02, RF-03
+420	```
+421	
+422	Nothing is waiting for intake. **The idea** is the seasonality-and-baselines stage. The idea file&#x27;s *Recommended direction* cites RF-01 as prior art (&quot;the daily and weekly profile removal in RF-01, fitted per window&quot;), never the path.
+423	
+424	**Gate message (end):**
+425	
+426	&gt; On acceptance I&#x27;ll add stage **S2: Seasonality &amp; baselines** to the roadmap with `**Skills:** profile-report, significance-check`: profile-report for the seasonal decomposition and load profiles, significance-check for the &quot;the profile is real&quot; claims. Route those two? [yes / edit]. RF-02 and RF-03 (boosting) don&#x27;t serve this stage, so they stay unassigned.
+427	
+428	*(Turn ends.)* **User:** &quot;Accepted, yes.&quot; Set the idea file to Accepted and add the stage row and section:
+429	
+430	```markdown
+431	## S2: Seasonality &amp; baselines
+432	**Outline:** Daily and weekly Fourier profile removed; seasonal-naive forecast and equal reserve split as baselines, scored on held-out weeks.
+433	**Skills:** profile-report, significance-check
+434	```
+435	
+436	**Months later, S3 Features &amp; boosting.** `references_unassigned` still lists RF-02 and RF-03. The gate adds &quot;RF-02 (holiday calendar) and RF-03 (boosting windows) look like they serve S3. Assign them? [yes / edit]&quot;. On a yes, both entries&#x27; `**Milestones:** —` becomes `**Milestones:** S3`. The index keeps its Status: the user&#x27;s yes at this gate is the confirmation.
+437	# Example: a new project
+438	
+439	A vague early-stage concept through all three phases to a Draft brief.
+440	
+441	## Vague Early-Stage Concept (Full 3-Phase Session)
+442	
+443	**User invokes:** `/ideate I want to help small local restaurants compete with the big delivery platforms`
+444	
+445	### Phase 1: Understand &amp; Expand
+446	
+447	**Skill response:**
+448	
+449	&gt; **How might we** give independent restaurants the reach and convenience customers expect from delivery platforms, without forcing them into a model that erodes their margins and brand?
+450	
+451	That&#x27;s a big space. Let me sharpen it:
+452	
+453	1. **Which part of &quot;compete&quot;?** Customer acquisition? Delivery logistics? Online ordering UX? Loyalty/retention? Margin pressure from platform fees?
+454	2. **Who are you building for?** The restaurant owner? The diner? Both?
+455	3. **What&#x27;s the constraint?** Are you thinking software? A cooperative model? Something physical?
+456	
+457	**User responds:** &quot;Restaurant owners. The core pain is that they&#x27;re paying 25-30% commission to delivery apps but feel they can&#x27;t opt out because that&#x27;s where the customers are. I&#x27;m thinking software but I&#x27;m open.&quot;
+458	
+459	**Skill continues:**
+460	
+461	So the problem isn&#x27;t delivery logistics — it&#x27;s **customer dependency**. The platforms own the customer relationship, and restaurants are renting access to their own customers at 30% of revenue. That&#x27;s the leverage to break.
+462	
+463	Here are 6 variations:
+464	
+465	1. **Direct Channel Toolkit:** Give restaurants their own branded ordering — web, SMS, maybe a lightweight app — so they can move existing customers off-platform. The core bet: customers who *already know* a restaurant will order direct if it&#x27;s easy enough. You don&#x27;t need to compete with DoorDash for discovery, just for reordering.
+466	
+467	2. **Inversion — Charge the Customer, Not the Restaurant:** What if the delivery fee model flipped? Customers pay a small premium for direct ordering, restaurants pay zero commission. Position it as &quot;support your local spot.&quot; The bet: enough customers care about supporting local businesses to pay $1-2 more per order.
+468	
+469	3. **Constraint Removal — What If Delivery Weren&#x27;t Required?** The platforms bundle discovery + ordering + delivery, but most of their cost (and the restaurant&#x27;s commission) is delivery. What if you only solved ordering and pickup? Pickup-first model. Restaurants keep 100% of revenue, customers save the delivery fee. Works best in dense neighborhoods.
+470	
+471	4. **Combination — Restaurant Collective:** A co-op model where 20-50 local restaurants in an area share a platform, split costs, and cross-promote each other. Individual restaurants can&#x27;t afford marketing — but a neighborhood collective can. Think &quot;local food hall&quot; but digital.
+472	
+473	5. **Audience Shift — For Regular Customers:** Don&#x27;t try to acquire new customers. Build exclusively for a restaurant&#x27;s existing regulars — the people who come in weekly. A loyalty/reorder tool that&#x27;s dead simple: &quot;Your usual?&quot; one-tap reorder. The 80/20 bet: 20% of customers drive 80% of revenue, and those people don&#x27;t need DoorDash to discover the restaurant.
+474	
+475	6. **Expert Lens — What Restaurant Owners Actually Do:** Most small restaurant owners aren&#x27;t looking at dashboards. They&#x27;re in the kitchen. Any tool that requires them to &quot;manage&quot; something will fail. The winning approach might be something that runs itself — auto-texts regulars when they haven&#x27;t ordered in 2 weeks, auto-posts the daily special, auto-handles reorders. Zero restaurant-side effort.
+476	
+477	Variation 5 and 6 together are interesting. Instead of trying to out-platform the platforms, you&#x27;d build something hyper-narrow: a reordering and retention tool for a restaurant&#x27;s best existing customers. No discovery, no delivery, no marketplace. Just &quot;keep your regulars ordering direct.&quot;
+478	
+479	Which directions interest you?
+480	
+481	---
+482	
+483	### Phase 2: Evaluate &amp; Converge
+484	
+485	**User responds:** &quot;I love the regulars angle (5 and 6). The direct channel toolkit (1) feels necessary but boring. The co-op idea (4) is interesting but complex. Let me focus on 1 + 5 + 6 combined.&quot;
+486	
+487	**Skill response:**
+488	
+489	Good instincts. That combination has a clear thesis: **own the relationship with your best customers, make reordering effortless, and require zero effort from the restaurant owner.** Let me stress-test it.
+490	
+491	**Direction A: The &quot;Regulars Engine&quot; (Variations 5 + 6 fused)**
+492	A tool focused entirely on a restaurant&#x27;s existing repeat customers. Auto-reorder, auto-engagement, zero management.
+493	
+494	- **Core bet:** A restaurant&#x27;s top 20% of customers will shift to direct ordering if the experience is frictionless and personal. The restaurant doesn&#x27;t need *new* customers — it needs to stop paying 30% on customers it already has.
+495	- **User value:** High and immediate. Every direct reorder saves the restaurant 25-30% commission. If a regular orders $30/week, that&#x27;s ~$400/year in saved fees per customer. 50 regulars = $20K/year. That&#x27;s real money for a small restaurant.
+496	- **Feasibility:** Medium. The ordering/payment tech is commodity. The hard parts: (a) how do you identify and onboard &quot;regulars&quot; without the restaurant doing manual work? (b) How do you handle the cold start — the first reorder needs an order history that lives on the delivery platform, not with you.
+497	- **Differentiation:** High for the niche. Platforms optimize for marketplace dynamics (new customer discovery, driver logistics). Nobody is optimizing specifically for &quot;keep your regulars ordering direct.&quot; It&#x27;s too small for DoorDash to care about, which is exactly why it&#x27;s a good wedge.
+498	- **Hidden assumptions:**
+499	  - Regulars will install/use yet another ordering method (assumption most likely to be wrong)
+500	  - Restaurant owners will share customer contact info or let you access it
+501	  - Direct ordering won&#x27;t cannibalize dine-in revenue
+502	- **What could kill it:** If customers simply won&#x27;t switch channels. Habit is powerful — even if DoorDash costs more, it&#x27;s already on their phone.
+503	
+504	**Direction B: Direct Channel + Retention Hybrid (Variation 1 + 5)**
+505	Branded ordering for the restaurant *plus* the retention automation. More complete but more complex.
+506	
+507	- **Core bet:** Restaurants need both the channel and the engine that keeps customers on it.
+508	- **User value / feasibility:** Higher ceiling, but two products; the channel alone is a commodity (Square, Toast).
+509	- **Hidden assumption:** Bundling beats partnering (a retention layer on top of Square Online).
+510	- **What could kill it:** Scope.
+511	
+512	**The honest read:** Direction A is the sharper bet. Direction B is safer but less differentiated. The biggest risk for A is the channel-switching problem — getting customers to order through a new method. If you can crack that (and variation 6&#x27;s &quot;zero effort&quot; approach might help — an SMS-based reorder doesn&#x27;t require a new app), the rest follows.
+513	
+514	One thing I want to push back on: you said variation 1 feels &quot;necessary but boring.&quot; That instinct to include the &quot;necessary&quot; thing is how products lose focus. If the regulars engine works, you can add a branded ordering channel later. But if you build the channel first, you&#x27;re just another Square Online competitor.
+515	
+516	---
+517	
+518	### Phase 3: Write the Brief
+519	
+520	**User picks Direction A.** The skill writes `docs/brief.md` as a Draft:
+521	
+522	```markdown
+523	# ReOrder
+524	
+525	**Status:** Draft · **Last updated:** 2026-10-14
+526	
+527	## The problem
+528	Independent restaurants pay delivery apps 25-30% on every order, including orders from their most loyal customers. Those regulars would happily order direct, but there is no easy way for them to do it, so the restaurant pays a fee on relationships it already owns.
+529	
+530	## Who it&#x27;s for
+531	Owners of independent restaurants with a steady base of repeat customers. Secondary: those regular customers.
+532	
+533	## Goals
+534	1. Regulars can reorder their usual meal directly in under 30 seconds.
+535	2. Owners move their best customers off delivery apps without extra daily work.
+536	3. Owners keep the full value of repeat orders.
+537	
+538	## Constraints
+539	- The owner is in the kitchen, not at a computer. Setup must take under 15 minutes.
+540	- Pickup only at first. We have no delivery drivers.
+541	- Must work for customers without installing an app.
+542	
+543	## What success looks like
+544	- 5 pilot restaurants, each with 20 regulars set up.
+545	- At least 30% of those regulars reorder direct within 4 weeks.
+546	
+547	## What we&#x27;re betting on
+548	- Regulars will order by text instead of their usual delivery app.
+549	- Owners know who their regulars are and will share their contact details.
+550	- Saving $8-10 per order is worth 15 minutes of setup.
+551	
+552	## Not doing
+553	- Delivery — expensive and not the core problem.
+554	- Helping restaurants find new customers — that is the delivery apps&#x27; game.
+555	- A branded app or website — Square and Toast already do this.
+556	- Menu or till integration — &quot;your usual&quot; doesn&#x27;t need a live menu yet.
+557	- Reporting dashboards — owners get a weekly text summary instead.
+558	
+559	## Open questions
+560	- What rules apply to texting customers for marketing?
+561	- How do we handle price changes on a saved &quot;usual&quot; order?
+562	```
+563	
+564	**Skill then says:** &quot;The brief is at `docs/brief.md` (about 300 words). In short: restaurants pay platform fees on customers they already own; the top goal is a 30-second direct reorder; the biggest thing we&#x27;re not doing is delivery. Read it and tell me to accept it or what to change — I&#x27;ll write the spec once it&#x27;s accepted.&quot; *(Turn ends.)*
+565	</pre></details></div><div class="step" id="SD6"><span class="sid">D6</span><span class="kind">Bash</span>python3 ../plugin/dev-team/scripts/dt.py request --help; python3 ../plugin/dev-team/scripts/dt.py request add --help<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;python3 ../plugin/dev-team/scripts/dt.py request --help; python3 ../plugin/dev-team/scripts/dt.py request add --help&quot;,
+  &quot;description&quot;: &quot;Show dt request usage&quot;
+}</pre><div class="lbl">output</div><pre>usage: dt request [-h] [--skill SKILL] [--about ABOUT] [--replaces UR-NN]
+                  [--approved APPROVED] [--into ID [ID ...]]
+                  [--owner {brief,spec,architecture,pipelines,tests,plan,constraints}]
+                  [--open] [--json]
+                  [{add,trace,change,list}] [args ...]
+
+positional arguments:
+  {add,trace,change,list}
+  args                  add: owner and words; trace: UR-NN and IDs; change:
+                        UR-NN and what
+
+options:
+  -h, --help            show this help message and exit
+  --skill SKILL         the skill that heard the words (add) or the approval
+                        (change)
+  --about ABOUT         add: what the words answer, when they don&#x27;t say it
+                        themselves
+  --replaces UR-NN      add: an earlier request these words replace
+  --approved APPROVED   change: the user&#x27;s words approving the change
+  --into ID [ID ...]    change: the IDs the change was written into (every ID
+                        that honoured the old words)
+  --owner {brief,spec,architecture,pipelines,tests,plan,constraints}
+                        list: only this owner&#x27;s requests
+  --open                list: only requests nothing honours yet
+  --json                list: print JSON
+usage: dt request [-h] [--skill SKILL] [--about ABOUT] [--replaces UR-NN]
+                  [--approved APPROVED] [--into ID [ID ...]]
+                  [--owner {brief,spec,architecture,pipelines,tests,plan,constraints}]
+                  [--open] [--json]
+                  [{add,trace,change,list}] [args ...]
+
+positional arguments:
+  {add,trace,change,list}
+  args                  add: owner and words; trace: UR-NN and IDs; change:
+                        UR-NN and what
+
+options:
+  -h, --help            show this help message and exit
+  --skill SKILL         the skill that heard the words (add) or the approval
+                        (change)
+  --about ABOUT         add: what the words answer, when they don&#x27;t say it
+                        themselves
+  --replaces UR-NN      add: an earlier request these words replace
+  --approved APPROVED   change: the user&#x27;s words approving the change
+  --into ID [ID ...]    change: the IDs the change was written into (every ID
+                        that honoured the old words)
+  --owner {brief,spec,architecture,pipelines,tests,plan,constraints}
+                        list: only this owner&#x27;s requests
+  --open                list: only requests nothing honours yet
+  --json                list: print JSON</pre></details></div><div class="step" id="SD7"><span class="sid">D7</span><span class="kind">Bash</span>DT=&quot;python3 ../plugin/dev-team/scripts/dt.py&quot; &amp;&amp; \
+python3 ../plugin/dev-team/scripts/dt.py request add brief &quot;I want to start a personal quant research platform for market research on US equities, built in stages.&quot; --skill idea-refine &amp;&amp; \
+python3 ../plugin/dev-team/scripts/dt.py request add brief &quot;I&#x27;m starting with just the first piece: Stage 1 — Data&quot; --skill idea-refine &amp;&amp; \
+python3 ../plugin/dev-team/scripts/dt.py request add spec &quot;a reliable daily US equity dataset and loader (prices, retu …[+1155 chars]<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;DT=\&quot;python3 ../plugin/dev-team/scripts/dt.py\&quot; &amp;&amp; \\\npython3 ../plugin/dev-team/scripts/dt.py request add brief \&quot;I want to start a personal quant research platform for market research on US equities, built in stages.\&quot; --skill idea-refine &amp;&amp; \\\npython3 ../plugin/dev-team/scripts/dt.py request add brief \&quot;I&#x27;m starting with just the first piece: Stage 1 — Data\&quot; --skill idea-refine &amp;&amp; \\\npython3 ../plugin/dev-team/scripts/dt.py request add spec \&quot;a reliable daily US equity dataset and loader (prices, returns, corporate actions, point-in-time universe)\&quot; --skill idea-refine --about \&quot;Stage 1 contents\&quot; &amp;&amp; \\\npython3 ../plugin/dev-team/scripts/dt.py request add architecture \&quot;from my Sharadar subscription\&quot; --skill idea-refine --about \&quot;Stage 1 primary data source\&quot; &amp;&amp; \\\npython3 ../plugin/dev-team/scripts/dt.py request add architecture \&quot;cross-checked against Yahoo Finance through yahooquery\&quot; --skill idea-refine --about \&quot;Stage 1 cross-check source\&quot; &amp;&amp; \\\npython3 ../plugin/dev-team/scripts/dt.py request add spec \&quot;with scripts to download, clean, validate, and store it\&quot; --skill idea-refine --about \&quot;Stage 1 dataset\&quot; &amp;&amp; \\\npython3 ../plugin/dev-team/scripts/dt.py request add spec \&quot;plus basic exploratory analysis\&quot; --skill idea-refine --about \&quot;Stage 1 dataset\&quot; &amp;&amp; \\\npython3 ../plugin/dev-team/scripts/dt.py request add spec \&quot;a data-viz app to explore it\&quot; --skill idea-refine --about \&quot;Stage 1 dataset\&quot; &amp;&amp; \\\npython3 ../plugin/dev-team/scripts/dt.py request add architecture \&quot;a TypeScript + React browser frontend over a Python backend (HTTP and WebSocket)\&quot; --skill idea-refine --about \&quot;Stage 1 data-viz app\&quot; &amp;&amp; \\\npython3 ../plugin/dev-team/scripts/dt.py request list&quot;,
+  &quot;description&quot;: &quot;Record the user&#x27;s opening statements as requests&quot;
+}</pre><div class="lbl">output</div><pre>UR-01 brief: &quot;I want to start a personal quant research platform for market research on US equities, built in stages.&quot;
+UR-02 brief: &quot;I&#x27;m starting with just the first piece: Stage 1 — Data&quot;
+UR-03 spec: &quot;a reliable daily US equity dataset and loader (prices, returns, corporate actions, point-in-time universe)&quot;
+UR-04 architecture: &quot;from my Sharadar subscription&quot;
+UR-05 architecture: &quot;cross-checked against Yahoo Finance through yahooquery&quot;
+UR-06 spec: &quot;with scripts to download, clean, validate, and store it&quot;
+UR-07 spec: &quot;plus basic exploratory analysis&quot;
+UR-08 spec: &quot;a data-viz app to explore it&quot;
+UR-09 architecture: &quot;a TypeScript + React browser frontend over a Python backend (HTTP and WebSocket)&quot;
+UR-01 &quot;I want to start a personal quant research platform for market research on US equities, built in stages.&quot; · brief · open
+UR-02 &quot;I&#x27;m starting with just the first piece: Stage 1 — Data&quot; · brief · open
+UR-03 &quot;a reliable daily US equity dataset and loader (prices, returns, corporate actions, point-in-time universe)&quot; [Stage 1 contents] · spec · open
+UR-04 &quot;from my Sharadar subscription&quot; [Stage 1 primary data source] · architecture · open
+UR-05 &quot;cross-checked against Yahoo Finance through yahooquery&quot; [Stage 1 cross-check source] · architecture · open
+UR-06 &quot;with scripts to download, clean, validate, and store it&quot; [Stage 1 dataset] · spec · open
+UR-07 &quot;plus basic exploratory analysis&quot; [Stage 1 dataset] · spec · open
+UR-08 &quot;a data-viz app to explore it&quot; [Stage 1 dataset] · spec · open
+UR-09 &quot;a TypeScript + React browser frontend over a Python backend (HTTP and WebSocket)&quot; [Stage 1 data-viz app] · architecture · open</pre></details></div><div class="step" id="SD8"><span class="sid">D8</span><span class="kind">say</span>I&#x27;ve logged your opening message in `docs/requests.md` (UR-01 to UR-09). Here&#x27;s Phase 1. I won&#x27;t write anything else until you answer. ⏎ ## How might we… ⏎ …build a daily US equity dataset you can trust enough to research on: survivorship-free, correctly adjusted, and reconstructable as of any past date, so that a later backtest can&#x27;t look good just because the data is wrong? ⏎ My honest read: the hard part of Stage 1 isn&#x27;t downloading. It&#x27;s knowing the data is right. The things that quietly ruin equity research all start here: missing delisted stocks, mishandled splits and dividends, a univer …[+3334 chars]<details><summary>full text</summary><pre>I&#x27;ve logged your opening message in `docs/requests.md` (UR-01 to UR-09). Here&#x27;s Phase 1. I won&#x27;t write anything else until you answer.
+
+## How might we…
+
+…build a daily US equity dataset you can trust enough to research on: survivorship-free, correctly adjusted, and reconstructable as of any past date, so that a later backtest can&#x27;t look good just because the data is wrong?
+
+My honest read: the hard part of Stage 1 isn&#x27;t downloading. It&#x27;s knowing the data is right. The things that quietly ruin equity research all start here: missing delisted stocks, mishandled splits and dividends, a universe that leaks future information, and stale or duplicated prints. The viz app is worth building, but it should serve that trust problem rather than become its own project.
+
+## Five questions
+
+1. **What comes after Stage 1?** Cross-sectional factor research, single-name signals, portfolio backtests, ML? And what would make you call Stage 1 done? My guess: &quot;I can pull total-return series for every stock that was investable on any date since X, and I trust them.&quot;
+2. **Which Sharadar tables do you have, and how far back do you want to go?** For example equity prices, fund/ETF prices, corporate actions, the ticker/metadata table, S&amp;P 500 membership, core fundamentals. Is 1998 onward fine?
+3. **What&#x27;s in the universe?** All US-listed common stocks including delisted ones? ETFs? ADRs, OTC, preferreds? Should &quot;point-in-time&quot; also mean index membership (S&amp;P 500 as of a date) or only listing status?
+4. **Fundamentals (balance sheet, earnings, etc.):** in Stage 1 or later? My guess is later. Stage 1 would be prices, returns, actions and the universe only, with fundamentals as their own stage because point-in-time fundamentals are a separate hard problem. That&#x27;s the default unless you say otherwise.
+5. **What is the WebSocket for?** The data only updates daily, so nothing in the market is live. Plausible reasons are streaming progress from long download or validation jobs, or pushing large chart data in pieces. If there&#x27;s no concrete need, I&#x27;d push back and say plain HTTP is enough for Stage 1. Tell me what you picture.
+
+## Variations
+
+1. **Validation-first dataset.** The product is a reconciliation report: every day where Sharadar and Yahoo disagree is flagged, explained or accepted. The loader is a thin layer on top. *Why:* trust is the real deliverable.
+2. **As-of loader (inversion).** One call, &quot;give me the universe and returns as known on date D,&quot; is the central interface. Everything else exists to make that call correct. *Why:* it removes look-ahead by construction.
+3. **Notebook-only (simplification).** Leave the viz app out of Stage 1. Notebooks and saved charts cover exploration. *Why:* it halves the build. It goes against what you asked for, though.
+4. **Data-quality cockpit (combination).** The viz app is mainly a data-QA tool: per-ticker price and adjustment views, Sharadar-vs-Yahoo diffs, corporate-action timelines, universe size over time. *Why:* it gives the app a job beyond pretty charts.
+5. **Expert lens: Yahoo as spot-check, not mirror.** Yahoo has no delisted names and adjusts for dividends differently. Cross-check a sample (survivors, known split and dividend events) instead of the whole history. *Why:* a full mirror would produce mostly noise.
+6. **10x: daily incremental pipeline.** Scheduled nightly updates, versioned snapshots, and a diff of what changed since yesterday. *Why:* research stays reproducible. It may be too much for Stage 1.
+7. **Explorer-first (audience shift).** The app is the front door for future research, with screeners and cross-sectional views. *Why:* this is fun to build, and it&#x27;s where scope creep comes from.
+
+Right now I lean toward **2 + 4 + 5**: an as-of loader as the core, the viz app as a data-quality cockpit, and Yahoo as a targeted spot-check.
+
+Which variations appeal to you, and what are your answers to 1–5?</pre></details></div>
+<h2>Commits</h2>
+<p>None.</p>
+<h2>Returned</h2>
+<pre>I&#x27;ve logged your opening message in `docs/requests.md` (UR-01 to UR-09). Here&#x27;s Phase 1. I won&#x27;t write anything else until you answer.
+
+## How might we…
+
+…build a daily US equity dataset you can trust enough to research on: survivorship-free, correctly adjusted, and reconstructable as of any past date, so that a later backtest can&#x27;t look good just because the data is wrong?
+
+My honest read: the hard part of Stage 1 isn&#x27;t downloading. It&#x27;s knowing the data is right. The things that quietly ruin equity research all start here: missing delisted stocks, mishandled splits and dividends, a universe that leaks future information, and stale or duplicated prints. The viz app is worth building, but it should serve that trust problem rather than become its own project.
+
+## Five questions
+
+1. **What comes after Stage 1?** Cross-sectional factor research, single-name signals, portfolio backtests, ML? And what would make you call Stage 1 done? My guess: &quot;I can pull total-return series for every stock that was investable on any date since X, and I trust them.&quot;
+2. **Which Sharadar tables do you have, and how far back do you want to go?** For example equity prices, fund/ETF prices, corporate actions, the ticker/metadata table, S&amp;P 500 membership, core fundamentals. Is 1998 onward fine?
+3. **What&#x27;s in the universe?** All US-listed common stocks including delisted ones? ETFs? ADRs, OTC, preferreds? Should &quot;point-in-time&quot; also mean index membership (S&amp;P 500 as of a date) or only listing status?
+4. **Fundamentals (balance sheet, earnings, etc.):** in Stage 1 or later? My guess is later. Stage 1 would be prices, returns, actions and the universe only, with fundamentals as their own stage because point-in-time fundamentals are a separate hard problem. That&#x27;s the default unless you say otherwise.
+5. **What is the WebSocket for?** The data only updates daily, so nothing in the market is live. Plausible reasons are streaming progress from long download or validation jobs, or pushing large chart data in pieces. If there&#x27;s no concrete need, I&#x27;d push back and say plain HTTP is enough for Stage 1. Tell me what you picture.
+
+## Variations
+
+1. **Validation-first dataset.** The product is a reconciliation report: every day where Sharadar and Yahoo disagree is flagged, explained or accepted. The loader is a thin layer on top. *Why:* trust is the real deliverable.
+2. **As-of loader (inversion).** One call, &quot;give me the universe and returns as known on date D,&quot; is the central interface. Everything else exists to make that call correct. *Why:* it removes look-ahead by construction.
+3. **Notebook-only (simplification).** Leave the viz app out of Stage 1. Notebooks and saved charts cover exploration. *Why:* it halves the build. It goes against what you asked for, though.
+4. **Data-quality cockpit (combination).** The viz app is mainly a data-QA tool: per-ticker price and adjustment views, Sharadar-vs-Yahoo diffs, corporate-action timelines, universe size over time. *Why:* it gives the app a job beyond pretty charts.
+5. **Expert lens: Yahoo as spot-check, not mirror.** Yahoo has no delisted names and adjusts for dividends differently. Cross-check a sample (survivors, known split and dividend events) instead of the whole history. *Why:* a full mirror would produce mostly noise.
+6. **10x: daily incremental pipeline.** Scheduled nightly updates, versioned snapshots, and a diff of what changed since yesterday. *Why:* research stays reproducible. It may be too much for Stage 1.
+7. **Explorer-first (audience shift).** The app is the front door for future research, with screeners and cross-sectional views. *Why:* this is fun to build, and it&#x27;s where scope creep comes from.
+
+Right now I lean toward **2 + 4 + 5**: an as-of loader as the core, the viz app as a data-quality cockpit, and Yahoo as a targeted spot-check.
+
+Which variations appeal to you, and what are your answers to 1–5?</pre>
+</body></html>

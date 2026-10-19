@@ -43,7 +43,7 @@ tests/                   → folders only; files are planned in pipelines.md
 - **Context:** [The problem and the requirements that constrain it.]
 - **Decision:** [What we chose.]
 - **Alternatives:** [Option — why not.] [Option — why not.]
-- **Consequences:** [What this makes easy, what it makes hard, what we must now live with.]
+- **Consequences:** [What this makes easy and what it makes hard, in the code and the product.]
 - **Probe:** [Only on a decision that picks an external API, vendor or dataset: `PB-NN — question`, or `none — why the docs settle it` (`decisions.md`).]
 
 ### AD-02: ~~[Old title]~~

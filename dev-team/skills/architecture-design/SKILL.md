@@ -34,7 +34,7 @@ Start with `dt status --skill architecture-design`. Take the mode, shape, gap ke
 
 ## Review Gate (CRITICAL)
 
-Rerun `dt status`: `uncovered`, `changed_since` and `stale` empty, or each gap under Risks and open questions; `broken_fences` (move lines added after a closing fence inside it), `contracts_missing`, `legacy_layout` and `probes_failed` empty. `dt lint docs/` reports no errors. Check by hand that a superseded decision is cited only by its own line, its replacement and the Changelog, and that nothing Accepted contradicts a newer decision (search the counts, ranges and names changed).
+Rerun `dt status`: `uncovered`, `changed_since` and `stale` empty, or each gap under Risks and open questions; `broken_fences` (move lines added after a closing fence inside it), `contracts_missing`, `legacy_layout` and `probes_failed` empty. `dt lint docs/` reports no errors. Check by hand that a superseded decision is cited only by its own line, its replacement and the Changelog, and that nothing Accepted contradicts a newer decision (search the counts, ranges, names and behaviours changed). Each `pipelines.md` row still stating an old version is routed (`references/decisions.md`).
 
 Then:
 1. Summarize: files, shape, components or packages, decisions needing attention, uncovered requirements, the **Your words** line (requests honoured and changed).

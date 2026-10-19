@@ -2,9 +2,9 @@
 
 Read when `dt status --skill architecture-design` reports Revise: a technical change with no spec change, probe results to fold in, or open requests (`requests_open`: the user's words, honoured by a new or revised decision as `decisions.md` says). It ends at the Review Gate in `../SKILL.md`, following `writing-rules.md`. Example: `examples-revise.md`.
 
-1. Write a new decision whose Context explains what was learned ("the simulator is 40× too slow for QR-02 at 1M steps"). Then supersede the old decision if the new one reverses it, or revise it in place if the new one changes only part of it (`decisions.md`).
-2. Update every section and contract the change touches (tech stack, components, Overview; contracts per `contracts.md`), and run the Review Gate.
-3. If a contract changes, list its consumers (its **Used by**) at the gate. Route to `pipeline-design` (`dt route pipeline-design "<change> (PL-02, PL-03)" --from architecture-design`) only what a step row must follow: a symbol a step calls renamed, removed or re-signed, a step's In → Out changed, or a type named otherwise than its route asked. A type added as routed, or a field or rule added to a type the steps already pass, changes no row: `dt route --done` at the gate closes it, and nothing goes back. A frozen interface's type, samples and fake change with it, in a new interface task Replan adds (a `contract-change` edge).
+1. Write a new decision whose Context states the fact that forces it ("the simulator runs 40× too slow for QR-02 at 1M steps"). Then supersede the old decision if the new one reverses it, or revise it in place if the new one changes only part of it (`decisions.md`).
+2. In the same round, rewrite every section and contract that still states the old version (tech stack, components, Overview, Risks, other decisions; contracts per `contracts.md`), as `decisions.md` says, and run the Review Gate.
+3. If a contract changes, list its consumers (its **Used by**) at the gate. Contract change or not, route the step rows the change makes untrue to `pipeline-design` (`decisions.md`, *Step rows that state the old version go back*). A frozen interface's type, samples and fake change with it, in a new interface task Replan adds (a `contract-change` edge).
 
 ## Probe results
 

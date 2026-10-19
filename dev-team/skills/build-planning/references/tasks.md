@@ -4,7 +4,7 @@ Read when writing thicken tasks, the dependency graph and the files. Templates: 
 
 ## 5. Thicken
 
-`**Kind:** thicken`, under Phase 2: one task per step upgrade, depending on its step's spine. Order in the file sets nothing: every thicken task can start once its spine lands. Risk orders tasks only when a later one must learn from an earlier one, as an `order` edge with its reason (step 9). In data and ML work, data loading, leak checks and the evaluation get thicken tasks of their own, never left until after the model.
+`**Kind:** thicken`, under Phase 2: one task per step upgrade, depending on its step's spine. Order in the file sets nothing: every thicken task can start once its spine lands, and thickens of one step that write separate files run side by side, with no edge between them. Each one's acceptance stays within its own file's seam; joining the concerns in the step's class (`learn` sampling the memory) is one task whose `Writes:` includes the class's file. Risk orders tasks only when a later one must learn from an earlier one, as an `order` edge with its reason (step 9). In data and ML work, data loading, leak checks and the evaluation get thicken tasks of their own, never left until after the model.
 
 **Split a task** when it needs more than one session, has more than 3 acceptance bullets, touches two packages or two steps, or has "and" in its title. Sizes count `Writes:` entries outside `tests/` (`task-size`; a folder glob counts as one): XS = 1, S = 1–2, M = 3–5. Nothing larger. Spine and thicken tasks are XS or S.
 
@@ -37,7 +37,7 @@ Read when writing thicken tasks, the dependency graph and the files. Templates: 
 |---|---|---|
 | `data` | One step's output feeds another's input | The type and its sample |
 | `call` | A step calls a function another task builds | Across pipelines or packages, its fixture-backed fake; in the caller's own pipeline and package, its replay double (`phase0.md` a), never a fake |
-| `file` | Two tasks must write one file | Move the shared part to the interface task; else serial. Two wiring tasks never share a file: each writes its own entry module. Thicken tasks on one module, of two steps or of one step's concerns (memory, targets, exploration): the interface task's layout splits it (each its own file, the old module re-exporting), or one step's thickens fold into one; never chain them |
+| `file` | Two tasks must write one file | Move the shared part to the interface task; else serial. Two wiring tasks never share a file: each writes its own entry module. Thicken tasks on one module, of two steps or of one step's concerns (memory, targets, exploration): the interface task's layout splits it (each its own file, its seam stubbed, the old module re-exporting), or one step's thickens fold into one; never chain them |
 | `code` | A task changes code another task wrote (a thicken after its step's spine; never after another thicken of that step: `file`) | None: serial |
 | `contract-change` | A task changes a frozen interface | None: serial, plus a new interface task |
 | `order` | Integration (a wiring task runs the steps its pipeline builds, never one it only calls, `phase0.md` c; a system task the providers it swaps in: `none: integration: the smoke runs it`), or risk or learning ("do X first to learn Y"; never a human approval: `phase0.md` a) | None: reason required |

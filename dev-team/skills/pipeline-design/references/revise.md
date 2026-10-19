@@ -35,12 +35,3 @@ After approval: build-planning Replan (its dt status says replan, changed_since_
 docs/packages/gridload/pipelines.md) adds the `penalize` task. TC-02's expected output is unchanged
 (the planted daily sine is recovered either way), so no test-planning Revise.
 ```
-
-## Sync
-
-`dt layout <pkg>` printed `PL-02: drift — calls […] vs steps […]`. For each mismatch, show both sides and ask which changes:
-
-- **The doc changes** when the code found a better order or a real extra step. Edit the table (as Revise), Status to Draft.
-- **The code changes** when it broke a rule: logic in the entry, a step owned by two components, a registry with no AD. Leave the doc, and list the fix for `build-planning` Replan.
-
-Never rewrite the table to match code that breaks a readability rule.

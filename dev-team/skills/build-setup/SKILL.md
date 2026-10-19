@@ -21,7 +21,7 @@ Run `python3 ../../scripts/dt.py status --skill build-setup` first (path relativ
 
 | Mode | When | Do |
 |---|---|---|
-| blocked | no Approved plan | Say which upstream skill is next. Stop |
+| blocked | no Approved plan | Stop; start what `dt next` names, this turn |
 | New | no `CONSTRAINTS.md` | `references/new.md` |
 | Extend | kickoff, next plan approved | `references/extend.md` |
 | Ratchet | Advance, after the exit checkpoint | `references/ratchet.md` |
@@ -37,11 +37,11 @@ New, Extend, Ratchet and Revise end here. Rerun `dt status --skill build-setup`.
 3. **Loosenings**, each as before → after, or say there are none. A loosening is a higher limit, a removed rule, a new exception or a weaker type mode, and needs the user's explicit yes; a tightening is routine.
 4. **Open questions** and anything uncovered (CI not requested, a non-Python part with no check).
 
-Ask for approval and **stop the turn**.
+Ask for approval (a yes also commits) and **stop the turn**.
 
 | The user says | Do |
 |---|---|
-| An unambiguous yes | Set `**Status:** Approved` and `**Last reviewed:**`. Offer to commit the bar; commit only on a yes. **New or Extend:** after that commit, run `python3 ../../scripts/dt.py base` (sets the plan's `**Base:**` to HEAD, so guard-the-bar diffs and Audit start from a commit that holds the bar) and say the next step is `/build`, run by the user. Other modes: the mode file's last step. **Stop.** |
+| An unambiguous yes | Set `**Status:** Approved` and `**Last reviewed:**`. Commit the bar if `git status` lists it. **New or Extend:** after that commit, run `python3 ../../scripts/dt.py base` (sets the plan's `**Base:**` to HEAD, so guard-the-bar diffs and Audit start from a commit that holds the bar) and say the next step is `/build`, run by the user. Other modes: the mode file's last step. **Stop.** |
 | A hedge on a loosening or exception ("fine I guess") | Not approval. Ask again about that item |
 | Changes | Edit, keep Draft, repeat the gate |
 

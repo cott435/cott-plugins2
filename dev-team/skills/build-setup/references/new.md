@@ -3,8 +3,8 @@
 Read when `dt status --skill build-setup` reports `new` (no `CONSTRAINTS.md`). Values come from `derive.md`; the run ends at the Review Gate in `../SKILL.md`.
 
 ```
-PRECHECK → DETECT → 4 QUESTIONS → GENERATE → [commit yes] → PROVE → REVIEW GATE
-   → (next turn) [approved] → [commit yes] → dt base
+PRECHECK → DETECT → 5 QUESTIONS, ONE MESSAGE → GENERATE → [commit yes] → PROVE → REVIEW GATE
+   → (next turn) [approved] → commit → dt base
 ```
 
 ## Steps
@@ -13,11 +13,11 @@ PRECHECK → DETECT → 4 QUESTIONS → GENERATE → [commit yes] → PROVE → 
 
 **2. Detect, don't ask.** Read, and report in two lines: shape, ids, dependency rules and stack ADs (`docs/architecture.md`); module layout (`pipelines.md`); tests and fixtures; the milestone's dependencies (`tasks/plan.md`); Python version; existing config, CI and `.claude/`.
 
-**3. Four questions**, one at a time, with these defaults: **block or warn mid-task?** (block on the floor and gate; `full` findings become review findings; "warn" adds `--warn` to the Stop hooks); **type gate?** (mypy strict gates, pyright in `full`); **targets or measure-and-hold?** (measure and hold); **slowest gate tolerated?** (90 s; no limit for `full`). Mention CI once; write it only if asked.
+**3. Five questions, in one message**, each with your guess and these defaults: **block or warn mid-task?** (block on the floor and gate; `full` findings become review findings; "warn" adds `--warn` to the Stop hooks); **type gate?** (mypy strict gates, pyright in `full`); **targets or measure-and-hold?** (measure and hold); **slowest gate tolerated?** (90 s; no limit for `full`); **commit the bar skeleton once generated?** (yes: the protected-path diff needs a commit). Mention CI once; write it only if asked.
 
 **4. Generate.** Derive every value per `derive.md` and fill the templates; `grep -rn '{{[a-z_]*}}'` over the written files must print nothing. `chmod +x scripts/*.sh scripts/hooks/*.sh`; append the `.gitignore` lines. `uv lock && uv sync`, then write the vulture whitelist: the template header plus `uv run --frozen vulture --make-whitelist`, and count `duplicates_today` with `check.sh`'s pylint line (`tools/pylint.md`). Never edit `check.sh` steps or hook commands by hand.
 
-**5. Prove.** Ask to commit the bar skeleton (default yes): the protected-path diff needs a commit. On a yes, commit and `git update-ref refs/checks/base HEAD`. Run `uv run --frozen ruff check --show-settings >/dev/null` and `time bash scripts/check.sh gate`; fix the config, never the check, until it passes within budget. Headless: don't commit; run the gate, report the protected-path step as expected to fail, leave Draft.
+**5. Prove.** On step 3's commit yes, commit and `git update-ref refs/checks/base HEAD`. Run `uv run --frozen ruff check --show-settings >/dev/null` and `time bash scripts/check.sh gate`; fix the config, never the check, until it passes within budget. Headless: don't commit; run the gate, report the protected-path step as expected to fail, leave Draft.
 
 ## Example: GridLoad, single package
 
@@ -54,7 +54,7 @@ DEP002 = ["numpy", "pandas"]
 | EX-01 | CR-25 DEP002 | `numpy`, `pandas` | M1 dependencies, declared before the code imports them | @connor | M1 exit |
 ```
 
-**Question, as asked**
+**One of the five, as asked**
 ```
 Q2: Which type checker gates the implementer, mypy or pyright?
 GUESS: mypy strict. The architecture pins pandas, and mypy with pandas-stubs is the verified setup.
@@ -80,5 +80,5 @@ ASSUMPTIONS:
 Loosenings: none (first bar).
 Open questions: none.
 
-Approve the bar? Once approved I'll offer to commit it and record the plan's Base.
+Approve the bar? A yes also commits it and records the plan's Base.
 ```

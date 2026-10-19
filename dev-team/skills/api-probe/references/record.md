@@ -25,4 +25,4 @@ Besides SKILL.md's gate, show:
 | Observed fields differ from a contract type | architecture-design Revise: the type's fields and invariants follow the evidence; `**Cases:**` can name the samples |
 | Spent resources must be kept (Items, tokens) | architecture-design Revise: the decision's Consequences say the build adopts them |
 
-On an unambiguous yes: set `Answered · pass|fail · <date>`, and offer to commit `docs/probes.md` and the probe folder. **Stop.** Next is architecture-design Revise.
+On an unambiguous yes: set `Answered · pass|fail · <date>`, and commit as the Review Gate says. **Stop.** Next is architecture-design Revise.

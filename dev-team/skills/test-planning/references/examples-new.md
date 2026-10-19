@@ -25,17 +25,17 @@ cases_no_source: none  (and the other gap keys: none)
 Q:       Which workflow would hurt most if it were quietly wrong?
 GUESS:   the meter load: dropping decommissioned meters would bias every regional total downstream.
 DEFAULT: meter load first, then the seasonality report.
-User:    The meter load.
 
 Q:       Do you have a real example of a decommissioned meter I can pin as a case?
 GUESS:   an export from the utility's system with a meter that was retired.
 DEFAULT: none; I'd use a synthetic registry with one planted decommissioning.
-User:    Yes, M-0417 was decommissioned 2018-06-29. Here's the export. [attaches decommissioned_2018.csv]
 
 Q:       Any trusted output for the seasonality report, from a notebook or a paper?
 GUESS:   no, so two synthetic known-answer cases: a flat spectrum on pure noise, and a planted daily sine.
 DEFAULT: those two.
-User:    No, go with those.
+
+User:    The meter load. Yes, M-0417 was decommissioned 2018-06-29; here's the export
+         [attaches decommissioned_2018.csv]. No trusted seasonality output, go with those two.
 ```
 
 ### A two-layer pair: TC-01

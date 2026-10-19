@@ -32,7 +32,7 @@ Start with `dt status --skill api-probe`. Take the mode, `probes_unwritten`, `pr
 | **Revise** | `probes_stale`, or the user changes a check or the Spends | `references/revise.md` |
 | **Record** | `probes_results`, or the user says "ran it" | `references/record.md` |
 | **Waiting** | Only `probes_open` | Say which checks wait on whom, with each one's command from the probe's README. Stop |
-| **Current** | Nothing open | Say so, and name the skill that routed here. Stop |
+| **Current** | Nothing open | Stop; start what `dt next` names, this turn |
 
 `evidence_leaks` non-empty in any mode: stop, name the file and pattern, and ask the user to look at it themselves. Never open the matched value.
 
@@ -46,13 +46,13 @@ Run `dt lint docs/probes.md` and fix what it reports. Run `git check-ignore` on 
 1. **What was written:** each new or changed entry in full, with its checks table; the mode file says what else its round shows.
 2. **ASSUMPTIONS**, then **Open questions**.
 3. **Hand-offs:** one line per skill that must act next, and why. Write none of them.
-4. Ask the user to approve. **STOP YOUR TURN.**
+4. Ask the user to approve (a yes also commits). **STOP YOUR TURN.**
 
 **No live user** (headless): write the entry and the folder, run only the agent's checks, put every question for the user under Open questions, leave the entry Draft, and stop. Spending and waiving are never decided headless.
 
 | The user says | Do | Then |
 |---|---|---|
-| An unambiguous yes | As the mode file says (New: `Ready`; Record: `Answered`). Offer to commit `docs/probes.md` and the probe folder (`.env` and `out/` stay ignored); commit only on a yes | **Stop.** Name the next skill |
+| An unambiguous yes | As the mode file says (New: `Ready`; Record: `Answered`). Commit `docs/probes.md` and the probe folder if `git status` lists them (`.env` and `out/` stay ignored) | **Stop.** Say what `dt next` names; never ask whether to start it |
 | "I'll take the risk" on an open or failed probe | Set `Waived · <date> — <their reason, in their words>`; the Risks line stays | **Stop.** Next: architecture-design Revise |
 | A change to a check, the Spends or the steps | Edit, keep Draft | Repeat the gate |
 | A hedge ("looks fine I guess") | Keep Draft, ask about the checks or the spend you are unsure of | Repeat the gate |

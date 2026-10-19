@@ -5,7 +5,7 @@ description: Plans how each package's pipelines are proven correct - a test stra
 
 # Test Planning
 
-A golden case is an oracle: an input and the output the code must produce, recorded before the code exists, from a source outside the agent that will build it. This skill writes `docs/packages/<pkg>/tests.md` (strategy and case index) and the fixtures under `tests/fixtures/<pkg>/TC-NN/`, and mints the `TC-NN` IDs. It's optional: when skipped, `build-planning` still requires a smoke test per pipeline and test-backed acceptance per task. The tester writes test code in the build.
+A golden case is an oracle: an input and the output the code must produce, recorded before the code exists, from a source outside the agent that will build it. This skill writes `docs/packages/<pkg>/tests.md` (strategy and case index) and the fixtures under `tests/fixtures/<pkg>/TC-NN/`, and mints the `TC-NN` IDs. It's optional: when skipped, `build-planning` still requires a smoke test per pipeline and test-backed acceptance per task.
 
 **Not for:** test code (the build's), pipeline design (`pipeline-design`), task order (`build-planning`). A change another skill owns (a contract, a pipeline, a spec ID) is recorded for its Revise, never made here: `dt route <owner> "<change>" --from test-planning`, and listed at the gate.
 
@@ -22,20 +22,20 @@ Start with `dt status --skill test-planning`: the mode per package, its gap keys
 | **Extend** | A new pipeline, new user pairs, or a regression case after a bug | Add cases; existing ones untouched: `references/extend.md` |
 | **Revise** | An expected output or tolerance must change, or `routed_changes` lists a change | Approval required: `references/revise.md` |
 | **Grow** | The package split; cases move with their pipelines | Move sections and fixtures; content unchanged: `references/grow.md` |
-| **Current** | Nothing to do | Say so; next is `build-planning`. Stop |
+| **Current** | Nothing to do | Stop; start what `dt next` names, this turn |
 
 **Read:** `pipelines.md`, `contract.md`, the spec's DATA-, QR- and model-quality criteria for the IDs in scope (`dt section …`), and the milestone's `docs/references.md` entries (if `dt status` lists references waiting, route to `reference-intake` first). **Don't read** `tasks/plan.md`: cases follow the pipelines and the spec, not the task order.
 
 ## Asking
 
-One question at a time, with your guess and a default, and only about what only the user knows. Infer the rest (names, seeds, sizes, tolerances) as ASSUMPTIONS. **The user's words:** record them and honour yours (`requests_open`) per `../idea-refine/references/requests.md`.
+All questions in one message, each with your guess and a default, and only about what only the user knows. Infer the rest (names, seeds, sizes, tolerances) as ASSUMPTIONS. **The user's words:** record them and honour yours (`requests_open`) per `../idea-refine/references/requests.md`.
 
 ## Rules
 
 - Every case has a Source outside the agent and a Tolerance with its reason.
 - Each ID comes from `dt next-id TC`, the section written before the next; never count by hand.
 - Fixtures are kilobytes; large data is a path plus hash. CSV for tables, JSON for structure and parameters.
-- **Every write of an `expected.json` brings a `dt guard` permission prompt**, here and in the build: the user approves every oracle write. Never route around it (no Bash `echo >`, no copying over).
+- **Every write of an `expected.json` brings a `dt guard` permission prompt**: the user approves every oracle write. Never route around it (no Bash `echo >`, no copying over).
 - `expected.json` changes only through Revise with the user's approval, never by a builder to make a test pass.
 - Write only `docs/packages/*/tests.md` and `tests/fixtures/**`. Never create or run anything under `src/`, `tests/intent/`, `tests/unit/` or `tests/contracts/`, nor a generator.
 
@@ -46,14 +46,14 @@ Fix what `dt lint docs/packages/<pkg>/tests.md` reports. Rerun `dt status --skil
 2. **ASSUMPTIONS:** seeds, sizes, tolerances, case names and transcriptions you chose.
 3. **Open questions,** including any skill you'd route to that isn't installed.
 4. **Uncovered:** pipelines with no golden case; spec IDs with no case.
-5. Ask the user to approve the expected outputs. **STOP YOUR TURN.**
+5. Ask the user to approve the expected outputs (a yes also commits). **STOP YOUR TURN.**
 
 **No live user** (headless): write the doc and fixtures, put every oracle confirmation under Open questions, leave Draft, and stop.
 
 | The user says | Do | Then |
 |---|---|---|
-| An unambiguous yes to the expected outputs | Set `Status: Approved` and the date; `dt route --done test-planning` if `routed_changes` listed any. Offer to commit `tests.md` and the fixtures; commit only on a yes | Stop. Next: `build-planning` |
-| "Approved, go ahead" | As above | Start `build-planning` (run its `dt status`). Never start code |
+| An unambiguous yes to the expected outputs | Set `Status: Approved` and the date; `dt route --done test-planning` if `routed_changes` listed any. Commit `tests.md` and the fixtures if `git status` lists them | **Stop.** Say what `dt next` names; never ask whether to start it |
+| "Approved, go ahead" | As above | Start what `dt next` names. Never start code |
 | A hedge on any oracle ("looks fine I guess") | Keep Draft. Ask again, naming the cases and values | Repeat this gate |
 | Changes to a case, or a case dropped | Edit; list drops explicitly; keep Draft | Repeat this gate |
 | Approved, plus an upstream change (a contract, a pipeline, a spec ID) | Set Approved; record it with `dt route` (Not for), never make it this turn | Stop; the owner's Revise is next |

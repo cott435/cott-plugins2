@@ -101,12 +101,31 @@ The new lints caused no separate fix turns: only two replies name one. `docs/req
 ### Truncation, not defects
 quant all-at-once's 25 plan checks (no `tasks/plan.md`, no `CONSTRAINTS.md`) and rl incremental's `dt_lint_clean`, `tasks_well_formed`, `wave_width` and `phase0_split`, all from its stale M1 (D4).
 
-## Fix plan for iteration 11
+## Fix plan for iteration 11, in waves
 
-1. **Driver (H1–H5), first:** without it no quant probe can be Answered and the quant comparison stays blind. Then a 3-turn smoke and a quant probe smoke that reaches a Verdict.
-2. **dt (D1–D8):** D1 and D3 block runs or fail lint on their own; D2 and D5 cost the most turns.
-3. **Skills (S1–S3) for the turn budget,** then S4–S9.
-4. **Grader (G1–G5),** with selftest pins and a regrade of iteration 10.
-5. **Judge:** keep 3 repeats; re-judge iteration 9 and 10 with the iteration-11 prompt if it changes.
+Each session in a wave owns whole folders or files, so a wave runs in parallel; the next wave starts once the last one is merged and passes `pytest`, `check.py` and `dryrun.py`. Every session branches from `interface-first-design`, commits on its own branch, and never merges or pushes.
+
+The wave also takes build-planning's proposals from build eval b1's contract-gap review (`dev-team/design/contract-gap-proposals.md` on `claude/contract-gap-fixes-398dd0`, reference shape `dev-team/design/examples/contract_first_pipeline.py` on `build-phase` at 6805e9c). That branch and `build-phase` hold the dt behaviour some of the new wording points at (`dispatch.added_barriers`, floor_guard's `stub-pinned`, `dt context`'s Conformance block), so that text reads true once those branches merge.
+
+**Wave 1 (six sessions, in parallel)**
+
+| Session | Owns | Fixes |
+|---|---|---|
+| 1. Driver | `evals/harness/driver.py`, `fakevendor/`, `scenarios.json`, `selftest/sessions.py` | H1–H5 |
+| 2. dt | `scripts/**` | D1–D8, `request-number` noise; contract-gap proposal 2's optional `interface-barrier` warning (lint.py has one owner) |
+| 3. build-planning | `skills/build-planning/**` | contract-gap proposals 1, 2 (the `tasks.md:31` line), 3, 6a, 6c; S4; S2 for its own gate |
+| 4. pipeline-design + architecture-design | `skills/pipeline-design/**`, `skills/architecture-design/**` except `references/contracts.md` (the contract-gap branch edits it) | S1, S3, S5; S2 for their gates |
+| 5. Other skills | `skills/{idea-refine,spec-writing,test-planning,build-setup,api-probe,reference-intake}/**` | S2, S6, S7, S8, S9 |
+| 6. Grader | `evals/harness/{grade,dtrun,dtprobe,simulate,probegrade}.py`, `selftest/checks.py`, `selftest/adjudicated/` | G1–G5, with pins; regrade iterations 9 and 10 into `results-iteration-{9,10}/regrade/` |
+
+Both 1 and 6 can move `dryrun.py`'s pins; whichever merges second re-pins.
+
+**Not in this wave:**
+- Contract-gap proposal 4 (a real vertical slice before the freeze): it changes the milestone shape `PURPOSE.md` describes, so it waits for the user's decision. Its cheaper alternative (ask for an `api-probe` when no probe sample backs an external record type) can go to session 3 if chosen.
+- Contract-gap 6b (architecture-design `contracts.md`) and 6d (the build skill's `escalation.md`): done on the contract-gap branch.
+
+**Wave 2 (integration):** merge wave 1; run the dt tests, both `check.py`, the grader selftest and `dryrun.py`; a 3-turn smoke; a quant smoke long enough for a probe Verdict through the proxied fake (H1, H2). Release level for dev-team decided then.
+
+**Wave 3:** iteration 11, judged 3 × both orders, against iteration 10 re-judged if the judge prompt changes.
 
 Iteration 11 is done when all four runs finish without hitting `max_turns`, a planted fact reaches each quant design from a probe Verdict, no check fails for a grader reason, total turns fall back toward iteration 9's 250 with sessions still fresh per skill run, and the user's facts still hold (`requests_*` pass).

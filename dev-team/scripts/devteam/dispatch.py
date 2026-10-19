@@ -8,6 +8,8 @@ Holds, in the order they are reported:
 - **critical** — a recorded review has a Critical finding not yet resolved: nothing is released.
 - **escalation** — an unresolved NEEDS-DEP escalation, or a CONTRACT-CHANGE naming no type: nothing is released.
 - **barrier** — a `(barrier)` checkpoint whose reviews haven't all passed: no half of a task after it in the plan.
+  A checkpoint straight after an interface task is a barrier too, and where the plan puts another task straight
+  after one, dt adds the barrier (`added_barriers`): nothing builds on a frozen interface before its review.
 - **contract** — an unresolved CONTRACT-CHANGE naming a contract type (`dt escalate CONTRACT-CHANGE --type`): no
   half of a task that reads that type, nor of a task depending on the escalating one, directly or not.
 - **blocked** — a half rejected twice, three harness failures in a row, or a TEST-WRONG escalation unresolved.
@@ -55,26 +57,38 @@ class Phase:
     checkpoint: model.Checkpoint
     key: str                    # the checkpoint's `after` task, or "exit"
     tasks: list[model.Task]
+    after_interface: bool = False   # straight after an interface task in the plan
 
     @property
     def barrier(self) -> bool:
-        return "(barrier)" in self.checkpoint.title.lower()
+        return self.after_interface or "(barrier)" in self.checkpoint.title.lower()
 
     @property
     def kind(self) -> str:
         return "exit" if self.key == "exit" else "interface" if self.barrier else "phase"
 
 
+def added_barriers(plan, tasks: list[model.Task]) -> list[model.Checkpoint]:
+    """A barrier checkpoint, not in the plan's text, after each interface task the plan follows straight with a
+    task that isn't one. It starts where the interface task's section ends; `dt finding` writes it into the plan
+    with the review's first finding."""
+    items = sorted([*tasks, *model.checkpoints(plan)], key=lambda x: x.start)
+    return [model.Checkpoint(f"Checkpoint after {a.id} (barrier)", a.id, plan, a.end, a.end, [], [])
+            for a, b in zip(items, items[1:])
+            if isinstance(a, model.Task) and isinstance(b, model.Task) and a.kind == "interface" != b.kind]
+
+
 def phases(plan) -> list[Phase]:
     tasks = model.tasks(plan)
     out, prev = [], -1
-    for cp in model.checkpoints(plan):
+    for cp in sorted([*model.checkpoints(plan), *added_barriers(plan, tasks)], key=lambda c: c.start):
         if not cp.after and "exit" in cp.title.lower():
             out.append(Phase(cp, "exit", tasks))
             continue
         if not cp.after:
             continue
-        out.append(Phase(cp, cp.after, [t for t in tasks if prev < t.start < cp.start]))
+        mine = [t for t in tasks if prev < t.start < cp.start]
+        out.append(Phase(cp, cp.after, mine, bool(mine) and mine[-1].kind == "interface"))
         prev = cp.start
     return out
 

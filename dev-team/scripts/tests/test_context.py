@@ -113,3 +113,24 @@ class ContextCopyTest(FixtureCopy):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ContextConformanceTest(FixtureCopy):
+    """A system task's packet names each fake it replaces with the real provider, so it runs the fake's cases on it."""
+
+    def test_system_task_runs_the_fakes_cases_on_the_real_provider(self):
+        self.write("tests/contracts/data.load_prices/fake.py", '"""Fake."""\n')
+        self.write("tests/contracts/data.load_prices/test_load_prices_contract.py", '"""Cases."""\n')
+        code, out, err = self.dt("context", "M1-T14")
+        self.assertEqual((code, err), (0, ""))
+        self.assertIn("## Conformance (each fake's contract cases, run on the real provider)\n", out)
+        self.assertIn("- data.load_prices: tests/contracts/data.load_prices/ (fake.py, test_load_prices_contract.py)\n",
+                      out)
+        self.assertIn("--type <symbol>", out)
+        self.assertLess(out.index("## Conformance"), out.index("## Writes"))
+        self.assertNotIn("## Conformance", self.dt("context", "M1-T09")[1])        # wiring: still on the fakes
+
+    def test_no_fake_no_conformance(self):
+        code, out, _ = self.dt("context", "M1-T14")
+        self.assertEqual(code, 0)
+        self.assertNotIn("## Conformance", out)

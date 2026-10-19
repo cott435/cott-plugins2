@@ -44,6 +44,20 @@ def _which(raw: str) -> str | None:
     return which if which == "exit" or re.fullmatch(md.TASK_ID, which) else None
 
 
+def _write_checkpoint(repo, plan, cp: model.Checkpoint):
+    """Write a barrier dt added (dispatch.added_barriers) into the plan as its heading, where the interface task's
+    section ends; the task's text is unchanged. Returns the reloaded plan."""
+    lines = edit.read_lines(plan.path)
+    nl = edit.eol(lines)
+    head = [f"### {cp.title}" + nl, nl]
+    if cp.start and lines[cp.start - 1].strip():
+        head.insert(0, nl)
+    lines[cp.start:cp.start] = head
+    edit.write_lines(plan.path, lines)
+    repo.reload(plan.rel)
+    return repo.plan
+
+
 def record(repo, which: str, severity: str, text: str, disposition: str = "") -> tuple[int, str]:
     """Append one finding under the checkpoint: (0, new ID) or (exit code, message)."""
     plan = repo.plan
@@ -51,6 +65,10 @@ def record(repo, which: str, severity: str, text: str, disposition: str = "") ->
     if not plan or not milestone:
         return 1, "tasks/plan.md has no active milestone"
     cp = _checkpoint(plan, which)
+    added = next((c for c in dispatch.added_barriers(plan, model.tasks(plan)) if c.after == which), None)
+    if cp is None and added is not None:
+        plan = _write_checkpoint(repo, plan, added)
+        cp = _checkpoint(plan, which)
     if cp is None:
         return 1, f"tasks/plan.md has no {'milestone exit checkpoint' if which == 'exit' else f'checkpoint after {which}'}"
     fid = repo.next_id(f"{milestone}-R")

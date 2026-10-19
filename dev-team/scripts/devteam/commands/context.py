@@ -1,5 +1,6 @@
 """Print a task's whole builder context packet: its Read: sections and files, the package layout, the frozen
-interfaces its steps cross, its Writes: (or Files likely), then the task."""
+interfaces its steps cross, for a system task the fakes whose cases it runs on the real providers, its Writes: (or
+Files likely), then the task."""
 from __future__ import annotations
 
 import json
@@ -227,6 +228,28 @@ def _interfaces_block(repo, syms: list[model.Symbol]) -> str:
     return "## Interfaces (frozen: build against these, never change them)\n" + "\n".join(parts)
 
 
+def conformance(repo, task: model.Task, syms: list[model.Symbol]) -> list[tuple[str, list[str]]]:
+    """For a system task, which runs real providers where fakes stood: each contract symbol it reads or crosses
+    whose `tests/contracts/<id>/` folder holds a fake, with that folder's files. Their cases run on the real one."""
+    if task.kind != "system":
+        return []
+    ids = dict.fromkeys([_ref(r) for r in task.read] + [s.id for s in syms])
+    out = []
+    for sid in ids:
+        folder = repo.root / "tests" / "contracts" / sid
+        if re.fullmatch(md.SYMBOL_ID, sid) and any(folder.glob("fake*.py")):
+            out.append((sid, sorted(f.name for f in folder.iterdir() if f.is_file())))
+    return out
+
+
+def _conformance_block(found: list[tuple[str, list[str]]]) -> str:
+    rows = "".join(f"- {sid}: tests/contracts/{sid}/ ({', '.join(files)})\n" for sid, files in found)
+    return ("## Conformance (each fake's contract cases, run on the real provider)\n"
+            "Run every case a folder's contract tests give its fake on the real provider too, in a test your "
+            "Writes: name. A case the real one fails: fix it if your Writes: hold the code, else "
+            "`dt escalate CONTRACT-CHANGE \"<the case, fake vs real>\" --type <symbol>`.\n" + rows)
+
+
 def _writes(repo, task: model.Task) -> list[dict]:
     out = []
     for w in task.writes:
@@ -291,6 +314,9 @@ def packet(repo, task, writes: list[str] | None = None, tester: bool = False) ->
     syms = interfaces(repo, task, shown_ids)
     if syms:
         blocks.append(_interfaces_block(repo, syms))
+    found = [] if tester else conformance(repo, task, syms)
+    if found:
+        blocks.append(_conformance_block(found))
     files = [{"path": f, "exists": (repo.root / f).exists()} for f in task.files_likely]
     out_writes = _writes(repo, task) if "Writes" in task.fields else []
     if writes is not None:

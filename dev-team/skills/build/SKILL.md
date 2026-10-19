@@ -21,7 +21,7 @@ agent-skills' `/build`).
 
 - **Writes only through `dt`:** `**Build:**` in `tasks/plan.md` (`dt build start`), the
   `tasks/todo.md` ticks and landing commits on `build/M<n>` (`dt land`), the findings under each
-  checkpoint block (`dt finding`, which creates the `M<n>-R<nn>` IDs) and the user's decisions
+  checkpoint block (`dt finding`, which creates the `M<n>-R<nn>` IDs, and the block of a barrier `dt` added) and the user's decisions
   (`dt build resolve`). It creates no IDs itself.
 - **One command per Bash call:** every `dt` call on its own, never chained with `;`, `&&` or a
   variable, so each matches its allow rule.

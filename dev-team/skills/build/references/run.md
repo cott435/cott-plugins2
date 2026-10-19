@@ -28,7 +28,7 @@ switches to `build/M<n>`, the branch every worktree starts from and every landin
 commits the go there as `**Build:**` in `tasks/plan.md`. A refusal is reported as it stands; fix nothing yourself.
 
 **3. Interface first.** The first `dt ready` lists only the interface task(s). After they land,
-the interface review runs as a barrier: `dt ready` releases nothing else until it is recorded as
+the interface review runs as a barrier, which `dt` adds when the plan has none: `dt ready` releases nothing else until it is recorded as
 passed. A Critical there is a stop like any other.
 
 **4. Loop** (`loop.md`) until it ends: Exit when every task has landed and the exit review is

@@ -22,31 +22,34 @@ A queued plan (`tasks/queued/M<n>-<slug>.md`) uses the same skeleton and has no 
 
 ## Phase 0: Interface
 
-### M<n>-T01: <the milestone's interface>
+### M<n>-T01: <the milestone's types>
 …
 
-### Checkpoint after M<n>-T01 (barrier)
+### M<n>-T02: <component> contract tests
+…
+
+### Checkpoint after M<n>-T02 (barrier)
 …
 
 ## Phase 1: Step spines
 
-### M<n>-T02: <step> spine (<baseline>)
+### M<n>-T03: <step> spine (<baseline>)
 …
 
 ## Phase 2: Wiring and thicken
 
-### M<n>-T05: Wire PL-NN
+### M<n>-T06: Wire PL-NN
 …
 
-### M<n>-T06: <one step upgrade>
+### M<n>-T07: <one step upgrade>
 …
 
-### Checkpoint after M<n>-T06
+### Checkpoint after M<n>-T07
 …
 
 ## Phase 3: System
 
-### M<n>-T07: <system: fakes swapped for real providers>
+### M<n>-T08: <system: fakes swapped for real providers>
 …
 
 ### Checkpoint: milestone exit
@@ -55,7 +58,7 @@ A queued plan (`tasks/queued/M<n>-<slug>.md`) uses the same skeleton and has no 
 ## Dependency graph
 | From | To | Kind | Mitigated by |
 |---|---|---|---|
-| M<n>-T06 <title> | M<n>-T02 <its step's spine> | code | none: thickens the same module |
+| M<n>-T07 <title> | M<n>-T03 <its step's spine> | code | none: thickens the same module |
 
 ## Risks
 | Risk | Impact | Mitigation |
@@ -71,7 +74,7 @@ Status runs Draft → Approved → In progress → Done, then `dt archive` repla
 
 ### Task templates
 
-The interface, wiring and system tasks are worked in `references/examples-phase0.md`.
+The interface, wiring, system and long-run tasks are worked in `references/examples-phase0.md`.
 
 **Step spine.** One step, solo, its owner module only; no smoke yet.
 
@@ -102,10 +105,10 @@ The interface, wiring and system tasks are worked in `references/examples-phase0
 | Field | Rule (lint code) |
 |---|---|
 | `Package` | One package id (`task-fields`) |
-| `Step` | `PL-NN.<function>` from the step table (`task-step`) on spine and thicken tasks; `PL-NN` on wiring and system tasks; `contract` on the interface task |
+| `Step` | `PL-NN.<function>` from the step table (`task-step`) on spine and thicken tasks; `PL-NN` on wiring and system tasks; `contract` on interface tasks |
 | `Kind` | `interface`, `spine`, `wiring`, `thicken` or `system` (`phase0.md`) |
 | `Covers` | Spec IDs the task satisfies |
-| `Size` | XS = 1, S = 1–2, M = 3–5 `Writes:` entries outside `tests/`, a folder glob counting as one (`task-size`) |
+| `Size` | XS, S or M, counting what the task builds (`tasks.md` step 5, `task-size`) |
 | `Mode` | `split` for checkable behavior, `solo` for interface, spine, wiring, system, refactor, glue, doc-sync |
 | `Skills` | Skill names, or `—`. Every skill on the milestone's `**Skills:**` line (else its stage's) lands on at least one task (`skills_unrouted`). A missing skill is still named |
 | `Read` | IDs and repo paths, comma-separated. Everything the builder needs, nothing more (`missing-ref`). References by ID with an optional selector: `RF-01:deseasonalize`, `RF-01:outline`, `RF-03:<heading>`, `PB-01:probe.py:sync_all`, `PB-01:samples`; a long one with none warns (`ref-large`). Every milestone reference lands on at least one task (`references_unrouted`) |
@@ -120,7 +123,7 @@ Title rule: no " and " (`task-title`). Required fields: Package, Step, Kind, Siz
 
 ### Checkpoint blocks
 
-After the interface task(s), the barrier:
+After the last interface task, the barrier:
 
 ```markdown
 ### Checkpoint after M2-T01 (barrier)

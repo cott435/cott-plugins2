@@ -49,7 +49,7 @@ A foreign plan's question: `references/examples-foreign.md`. **Next run:** with 
 
 Before presenting the Draft:
 - `dt lint tasks/ docs/roadmap.md AGENTS.md` is clean.
-- `dt status --skill build-planning`: `uncovered`, `no_spine`, `mode_violations`, `boundaries_unfrozen`, `references_unrouted`, `skills_unrouted` and `stage_unrouted` empty, or each item explained on its task or under Open questions; `skills_missing` listed for the user. `dt ready` lists only the interface task(s).
+- `dt status --skill build-planning`: `uncovered`, `no_spine`, `mode_violations`, `boundaries_unfrozen`, `references_unrouted`, `skills_unrouted` and `stage_unrouted` empty, or each item explained on its task or under Open questions; `skills_missing` listed for the user. `dt ready` lists only the types task(s).
 - `dt context` resolves for every task, under 2,000 lines; a contract symbol that doesn't resolve is routed (Not for).
 - Every plan header field is set.
 

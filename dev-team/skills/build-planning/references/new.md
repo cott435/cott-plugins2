@@ -4,7 +4,7 @@
 
 1. **Every stage designed first.** When the stages come from the brief (Source `brief`, planned up front), a stage below Designed stops New: `dt status` reports `blocked`, naming each stage's gap: packages with no Approved `pipelines.md`, or spec IDs on no step (a QR- limit included). Route to `pipeline-design`, or the first upstream skill whose doc isn't Approved.
 2. **Grow check, cut the stage, scope the milestone:** `cut.md`. Up front, cut every designed stage, not only the first.
-3. **Milestone shape** (interface task, one spine per step, wiring per pipeline, system task, folds): `phase0.md`.
+3. **Milestone shape** (types and contract tasks, one spine per step, wiring per pipeline, system task, long runs, folds): `phase0.md`.
 4. **Thicken, route skills and references, build modes, checkpoints, `Writes:`, the dependency graph, write:** `tasks.md`.
 5. **The AGENTS.md doc map** (below).
 6. Run the Review Gate.

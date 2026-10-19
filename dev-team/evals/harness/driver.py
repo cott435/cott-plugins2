@@ -40,13 +40,13 @@ ran the scripts (`ran`), the driver runs each Ready probe as the user would: it 
 .env.example (keys get the canary `sk-canary-<run id>`; a proxied vendor gets no base URL), runs public.py only where
 the README gives it to the user (as given: `uv run [--script] public.py <step>`), with no environment but the closed
 proxy's, then each probe.py step its README gives with the closed proxy's environment and the keys, logs them to
-<out>/user_runs.jsonl and commits "user run before turn N". The simulated user is then told which steps ran and each
-one's exit code (no output) and rewrites its message to match. When the user would move on while `dt next` says
+<out>/user_runs.jsonl and commits "user run before turn N". The simulated user then drops its own account of the run
+from its message, and the driver appends which steps ran and each one's exit code, never output (`ran_said`). When the user would move on while `dt next` says
 build-planning waits for Ready probes it never ran, readiness asks it to run them.
 
 A failed simulated-user call is retried twice and logged to <out>/sim_errors.jsonl. After that the fallback asks the
 agent to repeat its questions when it asked any, and approves only when it didn't; a failed rewrite after a user run
-keeps the message and appends the run report.
+keeps the message as it was, still with the run report appended.
 
 Usage: driver.py <trajectory-id> <out-dir>
 
@@ -238,6 +238,11 @@ def run_report(runs):
         step = " ".join([r["script"].split("/")[-1], *r.get("args", [])]) if r.get("script") else "(no folder)"
         out.append(f"{r['probe']} {step}: " + (r.get("error") or ("exit code " + str(r["rc"]))))
     return "; ".join(out)
+
+
+def ran_said(report):
+    """What the user's message says about its run: the run report as is, never the simulated user's own account."""
+    return "Nothing ran: no probe was Ready." if report.startswith("nothing ran") else f"I ran them as the READMEs say: {report}."
 
 
 def mcp_args(out):
@@ -895,15 +900,17 @@ def run_loop(scn, traj, project, stages, out, proj, plugin_root, dt, extra, msg,
             # The user saw what ran and each step's exit code (never the output), and says only that.
             report = run_report(user_run)
             rec["user_run_report"] = report
-            told = ask(f"You just ran the scripts as their READMEs say. What ran: {report}. Rewrite your message "
-                       f"(keep its action, \"{u.get('action')}\"): say you ran them, name only these steps, and for a "
-                       "step that failed give its exit code, never any output. If nothing ran, say so. Keep the rest "
-                       f"of your message.\nYOUR MESSAGE: {u.get('message')}")
+            # The sim user only drops its own account of the run; the driver says what ran (smoke-12: a rewrite named
+            # PB-02's step when only PB-01's had run).
+            told = ask("You just ran the scripts as their READMEs say, and the eval adds the exact list of what ran to "
+                       f"your message. Rewrite your message (keep its action, \"{u.get('action')}\"): remove whatever "
+                       "it says about running scripts, which steps ran or how they ended, and keep the rest as it is. "
+                       f"If nothing is left, the message is \"-\".\nYOUR MESSAGE: {u.get('message')}")
             if told.get("fallback"):  # keep the message and its answers, and still report the run (flow-F7)
                 rec["sim_fallback_rewrite"] = True
-                msg = f"{u.get('message', '').strip()} I ran them as the READMEs say: {report}." + refs_note(new_refs)
-            else:
-                msg = told["message"] + refs_note(new_refs)
+            kept = (u.get("message") if told.get("fallback") else told["message"]).strip()
+            msg = f"{'' if kept == '-' else kept} {ran_said(report)}".strip()
+            msg += refs_note(new_refs)
         (out / "turns.json").write_text(json.dumps(turns, indent=1))
     summary = {"trajectory": tid, "turns": len(turns), "stages_reached": n_revealed, "stage_log": stage_log,
                "references": refs,

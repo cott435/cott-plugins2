@@ -15,7 +15,7 @@ HERE = pathlib.Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(HERE))
 import driver  # noqa: E402
 from driver import (FALLBACK_APPROVE, FALLBACK_ASKED, approved_docs, asked, readiness, run_report,  # noqa: E402
-                    session_step, sim_answer, sim_user, user_steps, vendor_env, working_skill)
+                    ran_said, session_step, sim_answer, sim_user, user_steps, vendor_env, working_skill)
 
 
 def sess(skill, *seen):
@@ -251,6 +251,10 @@ DECISIONS = [
     ("the run report gives each step's exit code and no output",
      run_report(RUNS), "PB-01 public.py: exit code 0; PB-01 probe.py bulk: exit code 1; PB-02 (no folder): no folder PB-02"),
     ("nothing Ready: the report says nothing ran", run_report([]), "nothing ran: no probe was Ready"),
+    # Smoke 12: the sim user's rewrite named PB-02's step when only PB-01's had run; the driver says what ran.
+    ("the user's message says what ran in the driver's words", (ran_said(run_report(RUNS[:2])), ran_said(run_report([]))),
+     ("I ran them as the READMEs say: PB-01 public.py: exit code 0; PB-01 probe.py bulk: exit code 1.",
+      "Nothing ran: no probe was Ready.")),
     ("a reply ending on a question asks; one ending on a statement doesn't",
      (asked("Which start date?\n"), asked("Approved and marked.")), (True, False)),
     ("a failed sim-user call is tried three times, each logged with its exit code and output (flow-F7)",

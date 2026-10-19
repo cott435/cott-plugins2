@@ -139,8 +139,8 @@ class BudgetChecks(LintCase):
         self._add_symbols(22)
         self.p.edit(CONTRACT, "- **Used by:** PL-03", "- **Used by:** PL-03\nfiller\nfiller")
         self.assertEqual(self.budget_messages(CONTRACT), [
-            "212 lines, over the 200-line ceiling for one package's contract doc: architecture-design should "
-            "consider a Grow"])
+            "212 lines, over the 200-line ceiling for one package's contract doc: size alone never splits a "
+            "package; trim the doc, or split a module"])
         code, _ = run_main("--root", str(self.p.root), "lint")
         self.assertEqual(code, 0)
 
@@ -608,6 +608,17 @@ class StepIoTypes(LintCase):
         self.p.edit(PIPES, "| Cov → Factors |", "| Cov → Loadings |")
         self.assertEqual(self.messages(), [("E", "PL-02 step `pca` names Loadings, which no contract.md type section "
                                                  "defines (`### <component>.Loadings: type`)")])
+
+    def test_routed_type_is_a_warning(self):
+        # A type pipeline-design routed to architecture-design waits for that Revise: W until it lands, E once ticked.
+        self.p.edit(PIPES, "| Cov → Factors |", "| Cov → Loadings |")
+        self.p.write("docs/routes.md", "# Routed changes\n\n- [ ] architecture-design · add stats.Loadings, the "
+                     "factor loadings PL-02.pca returns (from pipeline-design, 2026-10-18)\n")
+        self.assertEqual(self.messages(), [("W", "PL-02 step `pca` names Loadings, which no contract.md type section "
+                                                 "defines (`### <component>.Loadings: type`); routed, waiting for its "
+                                                 "owner's Revise")])
+        self.p.edit("docs/routes.md", "- [ ]", "- [x]")
+        self.assertEqual([sev for sev, _ in self.messages()], ["E"])
 
     def test_qualified_type_resolves(self):
         self.p.edit(PIPES, "| Cov → Factors |", "| stats.Cov → quant.stats.Factors |")

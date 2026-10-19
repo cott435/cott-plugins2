@@ -291,7 +291,8 @@ def check_budget(ctx: Context):
             ceiling = GROW_CEILINGS[doc.kind]
             if len(doc.lines) > ceiling and not kept:
                 yield _p(doc, 0, "grow-size", f"{len(doc.lines)} lines, over the {ceiling}-line ceiling for one "
-                         f"package's {doc.kind} doc: architecture-design should consider a Grow")
+                         f"package's {doc.kind} doc: size alone never splits a package; trim the doc, or split a "
+                         "module")
         if doc.kind == "brief":
             words, goals = len(doc.text.split()), model.goal_count(doc)
             if words > BRIEF_WORDS:
@@ -1520,17 +1521,23 @@ def check_packet_type_closure(ctx: Context):
 def check_step_io_types(ctx: Context):
     """Every type a package step's `In → Out` cell names is a contract type section, and every step's Out names
     one: the boundaries an interface task freezes (entry arguments on the In side may stay plain). A project with
-    no type sections yet gets warnings, not errors."""
+    no type sections yet gets warnings, not errors, and so does a type an open route (docs/routes.md) names: the
+    addition waits for its owner's Revise."""
     types = model.contract_types(ctx.repo)
     sev = "" if types else "W"
+    routed = " ".join(r.change for r in rt.routes(ctx.repo) if not r.done)
     for doc in ctx.repo.docs("pipelines"):
         for p in model.pipelines(doc):
             for s in p.steps:
                 for name in s.in_types + s.out_types:
                     if model.resolve_type(types, name) is None:
+                        short = name.rsplit(".", 1)[-1]
+                        waiting = bool(re.search(rf"(?<![\w.]){re.escape(short)}\b|\b{re.escape(name)}\b", routed))
                         yield Problem(doc.rel, s.line + 1, "step-io-types",
                                       f"{p.id} step `{s.name}` names {name}, which no contract.md type section "
-                                      f"defines (`### <component>.{name.rsplit('.', 1)[-1]}: type`)", sev)
+                                      f"defines (`### <component>.{short}: type`)"
+                                      + ("; routed, waiting for its owner's Revise" if waiting else ""),
+                                      "W" if waiting else sev)
                 if not s.out_types:
                     yield Problem(doc.rel, s.line + 1, "step-io-types",
                                   f"{p.id} step `{s.name}`: its Out names no contract type", sev)

@@ -3,19 +3,20 @@
 it opens a fresh one, for which skill, and whether with `/dev-team:<skill>`), driver.user_steps (the probe.py and
 public.py steps a probe's README gives the user, run in order on "ran it"), driver.readiness's probe and approval
 clauses, run_report (what the simulated user is told after its run), sim_user's fallback when every call fails and
-sim_answer's when it answers in prose, working_skill (the skill a turn worked in), and start_vendors' proxied Sharadar
-(no base URL; the closed proxy serves api.sharadar.com with the canary key). No dt, no model calls; the dry run runs
-this too.
+sim_answer's when it answers in prose, working_skill (the skill a turn worked in), start_vendors' proxied Sharadar
+(no base URL; the closed proxy serves api.sharadar.com with the canary key), and agent_turn past the turn limit (a
+hanging CLI killed with its child, its stream kept, the run told and going on). No dt, no model calls; the dry run
+runs this too.
 
 Usage: sessions.py   prints one line per case; exit 1 if any case comes out wrong
 """
-import json, pathlib, sys, tempfile, urllib.request
+import json, os, pathlib, subprocess, sys, tempfile, textwrap, time, urllib.request
 
 HERE = pathlib.Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(HERE))
 import driver  # noqa: E402
 from driver import (FALLBACK_APPROVE, FALLBACK_ASKED, approved_docs, asked, readiness, run_report,  # noqa: E402
-                    ran_said, session_step, sim_answer, sim_user, user_steps, vendor_env, working_skill)
+                    ran_said, session_step, sim_answer, sim_user, timeout_note, user_steps, vendor_env, working_skill)
 
 
 def sess(skill, *seen):
@@ -232,6 +233,44 @@ def proxied_sharadar():
 SHARADAR, SHARADAR_ENV, SHARADAR_CODE, SHARADAR_LOG, N_SERVERS = proxied_sharadar()
 
 
+# Iteration 11's Q1: the agent's paced Yahoo check ran inside its turn past the 1,800 s limit; the uncaught timeout
+# killed both quant runs. A CLI that starts a Bash call (a child that would sleep for a minute) and hangs.
+HANG_CLI = textwrap.dedent("""\
+    #!/usr/bin/env python3
+    import json, subprocess, sys, time
+    print(json.dumps({"type": "system", "subtype": "init", "skills": []}), flush=True)
+    print(json.dumps({"type": "assistant", "message": {"content": [{"type": "tool_use", "id": "t1", "name": "Bash",
+          "input": {"command": "uv run --script probes/PB-03-yahoo/public.py paced"}}]}}), flush=True)
+    child = subprocess.Popen(["sleep", "60"])
+    open("child.pid", "w").write(str(child.pid))
+    time.sleep(60)
+    """)
+
+
+def hung_turn():
+    """agent_turn on HANG_CLI with a 2 s limit: (its reply, usage, seconds, whether the stream kept both lines, whether
+    the child still runs)."""
+    d = pathlib.Path(tempfile.mkdtemp(prefix="hang-"))
+    cli = d / "claude"
+    cli.write_text(HANG_CLI)
+    cli.chmod(0o755)
+    saved = driver.CLAUDE_BIN, driver.TURN_TIMEOUT
+    driver.CLAUDE_BIN, driver.TURN_TIMEOUT = str(cli), 2
+    try:
+        reply, usage, _, _, secs, *_ = driver.agent_turn(d, "sid", "hi", True, d / "agent_stream.jsonl", d, [], turn=5)
+    finally:
+        driver.CLAUDE_BIN, driver.TURN_TIMEOUT = saved
+    lines = (d / "agent_stream.jsonl").read_text().splitlines()
+    pid = int((d / "child.pid").read_text()) if (d / "child.pid").exists() else None
+    time.sleep(0.2)
+    alive = pid is not None and subprocess.run(["ps", "-o", "stat=", "-p", str(pid)], capture_output=True,
+                                               text=True).stdout.strip() not in ("", "Z")
+    return reply, usage, secs, len(lines) == 3 and '"driver_turn"' in lines[0], alive
+
+
+HUNG_REPLY, HUNG_USAGE, HUNG_SECS, HUNG_STREAM, HUNG_CHILD = hung_turn()
+
+
 RUNS = [{"probe": "PB-01", "script": "probes/PB-01-x/public.py", "args": [], "rc": 0, "stdout_tail": "secret rows"},
         {"probe": "PB-01", "script": "probes/PB-01-x/probe.py", "args": ["bulk"], "rc": 1, "stderr_tail": "Traceback"},
         {"probe": "PB-02", "script": None, "rc": None, "error": "no folder PB-02"}]
@@ -277,6 +316,16 @@ DECISIONS = [
                                                                              "NASDAQ_DATA_LINK_API_KEY": "sk-canary-selftest"}),
     ("api.sharadar.com through the closed proxy reaches the fake, which takes the canary",
      (SHARADAR_CODE, [(e["path"], e["key_ok"]) for e in SHARADAR_LOG]), (200, [("/v1.0/data/tickers", True)])),
+    ("a turn past the limit is killed, marked timed_out with the call it was in, and says so (Q1)",
+     (HUNG_USAGE.get("timed_out"), (HUNG_USAGE.get("last_call") or {}).get("name"), HUNG_REPLY.startswith("[agent turn timed out"),
+      HUNG_SECS < 20), (True, "Bash", True, True)),
+    ("the killed turn's stream so far stays in the log, after its turn marker", HUNG_STREAM, True),
+    ("what the killed turn started is killed with it", HUNG_CHILD, False),
+    ("the next turn is told it was stopped, what it was running, and to carry on",
+     timeout_note(1820, HUNG_USAGE.get("last_call")),
+     'Your last turn was still running after 30 minutes, so it was stopped (the last thing it ran: Bash {"command": '
+     '"uv run --script probes/PB-03-yahoo/public.py paced"}). Whatever it was running was killed and its output is '
+     'lost. Please carry on from where you were.'),
     ("a turn's working skill: the last its calls show", working_skill(["api-probe", "pipeline-design"], ["probes/x"],
                                                                      "api-probe", "api-probe"), ("pipeline-design", "calls")),
     ("no skill in its calls: the owner of most of the files it changed",

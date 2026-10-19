@@ -31,6 +31,11 @@ The simulated user answers in JSON (claude -p --json-schema; prose is taken as i
 what the assistant presented). Readiness skips a Draft the message approves. The closing message only approves; if a
 doc is still Draft after it, one more approve-only turn is sent.
 
+An agent turn still running after TURN_TIMEOUT_S (default 1,800 s) is killed with everything it started; its stream so
+far stays in agent_stream.jsonl, turns.json marks it `timed_out` with its `last_call` (the tool call still open), and
+the next message, to the same session and in place of the simulated user's, says it was stopped and asks it to carry
+on (`timeout_note`). The run stops only after TIMEOUT_LIMIT timed-out turns in a row, with its summary.
+
 Probes (design/probes.md §10.1): a project's `fake_vendors` (scenarios.json) are served for the whole run
 (fakevendor/) on their real API hosts (`proxy_hosts`: Yahoo's, Sharadar's `api.sharadar.com` and
 `data.nasdaq.com/api/`), behind an HTTPS proxy whose environment the whole run gets (`start_vendors`); no base URL
@@ -52,16 +57,16 @@ Usage: driver.py <trajectory-id> <out-dir>
 
 Env: PLUGIN_SRC / SKILLS_SRC (see plugin.py), CLAUDE_BIN (default: claude; fake_claude.py for a no-cost
 loop test), AGENT_MODEL, USER_MODEL, COST_CAP_USD (stop once the agent sessions together have cost this much;
-default none), MAX_TURNS (override the scenario's turn budget, e.g. 1 for a smoke run), PERMISSION_PROMPTS=0 (don't
-answer the oracle guard's "ask" prompts; see permission_mcp.py). Both sessions load project/local settings
-only, no CLAUDE.md files and no MCP servers but the eval's own, so the host's user-level instructions, skills,
+default none), MAX_TURNS (override the scenario's turn budget, e.g. 1 for a smoke run), TURN_TIMEOUT_S (above),
+PERMISSION_PROMPTS=0 (don't answer the oracle guard's "ask" prompts; see permission_mcp.py). Both sessions load
+project/local settings only, no CLAUDE.md files and no MCP servers but the eval's own, so the host's user-level instructions, skills,
 plugins and MCP servers don't leak into the trajectory.
 
 Agent frontmatter hooks (the .claude/agents/*.md files build-setup writes) don't fire in a headless run in an
 untrusted folder (checked live: skipped silently) unless the agents are passed with --agents or installed
 user-level; planning never runs those agents, so this harness doesn't need them.
 """
-import collections, json, os, re, subprocess, sys, time, uuid, shutil, pathlib
+import collections, json, os, re, signal, subprocess, sys, time, uuid, shutil, pathlib
 
 HERE = pathlib.Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
@@ -75,6 +80,11 @@ USER_MODEL = os.environ.get("USER_MODEL", "sonnet")
 COST_CAP = float(os.environ.get("COST_CAP_USD") or "inf")
 MAX_TURNS = int(os.environ["MAX_TURNS"]) if os.environ.get("MAX_TURNS") else None
 PERMISSION_PROMPTS = os.environ.get("PERMISSION_PROMPTS", "1") != "0"
+# An agent turn still running after this many seconds is killed (TURN_TIMEOUT_S; iteration 11's Q1: a paced probe check
+# inside a turn ran past 1,800 s and the uncaught timeout killed both quant runs). The run goes on; it stops only after
+# TIMEOUT_LIMIT timed-out turns in a row.
+TURN_TIMEOUT = int(os.environ.get("TURN_TIMEOUT_S") or 1800)
+TIMEOUT_LIMIT = 3
 STALL_LIMIT = 4  # blocked moves in a row with nothing changed in the turn (the agent's own commits count) before the run stops as stalled
 
 STRIP_ENV = ["CLAUDE_CODE_SESSION_ID", "CLAUDE_CODE_REMOTE_SESSION_ID", "CLAUDE_CODE_TEE_SDK_STDOUT",
@@ -351,12 +361,11 @@ def agent_turn(proj, sid, msg, first, log_path, plugin_root, extra, turn=None):
            "--plugin-dir", str(plugin_root), *extra, *ISOLATE]
     cmd += ["--session-id", sid] if first else ["--resume", sid]
     t0 = time.time()
-    r = sh(cmd, proj, timeout=1800)
+    rc, stderr, ran = run_streamed(cmd, proj, log_path)
     dt = time.time() - t0
-    with open(log_path, "a") as f:
-        f.write(r.stdout)
+    stdout = read_from(log_path, ran["start"])
     result, usage, tools, skills, errors, hooks, init, agents, seen = "", {}, [], [], [], 0, {}, [], []
-    for line in r.stdout.splitlines():
+    for line in stdout.splitlines():
         try:
             d = json.loads(line)
         except Exception:
@@ -388,11 +397,70 @@ def agent_turn(proj, sid, msg, first, log_path, plugin_root, extra, turn=None):
             result = d.get("result", "")
             usage = {"cost_usd": d.get("total_cost_usd"), "duration_ms": d.get("duration_ms"),
                      "usage": d.get("usage"), "num_turns": d.get("num_turns")}
-    if not result and r.returncode != 0:
-        result = f"[agent error rc={r.returncode}] {r.stderr[-500:]}"
+    if ran["killed"]:
+        usage.update(timed_out=True, last_call=last_call(stdout))
+        result = result or f"[agent turn timed out after {TURN_TIMEOUT} s and was killed]"
+    elif not result and rc != 0:
+        result = f"[agent error rc={rc}] {stderr[-500:]}"
     m = SLASH.match(msg)
     seen = list(dict.fromkeys(([m.group(1)] if m else []) + seen))  # in the order the turn worked in them
     return result, usage, tools, skills, dt, errors, hooks, init, agents, seen
+
+
+def run_streamed(cmd, cwd, log_path, timeout=None):
+    """Run `cmd` with its stdout appended to `log_path` as it comes, so a hung turn's stream is kept. Past `timeout`
+    (TURN_TIMEOUT) its whole process group is stopped (TERM, then KILL), with whatever it started: (rc, stderr tail,
+    {"start": the log offset the output starts at, "killed": whether it timed out})."""
+    with open(log_path, "a") as f:
+        start = f.tell()
+        p = subprocess.Popen(cmd, cwd=cwd, env=ENV, stdout=f, stderr=subprocess.PIPE, text=True, start_new_session=True)
+        try:
+            _, err = p.communicate(timeout=timeout or TURN_TIMEOUT)
+            return p.returncode, err or "", {"start": start, "killed": False}
+        except subprocess.TimeoutExpired:
+            for sig, wait in ((signal.SIGTERM, 10), (signal.SIGKILL, 30)):
+                try:
+                    os.killpg(p.pid, sig)
+                    _, err = p.communicate(timeout=wait)
+                    break
+                except ProcessLookupError:
+                    _, err = p.communicate()
+                    break
+                except subprocess.TimeoutExpired:
+                    err = ""
+            return p.returncode, err or "", {"start": start, "killed": True}
+
+
+def read_from(path, offset):
+    with open(path) as f:
+        f.seek(offset)
+        return f.read()
+
+
+def last_call(stdout):
+    """The last tool call in a stream that has no result yet ({name, input}, the input cut short), or None: what a
+    killed turn was still running."""
+    calls, done = {}, set()
+    for line in stdout.splitlines():
+        try:
+            d = json.loads(line)
+        except ValueError:
+            continue
+        for c in (d.get("message") or {}).get("content", []) if isinstance(d.get("message"), dict) else []:
+            if isinstance(c, dict) and c.get("type") == "tool_use":
+                calls[c.get("id")] = {"name": c.get("name"), "input": json.dumps(c.get("input"))[:300]}
+            elif isinstance(c, dict) and c.get("type") == "tool_result":
+                done.add(c.get("tool_use_id"))
+    open_ = [c for i, c in calls.items() if i not in done]
+    return open_[-1] if open_ else None
+
+
+def timeout_note(seconds, call):
+    """The next message after a timed-out turn: what happened, in a user's words, then "carry on"."""
+    what = f" (the last thing it ran: {call['name']} {call['input'][:200]})" if call else ""
+    took = f"{round(seconds / 60)} minutes" if seconds >= 120 else f"{round(seconds)} seconds"
+    return (f"Your last turn was still running after {took}, so it was stopped{what}. Whatever "
+            "it was running was killed and its output is lost. Please carry on from where you were.")
 
 
 PLANNING_CHAIN = """For each stage the assistant takes you through several planning documents, one at a time, each needing your approval: the idea/brief, the spec, the architecture, the pipelines (the workflows you will run and the planned file layout), optionally a test plan with golden test cases, and the build plan (the tasks for that milestone). Before the first build it also sets up the build tooling and quality bar (CONSTRAINTS.md, checks, agent roles); approve that too."""
@@ -755,6 +823,7 @@ def run_loop(scn, traj, project, stages, out, proj, plugin_root, dt, extra, msg,
     user_run = None  # what the user ran before this turn ("ran it")
     probes_run = set()  # the probes the user has run in this run
     stalled = 0  # consecutive turns where the user wanted to move on, readiness blocked it, and nothing changed since the turn began
+    timeouts = 0  # consecutive timed-out turns
     for t in range(1, (MAX_TURNS or traj["max_turns"]) + 1):
         # The commit the turn starts from (the previous turn's, or the user run's after it): diffing from it,
         # not `git show HEAD`, counts the agent's own commits in this turn as changes.
@@ -794,6 +863,8 @@ def run_loop(scn, traj, project, stages, out, proj, plugin_root, dt, extra, msg,
         if user_run is not None:
             rec["user_run"] = user_run
             user_run = None
+        if usage.get("timed_out"):
+            rec["timed_out"], rec["last_call"] = usage.pop("timed_out"), usage.pop("last_call")
         if fresh:
             rec["session_init"] = init
         if t == 1:
@@ -824,6 +895,18 @@ def run_loop(scn, traj, project, stages, out, proj, plugin_root, dt, extra, msg,
         if sum(s["cost_usd"] for s in sessions) > COST_CAP:
             stop_reason = f"cost cap {COST_CAP} USD"
             break
+        timeouts = timeouts + 1 if rec.get("timed_out") else 0
+        if timeouts >= TIMEOUT_LIMIT:
+            stop_reason = f"{timeouts} turns in a row timed out"
+            break
+        if timeouts:
+            # The killed turn left no answer for the user to read: the same session is told what happened and goes on,
+            # as if the message it never answered approved nothing (else an approval in it would open a fresh session).
+            msg = timeout_note(dt_s, rec["last_call"])
+            last = pending = {"action": "reply", "approves": False, "ran": False}
+            rec["sim_action"] = rec["sim_action_final"] = "timeout_note"
+            (out / "turns.json").write_text(json.dumps(turns, indent=1))
+            continue
         revealed = stages[:n_revealed]
         nxt = stages[n_revealed] if traj["mode"] == "incremental" and n_revealed < len(stages) else None
         ask = lambda note="": sim_user(scn, traj, revealed, nxt, "\n\n".join(history[-4:-1]), reply, status, refs, note,

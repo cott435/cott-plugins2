@@ -105,7 +105,7 @@ The interface, wiring and system tasks are worked in `references/examples-phase0
 | `Step` | `PL-NN.<function>` from the step table (`task-step`) on spine and thicken tasks; `PL-NN` on wiring and system tasks; `contract` on the interface task |
 | `Kind` | `interface`, `spine`, `wiring`, `thicken` or `system` (`phase0.md`) |
 | `Covers` | Spec IDs the task satisfies |
-| `Size` | XS = 1, S = 1–2, M = 3–5 `Writes:` entries outside `tests/`, a folder glob counting as one (`task-size`) |
+| `Size` | XS, S or M, counting what the task builds (`tasks.md` step 5, `task-size`) |
 | `Mode` | `split` for checkable behavior, `solo` for interface, spine, wiring, system, refactor, glue, doc-sync |
 | `Skills` | Skill names, or `—`. Every skill on the milestone's `**Skills:**` line (else its stage's) lands on at least one task (`skills_unrouted`). A missing skill is still named |
 | `Read` | IDs and repo paths, comma-separated. Everything the builder needs, nothing more (`missing-ref`). References by ID with an optional selector: `RF-01:deseasonalize`, `RF-01:outline`, `RF-03:<heading>`, `PB-01:probe.py:sync_all`, `PB-01:samples`; a long one with none warns (`ref-large`). Every milestone reference lands on at least one task (`references_unrouted`) |

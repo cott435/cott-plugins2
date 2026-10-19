@@ -4,9 +4,9 @@ Read when writing thicken tasks, the dependency graph and the files. Templates: 
 
 ## 5. Thicken
 
-`**Kind:** thicken`, under Phase 2: one task per step upgrade, depending on its step's spine. Order in the file sets nothing: every thicken task can start once its spine lands, and thickens of one step that write separate files run side by side, with no edge between them. Each one's acceptance stays within its own file's seam; joining the concerns in the step's class (`learn` sampling the memory) is one task whose `Writes:` includes the class's file. Risk orders tasks only when a later one must learn from an earlier one, as an `order` edge with its reason (step 9). In data and ML work, data loading, leak checks and the evaluation get thicken tasks of their own, never left until after the model.
+`**Kind:** thicken`, under Phase 2: one task per step upgrade, depending on its step's spine. Order in the file sets nothing: every thicken task can start once its spine lands, and thickens of one step that write separate files run side by side, with no edge between them. Each one's acceptance stays within its own file's seam; joining the concerns in the step's class (`learn` sampling the memory) is one task whose `Writes:` includes the class's file. In data and ML work, data loading, leak checks and the evaluation get thicken tasks of their own, never left until after the model.
 
-**Split a task** when it needs more than one session, has more than 3 acceptance bullets, touches two packages or two steps, or has "and" in its title. Sizes count `Writes:` entries outside `tests/` (`task-size`; a folder glob counts as one): XS = 1, S = 1–2, M = 3–5. Nothing larger. Spine and thicken tasks are XS or S.
+**Split a task** when it needs more than one session, has more than 3 acceptance bullets, touches two packages or two steps, or has "and" in its title. **Size counts what a task builds:** each `Writes:` entry outside `tests/`, and each concern a folder glob holds (`task-size` counts the glob as one): XS = 1, S = 1–2, M = 3–5. Nothing larger. Spine and thicken tasks are XS or S. XS is one concern in one file (the Double DQN target, the ε schedule); S a class with its helper (a seeded scripted baseline). A whole learner (replay memory, target network, exploration, the step-budget loop, curve points, the divergence stop) is six concerns: never XS or one task, but a spine and a thicken per concern.
 
 **Acceptance is test-backed.** Each bullet is checkable: a `TC-NN` passes, a Given/When/Then, a model criterion by ID, the smoke command. With no `tests.md`, write the criterion so a tester can encode it. A TC that runs the whole pipeline is the wiring or system task's acceptance (`phase0.md`), never a thicken's. A thicken's golden case builds its store from its own fixture (`input.json`) through a shared test helper, never through a wiring task's run, so no thicken waits on wiring.
 
@@ -51,6 +51,6 @@ A spine never has an edge to another step's task: it builds against the interfac
 
 Task IDs start at `dt next-id M<n>-T` and count up, in phase order.
 - **Next milestone only.** Later milestones stay as roadmap outlines. Write `tasks/queued/M<n>-<slug>.md` only when the user asks.
-- `tasks/plan.md` with Status `Draft` and `**Base:** —` (pending). Never record a sha yourself: `build-setup` runs `dt base` after its bar is approved and committed.
+- `tasks/plan.md` with Status `Draft` and `**Base:** —` (pending). Never record a sha: `build-setup` runs `dt base` once its bar is committed.
 - `tasks/todo.md`: one unchecked line per task, IDs matching the plan.
 - Milestone rows and sections (`cut.md` step 2), the planned milestone's `**Exit:**` and `**Plan:**`, then `dt roadmap`.

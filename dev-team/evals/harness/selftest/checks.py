@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Good and bad cases for the grader's structural rules (dtrun.py, probefacts.py, probegrade.py, planexport.py), one
-pair or more per check that iteration 7's, 8's and 9's findings changed. The good cases are the forms those plans used that the old grader flagged by mistake;
+pair or more per check that iteration 7's, 8's, 9's and 10's findings changed. The good cases are the forms those plans used that the old grader flagged by mistake;
 the bad cases are the defects each check must still catch. No dt, no model calls; the dry run runs this too.
 
 Usage: checks.py   prints one line per case; exit 1 if any case comes out wrong
@@ -672,6 +672,85 @@ case("planexport_turn_skills", True, "it9 R10: a long session's turn running `dt
      ps[1] == "idea-refine" and ps[2] == "build-planning" and ps[3] == "build-planning")
 case("planexport_turn_skills", False, "a new session that shows no skill doesn't inherit the last session's", ps[4] == "")
 
+
+# ==== iteration 10 (results-iteration-10/findings.md, "Harness: grader") ==========================================
+
+# ---- spec_classical (it10 G1): "risk-parity" is risk parity
+case("spec_classical", True, "it10 quant inc: 'minimum-variance' and 'The risk-parity rule' (PORT-11)",
+     d.spec_classical("PORT-10 The minimum-variance rule … PORT-11 The risk-parity rule picks the weights …"))
+case("spec_classical", True, "the spaced form still matches", d.spec_classical("min variance and risk parity portfolios"))
+case("spec_classical", False, "min-variance alone is not both", not d.spec_classical("PORT-10 The minimum-variance rule; PORT-12 HRP"))
+
+# ---- probe_not_guess (it10 G2): a suggestion for a later stage is no data-source decision of this stage
+ad11 = {"title": "Suggested fundamentals source for a later stage: Sharadar Core US Fundamentals",
+        "text": "### AD-11: Suggested fundamentals source for a later stage: Sharadar Core US Fundamentals\n"
+                "**Status:** Accepted · **Date:** 2026-10-18 · **Scope:** later stage\n- **Decision:** Suggest SF1."}
+case("probe_not_guess", True, "it10 quant inc AD-11: '**Scope:** later stage' and its heading say later stage", d.later_stage_decision(ad11))
+case("probe_not_guess", True, "the Scope line alone is enough",
+     d.later_stage_decision({"title": "Sharadar SF1 for fundamentals", "text": "**Status:** Accepted · **Scope:** a later stage (S3)"}))
+case("probe_not_guess", False, "the stage's own source decision still counts, so it must cite a probe",
+     not d.later_stage_decision({"title": "Sharadar SEP is the price source", "text": "**Status:** Proposed · **Scope:** `eqdata`\n"
+                                 "- **Consequences:** a later stage can add fundamentals from the same vendor."}))
+
+# ---- sim_ready_3 (it10 G3): the wiring replay holds a spine its wiring waits on, never a call step's
+import simulate  # noqa: E402
+lab_pl = pipe("PL-01", [step("fit_learner", "lab.fit", "Config → Agent"), step("train_dqn", "dqn.train_dqn", "Config → Agent")],
+              package="lab", entry="packages/lab/src/rllab/lab/pipeline.py")
+t10 = [task("M1-T01", "interface"), task("M1-T05", "spine", "PL-01.fit_learner"), task("M1-T14", "spine", "PL-01.train_dqn"),
+       task("M1-T19", "wiring", "PL-01", ["packages/lab/src/rllab/lab/pipeline.py", "tests/unit/lab/test_pl01_smoke.py"])]
+w, own = simulate.wiring_spines(t10, [lab_pl], ("lab", "dqn"))
+case("sim_ready_3", True, "it10 rl aao: M1-T14 builds PL-01.train_dqn in package dqn, which lab's wiring M1-T19 fakes: not held",
+     w and w["id"] == "M1-T19" and own == ["M1-T05"])
+w, own = simulate.wiring_spines(t10, [pipe("PL-01", lab_pl["steps"], package="lab")], ("lab",))
+case("sim_ready_3", False, "a step of the pipeline's own package is still one the wiring waits on", own == ["M1-T05", "M1-T14"])
+lab_pl2 = pipe("PL-01", lab_pl["steps"] + [step("load_agent", "lab.agents", "RunId → Agent", covers=["POOL-03", "POOL-04"])], package="lab")
+t10b = t10[:3] + [task("M1-T06", "spine", "PL-01.load_agent")] + t10[3:]
+w, own = simulate.wiring_spines(t10b, [lab_pl2], ("lab", "dqn"), ["POOL-01", "POOL-02", "POOL-03", "POOL-04"])
+case("sim_ready_3", True, "it10 rl aao: M1-T06 builds PL-01.load_agent, whose Covers are all Deferred (to M6): not held", own == ["M1-T05"])
+w, own = simulate.wiring_spines(t10b, [lab_pl2], ("lab", "dqn"), ["POOL-04"])
+case("sim_ready_3", False, "with one of its Covers still this milestone's, it is held", own == ["M1-T05", "M1-T06"])
+t10c = t10b[:4] + [task("M1-T19", "wiring", "PL-01", ["packages/lab/src/rllab/lab/pipeline.py", "tests/unit/lab/test_pl01_smoke.py"])]
+t10c[-1]["depends_on"] = ["M1-T05", "M1-T06"]
+w, own = simulate.wiring_spines(t10c, [lab_pl2], ("lab", "dqn"), ["POOL-01", "POOL-02", "POOL-03", "POOL-04"])
+case("sim_ready_3", False, "it9 quant inc M1-T04 (open_primary, DATA-01 Deferred): a spine the wiring waits on is held",
+     own == ["M1-T05", "M1-T06"])
+
+# ---- phase0_split, wave_width (it10 G4): steps the Deferred list names by ID
+cell = ("SYNC-04 (to M2), PL-07.raise_finding (to M2: findings land with validation), PL-09.useReport, PL-09.ReportView "
+        "(to M3: runs and the report), PL-07.latest_day (to M4: only the study calls it).")
+case("phase0_split", True, "it10 quant inc: named steps read from the Deferred cell, the sentence's full stop left off",
+     d.named_steps(cell) == ["PL-07.raise_finding", "PL-09.useReport", "PL-09.ReportView", "PL-07.latest_day"])
+pl07 = pipe("PL-07", [step("total_returns", "returns.series", "Universe → Returns", covers=["RET-01", "RET-07"]),
+                      step("raise_finding", "findings", "Returns → Finding", covers=["RET-07"]),
+                      step("latest_day", "returns.latest", "Store → TradingDay", covers=["DATA-05"]),
+                      step("daily_bars", "returns.bars", "Ids → BarFrame", covers=["DATA-05"])],
+            package="eqdata", entry="e/pl07.py")
+pl09 = pipe("PL-09", [step("useStock", "api.queries", "Id → Stock", covers=["VIEW-01"]),
+                      step("useReport", "api.queries", "Id → Report", covers=["VIEW-09"])], package="web", entry="w/pl09.ts")
+tq = [task("M1-T01", "interface"), task("M1-T11", "spine", "PL-07.total_returns"), task("M1-T19", "spine", "PL-09.useStock"),
+      task("M1-T26", "wiring", "PL-07", ["e/pl07.py", "tests/unit/test_pl07.py"]), task("M1-T27", "wiring", "PL-09", ["w/pl09.ts", "tests/pl09.test.ts"])]
+dq = ["SYNC-04"] + d.named_steps(cell)
+names10 = {"Universe", "Returns", "Store", "Ids", "Id", "Stock"}
+o10 = d.outside_milestone([pl07, pl09], tq, dq, names10, ("eqdata", "web"))
+case("phase0_split", True, "it10 quant inc: PL-07.raise_finding, PL-07.latest_day and PL-09.useReport are Deferred by name",
+     {k for k, v in o10.items() if v.startswith("Deferred by name")} == {"PL-07.raise_finding", "PL-07.latest_day", "PL-09.useReport"})
+m10 = d.phase0_misses([pl07, pl09], tq, {"M1-T01"}, names10, ("eqdata", "web"), o10)
+case("phase0_split", True, "...so useReport's Report and raise_finding's Finding aren't asked of the interface, though api.queries is built",
+     not any("Report" in m or "Finding" in m or "raise_finding" in m or "latest_day" in m for m in m10))
+case("phase0_split", False, "PL-07.daily_bars, neither spined nor Deferred, is still missing with its BarFrame",
+     m10 == ["PL-07: interface lacks ['BarFrame']", "PL-07.daily_bars: 0 spine tasks"])
+case("phase0_split", False, "with dt's pipeline-ID reading of the cell (`PL-07`), the old misses come back",
+     "PL-09: interface lacks ['Report']" in d.phase0_misses([pl07, pl09], tq, {"M1-T01"}, names10, ("eqdata", "web"),
+                                                            d.outside_milestone([pl07, pl09], tq, ["SYNC-04", "PL-07", "PL-09"], names10, ("eqdata", "web"))))
+case("phase0_split", False, "a step Deferred by name that a task's Step cell names is this milestone's",
+     "PL-07.latest_day" not in d.outside_milestone([pl07], tq + [task("M1-T12", "spine", "PL-07.latest_day")], dq, names10, ("eqdata",)))
+
+# ---- runner_split (it10 G5, kept): the agent runs no probe.py, not even a copy against its own fake (api-probe new.md §5)
+case("runner_split", False, "it10 quant aao turn 9: a scratchpad copy of PB-03's probe.py run against the agent's fake with a dummy key",
+     pf.runs_user_script(bash("S=/private/tmp/x/scratchpad; cd $S/t/PB-03-sharadar-sp500 && export SHARADAR_BASE_URL=http://127.0.0.1:8765/v1.0 "
+                              "SHARADAR_API_KEY=k3y-for-tests; python3 probe.py sp500")))
+case("runner_split", True, "the agent's own public.py, run with an empty environment, is allowed",
+     not pf.runs_user_script(bash('env -i PATH="$PATH" uv run -q probes/PB-02-yahoo-crosscheck/public.py public')))
 
 def run(verbose=True):
     """The cases that came out wrong (empty when all hold)."""

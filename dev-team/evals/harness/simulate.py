@@ -159,8 +159,41 @@ def task_ids_in(d, skip=("next_task", "progress", "milestone", "next ids", "next
     return set(re.findall(r"M\d+-T\d{2,}", d)) if isinstance(d, str) else set()
 
 
-def interface_first(src, dt, tmp, plan, check):
-    """The four `dt ready` / contract-change replays, on a plan whose tasks carry Kind (else one failing check)."""
+def wiring_spines(tasks, pls=(), packages=(), deferred=()):
+    """(the first wiring task with spines on its pipeline, those spine task IDs). Left out, as phase0_split leaves
+    them out (it10 G3):
+    - a spine of a call step (another package's code the pipeline calls, `dtrun.call_step`): the wiring runs
+      against its fake (rl aao M1-T14 `PL-01.train_dqn` in package dqn under lab's wiring M1-T19);
+    - a spine of a step this pipeline needs only in a later milestone (Deferred by name, or every one of its Covers
+      Deferred) that the wiring doesn't wait on: rl aao M1-T06 `PL-01.load_agent` (POOL-03, POOL-04), built now
+      for PL-02's call. One the wiring waits on stays (it9 quant inc M1-T04 `PL-04.open_primary`, DATA-01)."""
+    steps = {f"{pl['id']}.{s['name']}": (pl, s) for pl in pls for s in pl["steps"]}
+    dfr = set(deferred)
+    anc = dtrun.ancestors(tasks)
+
+    def needed(x, t, w):
+        if x not in steps:
+            return True
+        pl, s = steps[x]
+        covers = set(s.get("covers") or [])
+        later = x in dfr or (covers and covers <= dfr)
+        return not (dtrun.call_step(pl, s, packages) or (later and t["id"] not in anc[w["id"]]))
+
+    def built_on(t, w):
+        return any(needed(x, t, w) for x in dtrun.step_ids(t.get("step")) if x.split(".")[0] == dtrun.pipeline_of(w))
+    spines = [t for t in tasks if t.get("kind") == "spine"]
+    for w in tasks:
+        if w.get("kind") != "wiring":
+            continue
+        own = [t["id"] for t in spines if built_on(t, w)]
+        if own:
+            return w, own
+    return None, []
+
+
+def interface_first(src, dt, tmp, plan, check, facts=None):
+    """The four `dt ready` / contract-change replays, on a plan whose tasks carry Kind (else one failing check).
+    `facts` (dtprobe's) gives the pipelines and packages, so the wiring replay leaves call steps out."""
     tasks = plan["tasks"]
     iface = [t["id"] for t in tasks if t.get("kind") == "interface"]
     if not iface:
@@ -183,13 +216,11 @@ def interface_first(src, dt, tmp, plan, check):
           got is not None and spines and not missing,
           f"spines {spines}; tester halves {testers}; missing: {missing}; ready={got if got is not None else raw}")
     # Wiring: everything ticked except one pipeline's wiring, its last spine, and whatever follows them.
-    by_id = {t["id"]: t for t in tasks}
-    wiring = next((t for t in tasks if t.get("kind") == "wiring"
-                   and [s for s in spines if by_id[s]["step"].split(".")[0] == t["step"].split(".")[0]]), None)
+    wiring, own = wiring_spines(tasks, (facts or {}).get("pipelines", []), tuple((facts or {}).get("packages") or ()),
+                                plan.get("deferred", []))
     if not wiring:
         check("Ready simulation: a pipeline's wiring task waits for all its spines", False, "no wiring task with spines on its pipeline")
     else:
-        own = [s for s in spines if by_id[s]["step"].split(".")[0] == wiring["step"].split(".")[0]]
         held = {wiring["id"], own[-1]}
         anc = dtrun.ancestors(tasks)
         later = {t["id"] for t in tasks if held & anc[t["id"]]}
@@ -373,7 +404,7 @@ def simulate(src, dt=None):
               f"lint errors={lint.get('errors')} · next build-planning mode={s_bp.get('mode')}")
 
         # ---- Ready and contract change (interface-first)
-        interface_first(src, dt, tmp, plan, check)
+        interface_first(src, dt, tmp, plan, check, facts)
         return R
     finally:
         shutil.rmtree(tmp, ignore_errors=True)

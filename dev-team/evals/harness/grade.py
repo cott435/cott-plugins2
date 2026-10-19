@@ -960,7 +960,7 @@ if project == "quant":
     check("spec_pca_mp", "Spec covers PCA market-mode removal and Marchenko–Pastur denoising",
           bool(re.search(r"\bPCA\b|principal component|eigenvector|eigenvalue|components above the edge|factor model|top factors|market (factor|mode)", spec, re.I)) and bool(re.search(r"Marchenko|random[- ]matrix|noise band|pure noise", spec, re.I)), "")
     check("spec_classical", "Classical portfolios (min-variance / risk parity / HRP) are specified",
-          bool(re.search(r"min(imum)?[- ]variance", spec, re.I)) and bool(re.search(r"risk parity", spec, re.I)), "")
+          dtrun.spec_classical(spec), "")
     m = dtrun.ML_BEATS_CLASSICAL.search(spec)  # the classical portfolios, or S2's named benchmark strategy
     check("spec_ml_beats_classical", "ML/PPO portfolios must beat the classical portfolios out of sample", bool(m), m.group(0)[:200] if m else "")
     # Whole spec Out-of-scope list and brief Not-doing section; a fixed-size window missed items deep in a long list.
@@ -1127,7 +1127,9 @@ if probing and vendor_cfg:
 
 def source_decisions(decs):
     """The decisions that choose a data source: their heading names the vendor (a decision that only mentions it,
-    such as credentials or security identity, isn't one); by their text when no heading does."""
+    such as credentials or security identity, isn't one); by their text when no heading does. A suggestion for a
+    later stage chooses nothing this stage builds (dtrun.later_stage_decision)."""
+    decs = [d for d in decs if not dtrun.later_stage_decision(d)]
     return [d for d in decs if src_rx.search(d["title"])] or [d for d in decs if src_rx.search(d["text"])]
 
 

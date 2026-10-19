@@ -1,0 +1,482 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1"><title>U12 implementer</title>
+<style>
+:root{--bg:#fbfbfa;--fg:#1d1d1f;--muted:#6b6b70;--line:#d9d9de;--box:#fff;--rowp:#eef3fb;--band:#fff4d6;
+--ok:#2e7d32;--bad:#c62828;--warn:#b26a00;--idle:#6b6b70}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#17171a;--fg:#ececf0;--muted:#9a9aa3;
+--line:#34343a;--box:#222227;--rowp:#1d2433;--band:#3a3015;--ok:#6fcf73;--bad:#ff6b6b;--warn:#f0b35a;--idle:#9a9aa3}}
+:root[data-theme="dark"]{--bg:#17171a;--fg:#ececf0;--muted:#9a9aa3;--line:#34343a;--box:#222227;--rowp:#1d2433;
+--band:#3a3015;--ok:#6fcf73;--bad:#ff6b6b;--warn:#f0b35a;--idle:#9a9aa3}
+body{margin:0;padding:16px;background:var(--bg);color:var(--fg);font:14px/1.45 -apple-system,system-ui,sans-serif}
+h1{font-size:18px;margin:0 0 4px}h2{font-size:15px;margin:22px 0 8px}.sub{color:var(--muted)}
+table{border-collapse:collapse;margin:4px 0 8px}td,th{border-bottom:1px solid var(--line);padding:4px 10px;text-align:left;
+vertical-align:top}th{color:var(--muted);font-weight:600}.chips span{display:inline-block;margin:0 4px 2px 0}
+.legend span{margin-right:14px;white-space:nowrap}.sw{display:inline-block;width:10px;height:10px;border-radius:2px;
+margin-right:4px;vertical-align:-1px}.scroll{overflow:auto;max-height:88vh;border:1px solid var(--line);border-radius:8px}
+.chart{display:grid;width:max-content}.chart>div{line-height:0}.corner{position:sticky;top:0;left:0;z-index:3}
+.colhead{position:sticky;top:0;z-index:2}.rowhead{position:sticky;left:0;z-index:2}
+svg.bg{background:var(--bg)}.colhead svg{border-bottom:1px solid var(--line)}.rowhead svg{border-right:1px solid var(--line)}
+.ok{color:var(--ok);fill:var(--ok)}.bad{color:var(--bad);fill:var(--bad)}.warn{color:var(--warn);fill:var(--warn)}
+.idle{color:var(--idle);fill:var(--idle)}
+svg text{fill:var(--fg);font-family:-apple-system,system-ui,sans-serif}
+.box{fill:var(--box);stroke:var(--line)}.unit:hover .box{stroke:var(--fg)}
+.role{font-size:12px;font-weight:600}.uid,.wmeta,.lmeta,.meta{font-size:10px;fill:var(--muted)}
+.sub{font-size:10.5px;fill:var(--muted)}.badge{font-size:11px;font-weight:600}
+.meta.bad{fill:var(--bad);font-weight:600}.lane{font-size:13px;font-weight:700}.wave{font-size:13px;font-weight:700}
+.par{fill:#4e79a7}.ser{fill:var(--muted)}.rowp{fill:var(--rowp)}.rows{fill:transparent}.band{fill:var(--band)}
+.bandt{font-size:11.5px}.grid{stroke:var(--line)}.link{stroke:var(--muted);stroke-width:1.2;opacity:.55}
+.arrowhead{fill:var(--muted)}.marks{font-size:10.5px}.audit{stroke:var(--box);stroke-width:2}.auditn{font-size:10px;font-weight:700;fill:#fff}
+a{color:inherit}svg a .box{cursor:pointer}
+
+:root{--c0:#2a78d6;--c1:#eb6834;--c2:#1baf7a;--c3:#eda100;--c4:#e87ba4;--c5:#008300;--c6:#6250d6;--c7:#e34948;
+--cx:#8a8985;--main:#52514e;--read:#dcdbd5;--readfg:#1d1d1f}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--c0:#3987e5;--c1:#d95926;--c2:#199e70;
+--c3:#c98500;--c4:#d55181;--c5:#008300;--c6:#9085e9;--c7:#e66767;--cx:#77766f;--main:#c3c2b7;--read:#3b3b40;
+--readfg:#ececf0}}
+:root[data-theme="dark"]{--c0:#3987e5;--c1:#d95926;--c2:#199e70;--c3:#c98500;--c4:#d55181;--c5:#008300;
+--c6:#9085e9;--c7:#e66767;--cx:#77766f;--main:#c3c2b7;--read:#3b3b40;--readfg:#ececf0}
+.c0{fill:var(--c0);background:var(--c0)}.c1{fill:var(--c1);background:var(--c1)}.c2{fill:var(--c2);background:var(--c2)}
+.c3{fill:var(--c3);background:var(--c3)}.c4{fill:var(--c4);background:var(--c4)}.c5{fill:var(--c5);background:var(--c5)}
+.c6{fill:var(--c6);background:var(--c6)}.c7{fill:var(--c7);background:var(--c7)}.cx{fill:var(--cx);background:var(--cx)}
+.cmain{fill:var(--main)}.sc0{stroke:var(--c0)}.sc1{stroke:var(--c1)}.sc2{stroke:var(--c2)}
+.tl text,.sm text,.lc text{font-size:10.5px;fill:var(--muted)}.tl .lbl-in,.sm .lbl-in{fill:#fff;font-size:10.5px;font-weight:600}
+.tl .rowl,.sm .rowl,.lc .rowl{fill:var(--fg);font-size:11.5px;font-weight:600}.tl .band{fill:var(--rowp)}
+.tl .brk{stroke:var(--muted);stroke-dasharray:2 3}.tl a:hover rect,.sm a:hover rect{stroke:var(--fg);stroke-width:1.5}
+.axis{stroke:var(--line)}.sm .val{fill:var(--fg);font-weight:600}.lc path.ln{fill:none;stroke-width:2}
+.lc circle{stroke:var(--bg);stroke-width:2}.lc .end{font-weight:600;fill:var(--fg)}
+.tiles{display:flex;flex-wrap:wrap;gap:10px;margin:12px 0}.tile{border:1px solid var(--line);border-radius:8px;
+padding:8px 12px;min-width:110px;background:var(--box)}.tile b{display:block;font-size:20px;line-height:1.2}
+.tile span{font-size:12px;color:var(--muted)}.tile i{font-style:normal;font-size:12px;margin-left:6px}
+.fm{border-collapse:separate;border-spacing:2px}.fm td,.fm th{border:0;padding:0;text-align:center;font-size:11px}
+.fm th{padding:0 2px;font-weight:600}.fm td.f,.fm th.f{text-align:left;padding-right:10px;white-space:nowrap;
+position:sticky;left:0;background:var(--bg);font:11.5px ui-monospace,Menlo,monospace;
+max-width:380px;overflow:hidden;text-overflow:ellipsis}
+.fm td.cell{min-width:22px;height:20px;border-radius:3px}.fm td.fw{background:var(--c0);color:#fff;font-weight:700}
+.fm td.fe{background:var(--c1);color:#fff;font-weight:700}.fm td.fr{background:var(--read);color:var(--readfg)}
+.fm td.n{color:var(--muted);padding:0 6px}.fm tr.grp td{text-align:left;padding-top:8px;color:var(--muted);
+font-weight:600}
+.key{display:inline-block;min-width:18px;text-align:center;border-radius:3px;font-size:11px;margin-right:4px}
+.bar{display:inline-block;height:9px;border-radius:2px;vertical-align:0}
+
+pre{white-space:pre-wrap;word-break:break-word;background:var(--box);border:1px solid var(--line);border-radius:6px;
+padding:8px 10px;margin:4px 0;font:12px/1.45 ui-monospace,SFMono-Regular,Menlo,monospace;max-width:100%;overflow:auto}
+.step{border-top:1px solid var(--line);padding:6px 0}.step:target{background:var(--rowp)}
+.sid{font:12px ui-monospace,Menlo,monospace;color:var(--muted);margin-right:8px}.kind{font-weight:600;margin-right:8px}
+.err{color:var(--bad);font-weight:600}.hook{color:var(--bad);margin:4px 0 0 16px}.lbl{font-size:12px;color:var(--muted);margin-top:6px}
+details summary{cursor:pointer;color:var(--muted);font-size:12px}.head td:first-child{color:var(--muted)}
+.top{font-size:13px}.narr{list-style:none;padding-left:0}.narr li{margin:3px 0}
+</style></head>
+<body>
+<p class="top"><a href="../flow.html">← the run's flow chart</a></p>
+
+<h1>U12 · implementer · M1-T03 solo</h1>
+<table class="head"><tr><td>Type</td><td>implementer</td></tr><tr><td>Description</td><td>M1-T03 solo</td></tr><tr><td>Spawned by</td><td>driver at D79</td></tr><tr><td>Turn</td><td><a href="../turns/T04.html">T04</a></td></tr><tr><td>Model</td><td>claude-opus-5-5</td></tr><tr><td>Start</td><td>2026-10-19 04:33:38 UTC</td></tr><tr><td>Duration</td><td>1 min</td></tr><tr><td>Tool calls</td><td>12</td></tr><tr><td>Errors</td><td>0</td></tr><tr><td>Hook blocks</td><td>0</td></tr><tr><td>Tokens</td><td>2.7k out · 15.1k new in · 102k cached in · peak context 19.8k</td></tr><tr><td>Skills invoked</td><td>none</td></tr><tr><td>Files written or edited</td><td>.claude/worktrees/agent-ab0c8554268ecab2d/packages/mdata/src/mdata/validate.py, .claude/worktrees/agent-ab0c8554268ecab2d/tests/unit/mdata/test_validate.py</td></tr><tr><td>Definition</td><td>none</td></tr><tr><td>Steps</td><td>14</td></tr><tr><td>Finished</td><td>yes</td></tr></table>
+
+
+<h2>Prompt</h2>
+<pre>You are the solo for M1-T03. Run `python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A3-r4/with_skill/plugin/dev-team/scripts/dt.py claim M1-T03 --role solo`, then read the packet it names.</pre>
+<h2>Files</h2>
+<table><tr><th>Op</th><th>File</th><th>Calls</th><th>By</th><th>Via</th><th>Steps</th></tr><tr><td>write</td><td><code>.claude/worktrees/agent-ab0c8554268ecab2d/tests/unit/mdata/test_validate.py</code></td><td>1</td><td>U12</td><td>Write</td><td><a href="#12">U12.S12</a></td></tr><tr><td>edit</td><td><code>.claude/worktrees/agent-ab0c8554268ecab2d/packages/mdata/src/mdata/validate.py</code></td><td>1</td><td>U12</td><td>Edit</td><td><a href="#9">U12.S9</a></td></tr><tr><td>read</td><td><code>.claude/worktrees/agent-ab0c8554268ecab2d/.claude/packet.md</code></td><td>1</td><td>U12</td><td>Read</td><td><a href="#3">U12.S3</a></td></tr><tr><td>read</td><td><code>.claude/worktrees/agent-ab0c8554268ecab2d/CONSTRAINTS.md</code></td><td>1</td><td>U12</td><td>Read</td><td><a href="#4">U12.S4</a></td></tr><tr><td>read</td><td><code>.claude/worktrees/agent-ab0c8554268ecab2d/packages/mdata/src/mdata/validate.py</code></td><td>1</td><td>U12</td><td>Read</td><td><a href="#5">U12.S5</a></td></tr><tr><td>read</td><td><code>.claude/worktrees/agent-ab0c8554268ecab2d/pyproject.toml</code></td><td>1</td><td>U12</td><td>Read</td><td><a href="#7">U12.S7</a></td></tr><tr><td>read</td><td><code>.claude/worktrees/agent-ab0c8554268ecab2d/tests/contracts/mdata.RawRow/sample.json</code></td><td>1</td><td>U12</td><td>Bash</td><td><a href="#6">U12.S6</a></td></tr></table>
+<h2>Steps</h2>
+<div class="step" id="S1"><span class="sid">U12.S1</span><span class="kind">user</span>You are the solo for M1-T03. Run `python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A3-r4/with_skill/plugin/dev-team/scripts/dt.py claim M1-T03 --role solo`, then read the packet it names.<details><summary>full text</summary><pre>You are the solo for M1-T03. Run `python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A3-r4/with_skill/plugin/dev-team/scripts/dt.py claim M1-T03 --role solo`, then read the packet it names.</pre></details></div><div class="step" id="S2"><span class="sid">U12.S2</span><span class="kind">Bash</span>python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A3-r4/with_skill/plugin/dev-team/scripts/dt.py claim M1-T03 --role solo<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A3-r4/with_skill/plugin/dev-team/scripts/dt.py claim M1-T03 --role solo&quot;
+}</pre><div class="lbl">output</div><pre>packet: /Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A3-r4/with_skill/project/.claude/worktrees/agent-ab0c8554268ecab2d/.claude/packet.md (62 lines; read it in full)
+task: M1-T03 validate_rows spine (keep rows with a close, sorted) · role solo · package mdata · kind spine
+writes: packages/mdata/src/mdata/validate.py, tests/unit/mdata/test_validate.py
+done: Done when `scripts/check.sh gate` passes (the gate passes on your Writes); the Stop hook runs it. End with one line: `DONE M1-T03 solo`. If you can&#x27;t finish: `python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A3-r4/with_skill/plugin/dev-team/scripts/dt.py escalate &lt;TEST-WRONG|NEEDS-DEP&gt; &quot;&lt;why&gt;&quot;`, or `python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A3-r4/with_skill/plugin/dev-team/scripts/dt.py escalate CONTRACT-CHANGE &quot;&lt;why&gt;&quot; --type &lt;the contract symbol&gt;`, then end with one line: `STOPPED M1-T03 solo: see dt escalate`.</pre></details></div><div class="step" id="S3"><span class="sid">U12.S3</span><span class="kind">Read</span>/Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A3-r4/with_skill/project/.claude/worktrees/agent-ab0c8554268ecab2d/.claude/packet.md<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A3-r4/with_skill/project/.claude/worktrees/agent-ab0c8554268ecab2d/.claude/packet.md&quot;
+}</pre><div class="lbl">output</div><pre>1	# Packet: M1-T03 solo
+2	You are the solo for M1-T03. Your edit boundary is your Writes below (`.claude/.task_writes`); the guard blocks everything else.
+3	
+4	Done when `scripts/check.sh gate` passes (the gate passes on your Writes); the Stop hook runs it. End with one line: `DONE M1-T03 solo`. If you can&#x27;t finish: `python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A3-r4/with_skill/plugin/dev-team/scripts/dt.py escalate &lt;TEST-WRONG|NEEDS-DEP&gt; &quot;&lt;why&gt;&quot;`, or `python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A3-r4/with_skill/plugin/dev-team/scripts/dt.py escalate CONTRACT-CHANGE &quot;&lt;why&gt;&quot; --type &lt;the contract symbol&gt;`, then end with one line: `STOPPED M1-T03 solo: see dt escalate`.
+5	
+6	# Context for M1-T03: package mdata · mode solo · kind spine
+7	Read only what is below, plus CONSTRAINTS.md and the files you edit. Your task is the last section.
+8	
+9	&lt;!-- docs/packages/mdata/pipelines.md:5 --&gt;
+10	## PL-01: Load prices
+11	**Entry:** `packages/mdata/src/mdata/pipeline.py::load_prices` · **Trigger:** called from Python (`mdata.load_prices`)
+12	**Covers:** DATA-01–DATA-04, QR-01
+13	
+14	| # | Step | Owner | In → Out | Spine version | Covers |
+15	|---|---|---|---|---|---|
+16	| 1 | `read_csv` | mdata.io | path → RawRow | read every row | DATA-01 |
+17	| 2 | `validate_rows` | mdata.validate | RawRow → RawRow | keep rows with a close, sorted | DATA-02 |
+18	| 3 | `align_calendar` | mdata.calendar | RawRow → Prices | dates every ticker has, no fill | DATA-03, DATA-04 |
+19	
+20	### Entry sketch (pre-build — removed by spine task)
+21	```python
+22	def load_prices(path, tickers=None) -&gt; Prices:
+23	    rows = read_csv(path)
+24	    rows = validate_rows(rows, tickers)
+25	    return align_calendar(rows)
+26	```
+27	
+28	&lt;!-- docs/packages/mdata/contract.md:38 --&gt;
+29	### mdata.validate_rows: Usable rows, sorted
+30	`def validate_rows(rows: Sequence[RawRow], tickers: Sequence[str] | None = None) -&gt; list[RawRow]`
+31	- **Invariants:** positive closes only; one row per (date, ticker), the later one in file order; sorted by (date, ticker)
+32	- **Errors:** `KeyError` for a requested ticker with no usable row
+33	- **Used by:** PL-01
+34	
+35	&lt;!-- docs/packages/mdata/contract.md:7 --&gt;
+36	### mdata.RawRow: One CSV row
+37	**Kind:** type · **Sample:** `tests/contracts/mdata.RawRow/sample.json` · **Cases:** eight rows of two tickers, one with a blank close
+38	`@dataclass(frozen=True) class RawRow: date: str; ticker: str; close: float | None`
+39	- **Invariants:** `date` is ISO `yyyy-mm-dd`; `close` is None for a blank cell
+40	- **Used by:** PL-01
+41	
+42	## Layout (`dt layout mdata`)
+43	packages/mdata/src/mdata/
+44	  __init__.py — mdata: read a prices CSV, drop what can&#x27;t be used, put every ticker on one calendar.
+45	  calendar.py — Put every ticker on one calendar (DATA-03, DATA-04).
+46	  io.py — Read a date,ticker,close CSV (DATA-01).
+47	  pipeline.py — PL-01: Load prices.
+48	  types.py — The types mdata hands to its callers: CSV rows and aligned prices.
+49	  validate.py — Drop unusable rows and resolve duplicates (DATA-02).
+50	
+51	## Writes (edit only these files; the plan gives every other file to another task)
+52	- packages/mdata/src/mdata/validate.py (exists)
+53	- tests/unit/mdata/test_validate.py (new)
+54	
+55	&lt;!-- tasks/plan.md:44 --&gt;
+56	### M1-T03: validate_rows spine (keep rows with a close, sorted)
+57	**Package:** mdata · **Step:** PL-01.validate_rows · **Kind:** spine · **Size:** XS · **Mode:** solo
+58	**Read:** PL-01, mdata.validate_rows, mdata.RawRow
+59	**Acceptance:**
+60	- [ ] `validate_rows` turns the mdata.RawRow sample into a valid output (its spine version: keep rows with a close, sorted); signature unchanged
+61	**Verify:** `pytest tests/unit/mdata/test_validate.py` · `scripts/check.sh gate`
+62	**Depends on:** M1-T01 · **Writes:** packages/mdata/src/mdata/validate.py, tests/unit/mdata/test_validate.py
+63	</pre></details></div><div class="step" id="S4"><span class="sid">U12.S4</span><span class="kind">Read</span>/Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A3-r4/with_skill/project/.claude/worktrees/agent-ab0c8554268ecab2d/CONSTRAINTS.md<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A3-r4/with_skill/project/.claude/worktrees/agent-ab0c8554268ecab2d/CONSTRAINTS.md&quot;
+}</pre><div class="lbl">output</div><pre>1	# Constraints
+2	**Status:** Approved · **Last reviewed:** 2026-10-17 by @connor · **Ratcheted:** —
+3	
+4	The standing quality bar. `pyproject.toml` and `scripts/check.sh` enforce it; every number here names its config key, and `dt status` fails if the two disagree. Only `build-setup` changes this file, with the user: tightening is routine, loosening needs an explicit yes.
+5	
+6	## Floor
+7	- **CR-01** No new suppressions. Ruff runs with `--ignore-noqa` in gate and full, so a Ruff exception is a `per-file-ignores` entry in protected config with a row in Exceptions. `floor_guard.sh` catches the other suppressions on the diff
+8	- **CR-02** No stubs: `raise NotImplementedError` outside abstract methods, `pass`-only bodies, bare `except: pass`. One carve-out: the interface task&#x27;s step signatures, whose body is only `raise NotImplementedError(&quot;&lt;task id&gt;&quot;)` naming the open task that replaces it. `check.sh gate` fails on one naming a task that isn&#x27;t open in `tasks/todo.md`, and on a test that expects one (`stub-pinned`); `check.sh full --exit` fails on any
+9	- **CR-03** No skipped, deleted or assertion-free tests, unless a row in Exceptions names the test file
+10	- **CR-04** No secrets in source
+11	- **CR-05** Oracle files (`tests/fixtures/**/expected.json`) change only with the user&#x27;s approval
+12	- **CR-06** The implementer never changes `tests/intent/**`
+13	- **CR-07** This file, `pyproject.toml` tool config, `scripts/` and `.claude/agents/` are not weakened to make a change pass
+14	- **CR-08** Nothing imports from `references/` or `probes/`, or adds either to `sys.path` (or `PYTHONPATH`, pytest `pythonpath`). `floor_guard.sh` checks the diff for both. Code copied from either is project code and meets the same bar
+15	- **CR-09** A frozen interface (`tests/contracts/&lt;id&gt;.&lt;symbol&gt;/`: schema, samples, fake; and the types, signatures and exports the interface task wrote) is frozen once it exists at the task&#x27;s base. Only the interface task freezing it (`**Kind:** interface`) writes a new folder, and no other task&#x27;s `Writes:` names its `types.py` or `__init__.py`; a frozen interface changes only through `architecture-design` Revise, never to make a test pass
+16	
+17	## Readability
+18	- **CR-10** One entry function per pipeline; it reads top to bottom as its named steps (reviewer + `dt layout`)
+19	- **CR-11** No registries, plugin dispatch or config-driven wiring without an AD
+20	- **CR-12** New abstraction only with a second real implementation or a named seam
+21	
+22	
+23	## Enforced with numbers
+24	| ID | Dimension | Rule | Checked by | Config key | Runs at |
+25	|---|---|---|---|---|---|
+26	| CR-20 | Lint | zero errors; standing per-file-ignores only for `tests/**` and `__init__.py` | ruff | `tool.ruff.lint.select` | edit, gate |
+27	| CR-21 | Complexity | ≤ 10 per function | ruff C901 | `tool.ruff.lint.mccabe.max-complexity` | gate |
+28	| CR-22 | Size | ≤ 500 lines/module, ≤ 60/function | check_size.py | `tool.size_limits` | edit, gate |
+29	| CR-23 | Types | zero errors, strict | mypy | `tool.mypy.strict` | gate |
+30	| CR-24 | Boundaries | import contracts hold | import-linter | `tool.importlinter.contracts` | gate |
+31	| CR-25 | Dependencies | none missing or unused | deptry | `tool.deptry` | gate |
+32	| CR-26 | Deps security | nothing known-vulnerable | pip-audit | — | full, CI nightly |
+33	
+34	
+35	## Measured, not yet enforced
+36	| ID | Metric | Today | Direction |
+37	|---|---|---|---|
+38	| CR-40 | Coverage (branch) | 0% (`tool.coverage.report.fail_under`, raised by Ratchet) | must not fall |
+39	| CR-41 | vulture findings at `min_confidence = 60` (`scripts/vulture_whitelist.py`) | 0 | must not grow by `full --exit` (earlier `full` runs report) |
+40	| CR-42 | Duplicate blocks of ≥ 8 similar source lines (pylint `duplicate-code`, `[tool.pylint.similarities]` in pyproject.toml) | 0 | must not grow |
+41	
+42	## Boundaries (generated from architecture — do not edit)
+43	- `mdata` imports nothing first-party · `risk` → `mdata.types`, `mdata.load_prices`
+44	
+45	## Roles and protected paths
+46	| Role | May edit | May not edit | Stop gate |
+47	|---|---|---|---|
+48	| tester | `tests/intent/**`, within the task&#x27;s `Writes:` | everything else; reads no source | `check.sh collect` (lint, collect, red for the right reason) |
+49	| implementer / solo | `src/**`, `tests/unit/**`, within the task&#x27;s `Writes:`; an interface task also the `tests/contracts/&lt;id&gt;.&lt;symbol&gt;/` its `Writes:` names | the protected list; `tasks/` | `check.sh gate` + protected-path diff against the worktree&#x27;s base |
+50	| reviewer | its worktree, for the mutation check, and its findings file; nothing lands (the orchestrator records findings with `dt finding`) | everything else | runs `check.sh full` by hand |
+51	
+52	**Protected list** (`PROTECTED` in `scripts/check.sh`; `path_guard.sh deny --protected` reads the same list): `tests/intent/**`, `tests/fixtures/**`, `tests/conftest.py`, `pyproject.toml`, `uv.lock`, `CONSTRAINTS.md`, `scripts/**`, `.claude/agents/**`, `.claude/settings.json`, `references/**`, `probes/**`, `tests/contracts/**`, `packages/*/pyproject.toml`. `tests/contracts/**` covers the contract folders that exist at the task&#x27;s base (CR-09). **`Writes:`**: `dt claim` writes the role&#x27;s share of the task&#x27;s `Writes:` to `.claude/.task_writes` and sets the worktree&#x27;s base; `path_guard.sh writes` blocks edits outside it, and builder edits before the claim. Only the orchestrator writes `tasks/` (`dt land`, `dt finding`).
+53	
+54	**Worktree links:** —
+55	
+56	## Review
+57	Run by the reviewer agent: the interface review after Phase 0, a phase review per package at each checkpoint, and the milestone exit. `dt land` already checked each landing&#x27;s `Writes:`, protected paths and gates; review judges what tools can&#x27;t.
+58	
+59	**Interface** (after Phase 0): the code is the contract, no more and no less.
+60	1. Types match `contract.md`: fields, types, invariants. Nothing a step&#x27;s In → Out needs is missing; no helper is frozen.
+61	2. Signatures match the step tables, in their owner modules. Each stub names the open task that owns its step; no logic beyond types and validation.
+62	3. One sample per case the contract names, valid and realistic, never holding a TC&#x27;s expected value. Replay doubles replay an interaction the Protocol allows. Each fake passes its contract&#x27;s cases; anything it does beyond echoing a fixture (filtering, ordering, an error) is a case the real provider must pass too. Contract tests check shape only, never a stub or other state a later task changes.
+63	4. `__init__.py` exports exactly the contract; each `Mitigated by` in the plan&#x27;s dependency graph exists; each split task&#x27;s tester can write its tests from the frozen interface and its `Read:`.
+64	
+65	**Each phase**, per package, tests before code:
+66	1. **Interfaces followed** (CR-09): no frozen type, signature or contract folder changed outside a Revise. Consumers use the declared types: no dict for a dataclass, no reaching into a provider&#x27;s internals, no local redefinition. A stub is replaced only by the task it names; no cross-package import outside the contract; spine tests run on samples and doubles, not another step&#x27;s code.
+67	2. **Tests prove something:** each intent test asserts its TC case or acceptance bullet, loading expected values and tolerances from fixtures; none is assertion-free or weakened; Hypothesis runs the `ci` profile. Unit tests are specific, never computing the expected value with the code under test or testing only a mock. **Mutation check** (`.claude/agents/reviewer.md`): per acceptance bullet, the smallest change that should break it; a mutation no test catches is a finding.
+68	3. **Correct to the spec:** each acceptance bullet truly met, not special-cased to the sample; the error paths the requirement names; seeding and determinism; numerical edge cases.
+69	4. **Simple** (CR-11, CR-12, CR-42): no abstraction with one implementation outside the contract or an AD; no forwarding wrapper, one-method class, or class where a function does; no parameter, flag or config key every caller sets the same; no `try/except` that only re-raises or swallows, no checks the types already guarantee; no loop the library already provides. No near-copies within or across the phase&#x27;s tasks: one concept is one function in its owner module (tests may repeat for readability). Each finding names the simpler form, with the same tests passing.
+70	5. **Pipelines** (CR-10): entry functions read as their step tables (`dt layout`); step owners respected; spine baselines still selectable.
+71	6. **The bar** (CR-07): diff this file, `pyproject.toml`, `scripts/` and `.claude/agents/` against the milestone&#x27;s Base. Any loosening is Critical; new exceptions need an owner and expiry.
+72	7. **Hidden and parallel risks:** where a real provider could act differently from its double; fixed output paths, global state, test-order dependence.
+73	8. **The rest:** readability, security, performance where a QR sets a number; reused reference or probe code has its Caveats handled and fits the contract; `dt lint` clean, pre-build sections replaced by `dt layout` pointers.
+74	
+75	**Milestone exit**, over the whole diff, adds: the Scope&#x27;s Exit holds; every Covers ID has a test; `check.sh full --exit` finds no stub; system tests use real providers; the same sample through a real provider and its double agrees; deferred requirements untouched; pip-audit ran.
+76	
+77	**Severity:** Critical: a frozen interface changed, a contract test pinning a transient state, a weakened test, an intent test that misses a mutation changing its TC&#x27;s expected output, a wrong answer, a loosened bar, a security hole, lost data; it stops the build. Important: a consumer bypassing a type, any other surviving mutation, an unneeded abstraction, a duplicate across tasks. Suggestion and Nit: local. Findings go under the checkpoint block in `tasks/plan.md` (`dt finding`), each with a fix task or a reason.
+78	
+79	## Done
+80	agent-skills `references/definition-of-done.md`, tailored once:
+81	- **Correctness and Quality:** checked per task by the gate.
+82	- **Integration and Documentation:** checked at each checkpoint.
+83	- **The full list:** checked at milestone exit.
+84	
+85	## Exceptions
+86	| ID | Rule | Path | Reason | Owner | Expires |
+87	|---|---|---|---|---|---|
+88	
+89	</pre></details></div><div class="step" id="S5"><span class="sid">U12.S5</span><span class="kind">Read</span>/Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A3-r4/with_skill/project/.claude/worktrees/agent-ab0c8554268ecab2d/packages/mdata/src/mdata/validate.py<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A3-r4/with_skill/project/.claude/worktrees/agent-ab0c8554268ecab2d/packages/mdata/src/mdata/validate.py&quot;
+}</pre><div class="lbl">output</div><pre>1	&quot;&quot;&quot;Drop unusable rows and resolve duplicates (DATA-02).&quot;&quot;&quot;
+2	
+3	from collections.abc import Sequence
+4	
+5	from mdata.types import RawRow
+6	
+7	
+8	def validate_rows(rows: Sequence[RawRow], tickers: Sequence[str] | None = None) -&gt; list[RawRow]:
+9	    &quot;&quot;&quot;Positive closes only, one row per (date, ticker), sorted. KeyError for a requested ticker with no usable row.&quot;&quot;&quot;
+10	    raise NotImplementedError(&quot;M1-T03&quot;)
+11	</pre></details></div><div class="step" id="S6"><span class="sid">U12.S6</span><span class="kind">Bash</span>ls tests/unit/mdata tests/contracts/mdata.RawRow packages/mdata/tests 2&gt;&amp;1; cat tests/contracts/mdata.RawRow/sample.json; grep -n &quot;ARG\|select&quot; pyproject.toml; grep -n &quot;T0[0-9]&quot; tasks/todo.md<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;ls tests/unit/mdata tests/contracts/mdata.RawRow packages/mdata/tests 2&gt;&amp;1; cat tests/contracts/mdata.RawRow/sample.json; grep -n \&quot;ARG\\|select\&quot; pyproject.toml; grep -n \&quot;T0[0-9]\&quot; tasks/todo.md&quot;
+}</pre><div class="lbl">output</div><pre>ls: packages/mdata/tests: No such file or directory
+ls: tests/unit/mdata: No such file or directory
+tests/contracts/mdata.RawRow:
+sample.json
+{
+  &quot;rows&quot;: [
+    {
+      &quot;date&quot;: &quot;2024-03-04&quot;,
+      &quot;ticker&quot;: &quot;ACME&quot;,
+      &quot;close&quot;: 50.0
+    },
+    {
+      &quot;date&quot;: &quot;2024-03-04&quot;,
+      &quot;ticker&quot;: &quot;BOLT&quot;,
+      &quot;close&quot;: 20.0
+    },
+    {
+      &quot;date&quot;: &quot;2024-03-05&quot;,
+      &quot;ticker&quot;: &quot;ACME&quot;,
+      &quot;close&quot;: 51.0
+    },
+    {
+      &quot;date&quot;: &quot;2024-03-05&quot;,
+      &quot;ticker&quot;: &quot;BOLT&quot;,
+      &quot;close&quot;: null
+    },
+    {
+      &quot;date&quot;: &quot;2024-03-06&quot;,
+      &quot;ticker&quot;: &quot;ACME&quot;,
+      &quot;close&quot;: 49.5
+    },
+    {
+      &quot;date&quot;: &quot;2024-03-06&quot;,
+      &quot;ticker&quot;: &quot;BOLT&quot;,
+      &quot;close&quot;: 20.5
+    },
+    {
+      &quot;date&quot;: &quot;2024-03-07&quot;,
+      &quot;ticker&quot;: &quot;ACME&quot;,
+      &quot;close&quot;: 48.0
+    },
+    {
+      &quot;date&quot;: &quot;2024-03-07&quot;,
+      &quot;ticker&quot;: &quot;BOLT&quot;,
+      &quot;close&quot;: 20.6
+    }
+  ]
+}
+4:# single-package pyproject.toml: [tool.ruff.lint] select/ignore, mccabe, pylint,
+100:select = [
+3:- [x] M1-T01 Freeze the M1 interfaces (mdata, M, solo)
+4:- [ ] M1-T02 read_csv spine (read every row) (mdata, XS, solo)
+5:- [ ] M1-T03 validate_rows spine (keep rows with a close, sorted) (mdata, XS, solo)
+6:- [ ] M1-T04 align_calendar spine (dates every ticker has, no fill) (mdata, XS, solo)
+7:- [ ] M1-T05 log_returns spine (simple returns) (risk, XS, solo)
+8:- [ ] M1-T06 rolling_vol spine (expanding stdev of earlier returns) (risk, XS, solo)
+9:- [ ] M1-T07 annualize spine (daily values pass through) (risk, XS, solo)
+10:- [ ] M1-T08 summary_stats spine (daily mean, stdev) (risk, XS, solo)
+11:- [ ] M1-T09 max_drawdown spine (depth only) (risk, XS, solo)</pre></details></div><div class="step" id="S7"><span class="sid">U12.S7</span><span class="kind">Read</span>/Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A3-r4/with_skill/project/.claude/worktrees/agent-ab0c8554268ecab2d/pyproject.toml offset=95 limit=30<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A3-r4/with_skill/project/.claude/worktrees/agent-ab0c8554268ecab2d/pyproject.toml&quot;,
+  &quot;offset&quot;: 95,
+  &quot;limit&quot;: 30
+}</pre><div class="lbl">output</div><pre>95	
+96	[tool.ruff.lint]
+97	preview = true                  # needed for PLR0914 / PLR1702 / PLR0904 below
+98	explicit-preview-rules = true   # ...but only turn on preview rules named here
+99	
+100	select = [
+101	    # Core bug-finders and modernisers
+102	    &quot;E&quot;, &quot;F&quot;, &quot;I&quot;, &quot;B&quot;, &quot;UP&quot;, &quot;SIM&quot;, &quot;C4&quot;, &quot;RUF&quot;,
+103	    # Quality
+104	    &quot;A&quot;, &quot;RET&quot;, &quot;PTH&quot;, &quot;PERF&quot;, &quot;PGH&quot;, &quot;G&quot;, &quot;TRY&quot;,
+105	    &quot;PLE&quot;, &quot;PLW&quot;,               # only the Pylint error/warning groups
+106	    # Security and tests
+107	    &quot;S&quot;, &quot;PT&quot;,
+108	    # Domain (from the tech stack ADs)
+109	    &quot;DTZ&quot;,
+110	    # Complexity and size
+111	    &quot;C901&quot;,                     # cyclomatic complexity
+112	    &quot;PLR0911&quot;,                  # too many returns
+113	    &quot;PLR0912&quot;,                  # too many branches
+114	    &quot;PLR0913&quot;,                  # too many arguments
+115	    &quot;PLR0915&quot;,                  # too many statements
+116	    &quot;PLR0917&quot;,                  # too many positional arguments
+117	    &quot;PLR0914&quot;,                  # too many locals          (preview)
+118	    &quot;PLR1702&quot;,                  # too many nested blocks   (preview)
+119	    &quot;PLR0904&quot;,                  # too many public methods  (preview)
+120	]
+121	ignore = [
+122	    &quot;E501&quot;,     # line length is handled by the formatter
+123	    &quot;TRY003&quot;,   # long messages in exception constructors: too noisy
+124	]</pre></details></div><div class="step" id="S8"><span class="sid">U12.S8</span><span class="kind">Bash</span>grep -n &quot;validate\|T1[0-9]&quot; tasks/todo.md<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;grep -n \&quot;validate\\|T1[0-9]\&quot; tasks/todo.md&quot;
+}</pre><div class="lbl">output</div><pre>5:- [ ] M1-T03 validate_rows spine (keep rows with a close, sorted) (mdata, XS, solo)
+12:- [ ] M1-T10 write_report spine (JSON rows) (risk, XS, solo)
+13:- [ ] M1-T11 Wire PL-01 (mdata, S, solo)
+14:- [ ] M1-T12 Wire PL-02 on the mdata.load_prices fake (risk, S, solo)
+15:- [ ] M1-T13 Wire PL-03 on the risk.vol_series fake (risk, S, solo)
+16:- [ ] M1-T14 Drop unusable rows, resolve duplicates (mdata, S, split)
+17:- [ ] M1-T15 Forward fill with a gap limit (mdata, S, split)
+18:- [ ] M1-T16 Log returns (risk, S, split)
+19:- [ ] M1-T17 Rolling volatility from earlier returns (risk, S, split)
+20:- [ ] M1-T18 Annualize over trading days (risk, S, split)
+21:- [ ] M1-T19 Annualized summary with Sharpe (risk, S, split)</pre></details></div><div class="step" id="S9"><span class="sid">U12.S9</span><span class="kind">Edit</span>/Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A3-r4/with_skill/project/.claude/worktrees/agent-ab0c8554268ecab2d/packages/mdata/src/mdata/validate.py | old: &#x27;raise NotImplementedError(&quot;M1-T03&quot;)&#x27; | new: &#x27;wanted = None if tickers is None else set(tickers) ⏎     kept = [row for row in &#x27;<div class="lbl">edited /Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A3-r4/with_skill/project/.claude/worktrees/agent-ab0c8554268ecab2d/packages/mdata/src/mdata/validate.py · old</div><pre>    raise NotImplementedError(&quot;M1-T03&quot;)</pre><div class="lbl">new</div><pre>    wanted = None if tickers is None else set(tickers)
+    kept = [row for row in rows if row.close is not None and (wanted is None or row.ticker in wanted)]
+    return sorted(kept, key=lambda row: (row.date, row.ticker))</pre><details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;replace_all&quot;: false,
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A3-r4/with_skill/project/.claude/worktrees/agent-ab0c8554268ecab2d/packages/mdata/src/mdata/validate.py&quot;,
+  &quot;old_string&quot;: &quot;    raise NotImplementedError(\&quot;M1-T03\&quot;)&quot;,
+  &quot;new_string&quot;: &quot;    wanted = None if tickers is None else set(tickers)\n    kept = [row for row in rows if row.close is not None and (wanted is None or row.ticker in wanted)]\n    return sorted(kept, key=lambda row: (row.date, row.ticker))&quot;
+}</pre><div class="lbl">output</div><pre>The file /Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A3-r4/with_skill/project/.claude/worktrees/agent-ab0c8554268ecab2d/packages/mdata/src/mdata/validate.py has been updated successfully. (file state is current in your context — no need to Read it back)</pre></details></div><div class="step" id="S10"><span class="sid">U12.S10</span><span class="kind">Bash</span>ls tests/unit; ls tests/unit/* | head<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;ls tests/unit; ls tests/unit/* | head&quot;
+}</pre><div class="lbl">output</div><pre>ls: tests/unit: No such file or directory
+(eval):1: no matches found: tests/unit/*</pre></details></div><div class="step" id="S11"><span class="sid">U12.S11</span><span class="kind">Bash</span>grep -n -A8 &quot;tool.pytest&quot; pyproject.toml<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;grep -n -A8 \&quot;tool.pytest\&quot; pyproject.toml&quot;
+}</pre><div class="lbl">output</div><pre>5:# per-file-ignores, [tool.ruff.format], [tool.size_limits], [tool.pytest.ini_options],
+6-# [tool.typos.files], [tool.typos.default]. Only the sections below differ.
+7-# references/ and probes/ are excluded from every tool here and in the copied sections (CR-08).
+8-[project]
+9-name = &quot;minilab-workspace&quot;
+10-version = &quot;0.1.0&quot;
+11-requires-python = &quot;&gt;=3.11&quot;
+12-dependencies = [
+13-    &quot;mdata&quot;,
+--
+156:[tool.pytest.ini_options]
+157-minversion = &quot;8.0&quot;
+158-testpaths = [&quot;tests&quot;]
+159-norecursedirs = [&quot;.*&quot;, &quot;*.egg&quot;, &quot;build&quot;, &quot;dist&quot;, &quot;node_modules&quot;, &quot;venv&quot;, &quot;references&quot;, &quot;probes&quot;]
+160-addopts = &quot;-ra --strict-markers --strict-config --import-mode=importlib&quot;
+161-xfail_strict = true
+162-markers = [
+163-    &quot;intent: tester-written specification tests&quot;,
+164-    &quot;unit: implementer-written unit tests&quot;,</pre></details></div><div class="step" id="S12"><span class="sid">U12.S12</span><span class="kind">Write</span>/Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A3-r4/with_skill/project/.claude/worktrees/agent-ab0c8554268ecab2d/tests/unit/mdata/test_validate.py (53 lines)<div class="lbl">wrote /Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A3-r4/with_skill/project/.claude/worktrees/agent-ab0c8554268ecab2d/tests/unit/mdata/test_validate.py</div><pre>&quot;&quot;&quot;Unit tests for the validate_rows spine: keep rows with a close, sorted.&quot;&quot;&quot;
+
+import json
+from pathlib import Path
+
+import pytest
+
+from mdata.types import RawRow
+from mdata.validate import validate_rows
+
+SAMPLE = Path(__file__).parents[2] / &quot;contracts&quot; / &quot;mdata.RawRow&quot; / &quot;sample.json&quot;
+
+pytestmark = pytest.mark.unit
+
+
+def _sample_rows() -&gt; list[RawRow]:
+    data = json.loads(SAMPLE.read_text(encoding=&quot;utf-8&quot;))
+    return [RawRow(**row) for row in data[&quot;rows&quot;]]
+
+
+def test_sample_drops_the_blank_close() -&gt; None:
+    result = validate_rows(_sample_rows())
+    assert len(result) == 7
+    assert RawRow(&quot;2024-03-05&quot;, &quot;BOLT&quot;, None) not in result
+    assert all(row.close is not None for row in result)
+
+
+def test_output_is_sorted_by_date_then_ticker() -&gt; None:
+    rows = [
+        RawRow(&quot;2024-03-05&quot;, &quot;BOLT&quot;, 21.0),
+        RawRow(&quot;2024-03-04&quot;, &quot;BOLT&quot;, 20.0),
+        RawRow(&quot;2024-03-05&quot;, &quot;ACME&quot;, 51.0),
+        RawRow(&quot;2024-03-04&quot;, &quot;ACME&quot;, 50.0),
+    ]
+    assert validate_rows(rows) == [
+        RawRow(&quot;2024-03-04&quot;, &quot;ACME&quot;, 50.0),
+        RawRow(&quot;2024-03-04&quot;, &quot;BOLT&quot;, 20.0),
+        RawRow(&quot;2024-03-05&quot;, &quot;ACME&quot;, 51.0),
+        RawRow(&quot;2024-03-05&quot;, &quot;BOLT&quot;, 21.0),
+    ]
+
+
+def test_tickers_keeps_only_requested_tickers() -&gt; None:
+    result = validate_rows(_sample_rows(), [&quot;ACME&quot;])
+    assert [row.close for row in result] == [50.0, 51.0, 49.5, 48.0]
+    assert {row.ticker for row in result} == {&quot;ACME&quot;}
+
+
+def test_input_is_not_mutated() -&gt; None:
+    rows = _sample_rows()
+    before = list(rows)
+    validate_rows(rows)
+    assert rows == before
+</pre><details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A3-r4/with_skill/project/.claude/worktrees/agent-ab0c8554268ecab2d/tests/unit/mdata/test_validate.py&quot;,
+  &quot;content&quot;: &quot;\&quot;\&quot;\&quot;Unit tests for the validate_rows spine: keep rows with a close, sorted.\&quot;\&quot;\&quot;\n\nimport json\nfrom pathlib import Path\n\nimport pytest\n\nfrom mdata.types import RawRow\nfrom mdata.validate import validate_rows\n\nSAMPLE = Path(__file__).parents[2] / \&quot;contracts\&quot; / \&quot;mdata.RawRow\&quot; / \&quot;sample.json\&quot;\n\npytestmark = pytest.mark.unit\n\n\ndef _sample_rows() -&gt; list[RawRow]:\n    data = json.loads(SAMPLE.read_text(encoding=\&quot;utf-8\&quot;))\n    return [RawRow(**row) for row in data[\&quot;rows\&quot;]]\n\n\ndef test_sample_drops_the_blank_close() -&gt; None:\n    result = validate_rows(_sample_rows())\n    assert len(result) == 7\n    assert RawRow(\&quot;2024-03-05\&quot;, \&quot;BOLT\&quot;, None) not in result\n    assert all(row.close is not None for row in result)\n\n\ndef test_output_is_sorted_by_date_then_ticker() -&gt; None:\n    rows = [\n        RawRow(\&quot;2024-03-05\&quot;, \&quot;BOLT\&quot;, 21.0),\n        RawRow(\&quot;2024-03-04\&quot;, \&quot;BOLT\&quot;, 20.0),\n        RawRow(\&quot;2024-03-05\&quot;, \&quot;ACME\&quot;, 51.0),\n        RawRow(\&quot;2024-03-04\&quot;, \&quot;ACME\&quot;, 50.0),\n    ]\n    assert validate_rows(rows) == [\n        RawRow(\&quot;2024-03-04\&quot;, \&quot;ACME\&quot;, 50.0),\n        RawRow(\&quot;2024-03-04\&quot;, \&quot;BOLT\&quot;, 20.0),\n        RawRow(\&quot;2024-03-05\&quot;, \&quot;ACME\&quot;, 51.0),\n        RawRow(\&quot;2024-03-05\&quot;, \&quot;BOLT\&quot;, 21.0),\n    ]\n\n\ndef test_tickers_keeps_only_requested_tickers() -&gt; None:\n    result = validate_rows(_sample_rows(), [\&quot;ACME\&quot;])\n    assert [row.close for row in result] == [50.0, 51.0, 49.5, 48.0]\n    assert {row.ticker for row in result} == {\&quot;ACME\&quot;}\n\n\ndef test_input_is_not_mutated() -&gt; None:\n    rows = _sample_rows()\n    before = list(rows)\n    validate_rows(rows)\n    assert rows == before\n&quot;
+}</pre><div class="lbl">output</div><pre>File created successfully at: /Users/connorott/plugins/dev-team-workspace/iteration-b1/minilab-A3-r4/with_skill/project/.claude/worktrees/agent-ab0c8554268ecab2d/tests/unit/mdata/test_validate.py (file state is current in your context — no need to Read it back)</pre></details></div><div class="step" id="S13"><span class="sid">U12.S13</span><span class="kind">Bash</span>scripts/check.sh gate<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;scripts/check.sh gate&quot;
+}</pre><div class="lbl">output</div><pre>-&gt; ruff check --ignore-noqa .
+All checks passed!
+-&gt; ruff format --check .
+45 files already formatted
+-&gt; mypy
+Success: no issues found in 16 source files
+-&gt; python scripts/check_size.py packages/mdata/src packages/risk/src
+-&gt; deptry packages/mdata
+Scanning 6 files...
+
+Success! No dependency issues found.
+-&gt; deptry packages/risk
+Scanning 10 files...
+
+Success! No dependency issues found.
+-&gt; lint-imports --no-logo
+
+---------
+Contracts
+---------
+
+Analyzed 16 files, 27 dependencies.
+-----------------------------------
+
+Layers: risk &gt; mdata KEPT
+
+Contracts: 1 kept, 0 broken.
+-&gt; pytest tests/unit tests/contracts --no-cov -q -x
+...................................                                      [100%]
+35 passed in 0.04s
+-&gt; bash scripts/floor_guard.sh
+floor_guard: clean
+-&gt; protected files unchanged since refs/worktree/checks-base</pre></details></div><div class="step" id="S14"><span class="sid">U12.S14</span><span class="kind">say</span>DONE M1-T03 solo<details><summary>full text</summary><pre>DONE M1-T03 solo</pre></details></div>
+<h2>Commits</h2>
+<p>None.</p>
+<h2>Returned</h2>
+<pre>DONE M1-T03 solo</pre>
+</body></html>

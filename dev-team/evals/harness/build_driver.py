@@ -328,7 +328,8 @@ class Persona:
         bar = [e for e in escalations if e.get("kind") in ("TEST-WRONG", "NEEDS-DEP")
                and BAR_BLAME.search(e.get("why") or "")]
         tail = reply[-1500:]
-        if bar or (asks and "build-setup" in tail and BAR_BLAME.search(tail)):   # no test or code change gets past it
+        at_exit = st.get("all_landed") or any(str(r.get("review", "")).startswith("exit.") for r in st.get("reviews") or [])
+        if bar or (asks and not at_exit and "build-setup" in tail and BAR_BLAME.search(tail)):   # nothing else gets past it
             task = bar[0]["task"] if bar else (re.findall(r"M\d+-T\d+", tail) or ["<task>"])[0]
             return "bar_fix", p["bar_fix"].format(task=task)
         if any((e.get("claim"), e.get("time")) not in self.cc_seen for e in cc):   # new ones, maybe several at once

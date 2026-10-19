@@ -40,7 +40,7 @@ Run `python3 ../../scripts/dt.py status --skill spec-writing` first (path relati
 
 ## Review Gate (CRITICAL)
 
-Run the hygiene check in `references/spec.md`, and the gate steps your mode file adds. Then:
+Run the hygiene check in `references/spec.md` and the gate steps your mode file adds; `dt lint docs/spec.md` reports no errors. Then:
 
 1. Summarize: feature and requirement counts, the goal → feature and stage → feature mappings, the **Your words** line (requests honoured and changed), Open questions.
 2. Ask the user to approve (a yes also commits) or request changes.

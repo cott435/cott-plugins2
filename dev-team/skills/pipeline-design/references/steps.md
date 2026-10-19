@@ -22,7 +22,7 @@ Per pipeline:
 
 Revise, and Sync when the doc changes, edit an existing table this way:
 
-- A changed decision is followed everywhere, in the same round: every row, in every pipeline, whose Spine version or Covers states the old version is rewritten and cites the new `AD-NN`, not only the rows a route names. Search for the old version's words (`until the time limit`, `torch.load`, a skill's name), not only its AD ID.
+- A changed decision is followed everywhere, in the same round: every row, in every pipeline, whose Spine version or Covers states the old version is rewritten and cites the new `AD-NN`, not only the rows a route names. Search for the old version's words (`until the time limit`, `torch.load`, a skill's name), not only its AD ID. A row that defers to a skill cites the newest decision naming that skill (`stale-row`).
 - Keep step names where the function survives; a split step gets new rows with new function names. Keep the pipeline's ID: a rebuilt package keeps its PL IDs where it can, so its golden cases still apply.
 - If the entry sketch is gone (the spine was built), don't recreate it. The step table is the contract the code must match; the code change becomes a task.
 - Keep `Used by:` lines true: add the PL ID to a symbol a new step calls, and remove it from one no step of that pipeline calls any more.

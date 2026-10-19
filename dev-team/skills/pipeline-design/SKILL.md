@@ -5,11 +5,11 @@ description: Designs each package's pipelines (docs/packages/{pkg}/pipelines.md)
 
 # Pipeline Design
 
-A pipeline is one workflow the user runs: an entry function reading as calls to named steps, each owned by one component, each with a **spine version** (the simplest real implementation) so the first milestone runs it end to end. The planned layout is pre-build: the pipeline's wiring task replaces it with `dt layout`, and then the code is the truth for layout, the step table for call order.
+A pipeline is one workflow the user runs: an entry function reading as calls to named steps, each owned by one component, each with a **spine version** (the simplest real implementation) so the first milestone runs it end to end.
 
 **Owns:** `docs/packages/*/pipelines.md` and the `PL-NN` IDs, plus PL IDs appended to `contract.md`'s `Used by:` lines, and nothing else. The file format is `references/template.md`; step, layout and readability rules are `references/steps.md`.
 
-**Not for:** components or technologies (`architecture-design`), golden cases (`test-planning`), tasks (`build-planning`), code or contract changes. A change another skill owns (a contract type, a spec ID) is recorded for its Revise, never made here: `dt route architecture-design "<change>" --from pipeline-design` (or `spec-writing`), and listed at the gate.
+**Not for:** components or technologies (`architecture-design`), golden cases (`test-planning`), tasks (`build-planning`), code or contract changes. A change another skill owns (a contract type, a spec ID) is recorded for its Revise, never made here: `dt route architecture-design "<change>" --from pipeline-design` (or `spec-writing`), and listed at the gate. The route is its only record: no note or open question about it in `pipelines.md`, so the Revise closes it without sending anything back.
 
 `dt` means `python3 ../../scripts/dt.py`, relative to this skill's folder, run from the project root; write it out each call, never as a shell variable.
 
@@ -25,7 +25,7 @@ Start with `dt status --skill pipeline-design`: the mode per package, `uncovered
 | **Revise** | The build found a step to replace, split or reorder, or `routed_changes` lists one (`dt` reports `revise` until re-approval) | `references/revise.md` |
 | **Grow** | The architecture became Multi-package (`misplaced` lists a pipeline) | `references/grow.md` |
 | **Sync** | `drift` is non-empty | `references/sync.md` |
-| **Current** | Nothing to do | Say so and name the next skill. Stop |
+| **Current** | Nothing to do | Say so, run `dt next` and go on here to the run it names; stop if it waits on the user |
 
 Right after an architecture Grow, the new packages show `new` while the old `pipelines.md` still holds their pipelines: that is Grow, not New.
 
@@ -41,15 +41,15 @@ Rerun `dt status --skill pipeline-design`. `retired_refs` must be empty; `uncove
 1. **What was written:** one line per pipeline (ID, title, trigger, steps); the planned layout; the readable pages `dt explain --write` wrote to `docs/explained/`.
 2. **ASSUMPTIONS:** every name, trigger, type, step order and module split you chose.
 3. **Open questions.**
-4. **Uncovered:** spec IDs or components on no step, and why.
+4. **Uncovered and routed:** spec IDs or components on no step, and why; each change routed upstream.
 5. Ask the user to approve or request changes. **STOP YOUR TURN.**
 
 **Headless:** write the doc, unconfirmed workflows under Open questions, leave Draft, stop.
 
 | The user says | Do | Then |
 |---|---|---|
-| An unambiguous yes | Set `Status: Approved` and the date; `dt route --done pipeline-design` if `routed_changes` listed any. Offer to commit `pipelines.md` and any `contract.md` whose `Used by:` changed; commit only on a yes | Stop. Next: `test-planning` (optional) or `build-planning` (Replan, after a Revise) |
-| "Approved, go ahead" | As above | Start the next planning skill (run its `dt status`). Never start code |
+| An unambiguous yes | Set `Status: Approved` and the date; `dt route --done pipeline-design` if `routed_changes` listed any. Offer to commit only files `git status` shows uncommitted, committing on a yes; on a clean tree say nothing about commits | Stop. Name the run `dt next` names |
+| "Approved, go ahead" | As above | Start the run `dt next` names. Never start code |
 | Approved with a small, fully specified change | Make exactly that edit, set Approved | Stop; list the edit |
 | Approved, plus an upstream change (a contract type, a spec ID) | Set Approved; record it with `dt route` (Not for), never make it this turn | Stop; the owner's Revise is next |
 | Changes, or a hedge ("looks fine I guess") | Edit or ask again; keep Draft | Repeat this gate |

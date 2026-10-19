@@ -5,9 +5,9 @@ description: Cuts each roadmap stage into build-sized milestones once its pipeli
 
 # Build Planning
 
-The build plan says **in what order** the pipelines get built. Once a stage's pipelines are approved, this skill cuts it into milestones (`M<n>`), vertical slices each runnable end to end, then writes one milestone at a time into `tasks/plan.md` and `tasks/todo.md`: small tasks, many built at once, each ending with a check that leaves the system working.
+The build plan says **in what order** the pipelines get built. Once a stage's pipelines are approved, this skill cuts it into milestones (`M<n>`), vertical slices each runnable end to end, then plans one milestone at a time in `tasks/plan.md` and `tasks/todo.md`: small tasks, many built at once.
 
-**Not for:** plans from agent-skills' `/plan` (foreign); pipelines, oracles or the quality bar (`pipeline-design`, `test-planning`, `build-setup`); building tasks. A fix their docs need (a `tests.md` smoke command, a contract type) goes to `dt route <owner> "<change>" --from build-planning`.
+**Not for:** plans from agent-skills' `/plan` (foreign); pipelines, oracles or the quality bar (`pipeline-design`, `test-planning`, `build-setup`); building tasks. A fix their docs need goes to `dt route <owner> "<change>" --from build-planning`.
 
 `dt` means `python3 ../../scripts/dt.py`, relative to this skill's folder, run from the project root; write it out each call, never as a shell variable. IDs, coverage and lint come from `dt`, never by hand. Templates: `examples.md`.
 
@@ -21,7 +21,7 @@ The build plan says **in what order** the pipelines get built. Once a stage's pi
 
 - No roadmap stage for the work: route to `idea-refine`.
 - **References waiting:** route to `reference-intake`.
-- **Probes open:** `probes_blocking` (`PB-01 → service, ledger.BankTxn (M1)`) blocks New and Extend for that milestone: name the probe and route to `api-probe`. Cutting stages into milestone rows (`cut.md` steps 1–2) still runs. While blocked, offer one queued plan at most. Only the user waives a probe (`api-probe`), never on a headless run.
+- **Probes open:** `probes_blocking` blocks New and Extend for that milestone: name the probe and route to `api-probe`. Cutting stages into rows (`cut.md` steps 1–2) still runs, and one queued plan at most. Only the user waives a probe, never on a headless run.
 
 ## Modes
 
@@ -29,14 +29,15 @@ Run `dt status --skill build-planning` first. Read the mode's file and only the 
 
 | Mode | When | Do |
 |---|---|---|
-| **blocked** | A needed `pipelines.md` or `tests.md` is Draft or missing (in New up front, every stage's), or `probes_blocking` names the milestone | Name what must come first. Stop |
+| **blocked** | A needed `pipelines.md` or `tests.md` is Draft or missing (in New up front, every stage's), or `probes_blocking` names the milestone | Name what must come first. Stop: next run |
+| **current** | The plan is in step; no milestone is ready to plan | Stop: next run |
 | **foreign** | `tasks/plan.md` has no `**Milestone:**` header and unchecked tasks | **Stop and ask.** Never overwrite, rename or delete it |
 | **New** | No active or archived plan; the roadmap has stages | `references/new.md` |
 | **Extend** | A stage is newly designed (`stage_to_cut`), or the next milestone needs a plan | `references/extend.md` |
 | **Replan** | A task is `Blocked`, or a revised doc was re-approved (`changed_since_plan`) | `references/replan.md` |
 | **Advance** | All todo items and the exit checkpoint are ticked | `references/advance.md`, one gate per turn |
 
-A foreign plan's question: `references/examples-foreign.md`.
+A foreign plan's question: `references/examples-foreign.md`. **Next run:** with nothing left for this skill, go on to the run `dt next` names; never end on "say the word".
 
 ## Asking
 
@@ -54,15 +55,13 @@ Before presenting the Draft:
 
 Then present:
 1. **What was written:** files; any cut (milestones, pipelines, dependency lines); scope, exit, phases with task counts, critical path and widest wave, checkpoints.
-2. **ASSUMPTIONS:** the cut, interfaces frozen, every unmitigated edge with its reason, folds, sizes, modes and overrides, skill and reference routing, `Read:` choices.
-3. **Open questions:** missing skills, overrides to confirm, anything Deferred, routed fixes.
+2. **ASSUMPTIONS:** interfaces frozen, every unmitigated edge with its reason, folds, sizes, modes and overrides, skill and reference routing, `Read:` choices.
+3. **Open questions:** missing skills, overrides to confirm, routed fixes.
 4. **Uncovered:** each Deferred ID with its target.
-5. Ask the user to approve or request changes. **STOP YOUR TURN.**
+5. Ask for approval or changes. **STOP YOUR TURN.**
 
 | The user says | Do | Then |
 |---|---|---|
-| An unambiguous yes | Set Status `Approved` and the date. Offer to commit plan and roadmap; commit only on a yes | **Stop.** Point to `build-setup` (New on the first milestone, Extend at kickoff) |
-| Yes, with a change | Make exactly that edit. Approve only if it adds, drops or reorders nothing (a re-cut stage is a reorder) | **Stop.** List what changed |
+| An unambiguous yes | Set Status `Approved` and the date. Offer a commit only if `git status` shows changes; commit only on a yes | **Stop:** next run (`build-setup`, never `/build`) |
+| Yes, with a change | Make exactly that edit. Approve only if it adds, drops or reorders nothing (a re-cut stage is a reorder) | List what changed. **Stop:** next run once approved |
 | Changes, or a hedge ("looks fine I guess") on a drop, an override or the exit | Edit, keep Draft | Repeat the gate |
-
-"Approved, go ahead" means `build-setup` next, never building: no `/build`, tests or `src/`.

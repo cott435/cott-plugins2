@@ -47,6 +47,7 @@ SEVERITY = {
     "process-narration": "E", "explain-stale": "W", "spine-claim": "W", "step-unplanned": "W",
     "interface-barrier": "W", "stale-row": "E",
     "milestone-lopsided": "W", "read-unwritten": "E",
+    "task-order": "E",
 }
 
 # Size budgets (planning-stage.md §3), in lines. Package docs are budgeted per unit (lines per unit × units +
@@ -1273,6 +1274,27 @@ def check_depends(ctx: Context):
             yield _p(doc, tasks[order[cycle[0]]].start, "depends", "cycle: " + " → ".join(cycle + [cycle[0]]))
 
 
+def check_task_order(ctx: Context):
+    """A plan's task IDs run up the file (rl: M1-T20–M1-T24 sat before M1-T14). Checked only while no task of the
+    plan is ticked in todo.md: then nothing built names an ID yet, so the plan renumbers; once the build starts, a
+    replan keeps its IDs (replan.md)."""
+    done = model.todo_state(ctx.repo)
+    for doc in ctx.plan_docs:
+        tasks = model.tasks(doc)
+        if any(done.get(t.id) for t in tasks):
+            continue
+        for prev, t in zip(tasks, tasks[1:]):
+            if _task_number(t.id) < _task_number(prev.id):
+                yield _p(doc, t.start, "task-order",
+                         f"{t.id} comes after {prev.id}: task IDs run in plan order, so renumber the plan's tasks "
+                         "top to bottom (Depends on, the graph rows, todo.md and any doc naming them) while none "
+                         "is done")
+
+
+def _task_number(task_id: str) -> int:
+    return int(task_id.rsplit("-T", 1)[1])
+
+
 def _cycles(graph: dict[str, list[str]]) -> list[list[str]]:
     """Each dependency cycle once, as the list of its nodes."""
     seen_cycles, out = set(), []
@@ -1889,7 +1911,7 @@ CHECKS = [
     check_dup_id, check_missing_ref, check_retired_ref,
     check_budget, check_approved_edit, check_prebuild_left,
     check_task_fields, check_task_size, check_task_acceptance, check_task_title, check_task_step,
-    check_depends, check_milestone_size, check_writes, check_parallel_step, check_spine_claim, check_edges, check_deprecated, check_verify_smoke,
+    check_depends, check_task_order, check_milestone_size, check_writes, check_parallel_step, check_spine_claim, check_edges, check_deprecated, check_verify_smoke,
     check_step_io_types, check_packet_type_closure, check_type_cases, check_task_ref, check_read_unwritten,
     check_todo_mismatch, check_finding_disposition, check_foreign_plan,
     check_ref_file, check_ref_hash, check_ref_large, check_ref_prefix, check_roadmap_skill, check_roadmap_stage,

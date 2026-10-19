@@ -1238,5 +1238,30 @@ class ReadUnwrittenChecks(LintCase):
         self.assertEqual(self.messages(), [])
 
 
+class TaskOrderChecks(LintCase):
+    """`task-order`: task IDs run in plan order while no task is ticked."""
+    def swap(self):
+        self.p.edit(PLAN, "### M1-T11: Marchenko–Pastur cleaning", "### M1-T1x: Marchenko–Pastur cleaning")
+        self.p.edit(PLAN, "### M1-T12: Shrinkage covariance", "### M1-T11: Shrinkage covariance")
+        self.p.edit(PLAN, "### M1-T1x: Marchenko–Pastur cleaning", "### M1-T12: Marchenko–Pastur cleaning")
+
+    def messages(self):
+        return [(p.line, p.message) for p in self.problems() if p.code == "task-order"]
+
+    def test_ids_out_of_order_before_the_build_fail(self):
+        self.p.edit(TODO, "- [x] M1-T01", "- [ ] M1-T01")
+        self.swap()
+        self.assertEqual(self.messages(), [
+            (114, "M1-T11 comes after M1-T12: task IDs run in plan order, so renumber the plan's tasks top to bottom "
+                  "(Depends on, the graph rows, todo.md and any doc naming them) while none is done")])
+
+    def test_in_order_or_once_the_build_started_passes(self):
+        self.p.edit(TODO, "- [x] M1-T01", "- [ ] M1-T01")
+        self.assertEqual(self.messages(), [])
+        self.p.edit(TODO, "- [ ] M1-T01", "- [x] M1-T01")
+        self.swap()
+        self.assertEqual(self.messages(), [], "M1-T01 is ticked: a replan keeps its IDs")
+
+
 if __name__ == "__main__":
     unittest.main()

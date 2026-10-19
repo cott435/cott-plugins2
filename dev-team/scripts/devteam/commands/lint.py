@@ -45,7 +45,7 @@ SEVERITY = {
     "packet-type-closure": "W", "parallel-step": "W", "milestone-lines": "E", "milestone-order": "E",
     "exit-cases-in-scope": "E", "kind-title": "E", "covers-vs-deferred": "E", "closed-open-question": "W",
     "process-narration": "E", "explain-stale": "W", "spine-claim": "W", "step-unplanned": "W",
-    "interface-barrier": "W",
+    "interface-barrier": "W", "stale-row": "E",
 }
 
 # Size budgets (planning-stage.md §3), in lines. Package docs are budgeted per unit (lines per unit × units +
@@ -791,6 +791,46 @@ def check_process_narration(ctx: Context):
                 yield _p(doc, i, "process-narration",
                          f"{m.group(0)!r} narrates history: {fix} (the Changelog holds what changed, docs/routes.md "
                          f"what goes back)", sev)
+
+
+ROW_SKILL = re.compile(r"[`*]+([a-z0-9][a-z0-9-]*)[`*]+\s+skill\b")
+
+
+def _live_decisions(repo: Repo) -> dict[str, str]:
+    """Each live decision's ID → its section text (superseded ones are retired, and `retired-ref` covers them)."""
+    return {d.id: "\n".join(d.doc.lines[d.start:d.end]) for d in repo.all_definitions
+            if d.how == "heading" and not d.retired and re.fullmatch(r"AD-\d{2,}", d.id)
+            and d.doc.kind in ("architecture", "package-architecture")}
+
+
+def check_stale_row(ctx: Context):
+    """A pipeline step row that defers to a skill under an older decision while a newer decision naming that skill
+    goes uncited: the row restates what the newer one replaced (rl: "the `dataviz` skill specifies (AD-14)" after
+    AD-21 set the chart). A row deferring to a skill that isn't installed is a warning. A row citing a superseded
+    decision is `retired-ref`."""
+    decisions = _live_decisions(ctx.repo)
+    available = set(available_skills(ctx.repo))
+    num = lambda ad: int(ad[3:])
+    for p in ctx.pipelines.values():
+        if not ctx.in_scope(p.doc.rel):
+            continue
+        for s in p.steps:
+            cited = set(re.findall(r"AD-\d{2,}", s.spine))
+            for skill in dict.fromkeys(ROW_SKILL.findall(s.spine)):
+                naming = sorted((a for a, text in decisions.items() if re.search(rf"[`*]{re.escape(skill)}[`*]", text)),
+                                key=num)
+                old = [a for a in naming if a in cited]
+                newer = [a for a in naming if a not in cited and old and num(a) > num(old[-1])]
+                line = s.line
+                if newer:
+                    yield _p(p.doc, line, "stale-row",
+                             f"{p.id}.{s.name} defers to the `{skill}` skill ({', '.join(old)}), but {', '.join(newer)} "
+                             f"also decide{'s' if len(newer) == 1 else ''} it: restate the row from the newer "
+                             f"decision and cite it")
+                elif skill not in available:
+                    yield _p(p.doc, line, "stale-row",
+                             f"{p.id}.{s.name} defers to the `{skill}` skill, which isn't installed (.claude/skills or "
+                             f"the plugin): state what the row does, from the decision that sets it", "W")
 
 
 # ---- request checks (design/requests.md) ----------------------------------------------------------
@@ -1808,6 +1848,7 @@ CHECKS = [
     check_ref_file, check_ref_hash, check_ref_large, check_ref_prefix, check_roadmap_skill, check_roadmap_stage,
     check_spec_stage, check_milestone_lines, check_milestone_order, check_exit_cases_in_scope,
     check_kind_title, check_covers_vs_deferred, check_step_unplanned, check_interface_barrier, check_closed_open_question, check_process_narration,
+    check_stale_row,
     check_probe_fields, check_probe_informs, check_probe_cite, check_probe_runner, check_probe_leak,
     check_probe_sample, check_probe_results, check_probe_stale, check_probe_large,
     check_boundaries, check_probe_open, check_milestone_depends,

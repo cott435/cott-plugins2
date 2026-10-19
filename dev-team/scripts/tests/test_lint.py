@@ -1157,5 +1157,45 @@ class NarrationChecks(LintCase):
         self.assertEqual(self.messages("process-narration"), [])
 
 
+class StaleRowChecks(LintCase):
+    """`stale-row`: a step row deferring to a skill under an older decision a newer one replaced."""
+    ROW = "| 4 | `pca` | stats | Cov → Factors | full eigendecomposition | STAT-01 |"
+
+    def messages(self):
+        return [(p.line, p.severity, p.message) for p in self.problems() if p.code == "stale-row"]
+
+    def defer(self, cite: str, skill: str = "data-science"):
+        self.p.edit(PIPES, self.ROW, self.ROW.replace("full eigendecomposition",
+                                                     f"as the `{skill}` skill specifies ({cite})"))
+
+    def decide(self, ad: str, text: str):
+        self.p.edit(ARCH, "## Risks and open questions",
+                    f"### {ad}: Factors by eigendecomposition\n**Status:** Accepted · **Date:** 2026-10-16 · "
+                    f"**Scope:** stats\n- **Decision:** {text}\n\n## Risks and open questions")
+
+    def test_row_under_an_older_decision_fails(self):
+        self.p.edit(ARCH, "- **Decision:** Parquet via pyarrow.",
+                    "- **Decision:** Parquet via pyarrow; factors follow the `data-science` skill.")
+        self.decide("AD-04", "`numpy.linalg.eigh`, descending; the `data-science` skill names no method.")
+        self.defer("AD-03")
+        self.assertEqual(self.messages(), [
+            (25, "E", "PL-02.pca defers to the `data-science` skill (AD-03), but AD-04 also decides it: restate the "
+                      "row from the newer decision and cite it")])
+
+    def test_row_citing_the_newest_decision_passes(self):
+        self.decide("AD-04", "`numpy.linalg.eigh`, as the `data-science` skill's PCA recipe has it.")
+        self.defer("AD-04")
+        self.assertEqual(self.messages(), [])
+
+    def test_skill_not_installed_warns(self):
+        self.defer("AD-03", skill="dataviz")
+        patch = mock.patch.dict("os.environ")
+        patch.start().pop("CLAUDE_PLUGIN_ROOT", None)
+        self.addCleanup(patch.stop)
+        self.assertEqual(self.messages(), [
+            (25, "W", "PL-02.pca defers to the `dataviz` skill, which isn't installed (.claude/skills or the "
+                      "plugin): state what the row does, from the decision that sets it")])
+
+
 if __name__ == "__main__":
     unittest.main()

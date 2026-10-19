@@ -1,6 +1,6 @@
 # Grow: single package to multi-package
 
-Read when `dt status --skill architecture-design` reports Grow (a trigger in `shape.md` fires) or the user wants a split. It ends at the Review Gate in `../SKILL.md`, following `writing-rules.md`. Example: `examples-grow.md`; the multi-package result looks like `examples-new-multi.md`.
+Read when a Grow trigger in `shape.md` fires or the user wants a split. It ends at the Review Gate in `../SKILL.md`, following `writing-rules.md`. Example: `examples-grow.md`; the multi-package result looks like `examples-new-multi.md`.
 
 1. Write a decision (`AD-NN`, scope `system`, as `decisions.md` says) explaining why now: the trigger, and the new boundary, owner, runtime, or release need.
 2. Propose the package list and dependency rules. Component ids become package ids where possible, so Covers entries and contract IDs (`profile.fit_seasonality`) carry over unchanged.

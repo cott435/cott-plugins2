@@ -24,8 +24,9 @@ Start with `dt status --skill architecture-design`. Take the mode, shape, gap ke
 | **New** | No `docs/architecture.md` | `references/new.md` |
 | **Extend** | Uncovered or changed spec requirements | `references/extend.md` |
 | **Revise** | A technical change with no spec change, probe results to fold in (`probes_answered`, `probes_failed`), a change another skill routed here (`routed_changes`), or the user's words the Approved architecture doesn't honour (`requests_open`) | `references/revise.md` |
-| **Grow** | A Grow trigger fires, or the user wants a split | `references/grow.md` |
+| **Grow** | A Grow trigger fires (size alone never does), or the user wants a split | `references/grow.md` |
 | **Sync** | Code and doc disagree, or code has no doc | `references/sync.md` |
+| **Current** | Nothing to do | Say so, run `dt next` and go on here to the run it names; stop if it waits on the user |
 
 **Old layout:** if `legacy_layout` or `contracts_missing` is non-empty, fix it this round, whatever the mode: `git mv` each `docs/architecture/<pkg>.md` to `docs/packages/<pkg>/architecture.md`, fix links, and move each Interfaces section into its `contract.md`, leaving a link.
 
@@ -44,8 +45,8 @@ Approval is an unambiguous yes in the user's words; a hedge ("looks fine I guess
 
 | The user says | Do | Then |
 |---|---|---|
-| Approved, nothing to change | 1. Run `dt probes`: each decision whose `**Probe:**` names a probe not Answered or Waived stays `Proposed`, with its Risks line. 2. Set `Approved` on every doc and contract touched, the other `Proposed` decisions to `Accepted`, the date; `dt route --done architecture-design` if `routed_changes` listed any. 3. Offer to commit; commit only on a yes | **Stop.** Next is `pipeline-design`, and `api-probe` for each probe with no entry yet |
+| Approved, nothing to change | 1. Run `dt probes`: each decision whose `**Probe:**` names a probe not Answered or Waived stays `Proposed`, with its Risks line. 2. Set `Approved` on every doc and contract touched, the other `Proposed` decisions to `Accepted`, the date; `dt route --done architecture-design` if `routed_changes` listed any. 3. Offer to commit only files `git status` shows uncommitted, committing on a yes; on a clean tree say nothing about commits | **Stop.** Name the run `dt next` names |
 | Approved, with a change | Make exactly that edit. Fully specified and changing no decision or contract: set Approved. Otherwise keep Draft | **Stop.** List what you changed |
 | Changes requested | Edit, keep Draft | Repeat this gate |
 
-After approval this skill is done: "go ahead" means `pipeline-design`, never layout, plans or code. A new idea goes to `idea-refine`.
+After approval this skill is done: "go ahead" means the run `dt next` names, never layout, plans or code. A new idea goes to `idea-refine`.

@@ -48,8 +48,18 @@
 - Commit offers remain at 22 gates in rl incremental: the rule now offers a commit only when `git status` shows changes, and during a turn it always does, because the harness commits after the turn. This costs no turn (the sim user answers inside the approval) and is right for a real user; leave it, or have the driver tell the sim user to ignore commit offers.
 - Not analysed further with n = 2 runs; read with iteration 12's quant.
 
-## Fix plan for iteration 12
+## Fix plan for iteration 12, in waves
 
-1. **Q1 first:** the driver's timeout handling and api-probe's short agent checks. Then a quant smoke that runs a Yahoo agent check end to end and a deliberately long turn that times out without killing the run.
-2. **R1, R2 (build-planning):** wiring on fakes and doubles, never on spines it only calls; no chain of thickens on one step.
-3. Iteration 12 runs all four trajectories; quant is compared against iteration 10 (its last complete quant runs), judged 3 × both orders.
+**Wave 1 (one session, running):** Q1 (the driver's turn timeout, short agent-run probe checks), R1 (wiring on fakes and doubles) and R2 (thickens on separate files run in parallel; the shared class is wired by one task whose Writes include it; seam stubs for a pre-split module). Branch `claude/confident-lamport-3a1bb4`.
+
+**Wave 2 (five sessions, in parallel, each branched from wave 1's tip):** what the judges call out in every repeat of both rl plans (`judge-rl.*.json`).
+
+| Session | Owns | Fixes |
+|---|---|---|
+| 1. dt | `scripts/**` | Staleness: `process-narration` fails the gate (an error, or a status key the gate requires empty), with the phrases the judges quote ("Nothing is built yet", "Docs to rework", "the build waits for"); a lint for a pipeline or spec row that restates what a superseding decision replaced, at least rows under or citing a superseded AD. Milestones: a lint for lopsided milestones (one holding a whole stage beside slice-sized ones). Packets: "missing: not in the repo yet" in a `dt context` packet fails the gate; `dt context` carries only the task's own rows of a long step table. Task IDs in plan order. |
+| 2. build-planning | `skills/build-planning/**` | Milestones as vertical slices: M1 delivers the user's success criteria end to end (rl: it trains, beats the baselines, and can be watched), never layered by function (train / then baselines+curves+replay / then study) or a whole stage in one milestone. Task sizing: a whole learner or several concerns is never XS. A task's hyperparameters come from typed contract fields with defaults. |
+| 3. pipeline-design + architecture-design | `skills/pipeline-design/**`, `skills/architecture-design/**` | Revision sweep: an AD that changes behaviour a spine row states routes that row back (wave 1 of iteration 11's "close the route, nothing goes back" rule, narrowed); a superseded decision's restatements are rewritten; no process narration in an AD. One pipeline per stage's call path, not a 34-row table across stages. Configuration and hyperparameters as typed contract fields with defaults (`contracts.md`; the contract-gap branch also edits it, so expect a merge there). |
+| 4. idea-refine + spec-writing | `skills/idea-refine/**`, `skills/spec-writing/**` | Extend sweeps the earlier stage's framing ("The second environment, whatever it is"); one decision is stated in one place. |
+| 5. Eval | `evals/harness/scenarios.json`, `blind_judge_prompt.md`, `driver.py`'s sim persona | The rl scenario contradicts itself (persona: a rented cloud GPU is fine; facts: "no budget beyond free tools"): make them agree. The judge sees `final__requests.md` but treats the scenario facts as ground truth: add that a change the user approved in their own words (a `changed` or `superseded` request) is not a defect. The sim user never lowers a success bar the facts set (rl turn 3: "matching the scripted baseline counts as passing"). |
+
+**Wave 3:** merge waves 1 and 2, run the dt tests, both `check.py`, the selftests and `dryrun.py`; smoke a quant run through its probes and an rl run to its first plan; then iteration 12 with all four trajectories, judged 3 × both orders, quant against iteration 10.

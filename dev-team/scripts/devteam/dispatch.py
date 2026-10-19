@@ -290,7 +290,9 @@ class Build:
         prompt = (f"You are the reviewer for the {ph.kind} review at checkpoint {ph.key}, package {pkg} "
                   f"(lead: {'yes' if lead else 'no'}). Tasks {', '.join(ids)}; base {base[:12]}, end {end[:12]}; "
                   f"commits {' '.join(s[:12] for s in shas) or 'none'}; paths {' '.join(paths) or 'none'}. "
-                  f"Write your finding lines to .dt/review.md in your worktree, then run "
+                  + (f"What later tasks need from this surface: `python3 {bs.DT_PY} build needs {ph.key}`. "
+                     if ph.kind == "interface" else "")
+                  + f"Write your finding lines to .dt/review.md in your worktree, then run "
                   f"`python3 {bs.DT_PY} build submit-review {rid} .dt/review.md`, and end with one line: "
                   f"REVIEW {ph.key} {pkg}: <n> findings, <c> Critical. dt is `python3 {bs.DT_PY}`.")
         return {"id": rid, "role": "reviewer", "agent_type": "reviewer", "title": ph.checkpoint.title,
@@ -315,6 +317,26 @@ class Build:
         return {"rows": shown, "over_cap": len(rows) - len(shown), "in_flight": in_flight, "cap": cap,
                 "holds": glob, "held": held,
                 "all_landed": bool(self.tasks) and all(t.id in self.done for t in self.tasks)}
+
+    def needs(self, key: str) -> list[dict]:
+        """What each task after an interface checkpoint will ask of the frozen surface: its Read:, acceptance and
+        the golden cases it reads or covers, in plan order. The interface reviewer checks each against the code."""
+        ph = next((p for p in self.phases if p.key == key), None)
+        if ph is None:
+            raise ValueError(f"no checkpoint {key} in the plan")
+        cases = {tc.id: tc for doc in self.repo.docs("tests") for tc in model.test_cases(doc)}
+        out = []
+        for t in self.tasks:
+            if t.start < ph.checkpoint.start or t.kind == "interface":
+                continue
+            ids = [md.strip_md(r).split(" (")[0] for r in t.read] + t.covers
+            tcs = [cases[i] for i in dict.fromkeys(ids) if i in cases]
+            out.append({"id": t.id, "title": t.title, "kind": t.kind, "mode": t.mode,
+                        "read": [md.strip_md(r) for r in t.read],
+                        "acceptance": [c.text for c in t.acceptance],
+                        "cases": [{"id": tc.id, "title": tc.title,
+                                   "expected": md.strip_md(tc.fields.get("Expected", ""))} for tc in tcs]})
+        return out
 
     def next_checkpoint(self) -> dict | None:
         for ph in self.phases:

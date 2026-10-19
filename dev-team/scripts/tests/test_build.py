@@ -62,6 +62,26 @@ class ReadyTest(BuildCase):
         self.assertEqual([(x["id"], x["role"]) for x in r["rows"]], [("M1-T02", "solo"), ("M1-T03", "tester")])
         self.assertEqual(r["held"], [])
 
+    def test_interface_review_gets_what_later_tasks_need(self):
+        """rl9: the review checked the interface against the contract and missed the seams testers needed. Its
+        prompt names `dt build needs`, which lists each later task's Read:, acceptance and golden cases."""
+        self.fake_land("M1-T01")
+        review = self.ready()["rows"][0]
+        self.assertIn(f"`python3 {bs.DT_PY} build needs M1-T01`", review["prompt"])
+        rows = self.dt_json("build", "needs", "M1-T01", "--json")[1]["tasks"]
+        self.assertEqual([r["id"] for r in rows], ["M1-T02", "M1-T03", "M1-T04"])
+        t03 = rows[1]
+        self.assertEqual((t03["kind"], t03["mode"]), ("thicken", "split"))
+        self.assertIn("core.summarize", t03["read"])
+        self.assertEqual(t03["cases"], [{"id": "TC-01", "title": "Mean of four numbers",
+                                         "expected": "count 4, total 10, mean 2.5"}])
+        code, text, _ = self.dt("build", "needs", "M1-T01")
+        self.assertEqual(code, 0)
+        self.assertIn("## M1-T03: Mean in the summary (thicken, split)", text)
+        self.assertIn("- TC-01 Mean of four numbers: expected count 4", text)
+        code, out = self.dt_json("build", "needs", "M1-T09")
+        self.assertEqual((code, "no checkpoint M1-T09" in out["error"]), (1, True))
+
     BARRIER = ("### Checkpoint after M1-T01 (barrier)\n"
                "- [ ] The interface code matches contract.md exactly: types, signatures, stubs, samples, exports\n"
                "- [ ] M1-T03's tester can write its tests from what is frozen\n\n")

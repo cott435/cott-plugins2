@@ -41,7 +41,8 @@ Rules:
   `tests/contracts/<id>.<symbol>/` folders its `Writes:` names: schema, samples, fakes. Its
   contract tests check shape only: exports, signatures, each sample against its schema, each fake
   against its contract's cases, written as one test taking the provider so the real one can run
-  them too. Never a stub's body or other state a later task changes (`stub-pinned`). Every other
+  them too. Each concrete class it freezes is instantiated from its sample, so a missing
+  Protocol member fails here, not in a later task. Never a stub's body or other state a later task changes (`stub-pinned`). Every other
   task replaces only the stub naming it, and keeps the signature. What the interface froze (CR-09)
   changes only through a contract Revise: if it can't express what the task needs, run
   `python3 <dt> escalate CONTRACT-CHANGE "<why>" --type <the contract symbol>` and finish.

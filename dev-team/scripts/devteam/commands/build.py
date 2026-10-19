@@ -14,6 +14,8 @@ build-phase.md §6.5, §10. The last three are called by the project's hook scri
   and the implementer retried; its next `dt claim` prints the user's decision.
 - `prune [--dry-run]`: in the main checkout, deletes a done task's tests branch and the branch and worktree of
   every claim no longer live (a rejected half's, for one); Exit runs it after the merge.
+- `needs <checkpoint>`: for the interface reviewer, each task after that checkpoint with its `Read:`, acceptance
+  and golden cases (expected values included), so the review checks the frozen surface against what they need.
 - `release <task> <role>`: drops a reservation or claim the driver gave up on (`<checkpoint>.<pkg> reviewer`
   for a review).
 - `workflow M<n> [--cap N] [--out FILE]`: a Workflow script that drives the build with dt as the decider
@@ -54,6 +56,9 @@ def add_arguments(parser):
                    help="after a TEST-WRONG: the user says the test is right; keep it and retry the implementer")
     p = sub.add_parser("prune", help="delete the branches and worktrees a finished build left behind")
     p.add_argument("--dry-run", action="store_true", help="list what would go, delete nothing")
+    p = sub.add_parser("needs", help="(interface reviewer) what each task after a checkpoint needs from the surface")
+    p.add_argument("checkpoint", help="the checkpoint's key, the interface task it follows (M1-T01)")
+    p.add_argument("--json", action="store_true", help="print JSON instead of text")
     p = sub.add_parser("release", help="drop a reservation or claim")
     p.add_argument("task", help="task ID, or <checkpoint>.<pkg> for a review")
     p.add_argument("role", choices=bs.ROLES + ("reviewer",))
@@ -261,6 +266,27 @@ def release(args, repo) -> int:
     return 0
 
 
+def needs(args, repo) -> int:
+    try:
+        rows = dispatch.Build(repo).needs(args.checkpoint)
+    except ValueError as e:
+        return fail(f"dt build needs: {e}")
+    if args.json:
+        emit({"checkpoint": args.checkpoint, "tasks": rows})
+        return 0
+    print(f"# What the tasks after {args.checkpoint} need from the frozen surface\n\n"
+          "For each task: every type, method, attribute and state its acceptance and cases make its tests call or "
+          "observe must be public in the surface. A missing one is a Critical finding naming the task.")
+    for r in rows:
+        print(f"\n## {r['id']}: {r['title']} ({r['kind'] or 'task'}, {r['mode']})")
+        print("Read: " + (", ".join(r["read"]) or "—"))
+        for a in r["acceptance"]:
+            print(f"- {a}")
+        for c in r["cases"]:
+            print(f"- {c['id']} {c['title']}" + (f": expected {c['expected']}" if c["expected"] else ""))
+    return 0
+
+
 def submit_review(args, repo) -> int:
     if not re.fullmatch(r"(M\d+-T\d{2,}|exit)\.[\w-]+", args.review):
         return fail(f"not a review id: {args.review} (want <checkpoint>.<pkg>)", 2)
@@ -350,7 +376,7 @@ def mark_finished(args, repo) -> int:
     return 0
 
 
-ACTIONS = {"start": start, "status": status, "go": go, "prune": prune, "resolve": resolve, "release": release, "workflow": workflow,
+ACTIONS = {"start": start, "status": status, "go": go, "prune": prune, "resolve": resolve, "release": release, "needs": needs, "workflow": workflow,
            "verdict": verdict,
            "escalated": escalated, "mark-finished": mark_finished, "submit-review": submit_review}
 

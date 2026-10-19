@@ -54,17 +54,18 @@ The standing quality bar. `pyproject.toml` and `scripts/check.sh` enforce it; ev
 **Worktree links:** {{worktree_links}}
 
 ## Review
-Run by the reviewer agent: the interface review after Phase 0, a phase review per package at each checkpoint, and the milestone exit. `dt land` already checked each landing's `Writes:`, protected paths and gates; review judges what tools can't.
+Run by the reviewer agent, per package, at each checkpoint and the milestone exit. `dt land` already checked each landing's `Writes:`, protected paths and gates; review judges what tools can't.
 
 **Interface** (after Phase 0): the code is the contract, no more and no less.
 1. Types match `contract.md`: fields, types, invariants. Nothing a step's In → Out needs is missing; no helper is frozen.
 2. Signatures match the step tables, in their owner modules. Each stub names the open task that owns its step; no logic beyond types and validation.
 3. One sample per case the contract names, valid and realistic, never holding a TC's expected value. Replay doubles replay an interaction the Protocol allows. Each fake passes its contract's cases; anything it does beyond echoing a fixture (filtering, ordering, an error) is a case the real provider must pass too. Contract tests check shape only, never a stub or other state a later task changes.
-4. `__init__.py` exports exactly the contract; each `Mitigated by` in the plan's dependency graph exists; each split task's tester can write its tests from the frozen interface and its `Read:`.
+4. `__init__.py` exports exactly the contract; each `Mitigated by` in the plan's dependency graph exists; each frozen concrete class instantiates.
+5. **What later tasks need** (`dt build needs <checkpoint>`): every type, method, attribute and state each task's acceptance and golden cases make its tests use is public in the frozen surface.
 
 **Each phase**, per package, tests before code:
 1. **Interfaces followed** (CR-09): no frozen type, signature or contract folder changed outside a Revise. Consumers use the declared types: no dict for a dataclass, no reaching into a provider's internals, no local redefinition. A stub is replaced only by the task it names; no cross-package import outside the contract; spine tests run on samples and doubles, not another step's code.
-2. **Tests prove something:** each intent test asserts its TC case or acceptance bullet, loading expected values and tolerances from fixtures; none is assertion-free or weakened; Hypothesis runs the `ci` profile. Unit tests are specific, never computing the expected value with the code under test or testing only a mock. **Mutation check** (`.claude/agents/reviewer.md`): per acceptance bullet, the smallest change that should break it; a mutation no test catches is a finding.
+2. **Tests prove something:** each intent test asserts its TC case or acceptance bullet, loading expected values and tolerances from fixtures; none is assertion-free or weakened; Hypothesis runs the `ci` profile. Unit tests are specific, never computing the expected value with the code under test or testing only a mock. **Mutation check** per acceptance bullet (`.claude/agents/reviewer.md`).
 3. **Correct to the spec:** each acceptance bullet truly met, not special-cased to the sample; the error paths the requirement names; seeding and determinism; numerical edge cases.
 4. **Simple** (CR-11, CR-12, CR-42): no abstraction with one implementation outside the contract or an AD; no forwarding wrapper, one-method class, or class where a function does; no parameter, flag or config key every caller sets the same; no `try/except` that only re-raises or swallows, no checks the types already guarantee; no loop the library already provides. No near-copies within or across the phase's tasks: one concept is one function in its owner module (tests may repeat for readability). Each finding names the simpler form, with the same tests passing.
 5. **Pipelines** (CR-10): entry functions read as their step tables (`dt layout`); step owners respected; spine baselines still selectable.
@@ -74,7 +75,7 @@ Run by the reviewer agent: the interface review after Phase 0, a phase review pe
 
 **Milestone exit**, over the whole diff, adds: the Scope's Exit holds; every Covers ID has a test; `check.sh full --exit` finds no stub; system tests use real providers; the same sample through a real provider and its double agrees; deferred requirements untouched; pip-audit ran.
 
-**Severity:** Critical: a frozen interface changed, a contract test pinning a transient state, a weakened test, an intent test that misses a mutation changing its TC's expected output, a wrong answer, a loosened bar, a security hole, lost data; it stops the build. Important: a consumer bypassing a type, any other surviving mutation, an unneeded abstraction, a duplicate across tasks. Suggestion and Nit: local. Findings go under the checkpoint block in `tasks/plan.md` (`dt finding`), each with a fix task or a reason.
+**Severity:** Critical: a frozen interface changed, a seam a later task needs missing from the interface, a contract test pinning a transient state, a weakened test, an intent test that misses a mutation changing its TC's expected output, a wrong answer, a loosened bar, a security hole, lost data; it stops the build. Important: a consumer bypassing a type, any other surviving mutation, an unneeded abstraction, a duplicate across tasks. Suggestion and Nit: local. Each finding gets a fix task or a reason.
 
 ## Done
 agent-skills `references/definition-of-done.md`, tailored once:

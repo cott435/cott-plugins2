@@ -15,7 +15,7 @@ A reference is a file in `references/` showing how something is done (a boosting
 
 ## What's waiting
 
-Start with `dt status --skill reference-intake`: three waiting lists (`references_unindexed`, `references_changed`, `references_missing`), plus `files_to_read`, `outline_first` (`.py` over 400 lines), `next_id` and `milestones`. `mode: current` (all lists empty): say so, name the skill that routed here, and stop. Otherwise one process serves every status: with no index yet, create it from the template; process only the listed files.
+Start with `dt status --skill reference-intake`: three waiting lists (`references_unindexed`, `references_changed`, `references_missing`), plus `files_to_read`, `outline_first` (`.py` over 400 lines), `next_id` and `milestones`. `mode: current` (all lists empty): stop; start what `dt next` names, this turn. Otherwise one process serves every status: with no index yet, create it from the template; process only the listed files.
 
 ## Process
 
@@ -38,12 +38,12 @@ Rerun `dt status --skill reference-intake` and `dt lint docs/references.md`: wai
 1. **What was written:** each new or changed entry in full, any retired lines, any skipped files with the reason.
 2. **ASSUMPTIONS:** unconfirmed milestone guesses, Caveats inferred rather than read, summaries made from an outline.
 3. **Cited elsewhere:** docs and tasks that cite a retired or changed entry.
-4. Ask the user to approve. **STOP YOUR TURN.**
+4. Ask the user to approve (a yes also commits). **STOP YOUR TURN.**
 
 **No live user** (headless): write the entries with the guessed milestones, list each guess under ASSUMPTIONS, leave the index Draft, and stop.
 
 | The user says | Do | Then |
 |---|---|---|
-| An unambiguous yes | Set `**Status:** Approved` and the date. Offer to commit `docs/references.md` and untracked reference files; commit only on a yes | **Stop.** Name the skill that routed here, or the next one `dt status` points to |
+| An unambiguous yes | Set `**Status:** Approved` and the date. Commit `docs/references.md` and untracked reference files if `git status` lists them | **Stop.** Say what `dt next` names; never ask whether to start it |
 | A change to an entry or milestone | Edit, keep Draft | Repeat the gate |
 | A hedge ("looks fine I guess") | Keep Draft, ask about the specific entries | Repeat the gate |

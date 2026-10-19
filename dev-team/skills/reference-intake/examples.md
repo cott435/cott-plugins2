@@ -155,7 +155,7 @@ User: "all as listed."
 
 *(Turn ends.)*
 
-**User:** "Approved." Set `**Status:** Approved` and the date, and offer to commit `docs/references.md` and the three reference files. Then: "The references are indexed. `spec-writing` was in progress on S2, so continue there."
+**User:** "Approved." Set `**Status:** Approved` and the date, and commit `docs/references.md` and the three reference files. Then: "The references are indexed. Next is `spec-writing`, still on S2."
 
 **What follows (other skills):** `idea-refine` writes S2's `**Skills:** profile-report, significance-check` when the stage is accepted, and `build-planning` later cuts S2 into M2, which inherits RF-01. AD-14's Context cites RF-01's caveat. PL-03's `remove_seasonality` step carries `**References:** RF-01`. TC-09, a planted daily sine case, comes from that caveat. M2-T04 reads `RF-01:deseasonalize`. Months later, when the boosting stage S3 is added, `idea-refine` offers RF-02 and RF-03 for it.
 

@@ -6,7 +6,7 @@ No `tests.md` yet. Read `cases.md` before writing a case or a Strategy row. Work
 STATUS ─→ ASK ─→ CASES ─→ STRATEGY ─→ WRITE ─→ [gate: user approves oracles; stop]
 ```
 
-**1. Ask** the two things only the user knows: **which workflows matter most** (cases go where a wrong answer hurts) and **input/output pairs they already trust** (files, notebook outputs, paper tables).
+**1. Ask**, in one message, the two things only the user knows: **which workflows matter most** (cases go where a wrong answer hurts) and **input/output pairs they already trust** (files, notebook outputs, paper tables).
 
 **2. Cases** for those workflows and pairs, as `cases.md` says.
 

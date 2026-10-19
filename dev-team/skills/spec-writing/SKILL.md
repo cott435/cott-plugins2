@@ -27,7 +27,7 @@ Run `python3 ../../scripts/dt.py status --skill spec-writing` first (path relati
 
 | Mode | When | Read |
 |---|---|---|
-| Blocked | No `docs/brief.md` | Route to `idea-refine`. Stop |
+| Blocked | No `docs/brief.md` | Stop; start what `dt next` names, this turn |
 | New | No `docs/spec.md`; the brief is the input | `references/new.md` |
 | Extend | The spec exists; an idea file, or a change another skill routed here (`routed_changes`), is the input | `references/extend.md` |
 
@@ -43,13 +43,13 @@ Run `python3 ../../scripts/dt.py status --skill spec-writing` first (path relati
 Run the hygiene check in `references/spec.md`, and the gate steps your mode file adds. Then:
 
 1. Summarize: feature and requirement counts, the goal → feature and stage → feature mappings, the **Your words** line (requests honoured and changed), Open questions.
-2. Ask the user to approve or request changes.
+2. Ask the user to approve (a yes also commits) or request changes.
 3. **STOP YOUR TURN.** Never start the architecture or code in the same turn, and never edit the spec and draft the architecture in one turn.
 
 **No live user** (headless): don't invent confirmations. Write the spec, put unconfirmed assumptions and questions under Open questions, leave Draft, and stop.
 
 | The user says | Do | Then |
 |---|---|---|
-| Approved, nothing to change | Set `**Status:** Approved` and the date, do the on-approval step your mode file names, and `python3 ../../scripts/dt.py route --done spec-writing` if `routed_changes` listed any. Offer to commit the spec and idea; commit only on a yes | Hand off to `architecture-design` |
+| Approved, nothing to change | Set `**Status:** Approved` and the date, do the on-approval step your mode file names, and `python3 ../../scripts/dt.py route --done spec-writing` if `routed_changes` listed any. Commit the spec and idea if `git status` lists them | **Stop.** Next is `architecture-design`: say so; never ask whether to start it |
 | Approved, with a change ("make QR-02 ≤ 5 minutes") | Make exactly that edit. Fully specified: set Approved. Needs your judgment: keep Draft | **Stop.** List what you changed; the architecture starts next turn |
 | Changes requested | Edit, keep Draft | Repeat this gate |

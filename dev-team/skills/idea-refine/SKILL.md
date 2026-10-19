@@ -43,13 +43,13 @@ Each arrow waits on the user. Everything is written as **Draft** and becomes **A
 ## Review Gate (CRITICAL)
 
 1. Say what was written and where, in three lines: the problem, the top goal (or the idea's direction), the biggest Not Doing item. Propose the roadmap stage(s) to add on acceptance (`S3: Features & boosting`), each with its skills and references, as one question with your proposal as the default.
-2. Ask the user to **accept** or request changes.
+2. Ask the user to **accept** (a yes also commits) or request changes.
 3. **STOP YOUR TURN.** Never start the spec in the same turn, and never edit the brief or idea and draft the spec in one turn.
 
 **No live user** (headless): don't invent confirmations. Write the Draft, put what the user must confirm (direction, goals, stages) under Open questions, leave Draft, add no roadmap stage, and stop.
 
 | The user says | Do | Then |
 |---|---|---|
-| Accepted, nothing to change | Set `**Status:** Accepted` and the date on whichever of the brief and idea were written or edited. Add the roadmap stage(s) with their Skills lines, and the stage on each assigned reference. Offer to commit; commit only on a yes | Hand off to `spec-writing` |
+| Accepted, nothing to change | Set `**Status:** Accepted` and the date on whichever of the brief and idea were written or edited. Add the roadmap stage(s) with their Skills lines, and the stage on each assigned reference. Commit what `git status` lists | **Stop.** Next is `spec-writing`: say so; never ask whether to start it |
 | Accepted, with a change | Make exactly that edit. Fully specified: set Accepted and add the stage(s). Needs your judgment: keep Draft | **Stop.** List what you changed; the spec starts next turn |
 | Changes requested | Edit, keep Draft | Repeat this gate |

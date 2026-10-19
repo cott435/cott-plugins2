@@ -126,6 +126,6 @@ Hand-offs:
   ledger.BankTxn's Cases can name PB-01 samples/sync_added.json rows.
 ```
 
-The user approves the lines → `Answered · pass · 2026-10-21`, and an offer to commit `docs/probes.md` and `probes/PB-01-plaid-coverage/` (`.env` and `out/` stay ignored). **Stop.** Next is architecture-design Revise.
+The user approves the lines → `Answered · pass · 2026-10-21`, and a commit of `docs/probes.md` and `probes/PB-01-plaid-coverage/` (`.env` and `out/` stay ignored). **Stop.** Next is architecture-design Revise.
 
 **Had C1 failed** (no Trial): the Verdict is `fail: C1, team not eligible for Trial`. The hand-off goes to spec-writing through the user, since Pay-as-you-go bills Transactions monthly per Item and QR-08's $5 probably fails. api-probe names QR-08 and the finding, and edits nothing else.

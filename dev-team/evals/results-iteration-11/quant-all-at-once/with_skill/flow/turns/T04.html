@@ -1,0 +1,598 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1"><title>T04 turn</title>
+<style>
+:root{--bg:#fbfbfa;--fg:#1d1d1f;--muted:#6b6b70;--line:#d9d9de;--box:#fff;--rowp:#eef3fb;--band:#fff4d6;
+--ok:#2e7d32;--bad:#c62828;--warn:#b26a00;--idle:#6b6b70}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#17171a;--fg:#ececf0;--muted:#9a9aa3;
+--line:#34343a;--box:#222227;--rowp:#1d2433;--band:#3a3015;--ok:#6fcf73;--bad:#ff6b6b;--warn:#f0b35a;--idle:#9a9aa3}}
+:root[data-theme="dark"]{--bg:#17171a;--fg:#ececf0;--muted:#9a9aa3;--line:#34343a;--box:#222227;--rowp:#1d2433;
+--band:#3a3015;--ok:#6fcf73;--bad:#ff6b6b;--warn:#f0b35a;--idle:#9a9aa3}
+body{margin:0;padding:16px;background:var(--bg);color:var(--fg);font:14px/1.45 -apple-system,system-ui,sans-serif}
+h1{font-size:18px;margin:0 0 4px}h2{font-size:15px;margin:22px 0 8px}.sub{color:var(--muted)}
+table{border-collapse:collapse;margin:4px 0 8px}td,th{border-bottom:1px solid var(--line);padding:4px 10px;text-align:left;
+vertical-align:top}th{color:var(--muted);font-weight:600}.chips span{display:inline-block;margin:0 4px 2px 0}
+.legend span{margin-right:14px;white-space:nowrap}.sw{display:inline-block;width:10px;height:10px;border-radius:2px;
+margin-right:4px;vertical-align:-1px}.scroll{overflow:auto;max-height:88vh;border:1px solid var(--line);border-radius:8px}
+.chart{display:grid;width:max-content}.chart>div{line-height:0}.corner{position:sticky;top:0;left:0;z-index:3}
+.colhead{position:sticky;top:0;z-index:2}.rowhead{position:sticky;left:0;z-index:2}
+svg.bg{background:var(--bg)}.colhead svg{border-bottom:1px solid var(--line)}.rowhead svg{border-right:1px solid var(--line)}
+.ok{color:var(--ok);fill:var(--ok)}.bad{color:var(--bad);fill:var(--bad)}.warn{color:var(--warn);fill:var(--warn)}
+.idle{color:var(--idle);fill:var(--idle)}
+svg text{fill:var(--fg);font-family:-apple-system,system-ui,sans-serif}
+.box{fill:var(--box);stroke:var(--line)}.unit:hover .box{stroke:var(--fg)}
+.role{font-size:12px;font-weight:600}.uid,.wmeta,.lmeta,.meta{font-size:10px;fill:var(--muted)}
+.sub{font-size:10.5px;fill:var(--muted)}.badge{font-size:11px;font-weight:600}
+.meta.bad{fill:var(--bad);font-weight:600}.lane{font-size:13px;font-weight:700}.wave{font-size:13px;font-weight:700}
+.par{fill:#4e79a7}.ser{fill:var(--muted)}.rowp{fill:var(--rowp)}.rows{fill:transparent}.band{fill:var(--band)}
+.bandt{font-size:11.5px}.grid{stroke:var(--line)}.link{stroke:var(--muted);stroke-width:1.2;opacity:.55}
+.arrowhead{fill:var(--muted)}.marks{font-size:10.5px}.audit{stroke:var(--box);stroke-width:2}.auditn{font-size:10px;font-weight:700;fill:#fff}
+a{color:inherit}svg a .box{cursor:pointer}
+
+:root{--c0:#2a78d6;--c1:#eb6834;--c2:#1baf7a;--c3:#eda100;--c4:#e87ba4;--c5:#008300;--c6:#6250d6;--c7:#e34948;
+--cx:#8a8985;--main:#52514e;--read:#dcdbd5;--readfg:#1d1d1f}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--c0:#3987e5;--c1:#d95926;--c2:#199e70;
+--c3:#c98500;--c4:#d55181;--c5:#008300;--c6:#9085e9;--c7:#e66767;--cx:#77766f;--main:#c3c2b7;--read:#3b3b40;
+--readfg:#ececf0}}
+:root[data-theme="dark"]{--c0:#3987e5;--c1:#d95926;--c2:#199e70;--c3:#c98500;--c4:#d55181;--c5:#008300;
+--c6:#9085e9;--c7:#e66767;--cx:#77766f;--main:#c3c2b7;--read:#3b3b40;--readfg:#ececf0}
+.c0{fill:var(--c0);background:var(--c0)}.c1{fill:var(--c1);background:var(--c1)}.c2{fill:var(--c2);background:var(--c2)}
+.c3{fill:var(--c3);background:var(--c3)}.c4{fill:var(--c4);background:var(--c4)}.c5{fill:var(--c5);background:var(--c5)}
+.c6{fill:var(--c6);background:var(--c6)}.c7{fill:var(--c7);background:var(--c7)}.cx{fill:var(--cx);background:var(--cx)}
+.cmain{fill:var(--main)}.sc0{stroke:var(--c0)}.sc1{stroke:var(--c1)}.sc2{stroke:var(--c2)}
+.tl text,.sm text,.lc text{font-size:10.5px;fill:var(--muted)}.tl .lbl-in,.sm .lbl-in{fill:#fff;font-size:10.5px;font-weight:600}
+.tl .rowl,.sm .rowl,.lc .rowl{fill:var(--fg);font-size:11.5px;font-weight:600}.tl .band{fill:var(--rowp)}
+.tl .brk{stroke:var(--muted);stroke-dasharray:2 3}.tl a:hover rect,.sm a:hover rect{stroke:var(--fg);stroke-width:1.5}
+.axis{stroke:var(--line)}.sm .val{fill:var(--fg);font-weight:600}.lc path.ln{fill:none;stroke-width:2}
+.lc circle{stroke:var(--bg);stroke-width:2}.lc .end{font-weight:600;fill:var(--fg)}
+.tiles{display:flex;flex-wrap:wrap;gap:10px;margin:12px 0}.tile{border:1px solid var(--line);border-radius:8px;
+padding:8px 12px;min-width:110px;background:var(--box)}.tile b{display:block;font-size:20px;line-height:1.2}
+.tile span{font-size:12px;color:var(--muted)}.tile i{font-style:normal;font-size:12px;margin-left:6px}
+.fm{border-collapse:separate;border-spacing:2px}.fm td,.fm th{border:0;padding:0;text-align:center;font-size:11px}
+.fm th{padding:0 2px;font-weight:600}.fm td.f,.fm th.f{text-align:left;padding-right:10px;white-space:nowrap;
+position:sticky;left:0;background:var(--bg);font:11.5px ui-monospace,Menlo,monospace;
+max-width:380px;overflow:hidden;text-overflow:ellipsis}
+.fm td.cell{min-width:22px;height:20px;border-radius:3px}.fm td.fw{background:var(--c0);color:#fff;font-weight:700}
+.fm td.fe{background:var(--c1);color:#fff;font-weight:700}.fm td.fr{background:var(--read);color:var(--readfg)}
+.fm td.n{color:var(--muted);padding:0 6px}.fm tr.grp td{text-align:left;padding-top:8px;color:var(--muted);
+font-weight:600}
+.key{display:inline-block;min-width:18px;text-align:center;border-radius:3px;font-size:11px;margin-right:4px}
+.bar{display:inline-block;height:9px;border-radius:2px;vertical-align:0}
+
+pre{white-space:pre-wrap;word-break:break-word;background:var(--box);border:1px solid var(--line);border-radius:6px;
+padding:8px 10px;margin:4px 0;font:12px/1.45 ui-monospace,SFMono-Regular,Menlo,monospace;max-width:100%;overflow:auto}
+.step{border-top:1px solid var(--line);padding:6px 0}.step:target{background:var(--rowp)}
+.sid{font:12px ui-monospace,Menlo,monospace;color:var(--muted);margin-right:8px}.kind{font-weight:600;margin-right:8px}
+.err{color:var(--bad);font-weight:600}.hook{color:var(--bad);margin:4px 0 0 16px}.lbl{font-size:12px;color:var(--muted);margin-top:6px}
+details summary{cursor:pointer;color:var(--muted);font-size:12px}.head td:first-child{color:var(--muted)}
+.top{font-size:13px}.narr{list-style:none;padding-left:0}.narr li{margin:3px 0}
+</style></head>
+<body>
+<p class="top"><a href="../flow.html">← the run's flow chart</a></p>
+<p class="top"><a href="../plan/T04.html">The plan as of T04</a>: this turn changed the plan (+5 ~0 −0) · <a href="../plan/index.html">plan map</a></p>
+<h1>T04 · turn · /dev-team:idea-refine Continue.</h1>
+<table class="head"><tr><td>Type</td><td>turn</td></tr><tr><td>Description</td><td>/dev-team:idea-refine Continue.</td></tr><tr><td>Spawned by</td><td>user</td></tr><tr><td>Model</td><td>claude-opus-5-5</td></tr><tr><td>Start</td><td>2026-10-19 02:22:55 UTC</td></tr><tr><td>Duration</td><td>1 min</td></tr><tr><td>Tool calls</td><td>6</td></tr><tr><td>Errors</td><td>0</td></tr><tr><td>Hook blocks</td><td>0</td></tr><tr><td>Tokens</td><td>4.0k out · 23.0k new in · 269k cached in · peak context 47.5k</td></tr><tr><td>Skills invoked</td><td>none</td></tr><tr><td>Files written or edited</td><td>docs/brief.md</td></tr><tr><td>Definition</td><td>none</td></tr><tr><td>Steps</td><td>11</td></tr><tr><td>Finished</td><td>yes</td></tr></table>
+
+
+<h2>Prompt</h2>
+<pre>/dev-team:idea-refine Continue.</pre>
+<h2>Files</h2>
+<table><tr><th>Op</th><th>File</th><th>Calls</th><th>By</th><th>Via</th><th>Steps</th></tr><tr><td>write</td><td><code>docs/brief.md</code></td><td>1</td><td>main</td><td>Write</td><td><a href="#D34">D34</a></td></tr><tr><td>read</td><td><code>../plugin/dev-team/skills/idea-refine/references/examples-ml.md</code></td><td>1</td><td>main</td><td>Bash</td><td><a href="#D32">D32</a></td></tr><tr><td>read</td><td><code>../plugin/dev-team/skills/idea-refine/references/new.md</code></td><td>1</td><td>main</td><td>Bash</td><td><a href="#D31">D31</a></td></tr><tr><td>read</td><td><code>../plugin/dev-team/skills/idea-refine/references/requests.md</code></td><td>1</td><td>main</td><td>Bash</td><td><a href="#D32">D32</a></td></tr><tr><td>read</td><td><code>../plugin/dev-team/skills/idea-refine/references/roadmap.md</code></td><td>1</td><td>main</td><td>Bash</td><td><a href="#D32">D32</a></td></tr><tr><td>read</td><td><code>docs/brief.md</code></td><td>1</td><td>main</td><td>Bash</td><td><a href="#D36">D36</a></td></tr><tr><td>read</td><td><code>docs/references.md</code></td><td>1</td><td>main</td><td>Bash</td><td><a href="#D31">D31</a></td></tr><tr><td>read</td><td><code>docs/requests.md</code></td><td>1</td><td>main</td><td>Bash</td><td><a href="#D31">D31</a></td></tr></table>
+<h2>Steps</h2>
+<div class="step" id="SD28"><span class="sid">D28</span><span class="kind">command</span>USER TYPED `/dev-team:idea-refine Continue.`</div><div class="step" id="SD29"><span class="sid">D29</span><span class="kind">skill-body</span>skill loaded from `/Users/connorott/plugins/dev-team-workspace/iteration-11/quant-all-at-once/with_skill/plugin/dev-team/skills/idea-refine`</div><div class="step" id="SD30"><span class="sid">D30</span><span class="kind">Bash</span>python3 ../plugin/dev-team/scripts/dt.py status --skill idea-refine; ls docs; git log --stat -3 | head -50<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;python3 ../plugin/dev-team/scripts/dt.py status --skill idea-refine; ls docs; git log --stat -3 | head -50&quot;,
+  &quot;description&quot;: &quot;Check idea-refine mode and project state&quot;
+}</pre><div class="lbl">output</div><pre>skill: idea-refine
+mode: new
+docs: brief missing · spec missing · architecture missing · roadmap missing · plan missing · constraints missing
+next ids: AD-01 PL-01 TC-01 M1
+references_unindexed: none
+references_changed: none
+references_missing: none
+brief_words: 0
+brief_goals: 0
+ideas: none
+roadmap_rows: none
+references_unassigned: RF-01, RF-02, RF-03
+requests_open: UR-01 &quot;I want to start a personal quant research platform for market research on US equities, built in stages.&quot;, UR-12 &quot;Get variance optimization right before any return prediction.&quot; [ordering of stages], UR-19 &quot;Research and paper trading only&quot; [Q1 purpose], UR-26 &quot;Fundamentals aren&#x27;t a concern now, so your default is fine.&quot; [Q3 default: price and volume features only; fundamentals under Not Doing], UR-28 &quot;your lean, 2 + 3 + 6, and also 5.&quot; [Direction: 2 = trust first (past-only refits, shared no-look-ahead check); 3 = thin viz app first, each stage adds views; 6 = shared out-of-sample scoreboard built in Stage 2; 5 = Stage 4 split, PPO agents a separate optional stage]
+references.md
+requests.md
+commit 6024e6ffadcc889d67d10f6ea3afd3fffadb87fe
+Author: eval &lt;e@e&gt;
+Date:   Sun Oct 18 22:22:51 2026 -0400
+
+    turn 3
+
+commit 1d34d43aba3495c5c75865afd397fe258de2ef9a
+Author: Connor Ott &lt;cott7729@gmail.com&gt;
+Date:   Sun Oct 18 22:22:45 2026 -0400
+
+    Index reference files RF-01 to RF-03
+    
+    Co-Authored-By: Claude Opus 5.5 &lt;noreply@anthropic.com&gt;
+
+ docs/references.md | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+commit e940a5960971c3dfe78d0874bbd12860fa181531
+Author: eval &lt;e@e&gt;
+Date:   Sun Oct 18 22:22:32 2026 -0400
+
+    turn 2
+
+ docs/references.md | 27 +++++++++++++++++++++++++++
+ docs/requests.md   | 10 ++++++++++
+ 2 files changed, 37 insertions(+)</pre></details></div><div class="step" id="SD31"><span class="sid">D31</span><span class="kind">Bash</span>cat docs/requests.md docs/references.md; cat ../plugin/dev-team/skills/idea-refine/references/new.md; ls ../plugin/dev-team/skills/idea-refine/references/ ../plugin/dev-team/skills/idea-refine/<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;cat docs/requests.md docs/references.md; cat ../plugin/dev-team/skills/idea-refine/references/new.md; ls ../plugin/dev-team/skills/idea-refine/references/ ../plugin/dev-team/skills/idea-refine/&quot;,
+  &quot;description&quot;: &quot;Read requests, references, and new-mode guide&quot;
+}</pre><div class="lbl">output</div><pre># User requests
+
+**Last updated:** 2026-10-18
+
+The user&#x27;s words, verbatim: one line per fact, constraint, tool, choice or answer, with the skill that heard it and the date. The words never change; only the trace after → does. Written with `dt request`.
+
+- **UR-01** brief · &quot;I want to start a personal quant research platform for market research on US equities, built in stages.&quot; · idea-refine 2026-10-18
+- **UR-02** spec · &quot;a reliable daily US equity dataset and loader (prices, returns, corporate actions, point-in-time universe)&quot; [Stage 1 scope] · idea-refine 2026-10-18
+- **UR-03** architecture · &quot;from my Sharadar subscription&quot; [Stage 1 primary data source] · idea-refine 2026-10-18
+- **UR-04** architecture · &quot;cross-checked against Yahoo Finance through yahooquery&quot; [Stage 1 cross-check source] · idea-refine 2026-10-18
+- **UR-05** spec · &quot;scripts to download, clean, validate, and store it, plus basic exploratory analysis&quot; [Stage 1] · idea-refine 2026-10-18
+- **UR-06** architecture · &quot;a data-viz app to explore it: a TypeScript + React browser frontend over a Python backend (HTTP and WebSocket)&quot; [Stage 1 data-viz app] · idea-refine 2026-10-18
+- **UR-07** spec · &quot;Return structure &amp; classical portfolios, no ML&quot; [Stage 2 scope] · idea-refine 2026-10-18
+- **UR-08** spec · &quot;PCA decomposition of returns to remove the market (and other dominant) factors&quot; [Stage 2] · idea-refine 2026-10-18
+- **UR-09** spec · &quot;Marchenko–Pastur random-matrix denoising of the correlation matrix&quot; [Stage 2] · idea-refine 2026-10-18
+- **UR-10** spec · &quot;covariance estimation (sample, shrinkage, denoised) compared on real data&quot; [Stage 2] · idea-refine 2026-10-18
+- **UR-11** spec · &quot;minimum-variance, risk parity and hierarchical risk parity built on those estimates, compared out of sample on realized variance&quot; [Stage 2] · idea-refine 2026-10-18
+- **UR-12** brief · &quot;Get variance optimization right before any return prediction.&quot; [ordering of stages] · idea-refine 2026-10-18
+- **UR-13** spec · &quot;build candidate features, then test them with ML for information gain over the residual (market-removed) returns&quot; [Stage 3] · idea-refine 2026-10-18
+- **UR-14** spec · &quot;Every feature claim must pass a proper null-hypothesis test so we don&#x27;t fool ourselves&quot; [Stage 3] · idea-refine 2026-10-18
+- **UR-15** spec · &quot;return/volatility forecasting with neural networks (e.g. sequence models), built on the features that survived stage 3 and compared against simple forecasting baselines&quot; [Stage 4] · idea-refine 2026-10-18
+- **UR-16** spec · &quot;portfolios driven by those forecasts, and PPO trading/allocation agents trained in a backtest environment&quot; [Stage 4] · idea-refine 2026-10-18
+- **UR-17** spec · &quot;Both must beat the stage-2 classical portfolios out of sample&quot; [Stage 4 forecast-driven portfolios and PPO agents] · idea-refine 2026-10-18
+- **UR-18** spec · &quot;paper trading only&quot; [Stage 4 scope] · idea-refine 2026-10-18
+- **UR-19** brief · &quot;Research and paper trading only&quot; [Q1 purpose] · idea-refine 2026-10-18
+- **UR-20** spec · &quot;no real money, no live brokerage&quot; [Q1 scope] · idea-refine 2026-10-18
+- **UR-21** spec · &quot;Success after Stage 2: a shrinkage or denoised covariance measurably lowers out-of-sample variance against the sample covariance.&quot; [Q1 Stage 2 success] · idea-refine 2026-10-18
+- **UR-22** spec · &quot;Defaults on size and history, but a smaller universe is fine.&quot; [Q2 default proposed: about the top 1,000 by market cap, point in time, from 2000 on, delisted names included] · idea-refine 2026-10-18
+- **UR-23** spec · &quot;S&amp;P 500 history with point-in-time membership works for me.&quot; [Q2 universe] · idea-refine 2026-10-18
+- **UR-24** architecture · &quot;I already subscribe to Sharadar for prices.&quot; [Q2 which Sharadar data] · idea-refine 2026-10-18
+- **UR-25** spec · &quot;I also have a list of 10 delisted former S&amp;P 500 members to check any data source against.&quot; [Q2 data validation] · idea-refine 2026-10-18
+- **UR-26** brief · &quot;Fundamentals aren&#x27;t a concern now, so your default is fine.&quot; [Q3 default: price and volume features only; fundamentals under Not Doing] · idea-refine 2026-10-18
+- **UR-27** spec · &quot;Your default. After-cost Sharpe plus realized variance, same period, same costs.&quot; [Q4 what &#x27;beat the stage-2 portfolios&#x27; means] · idea-refine 2026-10-18
+- **UR-28** brief · &quot;your lean, 2 + 3 + 6, and also 5.&quot; [Direction: 2 = trust first (past-only refits, shared no-look-ahead check); 3 = thin viz app first, each stage adds views; 6 = shared out-of-sample scoreboard built in Stage 2; 5 = Stage 4 split, PPO agents a separate optional stage] · idea-refine 2026-10-18
+# Quant Research Platform — References
+
+**Status:** Approved · **Last updated:** 2026-10-18
+
+### RF-01: PCA market removal
+**File:** `references/market_decomposition.py` · **Hash:** b3993e95 · **Kind:** code · **Milestones:** —
+- **Purpose:** removes the market (and other dominant) principal components from a daily returns panel, leaving residual returns
+- **Key parts:** `demean_returns(returns, min_obs)`, `standardise(returns)`, `pca_factors(returns, k)`, `residualize(returns, factors)`, `remove_market(returns, k)`, `residual_correlation_check(residuals)`
+- **In → Out:** T×N daily simple returns → residuals (T×N), factors (T×k), loadings and betas (N×k), explained variance (k), mean absolute residual correlation
+- **Use for:** the market-removal step in return structure; a check that residual correlation falls well below raw; choosing k
+- **Caveats:** eigenvectors, scaling, means and betas are fit on the full panel (look-ahead), so the project must fit on past data only; drops columns with fewer than 60 rows and fills gaps with 0 returns, which biases a point-in-time universe; PCA runs on standardised returns but the regression uses unscaled ones
+
+### RF-02: Sequence-model window builder
+**File:** `references/tft_dataset.py` · **Hash:** fdf31b69 · **Kind:** code · **Milestones:** —
+- **Purpose:** turns a long (ticker, date) panel into encoder/decoder windows with static, known and observed inputs kept apart, for a temporal-fusion-transformer style forecaster
+- **Key parts:** `WindowSpec`, `add_calendar_features(panel)`, `encode_static(panel, cols)`, `normalise_observed(panel, cols, window)`, `build_windows(panel, targets, spec)`, `split_by_origin(arrays, train_end, valid_end)`
+- **In → Out:** long panel + targets frame → arrays static (S, n), known (S, L+H, n), observed (S, L, n), target (S, H, n), origin and ticker (S,)
+- **Use for:** the dataset step of neural forecasting; separating known from observed inputs; a leakage check at window and split edges
+- **Caveats:** `split_by_origin` leaves no gap, so targets of samples near `train_end` reach into valid (needs a purge of at least the horizon); rows are assumed consecutive trading days and the inner merge, short tickers and `fillna(0.0)` drop or fill data silently; sector is taken from the first row, not point in time; static vocabulary fit on all dates; stride-1 Python lists are heavy for 500 names
+
+### RF-03: Forward return and volatility targets
+**File:** `references/tft_targets.py` · **Hash:** fd947a4a · **Kind:** code · **Milestones:** —
+- **Purpose:** builds forward log-return and forward realised-volatility labels per ticker over several horizons, from daily closes
+- **Key parts:** `log_returns(prices, price_col)`, `forward_return(prices, horizon, price_col)`, `forward_volatility(prices, horizon, annualise, price_col)`, `make_targets(prices, horizons)`, `demean_cross_section(targets, cols)`, `drop_incomplete(targets)`, `TRADING_DAYS`
+- **In → Out:** long (ticker, date, adj_close) → (ticker, date, `fwd_ret_{h}d`, `fwd_vol_{h}d`) for h in (1, 5, 21)
+- **Use for:** forecasting targets and their alignment; forward returns for feature tests and out-of-sample scoring; a test that no target includes the origin day&#x27;s return
+- **Caveats:** alignment is correct (covers t+1..t+h), but splits need a purge of at least the longest horizon; horizons count rows, not trading days, so gaps stretch them; `drop_incomplete` drops every row missing any horizon, including delisted names&#x27; last days (survivorship); a price ≤ 0 gives -inf, which `dropna` keeps; `demean_cross_section` uses whoever is present, not point-in-time membership
+# New mode: the brief
+
+No `docs/brief.md` yet. Examples: `examples-new.md` (all phases), `examples-process.md` (a non-product idea), `examples-data.md` (a data-dependent brief).
+
+1. **Phases 1-2** per `ideation.md`.
+2. **Phase 3: write the brief** from the template below. Check the word count (`wc -w docs/brief.md`) before presenting it.
+3. **Stages** per `roadmap.md`: one per outcome the user agreed in conversation, Source `brief`. If only the first is known, add just that one.
+
+## The brief
+
+Write `docs/brief.md` (create `docs/` if needed) from this template. The brief answers **why**, not **how** or **what exactly** — no requirements lists, no tech choices, no screens.
+
+```markdown
+# [Project Name]
+
+**Status:** Draft · **Last updated:** YYYY-MM-DD
+
+## The problem
+[2-4 sentences. Who has the problem, what it costs them today, and why it matters now.]
+
+## Who it&#x27;s for
+[The specific people this serves. Name a primary user; mention a secondary one only if it matters.]
+
+## Goals
+1. [An outcome for the user, not a feature — &quot;Regulars can reorder in under 30 seconds&quot;]
+2. [...]
+3. [...]
+
+## Constraints
+- [Real limits: deadline, budget, team, existing systems, rules or regulations]
+
+## What success looks like
+- [Observable signs it worked — numbers where you have them]
+
+## What we&#x27;re betting on
+- [The 2-3 assumptions that must be true, in plain words]
+
+## Not doing
+- [Tempting thing we&#x27;re deliberately leaving out] — [one-line reason]
+
+## Open questions
+- [Only questions that could change the direction. Omit the section if none.]
+```
+
+**Writing rules — the brief must pass all of these:**
+
+- **One page or less.** Aim for 250-450 words. If it&#x27;s longer, cut — don&#x27;t shrink the font.
+- **Plain English.** Write for a smart person outside the team. No acronyms without a definition, no jargon, no code, no file paths.
+- **Short sentences, short bullets.** One idea per bullet. No bullet longer than two lines.
+- **Data needs, not data vendors.** For ML and data projects, say what data the project depends on in plain terms (&quot;10 years of hourly meter readings, including meters since decommissioned&quot;) as a constraint or a bet. Name a specific source only if it&#x27;s fixed (our own data, a required benchmark). Choosing APIs and datasets happens in the architecture, after the spec.
+- **Goals are numbered** so `spec-writing` can trace requirements back to them (&quot;serves Goal 2&quot;).
+- **3-5 goals, project-level and stage-neutral.** A goal is an outcome of the whole project (&quot;Forecast errors we can trust&quot;), never a stage (&quot;Stage 2: the seasonal fit works&quot;). If the user describes the project in stages, the stages become roadmap stage rows (`roadmap.md`), and every goal stays true whichever stage is being built. More than five goals means the project isn&#x27;t focused yet — go back to Phase 2.
+- **The Not Doing list is mandatory.** It is the most valuable part: it makes trade-offs explicit.
+../plugin/dev-team/skills/idea-refine/:
+SKILL.md
+references
+
+../plugin/dev-team/skills/idea-refine/references/:
+examples-data.md
+examples-extend.md
+examples-ml.md
+examples-new.md
+examples-process.md
+extend.md
+frameworks.md
+ideation.md
+new.md
+refinement-criteria.md
+requests.md
+roadmap.md</pre></details></div><div class="step" id="SD32"><span class="sid">D32</span><span class="kind">Bash</span>cd /Users/connorott/plugins/dev-team-workspace/iteration-11/quant-all-at-once/with_skill/plugin/dev-team/skills/idea-refine/references &amp;&amp; cat roadmap.md requests.md; grep -n &quot;Phase 3&quot; -A30 ideation.md | head -60; cat examples-ml.md | head -120<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;cd /Users/connorott/plugins/dev-team-workspace/iteration-11/quant-all-at-once/with_skill/plugin/dev-team/skills/idea-refine/references &amp;&amp; cat roadmap.md requests.md; grep -n \&quot;Phase 3\&quot; -A30 ideation.md | head -60; cat examples-ml.md | head -120&quot;,
+  &quot;description&quot;: &quot;Read roadmap, requests rules, and examples&quot;
+}</pre><div class="lbl">output</div><pre># Roadmap stages
+
+Read when proposing stages at the Review Gate and when adding them on acceptance; the mode file says which stages to propose. An example: `examples-data.md`.
+
+Stages live in `docs/roadmap.md`. A stage is an outcome the user agreed: what they can do when it&#x27;s done, such as &quot;Data + stats&quot; or &quot;See my spending&quot;. It is coarse and unsized. **Don&#x27;t size it:** no task estimates, no pipeline counts, no splitting a stage because it looks big. Two stages differ by outcome, never by size. Once a stage&#x27;s pipelines are approved, `build-planning` cuts it into build-sized milestones (`M&lt;n&gt;`), each a vertical slice it can run end to end, and owns those rows.
+
+**Add stages only when the user accepts** (Phase 4). Each stage takes its ID from `dt next-id S` (`dt` as defined in `../SKILL.md`), a short name, and its Source. Leave the Status* cell empty, then run `dt roadmap`, which fills it. Under the tables, add a `## S&lt;n&gt;: &lt;Name&gt;` section with one plain-English `**Outline:**` line (what the user can do when the stage is done) and one `**Skills:**` line.
+
+**Stage skills and references.** The `**Skills:**` line is the one record of which skills serve a stage; later skills start from it and `build-planning` checks each one lands on a milestone and then a task. Propose the skills whose descriptions fit the stage (project `.claude/skills/*/SKILL.md` and the installed skills in your context), and ask once: &quot;Route profile-report and significance-check to S2? [yes / edit]&quot;. None fit → `**Skills:** —`. Also offer each `references_unassigned` entry that serves the stage (&quot;RF-02 and RF-03 (boosting) → S3? [yes / edit]&quot;). On acceptance, write the line and set `**Milestones:**` on each RF entry the user assigned to the stage ID (`—` becomes `S3`; otherwise append). Those two fields are all you write in the roadmap sections and `docs/references.md`.
+
+If `docs/roadmap.md` doesn&#x27;t exist, create it:
+
+```markdown
+# [Project Name] — Roadmap
+
+**Last updated:** YYYY-MM-DD
+
+| Stage | Name | Source | Status* |
+|---|---|---|---|
+| S1 | [Name] | brief | |
+
+*Written by `dt roadmap` from doc statuses and todo checkboxes; never hand-edited.
+
+## S1: [Name]
+**Outline:** [What the user can do when this stage is done, in one sentence.]
+**Skills:** [skill names routed to this stage, comma-separated, or —]
+```
+
+Add stages; never renumber, reorder or edit existing ones. A roadmap from before stages has only a milestone table (with a Source column): add the stage table above it for the first new stage, and leave the old rows as they are.
+# The user&#x27;s words: `docs/requests.md`
+
+Every planning skill follows this. The brief and the spec compress, and the next skill often runs in a fresh session that sees only the docs. `docs/requests.md` keeps what the user actually said, word for word, so the skill whose doc must honour it can. `dt request` writes every line; never edit the file by hand.
+
+## What goes in
+
+One request (`UR-NN`) per concrete statement you could check a doc against:
+
+- facts about the domain, the data or the world (&quot;the tank is circular&quot;), numbers, limits, deadlines, budgets
+- tools, libraries, vendors, protocols and data sources the user names (&quot;stream prices over a WebSocket&quot;, &quot;use yahooquery&quot;)
+- choices: an option picked from yours (&quot;Go with A&quot;), and the answer to any question a skill asked
+- a block acceptance (&quot;assumptions 1–7 are fine&quot;): one request, its `--about` listing what was accepted
+- scope: what must be in, or left out
+
+Not: approval of a whole doc (&quot;approved&quot;, &quot;looks good&quot;), wishes with nothing to check (&quot;make it nice&quot;), your own proposals the user hasn&#x27;t picked, or words already recorded (`dt request` lists them).
+
+## Recording
+
+As you hear it, before you write any doc:
+
+```
+dt request add &lt;owner&gt; &quot;&lt;their words&gt;&quot; --skill &lt;this skill&gt; [--about &quot;&lt;what it answers&gt;&quot;] [--replaces UR-NN]
+```
+
+- **Verbatim.** Quote the shortest span of their message that carries the fact. Never paraphrase, translate, correct or merge. A message stating three facts is three requests.
+- **`--about`** whenever the words don&#x27;t stand alone: &quot;Go with A&quot; → `--about &quot;AD-22 price source: A = Sharadar, B = yfinance&quot;`; &quot;yes, 3&quot; → what was asked. A bare letter means nothing to the next session, and the same words can pick opposite options in two rounds.
+- **Owner** is the doc that must honour it: `brief` (who the user is, their time, budget or experience: context no later doc carries), `spec` (behaviour, numbers, scope the user can observe), `architecture` (tools, libraries, vendors, protocols, data sources, an option for a decision), `pipelines`, `tests`, `plan`, or `constraints` (the quality bar, tooling rules).
+- **The user changes their mind:** record the new words with `--replaces` the old UR. A line is never edited or deleted.
+- The request that started the run is the user&#x27;s first message: record it too.
+
+## Honouring
+
+Before you write your doc, read `docs/requests.md` whole; `requests_open` in `dt status` lists the open requests your doc owns. For each:
+
+- **Honour it:** write the requirement, decision, step, case or rule that does what the words say, then `dt request trace UR-NN &lt;ID&gt;…` with the IDs that do it (spec: requirement IDs; architecture: `AD-NN` or a contract ID; the others: their IDs). Honoured by a section with no ID (Out of scope, Assumptions, Constraints): trace its heading, `§Out of scope`.
+- **Does what the words say** means the same shape, count, number, tool and goal, and for a named method or concept its mechanism, not its name: &quot;self-play&quot; is training against the opponent&#x27;s past versions, not two learners at once. A number the words state must appear in the traced text (`request-number` warns).
+- **Or change it, with the user&#x27;s yes:** when it conflicts with another request or can&#x27;t be met, say so at your gate with your alternative. Only after the user agrees, write the change into every ID it touches, the ones that honoured the old words included (a test case restating the old value too), then `dt request change UR-NN &quot;&lt;what instead&gt;&quot; --approved &quot;&lt;their words&gt;&quot; --skill &lt;this skill&gt; --into &lt;those IDs&gt;`. A doc that cites the request from another ID gets `request-cite`: bring it in line and add it with `dt request change UR-NN --into &lt;ID&gt;`. Never override a request silently, and never record an approval the user didn&#x27;t give. Headless: leave it open under Open questions and the doc Draft.
+- **A value from the user&#x27;s words** (a golden case&#x27;s expected output, a limit) cites the request as its Source: `**Source:** UR-04`. A number worked out from their words is not theirs; its Source says how it was derived (`request-source` warns).
+- A request another doc owns waits for that doc&#x27;s skill. Don&#x27;t copy it into yours (the spec names no tools, even when a request does).
+
+## At the gate
+
+Before asking for approval, `dt request --open --owner &lt;yours&gt;` is empty, except requests whose change you are asking the user about. The summary lists them in one line:
+
+&gt; **Your words:** &quot;circular tank&quot; UR-01 → TANK-02 &quot;the tank is a circle&quot;; &quot;use yahooquery&quot; UR-03 → AD-04 &quot;yahooquery&quot;; change proposed: UR-05 one predator → two (yes?); open: none.
+
+Quote the words and the traced text side by side, so the user sees whether one does the other.
+
+Once the spec or architecture is Approved, `dt lint` fails it for every open request it owns, and `dt next` sends the run back to its skill.
+# Example: an ML feature in an existing product
+
+Extend mode for an ML idea: the Data section and a baseline.
+
+## ML Feature in an Existing Product (Extend Mode)
+
+**User invokes:** `/ideate use ML to flag bad assay plates automatically in our lab results app`
+
+The app already has `docs/brief.md` (Goal 2: *Bad data is caught before it reaches analysis*) and `docs/spec.md`, so this is **extend mode**. The skill reads both, plus the `qc` module in the codebase.
+
+### Phase 1: Understand &amp; Expand
+
+&gt; **How might we** catch failed plates before they reach analysis, without scientists reviewing every plate by hand?
+
+Questions:
+
+1. **How are plates checked today, and how long does it take?**
+2. **What history exists?** How many plates, and is there a record of which ones were failed and why?
+3. **What&#x27;s worse: a bad plate getting through, or a good plate being re-run?**
+
+**User responds:** &quot;Scientists eyeball every plate — about 6 hours a week. We have 3 years of plate reads, roughly 40,000 plates, and about 2% were marked failed in the app. Missing a bad plate is much worse; a re-run costs a day.&quot;
+
+**Skill continues:**
+
+Before any ML: assay QC already has a standard rule, the **Z′-factor** (plates under 0.5 are suspect). Your `qc` module computes it but nobody acts on it. That&#x27;s the baseline any model has to beat. If the rule alone catches most failures, you may not need ML at all.
+
+Variations:
+
+1. **Simplification — Just Use the Rule:** Auto-flag plates with Z′ &lt; 0.5 and stop there. Zero ML.
+2. **Ranked Review Queue:** A model scores every plate. Scientists review the riskiest first and stop when the scores get low. Humans still decide.
+3. **Inversion — Auto-Pass the Obvious:** Instead of finding bad plates, confidently clear the clearly-good ones, and scientists review the rest.
+4. **Anomaly Detection:** No labels needed. Flag plates that look unlike typical ones. Useful if past &quot;failed&quot; labels turn out to be unreliable.
+5. **Expert Lens — Layout Patterns:** Many failures show up as spatial patterns (edge effects, a dead column). Features built from plate layout may beat a generic model.
+
+### Phase 2: Evaluate &amp; Converge (summary)
+
+**Data check:** 40,000 plates with 800 failures is enough to try a supervised model, *if* the labels are consistent. That&#x27;s the biggest bet. Different scientists may fail plates for different reasons. **Baseline:** the Z′ rule. **Cost asymmetry:** missing a bad plate is far worse, so measure recall at a fixed review budget, not accuracy (98% accuracy is free by passing everything).
+
+The user picks **2 (ranked queue), with 1 as the baseline it must beat**. **Fit check:** it serves existing Goal 2 and the same users, so **the brief does not change.**
+
+### Phase 3: Write the Idea File
+
+`docs/ideas/plate-qc-ranking.md`:
+
+```markdown
+# Idea: Plate QC Ranking
+
+**Status:** Draft · **Last updated:** 2026-10-14 · **Brief:** [../brief.md](../brief.md)
+
+## In one sentence
+This ranks every new assay plate by how likely it is to fail QC, so scientists review the riskiest plates first instead of checking all of them.
+
+## The problem
+Scientists check every plate by eye, about 6 hours a week. Failures are rare (about 2%) but costly: a bad plate that slips through corrupts downstream analysis. A good plate failed by mistake costs a day to re-run. The app already computes a standard quality score (Z′) but nothing acts on it.
+
+## Who it&#x27;s for
+Lab scientists doing plate QC, during their weekly review.
+
+## How it fits
+- **Serves:** Goal 2 (bad data caught before analysis)
+- **Touches:** QC-01 (Z′ is calculated per plate), QC-03 (scientist marks pass/fail)
+- **Brief changes:** None
+- **Stage:** New S3 (roadmap stage on acceptance)
+
+## Recommended direction
+Each new plate gets a risk score from a model trained on three years of past pass/fail decisions. The review screen sorts plates riskiest first. Scientists still make every pass/fail call; the model only sets the order.
+
+The Z′ rule is the baseline. If the model doesn&#x27;t clearly beat &quot;sort by Z′&quot;, we ship the rule alone and stop.
+
+## Data
+- About 40,000 plates over 3 years, with raw reads, Z′, and the scientist&#x27;s pass/fail decision (about 800 failures).
+- All in our own database. No outside data needed.
+- Evaluate on the most recent 6 months, never trained on, to mimic real use.
+
+## Alternatives considered
+- Rule only (Z′ &lt; 0.5) — kept as the baseline, and the fallback if the model doesn&#x27;t beat it.
+- Anomaly detection — only if past labels turn out to be unreliable.
+- Auto-passing obvious plates — revisit once the ranking has earned trust.
+
+## What success looks like
+- Reviewing the top 20% of plates catches at least 90% of the plates scientists would fail.
+- Clearly better than sorting by Z′ alone on the same 6 months.
+- Weekly review time drops from about 6 hours to under 2.
+
+## What we&#x27;re betting on
+- Past pass/fail decisions are consistent enough to learn from.
+- New plates look like past plates (same instruments and assays).
+
+## Not doing
+- Automatically failing or passing plates — a scientist always decides.
+- Image-based models of the plate.
+- Plates from other sites or instruments.
+
+## Open questions
+- How often do two scientists agree on the same plate? Measure before training.
+- How often should the model be retrained, and who signs off?
+```
+
+**Skill then says:** &quot;The idea is at `docs/ideas/plate-qc-ranking.md`. The brief is unchanged: this serves Goal 2. The biggest risk is label consistency. I&#x27;d measure scientist agreement on ~100 plates before anyone trains anything. Accept it or tell me what to change.&quot; *(Turn ends.)*
+
+*An idea file for an ML feature adds a **Data** section. It names the data, where it lives, and how it will be evaluated. It still says nothing about model type or libraries; those are decided in the architecture.*
+Shell cwd was reset to /Users/connorott/plugins/dev-team-workspace/iteration-11/quant-all-at-once/with_skill/project</pre></details></div><div class="step" id="SD33"><span class="sid">D33</span><span class="kind">Bash</span>python3 ../plugin/dev-team/scripts/dt.py request trace --help; grep -n &quot;brief&quot; ../plugin/dev-team/skills/idea-refine/references/examples-data.md | head -30<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;python3 ../plugin/dev-team/scripts/dt.py request trace --help; grep -n \&quot;brief\&quot; ../plugin/dev-team/skills/idea-refine/references/examples-data.md | head -30&quot;,
+  &quot;description&quot;: &quot;Check request trace syntax and brief tracing example&quot;
+}</pre><div class="lbl">output</div><pre>usage: dt request [-h] [--skill SKILL] [--about ABOUT] [--replaces UR-NN]
+                  [--approved APPROVED] [--into ID [ID ...]]
+                  [--owner {brief,spec,architecture,pipelines,tests,plan,constraints}]
+                  [--open] [--json]
+                  [{add,trace,change,list}] [args ...]
+
+positional arguments:
+  {add,trace,change,list}
+  args                  add: owner and words; trace: UR-NN and IDs; change:
+                        UR-NN and what
+
+options:
+  -h, --help            show this help message and exit
+  --skill SKILL         the skill that heard the words (add) or the approval
+                        (change)
+  --about ABOUT         add: what the words answer, when they don&#x27;t say it
+                        themselves
+  --replaces UR-NN      add: an earlier request these words replace
+  --approved APPROVED   change: the user&#x27;s words approving the change
+  --into ID [ID ...]    change: the IDs the change was written into (every ID
+                        that honoured the old words)
+  --owner {brief,spec,architecture,pipelines,tests,plan,constraints}
+                        list: only this owner&#x27;s requests
+  --open                list: only requests nothing honours yet
+  --json                list: print JSON
+89:*Notice what&#x27;s **not** in the brief: a weather API. The brief records data **needs** (hourly, by region, includes decommissioned meters, forecasts as issued, under budget) as constraints and bets. `spec-writing` turns them into data requirements, and the provider is chosen in the architecture against those requirements.*
+91:**On acceptance.** In Phase 2 the user agreed to build in two stages: the trustworthy data layer first, then tabular forecasts. The stages are not goals: Goals 1-4 hold whichever stage is being built. The skill sets the brief to Accepted, creates `docs/roadmap.md` with a stage row per stage (IDs from `dt next-id S`), and runs `dt roadmap` to fill Status:
+96:| S1 | As-of data | brief | Idea |
+97:| S2 | Tabular forecasts | brief | Idea |</pre></details></div><div class="step" id="SD34"><span class="sid">D34</span><span class="kind">Write</span>/Users/connorott/plugins/dev-team-workspace/iteration-11/quant-all-at-once/with_skill/project/docs/brief.md (40 lines)<div class="lbl">wrote /Users/connorott/plugins/dev-team-workspace/iteration-11/quant-all-at-once/with_skill/project/docs/brief.md</div><pre># Quant Research Platform
+
+**Status:** Draft · **Last updated:** 2026-10-18
+
+## The problem
+Doing quantitative research on US stocks alone is easy to get wrong. Free data quietly drops companies that went bust or left the index, and models quietly use information from the future. Either one makes a strategy look better than it is. Without a trusted base, every later result is suspect.
+
+## Who it&#x27;s for
+One person: the owner, researching US stocks for learning and paper trading, not for clients.
+
+## Goals
+1. **Data I can trust.** Daily US stock prices, returns and corporate actions, with index membership as it was on each date, including companies that later left.
+2. **No look-ahead, ever.** Every model is fit only on data available at the time, and one shared check catches any step that peeks at the future.
+3. **One honest scoreboard.** Every portfolio or strategy is scored out of sample on the same period, with the same trading costs, by after-cost Sharpe ratio (return per unit of risk) and realised variance.
+4. **Claims tested against chance.** Every claim that a signal or model helps must pass a significance test before anything is built on it.
+5. **See it, don&#x27;t just compute it.** A browser app to explore the data and results, gaining views as each part lands.
+
+## Constraints
+- Research and paper trading only: no real money, no live brokerage.
+- Risk before returns: get variance (risk) right before any return prediction.
+- Prices come from an existing paid daily-data subscription, cross-checked against a free public source.
+- Universe: S&amp;P 500 members as of each date, from 2000 on, delisted companies included.
+- Built in stages, each usable on its own.
+
+## What success looks like
+- Ten known delisted former S&amp;P 500 members all appear correctly in the data.
+- A cleaned-up risk estimate (shrunk or noise-filtered) measurably lowers out-of-sample variance compared with the raw sample estimate.
+- Any later forecasting or trading approach beats the classical risk-based portfolios on the shared scoreboard, or is reported as not doing so.
+
+## What we&#x27;re betting on
+- Removing the market-wide moves from returns leaves structure worth studying.
+- Daily price and volume data, with no company fundamentals, is enough to find signals worth testing.
+- Out-of-sample scoring with honest costs is strict enough to stop fooling ourselves.
+
+## Not doing
+- Company fundamentals (earnings, balance sheets) — not a concern now; price and volume features only.
+- Real trading or broker connections — paper trading only.
+- Intraday data — daily bars are enough for this research.
+- Markets outside US stocks.
+- Other users, accounts or hosting — a personal tool.
+</pre><details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-11/quant-all-at-once/with_skill/project/docs/brief.md&quot;,
+  &quot;content&quot;: &quot;# Quant Research Platform\n\n**Status:** Draft · **Last updated:** 2026-10-18\n\n## The problem\nDoing quantitative research on US stocks alone is easy to get wrong. Free data quietly drops companies that went bust or left the index, and models quietly use information from the future. Either one makes a strategy look better than it is. Without a trusted base, every later result is suspect.\n\n## Who it&#x27;s for\nOne person: the owner, researching US stocks for learning and paper trading, not for clients.\n\n## Goals\n1. **Data I can trust.** Daily US stock prices, returns and corporate actions, with index membership as it was on each date, including companies that later left.\n2. **No look-ahead, ever.** Every model is fit only on data available at the time, and one shared check catches any step that peeks at the future.\n3. **One honest scoreboard.** Every portfolio or strategy is scored out of sample on the same period, with the same trading costs, by after-cost Sharpe ratio (return per unit of risk) and realised variance.\n4. **Claims tested against chance.** Every claim that a signal or model helps must pass a significance test before anything is built on it.\n5. **See it, don&#x27;t just compute it.** A browser app to explore the data and results, gaining views as each part lands.\n\n## Constraints\n- Research and paper trading only: no real money, no live brokerage.\n- Risk before returns: get variance (risk) right before any return prediction.\n- Prices come from an existing paid daily-data subscription, cross-checked against a free public source.\n- Universe: S&amp;P 500 members as of each date, from 2000 on, delisted companies included.\n- Built in stages, each usable on its own.\n\n## What success looks like\n- Ten known delisted former S&amp;P 500 members all appear correctly in the data.\n- A cleaned-up risk estimate (shrunk or noise-filtered) measurably lowers out-of-sample variance compared with the raw sample estimate.\n- Any later forecasting or trading approach beats the classical risk-based portfolios on the shared scoreboard, or is reported as not doing so.\n\n## What we&#x27;re betting on\n- Removing the market-wide moves from returns leaves structure worth studying.\n- Daily price and volume data, with no company fundamentals, is enough to find signals worth testing.\n- Out-of-sample scoring with honest costs is strict enough to stop fooling ourselves.\n\n## Not doing\n- Company fundamentals (earnings, balance sheets) — not a concern now; price and volume features only.\n- Real trading or broker connections — paper trading only.\n- Intraday data — daily bars are enough for this research.\n- Markets outside US stocks.\n- Other users, accounts or hosting — a personal tool.\n&quot;
+}</pre><div class="lbl">output</div><pre>File created successfully at: /Users/connorott/plugins/dev-team-workspace/iteration-11/quant-all-at-once/with_skill/project/docs/brief.md (file state is current in your context — no need to Read it back)</pre></details></div><div class="step" id="SD35"><span class="sid">D35</span><span class="kind">say</span>Brief drafted; now tracing your brief-level requests and checking length.<details><summary>full text</summary><pre>Brief drafted; now tracing your brief-level requests and checking length.</pre></details></div><div class="step" id="SD36"><span class="sid">D36</span><span class="kind">Bash</span>wc -w docs/brief.md &amp;&amp; D=&quot;python3 ../plugin/dev-team/scripts/dt.py&quot; &amp;&amp; python3 ../plugin/dev-team/scripts/dt.py request trace UR-01 &quot;§Who it&#x27;s for&quot; &quot;§Constraints&quot; &amp;&amp; python3 ../plugin/dev-team/scripts/dt.py request trace UR-12 &quot;§Constraints&quot; &amp;&amp; python3 ../plugin/dev-team/scripts/dt.py request trace UR-19 &quot;§Constraints&quot; &amp;&amp; python3 ../plugin/dev-team/scripts/dt.py request trace UR-26 &quot;§Not doing&quot; &amp;&amp; python3 ../plugin/dev-team/scripts/dt.py request trace UR-28 &quot;§Goals&quot; &amp;&amp; python3 ../plugin/dev-team …[+126 chars]<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;wc -w docs/brief.md &amp;&amp; D=\&quot;python3 ../plugin/dev-team/scripts/dt.py\&quot; &amp;&amp; python3 ../plugin/dev-team/scripts/dt.py request trace UR-01 \&quot;§Who it&#x27;s for\&quot; \&quot;§Constraints\&quot; &amp;&amp; python3 ../plugin/dev-team/scripts/dt.py request trace UR-12 \&quot;§Constraints\&quot; &amp;&amp; python3 ../plugin/dev-team/scripts/dt.py request trace UR-19 \&quot;§Constraints\&quot; &amp;&amp; python3 ../plugin/dev-team/scripts/dt.py request trace UR-26 \&quot;§Not doing\&quot; &amp;&amp; python3 ../plugin/dev-team/scripts/dt.py request trace UR-28 \&quot;§Goals\&quot; &amp;&amp; python3 ../plugin/dev-team/scripts/dt.py request --open --owner brief; python3 ../plugin/dev-team/scripts/dt.py next-id S; ls .claude/skills 2&gt;/dev/null&quot;,
+  &quot;description&quot;: &quot;Count words, trace brief requests, get next stage id&quot;
+}</pre><div class="lbl">output</div><pre>     445 docs/brief.md
+UR-01 → §Who it&#x27;s for, §Constraints
+UR-12 → §Constraints
+UR-19 → §Constraints
+UR-26 → §Not doing
+UR-28 → §Goals
+requests: none
+S1
+data-analysis
+frontend-design
+null-hypothesis-testing</pre></details></div><div class="step" id="SD37"><span class="sid">D37</span><span class="kind">say</span>I&#x27;ve drafted the brief at `docs/brief.md` (445 words, Draft). Your five brief-level requests are traced to it. ⏎ - Problem: researching US stocks alone is easy to get wrong. Survivorship gaps in the data and look-ahead in models make results look better than they are. ⏎ - Top goal: data you can trust: daily prices, returns and corporate actions, with S&amp;P 500 membership as it was on each date, delisted names included. The other goals are no look-ahead, one shared out-of-sample scoreboard, claims tested against chance, and a browser app that gets new views at each stage. ⏎ - Biggest No …[+1565 chars]<details><summary>full text</summary><pre>I&#x27;ve drafted the brief at `docs/brief.md` (445 words, Draft). Your five brief-level requests are traced to it.
+
+- **Problem:** researching US stocks alone is easy to get wrong. Survivorship gaps in the data and look-ahead in models make results look better than they are.
+- **Top goal:** data you can trust: daily prices, returns and corporate actions, with S&amp;P 500 membership as it was on each date, delisted names included. The other goals are no look-ahead, one shared out-of-sample scoreboard, claims tested against chance, and a browser app that gets new views at each stage.
+- **Biggest Not Doing item:** company fundamentals. You set this (UR-26): price and volume features only.
+
+**Your words:**
+- &quot;personal quant research platform… built in stages&quot; (UR-01) → Who it&#x27;s for and Constraints: &quot;One person: the owner&quot; and &quot;Built in stages&quot;.
+- &quot;variance optimization right before any return prediction&quot; (UR-12) → &quot;Risk before returns&quot;.
+- &quot;Research and paper trading only&quot; (UR-19) → &quot;no real money, no live brokerage&quot;.
+- &quot;Fundamentals aren&#x27;t a concern now&quot; (UR-26) → Not doing.
+- &quot;2 + 3 + 6, and also 5&quot; (UR-28) → Goals 2, 3 and 5, plus the stage split below.
+- Still open: none.
+
+**I added two Not Doing items you didn&#x27;t state.** My default is to keep both:
+- intraday data (daily bars only)
+- markets outside US stocks
+
+Say if either should come out.
+
+**Proposed roadmap stages, added when you accept:**
+
+| Stage | Name | Skills | References |
+|---|---|---|---|
+| S1 | Data &amp; explorer app | data-analysis, frontend-design | — |
+| S2 | Risk structure &amp; classical portfolios (+ shared scoreboard) | data-analysis, null-hypothesis-testing | RF-01 (removing the market factor) |
+| S3 | Feature discovery | data-analysis, null-hypothesis-testing | RF-03 (forward-return targets) |
+| S4 | Neural forecasting &amp; forecast-driven portfolios | data-analysis, null-hypothesis-testing | RF-02, RF-03 |
+| S5 | Reinforcement-learning trading agents (optional) | null-hypothesis-testing | — |
+
+Use these stages, skills and reference assignments? [yes / edit]
+
+Then **accept** the brief (a yes also commits it), or tell me what to change.</pre></details></div><div class="step" id="SD38"><span class="sid">D38</span><span class="kind">hook</span><span class="hook">SessionStart:resume said: milestone: none (no tasks/plan.md)
+draft (waiting for approval): docs/brief.md
+dt: /Users/connorott/plugins/dev-team-workspace/iteration-11/quant-all-at-once/with_skill/plugin/dev-team/scripts/dt
+</span></div>
+<h2>Commits</h2>
+<p>None.</p>
+<h2>Returned</h2>
+<pre>I&#x27;ve drafted the brief at `docs/brief.md` (445 words, Draft). Your five brief-level requests are traced to it.
+
+- **Problem:** researching US stocks alone is easy to get wrong. Survivorship gaps in the data and look-ahead in models make results look better than they are.
+- **Top goal:** data you can trust: daily prices, returns and corporate actions, with S&amp;P 500 membership as it was on each date, delisted names included. The other goals are no look-ahead, one shared out-of-sample scoreboard, claims tested against chance, and a browser app that gets new views at each stage.
+- **Biggest Not Doing item:** company fundamentals. You set this (UR-26): price and volume features only.
+
+**Your words:**
+- &quot;personal quant research platform… built in stages&quot; (UR-01) → Who it&#x27;s for and Constraints: &quot;One person: the owner&quot; and &quot;Built in stages&quot;.
+- &quot;variance optimization right before any return prediction&quot; (UR-12) → &quot;Risk before returns&quot;.
+- &quot;Research and paper trading only&quot; (UR-19) → &quot;no real money, no live brokerage&quot;.
+- &quot;Fundamentals aren&#x27;t a concern now&quot; (UR-26) → Not doing.
+- &quot;2 + 3 + 6, and also 5&quot; (UR-28) → Goals 2, 3 and 5, plus the stage split below.
+- Still open: none.
+
+**I added two Not Doing items you didn&#x27;t state.** My default is to keep both:
+- intraday data (daily bars only)
+- markets outside US stocks
+
+Say if either should come out.
+
+**Proposed roadmap stages, added when you accept:**
+
+| Stage | Name | Skills | References |
+|---|---|---|---|
+| S1 | Data &amp; explorer app | data-analysis, frontend-design | — |
+| S2 | Risk structure &amp; classical portfolios (+ shared scoreboard) | data-analysis, null-hypothesis-testing | RF-01 (removing the market factor) |
+| S3 | Feature discovery | data-analysis, null-hypothesis-testing | RF-03 (forward-return targets) |
+| S4 | Neural forecasting &amp; forecast-driven portfolios | data-analysis, null-hypothesis-testing | RF-02, RF-03 |
+| S5 | Reinforcement-learning trading agents (optional) | null-hypothesis-testing | — |
+
+Use these stages, skills and reference assignments? [yes / edit]
+
+Then **accept** the brief (a yes also commits it), or tell me what to change.</pre>
+</body></html>

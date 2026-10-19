@@ -1,0 +1,864 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1"><title>T30 turn</title>
+<style>
+:root{--bg:#fbfbfa;--fg:#1d1d1f;--muted:#6b6b70;--line:#d9d9de;--box:#fff;--rowp:#eef3fb;--band:#fff4d6;
+--ok:#2e7d32;--bad:#c62828;--warn:#b26a00;--idle:#6b6b70}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#17171a;--fg:#ececf0;--muted:#9a9aa3;
+--line:#34343a;--box:#222227;--rowp:#1d2433;--band:#3a3015;--ok:#6fcf73;--bad:#ff6b6b;--warn:#f0b35a;--idle:#9a9aa3}}
+:root[data-theme="dark"]{--bg:#17171a;--fg:#ececf0;--muted:#9a9aa3;--line:#34343a;--box:#222227;--rowp:#1d2433;
+--band:#3a3015;--ok:#6fcf73;--bad:#ff6b6b;--warn:#f0b35a;--idle:#9a9aa3}
+body{margin:0;padding:16px;background:var(--bg);color:var(--fg);font:14px/1.45 -apple-system,system-ui,sans-serif}
+h1{font-size:18px;margin:0 0 4px}h2{font-size:15px;margin:22px 0 8px}.sub{color:var(--muted)}
+table{border-collapse:collapse;margin:4px 0 8px}td,th{border-bottom:1px solid var(--line);padding:4px 10px;text-align:left;
+vertical-align:top}th{color:var(--muted);font-weight:600}.chips span{display:inline-block;margin:0 4px 2px 0}
+.legend span{margin-right:14px;white-space:nowrap}.sw{display:inline-block;width:10px;height:10px;border-radius:2px;
+margin-right:4px;vertical-align:-1px}.scroll{overflow:auto;max-height:88vh;border:1px solid var(--line);border-radius:8px}
+.chart{display:grid;width:max-content}.chart>div{line-height:0}.corner{position:sticky;top:0;left:0;z-index:3}
+.colhead{position:sticky;top:0;z-index:2}.rowhead{position:sticky;left:0;z-index:2}
+svg.bg{background:var(--bg)}.colhead svg{border-bottom:1px solid var(--line)}.rowhead svg{border-right:1px solid var(--line)}
+.ok{color:var(--ok);fill:var(--ok)}.bad{color:var(--bad);fill:var(--bad)}.warn{color:var(--warn);fill:var(--warn)}
+.idle{color:var(--idle);fill:var(--idle)}
+svg text{fill:var(--fg);font-family:-apple-system,system-ui,sans-serif}
+.box{fill:var(--box);stroke:var(--line)}.unit:hover .box{stroke:var(--fg)}
+.role{font-size:12px;font-weight:600}.uid,.wmeta,.lmeta,.meta{font-size:10px;fill:var(--muted)}
+.sub{font-size:10.5px;fill:var(--muted)}.badge{font-size:11px;font-weight:600}
+.meta.bad{fill:var(--bad);font-weight:600}.lane{font-size:13px;font-weight:700}.wave{font-size:13px;font-weight:700}
+.par{fill:#4e79a7}.ser{fill:var(--muted)}.rowp{fill:var(--rowp)}.rows{fill:transparent}.band{fill:var(--band)}
+.bandt{font-size:11.5px}.grid{stroke:var(--line)}.link{stroke:var(--muted);stroke-width:1.2;opacity:.55}
+.arrowhead{fill:var(--muted)}.marks{font-size:10.5px}.audit{stroke:var(--box);stroke-width:2}.auditn{font-size:10px;font-weight:700;fill:#fff}
+a{color:inherit}svg a .box{cursor:pointer}
+
+:root{--c0:#2a78d6;--c1:#eb6834;--c2:#1baf7a;--c3:#eda100;--c4:#e87ba4;--c5:#008300;--c6:#6250d6;--c7:#e34948;
+--cx:#8a8985;--main:#52514e;--read:#dcdbd5;--readfg:#1d1d1f}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--c0:#3987e5;--c1:#d95926;--c2:#199e70;
+--c3:#c98500;--c4:#d55181;--c5:#008300;--c6:#9085e9;--c7:#e66767;--cx:#77766f;--main:#c3c2b7;--read:#3b3b40;
+--readfg:#ececf0}}
+:root[data-theme="dark"]{--c0:#3987e5;--c1:#d95926;--c2:#199e70;--c3:#c98500;--c4:#d55181;--c5:#008300;
+--c6:#9085e9;--c7:#e66767;--cx:#77766f;--main:#c3c2b7;--read:#3b3b40;--readfg:#ececf0}
+.c0{fill:var(--c0);background:var(--c0)}.c1{fill:var(--c1);background:var(--c1)}.c2{fill:var(--c2);background:var(--c2)}
+.c3{fill:var(--c3);background:var(--c3)}.c4{fill:var(--c4);background:var(--c4)}.c5{fill:var(--c5);background:var(--c5)}
+.c6{fill:var(--c6);background:var(--c6)}.c7{fill:var(--c7);background:var(--c7)}.cx{fill:var(--cx);background:var(--cx)}
+.cmain{fill:var(--main)}.sc0{stroke:var(--c0)}.sc1{stroke:var(--c1)}.sc2{stroke:var(--c2)}
+.tl text,.sm text,.lc text{font-size:10.5px;fill:var(--muted)}.tl .lbl-in,.sm .lbl-in{fill:#fff;font-size:10.5px;font-weight:600}
+.tl .rowl,.sm .rowl,.lc .rowl{fill:var(--fg);font-size:11.5px;font-weight:600}.tl .band{fill:var(--rowp)}
+.tl .brk{stroke:var(--muted);stroke-dasharray:2 3}.tl a:hover rect,.sm a:hover rect{stroke:var(--fg);stroke-width:1.5}
+.axis{stroke:var(--line)}.sm .val{fill:var(--fg);font-weight:600}.lc path.ln{fill:none;stroke-width:2}
+.lc circle{stroke:var(--bg);stroke-width:2}.lc .end{font-weight:600;fill:var(--fg)}
+.tiles{display:flex;flex-wrap:wrap;gap:10px;margin:12px 0}.tile{border:1px solid var(--line);border-radius:8px;
+padding:8px 12px;min-width:110px;background:var(--box)}.tile b{display:block;font-size:20px;line-height:1.2}
+.tile span{font-size:12px;color:var(--muted)}.tile i{font-style:normal;font-size:12px;margin-left:6px}
+.fm{border-collapse:separate;border-spacing:2px}.fm td,.fm th{border:0;padding:0;text-align:center;font-size:11px}
+.fm th{padding:0 2px;font-weight:600}.fm td.f,.fm th.f{text-align:left;padding-right:10px;white-space:nowrap;
+position:sticky;left:0;background:var(--bg);font:11.5px ui-monospace,Menlo,monospace;
+max-width:380px;overflow:hidden;text-overflow:ellipsis}
+.fm td.cell{min-width:22px;height:20px;border-radius:3px}.fm td.fw{background:var(--c0);color:#fff;font-weight:700}
+.fm td.fe{background:var(--c1);color:#fff;font-weight:700}.fm td.fr{background:var(--read);color:var(--readfg)}
+.fm td.n{color:var(--muted);padding:0 6px}.fm tr.grp td{text-align:left;padding-top:8px;color:var(--muted);
+font-weight:600}
+.key{display:inline-block;min-width:18px;text-align:center;border-radius:3px;font-size:11px;margin-right:4px}
+.bar{display:inline-block;height:9px;border-radius:2px;vertical-align:0}
+
+pre{white-space:pre-wrap;word-break:break-word;background:var(--box);border:1px solid var(--line);border-radius:6px;
+padding:8px 10px;margin:4px 0;font:12px/1.45 ui-monospace,SFMono-Regular,Menlo,monospace;max-width:100%;overflow:auto}
+.step{border-top:1px solid var(--line);padding:6px 0}.step:target{background:var(--rowp)}
+.sid{font:12px ui-monospace,Menlo,monospace;color:var(--muted);margin-right:8px}.kind{font-weight:600;margin-right:8px}
+.err{color:var(--bad);font-weight:600}.hook{color:var(--bad);margin:4px 0 0 16px}.lbl{font-size:12px;color:var(--muted);margin-top:6px}
+details summary{cursor:pointer;color:var(--muted);font-size:12px}.head td:first-child{color:var(--muted)}
+.top{font-size:13px}.narr{list-style:none;padding-left:0}.narr li{margin:3px 0}
+</style></head>
+<body>
+<p class="top"><a href="../flow.html">← the run's flow chart</a></p>
+<p class="top"><a href="../plan/T28.html">The plan as of T30</a>: unchanged since T28 · <a href="../plan/index.html">plan map</a></p>
+<h1>T30 · turn · /dev-team:build-setup Continue.</h1>
+<table class="head"><tr><td>Type</td><td>turn</td></tr><tr><td>Description</td><td>/dev-team:build-setup Continue.</td></tr><tr><td>Spawned by</td><td>user</td></tr><tr><td>Model</td><td>claude-opus-5-5</td></tr><tr><td>Start</td><td>2026-10-19 03:16:35 UTC</td></tr><tr><td>Duration</td><td>1 min</td></tr><tr><td>Tool calls</td><td>8</td></tr><tr><td>Errors</td><td>0</td></tr><tr><td>Hook blocks</td><td>0</td></tr><tr><td>Tokens</td><td>3.3k out · 32.0k new in · 372k cached in · peak context 56.5k</td></tr><tr><td>Skills invoked</td><td>none</td></tr><tr><td>Files written or edited</td><td>none</td></tr><tr><td>Definition</td><td>none</td></tr><tr><td>Steps</td><td>12</td></tr><tr><td>Finished</td><td>yes</td></tr></table>
+
+
+<h2>Prompt</h2>
+<pre>/dev-team:build-setup Continue.</pre>
+<h2>Files</h2>
+<table><tr><th>Op</th><th>File</th><th>Calls</th><th>By</th><th>Via</th><th>Steps</th></tr><tr><td>read</td><td><code>../plugin/dev-team/skills/build-setup/references/derive.md</code></td><td>1</td><td>main</td><td>Bash</td><td><a href="#D394">D394</a></td></tr><tr><td>read</td><td><code>../plugin/dev-team/skills/build-setup/references/new.md</code></td><td>1</td><td>main</td><td>Bash</td><td><a href="#D394">D394</a></td></tr><tr><td>read</td><td><code>AGENTS.md</code></td><td>1</td><td>main</td><td>Bash</td><td><a href="#D396">D396</a></td></tr><tr><td>read</td><td><code>docs/architecture.md</code></td><td>3</td><td>main</td><td>Bash</td><td><a href="#D396">D396</a> <a href="#D399">D399</a> <a href="#D399">D399</a></td></tr><tr><td>read</td><td><code>docs/requests.md</code></td><td>1</td><td>main</td><td>Bash</td><td><a href="#D396">D396</a></td></tr><tr><td>read</td><td><code>pyproject.toml</code></td><td>1</td><td>main</td><td>Bash</td><td><a href="#D395">D395</a></td></tr><tr><td>read</td><td><code>tasks/plan.md</code></td><td>3</td><td>main</td><td>Bash</td><td><a href="#D396">D396</a> <a href="#D399">D399</a> <a href="#D401">D401</a></td></tr></table>
+<h2>Steps</h2>
+<div class="step" id="SD391"><span class="sid">D391</span><span class="kind">command</span>USER TYPED `/dev-team:build-setup Continue.`</div><div class="step" id="SD392"><span class="sid">D392</span><span class="kind">skill-body</span>skill loaded from `/Users/connorott/plugins/dev-team-workspace/iteration-11/rl-all-at-once/with_skill/plugin/dev-team/skills/build-setup`</div><div class="step" id="SD393"><span class="sid">D393</span><span class="kind">Bash</span>python3 ../plugin/dev-team/scripts/dt.py status --skill build-setup<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;python3 ../plugin/dev-team/scripts/dt.py status --skill build-setup&quot;,
+  &quot;description&quot;: &quot;Report build-setup mode and gaps&quot;
+}</pre><div class="lbl">output</div><pre>skill: build-setup
+mode: new
+docs: brief Accepted · spec Approved · architecture Approved (Single package) · roadmap ok · plan M1 Approved · constraints missing
+next ids: AD-22 PL-09 TC-45 S4 M5 M1-T25
+references_unindexed: none
+references_changed: none
+references_missing: none
+constraints: missing
+config_mismatches: none
+contract_mismatches: unknown
+optional_layers_existing: unknown
+deptry_missing: unknown
+protected_gaps: unknown
+ignores_without_exception: unknown
+agents_missing: tester, implementer, reviewer
+hooks_missing: scripts/check.sh, scripts/check_size.py, scripts/floor_guard.sh, scripts/floor_guard.py, scripts/hooks/path_guard.sh, scripts/hooks/post_edit.sh, scripts/hooks/stop_gate.sh, scripts/hooks/project_root.sh
+not_executable: none
+expired_exceptions: none
+tools_missing: none
+dependents: core&lt;-worlds,baselines,store,evaluate,learners,coevo,reference,replay,signoff, worlds&lt;-baselines, baselines&lt;-, store&lt;-evaluate,learners,coevo,reference,replay,signoff, evaluate&lt;-learners,coevo,reference, learners&lt;-coevo, coevo&lt;-, reference&lt;-, replay&lt;-, signoff&lt;-
+base: pending
+requests_open: none</pre></details></div><div class="step" id="SD394"><span class="sid">D394</span><span class="kind">Bash</span>cd /Users/connorott/plugins/dev-team-workspace/iteration-11/rl-all-at-once/with_skill/plugin/dev-team/skills/build-setup &amp;&amp; cat references/new.md &amp;&amp; ls -R templates references &amp;&amp; cat references/derive.md<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;cd /Users/connorott/plugins/dev-team-workspace/iteration-11/rl-all-at-once/with_skill/plugin/dev-team/skills/build-setup &amp;&amp; cat references/new.md &amp;&amp; ls -R templates references &amp;&amp; cat references/derive.md&quot;,
+  &quot;description&quot;: &quot;Read New mode instructions and templates list&quot;
+}</pre><div class="lbl">output</div><pre># New
+
+Read when `dt status --skill build-setup` reports `new` (no `CONSTRAINTS.md`). Values come from `derive.md`; the run ends at the Review Gate in `../SKILL.md`.
+
+```
+PRECHECK → DETECT → 5 QUESTIONS, ONE MESSAGE → GENERATE → [commit yes] → PROVE → REVIEW GATE
+   → (next turn) [approved] → commit → dt base
+```
+
+## Steps
+
+**1. Precheck.** `command -v uv jq`; if either is missing, stop and ask the user to install it (check.sh and the hooks need both). A `tasks/plan.md` without a dev-team header (agent-skills `/plan`) means stop and ask.
+
+**2. Detect, don&#x27;t ask.** Read, and report in two lines: shape, ids, dependency rules and stack ADs (`docs/architecture.md`); module layout (`pipelines.md`); tests and fixtures; the milestone&#x27;s dependencies (`tasks/plan.md`); Python version; existing config, CI and `.claude/`.
+
+**3. Five questions, in one message**, each with your guess and these defaults: **block or warn mid-task?** (block on the floor and gate; `full` findings become review findings; &quot;warn&quot; adds `--warn` to the Stop hooks); **type gate?** (mypy strict gates, pyright in `full`); **targets or measure-and-hold?** (measure and hold); **slowest gate tolerated?** (90 s; no limit for `full`); **commit the bar skeleton once generated?** (yes: the protected-path diff needs a commit). Mention CI once; write it only if asked.
+
+**4. Generate.** Derive every value per `derive.md` and fill the templates; `grep -rn &#x27;{{[a-z_]*}}&#x27;` over the written files must print nothing. `chmod +x scripts/*.sh scripts/hooks/*.sh`; append the `.gitignore` lines. `uv lock &amp;&amp; uv sync`, then write the vulture whitelist: the template header plus `uv run --frozen vulture --make-whitelist`, and count `duplicates_today` with `check.sh`&#x27;s pylint line (`tools/pylint.md`). Never edit `check.sh` steps or hook commands by hand.
+
+**5. Prove.** On step 3&#x27;s commit yes, commit and `git update-ref refs/checks/base HEAD`. Run `uv run --frozen ruff check --show-settings &gt;/dev/null` and `time bash scripts/check.sh gate`; fix the config, never the check, until it passes within budget. Headless: don&#x27;t commit; run the gate, report the protected-path step as expected to fail, leave Draft.
+
+## Example: GridLoad, single package
+
+Architecture: `gridload` with components `data` (depends on nothing), `profile` (→ data), `reserve` (→ profile, data); pandas and NumPy (AD-02); `reserve` arrives in M2. Plan M1 declares `numpy` and `pandas`.
+
+**Values**
+```bash
+PROTECTED=(&#x27;tests/intent/**&#x27; &#x27;tests/fixtures/**&#x27; &#x27;tests/conftest.py&#x27; &#x27;pyproject.toml&#x27; &#x27;uv.lock&#x27; &#x27;CONSTRAINTS.md&#x27; &#x27;scripts/**&#x27; &#x27;.claude/agents/**&#x27; &#x27;.claude/settings.json&#x27; &#x27;references/**&#x27; &#x27;probes/**&#x27; &#x27;tests/contracts/**&#x27;)
+pkg_scope() {
+  case &quot;$1&quot; in
+    data) echo &quot;data profile reserve&quot; ;;
+    profile) echo &quot;profile reserve&quot; ;;
+    reserve) echo &quot;reserve&quot; ;;
+    *) return 1 ;;
+  esac
+}
+```
+```toml
+[[tool.importlinter.contracts]]
+name = &quot;Layers: reserve &gt; profile &gt; data&quot;
+type = &quot;layers&quot;
+layers = [&quot;(gridload.reserve)&quot;, &quot;gridload.profile&quot;, &quot;gridload.data&quot;]
+
+[tool.deptry.per_rule_ignores]
+DEP002 = [&quot;numpy&quot;, &quot;pandas&quot;]
+```
+```markdown
+## Boundaries (generated from architecture — do not edit)
+- `gridload.data` imports nothing first-party · `gridload.profile` → data · `gridload.reserve` → profile, data
+
+## Exceptions
+| ID | Rule | Path | Reason | Owner | Expires |
+|---|---|---|---|---|---|
+| EX-01 | CR-25 DEP002 | `numpy`, `pandas` | M1 dependencies, declared before the code imports them | @connor | M1 exit |
+```
+
+**One of the five, as asked**
+```
+Q2: Which type checker gates the implementer, mypy or pyright?
+GUESS: mypy strict. The architecture pins pandas, and mypy with pandas-stubs is the verified setup.
+DEFAULT if unsure: mypy strict as the gate; pyright runs in check.sh full.
+```
+
+**Review gate**
+```
+Wrote: CONSTRAINTS.md (Draft), pyproject.toml tool config, scripts/check.sh, check_size.py,
+floor_guard.sh/.py, red_check.py, vulture_whitelist.py, scripts/hooks/*.sh, .claude/agents/{tester,implementer,
+reviewer}.md, tests/conftest.py (didn&#x27;t exist), .gitignore (+12 lines). No CI (not requested).
+Proof run, after the skeleton commit: ruff --show-settings ok; check.sh gate passed in 14 s
+(fresh venv; budget 90 s).
+
+ASSUMPTIONS:
+- Single package `gridload`; components data &lt; profile &lt; reserve; reserve is an optional layer until M2
+- Protected list: the twelve globs above
+- Rule families DTZ, NPY, PD; stubs: pandas-stubs
+- numpy, pandas declared now with a DEP002 exception expiring at M1 exit
+- Coverage floor 0 (no code yet); Ratchet sets it at M1 exit. vulture whitelist: 0 entries
+- Answers: block (default), mypy (default), measure and hold (default), 90 s (default)
+
+Loosenings: none (first bar).
+Open questions: none.
+
+Approve the bar? A yes also commits it and records the plan&#x27;s Base.
+```
+references:
+audit.md
+derive.md
+extend.md
+new.md
+ratchet.md
+revise.md
+tools
+
+references/tools:
+deptry.md
+hooks.md
+import_linter.md
+mypy.md
+pandera.md
+pip_audit.md
+pylint.md
+pyright.md
+pytest.md
+ruff_complexity.md
+ruff_core.md
+ruff_domain.md
+typos.md
+vulture.md
+
+templates:
+CONSTRAINTS.md
+gitignore.additions
+package.pyproject.toml
+pyproject.toml
+pyproject.workspace.toml
+scripts
+tests
+
+templates/scripts:
+check.sh
+check_size.py
+floor_guard.py
+floor_guard.sh
+hooks
+red_check.py
+vulture_whitelist.py
+
+templates/scripts/hooks:
+path_guard.sh
+post_edit.sh
+project_root.sh
+stop_gate.sh
+
+templates/tests:
+conftest.py
+# Deriving the bar&#x27;s values
+
+Read when generating or extending the bar: the templates, the values that matter most, and where every `{{placeholder}}` comes from.
+
+## Templates
+
+| Project file | Template |
+|---|---|
+| `CONSTRAINTS.md` | `CONSTRAINTS.md` (≤ 2 pages) |
+| `pyproject.toml` | single: `pyproject.toml` · multi: `pyproject.workspace.toml` at the root plus `package.pyproject.toml` per package |
+| `scripts/check.sh`, `check_size.py`, `floor_guard.sh`, `floor_guard.py`, `red_check.py`, `vulture_whitelist.py` | `scripts/` |
+| `scripts/hooks/{path_guard,post_edit,stop_gate,project_root}.sh` | `scripts/hooks/` |
+| `.claude/agents/{tester,implementer,reviewer}.md` | `.claude/agents/` |
+| `.github/workflows/check.yml` | only when the user asks for CI |
+| `.gitignore` | append `gitignore.additions` (skip lines already present) |
+
+## Values
+
+- **Protected list**: written once into `check.sh`&#x27;s `PROTECTED` (`path_guard.sh deny --protected` reads it from there) and copied into CONSTRAINTS.md: `tests/intent/**`, `tests/fixtures/**`, `tests/conftest.py`, `pyproject.toml`, `uv.lock`, `CONSTRAINTS.md`, `scripts/**`, `.claude/agents/**`, `.claude/settings.json`, `references/**`, `probes/**`, `tests/contracts/**`. Multi-package adds `packages/*/pyproject.toml`. The two lists must match, and no test directory may be missing.
+- **Frozen interfaces** (CR-09): `check.sh` narrows `tests/contracts/**` to the contract folders that exist at `refs/checks/base`, so the milestone&#x27;s interface task (`**Kind:** interface`, run as the implementer) can write the new `tests/contracts/&lt;id&gt;.&lt;symbol&gt;/` it freezes, and from the next task&#x27;s base nothing can change it. A frozen interface changes only through `architecture-design` Revise, then a new interface task re-freezes it in the main session (the implementer&#x27;s guard blocks a folder frozen at the base); outside an open interface task naming the folder, the plugin&#x27;s `dt guard` asks before any edit under `tests/contracts/`. The types and signatures it writes in `src/` are held by `Writes:`: no later task&#x27;s list names them.
+- **Interface stubs** (CR-02): `floor_guard.py` treats a body that is only `raise NotImplementedError(&quot;&lt;task id&gt;&quot;)` as the interface task&#x27;s signature stub, never a `stub` finding; across the whole project it fails one naming a task not open in `tasks/todo.md` (`stub-task`, gate and full) and, under `--exit`, any (`stub-left`). Nothing to derive.
+- **`Writes:` guard**: tester and implementer both run `path_guard.sh writes`, which reads `.claude/.task_writes` (written by the orchestrator per task, one path or folder glob a line) and blocks edits outside it; with no file it allows everything, so a serial `/build` works unchanged.
+- **RED for the right reason**: `check.sh collect` runs `red_check.py` on the intent test files changed since the base. Each failure must be an `AssertionError`, a `NotImplementedError` from an interface stub, or `pytest.fail`; an ImportError, AttributeError, TypeError or fixture error fails collect, as does a set of tests none of which is red.
+- **Import contracts**: generated from the architecture&#x27;s dependency rules (`tools/import_linter.md`), never hand-written, so `dt` can check them. A module that doesn&#x27;t exist yet is an optional layer: `&quot;(pkg.component)&quot;`.
+- **`pkg_scope`** in `check.sh`: each package (single: component) and every package that depends on it, from the dependency graph. It must match `dt status`&#x27;s `dependents`.
+- **Domain rule families and stubs** from the tech stack ADs (`DTZ`, `NPY` + numpy, `PD` + `pandas-stubs`); pandera only when a DataFrame crosses a contract.
+- **Dependencies**: the milestone&#x27;s, each with a `[tool.deptry.per_rule_ignores] DEP002` entry and an Exceptions row expiring `M&lt;n&gt; exit`. A dependency nobody planned blocks its task and comes back through Revise; the implementer never edits `[project.dependencies]`.
+- **Thresholds**: measure and hold unless the user chose targets. Coverage `fail_under` is today&#x27;s value (0 on an empty skeleton, recorded at the first Ratchet); vulture&#x27;s whitelist holds today&#x27;s findings. Never set a threshold the codebase fails today.
+- **References and probes** (`design/references.md` §7, `design/probes.md` §4.6): nothing to derive. The templates exclude `references/` and `probes/` from Ruff, mypy, pytest, coverage, deptry, vulture and typos; both are protected (so reference files are committed before a task starts, and no builder edits probe evidence); CR-08 forbids importing either or putting it on `sys.path`, and `floor_guard` checks the diff. Copying from either is the builder&#x27;s call: there is no copy check, and copied code meets the normal bar. `gitignore.additions` keeps `.env` files and each probe&#x27;s `out/` out of git.
+- **Exceptions**: every one is an `EX-NN` row with a rule, path, reason, owner and expiry (a date, or `M&lt;n&gt; exit`); a Ruff exception is also a `per-file-ignores` entry, and every config ignore has a row.
+- **Numbers**: every CR rule with a number names its config key, and the two are identical. Every rule has a tool behind it, and at least one external check (pip-audit) runs in `full`.
+- **Non-Python parts** (a frontend): their rules come from agent-skills `constraint-driven-development`; record them here with that part&#x27;s path, and `check.sh` calls its check command.
+
+## Placeholders: where each value comes from
+
+Templates use `{{name}}`. After filling, `grep -rn &#x27;{{[a-z_]*}}&#x27;` over the written files must print nothing (`${{ github.… }}` in the CI file is GitHub&#x27;s own syntax and has spaces, so it doesn&#x27;t match). `../tests/project.py` fills them the same way for the tests.
+
+| Placeholder | Where | Value | Derived from |
+|---|---|---|---|
+| `project_name` | pyproject | distribution name | existing `[project].name`, else the repo name |
+| `python_version`, `python_target` | pyproject | `3.11`, `py311` | `.python-version`, else the language AD |
+| `uv_build_requirement` | pyproject | `uv_build&gt;=0.11,&lt;0.12` | `uv --version` (major.minor, next minor) |
+| `dependencies` | pyproject | `    &quot;numpy&quot;,` lines | the milestone&#x27;s dependencies (plan, tech stack ADs) |
+| `stub_packages` | pyproject | `    &quot;pandas-stubs&quot;,` | one per dependency without inline types (`tools/mypy.md`) |
+| `domain_rules` | pyproject | `    &quot;DTZ&quot;, &quot;NPY&quot;, &quot;PD&quot;,` | tech stack ADs (`tools/ruff_domain.md`); empty if none |
+| `pkg` | pyproject | import name | the package id (multi: one file per package) |
+| `pkg_dist`, `package_sources` | package pyproject | dist name; `[tool.uv.sources]` with `{ workspace = true }` for each sibling it depends on | package dependency rules |
+| `workspace_members`, `workspace_sources`, `pkgs_quoted`, `src_dirs_quoted` | workspace pyproject | every package, as lists | the Packages table |
+| `coverage_floor` | pyproject | `0` on an empty skeleton, else today&#x27;s measured value (measure and hold), or the user&#x27;s target | measure with `check.sh full` |
+| `deptry_ignores` | pyproject | `[tool.deptry.per_rule_ignores]` + `DEP002 = [...]`, or empty | dependencies no code imports yet; one Exceptions row each |
+| `import_contracts` | pyproject | `[[tool.importlinter.contracts]]` blocks | `Depends on` (single) or the package dependency rules (multi); missing modules in `(…)` |
+| `typos_ignore_identifiers` | pyproject | `&quot;^[A-Z]{1,5}$&quot;` for region codes, else empty | domain |
+| `protected_globs` | check.sh | `&#x27;tests/intent/**&#x27; &#x27;tests/fixtures/**&#x27; …` (quoted) | the twelve globs of the Protected list above; multi adds `&#x27;packages/*/pyproject.toml&#x27;` |
+| `src_dirs`, `packages_dir` | check.sh | `src` and empty · `packages/a/src packages/b/src` and `packages` | shape |
+| `type_gate` | check.sh, CONSTRAINTS | `mypy` or `pyright` | the type-gate answer |
+| `pkg_scope_cases` | check.sh | `    data) echo &quot;data profile reserve&quot; ;;` per id | dependency graph: the id plus everything that depends on it, directly or not |
+| `source_globs` | tester.md | `&quot;src/**&quot;` · `&quot;packages/*/src/**&quot;` | shape |
+| `date`, `owner` | CONSTRAINTS | today, `@user` | — |
+| `type_gate_key` | CONSTRAINTS | `tool.mypy.strict` · `tool.pyright.typeCheckingMode` | the type-gate answer |
+| `coverage_today`, `vulture_today`, `duplicates_today` | CONSTRAINTS | `— (no code)` / `71.2%`; whitelist entry count; duplicate-code block count | measured. pylint has no whitelist: each block found on existing code is an Exceptions row plus its file in `[tool.pylint.main] ignore-paths`, so `full` fails only on new ones |
+| `readability_rules` | CONSTRAINTS | extra `- **CR-13** …` lines from pipeline-design, or empty | `pipelines.md` |
+| `extra_enforced_rows` | CONSTRAINTS | e.g. CR-27 repro, a frontend row, or empty | spec QRs; non-Python parts |
+| `boundary_rules` | CONSTRAINTS | one line, `` `pkg.data` imports nothing first-party · `pkg.profile` → data `` | same source as the contracts |
+| `protected_globs_md` | CONSTRAINTS | the protected list in backticks | same list as `protected_globs` |
+| `exception_rows` | CONSTRAINTS | `\| EX-01 \| … \|` rows, or empty | the `DEP002` and other exceptions |
+| `default_branch` | check.yml | `main` | `git symbolic-ref refs/remotes/origin/HEAD`, else `main` |
+
+**Multi-package `pyproject.toml`:** the root is `pyproject.workspace.toml` followed by these sections of `pyproject.toml`, unchanged: `[tool.ruff.lint]` (select, ignore), `.mccabe`, `.pylint`, `.per-file-ignores`, `[tool.ruff.format]`, `[tool.size_limits]`, `[tool.pytest.ini_options]`, `[tool.pylint.similarities]`, `[tool.typos.files]`, `[tool.typos.default]`. deptry lives in each package&#x27;s file, never the root.
+Shell cwd was reset to /Users/connorott/plugins/dev-team-workspace/iteration-11/rl-all-at-once/with_skill/project</pre></details></div><div class="step" id="SD395"><span class="sid">D395</span><span class="kind">Bash</span>command -v uv jq; uv --version; ls -la; ls -R docs tasks tests .claude 2&gt;/dev/null | head -80; cat .python-version pyproject.toml 2&gt;/dev/null; git log --oneline | head -40<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;command -v uv jq; uv --version; ls -la; ls -R docs tasks tests .claude 2&gt;/dev/null | head -80; cat .python-version pyproject.toml 2&gt;/dev/null; git log --oneline | head -40&quot;,
+  &quot;description&quot;: &quot;Precheck tools and survey project&quot;
+}</pre><div class="lbl">output</div><pre>/Users/connorott/.local/bin/uv
+/opt/anaconda3/bin/jq
+uv 0.11.27 (19fc8b03b 2026-07-06 aarch64-apple-darwin)
+total 8
+drwxr-xr-x@  8 connorott  staff  256 Oct 18 23:10 .
+drwxr-xr-x@ 10 connorott  staff  320 Oct 18 22:52 ..
+drwxr-xr-x@  3 connorott  staff   96 Oct 18 22:19 .claude
+drwxr-xr-x@ 13 connorott  staff  416 Oct 18 23:16 .git
+-rw-r--r--@  1 connorott  staff  759 Oct 18 23:10 AGENTS.md
+drwxr-xr-x@ 10 connorott  staff  320 Oct 18 23:14 docs
+drwxr-xr-x@  4 connorott  staff  128 Oct 18 23:16 tasks
+drwxr-xr-x@  3 connorott  staff   96 Oct 18 22:52 tests
+.claude:
+skills
+
+.claude/skills:
+null-hypothesis-testing
+
+.claude/skills/null-hypothesis-testing:
+SKILL.md
+
+docs:
+architecture.md
+brief.md
+explained
+packages
+requests.md
+roadmap.md
+routes.md
+spec.md
+
+docs/explained:
+rllab.md
+
+docs/packages:
+rllab
+
+docs/packages/rllab:
+contract.md
+pipelines.md
+tests.md
+
+tasks:
+plan.md
+todo.md
+
+tests:
+fixtures
+
+tests/fixtures:
+rllab
+
+tests/fixtures/rllab:
+TC-01
+TC-02
+TC-03
+TC-04
+TC-05
+TC-06
+TC-07
+TC-08
+TC-09
+TC-10
+TC-11
+TC-12
+TC-13
+TC-14
+TC-15
+TC-16
+TC-17
+TC-18
+TC-19
+TC-20
+TC-21
+TC-22
+TC-23
+TC-24
+TC-25
+TC-26
+TC-27
+TC-28
+TC-29
+TC-30
+TC-31
+TC-32
+TC-33
+TC-34
+TC-35
+TC-36
+TC-37
+TC-38
+TC-39
+0f88c40 turn 29
+e970455 Replan M1: interface task reads AD-20 and AD-21
+e8a40a8 turn 28
+ab6ef22 turn 27
+f8185b1 turn 26
+c340600 turn 25
+4f69c10 turn 24
+725e38b turn 23
+4b0c812 turn 22
+0227dc7 turn 21
+f66595c turn 20
+db25e78 turn 19
+afec99d Approve architecture revision: planted states, test worlds, step budget (AD-16–AD-18)
+bdf953a turn 18
+9f59ce3 turn 17
+f6c0aeb Approve spec: touching rule and predator-prey radii
+7fb07a2 turn 16
+2568ade turn 15
+d8c2a77 Approve rllab test plan: 44 golden cases
+5e66147 turn 14
+9ae9825 turn 13
+6ee203a turn 12
+e408da6 Approve rllab contract revisions and AD-15
+ed88707 turn 11
+cd7ef46 turn 10
+0a9ce31 Approve rllab pipelines
+1b704aa turn 9
+835e3d6 turn 8
+3c763cd turn 7
+542c50c Approve RL Lab architecture and rllab contract
+e9c73eb turn 6
+cca4e7c turn 5
+b23b9c4 Approve RL Lab spec
+8e1ff6f turn 4
+36e44ed turn 3
+1071438 Accept RL Lab brief and add roadmap stages S1-S3
+210bbf3 turn 2
+ec7a88d turn 1
+6689bba turn 0</pre></details></div><div class="step" id="SD396"><span class="sid">D396</span><span class="kind">Bash</span>cat AGENTS.md docs/requests.md; cat docs/architecture.md; cat tasks/plan.md<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;cat AGENTS.md docs/requests.md; cat docs/architecture.md; cat tasks/plan.md&quot;,
+  &quot;description&quot;: &quot;Read AGENTS, requests, architecture and plan&quot;
+}</pre><div class="lbl">output</div><pre>&lt;persisted-output&gt;
+Output too large (71.8KB). Full output saved to: /Users/connorott/.claude/projects/-Users-connorott-plugins-dev-team-workspace-iteration-11-rl-all-at-once-with-skill-project/45fa2cce-677a-4a60-98b4-695249fd1cbb/tool-results/b0ia5mjk2.txt
+
+Preview (first 2KB):
+# RL Lab — Agents
+
+## Docs
+- Plan with dev-team2&#x27;s `build-planning`, not agent-skills&#x27; `/plan`.
+- Your task&#x27;s context: `dt context &lt;M#-T##&gt;`. Read only what it prints.
+- Any section by ID: `dt section &lt;ID&gt;...` (e.g. PL-01 TC-29 SNAKE-05 AD-03 core.Env)
+- Package docs: `docs/packages/rllab/{contract,pipelines,tests}.md`; the architecture is `docs/architecture.md` (single package)
+- Real layout: `dt layout rllab` (planned layouts are gone once the wiring lands)
+- Quality bar: CONSTRAINTS.md. Oracle files (tests/fixtures/*/expected.json) need user approval to change.
+## Project skills
+- null-hypothesis-testing — `evaluate.compare` and the world comparisons (M2 onward)
+- dataviz (not installed) — `evaluate.curve_chart` learning curves (M2 onward)
+# User requests
+
+**Last updated:** 2026-10-18
+
+The user&#x27;s words, verbatim: one line per fact, constraint, tool, choice or answer, with the skill that heard it and the date. The words never change; only the trace after → does. Written with `dt request`.
+
+- **UR-01** brief · &quot;I want to start a small ML project&quot; · idea-refine 2026-10-18 → §The problem
+- **UR-02** brief · &quot;so I can learn RL by building&quot; · idea-refine 2026-10-18 → §The problem, §Goals
+- **UR-03** spec · &quot;an RL lab of little 2D environments where agents learn a concept through reinforcement learning&quot; · idea-refine 2026-10-18 → SNAKE-01, TANK-01, PREY-01, LEARN-01
+- **UR-04** spec · &quot;Environment 1: classic Snake on a grid. The agent learns to eat food and avoid itself/walls.&quot; · idea-refine 2026-10-18 → SNAKE-01, SNAKE-04, SNAKE-05
+- **UR-05** architecture · &quot;Good first env for DQN-style value learning.&quot; [Environment 1 (Snake): learning method] · idea-refine 2026-10-18 → AD-03
+- **UR-06** spec · &quot;Environment 2: a circular tank with a ball bouncing around inside it&quot; · idea-refine 2026-10-18 → TANK-01, TANK-02
+...
+&lt;/persisted-output&gt;</pre></details></div><div class="step" id="SD397"><span class="sid">D397</span><span class="kind">Bash</span>grep -n &quot;build-setup\|bar\|CI\|block\|mypy\|pyright\|90\|gate&quot; docs/requests.md | head -40; echo ---; grep -n &quot;^## \|^### \|^\*\*&quot; docs/architecture.md | head -80<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;grep -n \&quot;build-setup\\|bar\\|CI\\|block\\|mypy\\|pyright\\|90\\|gate\&quot; docs/requests.md | head -40; echo ---; grep -n \&quot;^## \\|^### \\|^\\*\\*\&quot; docs/architecture.md | head -80&quot;,
+  &quot;description&quot;: &quot;Find relevant requests and architecture headings&quot;
+}</pre><div class="lbl">output</div><pre>36:- **UR-30** spec · &quot;Fish tank: matching the scripted baseline counts as passing.&quot; [Gate: fish tank pass bar vs scripted baseline (refines UR-18 for Environment 2)] · idea-refine 2026-10-18 → EVAL-06
+39:- **UR-33** spec · &quot;Yes, predator and prey comparisons against baselines are reported but don&#x27;t block finishing that world.&quot; [Spec open question: whether EVAL-07 blocks predator and prey sign-off] · spec-writing 2026-10-18 → DONE-03, EVAL-07
+---
+3:**Status:** Approved · **Shape:** Single package · **Last updated:** 2026-10-18 · **Spec:** [spec.md](spec.md)
+5:## Overview
+21:## Tech stack
+34:## Components
+48:## Interfaces
+51:## Data
+57:## Cross-cutting concerns
+64:## Project layout
+72:## Decisions
+73:### AD-01: One Python 3.12 package, `rllab`
+74:**Status:** Accepted · **Date:** 2026-10-18 · **Scope:** system
+80:### AD-02: Learners written by hand on PyTorch autograd; worlds in NumPy
+81:**Status:** Accepted · **Date:** 2026-10-18 · **Scope:** system
+87:### AD-03: Double DQN for Snake
+88:**Status:** Accepted · **Date:** 2026-10-18 · **Scope:** learners
+94:### AD-04: Snake sees the whole grid plus a few direct features
+95:**Status:** Accepted · **Date:** 2026-10-18 · **Scope:** worlds
+101:### AD-05: PPO with a squashed Gaussian movement action, shared within a role
+102:**Status:** Accepted · **Date:** 2026-10-18 · **Scope:** learners
+108:### AD-06: Nearby things fill fixed slots with a presence flag
+109:**Status:** Accepted · **Date:** 2026-10-18 · **Scope:** worlds
+115:### AD-07: Rewards follow each world&#x27;s score
+116:**Status:** Accepted · **Date:** 2026-10-18 · **Scope:** worlds
+122:### AD-08: Stable-Baselines3 is the reference
+123:**Status:** Accepted · **Date:** 2026-10-18 · **Scope:** reference
+130:### AD-09: CPU training, a rented GPU only as fallback
+131:**Status:** Accepted · **Date:** 2026-10-18 · **Scope:** system
+137:### AD-10: Fixed seed ranges keep evaluation seeds out of training
+138:**Status:** Accepted · **Date:** 2026-10-18 · **Scope:** system
+144:### AD-11: Plain files per run
+145:**Status:** Accepted · **Date:** 2026-10-18 · **Scope:** store
+151:### AD-12: Replays are recorded frames played in a pygame window
+152:**Status:** Accepted · **Date:** 2026-10-18 · **Scope:** replay
+158:### AD-13: Two co-evolution regimes on the same PPO
+159:**Status:** Accepted · **Date:** 2026-10-18 · **Scope:** coevo
+165:### AD-14: Significance claims and charts go through `evaluate`
+166:**Status:** Accepted · **Date:** 2026-10-18 · **Scope:** evaluate
+172:### AD-15: A saved policy is a plain network plus an output rule
+173:**Status:** Accepted · **Date:** 2026-10-18 · **Scope:** store
+180:### AD-16: Worlds start from a planted state
+181:**Status:** Accepted · **Date:** 2026-10-18 · **Scope:** worlds
+187:### AD-17: Test worlds are registered by name
+188:**Status:** Accepted · **Date:** 2026-10-18 · **Scope:** worlds
+194:### AD-18: A run&#x27;s length is a step budget; the time limit is a backstop
+195:**Status:** Accepted · **Date:** 2026-10-18 · **Scope:** learners
+201:### AD-19: rllab stays one package
+202:**Status:** Accepted · **Date:** 2026-10-18 · **Scope:** system
+208:### AD-20: Each comparison is a paired sign-flip permutation test, Holm-corrected per world
+209:**Status:** Accepted · **Date:** 2026-10-18 · **Scope:** evaluate
+215:### AD-21: Learning curves are one Matplotlib axis in Okabe–Ito colours
+216:**Status:** Accepted · **Date:** 2026-10-18 · **Scope:** evaluate
+222:## Risks and open questions
+232:## Changelog</pre></details></div><div class="step" id="SD398"><span class="sid">D398</span><span class="kind">say</span>Still in the detect step: reading the architecture and the M1 plan so the five setup questions come with informed guesses.<details><summary>full text</summary><pre>Still in the detect step: reading the architecture and the M1 plan so the five setup questions come with informed guesses.</pre></details></div><div class="step" id="SD399"><span class="sid">D399</span><span class="kind">Bash</span>sed -n 1,72p docs/architecture.md; sed -n 222,240p docs/architecture.md; sed -n 1,80p tasks/plan.md<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;sed -n 1,72p docs/architecture.md; sed -n 222,240p docs/architecture.md; sed -n 1,80p tasks/plan.md&quot;,
+  &quot;description&quot;: &quot;Read architecture overview and plan header&quot;
+}</pre><div class="lbl">output</div><pre># RL Lab — Architecture
+
+**Status:** Approved · **Shape:** Single package · **Last updated:** 2026-10-18 · **Spec:** [spec.md](spec.md)
+
+## Overview
+Three NumPy worlds (Snake, fish tank, predator and prey) sit behind one `Env` protocol that hands each role a compact observation array, never pixels. Hand-written PyTorch learners (DQN for Snake, PPO for the fish and both predator-prey sides) train against batched world copies on the laptop CPU for a fixed number of environment steps, record a learning curve on held-out curve seeds, and save the agent into a plain-file run folder. Every agent, trained, baseline or reference, is a `Policy`, so evaluation, replay and the statistics treat them alike. A world is signed off when its run folder holds every artefact DONE-01 names and the learner&#x27;s note passes its checks. Tests can start a world from a planted state and train the learners on small registered test worlds.
+
+```mermaid
+flowchart LR
+  worlds --&gt; core
+  baselines --&gt; worlds
+  learners --&gt; evaluate
+  coevo --&gt; learners
+  reference --&gt; evaluate
+  evaluate --&gt; store
+  replay --&gt; store
+  signoff --&gt; store
+  store --&gt; core
+```
+
+## Tech stack
+| Area | Choice | Decision |
+|---|---|---|
+| Language | Python 3.12 | AD-01 |
+| Worlds and arrays | NumPy ≥ 2.0 | AD-02 |
+| Networks and gradients | PyTorch ≥ 2.4, CPU wheels | AD-02, AD-09 |
+| Reference implementations | Stable-Baselines3 ≥ 2.3, Gymnasium ≥ 1.0 | AD-08 |
+| Statistics | NumPy: paired sign-flip permutation test, Holm–Bonferroni correction | AD-14, AD-20 |
+| Charts | Matplotlib ≥ 3.9, Agg backend, PNG at 150 dpi, Okabe–Ito colours | AD-14, AD-21 |
+| Replay viewer | pygame-ce ≥ 2.5 | AD-12 |
+| Run storage | JSON, gzip JSON and `torch.save` files under `runs/` | AD-11, AD-15 |
+| Tests | pytest, hypothesis | — |
+
+## Components
+| Component | Responsibility | Covers | Depends on |
+|---|---|---|---|
+| `core` | `Env` and `Policy` protocols, the step, frame and spec types, and the seed ranges | DATA-01, QR-03 | — |
+| `worlds` | The three worlds&#x27; rules, observations and rewards, `make(name)`, planted states and test-world registration | SNAKE-01–SNAKE-07, TANK-01–TANK-09, PREY-01–PREY-07 | `core` |
+| `baselines` | Random and scripted policies per world and role, reading only the role&#x27;s observation | BASE-01–BASE-06 | `core`, `worlds` |
+| `store` | Run folders: records, saved policies, results and recordings on disk | LEARN-03, DATA-02 | `core` |
+| `evaluate` | Plays policies on seeds; runs the comparisons (AD-20) and draws the charts (AD-21) | EVAL-01–EVAL-07, CHECK-02, CHECK-03, COEVO-04, COEVO-06 | `core`, `store` |
+| `learners` | Hand-written DQN and PPO, the time-boxed training loop, curve points, divergence stop | LEARN-01, LEARN-02, LEARN-04, LEARN-05, QR-01, QR-02 | `core`, `evaluate`, `store` |
+| `coevo` | The simultaneous and past-versions regimes, snapshot pools, cross-play table and snapshot sweep | COEVO-01–COEVO-03, COEVO-05 | `core`, `learners`, `evaluate`, `store` |
+| `reference` | Trains Stable-Baselines3&#x27;s DQN or PPO on the same world through a Gymnasium adapter, as a `Policy` | CHECK-01 | `core`, `evaluate`, `store` |
+| `replay` | Records an episode&#x27;s frames, saves them, and plays them back in a window with controls | REPLAY-01–REPLAY-05, QR-04 | `core`, `store` |
+| `signoff` | Scaffolds each world&#x27;s note with its results, checks the note, and gates sign-off and world order | NOTE-01–NOTE-04, DONE-01–DONE-04 | `store` |
+
+## Interfaces
+See [packages/rllab/contract.md](packages/rllab/contract.md).
+
+## Data
+- **Worlds are generated, not downloaded.** Every episode is set by one integer seed (AD-10), or starts from a planted state in tests (AD-16).
+- **Seeds (DATA-01):** per world, evaluation seeds are 0–99, learning-curve seeds 100–119, training seeds 1,000,000 and up; `core.seeds` is the only source, and `learners` refuses a training seed below 1,000,000.
+- **Observations** are float32 arrays per role, shape (agents, features): Snake per AD-04, fish and predator-prey per AD-06. Rewards per AD-07.
+- **Run folder** `runs/&lt;world&gt;/&lt;run-id&gt;/` (AD-11): `record.json` (seed, settings, duration, curves, status: DATA-02), `policy.pt` only for a finished run (LEARN-03, AD-15), `scores/&lt;agent&gt;.json`, `comparisons.json`, `curve.png`, `recordings/&lt;agent&gt;-&lt;seed&gt;.json.gz`; a prey run adds `snapshots/&lt;regime&gt;/&lt;role&gt;/` (AD-13). Notes live in `notes/&lt;world&gt;.md`, committed; `runs/` is git-ignored.
+
+## Cross-cutting concerns
+- **Speed (QR-01):** training steps 16 world copies and makes one batched policy call per step; the loop ends at the run&#x27;s `total_steps`, set per world from measured steps per second so the run fits the hour, and `time_limit_s` (3,600 by default) is the backstop (AD-18). The duration is recorded. Small MLPs run on CPU (AD-09).
+- **Reproducibility (QR-03):** one `np.random.Generator` and one `torch.Generator` per run from the run seed, no global random state; `torch.use_deterministic_algorithms(True)` and a fixed thread count in the settings. The run length and curve points are counted in environment steps, never wall-clock time (AD-18); a run cut short by the time limit says so in its record and doesn&#x27;t count as a repeat.
+- **Errors:** a not-a-number loss or score stops the run with status `diverged` and the curve point where it happened; an interrupted run keeps its curve with status `stopped` and no `policy.pt`. A policy loaded into the wrong world raises `ValueError` naming both worlds.
+- **Statistics and charts:** every significance claim goes through `evaluate.compare`, one correction family per world (AD-14), tested as AD-20 sets; every chart goes through `evaluate.curve_chart`, drawn as AD-21 sets.
+- **Testing:** world rules are tested on planted states from `worlds.from_state` (AD-16; each spec Given/When/Then is a test); learners on test worlds registered with `worlds.register` (AD-17); the reference adapter with SB3&#x27;s `check_env`.
+
+## Project layout
+```
+src/rllab/   → core/ worlds/ baselines/ store/ evaluate/ learners/ coevo/ reference/ replay/ signoff/ — one folder per component; __init__ exports its contract
+notes/       → one note per world, written by the learner
+runs/        → run folders (git-ignored)
+tests/
+```
+
+## Decisions
+## Risks and open questions
+- The spec&#x27;s EVAL-02, EVAL-03, EVAL-06, CHECK-03, COEVO-04 and COEVO-06 name the `null-hypothesis-testing` and `dataviz` skills; AD-20 and AD-21 stand in for them (UR-46). If a working `null-hypothesis-testing` skill is installed later, its test is checked against AD-20, and AD-20 is revised if they differ.
+- Beating the scripted snake (EVAL-04) may be hard within an hour; the script is strong on a 10 × 10 grid. Mitigation: AD-04&#x27;s full-grid observation; the fallback is a small CNN, then a longer run on a rented machine within QR-02.
+- Sparse rewards (AD-07) may slow early Snake and predator learning. If the curve is flat after 20% of the budget, the learner chooses between shaping and more steps, and the note records it.
+- Python per-step overhead could break QR-01 for 1,000-step fish episodes; a speed test on the tank world comes early in S2.
+- Step budgets (AD-18) are set from a measured speed: a budget sized for the hour may be too short to beat the scripted snake (EVAL-04). The note then records the budget and the curve&#x27;s slope at the end, and the fallback is the rented machine in the EVAL-04 risk above.
+- Assumption: AD-16&#x27;s state types hold positions and velocities as tuples of floats (grid cells as integer pairs, head first); `from_state` checks the state is legal (inside the arena, `alive` and counts consistent) and raises `ValueError` otherwise.
+- Reference check for the several-fish version depends on our `VecEnv` adapter (AD-08); `check_env` covers single-agent worlds only, so the adapter gets its own tests.
+- Assumption: AD-06 keeps the 3 nearest visible pellets, and the predator sees up to 5 prey slots.
+
+## Changelog
+| Date | Change | Source | IDs |
+|---|---|---|---|
+| 2026-10-18 | Initial architecture | spec.md | AD-01–AD-14 |
+| 2026-10-18 | Pipeline boundaries: result types, `open_run`, snapshots for both regimes, saved-policy form | routes.md | AD-15 |
+| 2026-10-18 | Test hooks and the touching rule: planted states, registered test worlds, step budget | spec.md, routes.md | AD-16–AD-18; TANK-04, PREY-02, PREY-03 (changed) |
+| 2026-10-18 | Grow check: rllab stays one package | requests.md | AD-19 |
+| 2026-10-18 | The comparison test and chart style stated here instead of in the skills | routes.md | AD-20–AD-21 |
+# M1: Train and watch a snake — Plan
+
+**Milestone:** M1 · **Status:** Approved · **Base:** — · **Last updated:** 2026-10-18 · **Roadmap:** [../docs/roadmap.md](../docs/roadmap.md)
+
+## Scope
+**Exit:** `rllab train snake` finishes and its run replays; TC-01–TC-06, TC-29, TC-31 (snake), TC-32, TC-37, TC-38 and TC-42 (DONE-02 ledgers) pass, and the random and scripted snakes pass their PL-02 cases on M1-T13 and M1-T24.
+**Covers:** SNAKE-01–SNAKE-07, LEARN-01–LEARN-04, BASE-01, BASE-02, BASE-06, DATA-01, DATA-02, DONE-02, QR-03, REPLAY-01–REPLAY-03, REPLAY-05 · **Deferred:** PL-01.train_ppo, PL-01.ppo_learner, PL-01.ClippedPPO, PL-01.TankEnv, TANK-01–TANK-09, LEARN-05 (to M3: the fish need the tank and PPO); DONE-04 (to M3: needs tank1&#x27;s comparisons); REPLAY-04 (to M3: sight circles need the five-fish tank); QR-04 (to M3: measured on a 1,000-step fish replay); QR-01 (to M2: TC-33 times the hour-long run); QR-02 (to M2: applies only if the hour-long run misses QR-01)
+**Skills:** none
+
+## Phase 0: Interface
+
+### M1-T01: M1 interface
+**Package:** rllab · **Step:** contract · **Kind:** interface · **Covers:** DATA-01 · **Size:** S · **Mode:** solo
+**Read:** PL-01, PL-04, PL-05, AD-15, AD-16, AD-17, AD-20, AD-21, core.EnvSpec, core.StepResult, core.Frame, core.Env, core.GreedyNet, core.Policy, core.seeds, worlds.make, worlds.decode, worlds.register, worlds.SnakeState, worlds.TankState, worlds.PreyState, worlds.from_state, worlds.state_of, baselines.random_policy, baselines.scripted_policy, store.RunDir, store.new_run, store.open_run, store.load_policy, evaluate.Scores, evaluate.CurvePoint, evaluate.play, evaluate.Comparison, evaluate.compare, evaluate.Chart, evaluate.curve_chart, learners.TrainSettings, learners.RunRecord, learners.train_dqn, learners.PpoLearner, learners.ppo_learner, replay.Recording, replay.record, replay.ViewStats, replay.view, signoff.Status, signoff.may_start
+**Acceptance:**
+- [ ] Each contract type is code in its component&#x27;s `types.py` (`core.Env` and `core.Policy` in `core/protocols.py`), with one sample per listed case in `tests/contracts/&lt;id&gt;.&lt;Type&gt;/` that validates against it; `core.seeds` is built whole (eval 0–99, curve 100–119); the evaluate.Comparison samples carry `test` &quot;paired sign-flip permutation, Holm&quot; and `statistic` as the mean per-seed a − margin × b (AD-20)
+- [ ] Every M1 step and entry function imports and matches its contract or step-table signature, its body the CR-02 stub naming its task; `worlds.from_state` and `worlds.state_of` dispatch by state type to per-world stubs; each `__init__.py` exports its contract; `__main__.py` dispatches `train`, `replay` and `watch`, where `--smoke` sets `RLLAB_SMOKE=1`, points `RLLAB_RUNS` at a temp folder and selects SDL&#x27;s dummy video driver
+- [ ] Each boundary fake (may_start, make, new_run, open_run, load_policy, random_policy, scripted_policy, play, decode, view, compare, curve_chart, ppo_learner) passes its contract&#x27;s cases as one test that takes the provider, the curve_chart fake raising ValueError for an empty curve, more than 4 curves or more than 3 baselines (AD-21); the core.Env, core.Policy, store.RunDir and learners.PpoLearner replay doubles serve their fixtures; the golden-case store helper loads `tests/fixtures/rllab/TC-NN/`
+**Verify:** `pytest tests/contracts` · `scripts/check.sh gate`
+**Depends on:** — · **Writes:** src/rllab/__init__.py, src/rllab/__main__.py, src/rllab/core/**, src/rllab/worlds/**, src/rllab/baselines/**, src/rllab/store/**, src/rllab/evaluate/**, src/rllab/learners/**, src/rllab/coevo/**, src/rllab/reference/**, src/rllab/replay/**, src/rllab/signoff/**, tests/contracts/**, tests/conftest.py, tests/helpers/golden.py
+
+### Checkpoint after M1-T01 (barrier)
+- [ ] Interface review passed: the code is the contract, no more and no less (CONSTRAINTS.md Review, Interface)
+
+## Phase 1: Step spines
+
+### M1-T02: World order gate
+**Package:** rllab · **Step:** PL-01.may_start · **Kind:** thicken · **Covers:** DONE-02 · **Size:** XS · **Mode:** split
+**Reason:** fold: spine is the whole behavior
+**Read:** PL-01, TC-42, DONE-02, signoff.may_start, signoff.Status
+**Acceptance:**
+- [ ] TC-42&#x27;s DONE-02 ledgers pass: empty `notes/signoff.json` → snake open, tank1 blocked naming snake; {snake, tank1, tank5} → prey open
+- [ ] The signoff.may_start fake&#x27;s cases pass on the real `may_start`
+**Verify:** `pytest tests/intent/rllab tests/unit/rllab -k may_start` · `scripts/check.sh gate`
+**Depends on:** M1-T01 · **Writes:** src/rllab/signoff/order.py, tests/intent/rllab/test_may_start.py, tests/unit/rllab/test_may_start.py
+
+### M1-T03: ensure_may_start spine (raise on blockers)
+**Package:** rllab · **Step:** PL-01.ensure_may_start · **Kind:** spine · **Covers:** DONE-02 · **Size:** XS · **Mode:** solo
+**Read:** PL-01, signoff.may_start, signoff.Status
+**Acceptance:**
+- [ ] On the signoff.may_start fake, `ensure_may_start(&quot;snake&quot;)` returns the empty Status and `ensure_may_start(&quot;tank5&quot;)` raises listing the Status&#x27;s blockers; signature unchanged
+**Verify:** `pytest tests/unit/rllab -k ensure_may_start` · `scripts/check.sh gate`
+**Depends on:** M1-T01 · **Writes:** src/rllab/learners/gate.py, tests/unit/rllab/test_gate.py
+
+### M1-T04: train_settings spine (contract defaults)
+**Package:** rllab · **Step:** PL-01.train_settings · **Kind:** spine · **Covers:** DATA-01 · **Size:** XS · **Mode:** solo
+**Read:** PL-01, AD-09, AD-10, AD-18, learners.TrainSettings
+**Acceptance:**
+- [ ] `train_settings(&quot;snake&quot;, 1_000_000, 3600)` validates as learners.TrainSettings with a step budget, CPU and a fixed thread count; `train_settings(&quot;snake&quot;, 999_999, 60)` raises ValueError (TC-28&#x27;s seed rule); with `RLLAB_SMOKE=1` the budget is 2,000 steps
+**Verify:** `pytest tests/unit/rllab -k train_settings` · `scripts/check.sh gate`
+**Depends on:** M1-T01 · **Writes:** src/rllab/learners/settings.py, tests/unit/rllab/test_settings.py
+
+### M1-T05: Double DQN learner
+**Package:** rllab · **Step:** PL-01.train_dqn · **Kind:** thicken · **Covers:** LEARN-01, LEARN-02, LEARN-04 · **Size:** XS · **Mode:** split
+**Reason:** fold: the spine version is AD-03&#x27;s whole behavior; TC-29 and TC-31 need the real world and play, so they run in M1-T23
+**Read:** PL-01, AD-03, AD-04, AD-18, learners.train_dqn, learners.TrainSettings, learners.RunRecord, core.Env, core.Policy, core.GreedyNet, evaluate.play, evaluate.CurvePoint, worlds.make
+**Acceptance:**
+- [ ] Given a fixed batch from the core.Env replay double, the Double DQN target equals r + γ·Q_target(s′, argmax Q_online(s′)) (r alone at a terminal step), and the target net syncs every `target_sync` steps
+- [ ] On the worlds.make and evaluate.play fakes, a 2,000-step budget returns a `finished` RunRecord with ≥ 20 curve points evenly spaced in env steps and a Policy whose `network()` is an argmax core.GreedyNet acting as `act` does
+- [ ] A not-a-number loss ends the run `diverged`, naming the curve point, with no policy; a seed below 1,000,000 or a world with no `discrete3` role raises ValueError
+**Verify:** `pytest tests/intent/rllab tests/unit/rllab -k dqn` · `scripts/check.sh gate`
+**Depends on:** M1-T01 · **Writes:** src/rllab/learners/dqn/**, tests/intent/rllab/test_dqn.py, tests/unit/rllab/test_dqn.py
+
+### M1-T06: make spine (if-chain plus test registry)
+**Package:** rllab · **Step:** PL-01.make · **Kind:** spine · **Covers:** — · **Size:** XS · **Mode:** solo
+**Read:** PL-01, AD-17, worlds.make, worlds.register
+**Acceptance:**
+- [ ] After `register(&quot;test_x&quot;, factory)`, `make(&quot;test_x&quot;)` returns a fresh Env from `factory`; `register(&quot;x&quot;, …)` raises ValueError; an unknown name raises KeyError; &quot;snake&quot; routes to `SnakeEnv`, and tank1, tank5 and prey raise KeyError naming M3 or M4; the worlds.make fake&#x27;s cases pass on the real `make` for the registered names
+**Verify:** `pytest tests/unit/rllab -k make` · `scripts/check.sh gate`
+**Depends on:** M1-T01 · **Writes:** src/rllab/worlds/factory.py, tests/unit/rllab/test_factory.py
+
+### M1-T07: Snake world rules
+**Package:** rllab · **Step:** PL-01.SnakeEnv · **Kind:** thicken · **Covers:** SNAKE-01, SNAKE-02, SNAKE-03, SNAKE-04, SNAKE-05, SNAKE-06, SNAKE-07 · **Size:** S · **Mode:** split
+**Reason:** fold: spine is the whole behavior (AD-04 observation, AD-07 reward); also builds `worlds.decode`&#x27;s snake fields, which have no step row
+**Read:** PL-01, TC-01, TC-02, TC-03, TC-04, TC-05, TC-06, AD-04, AD-07, AD-16, core.Env, core.StepResult, core.Frame, worlds.SnakeState, worlds.from_state, worlds.state_of, worlds.decode
+**Acceptance:**
+- [ ] TC-01–TC-06 pass, the planted cases through `worlds.from_state`
+- [ ] `from_state(state_of(env), seed=s)` steps exactly as `env` does; an illegal SnakeState raises ValueError; `step` after `done` raises RuntimeError; `frame()` validates as core.Frame
+- [ ] `worlds.decode(&quot;snake&quot;, &quot;snake&quot;, obs)` names every AD-04 field and adds nothing; the worlds.decode fake&#x27;s snake case passes on the real `decode`
+**Verify:** `pytest tests/intent/rllab tests/unit/rllab -k snake` · `scripts/check.sh gate`</pre></details></div><div class="step" id="SD400"><span class="sid">D400</span><span class="kind">Bash</span>grep -n -i &quot;depend\|numpy\|torch\|pygame\|matplotlib\|hypothesis\|stable&quot; tasks/plan.md | grep -v &quot;Depends on:&quot; | head; grep -n &quot;^## &quot; tasks/plan.md; grep -n -i &quot;pipelines\|readab\|CR-&quot; docs/packages/rllab/pipelines.md | head -20; git ls-files tests | head; ls tests/fixtures/rllab/TC-01<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;grep -n -i \&quot;depend\\|numpy\\|torch\\|pygame\\|matplotlib\\|hypothesis\\|stable\&quot; tasks/plan.md | grep -v \&quot;Depends on:\&quot; | head; grep -n \&quot;^## \&quot; tasks/plan.md; grep -n -i \&quot;pipelines\\|readab\\|CR-\&quot; docs/packages/rllab/pipelines.md | head -20; git ls-files tests | head; ls tests/fixtures/rllab/TC-01&quot;,
+  &quot;description&quot;: &quot;Find milestone dependencies and pipeline rules&quot;
+}</pre><div class="lbl">output</div><pre>95:- [ ] `FileRunDir` satisfies store.RunDir: JSON and gzip JSON round-trip with arrays and dataclasses as plain JSON; `save_policy` writes the GreedyNet, world and role with `torch.save`; a policy with no network raises TypeError; reading a missing file raises FileNotFoundError
+130:- [ ] On the test_reach_target EnvSpec sample, headings are uniform and speeds in [0, top speed]; actions depend only on the `rng` passed to `act`; the baselines.random_policy fake&#x27;s cases pass on the real function
+169:### M1-T18: view spine (pygame-ce shapes)
+256:## Dependency graph
+304:| pygame-ce misbehaves under SDL&#x27;s dummy driver in CI | Viewer tests flake | M1-T18 and M1-T22 run headless from the start; QR-04 is measured by hand in M3 (TC-39) |
+305:| Determinism (QR-03) breaks across torch thread counts | TC-31 fails | M1-T04 fixes threads and `torch.use_deterministic_algorithms`; M1-T23 runs TC-31 |
+5:## Scope
+10:## Phase 0: Interface
+25:## Phase 1: Step spines
+177:## Phase 2: Wiring and thicken
+223:## Phase 3: System
+256:## Dependency graph
+300:## Risks
+307:## Open questions
+310:## Replan notes
+1:# rllab — Pipelines
+93:**Entry:** `src/rllab/replay/pipelines/pl04_replay.py::run_replay` · **Trigger:** `python -m rllab replay &lt;run&gt; &lt;agent&gt; &lt;seed&gt;`
+118:**Entry:** `src/rllab/replay/pipelines/pl05_watch.py::run_watch` · **Trigger:** `python -m rllab watch &lt;file&gt;`
+134:**Entry:** `src/rllab/signoff/pipelines/pl06_note.py::run_note` · **Trigger:** `python -m rllab note &lt;world&gt; &lt;run&gt;`
+150:**Entry:** `src/rllab/signoff/pipelines/pl07_signoff.py::run_signoff` · **Trigger:** `python -m rllab signoff &lt;world&gt; &lt;run&gt;`
+219:  replay/     __init__.py  types.py  pipelines/pl04_replay.py  pipelines/pl05_watch.py  agents.py  record.py  recording.py  viewer.py
+220:  signoff/    __init__.py  types.py  pipelines/pl06_note.py  pipelines/pl07_signoff.py  order.py  note.py  check.py  ledger.py
+tests/fixtures/rllab/TC-01/expected.json
+tests/fixtures/rllab/TC-01/input.json
+tests/fixtures/rllab/TC-02/expected.json
+tests/fixtures/rllab/TC-02/input.json
+tests/fixtures/rllab/TC-03/expected.json
+tests/fixtures/rllab/TC-03/input.json
+tests/fixtures/rllab/TC-04/expected.json
+tests/fixtures/rllab/TC-04/input.json
+tests/fixtures/rllab/TC-05/expected.json
+tests/fixtures/rllab/TC-05/input.json
+expected.json
+input.json</pre></details></div><div class="step" id="SD401"><span class="sid">D401</span><span class="kind">Bash</span>grep -n &quot;^### M1&quot; tasks/plan.md; grep -n &quot;curve_chart\|compare&quot; tasks/plan.md | grep -v &quot;^1[0-9]:&quot; | head; sed -n 300,330p tasks/plan.md<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;grep -n \&quot;^### M1\&quot; tasks/plan.md; grep -n \&quot;curve_chart\\|compare\&quot; tasks/plan.md | grep -v \&quot;^1[0-9]:\&quot; | head; sed -n 300,330p tasks/plan.md&quot;,
+  &quot;description&quot;: &quot;List M1 tasks and open questions&quot;
+}</pre><div class="lbl">output</div><pre>12:### M1-T01: M1 interface
+27:### M1-T02: World order gate
+37:### M1-T03: ensure_may_start spine (raise on blockers)
+45:### M1-T04: train_settings spine (contract defaults)
+53:### M1-T05: Double DQN learner
+64:### M1-T06: make spine (if-chain plus test registry)
+72:### M1-T07: Snake world rules
+83:### M1-T08: play spine (one episode per seed)
+91:### M1-T09: FileRunDir spine (plain files)
+99:### M1-T10: Run folder spine (new_run, open_run)
+108:### M1-T11: save_run spine (record always, policy when finished)
+116:### M1-T12: load_policy spine (rebuild from GreedyNet)
+124:### M1-T13: Random agent
+134:### M1-T14: Scripted snake
+144:### M1-T15: replay_policies spine (trained or baseline)
+152:### M1-T16: Recording file spine (gzip JSON)
+161:### M1-T17: record_saved spine (frame every step)
+169:### M1-T18: view spine (pygame-ce shapes)
+179:### M1-T19: Wire PL-01
+189:### M1-T20: Wire PL-04
+197:### M1-T21: Wire PL-05
+205:### M1-T22: Replay controls
+225:### M1-T23: PL-01 on the real chain
+235:### M1-T24: PL-04 on the real chain
+311:- 2026-10-18: AD-20 and AD-21 changed the text of evaluate.Comparison, evaluate.compare and evaluate.curve_chart; M1-T01 now reads both decisions, and its acceptance names the new Comparison sample fields and curve_chart errors. No M1 task past the interface uses them; the test and chart themselves are M2 work, planned at Extend from the revised contract. The open question on the two skills is resolved by AD-20 and AD-21 (UR-46, UR-47). Dropped none
+## Risks
+| Risk | Impact | Mitigation |
+|---|---|---|
+| The `--smoke` switches (`RLLAB_SMOKE`, `RLLAB_RUNS`) leak into a real run | A real run gets a 2,000-step budget or writes to a temp folder | M1-T04 and M1-T10 test both settings; M1-T23&#x27;s TC-32 runs without them |
+| pygame-ce misbehaves under SDL&#x27;s dummy driver in CI | Viewer tests flake | M1-T18 and M1-T22 run headless from the start; QR-04 is measured by hand in M3 (TC-39) |
+| Determinism (QR-03) breaks across torch thread counts | TC-31 fails | M1-T04 fixes threads and `torch.use_deterministic_algorithms`; M1-T23 runs TC-31 |
+
+## Open questions
+- none
+
+## Replan notes
+- 2026-10-18: AD-20 and AD-21 changed the text of evaluate.Comparison, evaluate.compare and evaluate.curve_chart; M1-T01 now reads both decisions, and its acceptance names the new Comparison sample fields and curve_chart errors. No M1 task past the interface uses them; the test and chart themselves are M2 work, planned at Extend from the revised contract. The open question on the two skills is resolved by AD-20 and AD-21 (UR-46, UR-47). Dropped none</pre></details></div><div class="step" id="SD402"><span class="sid">D402</span><span class="kind">say</span>I&#x27;ve checked the project and the tools it needs. `uv` 0.11.27 and `jq` are installed, and the M1 plan is Approved. There&#x27;s no `CONSTRAINTS.md` yet, so this is New mode. ⏎ What I found: ⏎ - Layout: one package, `rllab`, on Python 3.12 (AD-01). It has ten components under `src/rllab/`. Their allowed imports become the import rules: `core` imports nothing from the project; `worlds` and `store` → core; `baselines` → core, worlds; `evaluate` → core, store; `learners` → core, evaluate, store; `coevo` → core, learners, evaluate, store; `reference` and `replay` → core plus their listed dep …[+1894 chars]<details><summary>full text</summary><pre>I&#x27;ve checked the project and the tools it needs. `uv` 0.11.27 and `jq` are installed, and the M1 plan is Approved. There&#x27;s no `CONSTRAINTS.md` yet, so this is **New** mode.
+
+**What I found:**
+- **Layout:** one package, `rllab`, on Python 3.12 (AD-01). It has ten components under `src/rllab/`. Their allowed imports become the import rules: `core` imports nothing from the project; `worlds` and `store` → core; `baselines` → core, worlds; `evaluate` → core, store; `learners` → core, evaluate, store; `coevo` → core, learners, evaluate, store; `reference` and `replay` → core plus their listed deps; `signoff` → store.
+- **What exists:** golden cases TC-01–TC-39 in `tests/fixtures/rllab/`. There&#x27;s no code, no `pyproject.toml`, no CI, and `.claude/` only holds a skill.
+- **M1:** 24 tasks, starting with the interface task M1-T01. M1 needs numpy ≥ 2.0, torch ≥ 2.4 (CPU) and pygame-ce ≥ 2.5, with pytest and hypothesis for tests. Matplotlib, Stable-Baselines3 and Gymnasium aren&#x27;t needed until later milestones, so I&#x27;d add them then.
+
+**Five questions** (each has my guess and the default to use if you&#x27;re unsure):
+
+```
+Q1: When an agent breaks a check mid-task, should it be blocked or just warned?
+GUESS: block. The tasks run in parallel with strict file ownership, so a warning
+would let a broken task pass to the next one.
+DEFAULT: block on the floor and the gate; findings from the slower full check go to
+review instead.
+
+Q2: Which type checker should agents have to pass, mypy or pyright?
+GUESS: mypy strict. numpy 2 and torch both ship type hints, and mypy is the
+tested setup.
+DEFAULT: mypy strict blocks; pyright also runs in check.sh full.
+
+Q3: Set target numbers now, or measure what exists and hold it?
+GUESS: measure and hold. There&#x27;s no code yet, so coverage starts at 0 and gets
+set from real numbers when M1 finishes.
+DEFAULT: measure and hold.
+
+Q4: What&#x27;s the slowest gate check you&#x27;ll tolerate?
+GUESS: 90 s. This bar&#x27;s gate only runs quick tests; the hour-long training run
+(TC-33) is in M2 and won&#x27;t run here.
+DEFAULT: 90 s; no limit for full.
+
+Q5: Should I commit the bar&#x27;s skeleton once it&#x27;s generated?
+GUESS: yes. The check that stops agents editing protected files needs a commit to
+compare against.
+DEFAULT: yes.
+```
+
+I won&#x27;t set up CI unless you ask; it isn&#x27;t in the plan.
+
+Answer with &quot;defaults&quot; or give your own answers. I&#x27;ll generate the bar, run the check to prove it passes, and bring it back for your approval.</pre></details></div>
+<h2>Commits</h2>
+<p>None.</p>
+<h2>Returned</h2>
+<pre>I&#x27;ve checked the project and the tools it needs. `uv` 0.11.27 and `jq` are installed, and the M1 plan is Approved. There&#x27;s no `CONSTRAINTS.md` yet, so this is **New** mode.
+
+**What I found:**
+- **Layout:** one package, `rllab`, on Python 3.12 (AD-01). It has ten components under `src/rllab/`. Their allowed imports become the import rules: `core` imports nothing from the project; `worlds` and `store` → core; `baselines` → core, worlds; `evaluate` → core, store; `learners` → core, evaluate, store; `coevo` → core, learners, evaluate, store; `reference` and `replay` → core plus their listed deps; `signoff` → store.
+- **What exists:** golden cases TC-01–TC-39 in `tests/fixtures/rllab/`. There&#x27;s no code, no `pyproject.toml`, no CI, and `.claude/` only holds a skill.
+- **M1:** 24 tasks, starting with the interface task M1-T01. M1 needs numpy ≥ 2.0, torch ≥ 2.4 (CPU) and pygame-ce ≥ 2.5, with pytest and hypothesis for tests. Matplotlib, Stable-Baselines3 and Gymnasium aren&#x27;t needed until later milestones, so I&#x27;d add them then.
+
+**Five questions** (each has my guess and the default to use if you&#x27;re unsure):
+
+```
+Q1: When an agent breaks a check mid-task, should it be blocked or just warned?
+GUESS: block. The tasks run in parallel with strict file ownership, so a warning
+would let a broken task pass to the next one.
+DEFAULT: block on the floor and the gate; findings from the slower full check go to
+review instead.
+
+Q2: Which type checker should agents have to pass, mypy or pyright?
+GUESS: mypy strict. numpy 2 and torch both ship type hints, and mypy is the
+tested setup.
+DEFAULT: mypy strict blocks; pyright also runs in check.sh full.
+
+Q3: Set target numbers now, or measure what exists and hold it?
+GUESS: measure and hold. There&#x27;s no code yet, so coverage starts at 0 and gets
+set from real numbers when M1 finishes.
+DEFAULT: measure and hold.
+
+Q4: What&#x27;s the slowest gate check you&#x27;ll tolerate?
+GUESS: 90 s. This bar&#x27;s gate only runs quick tests; the hour-long training run
+(TC-33) is in M2 and won&#x27;t run here.
+DEFAULT: 90 s; no limit for full.
+
+Q5: Should I commit the bar&#x27;s skeleton once it&#x27;s generated?
+GUESS: yes. The check that stops agents editing protected files needs a commit to
+compare against.
+DEFAULT: yes.
+```
+
+I won&#x27;t set up CI unless you ask; it isn&#x27;t in the plan.
+
+Answer with &quot;defaults&quot; or give your own answers. I&#x27;ll generate the bar, run the check to prove it passes, and bring it back for your approval.</pre>
+</body></html>

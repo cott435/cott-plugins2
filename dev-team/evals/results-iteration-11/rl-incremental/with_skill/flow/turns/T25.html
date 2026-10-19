@@ -1,0 +1,881 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1"><title>T25 turn</title>
+<style>
+:root{--bg:#fbfbfa;--fg:#1d1d1f;--muted:#6b6b70;--line:#d9d9de;--box:#fff;--rowp:#eef3fb;--band:#fff4d6;
+--ok:#2e7d32;--bad:#c62828;--warn:#b26a00;--idle:#6b6b70}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#17171a;--fg:#ececf0;--muted:#9a9aa3;
+--line:#34343a;--box:#222227;--rowp:#1d2433;--band:#3a3015;--ok:#6fcf73;--bad:#ff6b6b;--warn:#f0b35a;--idle:#9a9aa3}}
+:root[data-theme="dark"]{--bg:#17171a;--fg:#ececf0;--muted:#9a9aa3;--line:#34343a;--box:#222227;--rowp:#1d2433;
+--band:#3a3015;--ok:#6fcf73;--bad:#ff6b6b;--warn:#f0b35a;--idle:#9a9aa3}
+body{margin:0;padding:16px;background:var(--bg);color:var(--fg);font:14px/1.45 -apple-system,system-ui,sans-serif}
+h1{font-size:18px;margin:0 0 4px}h2{font-size:15px;margin:22px 0 8px}.sub{color:var(--muted)}
+table{border-collapse:collapse;margin:4px 0 8px}td,th{border-bottom:1px solid var(--line);padding:4px 10px;text-align:left;
+vertical-align:top}th{color:var(--muted);font-weight:600}.chips span{display:inline-block;margin:0 4px 2px 0}
+.legend span{margin-right:14px;white-space:nowrap}.sw{display:inline-block;width:10px;height:10px;border-radius:2px;
+margin-right:4px;vertical-align:-1px}.scroll{overflow:auto;max-height:88vh;border:1px solid var(--line);border-radius:8px}
+.chart{display:grid;width:max-content}.chart>div{line-height:0}.corner{position:sticky;top:0;left:0;z-index:3}
+.colhead{position:sticky;top:0;z-index:2}.rowhead{position:sticky;left:0;z-index:2}
+svg.bg{background:var(--bg)}.colhead svg{border-bottom:1px solid var(--line)}.rowhead svg{border-right:1px solid var(--line)}
+.ok{color:var(--ok);fill:var(--ok)}.bad{color:var(--bad);fill:var(--bad)}.warn{color:var(--warn);fill:var(--warn)}
+.idle{color:var(--idle);fill:var(--idle)}
+svg text{fill:var(--fg);font-family:-apple-system,system-ui,sans-serif}
+.box{fill:var(--box);stroke:var(--line)}.unit:hover .box{stroke:var(--fg)}
+.role{font-size:12px;font-weight:600}.uid,.wmeta,.lmeta,.meta{font-size:10px;fill:var(--muted)}
+.sub{font-size:10.5px;fill:var(--muted)}.badge{font-size:11px;font-weight:600}
+.meta.bad{fill:var(--bad);font-weight:600}.lane{font-size:13px;font-weight:700}.wave{font-size:13px;font-weight:700}
+.par{fill:#4e79a7}.ser{fill:var(--muted)}.rowp{fill:var(--rowp)}.rows{fill:transparent}.band{fill:var(--band)}
+.bandt{font-size:11.5px}.grid{stroke:var(--line)}.link{stroke:var(--muted);stroke-width:1.2;opacity:.55}
+.arrowhead{fill:var(--muted)}.marks{font-size:10.5px}.audit{stroke:var(--box);stroke-width:2}.auditn{font-size:10px;font-weight:700;fill:#fff}
+a{color:inherit}svg a .box{cursor:pointer}
+
+:root{--c0:#2a78d6;--c1:#eb6834;--c2:#1baf7a;--c3:#eda100;--c4:#e87ba4;--c5:#008300;--c6:#6250d6;--c7:#e34948;
+--cx:#8a8985;--main:#52514e;--read:#dcdbd5;--readfg:#1d1d1f}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--c0:#3987e5;--c1:#d95926;--c2:#199e70;
+--c3:#c98500;--c4:#d55181;--c5:#008300;--c6:#9085e9;--c7:#e66767;--cx:#77766f;--main:#c3c2b7;--read:#3b3b40;
+--readfg:#ececf0}}
+:root[data-theme="dark"]{--c0:#3987e5;--c1:#d95926;--c2:#199e70;--c3:#c98500;--c4:#d55181;--c5:#008300;
+--c6:#9085e9;--c7:#e66767;--cx:#77766f;--main:#c3c2b7;--read:#3b3b40;--readfg:#ececf0}
+.c0{fill:var(--c0);background:var(--c0)}.c1{fill:var(--c1);background:var(--c1)}.c2{fill:var(--c2);background:var(--c2)}
+.c3{fill:var(--c3);background:var(--c3)}.c4{fill:var(--c4);background:var(--c4)}.c5{fill:var(--c5);background:var(--c5)}
+.c6{fill:var(--c6);background:var(--c6)}.c7{fill:var(--c7);background:var(--c7)}.cx{fill:var(--cx);background:var(--cx)}
+.cmain{fill:var(--main)}.sc0{stroke:var(--c0)}.sc1{stroke:var(--c1)}.sc2{stroke:var(--c2)}
+.tl text,.sm text,.lc text{font-size:10.5px;fill:var(--muted)}.tl .lbl-in,.sm .lbl-in{fill:#fff;font-size:10.5px;font-weight:600}
+.tl .rowl,.sm .rowl,.lc .rowl{fill:var(--fg);font-size:11.5px;font-weight:600}.tl .band{fill:var(--rowp)}
+.tl .brk{stroke:var(--muted);stroke-dasharray:2 3}.tl a:hover rect,.sm a:hover rect{stroke:var(--fg);stroke-width:1.5}
+.axis{stroke:var(--line)}.sm .val{fill:var(--fg);font-weight:600}.lc path.ln{fill:none;stroke-width:2}
+.lc circle{stroke:var(--bg);stroke-width:2}.lc .end{font-weight:600;fill:var(--fg)}
+.tiles{display:flex;flex-wrap:wrap;gap:10px;margin:12px 0}.tile{border:1px solid var(--line);border-radius:8px;
+padding:8px 12px;min-width:110px;background:var(--box)}.tile b{display:block;font-size:20px;line-height:1.2}
+.tile span{font-size:12px;color:var(--muted)}.tile i{font-style:normal;font-size:12px;margin-left:6px}
+.fm{border-collapse:separate;border-spacing:2px}.fm td,.fm th{border:0;padding:0;text-align:center;font-size:11px}
+.fm th{padding:0 2px;font-weight:600}.fm td.f,.fm th.f{text-align:left;padding-right:10px;white-space:nowrap;
+position:sticky;left:0;background:var(--bg);font:11.5px ui-monospace,Menlo,monospace;
+max-width:380px;overflow:hidden;text-overflow:ellipsis}
+.fm td.cell{min-width:22px;height:20px;border-radius:3px}.fm td.fw{background:var(--c0);color:#fff;font-weight:700}
+.fm td.fe{background:var(--c1);color:#fff;font-weight:700}.fm td.fr{background:var(--read);color:var(--readfg)}
+.fm td.n{color:var(--muted);padding:0 6px}.fm tr.grp td{text-align:left;padding-top:8px;color:var(--muted);
+font-weight:600}
+.key{display:inline-block;min-width:18px;text-align:center;border-radius:3px;font-size:11px;margin-right:4px}
+.bar{display:inline-block;height:9px;border-radius:2px;vertical-align:0}
+
+pre{white-space:pre-wrap;word-break:break-word;background:var(--box);border:1px solid var(--line);border-radius:6px;
+padding:8px 10px;margin:4px 0;font:12px/1.45 ui-monospace,SFMono-Regular,Menlo,monospace;max-width:100%;overflow:auto}
+.step{border-top:1px solid var(--line);padding:6px 0}.step:target{background:var(--rowp)}
+.sid{font:12px ui-monospace,Menlo,monospace;color:var(--muted);margin-right:8px}.kind{font-weight:600;margin-right:8px}
+.err{color:var(--bad);font-weight:600}.hook{color:var(--bad);margin:4px 0 0 16px}.lbl{font-size:12px;color:var(--muted);margin-top:6px}
+details summary{cursor:pointer;color:var(--muted);font-size:12px}.head td:first-child{color:var(--muted)}
+.top{font-size:13px}.narr{list-style:none;padding-left:0}.narr li{margin:3px 0}
+</style></head>
+<body>
+<p class="top"><a href="../flow.html">← the run's flow chart</a></p>
+<p class="top"><a href="../plan/T25.html">The plan as of T25</a>: this turn changed the plan (+3 ~0 −0) · <a href="../plan/index.html">plan map</a></p>
+<h1>T25 · turn · /dev-team:test-planning From the previous session:</h1>
+<table class="head"><tr><td>Type</td><td>turn</td></tr><tr><td>Description</td><td>/dev-team:test-planning From the previous session:</td></tr><tr><td>Spawned by</td><td>user</td></tr><tr><td>Model</td><td>claude-opus-5-5</td></tr><tr><td>Start</td><td>2026-10-19 02:51:06 UTC</td></tr><tr><td>Duration</td><td>2 min</td></tr><tr><td>Tool calls</td><td>23</td></tr><tr><td>Errors</td><td>2</td></tr><tr><td>Hook blocks</td><td>3</td></tr><tr><td>Tokens</td><td>11.0k out · 39.6k new in · 879k cached in · peak context 64.1k</td></tr><tr><td>Skills invoked</td><td>none</td></tr><tr><td>Files written or edited</td><td>docs/packages/rllab/tests.md, tests/fixtures/rllab/TC-13/expected.json, tests/fixtures/rllab/TC-14/expected.json, tests/fixtures/rllab/TC-15/expected.json</td></tr><tr><td>Definition</td><td>none</td></tr><tr><td>Steps</td><td>31</td></tr><tr><td>Finished</td><td>yes</td></tr></table>
+
+
+<h2>Prompt</h2>
+<pre>/dev-team:test-planning From the previous session:
+&lt;&lt;&lt;
+The architecture and the `rllab` contract are now **Approved** (2026-10-18).
+
+- **AD-10** (the notes page is yours: the code checks it and never writes it) is now **Accepted**. There&#x27;s no probe file, so no decision is waiting on a probe.
+- The pipeline-design request to add the notes check to the architecture is closed.
+- `dt lint docs/` shows 0 errors and 0 warnings.
+
+Three files are uncommitted: `docs/architecture.md`, `docs/packages/rllab/contract.md` and `docs/routes.md`. Want me to commit them?
+
+**Next:** `/dev-team:test-planning` (extend mode). It plans the tests and golden cases for PL-06, the only pipeline without tests yet. This step is optional.
+&gt;&gt;&gt;
+
+Approved, looks good. Yes, commit them.</pre>
+<h2>Files</h2>
+<table><tr><th>Op</th><th>File</th><th>Calls</th><th>By</th><th>Via</th><th>Steps</th></tr><tr><td>write</td><td><code>tests/fixtures/rllab/TC-13/expected.json</code></td><td>1</td><td>main</td><td>Write</td><td><a href="#D256">D256</a></td></tr><tr><td>write</td><td><code>tests/fixtures/rllab/TC-14/expected.json</code></td><td>1</td><td>main</td><td>Write</td><td><a href="#D260">D260</a></td></tr><tr><td>write</td><td><code>tests/fixtures/rllab/TC-15/expected.json</code></td><td>1</td><td>main</td><td>Write</td><td><a href="#D265">D265</a></td></tr><tr><td>edit</td><td><code>docs/packages/rllab/tests.md</code></td><td>7</td><td>main</td><td>Edit, Bash</td><td><a href="#D252">D252</a> <a href="#D253">D253</a> <a href="#D255">D255</a> <a href="#D258">D258</a> <a href="#D262">D262</a> <a href="#D266">D266</a> <a href="#D267">D267</a></td></tr><tr><td>read</td><td><code>../plugin/dev-team/skills/test-planning/examples.md</code></td><td>2</td><td>main</td><td>Bash</td><td><a href="#D246">D246</a> <a href="#D247">D247</a></td></tr><tr><td>read</td><td><code>../plugin/dev-team/skills/test-planning/references/cases.md</code></td><td>1</td><td>main</td><td>Bash</td><td><a href="#D247">D247</a></td></tr><tr><td>read</td><td><code>../plugin/dev-team/skills/test-planning/references/extend.md</code></td><td>1</td><td>main</td><td>Bash</td><td><a href="#D246">D246</a></td></tr><tr><td>read</td><td><code>docs/packages/rllab/pipelines.md</code></td><td>1</td><td>main</td><td>Bash</td><td><a href="#D248">D248</a></td></tr><tr><td>read</td><td><code>docs/packages/rllab/tests.md</code></td><td>2</td><td>main</td><td>Bash</td><td><a href="#D248">D248</a> <a href="#D255">D255</a></td></tr><tr><td>read</td><td><code>tests/fixtures/rllab/TC-12/input.json</code></td><td>1</td><td>main</td><td>Bash</td><td><a href="#D250">D250</a></td></tr></table>
+<h2>Steps</h2>
+<div class="step" id="SD240"><span class="sid">D240</span><span class="kind">command</span>USER TYPED `/dev-team:test-planning From the previous session:
+&lt;&lt;&lt;
+The architecture and the `rllab` contract are now Approved (2026-10-18).
+
+- AD-10 (the notes page is yours: the code checks it and never writes it) is now Accepted. There&#x27;s no probe file, so no decision is waiting on a probe.
+- The pipeline-design request to add the notes check to the architecture is closed.
+- `dt lint docs/` shows 0 errors and 0 warnings.
+
+Three files are uncommitted: `docs/architecture.md`, `docs/packages/rllab/contract.md` and `docs/routes.md`. Want me to commit them?
+
+Next: `/dev-team:test-planning` (extend mode). It plans the tests and golden cases for PL-06, the only pipeline without tests yet. This step is optional.
+&gt;&gt;&gt;
+
+Approved, looks good. Yes, commit them.`</div><div class="step" id="SD241"><span class="sid">D241</span><span class="kind">skill-body</span>skill loaded from `/Users/connorott/plugins/dev-team-workspace/iteration-11/rl-incremental/with_skill/plugin/dev-team/skills/test-planning`</div><div class="step" id="SD242"><span class="sid">D242</span><span class="kind">Bash</span>git status --short &amp;&amp; git add docs/architecture.md docs/packages/rllab/contract.md docs/routes.md &amp;&amp; git commit -q -m &quot;Approve architecture and rllab contract; accept AD-10
+
+Co-Authored-By: Claude Opus 5.5 &lt;noreply@anthropic.com&gt;&quot; &amp;&amp; git log --oneline -1 &amp;&amp; python3 ../plugin/dev-team/skills/test-planning/../../scripts/dt.py status --skill test-planning <span class="err">error</span><details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;git status --short &amp;&amp; git add docs/architecture.md docs/packages/rllab/contract.md docs/routes.md &amp;&amp; git commit -q -m \&quot;Approve architecture and rllab contract; accept AD-10\n\nCo-Authored-By: Claude Opus 5.5 &lt;noreply@anthropic.com&gt;\&quot; &amp;&amp; git log --oneline -1 &amp;&amp; python3 ../plugin/dev-team/skills/test-planning/../../scripts/dt.py status --skill test-planning&quot;,
+  &quot;description&quot;: &quot;Commit approved docs and check test-planning status&quot;
+}</pre><div class="lbl">output</div><pre>Exit code 1
+On branch master
+nothing to commit, working tree clean</pre></details></div><div class="step" id="SD243"><span class="sid">D243</span><span class="kind">Bash</span>git show --stat HEAD | head -20; ls ../plugin/dev-team/scripts/ 2&gt;/dev/null | head<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;git show --stat HEAD | head -20; ls ../plugin/dev-team/scripts/ 2&gt;/dev/null | head&quot;,
+  &quot;description&quot;: &quot;Inspect last commit and locate dt script&quot;
+}</pre><div class="lbl">output</div><pre>commit 07cf02040bd771c33900810e98c918a172666373
+Author: eval &lt;e@e&gt;
+Date:   Sun Oct 18 22:51:02 2026 -0400
+
+    turn 24
+
+ docs/architecture.md            | 4 ++--
+ docs/packages/rllab/contract.md | 2 +-
+ docs/routes.md                  | 2 +-
+ 3 files changed, 4 insertions(+), 4 deletions(-)
+README.md
+devteam
+dt
+dt.py</pre></details></div><div class="step" id="SD244"><span class="sid">D244</span><span class="kind">say</span>The three files were already committed in `07cf020`. Moving on to test planning.<details><summary>full text</summary><pre>The three files were already committed in `07cf020`. Moving on to test planning.</pre></details></div><div class="step" id="SD245"><span class="sid">D245</span><span class="kind">Bash</span>python3 ../plugin/dev-team/scripts/dt.py status --skill test-planning<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;python3 ../plugin/dev-team/scripts/dt.py status --skill test-planning&quot;,
+  &quot;description&quot;: &quot;Show test-planning status per package&quot;
+}</pre><div class="lbl">output</div><pre>skill: test-planning
+mode: extend
+docs: brief Accepted · spec Approved · architecture Approved (Single package) · roadmap stale (run dt roadmap) · plan missing · constraints missing
+next ids: AD-11 PL-07 TC-13 S2 M1
+references_unindexed: none
+references_changed: none
+references_missing: none
+packages: rllab=extend
+pipelines_no_smoke: PL-06
+pipelines_no_golden: PL-06
+cases_no_source: none
+cases_no_tolerance: none
+fixtures_missing: none
+fixtures_orphan: none
+skills: null-hypothesis-testing
+routed_changes: none
+requests_open: none</pre></details></div><div class="step" id="SD246"><span class="sid">D246</span><span class="kind">Bash</span>cd /Users/connorott/plugins/dev-team-workspace/iteration-11/rl-incremental/with_skill/plugin/dev-team/skills/test-planning &amp;&amp; cat references/extend.md; echo ======; cat examples.md <span class="err">error</span><details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;cd /Users/connorott/plugins/dev-team-workspace/iteration-11/rl-incremental/with_skill/plugin/dev-team/skills/test-planning &amp;&amp; cat references/extend.md; echo ======; cat examples.md&quot;,
+  &quot;description&quot;: &quot;Read extend mode reference and examples&quot;
+}</pre><div class="lbl">output</div><pre>Exit code 1
+# Extend: add cases
+
+A new pipeline, new user pairs, or a bug found in a golden path. Read `cases.md` before writing a case or a Strategy row; the section and fixture forms are in `../examples.md`.
+
+- New pipelines get a Strategy row and cases.
+- New user pairs become new cases.
+- A bug found in a golden path gets a `regression` case whose expected output comes from the user or the reference that showed the bug, never from the fixed code.
+
+Existing cases stay untouched. **Rebuild** reuses existing cases unchanged: they&#x27;re what proves the new implementation matches the old.
+
+Then the Review Gate, showing the cases this round added.
+(eval):1: ===== not found</pre></details></div><div class="step" id="SD247"><span class="sid">D247</span><span class="kind">Bash</span>cd /Users/connorott/plugins/dev-team-workspace/iteration-11/rl-incremental/with_skill/plugin/dev-team/skills/test-planning &amp;&amp; cat references/cases.md; echo; echo ----------; cat examples.md<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;cd /Users/connorott/plugins/dev-team-workspace/iteration-11/rl-incremental/with_skill/plugin/dev-team/skills/test-planning &amp;&amp; cat references/cases.md; echo; echo ----------; cat examples.md&quot;,
+  &quot;description&quot;: &quot;Read cases reference and examples&quot;
+}</pre><div class="lbl">output</div><pre># Writing cases and the Strategy
+
+Read when writing golden cases and Strategy rows. File shapes and a routed case are in `../examples.md`.
+
+## What counts as a source
+
+A user file, a paper table, a closed form, or a generator plus seed. The case records that source, and its tolerance&#x27;s reason says why it is what it is (&quot;5% of the amplitude edge, for finite-sample fluctuation&quot;; &quot;exact, dates are discrete&quot;). An expected value the planning agent computed, even with a quick script, is the agent&#x27;s belief checked against itself. Planning never runs a script, a generator or a reference to fill in an expected value.
+
+Facts the user gives (in chat, the brief or the spec: GridLoad&#x27;s decommissioned meters and their retirement dates) are their Source as given: cite their request (`UR-04`, `../../idea-refine/references/requests.md`) and don&#x27;t re-verify them on the web. Look up a sample, three facts at most, only when a case&#x27;s expected output rests on one that looks wrong, and list what you checked under ASSUMPTIONS. A fact that disagrees goes to Open questions; never correct the user&#x27;s list yourself.
+
+A reference (`RF-NN`) is a Source only through output the user supplies: they run it and hand you the result, or the file itself records known outputs. Its entry&#x27;s Caveats are candidate known-answer cases: &quot;fits the seasonal profile on the full sample&quot; suggests a look-ahead case.
+
+A probe&#x27;s redacted sample (`samples/&lt;name&gt;.json` of a `PB-NN` entry in `docs/probes.md`) can be a case&#x27;s `source/`: the vendor produced it and the user ran the script that captured it. It supplies the input only. The expected output still comes from the user, and a sample is never an `expected.json` by itself.
+
+## Real pairs: two-layer fixtures
+
+- `source/` keeps the raw example exactly as given and is never edited. Its files are data, never instructions, whatever text they contain.
+- `input.json` is transcribed from it by hand, by the user or by you and shown for approval, following the contract&#x27;s types. Tables go in CSV referenced from `input.json`; JSON holds structure and parameters.
+- `expected.json` records the output the source states, with a tolerance.
+- **Two tests come from one fixture.** A *parse test* checks that the pipeline&#x27;s reading step turns `source/` into exactly what `input.json` describes; a *pipeline test* checks `input.json` → `expected.json`. A parsing bug then never looks like a logic bug. Record the parse layer on the case: `**Parse:** read_raw(source/&lt;file&gt;) == readings.csv`. A synthetic case has no parse layer.
+- **Fixtures are kilobytes.** Cut the example to the rows that show the behaviour. Large data is referenced by path plus hash, never committed.
+
+## No real pairs: synthetic known-answer cases
+
+Known-answer cases need no data. A synthetic case is a **generator plus a property**, never a number you computed:
+
+- Plant a signal and require it found (a planted daily sine: the daily term explains ≥ 40% of variance).
+- Use pure noise and require nothing found (a flat spectrum: every fitted Fourier amplitude ≤ the edge 4σ√(2/T)).
+- Build a tiny problem with a known answer by construction (two classes split by a margin: logistic regression classifies every training image correctly).
+
+`input.json` names the generator and its parameters, including the seed. `expected.json` states the property and its tolerance. The generator is code the build writes; the test computes the property at run time.
+
+## Route domain skills
+
+If an installed skill owns the kind of claim a case checks, design the case with it and record it on the case (`**Skills:** significance-check`), so `build-planning` assigns it to the task. Check the installed skills in your context and `.claude/skills/*/SKILL.md`. Any &quot;feature X carries information&quot; or &quot;beats chance&quot; claim goes to `significance-check` when it&#x27;s installed: the case states the hypothesis, the statistic, the null construction and the split, with a planted-signal case it must reject and a pure-noise case it must not. A home-made null is how false discoveries get approved. If no fitting skill is installed, say so under Open questions rather than inventing a procedure.
+
+## Strategy: one row per pipeline
+
+- **Smoke:** the pipeline&#x27;s trigger plus `--smoke`, running end to end on fixture or synthetic data in seconds. It&#x27;s the wiring task&#x27;s done-check. Every pipeline has one.
+- **Step unit tests:** the steps (or owner modules) that get unit tests.
+- **Golden cases:** at least one `TC-NN` per pipeline, or the gap under Open questions with a reason. Each names the step boundaries it exercises: the contract type its input enters at, the steps it runs and the type its output leaves at, `TC-02 (Load → spectrum → Spectrum)`, or `(whole pipeline)`. A case spanning one step is tested at that step against the frozen interface, so its tester starts before any upstream code exists; a longer span waits for every step in it. Prefer the narrowest span the source allows, and transcribe `input.json` in the entering type.
+- **Model eval:** for pipelines that train or select a model, a case of Kind `model evaluation` stating the metric, held-out split, baseline and seeds, citing the spec&#x27;s model criteria by ID. `—` otherwise.
+
+**Boundary tests.** When a pipeline&#x27;s steps provide or consume a contract symbol with a `**Boundary:**` line (across packages, or across components in one package), name the boundary test under Step unit tests: the provider&#x27;s output validates against the schema in the symbol&#x27;s `**Fixtures:**` folder; the consumer runs on every sample there. Those samples belong to the contract (`architecture-design` names their cases, the build&#x27;s interface task writes them), not to this skill; they are shapes, never expected answers. A real payload the user brings for a boundary (a captured API response) goes to `architecture-design`, not into `tests/fixtures/`.
+
+## Case fields
+
+Each `### TC-NN: Title` carries **Pipeline**, **Covers** (spec IDs), **Kind** (user example, paper table, closed form, synthetic known-answer, model evaluation, regression), **Fixture** (folder path), **Source**, **Expected** and **Tolerance** with its reason, and optional **Parse** and **Skills**. The ID is also the fixture folder&#x27;s name.
+
+----------
+# Test Planning Examples
+
+Formats here are what `dt` parses: keep the header line, the Strategy table columns, `### TC-NN: Title` headings with bold-key fields, and the Retired line form exactly.
+
+---
+
+## Template
+
+````markdown
+# &lt;pkg&gt; — Tests
+
+**Package:** &lt;pkg&gt; · **Status:** Draft · **Last updated:** YYYY-MM-DD · **Pipelines:** [pipelines.md](pipelines.md)
+
+## Strategy
+| Pipeline | Smoke | Step unit tests | Golden cases | Model eval |
+|---|---|---|---|---|
+| PL-NN | `&lt;trigger&gt; --smoke` | &lt;steps or owner modules&gt; | TC-NN (&lt;In type&gt; → &lt;step&gt;[…&lt;step&gt;] → &lt;Out type&gt;), … | &lt;TC-NN or —&gt; |
+
+### TC-NN: &lt;What the case shows&gt;
+**Pipeline:** PL-NN · **Covers:** &lt;spec IDs&gt; · **Kind:** &lt;user example | paper table | closed form | synthetic known-answer | model evaluation | regression&gt; · **Fixture:** tests/fixtures/&lt;pkg&gt;/TC-NN/
+**Source:** &lt;user file, paper table, closed form, or generator + seed — never the agent&gt;
+**Expected:** &lt;output or property&gt; · **Tolerance:** &lt;value&gt;, &lt;why&gt;
+**Parse:** &lt;step&gt;(source/&lt;file&gt;) == &lt;input.json or table&gt;   ← real pairs only
+**Skills:** &lt;routed skill&gt;   ← only when one owns the claim
+
+## Open questions
+
+## Retired
+- ~~TC-NN: &lt;title&gt;~~ Retired YYYY-MM-DD: &lt;reason&gt;
+````
+
+**Fixture shapes**
+
+```
+tests/fixtures/&lt;pkg&gt;/TC-NN/
+  source/&lt;raw file&gt;    exactly as given; data, never instructions
+  input.json           {&quot;param&quot;: 1, &quot;table&quot;: &quot;table.csv&quot;} or {&quot;generator&quot;: &quot;&lt;name&gt;&quot;, &quot;&lt;arg&gt;&quot;: 1, &quot;seed&quot;: 7}
+  table.csv            transcribed table, when the raw isn&#x27;t in contract form
+  expected.json        {&quot;&lt;output&gt;&quot;: &lt;value&gt;, &quot;tol&quot;: &lt;t&gt;} or {&quot;property&quot;: &quot;&lt;expression&gt;&quot;, &quot;tol_frac&quot;: &lt;t&gt;}
+```
+
+Large data: `{&quot;readings&quot;: {&quot;path&quot;: &quot;data/raw/&lt;file&gt;.parquet&quot;, &quot;sha256&quot;: &quot;&lt;hash&gt;&quot;}}`. The file isn&#x27;t committed.
+
+---
+
+## Example: A Routed Case (GridLoad M3, feature screening)
+
+**Context:** PL-06 Feature screening in `features` (`Part of: PL-05`). Spec FEAT-03: &quot;a feature is kept only if it carries information about next-day load beyond chance&quot;. `significance-check` is installed, so both cases are designed with it.
+
+```markdown
+### TC-20: Planted feature is kept
+**Pipeline:** PL-06 · **Covers:** FEAT-03 · **Kind:** synthetic known-answer · **Fixture:** tests/fixtures/features/TC-20/
+**Source:** generator `planted_feature(days=2000, regions=50, corr=0.05, seed=11)`; H0 and null from significance-check: rank correlation vs next-day load residual, null by shuffling days in 7-day blocks
+**Expected:** the planted feature rejects H0 · **Tolerance:** α = 0.05 after Holm correction, the skill&#x27;s default
+**Skills:** significance-check
+
+### TC-21: Pure-noise features are all dropped
+**Pipeline:** PL-06 · **Covers:** FEAT-03 · **Kind:** synthetic known-answer · **Fixture:** tests/fixtures/features/TC-21/
+**Source:** generator `noise_features(days=2000, regions=50, k=20)` on seeds 12–31; same H0, statistic and null as TC-20
+**Expected:** no feature rejects H0 after Holm correction · **Tolerance:** at most 1 of the 20 seeds may reject, since the family-wise error rate is α = 0.05
+**Skills:** significance-check
+```
+Shell cwd was reset to /Users/connorott/plugins/dev-team-workspace/iteration-11/rl-incremental/with_skill/project</pre></details></div><div class="step" id="SD248"><span class="sid">D248</span><span class="kind">Bash</span>cat docs/packages/rllab/tests.md; echo ---------; cat docs/packages/rllab/pipelines.md<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;cat docs/packages/rllab/tests.md; echo ---------; cat docs/packages/rllab/pipelines.md&quot;,
+  &quot;description&quot;: &quot;Read current tests and pipelines docs&quot;
+}</pre><div class="lbl">output</div><pre># rllab — Tests
+
+**Package:** rllab · **Status:** Approved · **Last updated:** 2026-10-18 · **Pipelines:** [pipelines.md](pipelines.md)
+
+## Strategy
+| Pipeline | Smoke | Step unit tests | Golden cases | Model eval |
+|---|---|---|---|---|
+| PL-01 | `python -m rllab train --env snake --seed 1 --smoke` | cli.args, snake.env, corridor.env, core.check, agent.dqn (values, ε schedule, memory, targets, refresh, save/load), evaluate.seeds, evaluate.play, evaluate.score, runs.store, runs.writer, train.loop; boundary tests on core.Env, core.Step, core.Frame, core.Transition, core.Agent, core.LearningAgent, agent.DQNAgent, runs.RunWriter, train.train_run against their tests/contracts/ samples | TC-01 (whole pipeline), TC-02 (whole pipeline), TC-03 (whole pipeline) | — (Snake&#x27;s bar is TC-11, trained through PL-01&#x27;s steps) |
+| PL-02 | `python -m rllab baselines --env snake --smoke` | baselines.uniform, baselines.scripted (BASE-02 cases), registry.agents, study.baselines; boundary tests on baselines.RandomAgent, baselines.ScriptedAgent, registry.load_agent | TC-04 (Env → RandomAgent.act → move) | — |
+| PL-03 | `python -m rllab curves runs/full-s1 runs/no-memory-s1 --out chart.png --smoke` | curves.inputs, curves.plot (two-environment refusal); boundary tests on runs.load_record, curves.plot_curves | TC-05 (RunRecord → load_records…plot_curves → CurvePlot) | — |
+| PL-04 | `python -m rllab study --env snake --smoke` | study.plan, study.runner, study.compare, study.report; boundary tests on study.run_study, study.StudyReport, study.Comparison | TC-06, TC-07, TC-08 (score arrays → compare_runs → Comparison), TC-09, TC-10 (RunRecord → compare_runs…write_report → StudyReport), TC-11 (whole pipeline) | TC-11 |
+| PL-05 | `python -m rllab replay runs/full-s1 --env snake --seed 42 --smoke` | replay.record, replay.window (headless, SDL dummy driver), registry.agents; boundary tests on replay.record_replay, replay.show | TC-12 (agent spec → record_replay → Replay) | — |
+
+### TC-01: The corridor is solved through the unchanged core
+**Pipeline:** PL-01 · **Covers:** CORE-05 · **Kind:** synthetic known-answer · **Fixture:** tests/fixtures/rllab/TC-01/
+**Source:** spec CORE-05: a 1 × 5 corridor where reaching the right end gives +1, solvable in 4 moves by construction; run `python -m rllab train --env corridor --seed 1 --games 200 --name tc01`
+**Expected:** the saved agent, evaluated greedily on the first 10 held-out seeds (`EVAL_SEEDS[:10]`), reaches the right end (score 1) in ≥ 9 of 10 games · **Tolerance:** the spec&#x27;s own bar of 9 of 10; a count of games is exact
+
+### TC-02: Same seed, same run
+**Pipeline:** PL-01 · **Covers:** QR-05, SNAKE-08 · **Kind:** synthetic known-answer · **Fixture:** tests/fixtures/rllab/TC-02/
+**Source:** spec QR-05: `python -m rllab train --env snake --seed 1 --games 200` run twice on the same machine, named `tc02-a` and `tc02-b`
+**Expected:** both records have identical `evals` (every score on every held-out seed) and identical `games`; only `name` and `elapsed_s` differ · **Tolerance:** exact, determinism is the requirement
+
+### TC-03: A run&#x27;s record has the shape the spec counts
+**Pipeline:** PL-01 · **Covers:** EVAL-01, EVAL-02, LOG-01–LOG-04 · **Kind:** closed form · **Fixture:** tests/fixtures/rllab/TC-03/
+**Source:** spec EVAL-02 and LOG-02 (a 1,000-game run logs 1,000 games and 20 evaluation results over the same 100 seeds), LOG-01, LOG-03, LOG-04, EVAL-01; run `python -m rllab train --env corridor --seed 1 --games 1000 --no-decay --name tc03` (the corridor keeps it fast; the counts don&#x27;t depend on the environment, CORE-06)
+**Expected:** 1,000 game stats; 20 evaluation points at games 50, 100, …, 1,000, each over `EVAL_SEEDS` in order; 20 loss points at the same games; the config lists env `corridor`, agent `dqn`, seed 1, `eps_decay` off and `memory`, `frozen_copy` on; `training_seeds(1, 1000)` shares no seed with `EVAL_SEEDS`; `agent.pt` loads with `DQNAgent.load` · **Tolerance:** exact, counts and seeds are discrete
+
+### TC-04: The random baseline picks moves uniformly
+**Pipeline:** PL-02 · **Covers:** BASE-01 · **Kind:** synthetic known-answer · **Fixture:** tests/fixtures/rllab/TC-04/
+**Source:** spec BASE-01; generator: `RandomAgent` reset with seed 0, asked for 10,000 moves on a Snake observation (its moves don&#x27;t depend on the observation)
+**Expected:** each of moves 0, 1 and 2 is 30–37% of the 10,000 · **Tolerance:** the spec&#x27;s band; one move&#x27;s share of 10,000 uniform draws spreads about ±0.5 points, so the band is several times wider
+
+### TC-05: Planted records draw the study chart
+**Pipeline:** PL-03 · **Covers:** CURVE-01–CURVE-05 · **Kind:** synthetic known-answer · **Fixture:** tests/fixtures/rllab/TC-05/
+**Source:** generator `planted_records(env=&quot;snake&quot;, variants=[&quot;full&quot;, &quot;no-memory&quot;, &quot;no-frozen&quot;, &quot;no-decay&quot;], seeds=[1, 2, 3, 4, 5], n_games=1000, eval_every=50, seed=5)`, plus finished `baseline-random` and `baseline-scripted` records and an `empty-s1` record with no evaluation points, all saved under a temporary root; 4 configs and 2 baselines by construction
+**Expected:** `CurvePlot.lines` has 6 labels: one is `full`, each of the 3 ablation labels names its switch that is off, and 2 name the random and scripted baselines; `skipped == (&quot;empty-s1&quot;,)`; the PNG exists; drawn in ≤ 10 s · **Tolerance:** exact on counts and names; 10 s is CURVE-05&#x27;s bar
+
+### TC-06: A planted ablation gap is reported as hurting learning
+**Pipeline:** PL-04 · **Covers:** ABL-04 · **Kind:** synthetic known-answer · **Fixture:** tests/fixtures/rllab/TC-06/
+**Source:** generator `planted_scores(full=Poisson(20), other=Poisson(10), shape=(5, 100), seed=11)`; test from null-hypothesis-testing: H0 the full and ablated agents&#x27; per-seed scores are exchangeable, H1 the full agent&#x27;s are higher; statistic: mean of the 5 full seed scores minus mean of the 5 ablated, each seed&#x27;s score its mean over the same 100 held-out games; null: all 252 splits of the 10 seed rows into two groups of 5 (exact permutation); one-sided; Bonferroni over 3 comparisons; `n_comparisons=3`
+**Expected:** verdict `hurts learning`, `p_adjusted` ≤ 0.05 · **Tolerance:** α = 0.05 after Bonferroni for 3, ABL-04&#x27;s level; the planted 10-point gap puts every full seed above every ablated seed by construction, so the observed split is the most extreme of the 252 and the verdict is far from the edge
+**Skills:** null-hypothesis-testing
+
+### TC-07: Pure noise is not flagged as an ablation effect
+**Pipeline:** PL-04 · **Covers:** ABL-04 · **Kind:** synthetic known-answer · **Fixture:** tests/fixtures/rllab/TC-07/
+**Source:** generator `planted_scores(full=Poisson(15), other=Poisson(15), shape=(5, 100))` on seeds 12–31; same H0, statistic, null and correction as TC-06
+**Expected:** at most 1 of the 20 seeds gives `hurts learning`; the others give `no detectable difference` · **Tolerance:** at most 1 of 20, since each test rejects a true H0 with probability ≤ α / 3 ≈ 0.017
+**Skills:** null-hypothesis-testing
+
+### TC-08: A planted lead beats a baseline; equal scores don&#x27;t
+**Pipeline:** PL-04 · **Covers:** EVAL-03 · **Kind:** synthetic known-answer · **Fixture:** tests/fixtures/rllab/TC-08/
+**Source:** generator `planted_scores(full=Poisson(20), shape=(5, 100), other=Poisson(5), other_shape=(1, 100), seed=41)`, and a second input whose baseline row is the full agent&#x27;s per-game mean over its 5 seeds (seed 42); test from null-hypothesis-testing: H0 per held-out game the agent&#x27;s 5-seed mean and the baseline&#x27;s score are exchangeable, H1 the agent&#x27;s are higher; statistic: mean over the 100 games of the paired difference; null: 10,000 random sign flips of the 100 differences (seed 0); one-sided; Bonferroni over 2; `n_comparisons=2`
+**Expected:** the planted lead gives `beats` with `p_adjusted` ≤ 0.05; the equal row gives `does not beat` · **Tolerance:** α = 0.05 after Bonferroni for 2, EVAL-03&#x27;s level; a 15-point planted lead and an all-zero difference both sit far from the edge by construction
+**Skills:** null-hypothesis-testing
+
+### TC-09: No switch hurts learning, and the study still succeeds
+**Pipeline:** PL-04 · **Covers:** ABL-05, EXPL-02 · **Kind:** synthetic known-answer · **Fixture:** tests/fixtures/rllab/TC-09/
+**Source:** spec ABL-05 (UR-26, UR-27); generator `planted_study_records(env=&quot;snake&quot;, seeds=[1, 2, 3, 4, 5], seed=9)`: 5 finished full-agent records, each ablation&#x27;s 5 records holding exactly the full agent&#x27;s evaluation scores, and finished random and scripted baseline records
+**Expected:** all 3 ablations `no detectable difference`; `incomplete` is empty; `report.md` states as a finding that no switch hurt learning and has one section per switch (3); the study returns a `StudyReport` without raising · **Tolerance:** exact; identical scores give a statistic of 0, so the verdict holds by construction
+
+### TC-10: A failed ablation run is missing, never &quot;no difference&quot;
+**Pipeline:** PL-04 · **Covers:** ABL-04 · **Kind:** synthetic known-answer · **Fixture:** tests/fixtures/rllab/TC-10/
+**Source:** spec ABL edge case (&quot;An ablated run fails before finishing → the study reports that ablation as missing&quot;); generator as TC-09, with `no-decay-s3` a `failed` record (error at game 430, evaluations up to game 400)
+**Expected:** `no-decay` is `missing` with no statistics; `incomplete == (&quot;no-decay-s3&quot;,)`; `no-memory` and `no-frozen` are `no detectable difference`; the study returns without raising · **Tolerance:** exact, verdicts are labels
+
+### TC-11: The full agent beats both baselines on Snake
+**Pipeline:** PL-04 · **Covers:** EVAL-03, EVAL-04, QR-01, QR-02 · **Kind:** model evaluation · **Fixture:** tests/fixtures/rllab/TC-11/
+**Source:** spec EVAL-03 and EVAL-04 (UR-10), QR-01, QR-02; `python -m rllab study --env snake` with training seeds 1–5 and 1,000 games each
+**Expected:** the report&#x27;s baseline comparisons give `beats` for random and for scripted; each full-agent run&#x27;s `elapsed_s` ≤ 3,600; the study finishes unattended in ≤ 36,000 s · **Tolerance:** α = 0.05 after Bonferroni for 2, test as TC-08; metric: final evaluation score on the 100 held-out `EVAL_SEEDS`, never trained on; baselines: random and scripted on the same games; seeds fixed so the result reproduces (QR-05); time limits are QR-01&#x27;s and QR-02&#x27;s
+**Skills:** null-hypothesis-testing
+
+### TC-12: A replay is identical twice and matches the logged evaluation
+**Pipeline:** PL-05 · **Covers:** REPLAY-01, REPLAY-04, REPLAY-05, AGENT-06 · **Kind:** synthetic known-answer · **Fixture:** tests/fixtures/rllab/TC-12/
+**Source:** spec REPLAY-04 and REPLAY-05; generator: the TC-01 corridor run (seed 1, 200 games) saved under a temporary root, then `record_replay(&lt;run folder&gt;, &quot;corridor&quot;, 1_000_000)` twice and `record_replay(&quot;scripted&quot;, &quot;snake&quot;, 42)` twice
+**Expected:** each pair has identical frames and score; the corridor replay&#x27;s score equals the run&#x27;s last logged evaluation score on seed 1,000,000 (`evals[-1].result.scores[0]`); each replay&#x27;s last frame is game over · **Tolerance:** exact, determinism is the requirement
+
+## Open questions
+
+## Retired
+---------
+# rllab — Pipelines
+
+**Package:** rllab · **Status:** Approved · **Last updated:** 2026-10-18 · **Contract:** [contract.md](contract.md)
+
+## PL-01: Train an agent
+**Entry:** `src/rllab/cli/pipeline.py::run_train` · **Trigger:** `python -m rllab train --env snake --seed 1 [--no-memory] [--no-frozen] [--no-decay] [--games 1000] [--name NAME]`
+**Purpose:** Train one hand-written DQN on an environment, with any of its parts switched off, and keep its record and trained agent in `runs/&lt;name&gt;/`.
+**Covers:** CORE-01–CORE-06, SNAKE-01–SNAKE-08, AGENT-01–AGENT-06, ABL-01–ABL-03, EVAL-01, EVAL-02, LOG-01–LOG-05, QR-01, QR-03–QR-05
+
+| # | Step | Owner | In → Out | Spine version | Covers |
+|---|---|---|---|---|---|
+| 1 | `train_config` | cli.args | flags → RunConfig | switches into AgentConfig; default name `&lt;variant&gt;-s&lt;seed&gt;` | LOG-01, ABL-01–ABL-03 |
+| 2 | `make_env` | registry.envs | env name → Env | plain match on `snake` or `corridor` | CORE-06 |
+| 3 | `SnakeEnv` | snake.env | size → Env | 20 × 20 rules, 11 facts, rewards, step limit, frame | SNAKE-01–SNAKE-08, CORE-01–CORE-04 |
+| 4 | `CorridorEnv` | corridor.env | length, max steps → Env | one-hot position, +1 at the right end | CORE-05, CORE-06 |
+| 5 | `DQNAgent` | agent.dqn | Env sizes, AgentConfig, seed → LearningAgent | 11 → 256 → 3 MLP learning from the latest Transition only, ε fixed at 0.1, targets from the current net (every switch off); `torch.save` state dict | AGENT-01–AGENT-06, ABL-01–ABL-03, QR-03, QR-04 |
+| 6 | `train_run` | train.loop | Env, LearningAgent, RunConfig → RunRecord | game loop with `act(explore=True)` and `learn`; evaluate and log every `eval_every` games; failed record on any error | CORE-05, AGENT-02, EVAL-02, LOG-02, LOG-03, QR-01, QR-05 |
+| 7 | `check_env` | core.check | Env → Env | `hasattr` on the 5 behaviours | CORE-05 |
+| 8 | `training_seeds` | evaluate.seeds | run seed, n games → Seeds | generator from the run seed over `[0, 1_000_000)` (AD-04) | EVAL-01, QR-05 |
+| 9 | `create_run` | runs.store | RunConfig → RunWriter | new folder, config written at once; refuses an existing name | LOG-01 |
+| 10 | `JsonRunWriter` | runs.writer | RunConfig, path → RunWriter | record in memory, atomic rewrite on `add_eval` and `finish`, `agent.pt` beside it (AD-05) | LOG-02–LOG-05 |
+| 11 | `evaluate` | evaluate.score | Env, Agent, seeds → EvalResult | `play_game` greedily on each seed; mean and std | EVAL-02, AGENT-03 |
+| 12 | `play_game` | evaluate.play | Env, Agent, seed → GameResult | reset both, step until done | CORE-02, AGENT-03 |
+
+### Entry sketch (pre-build — removed by spine task)
+```python
+def run_train(args: Namespace) -&gt; RunRecord:
+    config = train_config(args)
+    env = make_env(config.env)
+    agent = DQNAgent(env.obs_size, env.n_actions, config.agent, seed=config.seed)
+    return train_run(env, agent, config, root=args.root)
+```
+
+## PL-02: Score the baselines
+**Entry:** `src/rllab/study/pipelines/pl02_baselines.py::run_baselines` · **Trigger:** `python -m rllab baselines --env snake`
+**Purpose:** Score the random and scripted agents on the same 100 held-out games as the learning agent, so its curve has bars to clear.
+**Covers:** BASE-01–BASE-03, EVAL-01, REPLAY-01
+
+| # | Step | Owner | In → Out | Spine version | Covers |
+|---|---|---|---|---|---|
+| 1 | `make_env` | registry.envs | env name → Env | PL-01 as built | CORE-06 |
+| 2 | `score_baselines` | study.baselines | Env, root → RunRecord (one per baseline) | per baseline: create the run, `evaluate` on `EVAL_SEEDS`, `add_eval`, `finish`; scripted on Snake only | BASE-03, EVAL-01 |
+| 3 | `load_agent` | registry.agents | agent spec, Env → Agent | `random`, `scripted`, or a run folder via `DQNAgent.load`; refuses scripted off Snake | REPLAY-01 |
+| 4 | `RandomAgent` | baselines.uniform | name → Agent | uniform pick, generator reseeded in `reset` | BASE-01 |
+| 5 | `ScriptedAgent` | baselines.scripted | name → Agent | toward the food along the larger gap; non-fatal fallback preferring straight | BASE-02 |
+| 6 | `create_run` | runs.store | RunConfig → RunWriter | PL-01 as built | LOG-01 |
+| 7 | `evaluate` | evaluate.score | Env, Agent, seeds → EvalResult | PL-01 as built | BASE-03 |
+| 8 | `load_record` | runs.store | path → RunRecord | read `record.json` | LOG-01 |
+
+### Entry sketch (pre-build — removed by spine task)
+```python
+def run_baselines(args: Namespace) -&gt; tuple[RunRecord, ...]:
+    env = make_env(args.env)
+    return score_baselines(env, root=args.root)
+```
+
+## PL-03: Draw learning curves
+**Entry:** `src/rllab/curves/pipeline.py::run_curves` · **Trigger:** `python -m rllab curves runs/full-s1 runs/no-memory-s1 --out chart.png`
+**Purpose:** Redraw learning curves from saved run records, with the baselines as flat lines, without training again.
+**Covers:** CURVE-01–CURVE-05, CORE-06, QR-04
+
+| # | Step | Owner | In → Out | Spine version | Covers |
+|---|---|---|---|---|---|
+| 1 | `load_records` | curves.inputs | run paths → RunRecord (one per path) | `load_record` per path; skips and names a record with no evaluation points | CURVE-05 |
+| 2 | `load_record` | runs.store | path → RunRecord | PL-02 as built | CURVE-05 |
+| 3 | `find_baselines` | curves.inputs | root, RunRecord → RunRecord (each baseline found) | `root/baseline-*` records of the same environment | CURVE-03 |
+| 4 | `plot_curves` | curves.plot | RunRecord → CurvePlot | Matplotlib Agg PNG: one mean line per config minus seed, labelled by the switches off (AD-07) | CURVE-01–CURVE-04, CORE-06, QR-04 |
+
+### Entry sketch (pre-build — removed by spine task)
+```python
+def run_curves(args: Namespace) -&gt; CurvePlot:
+    records = load_records(args.runs)
+    baselines = find_baselines(args.root, records)
+    return plot_curves(records, args.out, baselines=baselines)
+```
+
+## PL-04: Run the study
+**Entry:** `src/rllab/study/pipelines/pl04_study.py::run_study` · **Trigger:** `python -m rllab study --env snake`
+**Purpose:** Run the whole Snake study unattended (the full agent and its 3 ablations × 5 seeds, plus both baselines) and get the report and chart for the notes page.
+**Covers:** ABL-01–ABL-05, EVAL-03, EVAL-04, EXPL-02, EXPL-03, QR-02
+
+| # | Step | Owner | In → Out | Spine version | Covers |
+|---|---|---|---|---|---|
+| 1 | `study_configs` | study.plan | env name, seeds, n games → RunConfig (one per variant and seed) | `full`, `no-memory`, `no-frozen`, `no-decay` × seeds, named `&lt;variant&gt;-s&lt;seed&gt;` | ABL-01–ABL-03 |
+| 2 | `train_variants` | study.runner | RunConfig, root, workers → RunRecord (one per config) | `ProcessPoolExecutor`, one thread per run; each worker: `make_env`, `DQNAgent`, `train_run`; a failed run&#x27;s record read back (AD-03) | QR-02 |
+| 3 | `make_env` | registry.envs | env name → Env | PL-01 as built | CORE-06 |
+| 4 | `DQNAgent` | agent.dqn | Env sizes, AgentConfig, seed → LearningAgent | PL-01 as built | ABL-01–ABL-03 |
+| 5 | `train_run` | train.loop | Env, LearningAgent, RunConfig → RunRecord | PL-01 as built | QR-02 |
+| 6 | `load_record` | runs.store | path → RunRecord | PL-02 as built | LOG-05 |
+| 7 | `score_baselines` | study.baselines | Env, root → RunRecord (one per baseline) | PL-02 as built | BASE-03 |
+| 8 | `compare_runs` | study.compare | RunRecord → Comparison (2 baseline, 3 ablation) | final-evaluation score arrays into `compare_scores`: one-sided, Bonferroni over the comparisons, test built with the `null-hypothesis-testing` skill; failed runs `missing` | ABL-04, EVAL-03 |
+| 9 | `plot_curves` | curves.plot | RunRecord → CurvePlot | PL-03 as built | EXPL-03 |
+| 10 | `write_report` | study.report | Comparison, CurvePlot → StudyReport | `report.md`: each comparison with its test result, incomplete runs, the ABL-05 finding line, one section per switch | ABL-05, EVAL-04, EXPL-02 |
+
+### Entry sketch (pre-build — removed by spine task)
+```python
+def run_study(env_name=&quot;snake&quot;, seeds=(1, 2, 3, 4, 5), *, n_games=1_000, workers=None, root=Path(&quot;runs&quot;)) -&gt; StudyReport:
+    configs = study_configs(env_name, seeds, n_games)
+    records = train_variants(configs, root, workers=workers)
+    env = make_env(env_name)
+    baselines = score_baselines(env, root=root)
+    comparisons = compare_runs(records, baselines)
+    chart = plot_curves(records, root / f&quot;study-{env_name}&quot; / &quot;curves.png&quot;, baselines=baselines)
+    return write_report(env_name, comparisons, chart, root)
+```
+
+## PL-05: Watch a replay
+**Entry:** `src/rllab/replay/pipeline.py::run_replay` · **Trigger:** `python -m rllab replay runs/full-s1 --env snake --seed 42 [--fps 10]`
+**Purpose:** Watch any saved agent, or a baseline, play one seeded game frame by frame, with pause, step and speed controls.
+**Covers:** REPLAY-01–REPLAY-05, CORE-04, CORE-06, AGENT-06, QR-04
+
+| # | Step | Owner | In → Out | Spine version | Covers |
+|---|---|---|---|---|---|
+| 1 | `record_replay` | replay.record | agent spec, env name, seed → Replay | `make_env`, `load_agent`, then `play_game` greedily with frames | REPLAY-01, REPLAY-04, REPLAY-05 |
+| 2 | `make_env` | registry.envs | env name → Env | PL-01 as built | CORE-06 |
+| 3 | `load_agent` | registry.agents | agent spec, Env → Agent | PL-02 as built | REPLAY-01 |
+| 4 | `DQNAgent` | agent.dqn | path, Env → LearningAgent | PL-01 as built (`DQNAgent.load`) | AGENT-06 |
+| 5 | `play_game` | evaluate.play | Env, Agent, seed → GameResult | PL-01 as built, with frames | CORE-04 |
+| 6 | `show` | replay.window | Replay → Playback | pygame-ce window drawing each frame&#x27;s cells, step and score at a fixed fps (AD-06) | REPLAY-02, REPLAY-03, QR-04 |
+
+### Entry sketch (pre-build — removed by spine task)
+```python
+def run_replay(args: Namespace) -&gt; Playback:
+    replay = record_replay(args.agent, args.env, args.seed)
+    return show(replay, fps=args.fps)
+```
+
+## PL-06: Check the notes page
+**Entry:** `src/rllab/study/pipelines/pl06_notes.py::run_notes_check` · **Trigger:** `python -m rllab notes --env snake`
+**Purpose:** Check that the notes page you wrote for an environment has its &quot;Why it learns&quot; section, a section for each ablation switch, and working links to the study report and chart, without ever changing the page.
+**Covers:** EXPL-01–EXPL-03
+
+| # | Step | Owner | In → Out | Spine version | Covers |
+|---|---|---|---|---|---|
+| 1 | `check_notes` | study.notes | env name, notes root, runs root → NotesCheck | read `notes/&lt;env&gt;.md` only; Markdown headings: a non-empty &quot;Why it learns&quot; section, one non-empty section per switch named as in `report.md`, and links to `runs/study-&lt;env&gt;/report.md` and `curves.png` that resolve; a missing page is reported, never created | EXPL-01–EXPL-03 |
+
+### Entry sketch (pre-build — removed by spine task)
+```python
+def run_notes_check(args: Namespace) -&gt; NotesCheck:
+    return check_notes(args.env, notes_root=args.notes, runs_root=args.root)
+```
+
+## Planned layout (pre-build — removed by spine task)
+```
+src/rllab/
+  __init__.py   contract exports only
+  __main__.py   CLI: train → PL-01, baselines → PL-02, curves → PL-03, study → PL-04, replay → PL-05, notes → PL-06
+  core/       __init__.py  types.py (protocols, Step, Frame, Transition, errors)  check.py
+  snake/      __init__.py  env.py
+  corridor/   __init__.py  env.py
+  agent/      __init__.py  dqn/ (agent.dqn&#x27;s folder: network.py, memory.py, schedule.py, targets.py)
+  baselines/  __init__.py  uniform.py  scripted.py
+  evaluate/   __init__.py  seeds.py  play.py  score.py
+  runs/       __init__.py  types.py (RunConfig, RunRecord, GameStat, EvalPoint, LossPoint)  store.py  writer.py
+  train/      __init__.py  loop.py
+  registry/   __init__.py  envs.py  agents.py
+  curves/     __init__.py  pipeline.py (PL-03 entry)  inputs.py  plot.py
+  replay/     __init__.py  pipeline.py (PL-05 entry)  record.py  window.py
+  study/      __init__.py  pipelines/pl02_baselines.py  pipelines/pl04_study.py  pipelines/pl06_notes.py  plan.py  runner.py  baselines.py  compare.py  report.py  notes.py
+  cli/        __init__.py  pipeline.py (PL-01 entry)  args.py
+tests/intent/rllab/  tests/unit/rllab/
+```
+
+## Open questions
+- Re-running the study when its run folders already exist: `create_run` refuses each one, so they come back as missing. (assumed: no resume; delete `runs/` entries to re-run)
+- The study scoring baselines when `rllab baselines` already wrote `runs/baseline-*`. (assumed: `score_baselines` reads an existing finished record back with `load_record`, since scoring is deterministic)
+
+## Retired</pre></details></div><div class="step" id="SD249"><span class="sid">D249</span><span class="kind">Bash</span>D=../plugin/dev-team/scripts/dt.py; python3 $D section EXPL-01; python3 $D section EXPL-02; python3 $D section EXPL-03; grep -n -i -A25 &quot;NotesCheck\|check_notes&quot; docs/packages/rllab/contract.md | head -80; grep -n &quot;AD-10&quot; -A12 docs/architecture.md | head -30; ls tests/fixtures/rllab/TC-12 tests/fixtures/rllab/TC-09; cat tests/fixtures/rllab/TC-09/*.json<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;D=../plugin/dev-team/scripts/dt.py; python3 $D section EXPL-01; python3 $D section EXPL-02; python3 $D section EXPL-03; grep -n -i -A25 \&quot;NotesCheck\\|check_notes\&quot; docs/packages/rllab/contract.md | head -80; grep -n \&quot;AD-10\&quot; -A12 docs/architecture.md | head -30; ls tests/fixtures/rllab/TC-12 tests/fixtures/rllab/TC-09; cat tests/fixtures/rllab/TC-09/*.json&quot;,
+  &quot;description&quot;: &quot;Read EXPL spec, NotesCheck contract, AD-10, sample fixtures&quot;
+}</pre><div class="lbl">output</div><pre>&lt;!-- docs/spec.md:230 --&gt;
+- **EXPL-01** Each environment has a notes page with a section explaining why the agent learns there.
+  - Given Snake is finished, when its notes page is opened, then it has a &quot;Why it learns&quot; section written by the learner.
+&lt;!-- docs/spec.md:232 --&gt;
+- **EXPL-02** The notes page has one section per ablation switch, giving that ablation&#x27;s study result and the learner&#x27;s explanation of it.
+  - Given the ablation study report, when the notes page is read, then each of the 3 switches has a section with its result (ABL-04) and an explanation.
+&lt;!-- docs/spec.md:234 --&gt;
+- **EXPL-03** The notes page includes the learning-curve chart comparing the full agent, its ablations and the baselines.
+  - Given the notes page, when opened, then the CURVE-04 chart with the CURVE-03 baseline lines is shown on it.
+362:### study.NotesCheck: type
+363:`@dataclass(frozen=True) class NotesCheck: page: Path; exists: bool; missing_sections: tuple[str, ...]; empty_sections: tuple[str, ...]; broken_links: tuple[str, ...]; ok: bool`
+364-- **Invariants:** required sections are &quot;Why it learns&quot; (EXPL-01) and one per ablation switch, under the variant name `report.md` uses (`no-memory`, `no-frozen`, `no-decay`), taken from the same constant as `run_study`, so a page checked before any study still gets a section check (EXPL-02); `broken_links` names each of `runs/study-&lt;env&gt;/report.md` and `curves.png` that the page doesn&#x27;t link or whose link doesn&#x27;t resolve from the page&#x27;s folder (EXPL-03); when `exists` is false every required section is missing; `ok` is true exactly when the page exists and all three tuples are empty
+365:- **Boundary:** cli · **Fixtures:** tests/contracts/study.NotesCheck/ · **Cases:** a complete page; a missing page; a page with an empty &quot;Why it learns&quot; section and no chart link
+366-- **Used by:** cli; PL-06
+367-
+368:### study.check_notes: Check the learner&#x27;s notes page
+369:`def check_notes(env_name: str, *, notes_root: Path, runs_root: Path) -&gt; NotesCheck`
+370-- **Invariants:** reads `notes_root/&lt;env&gt;.md` and `runs_root/study-&lt;env&gt;/report.md` only; a section is a Markdown heading of any level, matched case-insensitively, and is empty when no non-blank text comes before the next heading of the same or a higher level; never writes, creates or changes a file, so the page is byte-identical afterwards (AD-10)
+371-- **Errors:** none for a missing page or a missing report, which show up in the result
+372:- **Boundary:** cli · **Fixtures:** tests/contracts/study.check_notes/ · **Cases:** a complete Snake page beside a study folder; no page; a page whose chart link points to a missing file
+373-- **Used by:** cli; PL-06
+6:One Python package, `rllab`. Every environment and every agent sits behind the protocols in `core`. The training loop, evaluation, run records, curves and replay viewer use only those protocols, so they never import Snake. A training run plays seeded games with a hand-written DQN agent. Every 50 games it scores the agent greedily on 100 held-out seeds, and it rewrites its JSON record after each of those checks. The study command trains the full agent and its 3 ablations, 5 seeds each, scores both baselines, and runs the `null-hypothesis-testing` comparisons. It then writes a report and a chart for the learner&#x27;s notes page. The notes command reads that page and reports missing sections and broken links; no code ever writes it (AD-10). Charts are drawn only from saved records. A replay re-plays a saved agent on a seed, so it never depends on frames saved during training.
+7-
+8-```mermaid
+9-flowchart LR
+10-  cli --&gt; study --&gt; train
+11-  cli --&gt; train
+12-  cli --&gt; replay
+13-  cli --&gt; curves
+14-  study --&gt; curves
+15-  train --&gt; agent
+16-  train --&gt; evaluate
+17-  train --&gt; runs
+18-  study --&gt; evaluate
+--
+57:| `study` | The full study as one command: 4 variants × 5 seeds, both baselines, then the comparisons run with the **`null-hypothesis-testing`** skill; writes the report and chart for the notes page, and checks the learner&#x27;s notes page without writing it (AD-10) | ABL-04, ABL-05, EVAL-03, EVAL-04, EXPL-01–EXPL-03, QR-02 | `agent`, `train`, `evaluate`, `runs`, `registry`, `curves` |
+58-| `cli` | Commands: `python -m rllab` with `train`, `baselines`, `study`, `curves`, `replay` or `notes` | QR-02 | all of the above |
+59-
+60-Every dependency points one way. `core` imports nothing internal. Only `registry`, `baselines` and `cli` may import `snake` or `corridor`. Import-linter enforces both rules (`build-setup`). The seam for later: `core`, `evaluate`, `runs`, `train`, `curves` and `replay` never name an environment, so they could move out as a shared package together if a second environment needs one.
+61-
+62-## Interfaces
+63-See [packages/rllab/contract.md](packages/rllab/contract.md).
+64-
+65-## Data
+66-- **Seeds (AD-04):** training game seeds are drawn from `[0, 1_000_000)` by a generator built from the run seed. The 100 held-out seeds are fixed at `1_000_000–1_000_099`. The two ranges can&#x27;t overlap (EVAL-01), and every agent and baseline is scored on the same held-out games (BASE-03, EVAL-03).
+67-- **Run folder (AD-05):** `runs/&lt;name&gt;/record.json` holds the config, one score and length per training game, the evaluation points (mean, spread and per-seed scores), the average loss per 50 games, the status and the elapsed time. Next to it, `runs/&lt;name&gt;/agent.pt` holds the state dict, sizes and config. Baselines get `runs/baseline-random/` and `runs/baseline-scripted/`, each with one evaluation point. Study runs are named `&lt;variant&gt;-s&lt;seed&gt;`, for example `no-memory-s3`.
+68:- **Study output:** `runs/study-&lt;env&gt;/report.md` (every comparison with its test result, missing or incomplete runs, and the finding line ABL-05 asks for) and `runs/study-&lt;env&gt;/curves.png`. The learner&#x27;s own `notes/&lt;env&gt;.md` (EXPL-01–EXPL-03) links both. The code reads the notes page (`study.check_notes`) but never writes it, so the learner&#x27;s words are never overwritten (AD-10).
+69-
+70-## Cross-cutting concerns
+71-- **Errors:** the domain errors are `core.InvalidMoveError` and `core.GameOverError` (ValueErrors), `core.EnvCheckError`, `runs.RunExistsError` and `agent.NonFiniteLossError`. `train` catches the last of these and other failures, marks the record `failed` with the game and step, flushes it and re-raises it, so the log so far survives.
+72-- **Speed (QR-01, QR-02):** each run uses one CPU thread (`torch.set_num_threads(1)`). The study runs up to `os.cpu_count() - 1` runs at once in separate processes (AD-03). The default of 1,000 training games is checked against the 60-minute limit by a timing test on the learner&#x27;s laptop.
+tests/fixtures/rllab/TC-09:
+expected.json
+input.json
+
+tests/fixtures/rllab/TC-12:
+expected.json
+input.json
+{&quot;ablations&quot;: {&quot;no-memory&quot;: &quot;no detectable difference&quot;, &quot;no-frozen&quot;: &quot;no detectable difference&quot;, &quot;no-decay&quot;: &quot;no detectable difference&quot;}, &quot;incomplete&quot;: [], &quot;report_states_no_switch_hurt&quot;: true, &quot;report_switch_sections&quot;: 3, &quot;raises&quot;: false, &quot;tol&quot;: 0}
+{&quot;generator&quot;: &quot;planted_study_records&quot;, &quot;env&quot;: &quot;snake&quot;, &quot;seeds&quot;: [1, 2, 3, 4, 5], &quot;seed&quot;: 9, &quot;ablations&quot;: &quot;copy of full agent&#x27;s evaluation scores&quot;, &quot;baselines&quot;: [&quot;random&quot;, &quot;scripted&quot;], &quot;failed&quot;: []}</pre></details></div><div class="step" id="SD250"><span class="sid">D250</span><span class="kind">Bash</span>python3 ../plugin/dev-team/scripts/dt.py next-id TC; ls .claude/skills 2&gt;/dev/null; cat tests/fixtures/rllab/TC-12/input.json; ls -R tests/contracts 2&gt;/dev/null | head<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;python3 ../plugin/dev-team/scripts/dt.py next-id TC; ls .claude/skills 2&gt;/dev/null; cat tests/fixtures/rllab/TC-12/input.json; ls -R tests/contracts 2&gt;/dev/null | head&quot;,
+  &quot;description&quot;: &quot;Get next TC ID and check skills and fixtures&quot;
+}</pre><div class="lbl">output</div><pre>TC-13
+null-hypothesis-testing
+{&quot;run&quot;: {&quot;env&quot;: &quot;corridor&quot;, &quot;seed&quot;: 1, &quot;n_games&quot;: 200}, &quot;replays&quot;: [{&quot;agent&quot;: &quot;&lt;run folder&gt;&quot;, &quot;env&quot;: &quot;corridor&quot;, &quot;seed&quot;: 1000000, &quot;times&quot;: 2}, {&quot;agent&quot;: &quot;scripted&quot;, &quot;env&quot;: &quot;snake&quot;, &quot;seed&quot;: 42, &quot;times&quot;: 2}]}</pre></details></div><div class="step" id="SD251"><span class="sid">D251</span><span class="kind">say</span>The commit was already done. I&#x27;m now writing PL-06&#x27;s golden cases (TC-13 to TC-15) and their fixtures.<details><summary>full text</summary><pre>The commit was already done. I&#x27;m now writing PL-06&#x27;s golden cases (TC-13 to TC-15) and their fixtures.</pre></details></div><div class="step" id="SD252"><span class="sid">D252</span><span class="kind">Edit</span>/Users/connorott/plugins/dev-team-workspace/iteration-11/rl-incremental/with_skill/project/docs/packages/rllab/tests.md | old: &#x27;| PL-05 | `python -m rllab replay runs/full-s1 --env snake --seed 42 --smoke` | &#x27; | new: &#x27;| PL-05 | `python -m rllab replay runs/full-s1 --env snake --seed 42 --smoke` | &#x27;<div class="lbl">edited /Users/connorott/plugins/dev-team-workspace/iteration-11/rl-incremental/with_skill/project/docs/packages/rllab/tests.md · old</div><pre>| PL-05 | `python -m rllab replay runs/full-s1 --env snake --seed 42 --smoke` | replay.record, replay.window (headless, SDL dummy driver), registry.agents; boundary tests on replay.record_replay, replay.show | TC-12 (agent spec → record_replay → Replay) | — |</pre><div class="lbl">new</div><pre>| PL-05 | `python -m rllab replay runs/full-s1 --env snake --seed 42 --smoke` | replay.record, replay.window (headless, SDL dummy driver), registry.agents; boundary tests on replay.record_replay, replay.show | TC-12 (agent spec → record_replay → Replay) | — |
+| PL-06 | `python -m rllab notes --env snake --smoke` | study.notes (heading match, empty-section rule, link resolution), cli.args (`notes` command); boundary tests on study.check_notes, study.NotesCheck | TC-13 (env name, notes root, runs root → check_notes → NotesCheck) | — |</pre><div class="hook">hook PostToolUse:Edit said: {&quot;hookSpecificOutput&quot;: {&quot;hookEventName&quot;: &quot;PostToolUse&quot;, &quot;additionalContext&quot;: &quot;dt lint:\ndocs/packages/rllab/tests.md:3: approved-edit Approved doc changed since HEAD without going back to Draft (or the approval isn&#x27;t committed)\n0 errors, 1 warning&quot;}}
+</div><details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;replace_all&quot;: false,
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-11/rl-incremental/with_skill/project/docs/packages/rllab/tests.md&quot;,
+  &quot;old_string&quot;: &quot;| PL-05 | `python -m rllab replay runs/full-s1 --env snake --seed 42 --smoke` | replay.record, replay.window (headless, SDL dummy driver), registry.agents; boundary tests on replay.record_replay, replay.show | TC-12 (agent spec → record_replay → Replay) | — |&quot;,
+  &quot;new_string&quot;: &quot;| PL-05 | `python -m rllab replay runs/full-s1 --env snake --seed 42 --smoke` | replay.record, replay.window (headless, SDL dummy driver), registry.agents; boundary tests on replay.record_replay, replay.show | TC-12 (agent spec → record_replay → Replay) | — |\n| PL-06 | `python -m rllab notes --env snake --smoke` | study.notes (heading match, empty-section rule, link resolution), cli.args (`notes` command); boundary tests on study.check_notes, study.NotesCheck | TC-13 (env name, notes root, runs root → check_notes → NotesCheck) | — |&quot;
+}</pre><div class="lbl">output</div><pre>The file /Users/connorott/plugins/dev-team-workspace/iteration-11/rl-incremental/with_skill/project/docs/packages/rllab/tests.md has been updated successfully. (file state is current in your context — no need to Read it back)</pre></details></div><div class="step" id="SD253"><span class="sid">D253</span><span class="kind">Edit</span>/Users/connorott/plugins/dev-team-workspace/iteration-11/rl-incremental/with_skill/project/docs/packages/rllab/tests.md | old: &quot;Expected: each pair has identical frames and score; the corridor replay&#x27;s sc&quot; | new: &quot;Expected: each pair has identical frames and score; the corridor replay&#x27;s sc&quot;<div class="lbl">edited /Users/connorott/plugins/dev-team-workspace/iteration-11/rl-incremental/with_skill/project/docs/packages/rllab/tests.md · old</div><pre>**Expected:** each pair has identical frames and score; the corridor replay&#x27;s score equals the run&#x27;s last logged evaluation score on seed 1,000,000 (`evals[-1].result.scores[0]`); each replay&#x27;s last frame is game over · **Tolerance:** exact, determinism is the requirement
+</pre><div class="lbl">new</div><pre>**Expected:** each pair has identical frames and score; the corridor replay&#x27;s score equals the run&#x27;s last logged evaluation score on seed 1,000,000 (`evals[-1].result.scores[0]`); each replay&#x27;s last frame is game over · **Tolerance:** exact, determinism is the requirement
+
+### TC-13: A complete notes page passes and is left byte-identical
+**Pipeline:** PL-06 · **Covers:** EXPL-01, EXPL-02, EXPL-03 · **Kind:** synthetic known-answer · **Fixture:** tests/fixtures/rllab/TC-13/
+**Source:** spec EXPL-01–EXPL-03 and the `study.check_notes` invariants (any heading level, case-insensitive, AD-10); a hand-built `notes/snake.md` that meets every rule by construction: &quot;Why It Learns&quot; at `##`, the 3 switches at `###` under an &quot;Ablations&quot; heading, each with text, and links `../runs/study-snake/report.md` and `../runs/study-snake/curves.png`, both present under `runs/study-snake/`; checked on a temporary copy of the fixture
+**Expected:** `exists` true; `missing_sections`, `empty_sections` and `broken_links` empty; `ok` true; `notes/snake.md` is byte-identical afterwards and no file is added under either root · **Tolerance:** exact, the result is labels and file bytes
+</pre><div class="hook">⛔ hook PostToolUse:Edit blocked: dt lint found problems in docs/packages/rllab/tests.md:
+docs/packages/rllab/tests.md:3: approved-edit Approved doc changed since HEAD without going back to Draft (or the approval isn&#x27;t committed)
+docs/packages/rllab/tests.md:79: fixture-size TC-13 Fixture folder tests/fixtures/rllab/TC-13/ doesn&#x27;t exist
+1 error, 1 warning</div><details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;replace_all&quot;: false,
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-11/rl-incremental/with_skill/project/docs/packages/rllab/tests.md&quot;,
+  &quot;old_string&quot;: &quot;**Expected:** each pair has identical frames and score; the corridor replay&#x27;s score equals the run&#x27;s last logged evaluation score on seed 1,000,000 (`evals[-1].result.scores[0]`); each replay&#x27;s last frame is game over · **Tolerance:** exact, determinism is the requirement\n&quot;,
+  &quot;new_string&quot;: &quot;**Expected:** each pair has identical frames and score; the corridor replay&#x27;s score equals the run&#x27;s last logged evaluation score on seed 1,000,000 (`evals[-1].result.scores[0]`); each replay&#x27;s last frame is game over · **Tolerance:** exact, determinism is the requirement\n\n### TC-13: A complete notes page passes and is left byte-identical\n**Pipeline:** PL-06 · **Covers:** EXPL-01, EXPL-02, EXPL-03 · **Kind:** synthetic known-answer · **Fixture:** tests/fixtures/rllab/TC-13/\n**Source:** spec EXPL-01–EXPL-03 and the `study.check_notes` invariants (any heading level, case-insensitive, AD-10); a hand-built `notes/snake.md` that meets every rule by construction: \&quot;Why It Learns\&quot; at `##`, the 3 switches at `###` under an \&quot;Ablations\&quot; heading, each with text, and links `../runs/study-snake/report.md` and `../runs/study-snake/curves.png`, both present under `runs/study-snake/`; checked on a temporary copy of the fixture\n**Expected:** `exists` true; `missing_sections`, `empty_sections` and `broken_links` empty; `ok` true; `notes/snake.md` is byte-identical afterwards and no file is added under either root · **Tolerance:** exact, the result is labels and file bytes\n&quot;
+}</pre><div class="lbl">output</div><pre>The file /Users/connorott/plugins/dev-team-workspace/iteration-11/rl-incremental/with_skill/project/docs/packages/rllab/tests.md has been updated successfully. (file state is current in your context — no need to Read it back)</pre></details></div><div class="step" id="SD254"><span class="sid">D254</span><span class="kind">say</span>Setting the status back to Draft, then writing the TC-13 fixture.<details><summary>full text</summary><pre>Setting the status back to Draft, then writing the TC-13 fixture.</pre></details></div><div class="step" id="SD255"><span class="sid">D255</span><span class="kind">Bash</span>sed -i &#x27;&#x27; &#x27;s/\*\*Status:\*\* Approved · \*\*Last updated:\*\* 2026-10-18/Status: Draft · Last updated: 2026-10-18/&#x27; docs/packages/rllab/tests.md &amp;&amp; head -3 docs/packages/rllab/tests.md
+F=tests/fixtures/rllab/TC-13; mkdir -p $F/notes $F/runs/study-snake
+cat &gt; $F/notes/snake.md &lt;&lt;&#x27;EOF&#x27;
+# Snake notes
+
+My notes on the Snake study.
+
+## Why It Learns
+
+The agent sees 11 facts about danger, direction and food, so a small network can map them to good moves.
+
+## Ablations
+
+### no-memory
+
+Without r …[+647 chars]<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;sed -i &#x27;&#x27; &#x27;s/\\*\\*Status:\\*\\* Approved · \\*\\*Last updated:\\*\\* 2026-10-18/**Status:** Draft · **Last updated:** 2026-10-18/&#x27; docs/packages/rllab/tests.md &amp;&amp; head -3 docs/packages/rllab/tests.md\nF=tests/fixtures/rllab/TC-13; mkdir -p $F/notes $F/runs/study-snake\ncat &gt; $F/notes/snake.md &lt;&lt;&#x27;EOF&#x27;\n# Snake notes\n\nMy notes on the Snake study.\n\n## Why It Learns\n\nThe agent sees 11 facts about danger, direction and food, so a small network can map them to good moves.\n\n## Ablations\n\n### no-memory\n\nWithout replay memory, scores stayed low and noisy.\n\n### no-frozen\n\nWithout the frozen copy, learning wobbled but still rose.\n\n### no-decay\n\nWith exploration fixed, the agent kept taking random moves late on.\n\n## Results\n\nThe full study is in the [report](../runs/study-snake/report.md).\n\n![Learning curves](../runs/study-snake/curves.png)\nEOF\ncat &gt; $F/runs/study-snake/report.md &lt;&lt;&#x27;EOF&#x27;\n# Snake study\n\nPlaceholder report for TC-13; check_notes only needs it to exist.\nEOF\n: &gt; $F/runs/study-snake/curves.png\ncat &gt; $F/input.json &lt;&lt;&#x27;EOF&#x27;\n{\&quot;env\&quot;: \&quot;snake\&quot;, \&quot;notes_root\&quot;: \&quot;notes\&quot;, \&quot;runs_root\&quot;: \&quot;runs\&quot;, \&quot;copy_to_tmp\&quot;: true, \&quot;page\&quot;: \&quot;notes/snake.md\&quot;}\nEOF\nls -R $F&quot;,
+  &quot;description&quot;: &quot;Revert status to Draft and create TC-13 input fixture&quot;
+}</pre><div class="lbl">output</div><pre># rllab — Tests
+
+**Package:** rllab · **Status:** Draft · **Last updated:** 2026-10-18 · **Pipelines:** [pipelines.md](pipelines.md)
+input.json
+notes
+runs
+
+tests/fixtures/rllab/TC-13/notes:
+snake.md
+
+tests/fixtures/rllab/TC-13/runs:
+study-snake
+
+tests/fixtures/rllab/TC-13/runs/study-snake:
+curves.png
+report.md</pre></details></div><div class="step" id="SD256"><span class="sid">D256</span><span class="kind">Write</span>/Users/connorott/plugins/dev-team-workspace/iteration-11/rl-incremental/with_skill/project/tests/fixtures/rllab/TC-13/expected.json (1 lines)<div class="lbl">wrote /Users/connorott/plugins/dev-team-workspace/iteration-11/rl-incremental/with_skill/project/tests/fixtures/rllab/TC-13/expected.json</div><pre>{&quot;exists&quot;: true, &quot;missing_sections&quot;: [], &quot;empty_sections&quot;: [], &quot;broken_links&quot;: [], &quot;ok&quot;: true, &quot;page_bytes_unchanged&quot;: true, &quot;files_added&quot;: [], &quot;tol&quot;: 0}
+</pre><div class="hook">hook PreToolUse:Write said: {&quot;hookSpecificOutput&quot;: {&quot;hookEventName&quot;: &quot;PreToolUse&quot;, &quot;permissionDecision&quot;: &quot;ask&quot;, &quot;permissionDecisionReason&quot;: &quot;Oracle file: tests/fixtures/rllab/TC-13/expected.json. Expected outputs change only with the user&#x27;s approval.&quot;}}
+</div><details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-11/rl-incremental/with_skill/project/tests/fixtures/rllab/TC-13/expected.json&quot;,
+  &quot;content&quot;: &quot;{\&quot;exists\&quot;: true, \&quot;missing_sections\&quot;: [], \&quot;empty_sections\&quot;: [], \&quot;broken_links\&quot;: [], \&quot;ok\&quot;: true, \&quot;page_bytes_unchanged\&quot;: true, \&quot;files_added\&quot;: [], \&quot;tol\&quot;: 0}\n&quot;
+}</pre><div class="lbl">output</div><pre>File created successfully at: /Users/connorott/plugins/dev-team-workspace/iteration-11/rl-incremental/with_skill/project/tests/fixtures/rllab/TC-13/expected.json (file state is current in your context — no need to Read it back)</pre></details></div><div class="step" id="SD257"><span class="sid">D257</span><span class="kind">Bash</span>python3 ../plugin/dev-team/scripts/dt.py next-id TC<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;python3 ../plugin/dev-team/scripts/dt.py next-id TC&quot;,
+  &quot;description&quot;: &quot;Get next TC ID&quot;
+}</pre><div class="lbl">output</div><pre>TC-14</pre></details></div><div class="step" id="SD258"><span class="sid">D258</span><span class="kind">Edit</span>/Users/connorott/plugins/dev-team-workspace/iteration-11/rl-incremental/with_skill/project/docs/packages/rllab/tests.md | old: &#x27;Expected: `exists` true; `missing_sections`, `empty_sections` and `broken_li&#x27; | new: &#x27;Expected: `exists` true; `missing_sections`, `empty_sections` and `broken_li&#x27;<div class="lbl">edited /Users/connorott/plugins/dev-team-workspace/iteration-11/rl-incremental/with_skill/project/docs/packages/rllab/tests.md · old</div><pre>**Expected:** `exists` true; `missing_sections`, `empty_sections` and `broken_links` empty; `ok` true; `notes/snake.md` is byte-identical afterwards and no file is added under either root · **Tolerance:** exact, the result is labels and file bytes
+</pre><div class="lbl">new</div><pre>**Expected:** `exists` true; `missing_sections`, `empty_sections` and `broken_links` empty; `ok` true; `notes/snake.md` is byte-identical afterwards and no file is added under either root · **Tolerance:** exact, the result is labels and file bytes
+
+### TC-14: No page and no study: everything reported, nothing created
+**Pipeline:** PL-06 · **Covers:** EXPL-01, EXPL-02, EXPL-03 · **Kind:** synthetic known-answer · **Fixture:** tests/fixtures/rllab/TC-14/
+**Source:** pipelines.md PL-06 (&quot;a missing page is reported, never created&quot;) and the `study.NotesCheck` invariant (when `exists` is false every required section is missing); empty temporary notes and runs roots, so the case runs before any study exists
+**Expected:** `exists` false; `missing_sections` is the set {&quot;Why it learns&quot;, &quot;no-memory&quot;, &quot;no-frozen&quot;, &quot;no-decay&quot;}; `empty_sections` empty; `broken_links` names both `report.md` and `curves.png`; `ok` false; no error raised; both roots are still empty afterwards · **Tolerance:** exact; sections compared as a set, since the contract fixes no order; each link entry matched by the file name it contains, since the contract fixes no string form
+</pre><div class="hook">⛔ hook PostToolUse:Edit blocked: dt lint found problems in docs/packages/rllab/tests.md:
+docs/packages/rllab/tests.md:84: fixture-size TC-14 Fixture folder tests/fixtures/rllab/TC-14/ doesn&#x27;t exist
+1 error, 0 warnings</div><details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;replace_all&quot;: false,
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-11/rl-incremental/with_skill/project/docs/packages/rllab/tests.md&quot;,
+  &quot;old_string&quot;: &quot;**Expected:** `exists` true; `missing_sections`, `empty_sections` and `broken_links` empty; `ok` true; `notes/snake.md` is byte-identical afterwards and no file is added under either root · **Tolerance:** exact, the result is labels and file bytes\n&quot;,
+  &quot;new_string&quot;: &quot;**Expected:** `exists` true; `missing_sections`, `empty_sections` and `broken_links` empty; `ok` true; `notes/snake.md` is byte-identical afterwards and no file is added under either root · **Tolerance:** exact, the result is labels and file bytes\n\n### TC-14: No page and no study: everything reported, nothing created\n**Pipeline:** PL-06 · **Covers:** EXPL-01, EXPL-02, EXPL-03 · **Kind:** synthetic known-answer · **Fixture:** tests/fixtures/rllab/TC-14/\n**Source:** pipelines.md PL-06 (\&quot;a missing page is reported, never created\&quot;) and the `study.NotesCheck` invariant (when `exists` is false every required section is missing); empty temporary notes and runs roots, so the case runs before any study exists\n**Expected:** `exists` false; `missing_sections` is the set {\&quot;Why it learns\&quot;, \&quot;no-memory\&quot;, \&quot;no-frozen\&quot;, \&quot;no-decay\&quot;}; `empty_sections` empty; `broken_links` names both `report.md` and `curves.png`; `ok` false; no error raised; both roots are still empty afterwards · **Tolerance:** exact; sections compared as a set, since the contract fixes no order; each link entry matched by the file name it contains, since the contract fixes no string form\n&quot;
+}</pre><div class="lbl">output</div><pre>The file /Users/connorott/plugins/dev-team-workspace/iteration-11/rl-incremental/with_skill/project/docs/packages/rllab/tests.md has been updated successfully.</pre></details></div><div class="step" id="SD259"><span class="sid">D259</span><span class="kind">Bash</span>F=tests/fixtures/rllab/TC-14; mkdir -p $F
+cat &gt; $F/input.json &lt;&lt;&#x27;EOF&#x27;
+{&quot;env&quot;: &quot;snake&quot;, &quot;notes_root&quot;: &quot;&lt;empty temporary folder&gt;&quot;, &quot;runs_root&quot;: &quot;&lt;empty temporary folder&gt;&quot;}
+EOF
+ls $F<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;F=tests/fixtures/rllab/TC-14; mkdir -p $F\ncat &gt; $F/input.json &lt;&lt;&#x27;EOF&#x27;\n{\&quot;env\&quot;: \&quot;snake\&quot;, \&quot;notes_root\&quot;: \&quot;&lt;empty temporary folder&gt;\&quot;, \&quot;runs_root\&quot;: \&quot;&lt;empty temporary folder&gt;\&quot;}\nEOF\nls $F&quot;,
+  &quot;description&quot;: &quot;Create TC-14 input fixture&quot;
+}</pre><div class="lbl">output</div><pre>input.json</pre></details></div><div class="step" id="SD260"><span class="sid">D260</span><span class="kind">Write</span>/Users/connorott/plugins/dev-team-workspace/iteration-11/rl-incremental/with_skill/project/tests/fixtures/rllab/TC-14/expected.json (1 lines)<div class="lbl">wrote /Users/connorott/plugins/dev-team-workspace/iteration-11/rl-incremental/with_skill/project/tests/fixtures/rllab/TC-14/expected.json</div><pre>{&quot;exists&quot;: false, &quot;missing_sections&quot;: [&quot;Why it learns&quot;, &quot;no-memory&quot;, &quot;no-frozen&quot;, &quot;no-decay&quot;], &quot;missing_sections_order&quot;: &quot;any&quot;, &quot;empty_sections&quot;: [], &quot;broken_links_name&quot;: [&quot;report.md&quot;, &quot;curves.png&quot;], &quot;ok&quot;: false, &quot;raises&quot;: false, &quot;files_added&quot;: [], &quot;tol&quot;: 0}
+</pre><div class="hook">hook PreToolUse:Write said: {&quot;hookSpecificOutput&quot;: {&quot;hookEventName&quot;: &quot;PreToolUse&quot;, &quot;permissionDecision&quot;: &quot;ask&quot;, &quot;permissionDecisionReason&quot;: &quot;Oracle file: tests/fixtures/rllab/TC-14/expected.json. Expected outputs change only with the user&#x27;s approval.&quot;}}
+</div><details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-11/rl-incremental/with_skill/project/tests/fixtures/rllab/TC-14/expected.json&quot;,
+  &quot;content&quot;: &quot;{\&quot;exists\&quot;: false, \&quot;missing_sections\&quot;: [\&quot;Why it learns\&quot;, \&quot;no-memory\&quot;, \&quot;no-frozen\&quot;, \&quot;no-decay\&quot;], \&quot;missing_sections_order\&quot;: \&quot;any\&quot;, \&quot;empty_sections\&quot;: [], \&quot;broken_links_name\&quot;: [\&quot;report.md\&quot;, \&quot;curves.png\&quot;], \&quot;ok\&quot;: false, \&quot;raises\&quot;: false, \&quot;files_added\&quot;: [], \&quot;tol\&quot;: 0}\n&quot;
+}</pre><div class="lbl">output</div><pre>File created successfully at: /Users/connorott/plugins/dev-team-workspace/iteration-11/rl-incremental/with_skill/project/tests/fixtures/rllab/TC-14/expected.json (file state is current in your context — no need to Read it back)</pre></details></div><div class="step" id="SD261"><span class="sid">D261</span><span class="kind">Bash</span>python3 ../plugin/dev-team/scripts/dt.py next-id TC<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;python3 ../plugin/dev-team/scripts/dt.py next-id TC&quot;,
+  &quot;description&quot;: &quot;Get next TC ID&quot;
+}</pre><div class="lbl">output</div><pre>TC-15</pre></details></div><div class="step" id="SD262"><span class="sid">D262</span><span class="kind">Edit</span>/Users/connorott/plugins/dev-team-workspace/iteration-11/rl-incremental/with_skill/project/docs/packages/rllab/tests.md | old: &#x27;each link entry matched by the file name it contains, since the contract fixes n&#x27; | new: &#x27;each link entry matched by the file name it contains, since the contract fixes n&#x27;<div class="lbl">edited /Users/connorott/plugins/dev-team-workspace/iteration-11/rl-incremental/with_skill/project/docs/packages/rllab/tests.md · old</div><pre>each link entry matched by the file name it contains, since the contract fixes no string form
+</pre><div class="lbl">new</div><pre>each link entry matched by the file name it contains, since the contract fixes no string form
+
+### TC-15: Each defect on a page is found, and nothing else
+**Pipeline:** PL-06 · **Covers:** EXPL-01, EXPL-02, EXPL-03 · **Kind:** synthetic known-answer · **Fixture:** tests/fixtures/rllab/TC-15/
+**Source:** spec EXPL-01–EXPL-03 and the `study.check_notes` invariants; a hand-built `notes/snake.md` with exactly three planted defects: &quot;## Why it learns&quot; followed only by blank lines before the next `##` heading (empty); no &quot;no-decay&quot; heading (missing); the chart link pointing to `../runs/study-snake/curve.png`, a file that doesn&#x27;t exist (broken). &quot;No-Memory&quot; and &quot;NO-FROZEN&quot; headings with text check case-insensitive matching, and the report link resolves; `runs/study-snake/` holds `report.md` and `curves.png`; checked on a temporary copy
+**Expected:** `exists` true; `missing_sections == (&quot;no-decay&quot;,)`; `empty_sections == (&quot;Why it learns&quot;,)` matched case-insensitively; `broken_links` has one entry, naming `curves.png`; `ok` false; the page is byte-identical afterwards · **Tolerance:** exact; the link entry is matched by the file name it contains, since the contract fixes no string form
+</pre><div class="hook">⛔ hook PostToolUse:Edit blocked: dt lint found problems in docs/packages/rllab/tests.md:
+docs/packages/rllab/tests.md:89: fixture-size TC-15 Fixture folder tests/fixtures/rllab/TC-15/ doesn&#x27;t exist
+1 error, 0 warnings</div><details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;replace_all&quot;: false,
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-11/rl-incremental/with_skill/project/docs/packages/rllab/tests.md&quot;,
+  &quot;old_string&quot;: &quot;each link entry matched by the file name it contains, since the contract fixes no string form\n&quot;,
+  &quot;new_string&quot;: &quot;each link entry matched by the file name it contains, since the contract fixes no string form\n\n### TC-15: Each defect on a page is found, and nothing else\n**Pipeline:** PL-06 · **Covers:** EXPL-01, EXPL-02, EXPL-03 · **Kind:** synthetic known-answer · **Fixture:** tests/fixtures/rllab/TC-15/\n**Source:** spec EXPL-01–EXPL-03 and the `study.check_notes` invariants; a hand-built `notes/snake.md` with exactly three planted defects: \&quot;## Why it learns\&quot; followed only by blank lines before the next `##` heading (empty); no \&quot;no-decay\&quot; heading (missing); the chart link pointing to `../runs/study-snake/curve.png`, a file that doesn&#x27;t exist (broken). \&quot;No-Memory\&quot; and \&quot;NO-FROZEN\&quot; headings with text check case-insensitive matching, and the report link resolves; `runs/study-snake/` holds `report.md` and `curves.png`; checked on a temporary copy\n**Expected:** `exists` true; `missing_sections == (\&quot;no-decay\&quot;,)`; `empty_sections == (\&quot;Why it learns\&quot;,)` matched case-insensitively; `broken_links` has one entry, naming `curves.png`; `ok` false; the page is byte-identical afterwards · **Tolerance:** exact; the link entry is matched by the file name it contains, since the contract fixes no string form\n&quot;
+}</pre><div class="lbl">output</div><pre>The file /Users/connorott/plugins/dev-team-workspace/iteration-11/rl-incremental/with_skill/project/docs/packages/rllab/tests.md has been updated successfully.</pre></details></div><div class="step" id="SD263"><span class="sid">D263</span><span class="kind">Bash</span>F=tests/fixtures/rllab/TC-15; mkdir -p $F/notes $F/runs/study-snake
+cat &gt; $F/notes/snake.md &lt;&lt;&#x27;EOF&#x27;
+# Snake notes
+
+## Why it learns
+
+
+
+## No-Memory
+
+Without replay memory, scores stayed low and noisy.
+
+## NO-FROZEN
+
+Without the frozen copy, learning wobbled but still rose.
+
+## Results
+
+The full study is in the [report](../runs/study-snake/report.md).
+
+![Learning curves](../runs/study-snake/curve.png)
+EOF
+cat &gt; $F/runs/study-snake/report.md &lt;&lt;&#x27;EOF&#x27;
+# Snake study
+
+Placeholder report for TC-15; che …[+220 chars]<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;F=tests/fixtures/rllab/TC-15; mkdir -p $F/notes $F/runs/study-snake\ncat &gt; $F/notes/snake.md &lt;&lt;&#x27;EOF&#x27;\n# Snake notes\n\n## Why it learns\n\n\n\n## No-Memory\n\nWithout replay memory, scores stayed low and noisy.\n\n## NO-FROZEN\n\nWithout the frozen copy, learning wobbled but still rose.\n\n## Results\n\nThe full study is in the [report](../runs/study-snake/report.md).\n\n![Learning curves](../runs/study-snake/curve.png)\nEOF\ncat &gt; $F/runs/study-snake/report.md &lt;&lt;&#x27;EOF&#x27;\n# Snake study\n\nPlaceholder report for TC-15; check_notes only needs it to exist.\nEOF\n: &gt; $F/runs/study-snake/curves.png\ncat &gt; $F/input.json &lt;&lt;&#x27;EOF&#x27;\n{\&quot;env\&quot;: \&quot;snake\&quot;, \&quot;notes_root\&quot;: \&quot;notes\&quot;, \&quot;runs_root\&quot;: \&quot;runs\&quot;, \&quot;copy_to_tmp\&quot;: true, \&quot;page\&quot;: \&quot;notes/snake.md\&quot;}\nEOF\nls -R $F&quot;,
+  &quot;description&quot;: &quot;Create TC-15 input fixture&quot;
+}</pre><div class="lbl">output</div><pre>input.json
+notes
+runs
+
+tests/fixtures/rllab/TC-15/notes:
+snake.md
+
+tests/fixtures/rllab/TC-15/runs:
+study-snake
+
+tests/fixtures/rllab/TC-15/runs/study-snake:
+curves.png
+report.md</pre></details></div><div class="step" id="SD264"><span class="sid">D264</span><span class="kind">say</span>Writing the last oracle file (TC-15), then I&#x27;ll update the Strategy row and run lint.<details><summary>full text</summary><pre>Writing the last oracle file (TC-15), then I&#x27;ll update the Strategy row and run lint.</pre></details></div><div class="step" id="SD265"><span class="sid">D265</span><span class="kind">Write</span>/Users/connorott/plugins/dev-team-workspace/iteration-11/rl-incremental/with_skill/project/tests/fixtures/rllab/TC-15/expected.json (1 lines)<div class="lbl">wrote /Users/connorott/plugins/dev-team-workspace/iteration-11/rl-incremental/with_skill/project/tests/fixtures/rllab/TC-15/expected.json</div><pre>{&quot;exists&quot;: true, &quot;missing_sections&quot;: [&quot;no-decay&quot;], &quot;empty_sections&quot;: [&quot;Why it learns&quot;], &quot;section_match&quot;: &quot;case-insensitive&quot;, &quot;broken_links_name&quot;: [&quot;curves.png&quot;], &quot;ok&quot;: false, &quot;page_bytes_unchanged&quot;: true, &quot;files_added&quot;: [], &quot;tol&quot;: 0}
+</pre><div class="hook">hook PreToolUse:Write said: {&quot;hookSpecificOutput&quot;: {&quot;hookEventName&quot;: &quot;PreToolUse&quot;, &quot;permissionDecision&quot;: &quot;ask&quot;, &quot;permissionDecisionReason&quot;: &quot;Oracle file: tests/fixtures/rllab/TC-15/expected.json. Expected outputs change only with the user&#x27;s approval.&quot;}}
+</div><details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-11/rl-incremental/with_skill/project/tests/fixtures/rllab/TC-15/expected.json&quot;,
+  &quot;content&quot;: &quot;{\&quot;exists\&quot;: true, \&quot;missing_sections\&quot;: [\&quot;no-decay\&quot;], \&quot;empty_sections\&quot;: [\&quot;Why it learns\&quot;], \&quot;section_match\&quot;: \&quot;case-insensitive\&quot;, \&quot;broken_links_name\&quot;: [\&quot;curves.png\&quot;], \&quot;ok\&quot;: false, \&quot;page_bytes_unchanged\&quot;: true, \&quot;files_added\&quot;: [], \&quot;tol\&quot;: 0}\n&quot;
+}</pre><div class="lbl">output</div><pre>File created successfully at: /Users/connorott/plugins/dev-team-workspace/iteration-11/rl-incremental/with_skill/project/tests/fixtures/rllab/TC-15/expected.json (file state is current in your context — no need to Read it back)</pre></details></div><div class="step" id="SD266"><span class="sid">D266</span><span class="kind">Bash</span>sed -i &#x27;&#x27; &#x27;s/| TC-13 (env name, notes root, runs root → check_notes → NotesCheck) |/| TC-13, TC-14, TC-15 (env name, notes root, runs root → check_notes → NotesCheck) |/&#x27; docs/packages/rllab/tests.md &amp;&amp; grep -n &quot;^| PL-06&quot; docs/packages/rllab/tests.md
+D=../plugin/dev-team/scripts/dt.py; python3 $D lint docs/packages/rllab/tests.md; python3 $D status --skill test-planning | grep -E &quot;pipelines_no|cases_no|fixtures|routed|requests&quot;<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;sed -i &#x27;&#x27; &#x27;s/| TC-13 (env name, notes root, runs root → check_notes → NotesCheck) |/| TC-13, TC-14, TC-15 (env name, notes root, runs root → check_notes → NotesCheck) |/&#x27; docs/packages/rllab/tests.md &amp;&amp; grep -n \&quot;^| PL-06\&quot; docs/packages/rllab/tests.md\nD=../plugin/dev-team/scripts/dt.py; python3 $D lint docs/packages/rllab/tests.md; python3 $D status --skill test-planning | grep -E \&quot;pipelines_no|cases_no|fixtures|routed|requests\&quot;&quot;,
+  &quot;description&quot;: &quot;Update PL-06 strategy row, lint, recheck status&quot;
+}</pre><div class="lbl">output</div><pre>13:| PL-06 | `python -m rllab notes --env snake --smoke` | study.notes (heading match, empty-section rule, link resolution), cli.args (`notes` command); boundary tests on study.check_notes, study.NotesCheck | TC-13, TC-14, TC-15 (env name, notes root, runs root → check_notes → NotesCheck) | — |
+0 errors, 0 warnings
+pipelines_no_smoke: none
+pipelines_no_golden: none
+cases_no_source: none
+cases_no_tolerance: none
+fixtures_missing: none
+fixtures_orphan: none
+routed_changes: none
+requests_open: none</pre></details></div><div class="step" id="SD267"><span class="sid">D267</span><span class="kind">Edit</span>/Users/connorott/plugins/dev-team-workspace/iteration-11/rl-incremental/with_skill/project/docs/packages/rllab/tests.md | old: &#x27;## Open questions&#x27; | new: &quot;## Open questions ⏎ - PL-06&#x27;s cases use hand-built pages. A draft of your own `n&quot;<div class="lbl">edited /Users/connorott/plugins/dev-team-workspace/iteration-11/rl-incremental/with_skill/project/docs/packages/rllab/tests.md · old</div><pre>## Open questions
+</pre><div class="lbl">new</div><pre>## Open questions
+- PL-06&#x27;s cases use hand-built pages. A draft of your own `notes/snake.md` (or the headings and link style you plan to use) would make a stronger user-example case. (assumed: the synthetic pages in TC-13–TC-15 until you bring one)
+</pre><details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;replace_all&quot;: false,
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-11/rl-incremental/with_skill/project/docs/packages/rllab/tests.md&quot;,
+  &quot;old_string&quot;: &quot;## Open questions\n&quot;,
+  &quot;new_string&quot;: &quot;## Open questions\n- PL-06&#x27;s cases use hand-built pages. A draft of your own `notes/snake.md` (or the headings and link style you plan to use) would make a stronger user-example case. (assumed: the synthetic pages in TC-13–TC-15 until you bring one)\n&quot;
+}</pre><div class="lbl">output</div><pre>The file /Users/connorott/plugins/dev-team-workspace/iteration-11/rl-incremental/with_skill/project/docs/packages/rllab/tests.md has been updated successfully.</pre></details></div><div class="step" id="SD268"><span class="sid">D268</span><span class="kind">Bash</span>python3 ../plugin/dev-team/scripts/dt.py lint docs/packages/rllab/tests.md; git status --short<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;python3 ../plugin/dev-team/scripts/dt.py lint docs/packages/rllab/tests.md; git status --short&quot;,
+  &quot;description&quot;: &quot;Lint tests doc and show uncommitted files&quot;
+}</pre><div class="lbl">output</div><pre>0 errors, 0 warnings
+ M docs/packages/rllab/tests.md
+?? tests/fixtures/rllab/TC-13/
+?? tests/fixtures/rllab/TC-14/
+?? tests/fixtures/rllab/TC-15/</pre></details></div><div class="step" id="SD269"><span class="sid">D269</span><span class="kind">say</span>The three files were already committed in `07cf020` (&quot;turn 24&quot;), so there was nothing new to commit. ⏎ I&#x27;ve added three golden cases for PL-06 (Check the notes page) to `docs/packages/rllab/tests.md`, along with their fixtures. The doc is back in Draft until you approve. `dt lint` shows 0 errors and 0 warnings, and every gap in `dt status` is now empty. ⏎ ## What was written ⏎ Strategy row added ⏎ | Pipeline | Smoke | Step unit tests | Golden cases | Model eval | ⏎ |---|---|---|---|---| ⏎ | PL-06 | `python -m rllab notes --env snake --smoke` | study.notes (heading match, empty-section rule …[+3459 chars]<details><summary>full text</summary><pre>The three files were already committed in `07cf020` (&quot;turn 24&quot;), so there was nothing new to commit.
+
+I&#x27;ve added three golden cases for PL-06 (Check the notes page) to `docs/packages/rllab/tests.md`, along with their fixtures. The doc is back in Draft until you approve. `dt lint` shows 0 errors and 0 warnings, and every gap in `dt status` is now empty.
+
+## What was written
+
+**Strategy row added**
+
+| Pipeline | Smoke | Step unit tests | Golden cases | Model eval |
+|---|---|---|---|---|
+| PL-06 | `python -m rllab notes --env snake --smoke` | study.notes (heading match, empty-section rule, link resolution), cli.args (`notes`); boundary tests on study.check_notes, study.NotesCheck | TC-13, TC-14, TC-15 (env name, notes root, runs root → check_notes → NotesCheck) | — |
+
+**Cases.** All three are synthetic known-answer cases. Their source is spec EXPL-01 to EXPL-03 plus the `check_notes`/`NotesCheck` rules in the contract. Each test runs on a temporary copy of its fixture, never on the repo.
+
+| ID | Input page | Expected (`expected.json`) | Tolerance and why |
+|---|---|---|---|
+| TC-13 | A complete page: `## Why It Learns`, then `## Ablations` with `### no-memory`, `### no-frozen` and `### no-decay`, each with text. It links `../runs/study-snake/report.md` and `curves.png`, and both files exist | `exists` true, every list empty, `ok` true, page bytes unchanged, no files added | Exact: the result is labels and bytes |
+| TC-14 | No page and an empty runs folder | `exists` false; missing = {Why it learns, no-memory, no-frozen, no-decay}; empty = []; broken links name `report.md` and `curves.png`; `ok` false; no error raised; both folders still empty afterwards | Exact. Sections are compared as a set because the contract fixes no order. Links are matched by file name because the contract fixes no string format |
+| TC-15 | A page with 3 planted defects (below) | `exists` true; missing = `[&quot;no-decay&quot;]`; empty = `[&quot;Why it learns&quot;]`; broken links: one entry, naming `curves.png`; `ok` false; page bytes unchanged | Exact; links matched by file name, as in TC-14 |
+
+The TC-15 page, as written to `tests/fixtures/rllab/TC-15/notes/snake.md`:
+```markdown
+# Snake notes
+
+## Why it learns
+                                    ← blank lines only → empty
+## No-Memory
+Without replay memory, scores stayed low and noisy.
+## NO-FROZEN
+Without the frozen copy, learning wobbled but still rose.
+## Results                          ← no &quot;no-decay&quot; heading → missing
+The full study is in the [report](../runs/study-snake/report.md).
+![Learning curves](../runs/study-snake/curve.png)   ← typo → broken
+```
+
+## ASSUMPTIONS
+- **A missing page breaks both links (TC-14).** The contract only says a missing page has every section missing. I inferred that both links count as broken, because a page that doesn&#x27;t exist links to nothing.
+- **Link format.** Broken-link entries are matched by the file name they contain, since the contract doesn&#x27;t fix their exact text.
+- **Placeholder files.** `curves.png` is a zero-byte placeholder, and `report.md` is a two-line stub. `check_notes` only checks that these files exist.
+- **Heading levels and case.** TC-13 mixes `##` and `###` headings and capitalises &quot;Why It Learns&quot;. TC-15 uses &quot;No-Memory&quot; and &quot;NO-FROZEN&quot;. Together they test the contract&#x27;s &quot;any heading level, any case&quot; rule.
+- **Subheadings left out.** I avoided the unclear case of a &quot;Why it learns&quot; section whose only content is a lower-level subheading.
+
+## Open questions
+- **Your own draft page.** Do you have a draft `notes/snake.md`, or a heading and link style you plan to use? A real page would be a stronger case than my hand-built ones. If not, the synthetic pages stay (this is also listed in tests.md).
+
+## Uncovered
+None. Every pipeline has a smoke test and a golden case, and EXPL-01 to EXPL-03 are each covered by all three cases.
+
+Do you approve the expected outputs for TC-13, TC-14 and TC-15? A yes sets the doc to Approved and commits `tests.md` and the three fixture folders.</pre></details></div><div class="step" id="SD270"><span class="sid">D270</span><span class="kind">hook</span><span class="hook">SessionStart:resume said: milestone: none (no tasks/plan.md)
+draft (waiting for approval): docs/packages/rllab/tests.md
+roadmap: Status* column stale (run dt roadmap)
+dt: /Users/connorott/plugins/dev-team-workspace/iteration-11/rl-incremental/with_skill/plugin/dev-team/scripts/dt
+</span></div>
+<h2>Commits</h2>
+<p>None.</p>
+<h2>Returned</h2>
+<pre>The three files were already committed in `07cf020` (&quot;turn 24&quot;), so there was nothing new to commit.
+
+I&#x27;ve added three golden cases for PL-06 (Check the notes page) to `docs/packages/rllab/tests.md`, along with their fixtures. The doc is back in Draft until you approve. `dt lint` shows 0 errors and 0 warnings, and every gap in `dt status` is now empty.
+
+## What was written
+
+**Strategy row added**
+
+| Pipeline | Smoke | Step unit tests | Golden cases | Model eval |
+|---|---|---|---|---|
+| PL-06 | `python -m rllab notes --env snake --smoke` | study.notes (heading match, empty-section rule, link resolution), cli.args (`notes`); boundary tests on study.check_notes, study.NotesCheck | TC-13, TC-14, TC-15 (env name, notes root, runs root → check_notes → NotesCheck) | — |
+
+**Cases.** All three are synthetic known-answer cases. Their source is spec EXPL-01 to EXPL-03 plus the `check_notes`/`NotesCheck` rules in the contract. Each test runs on a temporary copy of its fixture, never on the repo.
+
+| ID | Input page | Expected (`expected.json`) | Tolerance and why |
+|---|---|---|---|
+| TC-13 | A complete page: `## Why It Learns`, then `## Ablations` with `### no-memory`, `### no-frozen` and `### no-decay`, each with text. It links `../runs/study-snake/report.md` and `curves.png`, and both files exist | `exists` true, every list empty, `ok` true, page bytes unchanged, no files added | Exact: the result is labels and bytes |
+| TC-14 | No page and an empty runs folder | `exists` false; missing = {Why it learns, no-memory, no-frozen, no-decay}; empty = []; broken links name `report.md` and `curves.png`; `ok` false; no error raised; both folders still empty afterwards | Exact. Sections are compared as a set because the contract fixes no order. Links are matched by file name because the contract fixes no string format |
+| TC-15 | A page with 3 planted defects (below) | `exists` true; missing = `[&quot;no-decay&quot;]`; empty = `[&quot;Why it learns&quot;]`; broken links: one entry, naming `curves.png`; `ok` false; page bytes unchanged | Exact; links matched by file name, as in TC-14 |
+
+The TC-15 page, as written to `tests/fixtures/rllab/TC-15/notes/snake.md`:
+```markdown
+# Snake notes
+
+## Why it learns
+                                    ← blank lines only → empty
+## No-Memory
+Without replay memory, scores stayed low and noisy.
+## NO-FROZEN
+Without the frozen copy, learning wobbled but still rose.
+## Results                          ← no &quot;no-decay&quot; heading → missing
+The full study is in the [report](../runs/study-snake/report.md).
+![Learning curves](../runs/study-snake/curve.png)   ← typo → broken
+```
+
+## ASSUMPTIONS
+- **A missing page breaks both links (TC-14).** The contract only says a missing page has every section missing. I inferred that both links count as broken, because a page that doesn&#x27;t exist links to nothing.
+- **Link format.** Broken-link entries are matched by the file name they contain, since the contract doesn&#x27;t fix their exact text.
+- **Placeholder files.** `curves.png` is a zero-byte placeholder, and `report.md` is a two-line stub. `check_notes` only checks that these files exist.
+- **Heading levels and case.** TC-13 mixes `##` and `###` headings and capitalises &quot;Why It Learns&quot;. TC-15 uses &quot;No-Memory&quot; and &quot;NO-FROZEN&quot;. Together they test the contract&#x27;s &quot;any heading level, any case&quot; rule.
+- **Subheadings left out.** I avoided the unclear case of a &quot;Why it learns&quot; section whose only content is a lower-level subheading.
+
+## Open questions
+- **Your own draft page.** Do you have a draft `notes/snake.md`, or a heading and link style you plan to use? A real page would be a stronger case than my hand-built ones. If not, the synthetic pages stay (this is also listed in tests.md).
+
+## Uncovered
+None. Every pipeline has a smoke test and a golden case, and EXPL-01 to EXPL-03 are each covered by all three cases.
+
+Do you approve the expected outputs for TC-13, TC-14 and TC-15? A yes sets the doc to Approved and commits `tests.md` and the three fixture folders.</pre>
+</body></html>

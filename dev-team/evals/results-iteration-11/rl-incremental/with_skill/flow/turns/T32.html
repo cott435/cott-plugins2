@@ -1,0 +1,658 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1"><title>T32 turn</title>
+<style>
+:root{--bg:#fbfbfa;--fg:#1d1d1f;--muted:#6b6b70;--line:#d9d9de;--box:#fff;--rowp:#eef3fb;--band:#fff4d6;
+--ok:#2e7d32;--bad:#c62828;--warn:#b26a00;--idle:#6b6b70}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#17171a;--fg:#ececf0;--muted:#9a9aa3;
+--line:#34343a;--box:#222227;--rowp:#1d2433;--band:#3a3015;--ok:#6fcf73;--bad:#ff6b6b;--warn:#f0b35a;--idle:#9a9aa3}}
+:root[data-theme="dark"]{--bg:#17171a;--fg:#ececf0;--muted:#9a9aa3;--line:#34343a;--box:#222227;--rowp:#1d2433;
+--band:#3a3015;--ok:#6fcf73;--bad:#ff6b6b;--warn:#f0b35a;--idle:#9a9aa3}
+body{margin:0;padding:16px;background:var(--bg);color:var(--fg);font:14px/1.45 -apple-system,system-ui,sans-serif}
+h1{font-size:18px;margin:0 0 4px}h2{font-size:15px;margin:22px 0 8px}.sub{color:var(--muted)}
+table{border-collapse:collapse;margin:4px 0 8px}td,th{border-bottom:1px solid var(--line);padding:4px 10px;text-align:left;
+vertical-align:top}th{color:var(--muted);font-weight:600}.chips span{display:inline-block;margin:0 4px 2px 0}
+.legend span{margin-right:14px;white-space:nowrap}.sw{display:inline-block;width:10px;height:10px;border-radius:2px;
+margin-right:4px;vertical-align:-1px}.scroll{overflow:auto;max-height:88vh;border:1px solid var(--line);border-radius:8px}
+.chart{display:grid;width:max-content}.chart>div{line-height:0}.corner{position:sticky;top:0;left:0;z-index:3}
+.colhead{position:sticky;top:0;z-index:2}.rowhead{position:sticky;left:0;z-index:2}
+svg.bg{background:var(--bg)}.colhead svg{border-bottom:1px solid var(--line)}.rowhead svg{border-right:1px solid var(--line)}
+.ok{color:var(--ok);fill:var(--ok)}.bad{color:var(--bad);fill:var(--bad)}.warn{color:var(--warn);fill:var(--warn)}
+.idle{color:var(--idle);fill:var(--idle)}
+svg text{fill:var(--fg);font-family:-apple-system,system-ui,sans-serif}
+.box{fill:var(--box);stroke:var(--line)}.unit:hover .box{stroke:var(--fg)}
+.role{font-size:12px;font-weight:600}.uid,.wmeta,.lmeta,.meta{font-size:10px;fill:var(--muted)}
+.sub{font-size:10.5px;fill:var(--muted)}.badge{font-size:11px;font-weight:600}
+.meta.bad{fill:var(--bad);font-weight:600}.lane{font-size:13px;font-weight:700}.wave{font-size:13px;font-weight:700}
+.par{fill:#4e79a7}.ser{fill:var(--muted)}.rowp{fill:var(--rowp)}.rows{fill:transparent}.band{fill:var(--band)}
+.bandt{font-size:11.5px}.grid{stroke:var(--line)}.link{stroke:var(--muted);stroke-width:1.2;opacity:.55}
+.arrowhead{fill:var(--muted)}.marks{font-size:10.5px}.audit{stroke:var(--box);stroke-width:2}.auditn{font-size:10px;font-weight:700;fill:#fff}
+a{color:inherit}svg a .box{cursor:pointer}
+
+:root{--c0:#2a78d6;--c1:#eb6834;--c2:#1baf7a;--c3:#eda100;--c4:#e87ba4;--c5:#008300;--c6:#6250d6;--c7:#e34948;
+--cx:#8a8985;--main:#52514e;--read:#dcdbd5;--readfg:#1d1d1f}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--c0:#3987e5;--c1:#d95926;--c2:#199e70;
+--c3:#c98500;--c4:#d55181;--c5:#008300;--c6:#9085e9;--c7:#e66767;--cx:#77766f;--main:#c3c2b7;--read:#3b3b40;
+--readfg:#ececf0}}
+:root[data-theme="dark"]{--c0:#3987e5;--c1:#d95926;--c2:#199e70;--c3:#c98500;--c4:#d55181;--c5:#008300;
+--c6:#9085e9;--c7:#e66767;--cx:#77766f;--main:#c3c2b7;--read:#3b3b40;--readfg:#ececf0}
+.c0{fill:var(--c0);background:var(--c0)}.c1{fill:var(--c1);background:var(--c1)}.c2{fill:var(--c2);background:var(--c2)}
+.c3{fill:var(--c3);background:var(--c3)}.c4{fill:var(--c4);background:var(--c4)}.c5{fill:var(--c5);background:var(--c5)}
+.c6{fill:var(--c6);background:var(--c6)}.c7{fill:var(--c7);background:var(--c7)}.cx{fill:var(--cx);background:var(--cx)}
+.cmain{fill:var(--main)}.sc0{stroke:var(--c0)}.sc1{stroke:var(--c1)}.sc2{stroke:var(--c2)}
+.tl text,.sm text,.lc text{font-size:10.5px;fill:var(--muted)}.tl .lbl-in,.sm .lbl-in{fill:#fff;font-size:10.5px;font-weight:600}
+.tl .rowl,.sm .rowl,.lc .rowl{fill:var(--fg);font-size:11.5px;font-weight:600}.tl .band{fill:var(--rowp)}
+.tl .brk{stroke:var(--muted);stroke-dasharray:2 3}.tl a:hover rect,.sm a:hover rect{stroke:var(--fg);stroke-width:1.5}
+.axis{stroke:var(--line)}.sm .val{fill:var(--fg);font-weight:600}.lc path.ln{fill:none;stroke-width:2}
+.lc circle{stroke:var(--bg);stroke-width:2}.lc .end{font-weight:600;fill:var(--fg)}
+.tiles{display:flex;flex-wrap:wrap;gap:10px;margin:12px 0}.tile{border:1px solid var(--line);border-radius:8px;
+padding:8px 12px;min-width:110px;background:var(--box)}.tile b{display:block;font-size:20px;line-height:1.2}
+.tile span{font-size:12px;color:var(--muted)}.tile i{font-style:normal;font-size:12px;margin-left:6px}
+.fm{border-collapse:separate;border-spacing:2px}.fm td,.fm th{border:0;padding:0;text-align:center;font-size:11px}
+.fm th{padding:0 2px;font-weight:600}.fm td.f,.fm th.f{text-align:left;padding-right:10px;white-space:nowrap;
+position:sticky;left:0;background:var(--bg);font:11.5px ui-monospace,Menlo,monospace;
+max-width:380px;overflow:hidden;text-overflow:ellipsis}
+.fm td.cell{min-width:22px;height:20px;border-radius:3px}.fm td.fw{background:var(--c0);color:#fff;font-weight:700}
+.fm td.fe{background:var(--c1);color:#fff;font-weight:700}.fm td.fr{background:var(--read);color:var(--readfg)}
+.fm td.n{color:var(--muted);padding:0 6px}.fm tr.grp td{text-align:left;padding-top:8px;color:var(--muted);
+font-weight:600}
+.key{display:inline-block;min-width:18px;text-align:center;border-radius:3px;font-size:11px;margin-right:4px}
+.bar{display:inline-block;height:9px;border-radius:2px;vertical-align:0}
+
+pre{white-space:pre-wrap;word-break:break-word;background:var(--box);border:1px solid var(--line);border-radius:6px;
+padding:8px 10px;margin:4px 0;font:12px/1.45 ui-monospace,SFMono-Regular,Menlo,monospace;max-width:100%;overflow:auto}
+.step{border-top:1px solid var(--line);padding:6px 0}.step:target{background:var(--rowp)}
+.sid{font:12px ui-monospace,Menlo,monospace;color:var(--muted);margin-right:8px}.kind{font-weight:600;margin-right:8px}
+.err{color:var(--bad);font-weight:600}.hook{color:var(--bad);margin:4px 0 0 16px}.lbl{font-size:12px;color:var(--muted);margin-top:6px}
+details summary{cursor:pointer;color:var(--muted);font-size:12px}.head td:first-child{color:var(--muted)}
+.top{font-size:13px}.narr{list-style:none;padding-left:0}.narr li{margin:3px 0}
+</style></head>
+<body>
+<p class="top"><a href="../flow.html">← the run's flow chart</a></p>
+<p class="top"><a href="../plan/T31.html">The plan as of T32</a>: unchanged since T31 · <a href="../plan/index.html">plan map</a></p>
+<h1>T32 · turn · /dev-team:idea-refine From the previous session:</h1>
+<table class="head"><tr><td>Type</td><td>turn</td></tr><tr><td>Description</td><td>/dev-team:idea-refine From the previous session:</td></tr><tr><td>Spawned by</td><td>user</td></tr><tr><td>Model</td><td>claude-opus-5-5</td></tr><tr><td>Start</td><td>2026-10-19 03:06:32 UTC</td></tr><tr><td>Duration</td><td>2 min</td></tr><tr><td>Tool calls</td><td>13</td></tr><tr><td>Errors</td><td>1</td></tr><tr><td>Hook blocks</td><td>0</td></tr><tr><td>Tokens</td><td>7.1k out · 30.1k new in · 606k cached in · peak context 54.6k</td></tr><tr><td>Skills invoked</td><td>none</td></tr><tr><td>Files written or edited</td><td>CONSTRAINTS.md</td></tr><tr><td>Definition</td><td>none</td></tr><tr><td>Steps</td><td>20</td></tr><tr><td>Finished</td><td>yes</td></tr></table>
+
+
+<h2>Prompt</h2>
+<pre>/dev-team:idea-refine From the previous session:
+&lt;&lt;&lt;
+ **EX-02** (pip-audit on torch, expiring at M1 exit). This is a loosening, so it needs your explicit yes.
+
+   I recommend (a). The unfixed findings may still need a narrower exception after the move.
+2. **Import rules the checker can&#x27;t hold yet (20 gaps):**
+   - **8 wait for M2.** The rules stopping `baselines`, `curves` and `replay` from importing what they shouldn&#x27;t can only be written once those modules exist. Extending the bar at M2 kickoff adds them.
+   - **12 come from `cli`.** The architecture says `cli` depends on &quot;all of the above&quot;, and the checker reads that as no dependencies. Listing them explicitly in the architecture would clear these.
+3. **Slow first install:** M1-T01&#x27;s first edit triggers the torch install, which can take minutes on a fresh machine.
+4. Two requests about the stage 1 skills line in the plan (UR-23, UR-24) are still open. They&#x27;re for build planning, not this bar.
+
+**Your words:** &quot;1) block on coverage floor and main check&quot; UR-37 → the gate budget line in CONSTRAINTS.md; &quot;2) mypy strict&quot; UR-38 → CR-23; &quot;3) measure and hold&quot; UR-39 → CR-40–42; &quot;4) 90 s&quot; UR-40 → &quot;`check.sh gate` finishes in ≤ 90 s&quot;; &quot;5) yes, commit the setup files&quot; UR-41 → committed; &quot;No CI.&quot; UR-42 → CR-26 runs in `full` only; &quot;the setup writes it and you drop it from T01&#x27;s file list&quot; UR-43 → M1-T01. Open: none.
+
+**Do you approve the bar, and is it (a) or (b) for torch?** A yes marks it Approved, commits that, and sets the plan&#x27;s `Base`. After that, you start building with `/build`.
+&gt;&gt;&gt;
+
+Approved. For torch, take your recommendation (a). Next idea: Environment 2 is a circular tank with a ball bouncing around inside it. Little fish agents have to learn to swim away from the ball and survive as long as possible. Movement is continuous and there are several fish at once, and each fish sees only nearby things. I want to use it for policy-gradient/PPO and continuous control, and it should reuse the shared core.</pre>
+<h2>Files</h2>
+<table><tr><th>Op</th><th>File</th><th>Calls</th><th>By</th><th>Via</th><th>Steps</th></tr><tr><td>edit</td><td><code>CONSTRAINTS.md</code></td><td>2</td><td>main</td><td>Bash</td><td><a href="#D398">D398</a> <a href="#D399">D399</a></td></tr><tr><td>read</td><td><code>../plugin/dev-team/skills/idea-refine/references/extend.md</code></td><td>1</td><td>main</td><td>Bash</td><td><a href="#D397">D397</a></td></tr><tr><td>read</td><td><code>../plugin/dev-team/skills/idea-refine/references/ideation.md</code></td><td>1</td><td>main</td><td>Bash</td><td><a href="#D401">D401</a></td></tr><tr><td>read</td><td><code>CONSTRAINTS.md</code></td><td>3</td><td>main</td><td>Bash</td><td><a href="#D395">D395</a> <a href="#D398">D398</a> <a href="#D399">D399</a></td></tr><tr><td>read</td><td><code>docs/brief.md</code></td><td>1</td><td>main</td><td>Bash</td><td><a href="#D401">D401</a></td></tr><tr><td>read</td><td><code>docs/requests.md</code></td><td>1</td><td>main</td><td>Bash</td><td><a href="#D389">D389</a></td></tr><tr><td>read</td><td><code>docs/roadmap.md</code></td><td>1</td><td>main</td><td>Bash</td><td><a href="#D389">D389</a></td></tr><tr><td>read</td><td><code>docs/spec.md</code></td><td>1</td><td>main</td><td>Bash</td><td><a href="#D403">D403</a></td></tr></table>
+<h2>Steps</h2>
+<div class="step" id="SD386"><span class="sid">D386</span><span class="kind">command</span>USER TYPED `/dev-team:idea-refine From the previous session:
+&lt;&lt;&lt;
+ EX-02 (pip-audit on torch, expiring at M1 exit). This is a loosening, so it needs your explicit yes.
+
+   I recommend (a). The unfixed findings may still need a narrower exception after the move.
+2. Import rules the checker can&#x27;t hold yet (20 gaps):
+   - 8 wait for M2. The rules stopping `baselines`, `curves` and `replay` from importing what they shouldn&#x27;t can only be written once those modules exist. Extending the bar at M2 kickoff adds them.
+   - 12 come from `cli`. The architecture says `cli` depends on &quot;all of the above&quot;, and the checker reads that as no dependencies. Listing them explicitly in the architecture would clear these.
+3. Slow first install: M1-T01&#x27;s first edit triggers the torch install, which can take minutes on a fresh machine.
+4. Two requests about the stage 1 skills line in the plan (UR-23, UR-24) are still open. They&#x27;re for build planning, not this bar.
+
+Your words: &quot;1) block on coverage floor and main check&quot; UR-37 → the gate budget line in CONSTRAINTS.md; &quot;2) mypy strict&quot; UR-38 → CR-23; &quot;3) measure and hold&quot; UR-39 → CR-40–42; &quot;4) 90 s&quot; UR-40 → &quot;`check.sh gate` finishes in ≤ 90 s&quot;; &quot;5) yes, commit the setup files&quot; UR-41 → committed; &quot;No CI.&quot; UR-42 → CR-26 runs in `full` only; &quot;the setup writes it and you drop it from T01&#x27;s file list&quot; UR-43 → M1-T01. Open: none.
+
+Do you approve the bar, and is it (a) or (b) for torch? A yes marks it Approved, commits that, and sets the plan&#x27;s `Base`. After that, you start building with `/build`.
+&gt;&gt;&gt;
+
+Approved. For torch, take your recommendation (a). Next idea: Environment 2 is a circular tank with a ball bouncing around inside it. Little fish agents have to learn to swim away from the ball and survive as long as possible. Movement is continuous and there are several fish at once, and each fish sees only nearby things. I want to use it for policy-gradient/PPO and continuous control, and it should reuse the shared core.`</div><div class="step" id="SD387"><span class="sid">D387</span><span class="kind">skill-body</span>skill loaded from `/Users/connorott/plugins/dev-team-workspace/iteration-11/rl-incremental/with_skill/plugin/dev-team/skills/idea-refine`</div><div class="step" id="SD388"><span class="sid">D388</span><span class="kind">Bash</span>python3 ../plugin/dev-team/scripts/dt.py status --skill idea-refine; ls docs docs/ideas 2&gt;/dev/null; grep -n -i -B2 -A12 &quot;EX-02\|torch&quot; CONSTRAINTS.md | head -80<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;python3 ../plugin/dev-team/scripts/dt.py status --skill idea-refine; ls docs docs/ideas 2&gt;/dev/null; grep -n -i -B2 -A12 \&quot;EX-02\\|torch\&quot; CONSTRAINTS.md | head -80&quot;
+}</pre><div class="lbl">output</div><pre>skill: idea-refine
+mode: extend
+docs: brief Accepted · spec Approved · architecture Approved (Single package) · roadmap ok · plan M1 Approved · constraints Draft
+next ids: AD-11 PL-07 TC-16 S2 M4 M1-T20
+references_unindexed: none
+references_changed: none
+references_missing: none
+brief_words: 448
+brief_goals: 4
+ideas: none
+roadmap_rows: S1 Snake + shared core [brief]
+references_unassigned: none
+requests_open: none
+docs:
+architecture.md
+brief.md
+explained
+packages
+requests.md
+roadmap.md
+routes.md
+spec.md
+32-| CR-26 | Deps security | nothing known-vulnerable | pip-audit | — | full |
+33-| CR-27 | Reproducibility | same seed and settings, same logged results (QR-05) | pytest `-m repro` | `tool.pytest.ini_options.markers` | gate |
+34:| CR-28 | Hand-written learning | no RL library declared or imported (QR-03); `agent` imports only torch, NumPy and the stdlib | deptry DEP001 + reviewer | `project.dependencies` | gate |
+35-
+36-**Gate budget:** `check.sh gate` finishes in ≤ 90 s (UR-40); a failing gate blocks the implementer&#x27;s Stop (UR-37). `check.sh full` has no time limit; its findings become review findings. No CI workflow (UR-42).
+37-
+38-## Measured, not yet enforced
+39-| ID | Metric | Today | Direction |
+40-|---|---|---|---|
+41-| CR-40 | Coverage (branch) | — (no code) (`tool.coverage.report.fail_under`, raised by Ratchet) | must not fall |
+42-| CR-41 | vulture findings at `min_confidence = 60` (`scripts/vulture_whitelist.py`) | 0 | must not grow |
+43-| CR-42 | Duplicate blocks of ≥ 8 similar source lines (pylint `duplicate-code`, `[tool.pylint.similarities]` in pyproject.toml) | 0 | must not grow |
+44-
+45-## Boundaries (generated from architecture — do not edit)
+46-- `rllab.core` imports nothing first-party · `rllab.snake` → core · `rllab.corridor` → core · `rllab.agent` → core · `rllab.baselines` → core, snake · `rllab.evaluate` → core · `rllab.runs` → agent, evaluate · `rllab.train` → core, agent, evaluate, runs · `rllab.registry` → snake, corridor, agent, baselines, runs · `rllab.curves` → runs · `rllab.replay` → core, evaluate, registry · `rllab.study` → agent, train, evaluate, runs, registry, curves · `rllab.cli` → core, snake, corridor, agent, baselines, evaluate, runs, train, registry, curves, replay, study
+--
+90-| ID | Rule | Path | Reason | Owner | Expires |
+91-|---|---|---|---|---|---|
+92:| EX-01 | CR-25 DEP002 | `numpy`, `torch` | M1 dependencies (AD-02), declared before the code imports them | @connorott | M1 exit |</pre></details></div><div class="step" id="SD389"><span class="sid">D389</span><span class="kind">Bash</span>grep -rn -i &quot;pip-audit\|EX-02\|(a)&quot; --include=*.md --include=*.toml --include=*.sh . | grep -v &quot;^./.git&quot; | head -30; tail -30 docs/requests.md; cat docs/roadmap.md<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;grep -rn -i \&quot;pip-audit\\|EX-02\\|(a)\&quot; --include=*.md --include=*.toml --include=*.sh . | grep -v \&quot;^./.git\&quot; | head -30; tail -30 docs/requests.md; cat docs/roadmap.md&quot;
+}</pre><div class="lbl">output</div><pre>(eval):1: no matches found: --include=*.md
+- **UR-14** spec · &quot;under ~1 hour training per environment&quot; [training time limit] · idea-refine 2026-10-18 → QR-01
+- **UR-15** brief · &quot;no budget beyond free tools&quot; [budget] · idea-refine 2026-10-18 → §Constraints
+- **UR-16** brief · &quot;Evenings/weekends, a few weeks per environment. No deadline.&quot; [time available] · idea-refine 2026-10-18 → §Constraints
+- **UR-17** spec · &quot;A lab = shared core (env interface, training loop, logging, replay viewer) reused across environments, plus learning curves.&quot; [what makes it a lab] · idea-refine 2026-10-18 → CORE-01, CORE-02, CORE-03, CORE-04, CORE-05, CORE-06, LOG-01, REPLAY-02, CURVE-01
+- **UR-18** spec · &quot;No fancy views.&quot; [what makes it a lab: no Q-value heatmaps or other visualisations beyond learning curves and replay] · idea-refine 2026-10-18 → §Scope, CURVE-01
+- **UR-19** brief · &quot;Nothing beyond Snake for now; I&#x27;m focusing on the current stage and haven&#x27;t decided what comes next.&quot; [later environments] · idea-refine 2026-10-18 → §Not doing
+- **UR-20** spec · &quot;your lean of 2 + 4 + 6 works for me (feature-state DQN, ablation switches, baseline-first)&quot; [direction: 2 = DQN on ~11 hand-crafted state features with small MLP, replay buffer, target network; 4 = switches to turn off replay buffer / target network / epsilon decay; 6 = greedy scripted + random baselines scored on the same seeded games] · idea-refine 2026-10-18 → SNAKE-06, AGENT-01, AGENT-04, AGENT-05, ABL-01, ABL-02, ABL-03, BASE-01, BASE-02, BASE-03
+- **UR-21** spec · &quot;Not interested in pixel/conv input.&quot; [scope: no raw-grid / convolutional state] · idea-refine 2026-10-18 → §Scope, SNAKE-06
+- **UR-22** plan · &quot;Yes, route both skills to S1.&quot; [route null-hypothesis-testing and dataviz to stage S1 (Snake + shared core)] · idea-refine 2026-10-18 → superseded by UR-23
+- **UR-23** plan · &quot;Drop dataviz from the S1 Skills line since it isn&#x27;t installed.&quot; [S1 Skills line: route only null-hypothesis-testing, not dataviz] · spec-writing 2026-10-18
+- **UR-24** plan · &quot;Keep null-hypothesis-testing.&quot; [S1 Skills line keeps null-hypothesis-testing] · spec-writing 2026-10-18
+- **UR-25** spec · &quot;keep the tougher scripted baseline (BASE-02 as written)&quot; [scripted baseline: danger-avoiding greedy vs no-danger-check greedy] · spec-writing 2026-10-18 → BASE-02
+- **UR-26** spec · &quot;if no switch hurts learning, record it as a finding in my notes&quot; [ABL-05: what happens if no ablation hurts learning] · spec-writing 2026-10-18 → ABL-05, EXPL-02
+- **UR-27** spec · &quot;S1 doesn&#x27;t count as failed.&quot; [ABL-05: no ablation hurting learning is not a stage failure] · spec-writing 2026-10-18 → ABL-05
+- **UR-28** architecture · &quot;Single package, go with your recommendation.&quot; [architecture shape: single package rllab (recommended) vs multi-package] · architecture-design 2026-10-18 → AD-01
+- **UR-29** architecture · &quot;Go with pygame-ce for the replay viewer.&quot; [AD-06 replay viewer: pygame-ce (default) vs Matplotlib animation] · architecture-design 2026-10-18 → AD-06
+- **UR-30** tests · &quot;test planning with known-answer cases&quot; [how golden cases are made: known-answer cases] · test-planning 2026-10-18 → TC-01, TC-02, TC-03, TC-04, TC-05, TC-06, TC-07, TC-08, TC-09, TC-10, TC-11, TC-12
+- **UR-31** tests · &quot;PL-04 hurts most if wrong, agreed&quot; [which workflow would hurt most if quietly wrong: PL-04 study verdicts] · test-planning 2026-10-18 → TC-06, TC-07, TC-08, TC-09, TC-10, TC-11
+- **UR-32** tests · &quot;Put the most cases on PL-04 and PL-01, one on each of the others.&quot; [case distribution across PL-01..PL-05] · test-planning 2026-10-18 → TC-01, TC-02, TC-03, TC-04, TC-05, TC-06, TC-07, TC-08, TC-09, TC-10, TC-11, TC-12
+- **UR-33** tests · &quot;No trusted input/output pairs, all synthetic or from the spec.&quot; [trusted input/output pairs for golden cases] · test-planning 2026-10-18 → TC-01, TC-02, TC-03, TC-04, TC-05, TC-06, TC-07, TC-08, TC-09, TC-10, TC-11, TC-12
+- **UR-34** plan · &quot;The three-milestone cut works.&quot; [S1 cut: M1 Train an agent (PL-01), M2 Baselines, curves and replay (PL-02, PL-03, PL-05), M3 The study (PL-04, PL-06) vs two milestones or one] · build-planning 2026-10-18 → §Scope
+- **UR-35** plan · &quot;with nothing in M1 deferred&quot; [M1 scope: all PL-01 spec IDs, exit TC-01–TC-03 plus a 1,000-game Snake run ≤ 60 min (QR-01)] · build-planning 2026-10-18 → M1-T01, M1-T19
+- **UR-36** plan · &quot;Keep the DQN upgrade chain as is.&quot; [M1 DQN thickens T15→T16→T17→T18 in series vs folding load into the spine] · build-planning 2026-10-18 → M1-T15, M1-T16, M1-T17, M1-T18
+- **UR-37** constraints · &quot;1) block on coverage floor and main check&quot; [Q1 block or warn mid-task: block on the floor and gate, full findings become review findings] · build-setup 2026-10-18 → §Enforced with numbers
+- **UR-38** constraints · &quot;2) mypy strict&quot; [Q2 type gate: mypy strict gates, pyright in full] · build-setup 2026-10-18 → CR-23
+- **UR-39** constraints · &quot;3) measure and hold&quot; [Q3 thresholds: targets vs measure and hold] · build-setup 2026-10-18 → CR-40, CR-41, CR-42
+- **UR-40** constraints · &quot;4) 90 s&quot; [Q4 slowest gate tolerated] · build-setup 2026-10-18 → §Enforced with numbers
+- **UR-41** constraints · &quot;5) yes, commit the setup files&quot; [Q5 commit the bar skeleton once generated] · build-setup 2026-10-18 → §Roles and protected paths
+- **UR-42** constraints · &quot;No CI.&quot; [whether build-setup writes a CI workflow] · build-setup 2026-10-18 → CR-26
+- **UR-43** plan · &quot;I agree on the conftest.py fix: the setup writes it and you drop it from T01&#x27;s file list.&quot; [tests/conftest.py: written by build-setup (protected), removed from M1-T01 Writes] · build-setup 2026-10-18 → M1-T01
+# RL Lab — Roadmap
+
+**Last updated:** 2026-10-18
+
+| Stage | Name | Source | Status* |
+|---|---|---|---|
+| S1 | Snake + shared core | brief | Planned |
+
+| Milestone | Stage | Name | Packages | Pipelines | Depends | Status* |
+|---|---|---|---|---|---|---|
+| M1 | S1 | Train an agent | rllab | PL-01 | — | Planned |
+| M2 | S1 | Baselines, curves and replay | rllab | PL-02, PL-03, PL-05 | M1 (runs.RunRecord, agent.DQNAgent, evaluate.evaluate) | Designed |
+| M3 | S1 | The study | rllab | PL-04, PL-06 | M1 (train.train_run), M2 (study.score_baselines, curves.plot_curves) | Designed |
+
+*Written by `dt roadmap` from doc statuses and todo checkboxes; never hand-edited.
+
+## S1: Snake + shared core
+**Outline:** I can train my own from-scratch DQN on Snake in under an hour, see its learning curve beat random and scripted agents, switch off parts of the agent to see what breaks, and watch a replay, all on a shared core the next environment can reuse.
+**Skills:** null-hypothesis-testing
+
+## M1: Train an agent
+**Outline:** `python -m rllab train --env snake` trains the hand-written DQN, with any of the 3 switches off, on the shared core, and keeps its record and trained agent in `runs/&lt;name&gt;/`.
+**Skills:** —
+**References:** —
+**Exit:** One command trains the full agent or any ablation on Snake or the corridor; TC-01–TC-03 pass and a 1,000-game Snake run finishes in ≤ 60 minutes (QR-01).
+**Plan:** [../tasks/plan.md](../tasks/plan.md)
+
+## M2: Baselines, curves and replay
+**Outline:** Score the random and scripted baselines on the held-out games, draw saved runs&#x27; learning curves against them, and watch any saved agent or baseline play a seeded game.
+**Skills:** —
+**References:** —
+**Exit:** `rllab baselines`, `rllab curves` and `rllab replay` run on M1&#x27;s saved runs; TC-04, TC-05 and TC-12 pass.
+
+## M3: The study
+**Outline:** One unattended command trains the full agent and its 3 ablations × 5 seeds, scores both baselines, runs the comparisons and writes the report and chart; the notes check reports what the learner&#x27;s page still lacks. Its exit holds the stage&#x27;s bar: the full agent beats both baselines (TC-11).
+**Skills:** null-hypothesis-testing
+**References:** —
+**Exit:** `rllab study --env snake` finishes unattended in ≤ 10 hours and the full agent beats both baselines; TC-06–TC-11 and TC-13–TC-15 pass.</pre></details></div><div class="step" id="SD390"><span class="sid">D390</span><span class="kind">Bash</span>grep -rn -i &quot;pip.audit\|EX-0&quot; pyproject.toml scripts CONSTRAINTS.md tasks 2&gt;/dev/null | head; ls docs/explained; ls ~/.claude/projects/-Users-connorott-plugins-dev-team-workspace-iteration-11-rl-incremental-with-skill-project/ | tail -5<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;grep -rn -i \&quot;pip.audit\\|EX-0\&quot; pyproject.toml scripts CONSTRAINTS.md tasks 2&gt;/dev/null | head; ls docs/explained; ls ~/.claude/projects/-Users-connorott-plugins-dev-team-workspace-iteration-11-rl-incremental-with-skill-project/ | tail -5&quot;
+}</pre><div class="lbl">output</div><pre>pyproject.toml:33:    &quot;pip-audit&quot;,
+scripts/check.sh:252:    run pip-audit --skip-editable   # the external opinion: a vulnerability database (CR-26)
+CONSTRAINTS.md:32:| CR-26 | Deps security | nothing known-vulnerable | pip-audit | — | full |
+CONSTRAINTS.md:79:**Milestone exit**, over the whole diff, adds: the Scope&#x27;s Exit holds; every Covers ID has a test; `check.sh full --exit` finds no stub; system tests use real providers; the same sample through a real provider and its double agrees; deferred requirements untouched; pip-audit ran.
+CONSTRAINTS.md:92:| EX-01 | CR-25 DEP002 | `numpy`, `torch` | M1 dependencies (AD-02), declared before the code imports them | @connorott | M1 exit |
+rllab.md
+e50d47f4-3c1f-4247-a148-0655deb493ca.jsonl
+ea9748b6-8dfd-43eb-b413-80987464ca9a.jsonl
+fc62686b-2bc8-48fe-bb07-51d72fb83e10.jsonl
+fd7f69dd-e50c-4569-97dc-4e227112adaa.jsonl
+memory</pre></details></div><div class="step" id="SD391"><span class="sid">D391</span><span class="kind">Bash</span>cd ~/.claude/projects/-Users-connorott-plugins-dev-team-workspace-iteration-11-rl-incremental-with-skill-project/ &amp;&amp; f=$(ls -t *.jsonl | head -1); echo $f; grep -o &#x27;(a)[^&quot;\\]\{0,300\}&#x27; $f | sort -u | head -20; grep -o &#x27;(b)[^&quot;\\]\{0,300\}&#x27; $f | sort -u | head -10<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;cd ~/.claude/projects/-Users-connorott-plugins-dev-team-workspace-iteration-11-rl-incremental-with-skill-project/ &amp;&amp; f=$(ls -t *.jsonl | head -1); echo $f; grep -o &#x27;(a)[^\&quot;\\\\]\\{0,300\\}&#x27; $f | sort -u | head -20; grep -o &#x27;(b)[^\&quot;\\\\]\\{0,300\\}&#x27; $f | sort -u | head -10&quot;
+}</pre><div class="lbl">output</div><pre>0b6b62cd-1bdb-434b-9c27-9b8067564bfe.jsonl
+(a)
+(a) or (b) for torch?** A yes marks it Approved, commits that, and sets the plan&#x27;s `Base`. After that, you start building with `/build`.
+(a). Next idea: Environment 2 is a circular tank with a ball bouncing around inside it. Little fish agents have to learn to swim away from the ball and survive as long as possible. Movement is continuous and there are several fish at once, and each fish sees only nearby things. I want to use it for pol
+(a). The unfixed findings may still need a narrower exception after the move.
+(a). The unfixed findings…
+(b) for torch?** A yes marks it Approved, commits that, and sets the plan&#x27;s `Base`. After that, you start building with `/build`.
+Shell cwd was reset to /Users/connorott/plugins/dev-team-workspace/iteration-11/rl-incremental/with_skill/project</pre></details></div><div class="step" id="SD392"><span class="sid">D392</span><span class="kind">Bash</span>cd ~/.claude/projects/-Users-connorott-plugins-dev-team-workspace-iteration-11-rl-incremental-with-skill-project/ &amp;&amp; for f in $(ls -t *.jsonl | sed -n &#x27;2,5p&#x27;); do echo &quot;== $f&quot;; grep -o &#x27;[^&quot;\\]\{0,400\}EX-02[^&quot;\\]\{0,600\}&#x27; $f | tail -4; done<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;cd ~/.claude/projects/-Users-connorott-plugins-dev-team-workspace-iteration-11-rl-incremental-with-skill-project/ &amp;&amp; for f in $(ls -t *.jsonl | sed -n &#x27;2,5p&#x27;); do echo \&quot;== $f\&quot;; grep -o &#x27;[^\&quot;\\\\]\\{0,400\\}EX-02[^\&quot;\\\\]\\{0,600\\}&#x27; $f | tail -4; done&quot;
+}</pre><div class="lbl">output</div><pre>== 636442c8-f5dd-44bb-a308-1fe9684ab147.jsonl
+ugrep: error: error at position 649
+\x80-\xbf][\x80-\xbf]){0,600}
+exceeds complexity limits___/
+
+
+== 8c390af6-c051-4204-829e-d7324dce976b.jsonl
+ugrep: error: error at position 649
+\x80-\xbf][\x80-\xbf]){0,600}
+exceeds complexity limits___/
+
+
+== fd7f69dd-e50c-4569-97dc-4e227112adaa.jsonl
+ugrep: error: error at position 649
+\x80-\xbf][\x80-\xbf]){0,600}
+exceeds complexity limits___/
+
+
+== 55fba9f5-7556-4393-9717-d101f456608b.jsonl
+ugrep: error: error at position 649
+\x80-\xbf][\x80-\xbf]){0,600}
+exceeds complexity limits___/
+Shell cwd was reset to /Users/connorott/plugins/dev-team-workspace/iteration-11/rl-incremental/with_skill/project</pre></details></div><div class="step" id="SD393"><span class="sid">D393</span><span class="kind">say</span>Looking up exactly what option (a) for torch was in the earlier session, so I record the right exception before approving the bar.<details><summary>full text</summary><pre>Looking up exactly what option (a) for torch was in the earlier session, so I record the right exception before approving the bar.</pre></details></div><div class="step" id="SD394"><span class="sid">D394</span><span class="kind">Bash</span>cd ~/.claude/projects/-Users-connorott-plugins-dev-team-workspace-iteration-11-rl-incremental-with-skill-project/ &amp;&amp; for f in $(ls -t *.jsonl | sed -n &#x27;2,6p&#x27;); do python3 - &quot;$f&quot; &lt;&lt;&#x27;EOF&#x27;
+import sys,re
+t=open(sys.argv[1]).read()
+for m in re.finditer(r&#x27;EX-02&#x27;,t):
+    s=t[max(0,m.start()-700):m.start()+900]
+    if &#x27;(a)&#x27; in s: print(&#x27;==&#x27;,sys.argv[1]); print(s.encode().decode(&#x27;unicode_escape&#x27;,&#x27;ignore&#x27;)[:1600]); break
+EOF
+done<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;cd ~/.claude/projects/-Users-connorott-plugins-dev-team-workspace-iteration-11-rl-incremental-with-skill-project/ &amp;&amp; for f in $(ls -t *.jsonl | sed -n &#x27;2,6p&#x27;); do python3 - \&quot;$f\&quot; &lt;&lt;&#x27;EOF&#x27;\nimport sys,re\nt=open(sys.argv[1]).read()\nfor m in re.finditer(r&#x27;EX-02&#x27;,t):\n    s=t[max(0,m.start()-700):m.start()+900]\n    if &#x27;(a)&#x27; in s: print(&#x27;==&#x27;,sys.argv[1]); print(s.encode().decode(&#x27;unicode_escape&#x27;,&#x27;ignore&#x27;)[:1600]); break\nEOF\ndone&quot;
+}</pre><div class="lbl">output</div><pre>== 636442c8-f5dd-44bb-a308-1fe9684ab147.jsonl
+whitelist entries and 0 duplicate blocks.
+- **Your answers:** block on the floor and main check (UR-37), mypy strict (UR-38), measure and hold (UR-39), 90 s (UR-40), commit the setup files (UR-41), no CI (UR-42), the `conftest.py` change (UR-43).
+
+## Loosenings
+None. This is the first bar.
+
+## Open questions
+1. **torch 2.5.1 has 22 known vulnerabilities**, and some have no fix in any version. The architecture pins 2.5 (AD-02). Only `full` runs this audit, so it doesn&#x27;t block building, but every review will report it. Pick one:
+   - **(a)** Move to a current torch. That changes AD-02, so it goes through `/dev-team:architecture-design` first.
+   - **(b)** Keep 2.5 and add exception **EX-02** (pip-audit on torch, expiring at M1 exit). This is a loosening, so it needs your explicit yes.
+
+   I recommend (a). The unfixed findings may still need a narrower exception after the move.
+2. **Import rules the checker can&#x27;t hold yet (20 gaps):**
+   - **8 wait for M2.** The rules stopping `baselines`, `curves` and `replay` from importing what they shouldn&#x27;t can only be written once those modules exist. Extending the bar at M2 kickoff adds them.
+   - **12 come from `cli`.** The architecture says `cli` depends on &quot;all of the above&quot;, and the checker reads that as no dependencies. Listing them explicitly in the architecture would clear these.
+3. **Slow first install:** M1-T01&#x27;s first edit triggers the torch install, which can take minutes on a fresh machine.
+4. Two requests about the stage 1 skills line in the plan (UR-23, UR-24) are still open. They&#x27;re for build planning, n
+Shell cwd was reset to /Users/connorott/plugins/dev-team-workspace/iteration-11/rl-incremental/with_skill/project</pre></details></div><div class="step" id="SD395"><span class="sid">D395</span><span class="kind">Bash</span>python3 ../plugin/dev-team/scripts/dt.py --help 2&gt;&amp;1 | head -40; grep -n &quot;Base\|Status&quot; tasks/plan.md | head; head -8 CONSTRAINTS.md; grep -n -i &quot;approv\|Base&quot; ../plugin/dev-team/skills/build-setup/SKILL.md | head -20<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;python3 ../plugin/dev-team/scripts/dt.py --help 2&gt;&amp;1 | head -40; grep -n \&quot;Base\\|Status\&quot; tasks/plan.md | head; head -8 CONSTRAINTS.md; grep -n -i \&quot;approv\\|Base\&quot; ../plugin/dev-team/skills/build-setup/SKILL.md | head -20&quot;
+}</pre><div class="lbl">output</div><pre>usage: dt [-h] [--root ROOT]
+          {status,next,next-id,section,explain,context,ready,plan,layout,outline,references,probes,lint,roadmap,guard,prebuild-clear,archive,finding,route,request,tick,base} ...
+
+dt: dev-team&#x27;s doc tool. One parser for every planning doc; see
+scripts/README.md for the commands.
+
+positional arguments:
+  {status,next,next-id,section,explain,context,ready,plan,layout,outline,references,probes,lint,roadmap,guard,prebuild-clear,archive,finding,route,request,tick,base}
+    status              What a skill needs before it starts: mode, upstream
+                        gates, gaps and next IDs. `--summary` for
+                        SessionStart.
+    next                Name the next skill run and its mode, and why: a Draft
+                        waiting for approval, references or probes waiting, a
+    next-id             Print the next free ID for a prefix (PL, TC, AD, CR,
+                        S, M, M2-T, M2-R, or a spec prefix), retired IDs
+                        counted.
+    section             Print the sections that define the given IDs,
+                        searching every doc (the archive last).
+    explain             Explain the pipelines in plain words: what each is
+                        for, how it runs and what each step does, from
+                        pipelines.md.
+    context             Print a task&#x27;s whole builder context packet: its Read:
+                        sections and files, the package layout, the frozen
+    ready               Every task of the active plan that can start now, with
+                        its Writes:, so an orchestrator fans out in one turn.
+    plan                The plan as one snapshot for workflow-analyzer&#x27;s plan
+                        map (`plan-map/2`, interface-first-design.md §8.3):
+                        goals,
+    layout              Print a package&#x27;s real source tree with module
+                        docstrings, and flag entry functions that drift from
+                        their step tables.
+    outline             Print a file&#x27;s outline: defs and classes with
+                        signatures and docstring first lines (`.py`, via ast;
+                        never
+    references          Reference files against docs/references.md: list each
+                        entry&#x27;s state, or `--stamp` its Hash (mechanical).
+    probes              Probe folders against docs/probes.md: list each
+                        probe&#x27;s state, `--stamp` its Hash (mechanical), or
+                        `--scan` its
+    lint                Check the planning docs: IDs, references, size
+3:**Milestone:** M1 · **Status:** Approved · **Base:** — · **Last updated:** 2026-10-18 · **Roadmap:** [../docs/roadmap.md](../docs/roadmap.md)
+# Constraints
+**Status:** Draft · **Last reviewed:** 2026-10-18 by @connorott · **Ratcheted:** —
+
+The standing quality bar. `pyproject.toml` and `scripts/check.sh` enforce it; every number here names its config key, and `dt status` fails if the two disagree. Only `build-setup` changes this file, with the user: tightening is routine, loosening needs an explicit yes.
+
+## Floor
+- **CR-01** No new suppressions. Ruff runs with `--ignore-noqa` in gate and full, so a Ruff exception is a `per-file-ignores` entry in protected config with a row in Exceptions. `# type: ignore`, `pyright:` comments and `pragma: no cover` are caught by `floor_guard.sh` on the diff
+- **CR-02** No stubs: `raise NotImplementedError` outside abstract methods, `pass`-only bodies, bare `except: pass`. One carve-out: the interface task&#x27;s step signatures, whose body is only `raise NotImplementedError(&quot;&lt;task id&gt;&quot;)` naming the open task that replaces it. `check.sh gate` fails on one naming a task that isn&#x27;t open in `tasks/todo.md`; `check.sh full --exit` (the milestone exit) fails on any
+3:description: Turns the approved plans into an enforced quality bar before agents write code - CONSTRAINTS.md, tool config in pyproject.toml, check and hook scripts, and the tester, implementer and reviewer agent files. Use when tasks/plan.md is approved and the first build hasn&#x27;t started, at kickoff when new packages or dependencies need the bar extended, at Advance to ratchet measured values, when a rule or exception should change, or to audit the bar for drift.
+8:This skill says what &quot;good enough&quot; means and makes it mechanical: `CONSTRAINTS.md` (the readable bar, `CR-NN` rules, `EX-NN` exceptions) and what enforces it: tool config, `scripts/check.sh` (modes `fast | collect | gate | full`), the floor guard, hook scripts and the three build agents. It is the last approval before agents write code. The tooling is **project-owned**: CI and people run it without the plugin. Loosening is loud; tightening is routine.
+12:**Needs:** an Approved `tasks/plan.md` from `build-planning`.
+20:Run `python3 ../../scripts/dt.py status --skill build-setup` first (path relative to this skill&#x27;s folder, run from the project root; write it out each call, never as a shell variable). It reports the mode, the gap keys (`config_mismatches`, `protected_gaps`, `agents_missing`, …), `expired_exceptions`, `dependents` and `base`. Revise and Audit run when the user asks for them.
+24:| blocked | no Approved plan | Stop; start what `dt next` names, this turn |
+26:| Extend | kickoff, next plan approved | `references/extend.md` |
+40:Ask for approval (a yes also commits) and **stop the turn**.
+44:| An unambiguous yes | Set `**Status:** Approved` and `**Last reviewed:**`. Commit the bar if `git status` lists it. **New or Extend:** after that commit, run `python3 ../../scripts/dt.py base` (sets the plan&#x27;s `**Base:**` to HEAD, so guard-the-bar diffs and Audit start from a commit that holds the bar) and say the next step is `/build`, run by the user. Other modes: the mode file&#x27;s last step. **Stop.** |
+45:| A hedge on a loosening or exception (&quot;fine I guess&quot;) | Not approval. Ask again about that item |</pre></details></div><div class="step" id="SD396"><span class="sid">D396</span><span class="kind">think</span>I&#x27;ll approve and commit the bar now, log your torch choice (noting it affects AD-02 and needs architecture-design review), then move on to the fish idea.<details><summary>full text</summary><pre>I&#x27;ll approve and commit the bar now, log your torch choice (noting it affects AD-02 and needs architecture-design review), then move on to the fish idea.
+
+</pre></details></div><div class="step" id="SD397"><span class="sid">D397</span><span class="kind">Bash</span>python3 ../plugin/dev-team/scripts/dt.py request add --help; sed -n 1,80p ../plugin/dev-team/skills/idea-refine/references/extend.md<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;python3 ../plugin/dev-team/scripts/dt.py request add --help; sed -n 1,80p ../plugin/dev-team/skills/idea-refine/references/extend.md&quot;
+}</pre><div class="lbl">output</div><pre>usage: dt request [-h] [--skill SKILL] [--about ABOUT] [--replaces UR-NN]
+                  [--approved APPROVED] [--into ID [ID ...]]
+                  [--owner {brief,spec,architecture,pipelines,tests,plan,constraints}]
+                  [--open] [--json]
+                  [{add,trace,change,list}] [args ...]
+
+positional arguments:
+  {add,trace,change,list}
+  args                  add: owner and words; trace: UR-NN and IDs; change:
+                        UR-NN and what
+
+options:
+  -h, --help            show this help message and exit
+  --skill SKILL         the skill that heard the words (add) or the approval
+                        (change)
+  --about ABOUT         add: what the words answer, when they don&#x27;t say it
+                        themselves
+  --replaces UR-NN      add: an earlier request these words replace
+  --approved APPROVED   change: the user&#x27;s words approving the change
+  --into ID [ID ...]    change: the IDs the change was written into (every ID
+                        that honoured the old words)
+  --owner {brief,spec,architecture,pipelines,tests,plan,constraints}
+                        list: only this owner&#x27;s requests
+  --open                list: only requests nothing honours yet
+  --json                list: print JSON
+# Extend mode: an idea file
+
+`docs/brief.md` exists, so the new idea gets its own file and must earn its place in the project. Examples: `examples-extend.md`, `examples-ml.md`, `examples-data.md` (stage skills and references).
+
+**Read before asking anything:** `docs/brief.md`, `docs/spec.md`, `docs/roadmap.md` and open ideas in `docs/ideas/`. Their problem, goals, constraints, Not Doing list and requirements constrain the new idea. `Specced` ideas are frozen records; where one disagrees with the spec, the spec is current.
+
+- A `Draft` brief: ask whether to finish reviewing it first.
+- A `Draft`, `Accepted` or `Parked` idea covering the same ground: offer to refine it instead. A `Specced` one is frozen; a change starts a new file.
+
+**Phases 1-2** per `ideation.md`. Before Phase 1, restate the new idea in terms of the existing project: &quot;This adds [X] so that [existing user] can [outcome].&quot; Note which existing features and requirement IDs it touches.
+
+**Fit check (during Phase 2) — answer one of these out loud. It decides whether the brief changes:**
+
+| Finding | Idea file | Brief |
+|---|---|---|
+| Serves an existing goal. Every new stage of the same project does | Write it | **No change.** This is the common case. A new stage never adds a goal, even when the user asks for one: the stage is its roadmap row and the idea&#x27;s *Serves* line. |
+| Needs a new goal: the project&#x27;s outcome itself widens, same problem and user | Write it | Add the goal with the next number. If that makes more than five, merge before writing: propose which goals fold together, your merge as the default, and write the merged set. Never write a sixth goal. |
+| Changes a constraint (deadline, budget, a rule) | Write it | Update Constraints. |
+| Contradicts the Not Doing list | Write it only if the user reverses that decision | Remove the item, with the user&#x27;s agreement. Otherwise park the idea. |
+| Different problem or different user | Don&#x27;t write it | Push back: this may be a separate project with its own brief. |
+
+**Phase 3: write `docs/ideas/&lt;idea-slug&gt;.md`** (kebab-case slug, e.g. `shared-editing.md`):
+
+```markdown
+# Idea: [Name]
+
+**Status:** Draft · **Last updated:** YYYY-MM-DD · **Brief:** [../brief.md](../brief.md)
+
+## In one sentence
+[This adds X so that Y can Z.]
+
+## The problem
+[The specific pain this solves. Who hit it, how often, and evidence — customer requests, support tickets, lost deals.]
+
+## Who it&#x27;s for
+[Which of the brief&#x27;s users. Name the specific situation they&#x27;re in.]
+
+## How it fits
+- **Serves:** Goal 2 (and new Goal 4, if added)
+- **Touches:** [existing features and spec IDs this changes or depends on, e.g. EDIT-03]
+- **Brief changes:** [None — or the sections edited, in one line: &quot;Goal 4 added; Not doing narrowed&quot;]
+- **Stage:** [New S3 (roadmap stage on acceptance) — or &quot;joins S2&quot;, when the user puts it in a stage not yet being built]
+
+## Recommended direction
+[1-3 paragraphs on how it should work from the user&#x27;s point of view, and why this direction over the others.]
+
+## Data
+[ML and data ideas only — omit otherwise. What data it needs, where it lives or could come from, how much history and labels exist, and how results will be evaluated (held-out data, baseline). If an installed skill owns the evaluation step, such as a hypothesis-testing skill, name it here.]
+
+## Alternatives considered
+- [Direction] — [why not, in one line]
+
+## What success looks like
+- [Observable signs it worked]
+
+## What we&#x27;re betting on
+- [Assumptions specific to this idea]
+
+## Not doing
+- [Tempting part of this idea we&#x27;re leaving out] — [reason]
+
+## Open questions
+- [Questions spec-writing must resolve or ask about]
+```
+
+**Writing rules for idea files:**
+
+- **Plain English, still no requirements.** Describe what the user experiences and why; `spec-writing` turns that into requirement IDs and acceptance criteria.
+- **More room than the brief, not unlimited.** Aim for 300-700 words. The extra space goes to *How it fits*, *Alternatives considered*, and *Open questions* — the context the spec needs.
+- **One idea per file.** If the conversation produced two separable ideas, write two files (ask the user which to do first).
+- **Write it as a record, in the brief&#x27;s voice.** The file outlives the review. Notes to the user (&quot;my proposed limit, for you to check&quot;) belong in the conversation. Questions belong under *Open questions*.
+- **Tool preferences live here, not in the spec.** If the user names a library, dataset or service (&quot;hand-write the CNN, then compare with a torchvision model&quot;), record it under *Recommended direction* or *Data*. `spec-writing` writes the behavior without the name, and `architecture-design` reads the name from here.
+- **Never paste the idea into the brief.** Brief edits are limited to the fit-check table above, and leave `brief_words` within `new.md`&#x27;s budget: pay for each addition with a cut. A stage&#x27;s content belongs in the roadmap, never in a brief line listing the stages. Goal numbers stay stable; new goals take the next number, and a merged goal keeps the lower one. If a goal is dropped or merged away, tell the user which spec requirements referenced it.
+
+**Review Gate** (`../SKILL.md`): also say whether the brief changed and which sections.
+
+**Stage** per `roadmap.md`: one stage for the idea, Source `ideas/&lt;slug&gt;.md`. Skip it only when the idea&#x27;s *Stage* line says it joins a stage not yet being built.
+
+**Idea status lifecycle:** `Draft` → `Accepted` (user approved here) → `Specced` (set by `spec-writing` once the spec is approved). Parked ideas get `Parked` with a one-line reason, so they aren&#x27;t re-proposed blindly. **A `Specced` idea is frozen.** It records why the feature was added, as it stood that day. `spec-writing` adds a one-line banner saying so, and nobody edits the file afterwards. The spec is the current description. When a new idea changes what a `Specced` one describes, such as a narrowed holdout or a merged stage, the new idea gets its own file and names the old one under *Touches*. The old file is not edited.</pre></details></div><div class="step" id="SD398"><span class="sid">D398</span><span class="kind">Bash</span>D=&quot;python3 ../plugin/dev-team/scripts/dt.py&quot;; $D request add constraints &quot;Approved.&quot; --skill build-setup --about &quot;approve the M1 quality bar (CONSTRAINTS.md)&quot; &amp;&amp; $D request add architecture &quot;For torch, take your recommendation (a).&quot; --skill build-setup --about &quot;torch 2.5.1 pip-audit findings: (a) move to a current torch, changing AD-02 via architecture-design, vs (b) keep 2.5 with exception EX-02&quot; &amp;&amp; sed -i &#x27;&#x27; &#x27;s/^\*\*Status:\*\* Draft · \*\*Last reviewed:\*\* 2026-10-18/Status: Approved · * …[+93 chars] <span class="err">error</span><details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;D=\&quot;python3 ../plugin/dev-team/scripts/dt.py\&quot;; $D request add constraints \&quot;Approved.\&quot; --skill build-setup --about \&quot;approve the M1 quality bar (CONSTRAINTS.md)\&quot; &amp;&amp; $D request add architecture \&quot;For torch, take your recommendation (a).\&quot; --skill build-setup --about \&quot;torch 2.5.1 pip-audit findings: (a) move to a current torch, changing AD-02 via architecture-design, vs (b) keep 2.5 with exception EX-02\&quot; &amp;&amp; sed -i &#x27;&#x27; &#x27;s/^\\*\\*Status:\\*\\* Draft · \\*\\*Last reviewed:\\*\\* 2026-10-18/**Status:** Approved · **Last reviewed:** 2026-10-18/&#x27; CONSTRAINTS.md &amp;&amp; head -3 CONSTRAINTS.md &amp;&amp; git status --short&quot;
+}</pre><div class="lbl">output</div><pre>Exit code 127
+(eval):1: no such file or directory: python3 ../plugin/dev-team/scripts/dt.py</pre></details></div><div class="step" id="SD399"><span class="sid">D399</span><span class="kind">Bash</span>python3 ../plugin/dev-team/scripts/dt.py request add constraints &quot;Approved.&quot; --skill build-setup --about &quot;approve the M1 quality bar (CONSTRAINTS.md)&quot; &amp;&amp; python3 ../plugin/dev-team/scripts/dt.py request add architecture &quot;For torch, take your recommendation (a).&quot; --skill build-setup --about &quot;torch 2.5.1 pip-audit findings: (a) move to a current torch, changing AD-02 via architecture-design, vs (b) keep 2.5 with exception EX-02&quot; &amp;&amp; sed -i &#x27;&#x27; &#x27;s/^\*\*Status:\*\* Draft · \*\*Last reviewed:\*\* 2026- …[+123 chars]<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;python3 ../plugin/dev-team/scripts/dt.py request add constraints \&quot;Approved.\&quot; --skill build-setup --about \&quot;approve the M1 quality bar (CONSTRAINTS.md)\&quot; &amp;&amp; python3 ../plugin/dev-team/scripts/dt.py request add architecture \&quot;For torch, take your recommendation (a).\&quot; --skill build-setup --about \&quot;torch 2.5.1 pip-audit findings: (a) move to a current torch, changing AD-02 via architecture-design, vs (b) keep 2.5 with exception EX-02\&quot; &amp;&amp; sed -i &#x27;&#x27; &#x27;s/^\\*\\*Status:\\*\\* Draft · \\*\\*Last reviewed:\\*\\* 2026-10-18/**Status:** Approved · **Last reviewed:** 2026-10-18/&#x27; CONSTRAINTS.md &amp;&amp; head -3 CONSTRAINTS.md &amp;&amp; git status --short&quot;
+}</pre><div class="lbl">output</div><pre>UR-44 constraints: &quot;Approved.&quot;
+UR-45 architecture: &quot;For torch, take your recommendation (a).&quot;
+# Constraints
+**Status:** Approved · **Last reviewed:** 2026-10-18 by @connorott · **Ratcheted:** —
+
+ M CONSTRAINTS.md
+ M docs/requests.md</pre></details></div><div class="step" id="SD400"><span class="sid">D400</span><span class="kind">Bash</span>python3 ../plugin/dev-team/scripts/dt.py request trace UR-44 &quot;§Status&quot; &gt;/dev/null 2&gt;&amp;1; git add CONSTRAINTS.md docs/requests.md &amp;&amp; git commit -q -m &quot;Approve the M1 quality bar; record the torch upgrade choice (UR-44, UR-45)
+
+Co-Authored-By: Claude Opus 5.5 &lt;noreply@anthropic.com&gt;&quot; &amp;&amp; python3 ../plugin/dev-team/scripts/dt.py base &amp;&amp; git status --short &amp;&amp; git log --oneline -1<div class="lbl">commit fadf518 (unconfirmed): Approve the M1 quality bar; record the torch upgrade choice (UR-44, UR-45)</div><details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;python3 ../plugin/dev-team/scripts/dt.py request trace UR-44 \&quot;§Status\&quot; &gt;/dev/null 2&gt;&amp;1; git add CONSTRAINTS.md docs/requests.md &amp;&amp; git commit -q -m \&quot;Approve the M1 quality bar; record the torch upgrade choice (UR-44, UR-45)\n\nCo-Authored-By: Claude Opus 5.5 &lt;noreply@anthropic.com&gt;\&quot; &amp;&amp; python3 ../plugin/dev-team/scripts/dt.py base &amp;&amp; git status --short &amp;&amp; git log --oneline -1&quot;
+}</pre><div class="lbl">output</div><pre>Base: fadf518
+ M tasks/plan.md
+fadf518 Approve the M1 quality bar; record the torch upgrade choice (UR-44, UR-45)</pre></details></div><div class="step" id="SD401"><span class="sid">D401</span><span class="kind">Bash</span>git commit -q -am &quot;Set the M1 plan&#x27;s Base to the approved bar
+
+Co-Authored-By: Claude Opus 5.5 &lt;noreply@anthropic.com&gt;&quot; &amp;&amp; cat docs/brief.md &amp;&amp; grep -n &quot;^## \|^### \|CORE-0&quot; docs/spec.md | head -40 &amp;&amp; cat ../plugin/dev-team/skills/idea-refine/references/ideation.md | head -60<div class="lbl">commit (sha not shown) (unconfirmed)</div><details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;git commit -q -am \&quot;Set the M1 plan&#x27;s Base to the approved bar\n\nCo-Authored-By: Claude Opus 5.5 &lt;noreply@anthropic.com&gt;\&quot; &amp;&amp; cat docs/brief.md &amp;&amp; grep -n \&quot;^## \\|^### \\|CORE-0\&quot; docs/spec.md | head -40 &amp;&amp; cat ../plugin/dev-team/skills/idea-refine/references/ideation.md | head -60&quot;
+}</pre><div class="lbl">output</div><pre># RL Lab
+
+**Status:** Accepted · **Last updated:** 2026-10-18
+
+## The problem
+Reinforcement learning (RL) is how an agent learns by trial and error from rewards. It is easy to read about and hard to really understand. Library code hides the parts that matter, and tutorials stop once the agent &quot;works&quot;. The fastest way to learn it is to build small agents from scratch, in small 2D game environments, where each one teaches one idea and you can see it learn.
+
+## Who it&#x27;s for
+Me: a solid Python programmer with some NumPy and PyTorch, who knows the basics of Q-learning (learning the value of each action in each state) and wants to learn RL by building it.
+
+## Goals
+1. For each environment, I can explain in my own words why the agent learns, and why each part of the algorithm matters.
+2. Every agent is shown to learn: its learning curve beats a random agent and a simple scripted agent on the same games.
+3. I can watch a replay of any trained agent playing.
+4. A new environment reuses a shared core (environment interface, training loop, logging, replay viewer, learning curves) instead of starting over.
+
+## Constraints
+- Laptop CPU only, and under about an hour of training per environment.
+- Free tools only.
+- Evenings and weekends, a few weeks per environment, no deadline.
+- Learning algorithms are written from scratch, not taken from a library.
+
+## What success looks like
+- The first environment, Snake, has an agent whose learning curve clearly beats both baselines, plus a replay of it playing.
+- Turning off a key part of the agent visibly hurts its learning, and I can say why.
+- The second environment, whatever it is, plugs into the shared core with small changes.
+
+## What we&#x27;re betting on
+- Small, hand-picked descriptions of the game state (&quot;danger ahead&quot;, &quot;food to the left&quot;) are enough for an agent to learn well within an hour on a CPU.
+- A shared core designed while Snake is the only example will still fit the next environment without a rewrite.
+- Writing the algorithms myself teaches more than tuning a library would.
+
+## Not doing
+- Learning from raw pixels or the full grid image: much slower, and not the lesson I&#x27;m after.
+- Comparing against library implementations, for now: a later step, once my own version works.
+- Fancy views such as heatmaps of the agent&#x27;s values: learning curves and replays are enough.
+- Planning environments beyond Snake: the next one is chosen once Snake is done.
+- Mastering Snake: agents that see only nearby danger tend to trap themselves, and that limit is fine.
+5:## Summary
+8:## Users
+13:## Scope
+24:## Features
+26:### Snake environment (`SNAKE`)
+57:### Shared core (`CORE`)
+63:- **CORE-01** Every environment can start a new game from a given seed and returns the first observation.
+65:- **CORE-02** Every environment takes one move and reports the next observation, the reward and whether the game has ended.
+67:- **CORE-03** Every environment reports its observation size and its number of allowed moves.
+69:- **CORE-04** Every environment draws a frame of its current state for the replay viewer.
+71:- **CORE-05** The training loop trains any agent on any environment that offers CORE-01 to CORE-04, for a set number of games, with a given seed.
+73:- **CORE-06** Logging, learning curves and the replay viewer work on any environment that offers CORE-01 to CORE-04.
+80:### Value-learning agent (`AGENT`)
+106:### Ablation switches (`ABL`)
+127:### Baselines (`BASE`)
+144:### Evaluation (`EVAL`)
+162:### Run logging (`LOG`)
+182:### Learning curves (`CURVE`)
+203:### Replay viewer (`REPLAY`)
+211:- **REPLAY-02** Each frame shows the environment&#x27;s drawing (CORE-04) plus the step number and score.
+224:### Explanation notes (`EXPL`)
+240:## Quality requirements
+252:## Assumptions
+260:## Changelog
+# Ideation: understand, expand, converge
+
+Phases 1 and 2 of every run, New and Extend alike. The mode file says what to read before Phase 1 and what Phase 2 must also settle. Throughout, record the user&#x27;s words as `requests.md` says: their first message, each answer, each direction they pick.
+
+## Phase 1: Understand &amp; expand
+
+1. **Restate the idea** as a &quot;How Might We&quot; problem statement.
+2. **Ask 3-5 sharpening questions**, no more, with `AskUserQuestion`: who it&#x27;s for, what success looks like, real constraints, what&#x27;s been tried, why now. Don&#x27;t proceed until you know who it&#x27;s for and what success looks like.
+3. **Generate 5-8 variations**, each with a one-line reason it exists. Lenses: inversion, constraint removal, audience shift, combination, simplification, 10x version, expert lens. `frameworks.md` has more; pick what fits.
+
+In a codebase, ground variations in what exists and cite files. Read `docs/references.md` too; an idea cites a reference as prior art by `RF-NN`, never its path.
+
+## Phase 2: Evaluate &amp; converge
+
+1. **Cluster** what resonated into 2-3 meaningfully different directions.
+2. **Stress-test** each: user value (painkiller or vitamin?), feasibility (cost, hardest part), differentiation (would someone switch?), and for ML and data projects, data: does usable data exist, can we use it, what&#x27;s the non-ML baseline? &quot;No usable data&quot; is a feasibility failure, not an open question. Rubric: `refinement-criteria.md`.
+3. **Surface hidden assumptions:** what you&#x27;re betting is true, what could kill it, what you&#x27;re ignoring for now.
+4. **Get a decision** on a direction before writing anything.</pre></details></div><div class="step" id="SD402"><span class="sid">D402</span><span class="kind">say</span>Bar approved and committed (`fadf518`), and the plan&#x27;s `Base` is set. Now the fish idea. First I&#x27;ll record what you said.<details><summary>full text</summary><pre>Bar approved and committed (`fadf518`), and the plan&#x27;s `Base` is set. Now the fish idea. First I&#x27;ll record what you said.</pre></details></div><div class="step" id="SD403"><span class="sid">D403</span><span class="kind">Bash</span>D=../plugin/dev-team/scripts/dt.py; python3 $D request add spec &quot;Environment 2 is a circular tank with a ball bouncing around inside it. Little fish agents have to learn to swim away from the ball and survive as long as possible.&quot; --skill idea-refine --about &quot;environment 2&quot; &amp;&amp; python3 $D request add spec &quot;Movement is continuous and there are several fish at once, and each fish sees only nearby things.&quot; --skill idea-refine --about &quot;environment 2 dynamics and observation&quot; &amp;&amp; python3 $D request add …[+324 chars]<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;D=../plugin/dev-team/scripts/dt.py; python3 $D request add spec \&quot;Environment 2 is a circular tank with a ball bouncing around inside it. Little fish agents have to learn to swim away from the ball and survive as long as possible.\&quot; --skill idea-refine --about \&quot;environment 2\&quot; &amp;&amp; python3 $D request add spec \&quot;Movement is continuous and there are several fish at once, and each fish sees only nearby things.\&quot; --skill idea-refine --about \&quot;environment 2 dynamics and observation\&quot; &amp;&amp; python3 $D request add spec \&quot;I want to use it for policy-gradient/PPO and continuous control\&quot; --skill idea-refine --about \&quot;environment 2 learning method\&quot; &amp;&amp; python3 $D request add architecture \&quot;it should reuse the shared core.\&quot; --skill idea-refine --about \&quot;environment 2 and the shared core\&quot;; ls docs/ideas 2&gt;/dev/null; sed -n 57,80p docs/spec.md&quot;
+}</pre><div class="lbl">output</div><pre>UR-46 spec: &quot;Environment 2 is a circular tank with a ball bouncing around inside it. Little fish agents have to learn to swim away from the ball and survive as long as possible.&quot;
+UR-47 spec: &quot;Movement is continuous and there are several fish at once, and each fish sees only nearby things.&quot;
+UR-48 spec: &quot;I want to use it for policy-gradient/PPO and continuous control&quot;
+UR-49 architecture: &quot;it should reuse the shared core.&quot;
+### Shared core (`CORE`)
+**Serves:** Goal 4
+**Stage:** S1
+**Behavior:** Every environment offers the same small set of behaviors: start a game from a seed, take one move and report what happened, say how many facts it observes and how many moves it allows, and draw one frame for the replay viewer. The training loop, logging, learning curves and replay viewer use only these behaviors, so a new environment plugs in without changing them.
+
+**Requirements**
+- **CORE-01** Every environment can start a new game from a given seed and returns the first observation.
+  - Given any environment and seed 3, when a game is started twice, then both first observations are identical.
+- **CORE-02** Every environment takes one move and reports the next observation, the reward and whether the game has ended.
+  - Given a running game, when a move is taken, then the next observation, the reward and the game-over flag are all reported.
+- **CORE-03** Every environment reports its observation size and its number of allowed moves.
+  - Given Snake, when asked, then it reports 11 facts and 3 moves.
+- **CORE-04** Every environment draws a frame of its current state for the replay viewer.
+  - Given a running Snake game, when a frame is requested, then it shows the grid, the snake, the food, the score and the step number.
+- **CORE-05** The training loop trains any agent on any environment that offers CORE-01 to CORE-04, for a set number of games, with a given seed.
+  - Given a tiny test environment (a 1 × 5 corridor where reaching the right end gives +1), when the training loop runs on it with no changes to the core, then training completes and the agent reaches the right end in ≥ 9 of 10 evaluation games.
+- **CORE-06** Logging, learning curves and the replay viewer work on any environment that offers CORE-01 to CORE-04.
+  - Given the tiny test environment, when a run is logged, its learning curve drawn and a game replayed, then each works with no changes to the core.
+
+**Edge cases &amp; errors**
+- An environment is missing one of the 4 behaviors → the core refuses it at start-up and names the missing behavior.
+- An agent returns a move outside the environment&#x27;s allowed moves → the run stops with an error naming the move and the game step.
+
+### Value-learning agent (`AGENT`)</pre></details></div><div class="step" id="SD404"><span class="sid">D404</span><span class="kind">say</span>Before I write anything, here&#x27;s my take, including the parts where I&#x27;d push back. ⏎ Restated: How might we add a second environment, a round tank where several fish with short-range senses learn continuous swimming to dodge a bouncing ball, so that you learn policy gradients and PPO from scratch on the same shared core as Snake? ⏎ Where I&#x27;d push back ⏎ 1. It reverses a Not Doing item. The brief says &quot;the next one is chosen once Snake is done&quot;, and M1 is at 0/19. Planning it now is fine. Building it should wait until S1 is finished, otherwise two environments are pulling on the core …[+2688 chars]<details><summary>full text</summary><pre>Before I write anything, here&#x27;s my take, including the parts where I&#x27;d push back.
+
+**Restated:** How might we add a second environment, a round tank where several fish with short-range senses learn continuous swimming to dodge a bouncing ball, so that you learn policy gradients and PPO from scratch on the same shared core as Snake?
+
+**Where I&#x27;d push back**
+
+1. **It reverses a Not Doing item.** The brief says &quot;the next one is chosen once Snake is done&quot;, and M1 is at 0/19. Planning it now is fine. Building it should wait until S1 is finished, otherwise two environments are pulling on the core at the same time.
+2. **It adds five new things at once:** continuous actions, policy gradients, PPO, several agents, and limited senses. Goal 1 is &quot;explain why each part matters&quot;, and that gets hard when everything is new together. I&#x27;d keep &quot;several fish&quot; cheap: one shared policy, with each fish learning on its own. That way the extra fish are just more training data, not a multi-agent problem.
+3. **This is the real test of your core bet.** CORE-02 and CORE-03 assume one agent and a fixed list of moves (&quot;11 facts and 3 moves&quot;). Continuous actions and several fish mean the core has to change. The brief&#x27;s &quot;plugs in with small changes&quot; might not hold, and that&#x27;s useful to find out. The aim should be that Snake still runs unchanged afterwards.
+4. **The scripted baseline could be hard to beat.** &quot;Swim straight away from the ball&quot; is close to the obvious strategy. In a round tank it gets fish pinned against the wall, which is what makes the problem interesting, but beating it isn&#x27;t guaranteed (Goal 2).
+
+**Variations**
+- **A. Algorithm ladder:** REINFORCE → add a critic → PPO. Turning each piece off works like S1&#x27;s ablation switches. *This teaches why PPO exists.*
+- **B. One fish first,** several fish once the single one learns. *Fewer new ideas per step.*
+- **C. Shared policy for all fish** (parameter sharing). *The core sees independent fish, not a game theory problem.*
+- **D. Discrete twin:** the same tank with 8 compass moves, run by the S1 DQN. *This shows what continuous control adds, and it&#x27;s a free test of the core.*
+- **E. Fish that interact** (crowding, blocking each other). *Richer behaviour, but a genuinely multi-agent problem.*
+- **F. Harder over time:** the ball speeds up, or more balls appear. *A curriculum.*
+
+**My recommendation:** A + C, with B as the first step inside the stage. D is an optional extra, and E is out.
+
+**Five questions** (my default in brackets):
+1. **When:** plan now and build after S1 is done? [yes]
+2. **Several fish:** one shared policy with independent fish, or fish that must deal with each other? And what happens when the ball hits a fish? [shared policy; a hit fish is removed and the episode ends when all are gone]
+3. **&quot;Sees only nearby things&quot;:** a fixed set of sensor rays reporting distance to the wall, ball and other fish, or a list of the nearest few objects? [about 8 rays]
+4. **Algorithm:** the full REINFORCE → actor-critic → PPO ladder with off switches, or PPO only? [ladder]
+5. **Core:** is it OK for the core to grow to handle continuous actions and several fish, as long as Snake runs unchanged? [yes]
+
+Answer whichever you like. Anything you skip, I&#x27;ll take my default.</pre></details></div><div class="step" id="SD405"><span class="sid">D405</span><span class="kind">hook</span><span class="hook">SessionStart:startup said: milestone: M1 Train an agent · plan Approved
+progress: 0/19 · next: M1-T01 M1 interface
+blocked: none
+requests: 5 not honoured → spec-writing, architecture-design
+dt: /Users/connorott/plugins/dev-team-workspace/iteration-11/rl-incremental/with_skill/plugin/dev-team/scripts/dt
+</span></div>
+<h2>Commits</h2>
+<table><tr><th>Commit</th><th>Message</th><th>Files</th></tr><tr><td><code>fadf518</code> <span class=err>unconfirmed</span></td><td>Approve the M1 quality bar; record the torch upgrade choice (UR-44, UR-45)</td><td>CONSTRAINTS.md, docs/requests.md</td></tr><tr><td><code>(sha not shown)</code> <span class=err>unconfirmed</span></td><td>—</td><td>—</td></tr></table>
+<h2>Returned</h2>
+<pre>Before I write anything, here&#x27;s my take, including the parts where I&#x27;d push back.
+
+**Restated:** How might we add a second environment, a round tank where several fish with short-range senses learn continuous swimming to dodge a bouncing ball, so that you learn policy gradients and PPO from scratch on the same shared core as Snake?
+
+**Where I&#x27;d push back**
+
+1. **It reverses a Not Doing item.** The brief says &quot;the next one is chosen once Snake is done&quot;, and M1 is at 0/19. Planning it now is fine. Building it should wait until S1 is finished, otherwise two environments are pulling on the core at the same time.
+2. **It adds five new things at once:** continuous actions, policy gradients, PPO, several agents, and limited senses. Goal 1 is &quot;explain why each part matters&quot;, and that gets hard when everything is new together. I&#x27;d keep &quot;several fish&quot; cheap: one shared policy, with each fish learning on its own. That way the extra fish are just more training data, not a multi-agent problem.
+3. **This is the real test of your core bet.** CORE-02 and CORE-03 assume one agent and a fixed list of moves (&quot;11 facts and 3 moves&quot;). Continuous actions and several fish mean the core has to change. The brief&#x27;s &quot;plugs in with small changes&quot; might not hold, and that&#x27;s useful to find out. The aim should be that Snake still runs unchanged afterwards.
+4. **The scripted baseline could be hard to beat.** &quot;Swim straight away from the ball&quot; is close to the obvious strategy. In a round tank it gets fish pinned against the wall, which is what makes the problem interesting, but beating it isn&#x27;t guaranteed (Goal 2).
+
+**Variations**
+- **A. Algorithm ladder:** REINFORCE → add a critic → PPO. Turning each piece off works like S1&#x27;s ablation switches. *This teaches why PPO exists.*
+- **B. One fish first,** several fish once the single one learns. *Fewer new ideas per step.*
+- **C. Shared policy for all fish** (parameter sharing). *The core sees independent fish, not a game theory problem.*
+- **D. Discrete twin:** the same tank with 8 compass moves, run by the S1 DQN. *This shows what continuous control adds, and it&#x27;s a free test of the core.*
+- **E. Fish that interact** (crowding, blocking each other). *Richer behaviour, but a genuinely multi-agent problem.*
+- **F. Harder over time:** the ball speeds up, or more balls appear. *A curriculum.*
+
+**My recommendation:** A + C, with B as the first step inside the stage. D is an optional extra, and E is out.
+
+**Five questions** (my default in brackets):
+1. **When:** plan now and build after S1 is done? [yes]
+2. **Several fish:** one shared policy with independent fish, or fish that must deal with each other? And what happens when the ball hits a fish? [shared policy; a hit fish is removed and the episode ends when all are gone]
+3. **&quot;Sees only nearby things&quot;:** a fixed set of sensor rays reporting distance to the wall, ball and other fish, or a list of the nearest few objects? [about 8 rays]
+4. **Algorithm:** the full REINFORCE → actor-critic → PPO ladder with off switches, or PPO only? [ladder]
+5. **Core:** is it OK for the core to grow to handle continuous actions and several fish, as long as Snake runs unchanged? [yes]
+
+Answer whichever you like. Anything you skip, I&#x27;ll take my default.</pre>
+</body></html>

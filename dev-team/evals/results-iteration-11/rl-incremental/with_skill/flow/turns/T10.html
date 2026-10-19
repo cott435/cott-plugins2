@@ -1,0 +1,561 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1"><title>T10 turn</title>
+<style>
+:root{--bg:#fbfbfa;--fg:#1d1d1f;--muted:#6b6b70;--line:#d9d9de;--box:#fff;--rowp:#eef3fb;--band:#fff4d6;
+--ok:#2e7d32;--bad:#c62828;--warn:#b26a00;--idle:#6b6b70}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#17171a;--fg:#ececf0;--muted:#9a9aa3;
+--line:#34343a;--box:#222227;--rowp:#1d2433;--band:#3a3015;--ok:#6fcf73;--bad:#ff6b6b;--warn:#f0b35a;--idle:#9a9aa3}}
+:root[data-theme="dark"]{--bg:#17171a;--fg:#ececf0;--muted:#9a9aa3;--line:#34343a;--box:#222227;--rowp:#1d2433;
+--band:#3a3015;--ok:#6fcf73;--bad:#ff6b6b;--warn:#f0b35a;--idle:#9a9aa3}
+body{margin:0;padding:16px;background:var(--bg);color:var(--fg);font:14px/1.45 -apple-system,system-ui,sans-serif}
+h1{font-size:18px;margin:0 0 4px}h2{font-size:15px;margin:22px 0 8px}.sub{color:var(--muted)}
+table{border-collapse:collapse;margin:4px 0 8px}td,th{border-bottom:1px solid var(--line);padding:4px 10px;text-align:left;
+vertical-align:top}th{color:var(--muted);font-weight:600}.chips span{display:inline-block;margin:0 4px 2px 0}
+.legend span{margin-right:14px;white-space:nowrap}.sw{display:inline-block;width:10px;height:10px;border-radius:2px;
+margin-right:4px;vertical-align:-1px}.scroll{overflow:auto;max-height:88vh;border:1px solid var(--line);border-radius:8px}
+.chart{display:grid;width:max-content}.chart>div{line-height:0}.corner{position:sticky;top:0;left:0;z-index:3}
+.colhead{position:sticky;top:0;z-index:2}.rowhead{position:sticky;left:0;z-index:2}
+svg.bg{background:var(--bg)}.colhead svg{border-bottom:1px solid var(--line)}.rowhead svg{border-right:1px solid var(--line)}
+.ok{color:var(--ok);fill:var(--ok)}.bad{color:var(--bad);fill:var(--bad)}.warn{color:var(--warn);fill:var(--warn)}
+.idle{color:var(--idle);fill:var(--idle)}
+svg text{fill:var(--fg);font-family:-apple-system,system-ui,sans-serif}
+.box{fill:var(--box);stroke:var(--line)}.unit:hover .box{stroke:var(--fg)}
+.role{font-size:12px;font-weight:600}.uid,.wmeta,.lmeta,.meta{font-size:10px;fill:var(--muted)}
+.sub{font-size:10.5px;fill:var(--muted)}.badge{font-size:11px;font-weight:600}
+.meta.bad{fill:var(--bad);font-weight:600}.lane{font-size:13px;font-weight:700}.wave{font-size:13px;font-weight:700}
+.par{fill:#4e79a7}.ser{fill:var(--muted)}.rowp{fill:var(--rowp)}.rows{fill:transparent}.band{fill:var(--band)}
+.bandt{font-size:11.5px}.grid{stroke:var(--line)}.link{stroke:var(--muted);stroke-width:1.2;opacity:.55}
+.arrowhead{fill:var(--muted)}.marks{font-size:10.5px}.audit{stroke:var(--box);stroke-width:2}.auditn{font-size:10px;font-weight:700;fill:#fff}
+a{color:inherit}svg a .box{cursor:pointer}
+
+:root{--c0:#2a78d6;--c1:#eb6834;--c2:#1baf7a;--c3:#eda100;--c4:#e87ba4;--c5:#008300;--c6:#6250d6;--c7:#e34948;
+--cx:#8a8985;--main:#52514e;--read:#dcdbd5;--readfg:#1d1d1f}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--c0:#3987e5;--c1:#d95926;--c2:#199e70;
+--c3:#c98500;--c4:#d55181;--c5:#008300;--c6:#9085e9;--c7:#e66767;--cx:#77766f;--main:#c3c2b7;--read:#3b3b40;
+--readfg:#ececf0}}
+:root[data-theme="dark"]{--c0:#3987e5;--c1:#d95926;--c2:#199e70;--c3:#c98500;--c4:#d55181;--c5:#008300;
+--c6:#9085e9;--c7:#e66767;--cx:#77766f;--main:#c3c2b7;--read:#3b3b40;--readfg:#ececf0}
+.c0{fill:var(--c0);background:var(--c0)}.c1{fill:var(--c1);background:var(--c1)}.c2{fill:var(--c2);background:var(--c2)}
+.c3{fill:var(--c3);background:var(--c3)}.c4{fill:var(--c4);background:var(--c4)}.c5{fill:var(--c5);background:var(--c5)}
+.c6{fill:var(--c6);background:var(--c6)}.c7{fill:var(--c7);background:var(--c7)}.cx{fill:var(--cx);background:var(--cx)}
+.cmain{fill:var(--main)}.sc0{stroke:var(--c0)}.sc1{stroke:var(--c1)}.sc2{stroke:var(--c2)}
+.tl text,.sm text,.lc text{font-size:10.5px;fill:var(--muted)}.tl .lbl-in,.sm .lbl-in{fill:#fff;font-size:10.5px;font-weight:600}
+.tl .rowl,.sm .rowl,.lc .rowl{fill:var(--fg);font-size:11.5px;font-weight:600}.tl .band{fill:var(--rowp)}
+.tl .brk{stroke:var(--muted);stroke-dasharray:2 3}.tl a:hover rect,.sm a:hover rect{stroke:var(--fg);stroke-width:1.5}
+.axis{stroke:var(--line)}.sm .val{fill:var(--fg);font-weight:600}.lc path.ln{fill:none;stroke-width:2}
+.lc circle{stroke:var(--bg);stroke-width:2}.lc .end{font-weight:600;fill:var(--fg)}
+.tiles{display:flex;flex-wrap:wrap;gap:10px;margin:12px 0}.tile{border:1px solid var(--line);border-radius:8px;
+padding:8px 12px;min-width:110px;background:var(--box)}.tile b{display:block;font-size:20px;line-height:1.2}
+.tile span{font-size:12px;color:var(--muted)}.tile i{font-style:normal;font-size:12px;margin-left:6px}
+.fm{border-collapse:separate;border-spacing:2px}.fm td,.fm th{border:0;padding:0;text-align:center;font-size:11px}
+.fm th{padding:0 2px;font-weight:600}.fm td.f,.fm th.f{text-align:left;padding-right:10px;white-space:nowrap;
+position:sticky;left:0;background:var(--bg);font:11.5px ui-monospace,Menlo,monospace;
+max-width:380px;overflow:hidden;text-overflow:ellipsis}
+.fm td.cell{min-width:22px;height:20px;border-radius:3px}.fm td.fw{background:var(--c0);color:#fff;font-weight:700}
+.fm td.fe{background:var(--c1);color:#fff;font-weight:700}.fm td.fr{background:var(--read);color:var(--readfg)}
+.fm td.n{color:var(--muted);padding:0 6px}.fm tr.grp td{text-align:left;padding-top:8px;color:var(--muted);
+font-weight:600}
+.key{display:inline-block;min-width:18px;text-align:center;border-radius:3px;font-size:11px;margin-right:4px}
+.bar{display:inline-block;height:9px;border-radius:2px;vertical-align:0}
+
+pre{white-space:pre-wrap;word-break:break-word;background:var(--box);border:1px solid var(--line);border-radius:6px;
+padding:8px 10px;margin:4px 0;font:12px/1.45 ui-monospace,SFMono-Regular,Menlo,monospace;max-width:100%;overflow:auto}
+.step{border-top:1px solid var(--line);padding:6px 0}.step:target{background:var(--rowp)}
+.sid{font:12px ui-monospace,Menlo,monospace;color:var(--muted);margin-right:8px}.kind{font-weight:600;margin-right:8px}
+.err{color:var(--bad);font-weight:600}.hook{color:var(--bad);margin:4px 0 0 16px}.lbl{font-size:12px;color:var(--muted);margin-top:6px}
+details summary{cursor:pointer;color:var(--muted);font-size:12px}.head td:first-child{color:var(--muted)}
+.top{font-size:13px}.narr{list-style:none;padding-left:0}.narr li{margin:3px 0}
+</style></head>
+<body>
+<p class="top"><a href="../flow.html">← the run's flow chart</a></p>
+<p class="top"><a href="../plan/T10.html">The plan as of T10</a>: this turn changed the plan (+45 ~0 −0) · <a href="../plan/index.html">plan map</a></p>
+<h1>T10 · turn · All five, go with your recommendation. Write pipelines.md. For EXPL-01, list it as an open question </h1>
+<table class="head"><tr><td>Type</td><td>turn</td></tr><tr><td>Description</td><td>All five, go with your recommendation. Write pipelines.md. For EXPL-01, list it as an open question </td></tr><tr><td>Spawned by</td><td>user</td></tr><tr><td>Model</td><td>claude-opus-5-5</td></tr><tr><td>Start</td><td>2026-10-19 02:32:36 UTC</td></tr><tr><td>Duration</td><td>5 min</td></tr><tr><td>Tool calls</td><td>9</td></tr><tr><td>Errors</td><td>0</td></tr><tr><td>Hook blocks</td><td>1</td></tr><tr><td>Tokens</td><td>32.8k out · 44.9k new in · 996k cached in · peak context 117k</td></tr><tr><td>Skills invoked</td><td>none</td></tr><tr><td>Files written or edited</td><td>docs/packages/rllab/pipelines.md, docs/packages/rllab/contract.md</td></tr><tr><td>Definition</td><td>none</td></tr><tr><td>Steps</td><td>16</td></tr><tr><td>Finished</td><td>yes</td></tr></table>
+
+
+<h2>Prompt</h2>
+<pre>All five, go with your recommendation. Write pipelines.md. For EXPL-01, list it as an open question at the review gate.</pre>
+<h2>Files</h2>
+<table><tr><th>Op</th><th>File</th><th>Calls</th><th>By</th><th>Via</th><th>Steps</th></tr><tr><td>write</td><td><code>docs/packages/rllab/pipelines.md</code></td><td>1</td><td>main</td><td>Write</td><td><a href="#D90">D90</a></td></tr><tr><td>edit</td><td><code>docs/packages/rllab/contract.md</code></td><td>1</td><td>main</td><td>Bash</td><td><a href="#D97">D97</a></td></tr><tr><td>read</td><td><code>docs/architecture.md</code></td><td>1</td><td>main</td><td>Bash</td><td><a href="#D87">D87</a></td></tr><tr><td>read</td><td><code>docs/explained/rllab.md</code></td><td>1</td><td>main</td><td>Bash</td><td><a href="#D98">D98</a></td></tr></table>
+<h2>Steps</h2>
+<div class="step" id="SD86"><span class="sid">D86</span><span class="kind">user</span>All five, go with your recommendation. Write pipelines.md. For EXPL-01, list it as an open question at the review gate.<details><summary>full text</summary><pre>All five, go with your recommendation. Write pipelines.md. For EXPL-01, list it as an open question at the review gate.</pre></details></div><div class="step" id="SD87"><span class="sid">D87</span><span class="kind">Bash</span>sed -n &#x27;/^### AD-02/,/^### AD-06/p&#x27; docs/architecture.md | grep -v &#x27;^$&#x27;; grep -n -i &#x27;registry&#x27; docs/architecture.md | head -30<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;sed -n &#x27;/^### AD-02/,/^### AD-06/p&#x27; docs/architecture.md | grep -v &#x27;^$&#x27;; grep -n -i &#x27;registry&#x27; docs/architecture.md | head -30&quot;
+}</pre><div class="lbl">output</div><pre>### AD-02: A hand-written DQN on the 11 facts; PyTorch only for the network and its gradients
+**Status:** Accepted · **Date:** 2026-10-18 · **Scope:** system
+- **Context:** The user called Snake a &quot;Good first env for DQN-style value learning&quot; (UR-06) and said &quot;I want to write DQN from scratch&quot; (UR-08). QR-03 rules out RL libraries but allows array math with automatic gradients. AGENT-01–AGENT-05 fix the algorithm: a learned value per move, ε-greedy decaying 1.0 → 0.01 over the first half of the games, 100,000 remembered steps, discount 0.9, and a frozen copy refreshed every 1,000 steps.
+- **Decision:** `agent.DQNAgent` is written by hand: the replay memory (a NumPy ring buffer), the ε schedule, the target computation, the frozen-copy refresh, the Huber-loss update and the ablation switches. Only the value network uses PyTorch: an MLP of 11 → 256 → 3 built from `torch.nn.Linear`, trained by autograd and `torch.optim.Adam` (lr 1e-3, batch 64). It takes one update per environment step once a full batch is remembered.
+- **Alternatives:** NumPy only, with backprop written by hand: it teaches more about gradients, but that isn&#x27;t the lesson the brief wants and it adds bug surface; it could come later as an exercise. A Q-table (2¹¹ × 3 entries): it would learn Snake well, but it isn&#x27;t DQN, and with no frozen copy or replay memory to switch off, the ablations would mean nothing.
+- **Consequences:** The network is the only library-backed part, so the &quot;from scratch&quot; check (QR-03) reduces to reading `agent/`. The network size, learning rate, batch size and Huber loss are choices the spec doesn&#x27;t fix, and they live in `AgentConfig` with these defaults.
+### AD-03: CPU only; one thread per run, separate processes for the study
+**Status:** Accepted · **Date:** 2026-10-18 · **Scope:** system
+- **Context:** The user&#x27;s words are &quot;Laptop CPU only&quot; (UR-13). QR-01 limits one run to ≤ 60 minutes and QR-02 the 20-run study plus baselines to ≤ 10 hours. A network this small gains nothing from torch&#x27;s thread pool, and extra threads hurt reproducibility (QR-05).
+- **Decision:** Install PyTorch from the CPU wheel index; the code never calls CUDA or MPS. Each run calls `torch.set_num_threads(1)`. `study` spreads its runs over `ProcessPoolExecutor(max_workers=os.cpu_count() - 1)`, with each run in its own process and writing its own folder.
+- **Alternatives:** Running the study serially: 20 runs at up to 60 minutes each could exceed 10 hours. Batching several agents into one process (vectorised): faster, but it tangles the hand-written agent and makes ablations harder to read.
+- **Consequences:** A run&#x27;s time doesn&#x27;t depend on the other runs, as long as there are enough cores. On a 4-core laptop the study takes about 7 rounds of 3 runs. QR-02 holds only if one run takes under about 80 minutes when 3 run in parallel, so the timing test measures that case too.
+### AD-04: Seeds owned per object, fixed held-out range
+**Status:** Accepted · **Date:** 2026-10-18 · **Scope:** system
+- **Context:** SNAKE-08, CORE-01, AGENT-06, REPLAY-04, REPLAY-05 and QR-05 need same seed → same game. EVAL-01 needs the training and held-out seeds never to overlap.
+- **Decision:** `Env.reset(seed)` builds the environment&#x27;s generator from the game seed. `Agent.reset(seed)` reseeds any randomness the agent uses while playing (the random baseline). `DQNAgent` builds its exploration, sampling and weight-initialisation generators from the run seed. The held-out seeds are `evaluate.EVAL_SEEDS = range(1_000_000, 1_000_100)`, and training seeds come from `[0, 1_000_000)`. Deterministic torch algorithms are switched on in every run.
+- **Alternatives:** One global seed set at start-up: any extra random call anywhere would shift every later game. Hashing training seeds: overlap with the held-out seeds would become unlikely rather than impossible.
+- **Consequences:** A replay of a saved agent on a held-out seed reproduces its logged evaluation score (REPLAY-05). Results are reproducible on one machine, not across machines (QR-05 asks only for the first).
+### AD-05: Run records as one JSON file per run, rewritten atomically
+**Status:** Accepted · **Date:** 2026-10-18 · **Scope:** system
+- **Context:** LOG-01–LOG-04 decide what a record holds, and LOG-05 needs it on disk at least after every evaluation point. At 1,000 games with 20 evaluation points of 100 scores, a record stays well under 1 MB. CURVE-05 needs charts in ≤ 10 seconds from records alone.
+- **Decision:** `runs.RunWriter` keeps the record in memory. After every evaluation point, and when the run finishes or fails, it rewrites `record.json` through a temporary file and `os.replace`. The agent is saved as `agent.pt` (state dict, observation size, move count, config). Creating a run whose folder already exists raises `RunExistsError` (LOG edge case).
+- **Alternatives:** SQLite: queryable, but one file per run is simpler to read, diff and delete. CSV per game plus JSON settings: two formats to keep in sync. Parquet: adds pyarrow to read a few kB.
+- **Consequences:** A crash loses at most the games since the last evaluation point, which LOG-05 allows. Reading a record means reading the whole file, which is fine at this size.
+### AD-06: The environment draws a toolkit-free `Frame`; the viewer is pygame-ce
+20:  replay --&gt; registry
+21:  study --&gt; registry
+22:  registry --&gt; snake &amp; corridor &amp; agent &amp; baselines
+53:| `registry` | Turns names into objects: environment names into environments, and `random`, `scripted` or a run folder into an agent | CORE-06, REPLAY-01 | `snake`, `corridor`, `agent`, `baselines`, `runs` |
+55:| `replay` | Re-plays an agent on a seed into frames, and shows them in a window with pause, step and 1–30 fps controls | REPLAY-01–REPLAY-05 | `core`, `evaluate`, `registry` |
+56:| `study` | The full study as one command: 4 variants × 5 seeds, both baselines, then the comparisons run with the **`null-hypothesis-testing`** skill; writes the report and chart for the notes page | ABL-04, ABL-05, EVAL-03, EVAL-04, EXPL-01, EXPL-02, QR-02 | `train`, `evaluate`, `runs`, `registry`, `curves` |
+59:Every dependency points one way. `core` imports nothing internal. Only `registry`, `baselines` and `cli` may import `snake` or `corridor`. Import-linter enforces both rules (`build-setup`). The seam for later: `core`, `evaluate`, `runs`, `train`, `curves` and `replay` never name an environment, so they could move out as a shared package together if a second environment needs one.
+78:src/rllab/       → core/ snake/ corridor/ agent/ baselines/ evaluate/ runs/ train/ registry/ curves/ replay/ study/ cli/ — one folder per component; __init__ exports its contract
+139:- **Consequences:** The scripted agent is Snake-only. `registry` refuses it for any other environment and names the environment.</pre></details></div><div class="step" id="SD88"><span class="sid">D88</span><span class="kind">say</span>Writing `pipelines.md` now.<details><summary>full text</summary><pre>Writing `pipelines.md` now.</pre></details></div><div class="step" id="SD89"><span class="sid">D89</span><span class="kind">Bash</span>python3 ../plugin/dev-team/scripts/dt.py next-id PL; python3 ../plugin/dev-team/scripts/dt.py --help 2&gt;&amp;1 | head -40<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;python3 ../plugin/dev-team/scripts/dt.py next-id PL; python3 ../plugin/dev-team/scripts/dt.py --help 2&gt;&amp;1 | head -40&quot;
+}</pre><div class="lbl">output</div><pre>PL-01
+usage: dt [-h] [--root ROOT]
+          {status,next,next-id,section,explain,context,ready,plan,layout,outline,references,probes,lint,roadmap,guard,prebuild-clear,archive,finding,route,request,tick,base} ...
+
+dt: dev-team&#x27;s doc tool. One parser for every planning doc; see
+scripts/README.md for the commands.
+
+positional arguments:
+  {status,next,next-id,section,explain,context,ready,plan,layout,outline,references,probes,lint,roadmap,guard,prebuild-clear,archive,finding,route,request,tick,base}
+    status              What a skill needs before it starts: mode, upstream
+                        gates, gaps and next IDs. `--summary` for
+                        SessionStart.
+    next                Name the next skill run and its mode, and why: a Draft
+                        waiting for approval, references or probes waiting, a
+    next-id             Print the next free ID for a prefix (PL, TC, AD, CR,
+                        S, M, M2-T, M2-R, or a spec prefix), retired IDs
+                        counted.
+    section             Print the sections that define the given IDs,
+                        searching every doc (the archive last).
+    explain             Explain the pipelines in plain words: what each is
+                        for, how it runs and what each step does, from
+                        pipelines.md.
+    context             Print a task&#x27;s whole builder context packet: its Read:
+                        sections and files, the package layout, the frozen
+    ready               Every task of the active plan that can start now, with
+                        its Writes:, so an orchestrator fans out in one turn.
+    plan                The plan as one snapshot for workflow-analyzer&#x27;s plan
+                        map (`plan-map/2`, interface-first-design.md §8.3):
+                        goals,
+    layout              Print a package&#x27;s real source tree with module
+                        docstrings, and flag entry functions that drift from
+                        their step tables.
+    outline             Print a file&#x27;s outline: defs and classes with
+                        signatures and docstring first lines (`.py`, via ast;
+                        never
+    references          Reference files against docs/references.md: list each
+                        entry&#x27;s state, or `--stamp` its Hash (mechanical).
+    probes              Probe folders against docs/probes.md: list each
+                        probe&#x27;s state, `--stamp` its Hash (mechanical), or
+                        `--scan` its
+    lint                Check the planning docs: IDs, references, size</pre></details></div><div class="step" id="SD90"><span class="sid">D90</span><span class="kind">Write</span>/Users/connorott/plugins/dev-team-workspace/iteration-11/rl-incremental/with_skill/project/docs/packages/rllab/pipelines.md (155 lines)<div class="lbl">wrote /Users/connorott/plugins/dev-team-workspace/iteration-11/rl-incremental/with_skill/project/docs/packages/rllab/pipelines.md</div><pre># rllab — Pipelines
+
+**Package:** rllab · **Status:** Draft · **Last updated:** 2026-10-18 · **Contract:** [contract.md](contract.md)
+
+## PL-01: Train an agent
+**Entry:** `src/rllab/cli/pipeline.py::run_train` · **Trigger:** `python -m rllab train --env snake --seed 1 [--no-memory] [--no-frozen] [--no-decay] [--games 1000] [--name NAME]`
+**Purpose:** Train one hand-written DQN on an environment, with any of its parts switched off, and keep its record and trained agent in `runs/&lt;name&gt;/`.
+**Covers:** CORE-01–CORE-06, SNAKE-01–SNAKE-08, AGENT-01–AGENT-06, ABL-01–ABL-03, EVAL-01, EVAL-02, LOG-01–LOG-05, QR-01, QR-03–QR-05
+
+| # | Step | Owner | In → Out | Spine version | Covers |
+|---|---|---|---|---|---|
+| 1 | `train_config` | cli.args | flags → RunConfig | switches into AgentConfig; default name `&lt;variant&gt;-s&lt;seed&gt;` | LOG-01, ABL-01–ABL-03 |
+| 2 | `make_env` | registry.envs | env name → Env | plain match on `snake` or `corridor` | CORE-06 |
+| 3 | `SnakeEnv` | snake.env | size → Env | 20 × 20 rules, 11 facts, rewards, step limit, frame | SNAKE-01–SNAKE-08, CORE-01–CORE-04 |
+| 4 | `CorridorEnv` | corridor.env | length, max steps → Env | one-hot position, +1 at the right end | CORE-05, CORE-06 |
+| 5 | `DQNAgent` | agent.dqn | Env sizes, AgentConfig, seed → LearningAgent | 11 → 256 → 3 MLP learning from the latest Transition only, ε fixed at 0.1, targets from the current net (every switch off); `torch.save` state dict | AGENT-01–AGENT-06, ABL-01–ABL-03, QR-03, QR-04 |
+| 6 | `train_run` | train.loop | Env, LearningAgent, RunConfig → RunRecord | game loop with `act(explore=True)` and `learn`; evaluate and log every `eval_every` games; failed record on any error | CORE-05, AGENT-02, EVAL-02, LOG-02, LOG-03, QR-01, QR-05 |
+| 7 | `check_env` | core.check | Env → Env | `hasattr` on the 5 behaviours | CORE-05 |
+| 8 | `training_seeds` | evaluate.seeds | run seed, n games → seeds | generator from the run seed over `[0, 1_000_000)` (AD-04) | EVAL-01, QR-05 |
+| 9 | `create_run` | runs.store | RunConfig → RunWriter | new folder, config written at once; refuses an existing name | LOG-01 |
+| 10 | `JsonRunWriter` | runs.writer | RunConfig, path → RunWriter | record in memory, atomic rewrite on `add_eval` and `finish`, `agent.pt` beside it (AD-05) | LOG-02–LOG-05 |
+| 11 | `evaluate` | evaluate.score | Env, Agent, seeds → EvalResult | `play_game` greedily on each seed; mean and std | EVAL-02, AGENT-03 |
+| 12 | `play_game` | evaluate.play | Env, Agent, seed → GameResult | reset both, step until done | CORE-02, AGENT-03 |
+
+### Entry sketch (pre-build — removed by spine task)
+```python
+def run_train(args: Namespace) -&gt; RunRecord:
+    config = train_config(args)
+    env = make_env(config.env)
+    agent = DQNAgent(env.obs_size, env.n_actions, config.agent, seed=config.seed)
+    return train_run(env, agent, config, root=args.root)
+```
+
+## PL-02: Score the baselines
+**Entry:** `src/rllab/study/pipelines/pl02_baselines.py::run_baselines` · **Trigger:** `python -m rllab baselines --env snake`
+**Purpose:** Score the random and scripted agents on the same 100 held-out games as the learning agent, so its curve has bars to clear.
+**Covers:** BASE-01–BASE-03, EVAL-01, REPLAY-01
+
+| # | Step | Owner | In → Out | Spine version | Covers |
+|---|---|---|---|---|---|
+| 1 | `make_env` | registry.envs | env name → Env | PL-01 as built | CORE-06 |
+| 2 | `score_baselines` | study.baselines | Env, root → RunRecord (one per baseline) | per baseline: create the run, `evaluate` on `EVAL_SEEDS`, `add_eval`, `finish`; scripted on Snake only | BASE-03, EVAL-01 |
+| 3 | `load_agent` | registry.agents | agent spec, Env → Agent | `random`, `scripted`, or a run folder via `DQNAgent.load`; refuses scripted off Snake | REPLAY-01 |
+| 4 | `RandomAgent` | baselines.uniform | name → Agent | uniform pick, generator reseeded in `reset` | BASE-01 |
+| 5 | `ScriptedAgent` | baselines.scripted | name → Agent | toward the food along the larger gap; non-fatal fallback preferring straight | BASE-02 |
+| 6 | `create_run` | runs.store | RunConfig → RunWriter | PL-01 as built | LOG-01 |
+| 7 | `evaluate` | evaluate.score | Env, Agent, seeds → EvalResult | PL-01 as built | BASE-03 |
+| 8 | `load_record` | runs.store | path → RunRecord | read `record.json` | LOG-01 |
+
+### Entry sketch (pre-build — removed by spine task)
+```python
+def run_baselines(args: Namespace) -&gt; tuple[RunRecord, ...]:
+    env = make_env(args.env)
+    return score_baselines(env, root=args.root)
+```
+
+## PL-03: Draw learning curves
+**Entry:** `src/rllab/curves/pipeline.py::run_curves` · **Trigger:** `python -m rllab curves runs/full-s1 runs/no-memory-s1 --out chart.png`
+**Purpose:** Redraw learning curves from saved run records, with the baselines as flat lines, without training again.
+**Covers:** CURVE-01–CURVE-05, CORE-06, QR-04
+
+| # | Step | Owner | In → Out | Spine version | Covers |
+|---|---|---|---|---|---|
+| 1 | `load_records` | curves.inputs | run paths → RunRecord (one per path) | `load_record` per path; skips and names a record with no evaluation points | CURVE-05 |
+| 2 | `load_record` | runs.store | path → RunRecord | PL-02 as built | CURVE-05 |
+| 3 | `find_baselines` | curves.inputs | root, RunRecord → RunRecord (each baseline found) | `root/baseline-*` records of the same environment | CURVE-03 |
+| 4 | `plot_curves` | curves.plot | RunRecord → CurvePlot | Matplotlib Agg PNG: one mean line per config minus seed, labelled by the switches off (AD-07) | CURVE-01–CURVE-04, CORE-06, QR-04 |
+
+### Entry sketch (pre-build — removed by spine task)
+```python
+def run_curves(args: Namespace) -&gt; CurvePlot:
+    records = load_records(args.runs)
+    baselines = find_baselines(args.root, records)
+    return plot_curves(records, args.out, baselines=baselines)
+```
+
+## PL-04: Run the study
+**Entry:** `src/rllab/study/pipelines/pl04_study.py::run_study` · **Trigger:** `python -m rllab study --env snake`
+**Purpose:** Run the whole Snake study unattended (the full agent and its 3 ablations × 5 seeds, plus both baselines) and get the report and chart for the notes page.
+**Covers:** ABL-01–ABL-05, EVAL-03, EVAL-04, EXPL-02, EXPL-03, QR-02
+
+| # | Step | Owner | In → Out | Spine version | Covers |
+|---|---|---|---|---|---|
+| 1 | `study_configs` | study.plan | env name, seeds, n games → RunConfig (one per variant and seed) | `full`, `no-memory`, `no-frozen`, `no-decay` × seeds, named `&lt;variant&gt;-s&lt;seed&gt;` | ABL-01–ABL-03 |
+| 2 | `train_variants` | study.runner | RunConfig, root, workers → RunRecord (one per config) | `ProcessPoolExecutor`, one thread per run; each worker: `make_env`, `DQNAgent`, `train_run`; a failed run&#x27;s record read back (AD-03) | QR-02 |
+| 3 | `make_env` | registry.envs | env name → Env | PL-01 as built | CORE-06 |
+| 4 | `DQNAgent` | agent.dqn | Env sizes, AgentConfig, seed → LearningAgent | PL-01 as built | ABL-01–ABL-03 |
+| 5 | `train_run` | train.loop | Env, LearningAgent, RunConfig → RunRecord | PL-01 as built | QR-02 |
+| 6 | `load_record` | runs.store | path → RunRecord | PL-02 as built | LOG-05 |
+| 7 | `score_baselines` | study.baselines | Env, root → RunRecord (one per baseline) | PL-02 as built | BASE-03 |
+| 8 | `compare_runs` | study.compare | RunRecord → Comparison (2 baseline, 3 ablation) | final-evaluation score arrays into `compare_scores`: one-sided, Bonferroni over the comparisons, test built with the `null-hypothesis-testing` skill; failed runs `missing` | ABL-04, EVAL-03 |
+| 9 | `plot_curves` | curves.plot | RunRecord → CurvePlot | PL-03 as built | EXPL-03 |
+| 10 | `write_report` | study.report | Comparison, CurvePlot → StudyReport | `report.md`: each comparison with its test result, incomplete runs, the ABL-05 finding line, one section per switch | ABL-05, EVAL-04, EXPL-02 |
+
+### Entry sketch (pre-build — removed by spine task)
+```python
+def run_study(env_name=&quot;snake&quot;, seeds=(1, 2, 3, 4, 5), *, n_games=1_000, workers=None, root=Path(&quot;runs&quot;)) -&gt; StudyReport:
+    configs = study_configs(env_name, seeds, n_games)
+    records = train_variants(configs, root, workers=workers)
+    env = make_env(env_name)
+    baselines = score_baselines(env, root=root)
+    comparisons = compare_runs(records, baselines)
+    chart = plot_curves(records, root / f&quot;study-{env_name}&quot; / &quot;curves.png&quot;, baselines=baselines)
+    return write_report(env_name, comparisons, chart, root)
+```
+
+## PL-05: Watch a replay
+**Entry:** `src/rllab/replay/pipeline.py::run_replay` · **Trigger:** `python -m rllab replay runs/full-s1 --env snake --seed 42 [--fps 10]`
+**Purpose:** Watch any saved agent, or a baseline, play one seeded game frame by frame, with pause, step and speed controls.
+**Covers:** REPLAY-01–REPLAY-05, CORE-04, CORE-06, AGENT-06, QR-04
+
+| # | Step | Owner | In → Out | Spine version | Covers |
+|---|---|---|---|---|---|
+| 1 | `record_replay` | replay.record | agent spec, env name, seed → Replay | `make_env`, `load_agent`, then `play_game` greedily with frames | REPLAY-01, REPLAY-04, REPLAY-05 |
+| 2 | `make_env` | registry.envs | env name → Env | PL-01 as built | CORE-06 |
+| 3 | `load_agent` | registry.agents | agent spec, Env → Agent | PL-02 as built | REPLAY-01 |
+| 4 | `DQNAgent` | agent.dqn | path, Env → LearningAgent | PL-01 as built (`DQNAgent.load`) | AGENT-06 |
+| 5 | `play_game` | evaluate.play | Env, Agent, seed → GameResult | PL-01 as built, with frames | CORE-04 |
+| 6 | `show` | replay.window | Replay → window | pygame-ce window drawing each frame&#x27;s cells, step and score at a fixed fps (AD-06) | REPLAY-02, REPLAY-03, QR-04 |
+
+### Entry sketch (pre-build — removed by spine task)
+```python
+def run_replay(args: Namespace) -&gt; Replay:
+    replay = record_replay(args.agent, args.env, args.seed)
+    show(replay, fps=args.fps)
+    return replay
+```
+
+## Planned layout (pre-build — removed by spine task)
+```
+src/rllab/
+  __init__.py   contract exports only
+  __main__.py   CLI: train → PL-01, baselines → PL-02, curves → PL-03, study → PL-04, replay → PL-05
+  core/       __init__.py  types.py (protocols, Step, Frame, Transition, errors)  check.py
+  snake/      __init__.py  env.py
+  corridor/   __init__.py  env.py
+  agent/      __init__.py  dqn/ (agent.dqn&#x27;s folder: network.py, memory.py, schedule.py, targets.py)
+  baselines/  __init__.py  uniform.py  scripted.py
+  evaluate/   __init__.py  seeds.py  play.py  score.py
+  runs/       __init__.py  types.py (RunConfig, RunRecord, GameStat, EvalPoint, LossPoint)  store.py  writer.py
+  train/      __init__.py  loop.py
+  registry/   __init__.py  envs.py  agents.py
+  curves/     __init__.py  pipeline.py (PL-03 entry)  inputs.py  plot.py
+  replay/     __init__.py  pipeline.py (PL-05 entry)  record.py  window.py
+  study/      __init__.py  pipelines/pl02_baselines.py  pipelines/pl04_study.py  plan.py  runner.py  baselines.py  compare.py  report.py
+  cli/        __init__.py  pipeline.py (PL-01 entry)  args.py
+tests/intent/rllab/  tests/unit/rllab/
+```
+
+## Open questions
+- EXPL-01 is on no step: the &quot;Why it learns&quot; section is written by the learner on `notes/&lt;env&gt;.md`, and no code writes the notes page (architecture, Data). (assumed: left uncovered by design; the study report supplies the evidence)
+- Re-running the study when its run folders already exist: `create_run` refuses each one, so they come back as missing. (assumed: no resume; delete `runs/` entries to re-run)
+- The study scoring baselines when `rllab baselines` already wrote `runs/baseline-*`. (assumed: `score_baselines` reads an existing finished record back with `load_record`, since scoring is deterministic)
+
+## Retired
+</pre><div class="hook">⛔ hook PostToolUse:Write blocked: dt lint found problems in docs/packages/rllab/pipelines.md:
+docs/packages/rllab/pipelines.md:19: step-io-types PL-01 step `training_seeds`: its Out names no contract type
+docs/packages/rllab/pipelines.md:119: step-io-types PL-05 step `show`: its Out names no contract type
+2 errors, 0 warnings</div><details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-11/rl-incremental/with_skill/project/docs/packages/rllab/pipelines.md&quot;,
+  &quot;content&quot;: &quot;# rllab — Pipelines\n\n**Package:** rllab · **Status:** Draft · **Last updated:** 2026-10-18 · **Contract:** [contract.md](contract.md)\n\n## PL-01: Train an agent\n**Entry:** `src/rllab/cli/pipeline.py::run_train` · **Trigger:** `python -m rllab train --env snake --seed 1 [--no-memory] [--no-frozen] [--no-decay] [--games 1000] [--name NAME]`\n**Purpose:** Train one hand-written DQN on an environment, with any of its parts switched off, and keep its record and trained agent in `runs/&lt;name&gt;/`.\n**Covers:** CORE-01–CORE-06, SNAKE-01–SNAKE-08, AGENT-01–AGENT-06, ABL-01–ABL-03, EVAL-01, EVAL-02, LOG-01–LOG-05, QR-01, QR-03–QR-05\n\n| # | Step | Owner | In → Out | Spine version | Covers |\n|---|---|---|---|---|---|\n| 1 | `train_config` | cli.args | flags → RunConfig | switches into AgentConfig; default name `&lt;variant&gt;-s&lt;seed&gt;` | LOG-01, ABL-01–ABL-03 |\n| 2 | `make_env` | registry.envs | env name → Env | plain match on `snake` or `corridor` | CORE-06 |\n| 3 | `SnakeEnv` | snake.env | size → Env | 20 × 20 rules, 11 facts, rewards, step limit, frame | SNAKE-01–SNAKE-08, CORE-01–CORE-04 |\n| 4 | `CorridorEnv` | corridor.env | length, max steps → Env | one-hot position, +1 at the right end | CORE-05, CORE-06 |\n| 5 | `DQNAgent` | agent.dqn | Env sizes, AgentConfig, seed → LearningAgent | 11 → 256 → 3 MLP learning from the latest Transition only, ε fixed at 0.1, targets from the current net (every switch off); `torch.save` state dict | AGENT-01–AGENT-06, ABL-01–ABL-03, QR-03, QR-04 |\n| 6 | `train_run` | train.loop | Env, LearningAgent, RunConfig → RunRecord | game loop with `act(explore=True)` and `learn`; evaluate and log every `eval_every` games; failed record on any error | CORE-05, AGENT-02, EVAL-02, LOG-02, LOG-03, QR-01, QR-05 |\n| 7 | `check_env` | core.check | Env → Env | `hasattr` on the 5 behaviours | CORE-05 |\n| 8 | `training_seeds` | evaluate.seeds | run seed, n games → seeds | generator from the run seed over `[0, 1_000_000)` (AD-04) | EVAL-01, QR-05 |\n| 9 | `create_run` | runs.store | RunConfig → RunWriter | new folder, config written at once; refuses an existing name | LOG-01 |\n| 10 | `JsonRunWriter` | runs.writer | RunConfig, path → RunWriter | record in memory, atomic rewrite on `add_eval` and `finish`, `agent.pt` beside it (AD-05) | LOG-02–LOG-05 |\n| 11 | `evaluate` | evaluate.score | Env, Agent, seeds → EvalResult | `play_game` greedily on each seed; mean and std | EVAL-02, AGENT-03 |\n| 12 | `play_game` | evaluate.play | Env, Agent, seed → GameResult | reset both, step until done | CORE-02, AGENT-03 |\n\n### Entry sketch (pre-build — removed by spine task)\n```python\ndef run_train(args: Namespace) -&gt; RunRecord:\n    config = train_config(args)\n    env = make_env(config.env)\n    agent = DQNAgent(env.obs_size, env.n_actions, config.agent, seed=config.seed)\n    return train_run(env, agent, config, root=args.root)\n```\n\n## PL-02: Score the baselines\n**Entry:** `src/rllab/study/pipelines/pl02_baselines.py::run_baselines` · **Trigger:** `python -m rllab baselines --env snake`\n**Purpose:** Score the random and scripted agents on the same 100 held-out games as the learning agent, so its curve has bars to clear.\n**Covers:** BASE-01–BASE-03, EVAL-01, REPLAY-01\n\n| # | Step | Owner | In → Out | Spine version | Covers |\n|---|---|---|---|---|---|\n| 1 | `make_env` | registry.envs | env name → Env | PL-01 as built | CORE-06 |\n| 2 | `score_baselines` | study.baselines | Env, root → RunRecord (one per baseline) | per baseline: create the run, `evaluate` on `EVAL_SEEDS`, `add_eval`, `finish`; scripted on Snake only | BASE-03, EVAL-01 |\n| 3 | `load_agent` | registry.agents | agent spec, Env → Agent | `random`, `scripted`, or a run folder via `DQNAgent.load`; refuses scripted off Snake | REPLAY-01 |\n| 4 | `RandomAgent` | baselines.uniform | name → Agent | uniform pick, generator reseeded in `reset` | BASE-01 |\n| 5 | `ScriptedAgent` | baselines.scripted | name → Agent | toward the food along the larger gap; non-fatal fallback preferring straight | BASE-02 |\n| 6 | `create_run` | runs.store | RunConfig → RunWriter | PL-01 as built | LOG-01 |\n| 7 | `evaluate` | evaluate.score | Env, Agent, seeds → EvalResult | PL-01 as built | BASE-03 |\n| 8 | `load_record` | runs.store | path → RunRecord | read `record.json` | LOG-01 |\n\n### Entry sketch (pre-build — removed by spine task)\n```python\ndef run_baselines(args: Namespace) -&gt; tuple[RunRecord, ...]:\n    env = make_env(args.env)\n    return score_baselines(env, root=args.root)\n```\n\n## PL-03: Draw learning curves\n**Entry:** `src/rllab/curves/pipeline.py::run_curves` · **Trigger:** `python -m rllab curves runs/full-s1 runs/no-memory-s1 --out chart.png`\n**Purpose:** Redraw learning curves from saved run records, with the baselines as flat lines, without training again.\n**Covers:** CURVE-01–CURVE-05, CORE-06, QR-04\n\n| # | Step | Owner | In → Out | Spine version | Covers |\n|---|---|---|---|---|---|\n| 1 | `load_records` | curves.inputs | run paths → RunRecord (one per path) | `load_record` per path; skips and names a record with no evaluation points | CURVE-05 |\n| 2 | `load_record` | runs.store | path → RunRecord | PL-02 as built | CURVE-05 |\n| 3 | `find_baselines` | curves.inputs | root, RunRecord → RunRecord (each baseline found) | `root/baseline-*` records of the same environment | CURVE-03 |\n| 4 | `plot_curves` | curves.plot | RunRecord → CurvePlot | Matplotlib Agg PNG: one mean line per config minus seed, labelled by the switches off (AD-07) | CURVE-01–CURVE-04, CORE-06, QR-04 |\n\n### Entry sketch (pre-build — removed by spine task)\n```python\ndef run_curves(args: Namespace) -&gt; CurvePlot:\n    records = load_records(args.runs)\n    baselines = find_baselines(args.root, records)\n    return plot_curves(records, args.out, baselines=baselines)\n```\n\n## PL-04: Run the study\n**Entry:** `src/rllab/study/pipelines/pl04_study.py::run_study` · **Trigger:** `python -m rllab study --env snake`\n**Purpose:** Run the whole Snake study unattended (the full agent and its 3 ablations × 5 seeds, plus both baselines) and get the report and chart for the notes page.\n**Covers:** ABL-01–ABL-05, EVAL-03, EVAL-04, EXPL-02, EXPL-03, QR-02\n\n| # | Step | Owner | In → Out | Spine version | Covers |\n|---|---|---|---|---|---|\n| 1 | `study_configs` | study.plan | env name, seeds, n games → RunConfig (one per variant and seed) | `full`, `no-memory`, `no-frozen`, `no-decay` × seeds, named `&lt;variant&gt;-s&lt;seed&gt;` | ABL-01–ABL-03 |\n| 2 | `train_variants` | study.runner | RunConfig, root, workers → RunRecord (one per config) | `ProcessPoolExecutor`, one thread per run; each worker: `make_env`, `DQNAgent`, `train_run`; a failed run&#x27;s record read back (AD-03) | QR-02 |\n| 3 | `make_env` | registry.envs | env name → Env | PL-01 as built | CORE-06 |\n| 4 | `DQNAgent` | agent.dqn | Env sizes, AgentConfig, seed → LearningAgent | PL-01 as built | ABL-01–ABL-03 |\n| 5 | `train_run` | train.loop | Env, LearningAgent, RunConfig → RunRecord | PL-01 as built | QR-02 |\n| 6 | `load_record` | runs.store | path → RunRecord | PL-02 as built | LOG-05 |\n| 7 | `score_baselines` | study.baselines | Env, root → RunRecord (one per baseline) | PL-02 as built | BASE-03 |\n| 8 | `compare_runs` | study.compare | RunRecord → Comparison (2 baseline, 3 ablation) | final-evaluation score arrays into `compare_scores`: one-sided, Bonferroni over the comparisons, test built with the `null-hypothesis-testing` skill; failed runs `missing` | ABL-04, EVAL-03 |\n| 9 | `plot_curves` | curves.plot | RunRecord → CurvePlot | PL-03 as built | EXPL-03 |\n| 10 | `write_report` | study.report | Comparison, CurvePlot → StudyReport | `report.md`: each comparison with its test result, incomplete runs, the ABL-05 finding line, one section per switch | ABL-05, EVAL-04, EXPL-02 |\n\n### Entry sketch (pre-build — removed by spine task)\n```python\ndef run_study(env_name=\&quot;snake\&quot;, seeds=(1, 2, 3, 4, 5), *, n_games=1_000, workers=None, root=Path(\&quot;runs\&quot;)) -&gt; StudyReport:\n    configs = study_configs(env_name, seeds, n_games)\n    records = train_variants(configs, root, workers=workers)\n    env = make_env(env_name)\n    baselines = score_baselines(env, root=root)\n    comparisons = compare_runs(records, baselines)\n    chart = plot_curves(records, root / f\&quot;study-{env_name}\&quot; / \&quot;curves.png\&quot;, baselines=baselines)\n    return write_report(env_name, comparisons, chart, root)\n```\n\n## PL-05: Watch a replay\n**Entry:** `src/rllab/replay/pipeline.py::run_replay` · **Trigger:** `python -m rllab replay runs/full-s1 --env snake --seed 42 [--fps 10]`\n**Purpose:** Watch any saved agent, or a baseline, play one seeded game frame by frame, with pause, step and speed controls.\n**Covers:** REPLAY-01–REPLAY-05, CORE-04, CORE-06, AGENT-06, QR-04\n\n| # | Step | Owner | In → Out | Spine version | Covers |\n|---|---|---|---|---|---|\n| 1 | `record_replay` | replay.record | agent spec, env name, seed → Replay | `make_env`, `load_agent`, then `play_game` greedily with frames | REPLAY-01, REPLAY-04, REPLAY-05 |\n| 2 | `make_env` | registry.envs | env name → Env | PL-01 as built | CORE-06 |\n| 3 | `load_agent` | registry.agents | agent spec, Env → Agent | PL-02 as built | REPLAY-01 |\n| 4 | `DQNAgent` | agent.dqn | path, Env → LearningAgent | PL-01 as built (`DQNAgent.load`) | AGENT-06 |\n| 5 | `play_game` | evaluate.play | Env, Agent, seed → GameResult | PL-01 as built, with frames | CORE-04 |\n| 6 | `show` | replay.window | Replay → window | pygame-ce window drawing each frame&#x27;s cells, step and score at a fixed fps (AD-06) | REPLAY-02, REPLAY-03, QR-04 |\n\n### Entry sketch (pre-build — removed by spine task)\n```python\ndef run_replay(args: Namespace) -&gt; Replay:\n    replay = record_replay(args.agent, args.env, args.seed)\n    show(replay, fps=args.fps)\n    return replay\n```\n\n## Planned layout (pre-build — removed by spine task)\n```\nsrc/rllab/\n  __init__.py   contract exports only\n  __main__.py   CLI: train → PL-01, baselines → PL-02, curves → PL-03, study → PL-04, replay → PL-05\n  core/       __init__.py  types.py (protocols, Step, Frame, Transition, errors)  check.py\n  snake/      __init__.py  env.py\n  corridor/   __init__.py  env.py\n  agent/      __init__.py  dqn/ (agent.dqn&#x27;s folder: network.py, memory.py, schedule.py, targets.py)\n  baselines/  __init__.py  uniform.py  scripted.py\n  evaluate/   __init__.py  seeds.py  play.py  score.py\n  runs/       __init__.py  types.py (RunConfig, RunRecord, GameStat, EvalPoint, LossPoint)  store.py  writer.py\n  train/      __init__.py  loop.py\n  registry/   __init__.py  envs.py  agents.py\n  curves/     __init__.py  pipeline.py (PL-03 entry)  inputs.py  plot.py\n  replay/     __init__.py  pipeline.py (PL-05 entry)  record.py  window.py\n  study/      __init__.py  pipelines/pl02_baselines.py  pipelines/pl04_study.py  plan.py  runner.py  baselines.py  compare.py  report.py\n  cli/        __init__.py  pipeline.py (PL-01 entry)  args.py\ntests/intent/rllab/  tests/unit/rllab/\n```\n\n## Open questions\n- EXPL-01 is on no step: the \&quot;Why it learns\&quot; section is written by the learner on `notes/&lt;env&gt;.md`, and no code writes the notes page (architecture, Data). (assumed: left uncovered by design; the study report supplies the evidence)\n- Re-running the study when its run folders already exist: `create_run` refuses each one, so they come back as missing. (assumed: no resume; delete `runs/` entries to re-run)\n- The study scoring baselines when `rllab baselines` already wrote `runs/baseline-*`. (assumed: `score_baselines` reads an existing finished record back with `load_record`, since scoring is deterministic)\n\n## Retired\n&quot;
+}</pre><div class="lbl">output</div><pre>File created successfully at: /Users/connorott/plugins/dev-team-workspace/iteration-11/rl-incremental/with_skill/project/docs/packages/rllab/pipelines.md (file state is current in your context — no need to Read it back)</pre></details></div><div class="step" id="SD91"><span class="sid">D91</span><span class="kind">Bash</span>cd /Users/connorott/plugins/dev-team-workspace/iteration-11/rl-incremental/with_skill/plugin/dev-team/scripts &amp;&amp; grep -rn &quot;names no contract type&quot; -B40 *.py | grep -n &quot;def \|last\|lower\|plain\|exempt\|skip&quot; | head -40<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;cd /Users/connorott/plugins/dev-team-workspace/iteration-11/rl-incremental/with_skill/plugin/dev-team/scripts &amp;&amp; grep -rn \&quot;names no contract type\&quot; -B40 *.py | grep -n \&quot;def \\|last\\|lower\\|plain\\|exempt\\|skip\&quot; | head -40&quot;
+}</pre><div class="lbl">output</div><pre>Shell cwd was reset to /Users/connorott/plugins/dev-team-workspace/iteration-11/rl-incremental/with_skill/project</pre></details></div><div class="step" id="SD92"><span class="sid">D92</span><span class="kind">Bash</span>cd /Users/connorott/plugins/dev-team-workspace/iteration-11/rl-incremental/with_skill/plugin/dev-team/scripts &amp;&amp; grep -rln &quot;names no contract type&quot; . ; f=$(grep -rln &quot;names no contract type&quot; . | head -1); n=$(grep -n &quot;names no contract type&quot; $f | head -1 | cut -d: -f1); sed -n &quot;$((n-60)),$((n+5))p&quot; $f<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;cd /Users/connorott/plugins/dev-team-workspace/iteration-11/rl-incremental/with_skill/plugin/dev-team/scripts &amp;&amp; grep -rln \&quot;names no contract type\&quot; . ; f=$(grep -rln \&quot;names no contract type\&quot; . | head -1); n=$(grep -n \&quot;names no contract type\&quot; $f | head -1 | cut -d: -f1); sed -n \&quot;$((n-60)),$((n+5))p\&quot; $f&quot;
+}</pre><div class="lbl">output</div><pre>README.md
+devteam/commands/lint.py
+
+### `dt explain [PL-NN|&lt;pkg&gt;…] [--write]`
+
+The pipelines in plain words, for a person reading the plan: per pipeline, its **Purpose** line (or, without one, the requirements it serves), how it runs (trigger; the system pipeline it is a segment of), then each step in order with what it does (its Spine version), what it takes and gives, and the requirements it serves, quoted from the spec. Library classes are listed under the factory step that builds them; a system pipeline shows its hops between packages and names its segments. Prints the chosen pipelines (default all); `--write` writes one page per package to `docs/explained/&lt;pkg&gt;.md` (`system.md` for system pipelines), outside the doc map. `explain-stale` warns when a written page no longer matches.
+
+### `dt layout &lt;pkg&gt; [--json]`
+
+```
+package: quant
+root: src/quant/
+  __init__.py — Quant Lab.
+  data/
+    pipeline.py — PL-01 entry: load prices.
+PL-01: ok
+PL-02: not built (src/quant/stats/pipeline.py missing)
+```
+
+- **Source folder:** each of the package&#x27;s pipelines&#x27; `Entry` folders, cut after its last `&lt;pkg&gt;` component (so a single package with component subfolders shows the whole package), then their common prefix; else `src/&lt;pkg&gt;/`. Unknown package (no `docs/packages/&lt;pkg&gt;/` and no folder) → exit 2.
+- **Tree:** files then subfolders, alphabetically; hidden, cache and build folders skipped. Each `.py` shows its module docstring&#x27;s first line, or `(no docstring)`.
+- **Pipelines** (the package&#x27;s `pipelines.md`): the entry function&#x27;s top-level calls (outermost calls per statement, in order; calls used as arguments don&#x27;t count), read with `ast` only — project code is never imported or run — compared with the step table&#x27;s function step names (a library-class row, whose Step is CamelCase like `SingleCropSet`, is reached through its factory and skipped). A call is named by its final attribute (`data.load_prices(…)` → `load_prices`) and `from … import x as y` aliases are resolved. Lines: `PL-NN: ok`, `PL-NN: drift — calls […] vs steps […]` (also when the entry function is undefined or the file doesn&#x27;t parse), `PL-NN: not built (&lt;entry file&gt; missing)`.
+- Exit 1 on drift. `--json`: `package`, `root`, `exists`, `tree` (`path`, `dir`, `doc`), `pipelines` (`id`, `entry`, `status` ok|drift|missing|no-entry, `calls`, `steps`, `detail`).
+- `devteam/code.py` exposes `pipeline_drift(repo, pipeline)` (the drift detail, or None) and `check_pipeline` for `dt status` and lint.
+
+### `dt lint [paths…] [--changed] [--json] [--hook]`
+
+No paths → the whole doc map (archive excluded). Paths (files or folders; a folder means every doc under it; relative to `--root`, else the current directory) → only problems located in those files; cross-doc checks still read the whole repo. `--changed` → docs changed vs `HEAD` plus untracked ones (outside git: exit 2). Output: `path:line: &lt;code&gt; &lt;message&gt;` sorted by path and line, then `N errors, M warnings`. `--json`: `problems` (`path`, `line`, `code`, `severity` E|W, `message`), `errors`, `warnings`. Exit 1 if any error; warnings don&#x27;t fail. A malformed doc yields findings, never a traceback.
+
+Checks (code: severity):
+- `dup-id` E — an ID with two live definitions, or one with a retired line that is still defined elsewhere
+- `missing-ref` E — an ID (`PB-NN` included) in a `Read:`, `Covers`, `Step`, `Pipeline`, `Used by`, `Part of` or `References` field, or a `Covers`, `Pipeline(s)`, `Used by` or `Read` table column, that isn&#x27;t defined anywhere (archive counts as defined). `Read:` entries that look like paths (`/` or a file extension) are skipped; `PL-02.step` checks `PL-02`; `RF-01:pca_factors` checks `RF-01`, `PB-01:probe.py:get` checks `PB-01`. A decision&#x27;s `**Probe:**` line isn&#x27;t checked here (a cited PB with no entry is `probes_unwritten`). Ranges expand. Changelog sections are skipped. (`Depends on` is checked by `depends`.)
+- `retired-ref` E — a literal mention of a retired ID (retired line, struck decision heading, struck requirement) anywhere outside code fences, except: retired lines and superseded/removed definitions themselves, the decision named in `Superseded by AD-NN`, and Changelog sections. An ID only reached through the inside of a range (`STAT-01–STAT-06`) isn&#x27;t flagged
+- `budget` W — size budgets (§3), in lines. Package docs are budgeted per unit: contract.md &gt; 8 per live symbol (`### comp.symbol`) + 12; pipelines.md &gt; 35 per live pipeline (or 20 + 1.5 per step row, rounded up, when that is more) + 10, plus the lines of its `## … (pre-build …)` layout section; tests.md &gt; 10 per live TC + 15. Fixed: plan.md and queued plans &gt; 400, a probes.md entry &gt; 10 non-blank lines plus its checks table (header, separator, one per check), a roadmap `## S&lt;n&gt;` or `## M&lt;n&gt;` section &gt; 6 non-blank lines, AGENTS.md/CLAUDE.md `## Docs` + `## Project skills` &gt; 25. docs/brief.md: over 500 words (the `brief_words` count) or more than 5 goals (`brief_goals`)
+- `grow-size` W — a package doc over a per-file ceiling (contract.md 200, pipelines.md 300, tests.md 300 lines), however well it keeps to its per-unit budget: the package holds too much for one set of docs, though size alone never splits a package: the message says to trim the doc or split a module; silent while `grow_held` (above) records the user&#x27;s one package
+- `approved-edit` W — a doc whose `HEAD` version and working copy are both Approved but whose text (header line and trailing whitespace excluded) differs: it was edited without going back to Draft, or the approval isn&#x27;t committed yet. Skipped outside git, for files not in `HEAD`, and for plan/queued/todo/roadmap (dt&#x27;s mechanical edits). In contract.md, `**Used by:**` lines are ignored: pipeline-design appends PL IDs there without a Revise; in references.md and probes.md, Hash values are ignored (`dt references --stamp` and `dt probes --stamp` write them)
+- `prebuild-left` E — a pre-build section inside a `PL-NN` section whose pipeline is built, or one outside any pipeline (Planned layout) when every pipeline in that doc is built. Built = `model.pipeline_built`, the same rule as `dt prebuild-clear`: the task that builds it (its wiring task; with no Kind, its Phase 0 spine task) checked in `todo.md`, or (no such task in the active plan) entry file exists
+- `pipeline-fields` E — a package pipeline (`PL-NN` in pipelines.md) with no `Entry` or `Trigger`, or a step row whose Owner or Spine version cell is empty (`—` counts as empty). A system pipeline (`PL-NN` in the root architecture.md: package → package over named contracts) needs only a `Trigger` and steps (a table or a numbered `1. …` list); no Entry, Owner or Spine version
+- `contract-heading` E — a contract.md `##`/`###` heading that starts with a `pkg.symbol` but isn&#x27;t `&lt;pkg&gt;.&lt;symbol&gt;: &lt;title&gt;`: most often one naming several symbols (`train.train / train.train_seeds: …`, split on `/ , · &amp; + and`), else a symbol with no `: &lt;title&gt;`. dt resolves a symbol only from its own heading, so `Read:` and `dt context` would fail on it later
+- `spine-mock` W — a pipelines.md Spine version cell containing mock, stub, fake, TODO or placeholder: the spine must be a real baseline (system pipelines are skipped). `contract fake` / `boundary fake` is allowed: a fake of another package generated from an approved contract, not a mocked step
+- `fixture-size` — per TC with a `Fixture:` folder: folder missing, or no `input.json` / `expected.json` → **E**; folder over 100 KB → W (also for a `tests/fixtures/&lt;pkg&gt;/TC-NN/` folder no TC names, reported at the folder). Optional TC fields such as `Parse:` and `Skills:` aren&#x27;t checked
+- Task checks run on `tasks/plan.md` and `tasks/queued/*.md` written by build-planning (a foreign plan is skipped):
+  - `task-size` E — Size not XS/S/M, or the source files it writes outside the size&#x27;s range (XS 1, S 1–2, M 3–5): `Writes:` (else `Files likely`) minus test files (`tests/**`, `test_*.py`). An interface task is sized by judgment
+  - `task-acceptance` E — more than 3 top-level bullets under `**Acceptance:**` (indented sub-bullets don&#x27;t count)
+  - `task-title` E — the word &quot;and&quot; in a task title (any case)
+  - `task-fields` E — missing Package, Step, Size, Mode, Read, Acceptance or Verify (in an interface-first plan also Kind and Writes); Mode not split/solo; Kind not one of the five
+  - `task-step` W — Step `PL-NN.&lt;name&gt;` names a step that isn&#x27;t in that pipeline&#x27;s table
+  - `depends` E — a `Depends on` task that isn&#x27;t defined, comes at or after the task **in plan order** (position in the file, not ID number: Replan reorders without renumbering), or a cycle (reported once). A task from another plan or the archive resolves
+  - `milestone-size` E — the plan&#x27;s critical path (`graph.critical_path`: the longest `Depends on` chain; mitigated graph rows don&#x27;t order; dependencies on other plans ignored) is over 15 tasks. The message names the chain. Parallel tracks don&#x27;t add up, so the total task count isn&#x27;t capped; the plan&#x27;s line budget bounds it
+  - `writes` — two tasks with no `Depends on` path between them (either way) whose writes overlap (same path, or one inside the other&#x27;s folder glob), across the whole plan: E, or W when either side claims only through `Files likely`. Two wiring tasks whose writes overlap, path or not: same severities. And E (tasks with a Kind): a task other than the interface task writing a shared module (`__init__.py`, `types.py`, `__main__.py`, or a `pipeline.py` that isn&#x27;t exactly one pipeline&#x27;s Entry file: a re-exporting one, or one several pipelines enter through); a task other than an interface, wiring or system task writing a pipeline&#x27;s Entry file
+  - `edges` E (interface-first plans) — a `Depends on` whose graph row is mitigated (mitigated edges don&#x27;t order); a `Depends on` with no graph row (or no `## Dependency graph` section), except on an interface task; a row whose From or To names no task or an undefined one; a Kind outside the six; `none` with no reason; a mitigation that names no `pkg.Symbol`, or one no interface task freezes (in its `Read:`, or a `tests/contracts/&lt;pkg.Symbol&gt;/` path in its `Writes:`); an unmitigated `data` row across a type an interface task freezes (To&#x27;s step Out ∩ From&#x27;s step In), or `call` row across a frozen symbol (`&lt;owner&gt;.&lt;step&gt;` of From&#x27;s steps that To reads or builds): mitigate it instead of waiting on code
+  - `kind-title` E — a task title with the word &quot;spine&quot; or &quot;thicken&quot; whose Kind is another (a fold is Kind thicken, never titled a spine)
+  - `covers-vs-deferred` — the Scope&#x27;s Covers and Deferred both list an ID, or a task covers an ID the Scope defers: **E**. A task covers an ID that another step&#x27;s Covers cell lists and its own step&#x27;s (`PL-NN.&lt;name&gt;`) doesn&#x27;t: W. That Covers and Deferred account for every ID is `uncovered` (`dt status`)
+  - `step-unplanned` W — `steps_unplanned` (build-planning above), one warning per pipeline at the Scope&#x27;s Deferred line: every spec ID can be on a task while a step is left out, so each step gets a task or a `PL-NN.step (to M&lt;n&gt;: why)` under Deferred
+  - `interface-barrier` W — an interface task followed straight, in plan order, by a non-interface task with no checkpoint heading between them: add `### Checkpoint after M&lt;n&gt;-T&lt;nn&gt; (barrier)`. The build reviews the interface anyway; the block&#x27;s items guide that review
+  - `parallel-step` W — two thicken tasks on one step (`PL-NN.&lt;name&gt;`) with no `Depends on` path between them: the step is one function, so each needs the file the other changes even when their Writes don&#x27;t overlap
+  - `spine-claim` W — a spine task&#x27;s Reason names (backticked, bare or `&lt;component&gt;.&lt;name&gt;`) a contract function or class that is no pipeline&#x27;s step or entry and sits outside the step&#x27;s owner, while the task writes a source file outside that owner&#x27;s folder or module (owner `train.loop` → `…/train/loop/…`, `…/train/loop.py`): give the symbol its own step, or its home in the step&#x27;s folder owner. A symbol beside the step&#x27;s own module raises nothing
+  - `deprecated` W — a task&#x27;s `**Parallel:**` (derived now) or `**Files likely:**` (use `**Writes:**`)
+  - `verify-smoke` E — a task whose `Verify:` lacks its Step pipeline&#x27;s smoke command (tests.md Strategy `Smoke` cell, else the pipeline&#x27;s Trigger + ` --smoke`) when one is due: always for wiring and system tasks, and for any other task once its `Depends on` path reaches that pipeline&#x27;s wiring task (with no Kind: every task outside Phase 0). Interface and spine tasks, and thicken tasks beside the wiring, land before the pipeline runs
+  - `finding-disposition` E — a finding under a checkpoint with no `→ &lt;disposition&gt;`
+  - `task-ref` E — a task ID in a task&#x27;s Acceptance text, or in a graph row&#x27;s Mitigated by cell (mitigation or `none:` reason), that names no task in any plan or the archive; a bare `T41` reads as the plan&#x27;s own milestone&#x27;s (`M1-T41`)
+- `todo-mismatch` E — task IDs in todo.md ≠ plan.md (each side reported in its own file)
+- `step-io-types` — in a package pipeline&#x27;s step table, a type an `In → Out` cell names that no contract type section defines (bare name or `pkg.Name`), or a step whose Out names no contract type (entry arguments on the In side may stay plain). E once any contract has a type section, W before (projects from before typed contracts); W for a type an open route in docs/routes.md names (its bare or qualified name), which waits for the owner&#x27;s Revise
+- `packet-type-closure` W — a name contract signatures use (as `dt context` reads a signature) that no contract section defines and that isn&#x27;t a library name, once per contract doc at its first use, naming the symbols that use it: no packet can show it. A name defined only outside every section (a preamble alias such as `` `Array = np.ndarray` is used throughout ``) is reported too, since no packet shows the preamble
+- `type-cases` — a contract type that crosses step owners (steps of two or more owners name it in `In → Out`, reused `PL-NN as built` steps aside, or its `**Boundary:**` line names a consumer) with no `**Cases:**` (or `—`): the interface task writes one sample per case. E once any contract type names a case, W before
+- `boundaries` E — a contract function (not a type) with no `**Boundary:**` line whose `Used by` names a package or component other than its own, or a pipeline that isn&#x27;t its own (its own: the pipelines it is the entry of, or a step of under its component). A function with no own pipeline is flagged only for a pipeline that calls it through a reused step (`PL-01 as built`, or an Owner cell naming a PL). A pipeline section with a `**Used by:**` naming another pipeline or package and no `**Boundary:**` is flagged the same way. The interface task freezes a fake for each Boundary (design §4.1)
+- Reference checks (design/references.md):
+  - `ref-file` E — an RF entry with no File, or whose file is missing
+Shell cwd was reset to /Users/connorott/plugins/dev-team-workspace/iteration-11/rl-incremental/with_skill/project</pre></details></div><div class="step" id="SD93"><span class="sid">D93</span><span class="kind">think</span>The lint found two steps lacking a contract type—`training_seeds` and `replay.show`—so I&#x27;ll route both to `architecture-design` instead of defining types myself, naming them in the cells to match the upcoming contract.<details><summary>full text</summary><pre>The lint found two steps lacking a contract type—`training_seeds` and `replay.show`—so I&#x27;ll route both to `architecture-design` instead of defining types myself, naming them in the cells to match the upcoming contract.
+
+</pre></details></div><div class="step" id="SD94"><span class="sid">D94</span><span class="kind">Bash</span>python3 ../plugin/dev-team/scripts/dt.py route architecture-design &quot;Add type evaluate.Seeds (tuple[int, ...]) as the return of evaluate.training_seeds, so PL-01.training_seeds has a contract Out&quot; --from pipeline-design &amp;&amp; python3 ../plugin/dev-team/scripts/dt.py route architecture-design &quot;Add type replay.Playback (the frame indices drawn, in order, and the fps at each) and have replay.show return it, so PL-05.show has a contract Out and a headless test can check pause, step and speed (REPLAY-03) …[+299 chars]<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;python3 ../plugin/dev-team/scripts/dt.py route architecture-design \&quot;Add type evaluate.Seeds (tuple[int, ...]) as the return of evaluate.training_seeds, so PL-01.training_seeds has a contract Out\&quot; --from pipeline-design &amp;&amp; python3 ../plugin/dev-team/scripts/dt.py route architecture-design \&quot;Add type replay.Playback (the frame indices drawn, in order, and the fps at each) and have replay.show return it, so PL-05.show has a contract Out and a headless test can check pause, step and speed (REPLAY-03)\&quot; --from pipeline-design &amp;&amp; python3 ../plugin/dev-team/scripts/dt.py route architecture-design \&quot;Add agent to study&#x27;s Depends on and study to agent.DQNAgent&#x27;s Used by: PL-04.train_variants constructs a DQNAgent per variant in each worker (study already uses agent.AgentConfig)\&quot; --from pipeline-design&quot;
+}</pre><div class="lbl">output</div><pre>routed: architecture-design · Add type evaluate.Seeds (tuple[int, ...]) as the return of evaluate.training_seeds, so PL-01.training_seeds has a contract Out
+routed: architecture-design · Add type replay.Playback (the frame indices drawn, in order, and the fps at each) and have replay.show return it, so PL-05.show has a contract Out and a headless test can check pause, step and speed (REPLAY-03)
+routed: architecture-design · Add agent to study&#x27;s Depends on and study to agent.DQNAgent&#x27;s Used by: PL-04.train_variants constructs a DQNAgent per variant in each worker (study already uses agent.AgentConfig)</pre></details></div><div class="step" id="SD95"><span class="sid">D95</span><span class="kind">Bash</span>f=docs/packages/rllab/pipelines.md &amp;&amp; python3 - &quot;$f&quot; &lt;&lt;&#x27;EOF&#x27;
+import sys,re
+p=sys.argv[1]; s=open(p).read()
+reps=[(&quot;| run seed, n games → seeds |&quot;,&quot;| run seed, n games → Seeds |&quot;),
+(&quot;| Replay → window |&quot;,&quot;| Replay → Playback |&quot;),
+(&quot;def run_replay(args: Namespace) -&gt; Replay:\n    replay = record_replay(args.agent, args.env, args.seed)\n    show(replay, fps=args.fps)\n    return replay&quot;,
+ &quot;def run_replay(args: Namespace) -&gt; Playback:\n    replay = record_replay(args.agent, args.env, args.seed)\n    …[+184 chars]<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;f=docs/packages/rllab/pipelines.md &amp;&amp; python3 - \&quot;$f\&quot; &lt;&lt;&#x27;EOF&#x27;\nimport sys,re\np=sys.argv[1]; s=open(p).read()\nreps=[(\&quot;| run seed, n games → seeds |\&quot;,\&quot;| run seed, n games → Seeds |\&quot;),\n(\&quot;| Replay → window |\&quot;,\&quot;| Replay → Playback |\&quot;),\n(\&quot;def run_replay(args: Namespace) -&gt; Replay:\\n    replay = record_replay(args.agent, args.env, args.seed)\\n    show(replay, fps=args.fps)\\n    return replay\&quot;,\n \&quot;def run_replay(args: Namespace) -&gt; Playback:\\n    replay = record_replay(args.agent, args.env, args.seed)\\n    return show(replay, fps=args.fps)\&quot;)]\nfor a,b in reps:\n    assert a in s,a; s=s.replace(a,b)\nopen(p,&#x27;w&#x27;).write(s)\nEOF\npython3 ../plugin/dev-team/scripts/dt.py lint docs/packages/rllab/&quot;
+}</pre><div class="lbl">output</div><pre>docs/packages/rllab/pipelines.md:19: step-io-types PL-01 step `training_seeds` names Seeds, which no contract.md type section defines (`### &lt;component&gt;.Seeds: type`); routed, waiting for its owner&#x27;s Revise
+docs/packages/rllab/pipelines.md:119: step-io-types PL-05 step `show` names Playback, which no contract.md type section defines (`### &lt;component&gt;.Playback: type`); routed, waiting for its owner&#x27;s Revise
+0 errors, 2 warnings</pre></details></div><div class="step" id="SD96"><span class="sid">D96</span><span class="kind">say</span>Both warnings are expected: they stay until the routed types are added. Next I&#x27;ll append the PL IDs to the contract&#x27;s `Used by:` lines.<details><summary>full text</summary><pre>Both warnings are expected: they stay until the routed types are added. Next I&#x27;ll append the PL IDs to the contract&#x27;s `Used by:` lines.</pre></details></div><div class="step" id="SD97"><span class="sid">D97</span><span class="kind">Bash</span>python3 - &lt;&lt;&#x27;EOF&#x27;
+p=&quot;docs/packages/rllab/contract.md&quot;; lines=open(p).read().split(&quot;\n&quot;)
+m={&quot;core.check_env&quot;:&quot;PL-01&quot;,&quot;snake.SnakeEnv&quot;:&quot;PL-01&quot;,&quot;corridor.CorridorEnv&quot;:&quot;PL-01&quot;,
+&quot;agent.DQNAgent&quot;:&quot;PL-01, PL-04, PL-05&quot;,&quot;baselines.RandomAgent&quot;:&quot;PL-02&quot;,&quot;baselines.ScriptedAgent&quot;:&quot;PL-02&quot;,
+&quot;evaluate.training_seeds&quot;:&quot;PL-01&quot;,&quot;evaluate.play_game&quot;:&quot;PL-01, PL-05&quot;,&quot;evaluate.evaluate&quot;:&quot;PL-01, PL-02&quot;,
+&quot;runs.RunWriter&quot;:&quot;PL-01&quot;,&quot;runs.create_run&quot;:&quot;PL-01, PL-02&quot;,&quot;runs.load_record&quot;:&quot;PL-02, PL-03, PL-04&quot;,
+&quot;train.train_ru …[+784 chars]<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;python3 - &lt;&lt;&#x27;EOF&#x27;\np=\&quot;docs/packages/rllab/contract.md\&quot;; lines=open(p).read().split(\&quot;\\n\&quot;)\nm={\&quot;core.check_env\&quot;:\&quot;PL-01\&quot;,\&quot;snake.SnakeEnv\&quot;:\&quot;PL-01\&quot;,\&quot;corridor.CorridorEnv\&quot;:\&quot;PL-01\&quot;,\n\&quot;agent.DQNAgent\&quot;:\&quot;PL-01, PL-04, PL-05\&quot;,\&quot;baselines.RandomAgent\&quot;:\&quot;PL-02\&quot;,\&quot;baselines.ScriptedAgent\&quot;:\&quot;PL-02\&quot;,\n\&quot;evaluate.training_seeds\&quot;:\&quot;PL-01\&quot;,\&quot;evaluate.play_game\&quot;:\&quot;PL-01, PL-05\&quot;,\&quot;evaluate.evaluate\&quot;:\&quot;PL-01, PL-02\&quot;,\n\&quot;runs.RunWriter\&quot;:\&quot;PL-01\&quot;,\&quot;runs.create_run\&quot;:\&quot;PL-01, PL-02\&quot;,\&quot;runs.load_record\&quot;:\&quot;PL-02, PL-03, PL-04\&quot;,\n\&quot;train.train_run\&quot;:\&quot;PL-01, PL-04\&quot;,\&quot;registry.make_env\&quot;:\&quot;PL-01, PL-02, PL-04, PL-05\&quot;,\&quot;registry.load_agent\&quot;:\&quot;PL-02, PL-05\&quot;,\n\&quot;curves.plot_curves\&quot;:\&quot;PL-03, PL-04\&quot;,\&quot;replay.record_replay\&quot;:\&quot;PL-05\&quot;,\&quot;replay.show\&quot;:\&quot;PL-05\&quot;,\n\&quot;study.compare_scores\&quot;:\&quot;PL-04\&quot;,\&quot;study.run_study\&quot;:\&quot;PL-04\&quot;}\ncur=None; done=set()\nfor i,l in enumerate(lines):\n    if l.startswith(\&quot;### \&quot;): cur=l[4:].split(\&quot;:\&quot;)[0]\n    elif l.startswith(\&quot;- **Used by:**\&quot;) and cur in m:\n        lines[i]=l.rstrip()+\&quot;; \&quot;+m[cur]; done.add(cur)\nassert done==set(m), set(m)-done\nopen(p,\&quot;w\&quot;).write(\&quot;\\n\&quot;.join(lines))\nEOF\ngrep -n \&quot;Used by.*PL-\&quot; docs/packages/rllab/contract.md | wc -l; python3 ../plugin/dev-team/scripts/dt.py lint; python3 ../plugin/dev-team/scripts/dt.py explain rllab --write; python3 ../plugin/dev-team/scripts/dt.py status --skill pipeline-design&quot;
+}</pre><div class="lbl">output</div><pre>      20
+docs/packages/rllab/pipelines.md:19: step-io-types PL-01 step `training_seeds` names Seeds, which no contract.md type section defines (`### &lt;component&gt;.Seeds: type`); routed, waiting for its owner&#x27;s Revise
+docs/packages/rllab/pipelines.md:119: step-io-types PL-05 step `show` names Playback, which no contract.md type section defines (`### &lt;component&gt;.Playback: type`); routed, waiting for its owner&#x27;s Revise
+0 errors, 2 warnings
+dt explain: --write writes every package&#x27;s page; give no targets
+skill: pipeline-design
+mode: extend
+docs: brief Accepted · spec Approved · architecture Approved (Single package) · roadmap ok · plan missing · constraints missing
+next ids: AD-09 PL-06 TC-01 S2 M1
+references_unindexed: none
+references_changed: none
+references_missing: none
+packages: rllab=extend
+uncovered_ids: EXPL-01
+stage_ids_unplaced: EXPL-01 (S1)
+components_unowned: none
+drift: none
+retired_refs: none
+misplaced: none
+routed_changes: none
+requests_open: none</pre></details></div><div class="step" id="SD98"><span class="sid">D98</span><span class="kind">Bash</span>python3 ../plugin/dev-team/scripts/dt.py explain --write &amp;&amp; ls docs/explained &amp;&amp; head -30 docs/explained/rllab.md &amp;&amp; git status --short<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;python3 ../plugin/dev-team/scripts/dt.py explain --write &amp;&amp; ls docs/explained &amp;&amp; head -30 docs/explained/rllab.md &amp;&amp; git status --short&quot;
+}</pre><div class="lbl">output</div><pre>docs/explained/rllab.md
+rllab.md
+# rllab pipelines, explained
+
+Generated by `dt explain --write` from the pipelines docs, for reading. Don&#x27;t edit it: change the pipelines doc and run `dt explain --write` again.
+
+## PL-01: Train an agent
+
+**What it&#x27;s for:** Train one hand-written DQN on an environment, with any of its parts switched off, and keep its record and trained agent in runs/&lt;name&gt;/.
+**How it runs:** `python -m rllab train --env snake --seed 1 [--no-memory] [--no-frozen] [--no-decay] [--games 1000] [--name NAME]`
+
+**What it does, in order:**
+
+1. **train_config** (cli.args): switches into AgentConfig; default name &lt;variant&gt;-s&lt;seed&gt;
+   - takes and gives: flags → RunConfig
+   - serves: LOG-01 &quot;Each run records its environment, agent, every setting including the ablation switches…&quot;; ABL-01 &quot;With the memory switch off, the agent learns from only the step it just took, with no…&quot;; ABL-02 &quot;With the frozen-copy switch off, the agent builds its targets from its current value…&quot; and 1 more
+2. **make_env** (registry.envs): plain match on snake or corridor
+   - takes and gives: env name → Env
+   - serves: CORE-06 &quot;Logging, learning curves and the replay viewer work on any environment that offers…&quot;
+   - builds one of these, which the pipeline then drives:
+      - **SnakeEnv** (snake.env): 20 × 20 rules, 11 facts, rewards, step limit, frame · takes size → Env
+      - **CorridorEnv** (corridor.env): one-hot position, +1 at the right end · takes length, max steps → Env
+      - **DQNAgent** (agent.dqn): 11 → 256 → 3 MLP learning from the latest Transition only, ε fixed at 0.1, targets from the current net (every switch off); torch.save state dict · takes Env sizes, AgentConfig, seed → LearningAgent
+3. **train_run** (train.loop): game loop with act(explore=True) and learn; evaluate and log every eval_every games; failed record on any error
+   - takes and gives: Env, LearningAgent, RunConfig → RunRecord
+   - serves: CORE-05 &quot;The training loop trains any agent on any environment that offers CORE-01 to CORE-04, for…&quot;; AGENT-02 &quot;During training the agent takes a random move with a probability that starts at 1.0 and…&quot;; EVAL-02 &quot;Every 50 training games, the agent plays the same 100 held-out games with exploration off…&quot; and 4 more
+4. **check_env** (core.check): hasattr on the 5 behaviours
+   - takes and gives: Env → Env
+   - serves: CORE-05 &quot;The training loop trains any agent on any environment that offers CORE-01 to CORE-04, for…&quot;
+5. **training_seeds** (evaluate.seeds): generator from the run seed over [0, 1_000_000) (AD-04)
+   - takes and gives: run seed, n games → Seeds
+   - serves: EVAL-01 &quot;Training games and evaluation games come from separate seed sets that never overlap.&quot;; QR-05 &quot;On the same machine, a training run repeated with the same seed and settings produces the…&quot;
+ M docs/packages/rllab/contract.md
+?? docs/explained/
+?? docs/packages/rllab/pipelines.md
+?? docs/routes.md</pre></details></div><div class="step" id="SD99"><span class="sid">D99</span><span class="kind">say</span>I&#x27;ve written `docs/packages/rllab/pipelines.md` as a Draft. It has five pipelines, and every S1 spec ID except EXPL-01 lands on a step. `dt lint` shows 0 errors and 2 warnings; both come from routed types (see section 4). ⏎ ## 1. What was written ⏎ | ID | Title | Trigger | Steps | ⏎ |---|---|---|---| ⏎ | PL-01 | Train an agent | `rllab train --env snake --seed 1 [--no-memory …]` | train_config → make_env (SnakeEnv / CorridorEnv) → DQNAgent → train_run (check_env, training_seeds, create_run / JsonRunWriter, evaluate, play_game) | ⏎ | PL-02 | Score the baselines | `rllab baselines --env snak …[+3708 chars]<details><summary>full text</summary><pre>I&#x27;ve written `docs/packages/rllab/pipelines.md` as a **Draft**. It has five pipelines, and every S1 spec ID except EXPL-01 lands on a step. `dt lint` shows 0 errors and 2 warnings; both come from routed types (see section 4).
+
+## 1. What was written
+| ID | Title | Trigger | Steps |
+|---|---|---|---|
+| PL-01 | Train an agent | `rllab train --env snake --seed 1 [--no-memory …]` | train_config → make_env (SnakeEnv / CorridorEnv) → DQNAgent → train_run (check_env, training_seeds, create_run / JsonRunWriter, evaluate, play_game) |
+| PL-02 | Score the baselines | `rllab baselines --env snake` | make_env → score_baselines (load_agent → RandomAgent / ScriptedAgent, create_run, evaluate, load_record) |
+| PL-03 | Draw learning curves | `rllab curves runs/… --out chart.png` | load_records (load_record) → find_baselines → plot_curves |
+| PL-04 | Run the study | `rllab study --env snake` | study_configs → train_variants (PL-01&#x27;s steps in worker processes) → make_env → score_baselines → compare_runs → plot_curves → write_report |
+| PL-05 | Watch a replay | `rllab replay runs/full-s1 --env snake --seed 42` | record_replay (make_env, load_agent, DQNAgent.load, play_game) → show |
+
+- **Layout:** one folder per component and one module per step owner. `agent/dqn/` is a folder for the DQN&#x27;s private helpers (network, memory, schedule, targets). The entry modules are `cli/pipeline.py` (PL-01), `study/pipelines/pl02_baselines.py`, `study/pipelines/pl04_study.py`, `curves/pipeline.py` and `replay/pipeline.py`. `__main__.py` sends each command to its pipeline.
+- **`contract.md`:** I appended PL IDs to 20 `Used by:` lines and changed nothing else, so it stays Approved.
+- **Readable page:** `docs/explained/rllab.md`.
+
+## 2. Assumptions
+- **Pipeline order:** I numbered them train, baselines, curves, study, replay, so each pipeline comes after the ones it reuses. This differs from the candidate list.
+- **Where the entries live:** each entry sits in the component whose dependencies already cover its steps. That&#x27;s why PL-01 is in `cli`, and PL-02 and PL-04 are both in `study` so they can share `score_baselines`.
+- **Simplest working versions:**
+  - **DQN:** the first version has every switch off: it learns from the latest step only, with ε fixed at 0.1 and no frozen copy. Memory, frozen copy and ε decay are added later as upgrades to it.
+  - **Charts:** start as mean lines with labels. Bands and baseline lines come later.
+  - **Replay window:** starts with a fixed frame rate. Pause, step and speed controls come later.
+  - **Comparison:** a one-sided test with a Bonferroni correction. The `null-hypothesis-testing` skill picks the actual test when it&#x27;s built.
+- **Name lookup:** `registry` matches the fixed names with a plain `if`, not a plugin registry. The scripted baseline only runs on Snake.
+
+## 3. Open questions
+- **EXPL-01** is on no step. You write the &quot;Why it learns&quot; section yourself on `notes/&lt;env&gt;.md`, and no code writes the notes page.
+- **Re-running the study:** if its run folders already exist, `create_run` refuses them and they&#x27;re reported as missing. My assumption is there&#x27;s no resume; you delete the old runs to re-run.
+- **Existing baseline records:** if `rllab baselines` has already written `runs/baseline-*`, my assumption is the study reads those records back instead of re-scoring, since scoring gives the same result every time.
+
+## 4. Uncovered and routed
+- **Uncovered:** EXPL-01 only, for the reason above. Every component owns at least one step.
+- **Routed to `architecture-design`.** These are recorded in `docs/routes.md` and not changed here:
+  1. **Add type `evaluate.Seeds`:** the return of `training_seeds`.
+  2. **Add type `replay.Playback`, returned by `replay.show`:** it lists the frames drawn and the fps at each, so a test without a window can check pause, step and speed (REPLAY-03).
+  3. **`study` gets a dependency on `agent`:** `train_variants` builds a `DQNAgent` in each worker process.
+
+## 5. Your call
+Approve, or tell me what to change.
+
+On your earlier request: those three files were already committed in `ea9a9dc`, so there was nothing to commit. Uncommitted now: `docs/packages/rllab/pipelines.md`, `docs/packages/rllab/contract.md`, `docs/routes.md` and `docs/explained/`.</pre></details></div><div class="step" id="SD100"><span class="sid">D100</span><span class="kind">hook</span><span class="hook">Stop said: {&quot;systemMessage&quot;: &quot;dt lint: 2 problems\ndocs/packages/rllab/pipelines.md:19: step-io-types PL-01 step `training_seeds` names Seeds, which no contract.md type section defines (`### &lt;component&gt;.Seeds: type`); routed, waiting for its owner&#x27;s Revise\ndocs/packages/rllab/pipelines.md:119: step-io-types PL-05 step `show` names Playback, which no contract.md type section defines (`### &lt;component&gt;.Playback: type`); routed, waiting for its owner&#x27;s Revise&quot;}
+</span></div><div class="step" id="SD101"><span class="sid">D101</span><span class="kind">hook</span><span class="hook">SessionStart:resume said: milestone: none (no tasks/plan.md)
+draft (waiting for approval): docs/packages/rllab/pipelines.md
+dt: /Users/connorott/plugins/dev-team-workspace/iteration-11/rl-incremental/with_skill/plugin/dev-team/scripts/dt
+</span></div>
+<h2>Commits</h2>
+<p>None.</p>
+<h2>Returned</h2>
+<pre>I&#x27;ve written `docs/packages/rllab/pipelines.md` as a **Draft**. It has five pipelines, and every S1 spec ID except EXPL-01 lands on a step. `dt lint` shows 0 errors and 2 warnings; both come from routed types (see section 4).
+
+## 1. What was written
+| ID | Title | Trigger | Steps |
+|---|---|---|---|
+| PL-01 | Train an agent | `rllab train --env snake --seed 1 [--no-memory …]` | train_config → make_env (SnakeEnv / CorridorEnv) → DQNAgent → train_run (check_env, training_seeds, create_run / JsonRunWriter, evaluate, play_game) |
+| PL-02 | Score the baselines | `rllab baselines --env snake` | make_env → score_baselines (load_agent → RandomAgent / ScriptedAgent, create_run, evaluate, load_record) |
+| PL-03 | Draw learning curves | `rllab curves runs/… --out chart.png` | load_records (load_record) → find_baselines → plot_curves |
+| PL-04 | Run the study | `rllab study --env snake` | study_configs → train_variants (PL-01&#x27;s steps in worker processes) → make_env → score_baselines → compare_runs → plot_curves → write_report |
+| PL-05 | Watch a replay | `rllab replay runs/full-s1 --env snake --seed 42` | record_replay (make_env, load_agent, DQNAgent.load, play_game) → show |
+
+- **Layout:** one folder per component and one module per step owner. `agent/dqn/` is a folder for the DQN&#x27;s private helpers (network, memory, schedule, targets). The entry modules are `cli/pipeline.py` (PL-01), `study/pipelines/pl02_baselines.py`, `study/pipelines/pl04_study.py`, `curves/pipeline.py` and `replay/pipeline.py`. `__main__.py` sends each command to its pipeline.
+- **`contract.md`:** I appended PL IDs to 20 `Used by:` lines and changed nothing else, so it stays Approved.
+- **Readable page:** `docs/explained/rllab.md`.
+
+## 2. Assumptions
+- **Pipeline order:** I numbered them train, baselines, curves, study, replay, so each pipeline comes after the ones it reuses. This differs from the candidate list.
+- **Where the entries live:** each entry sits in the component whose dependencies already cover its steps. That&#x27;s why PL-01 is in `cli`, and PL-02 and PL-04 are both in `study` so they can share `score_baselines`.
+- **Simplest working versions:**
+  - **DQN:** the first version has every switch off: it learns from the latest step only, with ε fixed at 0.1 and no frozen copy. Memory, frozen copy and ε decay are added later as upgrades to it.
+  - **Charts:** start as mean lines with labels. Bands and baseline lines come later.
+  - **Replay window:** starts with a fixed frame rate. Pause, step and speed controls come later.
+  - **Comparison:** a one-sided test with a Bonferroni correction. The `null-hypothesis-testing` skill picks the actual test when it&#x27;s built.
+- **Name lookup:** `registry` matches the fixed names with a plain `if`, not a plugin registry. The scripted baseline only runs on Snake.
+
+## 3. Open questions
+- **EXPL-01** is on no step. You write the &quot;Why it learns&quot; section yourself on `notes/&lt;env&gt;.md`, and no code writes the notes page.
+- **Re-running the study:** if its run folders already exist, `create_run` refuses them and they&#x27;re reported as missing. My assumption is there&#x27;s no resume; you delete the old runs to re-run.
+- **Existing baseline records:** if `rllab baselines` has already written `runs/baseline-*`, my assumption is the study reads those records back instead of re-scoring, since scoring gives the same result every time.
+
+## 4. Uncovered and routed
+- **Uncovered:** EXPL-01 only, for the reason above. Every component owns at least one step.
+- **Routed to `architecture-design`.** These are recorded in `docs/routes.md` and not changed here:
+  1. **Add type `evaluate.Seeds`:** the return of `training_seeds`.
+  2. **Add type `replay.Playback`, returned by `replay.show`:** it lists the frames drawn and the fps at each, so a test without a window can check pause, step and speed (REPLAY-03).
+  3. **`study` gets a dependency on `agent`:** `train_variants` builds a `DQNAgent` in each worker process.
+
+## 5. Your call
+Approve, or tell me what to change.
+
+On your earlier request: those three files were already committed in `ea9a9dc`, so there was nothing to commit. Uncommitted now: `docs/packages/rllab/pipelines.md`, `docs/packages/rllab/contract.md`, `docs/routes.md` and `docs/explained/`.</pre>
+</body></html>

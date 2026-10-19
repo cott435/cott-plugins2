@@ -1,0 +1,863 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1"><title>T24 turn</title>
+<style>
+:root{--bg:#fbfbfa;--fg:#1d1d1f;--muted:#6b6b70;--line:#d9d9de;--box:#fff;--rowp:#eef3fb;--band:#fff4d6;
+--ok:#2e7d32;--bad:#c62828;--warn:#b26a00;--idle:#6b6b70}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#17171a;--fg:#ececf0;--muted:#9a9aa3;
+--line:#34343a;--box:#222227;--rowp:#1d2433;--band:#3a3015;--ok:#6fcf73;--bad:#ff6b6b;--warn:#f0b35a;--idle:#9a9aa3}}
+:root[data-theme="dark"]{--bg:#17171a;--fg:#ececf0;--muted:#9a9aa3;--line:#34343a;--box:#222227;--rowp:#1d2433;
+--band:#3a3015;--ok:#6fcf73;--bad:#ff6b6b;--warn:#f0b35a;--idle:#9a9aa3}
+body{margin:0;padding:16px;background:var(--bg);color:var(--fg);font:14px/1.45 -apple-system,system-ui,sans-serif}
+h1{font-size:18px;margin:0 0 4px}h2{font-size:15px;margin:22px 0 8px}.sub{color:var(--muted)}
+table{border-collapse:collapse;margin:4px 0 8px}td,th{border-bottom:1px solid var(--line);padding:4px 10px;text-align:left;
+vertical-align:top}th{color:var(--muted);font-weight:600}.chips span{display:inline-block;margin:0 4px 2px 0}
+.legend span{margin-right:14px;white-space:nowrap}.sw{display:inline-block;width:10px;height:10px;border-radius:2px;
+margin-right:4px;vertical-align:-1px}.scroll{overflow:auto;max-height:88vh;border:1px solid var(--line);border-radius:8px}
+.chart{display:grid;width:max-content}.chart>div{line-height:0}.corner{position:sticky;top:0;left:0;z-index:3}
+.colhead{position:sticky;top:0;z-index:2}.rowhead{position:sticky;left:0;z-index:2}
+svg.bg{background:var(--bg)}.colhead svg{border-bottom:1px solid var(--line)}.rowhead svg{border-right:1px solid var(--line)}
+.ok{color:var(--ok);fill:var(--ok)}.bad{color:var(--bad);fill:var(--bad)}.warn{color:var(--warn);fill:var(--warn)}
+.idle{color:var(--idle);fill:var(--idle)}
+svg text{fill:var(--fg);font-family:-apple-system,system-ui,sans-serif}
+.box{fill:var(--box);stroke:var(--line)}.unit:hover .box{stroke:var(--fg)}
+.role{font-size:12px;font-weight:600}.uid,.wmeta,.lmeta,.meta{font-size:10px;fill:var(--muted)}
+.sub{font-size:10.5px;fill:var(--muted)}.badge{font-size:11px;font-weight:600}
+.meta.bad{fill:var(--bad);font-weight:600}.lane{font-size:13px;font-weight:700}.wave{font-size:13px;font-weight:700}
+.par{fill:#4e79a7}.ser{fill:var(--muted)}.rowp{fill:var(--rowp)}.rows{fill:transparent}.band{fill:var(--band)}
+.bandt{font-size:11.5px}.grid{stroke:var(--line)}.link{stroke:var(--muted);stroke-width:1.2;opacity:.55}
+.arrowhead{fill:var(--muted)}.marks{font-size:10.5px}.audit{stroke:var(--box);stroke-width:2}.auditn{font-size:10px;font-weight:700;fill:#fff}
+a{color:inherit}svg a .box{cursor:pointer}
+
+:root{--c0:#2a78d6;--c1:#eb6834;--c2:#1baf7a;--c3:#eda100;--c4:#e87ba4;--c5:#008300;--c6:#6250d6;--c7:#e34948;
+--cx:#8a8985;--main:#52514e;--read:#dcdbd5;--readfg:#1d1d1f}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--c0:#3987e5;--c1:#d95926;--c2:#199e70;
+--c3:#c98500;--c4:#d55181;--c5:#008300;--c6:#9085e9;--c7:#e66767;--cx:#77766f;--main:#c3c2b7;--read:#3b3b40;
+--readfg:#ececf0}}
+:root[data-theme="dark"]{--c0:#3987e5;--c1:#d95926;--c2:#199e70;--c3:#c98500;--c4:#d55181;--c5:#008300;
+--c6:#9085e9;--c7:#e66767;--cx:#77766f;--main:#c3c2b7;--read:#3b3b40;--readfg:#ececf0}
+.c0{fill:var(--c0);background:var(--c0)}.c1{fill:var(--c1);background:var(--c1)}.c2{fill:var(--c2);background:var(--c2)}
+.c3{fill:var(--c3);background:var(--c3)}.c4{fill:var(--c4);background:var(--c4)}.c5{fill:var(--c5);background:var(--c5)}
+.c6{fill:var(--c6);background:var(--c6)}.c7{fill:var(--c7);background:var(--c7)}.cx{fill:var(--cx);background:var(--cx)}
+.cmain{fill:var(--main)}.sc0{stroke:var(--c0)}.sc1{stroke:var(--c1)}.sc2{stroke:var(--c2)}
+.tl text,.sm text,.lc text{font-size:10.5px;fill:var(--muted)}.tl .lbl-in,.sm .lbl-in{fill:#fff;font-size:10.5px;font-weight:600}
+.tl .rowl,.sm .rowl,.lc .rowl{fill:var(--fg);font-size:11.5px;font-weight:600}.tl .band{fill:var(--rowp)}
+.tl .brk{stroke:var(--muted);stroke-dasharray:2 3}.tl a:hover rect,.sm a:hover rect{stroke:var(--fg);stroke-width:1.5}
+.axis{stroke:var(--line)}.sm .val{fill:var(--fg);font-weight:600}.lc path.ln{fill:none;stroke-width:2}
+.lc circle{stroke:var(--bg);stroke-width:2}.lc .end{font-weight:600;fill:var(--fg)}
+.tiles{display:flex;flex-wrap:wrap;gap:10px;margin:12px 0}.tile{border:1px solid var(--line);border-radius:8px;
+padding:8px 12px;min-width:110px;background:var(--box)}.tile b{display:block;font-size:20px;line-height:1.2}
+.tile span{font-size:12px;color:var(--muted)}.tile i{font-style:normal;font-size:12px;margin-left:6px}
+.fm{border-collapse:separate;border-spacing:2px}.fm td,.fm th{border:0;padding:0;text-align:center;font-size:11px}
+.fm th{padding:0 2px;font-weight:600}.fm td.f,.fm th.f{text-align:left;padding-right:10px;white-space:nowrap;
+position:sticky;left:0;background:var(--bg);font:11.5px ui-monospace,Menlo,monospace;
+max-width:380px;overflow:hidden;text-overflow:ellipsis}
+.fm td.cell{min-width:22px;height:20px;border-radius:3px}.fm td.fw{background:var(--c0);color:#fff;font-weight:700}
+.fm td.fe{background:var(--c1);color:#fff;font-weight:700}.fm td.fr{background:var(--read);color:var(--readfg)}
+.fm td.n{color:var(--muted);padding:0 6px}.fm tr.grp td{text-align:left;padding-top:8px;color:var(--muted);
+font-weight:600}
+.key{display:inline-block;min-width:18px;text-align:center;border-radius:3px;font-size:11px;margin-right:4px}
+.bar{display:inline-block;height:9px;border-radius:2px;vertical-align:0}
+
+pre{white-space:pre-wrap;word-break:break-word;background:var(--box);border:1px solid var(--line);border-radius:6px;
+padding:8px 10px;margin:4px 0;font:12px/1.45 ui-monospace,SFMono-Regular,Menlo,monospace;max-width:100%;overflow:auto}
+.step{border-top:1px solid var(--line);padding:6px 0}.step:target{background:var(--rowp)}
+.sid{font:12px ui-monospace,Menlo,monospace;color:var(--muted);margin-right:8px}.kind{font-weight:600;margin-right:8px}
+.err{color:var(--bad);font-weight:600}.hook{color:var(--bad);margin:4px 0 0 16px}.lbl{font-size:12px;color:var(--muted);margin-top:6px}
+details summary{cursor:pointer;color:var(--muted);font-size:12px}.head td:first-child{color:var(--muted)}
+.top{font-size:13px}.narr{list-style:none;padding-left:0}.narr li{margin:3px 0}
+</style></head>
+<body>
+<p class="top"><a href="../flow.html">← the run's flow chart</a></p>
+<p class="top"><a href="../plan/T24.html">The plan as of T24</a>: this turn changed the plan (+28 ~8 −0) · <a href="../plan/index.html">plan map</a></p>
+<h1>T24 · turn · Yes, use the cut and the M1 scope as written.</h1>
+<table class="head"><tr><td>Type</td><td>turn</td></tr><tr><td>Description</td><td>Yes, use the cut and the M1 scope as written.</td></tr><tr><td>Spawned by</td><td>user</td></tr><tr><td>Model</td><td>claude-opus-5-5</td></tr><tr><td>Start</td><td>2026-10-19 03:03:03 UTC</td></tr><tr><td>Duration</td><td>8 min</td></tr><tr><td>Tool calls</td><td>17</td></tr><tr><td>Errors</td><td>0</td></tr><tr><td>Hook blocks</td><td>1</td></tr><tr><td>Tokens</td><td>52.5k out · 60.4k new in · 2.9M cached in · peak context 190k</td></tr><tr><td>Skills invoked</td><td>none</td></tr><tr><td>Files written or edited</td><td>docs/roadmap.md, tasks/plan.md, tasks/todo.md, AGENTS.md</td></tr><tr><td>Definition</td><td>none</td></tr><tr><td>Steps</td><td>28</td></tr><tr><td>Finished</td><td>yes</td></tr></table>
+
+
+<h2>Prompt</h2>
+<pre>Yes, use the cut and the M1 scope as written.</pre>
+<h2>Files</h2>
+<table><tr><th>Op</th><th>File</th><th>Calls</th><th>By</th><th>Via</th><th>Steps</th></tr><tr><td>write</td><td><code>AGENTS.md</code></td><td>1</td><td>main</td><td>Bash</td><td><a href="#D333">D333</a></td></tr><tr><td>write</td><td><code>tasks/plan.md</code></td><td>1</td><td>main</td><td>Write</td><td><a href="#D326">D326</a></td></tr><tr><td>write</td><td><code>tasks/todo.md</code></td><td>1</td><td>main</td><td>Bash</td><td><a href="#D329">D329</a></td></tr><tr><td>edit</td><td><code>docs/roadmap.md</code></td><td>9</td><td>main</td><td>Bash</td><td><a href="#D318">D318</a> <a href="#D318">D318</a> <a href="#D320">D320</a> <a href="#D322">D322</a> <a href="#D322">D322</a> <a href="#D323">D323</a> <a href="#D329">D329</a> <a href="#D330">D330</a> <a href="#D331">D331</a></td></tr><tr><td>read</td><td><code>../plugin/dev-team/scripts/devteam/commands/lint.py</code></td><td>2</td><td>main</td><td>Bash</td><td><a href="#D316">D316</a> <a href="#D327">D327</a></td></tr><tr><td>read</td><td><code>../plugin/dev-team/scripts/devteam/status/build_planning.py</code></td><td>1</td><td>main</td><td>Bash</td><td><a href="#D315">D315</a></td></tr><tr><td>read</td><td><code>docs/roadmap.md</code></td><td>1</td><td>main</td><td>Bash</td><td><a href="#D318">D318</a></td></tr></table>
+<h2>Steps</h2>
+<div class="step" id="SD310"><span class="sid">D310</span><span class="kind">user</span>Yes, use the cut and the M1 scope as written.<details><summary>full text</summary><pre>Yes, use the cut and the M1 scope as written.</pre></details></div><div class="step" id="SD311"><span class="sid">D311</span><span class="kind">say</span>I&#x27;ll record your answer, then write the roadmap rows and check the fixtures that M1&#x27;s golden cases use.<details><summary>full text</summary><pre>I&#x27;ll record your answer, then write the roadmap rows and check the fixtures that M1&#x27;s golden cases use.</pre></details></div><div class="step" id="SD312"><span class="sid">D312</span><span class="kind">Bash</span>python3 ../plugin/dev-team/scripts/dt.py request add plan &quot;Yes, use the cut and the M1 scope as written.&quot; --skill build-planning --about &quot;Cut: M1 Train and watch a snake (PL-01, PL-04, PL-05), M2 Judge and sign off the snake (PL-02, PL-03, PL-06, PL-07), M3 Fish tank, M4 Predator and prey; M1 covers and exit as proposed, QR-01/QR-02 to M2, QR-04 to M3&quot;; for t in TC-19 TC-29 TC-32 TC-37 TC-38 TC-42; do echo &quot;== $t&quot;; ls tests/fixtures/rllab/$t; done; head -c 600 tests/fixtures/rllab/TC-19/*.json | …[+9 chars]<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;python3 ../plugin/dev-team/scripts/dt.py request add plan \&quot;Yes, use the cut and the M1 scope as written.\&quot; --skill build-planning --about \&quot;Cut: M1 Train and watch a snake (PL-01, PL-04, PL-05), M2 Judge and sign off the snake (PL-02, PL-03, PL-06, PL-07), M3 Fish tank, M4 Predator and prey; M1 covers and exit as proposed, QR-01/QR-02 to M2, QR-04 to M3\&quot;; for t in TC-19 TC-29 TC-32 TC-37 TC-38 TC-42; do echo \&quot;== $t\&quot;; ls tests/fixtures/rllab/$t; done; head -c 600 tests/fixtures/rllab/TC-19/*.json | head -30&quot;
+}</pre><div class="lbl">output</div><pre>UR-45 plan: &quot;Yes, use the cut and the M1 scope as written.&quot;
+== TC-19
+expected.json
+input.json
+== TC-29
+expected.json
+input.json
+== TC-32
+expected.json
+input.json
+== TC-37
+expected.json
+input.json
+== TC-38
+expected.json
+input.json
+== TC-42
+expected.json
+input.json
+==&gt; tests/fixtures/rllab/TC-19/expected.json &lt;==
+{&quot;a_food_left_wall_ahead&quot;: {&quot;action&quot;: 0}, &quot;b_no_safe_move&quot;: {&quot;action&quot;: 1}, &quot;tol&quot;: 0}
+
+==&gt; tests/fixtures/rllab/TC-19/input.json &lt;==
+{
+ &quot;world&quot;: &quot;snake&quot;,
+ &quot;policy&quot;: &quot;scripted_policy(&#x27;snake&#x27;, &#x27;snake&#x27;)&quot;,
+ &quot;cases&quot;: {
+  &quot;a_food_left_wall_ahead&quot;: {
+   &quot;state&quot;: {
+    &quot;body&quot;: [
+     [
+      9,
+      5
+     ],
+     [
+      8,
+      5
+     ],
+     [
+      7,
+      5
+     ]
+    ],
+    &quot;heading&quot;: &quot;right&quot;,
+    &quot;food&quot;: [
+     9,
+     8
+    ],
+    &quot;steps_since_food&quot;: 0,</pre></details></div><div class="step" id="SD313"><span class="sid">D313</span><span class="kind">Bash</span>cd /Users/connorott/plugins/dev-team-workspace/iteration-11/rl-all-at-once/with_skill/plugin/dev-team/scripts &amp;&amp; grep -rn &quot;verify-smoke\|\&quot;task-step\&quot;\|&#x27;task-step&#x27;&quot; devteam | head; grep -n &quot;verify-smoke\|task-step\|stub-pinned\|edges\b&quot; README.md | head<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;cd /Users/connorott/plugins/dev-team-workspace/iteration-11/rl-all-at-once/with_skill/plugin/dev-team/scripts &amp;&amp; grep -rn \&quot;verify-smoke\\|\\\&quot;task-step\\\&quot;\\|&#x27;task-step&#x27;\&quot; devteam | head; grep -n \&quot;verify-smoke\\|task-step\\|stub-pinned\\|edges\\b\&quot; README.md | head&quot;
+}</pre><div class="lbl">output</div><pre>devteam/commands/lint.py:33:    &quot;task-step&quot;: &quot;W&quot;, &quot;depends&quot;: &quot;E&quot;, &quot;milestone-size&quot;: &quot;E&quot;, &quot;writes&quot;: &quot;E&quot;, &quot;edges&quot;: &quot;E&quot;, &quot;deprecated&quot;: &quot;W&quot;,
+devteam/commands/lint.py:34:    &quot;step-io-types&quot;: &quot;E&quot;, &quot;verify-smoke&quot;: &quot;E&quot;, &quot;todo-mismatch&quot;: &quot;E&quot;,
+devteam/commands/lint.py:1169:                yield _p(t.doc, t.start, &quot;task-step&quot;, f&quot;{t.id} Step {pl}.{step}: no step `{step}` in {pl}&#x27;s table&quot;)
+devteam/commands/lint.py:1716:                yield _p(t.doc, t.start, &quot;verify-smoke&quot;, f&quot;{t.id} Verify lacks {pl}&#x27;s smoke command `{cmd}`&quot;)
+26:                           smoke_command, milestone_references, contract_types, graph_edges…)
+237:The plan as one `plan-map/2` snapshot body (design §8.3) for workflow-analyzer&#x27;s plan map: `{&quot;schema&quot;: &quot;plan-map/2&quot;, &quot;producer&quot;: &quot;dt &lt;version&gt;&quot;, &quot;levels&quot;: [...], &quot;nodes&quot;: [...], &quot;edges&quot;: [...], &quot;builds&quot;: [...]}`, with no `turn`, `commit` or `skill` (the exporter adds those).
+306:  - `task-step` W — Step `PL-NN.&lt;name&gt;` names a step that isn&#x27;t in that pipeline&#x27;s table
+310:  - `edges` E (interface-first plans) — a `Depends on` whose graph row is mitigated (mitigated edges don&#x27;t order); a `Depends on` with no graph row (or no `## Dependency graph` section), except on an interface task; a row whose From or To names no task or an undefined one; a Kind outside the six; `none` with no reason; a mitigation that names no `pkg.Symbol`, or one no interface task freezes (in its `Read:`, or a `tests/contracts/&lt;pkg.Symbol&gt;/` path in its `Writes:`); an unmitigated `data` row across a type an interface task freezes (To&#x27;s step Out ∩ From&#x27;s step In), or `call` row across a frozen symbol (`&lt;owner&gt;.&lt;step&gt;` of From&#x27;s steps that To reads or builds): mitigate it instead of waiting on code
+318:  - `verify-smoke` E — a task whose `Verify:` lacks its Step pipeline&#x27;s smoke command (tests.md Strategy `Smoke` cell, else the pipeline&#x27;s Trigger + ` --smoke`) when one is due: always for wiring and system tasks, and for any other task once its `Depends on` path reaches that pipeline&#x27;s wiring task (with no Kind: every task outside Phase 0). Interface and spine tasks, and thicken tasks beside the wiring, land before the pipeline runs
+Shell cwd was reset to /Users/connorott/plugins/dev-team-workspace/iteration-11/rl-all-at-once/with_skill/project</pre></details></div><div class="step" id="SD314"><span class="sid">D314</span><span class="kind">Bash</span>cd /Users/connorott/plugins/dev-team-workspace/iteration-11/rl-all-at-once/with_skill/plugin/dev-team/scripts &amp;&amp; grep -n &quot;steps_unplanned&quot; -A40 devteam/status/build_planning.py | grep -n &quot;def \|fold\|Reason\|reason\|spine\|wiring&quot; | head -30<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;cd /Users/connorott/plugins/dev-team-workspace/iteration-11/rl-all-at-once/with_skill/plugin/dev-team/scripts &amp;&amp; grep -n \&quot;steps_unplanned\&quot; -A40 devteam/status/build_planning.py | grep -n \&quot;def \\|fold\\|Reason\\|reason\\|spine\\|wiring\&quot; | head -30&quot;
+}</pre><div class="lbl">output</div><pre>1:56:def steps_unplanned(repo: Repo, plan: Doc) -&gt; dict[str, list[str]]:
+3:58-    name (`PL-07.daily_bars (to M3: …)`). A task builds a step its Step names (`PL-07.daily_bars`); a spine task
+15:70-             and (t.kind == &quot;spine&quot; or (not t.kind and t.is_spine))}
+24:79-                and not REUSED.search(md.strip_md(s.spine))
+31:86-def skills_missing(plan: Doc | None, tasks: list[model.Task], available: list[str],
+Shell cwd was reset to /Users/connorott/plugins/dev-team-workspace/iteration-11/rl-all-at-once/with_skill/project</pre></details></div><div class="step" id="SD315"><span class="sid">D315</span><span class="kind">Bash</span>cd /Users/connorott/plugins/dev-team-workspace/iteration-11/rl-all-at-once/with_skill/plugin/dev-team/scripts &amp;&amp; sed -n 56,85p devteam/status/build_planning.py<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;cd /Users/connorott/plugins/dev-team-workspace/iteration-11/rl-all-at-once/with_skill/plugin/dev-team/scripts &amp;&amp; sed -n 56,85p devteam/status/build_planning.py&quot;
+}</pre><div class="lbl">output</div><pre>def steps_unplanned(repo: Repo, plan: Doc) -&gt; dict[str, list[str]]:
+    &quot;&quot;&quot;Pipeline → the steps of the plan&#x27;s milestone pipelines that no task builds and the Scope doesn&#x27;t defer by
+    name (`PL-07.daily_bars (to M3: …)`). A task builds a step its Step names (`PL-07.daily_bars`); a spine task
+    on the whole pipeline (`PL-07`) builds all of them; a step another milestone built (a task of this, a queued or
+    an archived plan names the step&#x27;s name on another pipeline) or whose Spine version reuses one (`as PL-05`,
+    `PL-01 as built`) needs none.&quot;&quot;&quot;
+    row = milestone_row(repo, model.milestone_of(plan))
+    if row is None:
+        return {}
+    tasks = model.tasks(plan)
+    others = [t for d in repo.docs(&quot;plan&quot;, &quot;queued-plan&quot;, &quot;archived-plan&quot;, archive=True) for t in model.tasks(d)]
+    named = {m.group(0) for t in tasks for m in re.finditer(r&quot;PL-\d{2,}\.[\w.]+&quot;, t.step)}
+    refs = {(m.group(1), m.group(2)) for t in tasks + others for m in re.finditer(r&quot;(PL-\d{2,})\.([\w.]+)&quot;, t.step)}
+    whole = {t.step.strip() for t in tasks if re.fullmatch(r&quot;PL-\d{2,}&quot;, t.step.strip())
+             and (t.kind == &quot;spine&quot; or (not t.kind and t.is_spine))}
+    deferred = set(re.findall(r&quot;PL-\d{2,}\.[\w.]+&quot;, md.fields_in(plan.lines, 0, len(plan.lines)).get(&quot;Deferred&quot;, &quot;&quot;)))
+    by_id = {p.id: p for p in model.all_pipelines(repo)}
+    out: dict[str, list[str]] = {}
+    for pid in roadmap_cmd.milestone_pipelines(repo, row)[0]:
+        p = by_id.get(pid)
+        if p is None or repo.is_retired(pid) or pid in whole:
+            continue
+        left = [s.name for s in p.steps if f&quot;{pid}.{s.name}&quot; not in named | deferred
+                and not REUSED.search(md.strip_md(s.spine))
+                and not any(name == s.name and pl != pid for pl, name in refs)]
+        if left:
+            out[pid] = left
+    return out
+Shell cwd was reset to /Users/connorott/plugins/dev-team-workspace/iteration-11/rl-all-at-once/with_skill/project</pre></details></div><div class="step" id="SD316"><span class="sid">D316</span><span class="kind">Bash</span>cd /Users/connorott/plugins/dev-team-workspace/iteration-11/rl-all-at-once/with_skill/plugin/dev-team/scripts &amp;&amp; sed -n 1150,1175p devteam/commands/lint.py<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;cd /Users/connorott/plugins/dev-team-workspace/iteration-11/rl-all-at-once/with_skill/plugin/dev-team/scripts &amp;&amp; sed -n 1150,1175p devteam/commands/lint.py&quot;
+}</pre><div class="lbl">output</div><pre>                yield _p(t.doc, t.start, &quot;task-fields&quot;,
+                         f&quot;{t.id} Kind {t.get(&#x27;Kind&#x27;)!r}: must be one of {&#x27;, &#x27;.join(model.KINDS)}&quot;)
+
+
+def check_deprecated(ctx: Context):
+    &quot;&quot;&quot;`Parallel` and `Files likely` still parse, but an interface-first plan derives groups from the graph and
+    claims files with `Writes:`.&quot;&quot;&quot;
+    for t in ctx.tasks:
+        for key, why in model.DEPRECATED_FIELDS.items():
+            if key in t.fields:
+                line = md.field_line(t.doc.lines, t.start, t.end, key)
+                yield _p(t.doc, t.start if line is None else line, &quot;deprecated&quot;, f&quot;{t.id} **{key}:** is deprecated: {why}&quot;)
+
+
+def check_task_step(ctx: Context):
+    for t in ctx.tasks:
+        for pl, step in re.findall(r&quot;(PL-\d{2,})\.(\w+)&quot;, t.step):
+            p = ctx.pipelines.get(pl)
+            if p is not None and step not in [s.name for s in p.steps]:
+                yield _p(t.doc, t.start, &quot;task-step&quot;, f&quot;{t.id} Step {pl}.{step}: no step `{step}` in {pl}&#x27;s table&quot;)
+
+
+def check_depends(ctx: Context):
+    for doc in ctx.plan_docs:
+        tasks = model.tasks(doc)
+        order = {t.id: n for n, t in enumerate(tasks)}
+Shell cwd was reset to /Users/connorott/plugins/dev-team-workspace/iteration-11/rl-all-at-once/with_skill/project</pre></details></div><div class="step" id="SD317"><span class="sid">D317</span><span class="kind">say</span>I&#x27;m writing the roadmap&#x27;s milestone rows now, taking each ID from `dt next-id M`.<details><summary>full text</summary><pre>I&#x27;m writing the roadmap&#x27;s milestone rows now, taking each ID from `dt next-id M`.</pre></details></div><div class="step" id="SD318"><span class="sid">D318</span><span class="kind">Bash</span>DT=&quot;python3 ../plugin/dev-team/scripts/dt.py&quot;; python3 - &lt;&lt;&#x27;EOF&#x27;
+p=&#x27;docs/roadmap.md&#x27;
+s=open(p).read()
+table=&#x27;&#x27;&#x27;
+| Milestone | Stage | Name | Packages | Pipelines | Depends | Status* |
+|---|---|---|---|---|---|---|
+&#x27;&#x27;&#x27;
+marker=&quot;*Written by `dt roadmap`&quot;
+s=s.replace(marker, table.lstrip(&#x27;\n&#x27;)+&#x27;\n&#x27;+marker,1) if &#x27;| Milestone |&#x27; not in s else s
+open(p,&#x27;w&#x27;).write(s)
+EOF
+rows=(
+&quot;| ID | S1 | Train and watch a snake | rllab | PL-01, PL-04, PL-05 | — | |&quot;
+&quot;| ID | S1 | Judge and sign off the snake | rllab | …[+682 chars]<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;DT=\&quot;python3 ../plugin/dev-team/scripts/dt.py\&quot;; python3 - &lt;&lt;&#x27;EOF&#x27;\np=&#x27;docs/roadmap.md&#x27;\ns=open(p).read()\ntable=&#x27;&#x27;&#x27;\n| Milestone | Stage | Name | Packages | Pipelines | Depends | Status* |\n|---|---|---|---|---|---|---|\n&#x27;&#x27;&#x27;\nmarker=\&quot;*Written by `dt roadmap`\&quot;\ns=s.replace(marker, table.lstrip(&#x27;\\n&#x27;)+&#x27;\\n&#x27;+marker,1) if &#x27;| Milestone |&#x27; not in s else s\nopen(p,&#x27;w&#x27;).write(s)\nEOF\nrows=(\n\&quot;| ID | S1 | Train and watch a snake | rllab | PL-01, PL-04, PL-05 | — | |\&quot;\n\&quot;| ID | S1 | Judge and sign off the snake | rllab | PL-02, PL-03, PL-06, PL-07 | M1 (store.RunDir with policy.pt, PL-01 output) | |\&quot;\n\&quot;| ID | S2 | Fish tank | rllab | PL-01, PL-02, PL-03, PL-04, PL-05, PL-06, PL-07 | M2 (snake signed off, signoff.Status; PL-07 output) | |\&quot;\n\&quot;| ID | S3 | Predator and prey | rllab | PL-08 | M3 (learners.ppo_learner, PL-01 output) | |\&quot;\n)\nfor r in \&quot;${rows[@]}\&quot;; do id=$($DT next-id M | tail -1); echo \&quot;$id\&quot;; python3 - \&quot;$id\&quot; \&quot;$r\&quot; &lt;&lt;&#x27;EOF&#x27;\nimport sys\np=&#x27;docs/roadmap.md&#x27;; id,row=sys.argv[1],sys.argv[2].replace(&#x27;| ID |&#x27;,f&#x27;| {sys.argv[1]} |&#x27;,1)\ns=open(p).read()\ni=s.index(&#x27;|---|---|---|---|---|---|---|&#x27;)\nj=s.index(&#x27;\\n\\n&#x27;,i)\ns=s[:j]+&#x27;\\n&#x27;+row+s[j:]\nopen(p,&#x27;w&#x27;).write(s)\nEOF\ndone; sed -n 1,25p docs/roadmap.md&quot;
+}</pre><div class="lbl">output</div><pre>(eval):18: no such file or directory: python3 ../plugin/dev-team/scripts/dt.py
+
+(eval):18: no such file or directory: python3 ../plugin/dev-team/scripts/dt.py
+
+(eval):18: no such file or directory: python3 ../plugin/dev-team/scripts/dt.py
+
+(eval):18: no such file or directory: python3 ../plugin/dev-team/scripts/dt.py
+
+# RL Lab — Roadmap
+
+**Last updated:** 2026-10-18
+
+| Stage | Name | Source | Status* |
+|---|---|---|---|
+| S1 | Snake | brief | Specced |
+| S2 | Fish tank | brief | Specced |
+| S3 | Predator and prey | brief | Specced |
+
+| Milestone | Stage | Name | Packages | Pipelines | Depends | Status* |
+|---|---|---|---|---|---|---|
+|  | S1 | Train and watch a snake | rllab | PL-01, PL-04, PL-05 | — | |
+|  | S1 | Judge and sign off the snake | rllab | PL-02, PL-03, PL-06, PL-07 | M1 (store.RunDir with policy.pt, PL-01 output) | |
+|  | S2 | Fish tank | rllab | PL-01, PL-02, PL-03, PL-04, PL-05, PL-06, PL-07 | M2 (snake signed off, signoff.Status; PL-07 output) | |
+|  | S3 | Predator and prey | rllab | PL-08 | M3 (learners.ppo_learner, PL-01 output) | |
+
+*Written by `dt roadmap` from doc statuses and todo checkboxes; never hand-edited.
+
+## S1: Snake
+**Outline:** A hand-written value-learning agent plays Snake, eating food and avoiding walls and itself; it beats the random and scripted baselines, has a replay and a note, and is checked against a library&#x27;s version.
+**Skills:** null-hypothesis-testing, dataviz
+
+## S2: Fish tank
+**Outline:** In a circular tank with a bouncing ball, one fish that sees everything, then several fish that see only what&#x27;s nearby, learn by a hand-written policy-gradient method to survive; they beat random and at least match the scripted fish, with a replay, a note and a library check.</pre></details></div><div class="step" id="SD319"><span class="sid">D319</span><span class="kind">say</span>The shell variable didn&#x27;t work, as the skill warned. I&#x27;ll redo the IDs one row at a time.<details><summary>full text</summary><pre>The shell variable didn&#x27;t work, as the skill warned. I&#x27;ll redo the IDs one row at a time.</pre></details></div><div class="step" id="SD320"><span class="sid">D320</span><span class="kind">Bash</span>for n in 1 2 3 4; do id=$(python3 ../plugin/dev-team/scripts/dt.py next-id M | tail -1); python3 - &quot;$id&quot; &lt;&lt;&#x27;EOF&#x27;
+import sys
+p=&#x27;docs/roadmap.md&#x27;; s=open(p).read()
+s=s.replace(&#x27;|  | S&#x27;,f&#x27;| {sys.argv[1]} | S&#x27;,1)
+open(p,&#x27;w&#x27;).write(s)
+EOF
+echo $id; done; grep -n &quot;^| M&quot; docs/roadmap.md<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;for n in 1 2 3 4; do id=$(python3 ../plugin/dev-team/scripts/dt.py next-id M | tail -1); python3 - \&quot;$id\&quot; &lt;&lt;&#x27;EOF&#x27;\nimport sys\np=&#x27;docs/roadmap.md&#x27;; s=open(p).read()\ns=s.replace(&#x27;|  | S&#x27;,f&#x27;| {sys.argv[1]} | S&#x27;,1)\nopen(p,&#x27;w&#x27;).write(s)\nEOF\necho $id; done; grep -n \&quot;^| M\&quot; docs/roadmap.md&quot;
+}</pre><div class="lbl">output</div><pre>M4
+M5
+M6
+M7
+11:| Milestone | Stage | Name | Packages | Pipelines | Depends | Status* |
+13:| M4 | S1 | Train and watch a snake | rllab | PL-01, PL-04, PL-05 | — | |
+14:| M5 | S1 | Judge and sign off the snake | rllab | PL-02, PL-03, PL-06, PL-07 | M1 (store.RunDir with policy.pt, PL-01 output) | |
+15:| M6 | S2 | Fish tank | rllab | PL-01, PL-02, PL-03, PL-04, PL-05, PL-06, PL-07 | M2 (snake signed off, signoff.Status; PL-07 output) | |
+16:| M7 | S3 | Predator and prey | rllab | PL-08 | M3 (learners.ppo_learner, PL-01 output) | |</pre></details></div><div class="step" id="SD321"><span class="sid">D321</span><span class="kind">say</span>`dt` read the M1–M3 mentioned in the Depends cells as IDs already in use. I&#x27;ll rebuild the rows in order, writing each Depends cell only after its target row exists.<details><summary>full text</summary><pre>`dt` read the M1–M3 mentioned in the Depends cells as IDs already in use. I&#x27;ll rebuild the rows in order, writing each Depends cell only after its target row exists.</pre></details></div><div class="step" id="SD322"><span class="sid">D322</span><span class="kind">Bash</span>python3 - &lt;&lt;&#x27;EOF&#x27;
+import re
+p=&#x27;docs/roadmap.md&#x27;; s=open(p).read()
+s=re.sub(r&#x27;\n\| M\d \| S.*&#x27;,&#x27;&#x27;,s)
+open(p,&#x27;w&#x27;).write(s)
+EOF
+add() { python3 - &quot;$1&quot; &quot;$2&quot; &lt;&lt;&#x27;EOF&#x27;
+import sys
+p=&#x27;docs/roadmap.md&#x27;; s=open(p).read()
+i=s.index(&#x27;|---|---|---|---|---|---|---|&#x27;); j=s.index(&#x27;\n\n&#x27;,i)
+s=s[:j]+&#x27;\n&#x27;+sys.argv[2].replace(&#x27;| ID |&#x27;,f&#x27;| {sys.argv[1]} |&#x27;,1)+s[j:]
+open(p,&#x27;w&#x27;).write(s)
+EOF
+}
+id=$(python3 ../plugin/dev-team/scripts/dt.py next-id M | tail -1); echo $id; add $id &quot;| ID | S1 | Train and watch a snake | rl …[+689 chars]<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;python3 - &lt;&lt;&#x27;EOF&#x27;\nimport re\np=&#x27;docs/roadmap.md&#x27;; s=open(p).read()\ns=re.sub(r&#x27;\\n\\| M\\d \\| S.*&#x27;,&#x27;&#x27;,s)\nopen(p,&#x27;w&#x27;).write(s)\nEOF\nadd() { python3 - \&quot;$1\&quot; \&quot;$2\&quot; &lt;&lt;&#x27;EOF&#x27;\nimport sys\np=&#x27;docs/roadmap.md&#x27;; s=open(p).read()\ni=s.index(&#x27;|---|---|---|---|---|---|---|&#x27;); j=s.index(&#x27;\\n\\n&#x27;,i)\ns=s[:j]+&#x27;\\n&#x27;+sys.argv[2].replace(&#x27;| ID |&#x27;,f&#x27;| {sys.argv[1]} |&#x27;,1)+s[j:]\nopen(p,&#x27;w&#x27;).write(s)\nEOF\n}\nid=$(python3 ../plugin/dev-team/scripts/dt.py next-id M | tail -1); echo $id; add $id \&quot;| ID | S1 | Train and watch a snake | rllab | PL-01, PL-04, PL-05 | — | |\&quot;\nid=$(python3 ../plugin/dev-team/scripts/dt.py next-id M | tail -1); echo $id; add $id \&quot;| ID | S1 | Judge and sign off the snake | rllab | PL-02, PL-03, PL-06, PL-07 | M1 (store.RunDir with policy.pt, PL-01 output) | |\&quot;\nid=$(python3 ../plugin/dev-team/scripts/dt.py next-id M | tail -1); echo $id; add $id \&quot;| ID | S2 | Fish tank | rllab | PL-01, PL-02, PL-03, PL-04, PL-05, PL-06, PL-07 | M2 (signoff.Status snake signed off, PL-07 output) | |\&quot;\nid=$(python3 ../plugin/dev-team/scripts/dt.py next-id M | tail -1); echo $id; add $id \&quot;| ID | S3 | Predator and prey | rllab | PL-08 | M3 (learners.ppo_learner, PL-01 output) | |\&quot;\ngrep -n \&quot;^| M\&quot; docs/roadmap.md&quot;
+}</pre><div class="lbl">output</div><pre>M1
+M2
+M3
+M4
+11:| Milestone | Stage | Name | Packages | Pipelines | Depends | Status* |
+13:| M1 | S1 | Train and watch a snake | rllab | PL-01, PL-04, PL-05 | — | |
+14:| M2 | S1 | Judge and sign off the snake | rllab | PL-02, PL-03, PL-06, PL-07 | M1 (store.RunDir with policy.pt, PL-01 output) | |
+15:| M3 | S2 | Fish tank | rllab | PL-01, PL-02, PL-03, PL-04, PL-05, PL-06, PL-07 | M2 (signoff.Status snake signed off, PL-07 output) | |
+16:| M4 | S3 | Predator and prey | rllab | PL-08 | M3 (learners.ppo_learner, PL-01 output) | |</pre></details></div><div class="step" id="SD323"><span class="sid">D323</span><span class="kind">Bash</span>python3 - &lt;&lt;&#x27;EOF&#x27;
+p=&#x27;docs/roadmap.md&#x27;; s=open(p).read()
+s=s.replace(&#x27;| M2 (signoff.Status snake signed off, PL-07 output) |&#x27;,&#x27;| M2 (evaluate.Comparison, PL-02 output) |&#x27;)
+s=s.replace(&#x27;| M3 (learners.ppo_learner, PL-01 output) |&#x27;,&#x27;| M2 (evaluate.compare, PL-02 output), M3 (learners.ppo_learner, PL-01 output) |&#x27;)
+s=s.rstrip(&#x27;\n&#x27;)+&#x27;&#x27;&#x27;
+
+## M1: Train and watch a snake
+Outline: `rllab train snake` trains the hand-written Double DQN on the Snake world and leaves a run folder with its learning curve …[+1615 chars]<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;python3 - &lt;&lt;&#x27;EOF&#x27;\np=&#x27;docs/roadmap.md&#x27;; s=open(p).read()\ns=s.replace(&#x27;| M2 (signoff.Status snake signed off, PL-07 output) |&#x27;,&#x27;| M2 (evaluate.Comparison, PL-02 output) |&#x27;)\ns=s.replace(&#x27;| M3 (learners.ppo_learner, PL-01 output) |&#x27;,&#x27;| M2 (evaluate.compare, PL-02 output), M3 (learners.ppo_learner, PL-01 output) |&#x27;)\ns=s.rstrip(&#x27;\\n&#x27;)+&#x27;&#x27;&#x27;\n\n## M1: Train and watch a snake\n**Outline:** `rllab train snake` trains the hand-written Double DQN on the Snake world and leaves a run folder with its learning curve and saved agent; `rllab replay` records the trained, random or scripted snake on a seed and plays it in the replay window, and `rllab watch` plays a saved recording again.\n**Skills:** —\n**References:** —\n**Exit:** `rllab train snake` finishes and its run replays; TC-01–TC-06, TC-18, TC-19, TC-29, TC-31 (snake), TC-32, TC-37, TC-38 and TC-42 (DONE-02 ledgers) pass.\n**Plan:** [../tasks/plan.md](../tasks/plan.md)\n\n## M2: Judge and sign off the snake\n**Outline:** The trained snake, both baselines and the Stable-Baselines3 reference are scored on the 100 evaluation seeds and compared as one corrected family, with the learning curve against the baselines; the note is scaffolded and the snake is signed off. Its exit holds the stage&#x27;s bar: the snake beats both baselines and lands in the reference&#x27;s range within the hour (TC-33).\n**Skills:** null-hypothesis-testing, dataviz\n**References:** —\n\n## M3: Fish tank\n**Outline:** The tank world and hand-written PPO train one fully-seeing fish, then five fish that see only within 0.5; the scripted fish, the fish comparisons, the SB3 PPO reference (with its several-fish `VecEnv`), sight circles in the replay and both tanks&#x27; sign-off, so the fish beat random and match the scripted fish (TC-34, TC-35).\n\n## M4: Predator and prey\n**Outline:** Prey and a predator both learn under the simultaneous and past-versions regimes; cross-play, the snapshot sweep, the four-curve chart and the corrected comparisons are reported (TC-43, TC-44), and the world finishes under DONE-03.\n&#x27;&#x27;&#x27;\nopen(p,&#x27;w&#x27;).write(s)\nEOF\npython3 ../plugin/dev-team/scripts/dt.py roadmap 2&gt;&amp;1 | tail -5&quot;
+}</pre><div class="lbl">output</div><pre>M1: — → Designed
+M2: — → Designed
+M3: — → Designed
+M4: — → Designed
+roadmap: updated 7</pre></details></div><div class="step" id="SD324"><span class="sid">D324</span><span class="kind">say</span>The roadmap rows are in. Next I&#x27;m writing the M1 plan: 24 tasks, built in the order interface, step spines, wiring and thicken, then system.<details><summary>full text</summary><pre>The roadmap rows are in. Next I&#x27;m writing the M1 plan: 24 tasks, built in the order interface, step spines, wiring and thicken, then system.</pre></details></div><div class="step" id="SD325"><span class="sid">D325</span><span class="kind">Bash</span>python3 ../plugin/dev-team/scripts/dt.py next-id M1-T<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;python3 ../plugin/dev-team/scripts/dt.py next-id M1-T&quot;
+}</pre><div class="lbl">output</div><pre>M1-T01</pre></details></div><div class="step" id="SD326"><span class="sid">D326</span><span class="kind">Write</span>/Users/connorott/plugins/dev-team-workspace/iteration-11/rl-all-at-once/with_skill/project/tasks/plan.md (311 lines)<div class="lbl">wrote /Users/connorott/plugins/dev-team-workspace/iteration-11/rl-all-at-once/with_skill/project/tasks/plan.md</div><pre># M1: Train and watch a snake — Plan
+
+**Milestone:** M1 · **Status:** Draft · **Base:** — · **Last updated:** 2026-10-18 · **Roadmap:** [../docs/roadmap.md](../docs/roadmap.md)
+
+## Scope
+**Exit:** `rllab train snake` finishes and its run replays; TC-01–TC-06, TC-18, TC-19, TC-29, TC-31 (snake), TC-32, TC-37, TC-38 and TC-42 (DONE-02 ledgers) pass.
+**Covers:** SNAKE-01–SNAKE-07, LEARN-01–LEARN-04, BASE-01, BASE-02, BASE-06, DATA-01, DATA-02, DONE-02, QR-03, REPLAY-01–REPLAY-03, REPLAY-05 · **Deferred:** PL-01.train_ppo, PL-01.ppo_learner, PL-01.ClippedPPO, PL-01.TankEnv, TANK-01–TANK-09, LEARN-05 (to M3: the fish need the tank and PPO); DONE-04 (to M3: needs tank1&#x27;s comparisons); REPLAY-04 (to M3: sight circles need the five-fish tank); QR-04 (to M3: measured on a 1,000-step fish replay); QR-01 (to M2: TC-33 times the hour-long run); QR-02 (to M2: applies only if the hour-long run misses QR-01)
+**Skills:** none
+
+## Phase 0: Interface
+
+### M1-T01: M1 interface
+**Package:** rllab · **Step:** contract · **Kind:** interface · **Covers:** DATA-01 · **Size:** S · **Mode:** solo
+**Read:** PL-01, PL-04, PL-05, AD-15, AD-16, AD-17, core.EnvSpec, core.StepResult, core.Frame, core.Env, core.GreedyNet, core.Policy, core.seeds, worlds.make, worlds.decode, worlds.register, worlds.SnakeState, worlds.TankState, worlds.PreyState, worlds.from_state, worlds.state_of, baselines.random_policy, baselines.scripted_policy, store.RunDir, store.new_run, store.open_run, store.load_policy, evaluate.Scores, evaluate.CurvePoint, evaluate.play, evaluate.Comparison, evaluate.compare, evaluate.Chart, evaluate.curve_chart, learners.TrainSettings, learners.RunRecord, learners.train_dqn, learners.PpoLearner, learners.ppo_learner, replay.Recording, replay.record, replay.ViewStats, replay.view, signoff.Status, signoff.may_start
+**Acceptance:**
+- [ ] Each contract type is code in its component&#x27;s `types.py` (`core.Env` and `core.Policy` in `core/protocols.py`), with one sample per listed case in `tests/contracts/&lt;id&gt;.&lt;Type&gt;/` that validates against it; `core.seeds` is built whole (eval 0–99, curve 100–119)
+- [ ] Every M1 step and entry function imports and matches its contract or step-table signature, its body the CR-02 stub naming its task; `worlds.from_state` and `worlds.state_of` dispatch by state type to per-world stubs; each `__init__.py` exports its contract; `__main__.py` dispatches `train`, `replay` and `watch`, where `--smoke` sets `RLLAB_SMOKE=1`, points `RLLAB_RUNS` at a temp folder and selects SDL&#x27;s dummy video driver
+- [ ] Each boundary fake (may_start, make, new_run, open_run, load_policy, random_policy, scripted_policy, play, decode, view, compare, curve_chart, ppo_learner) passes its contract&#x27;s cases as one test that takes the provider; the core.Env, core.Policy, store.RunDir and learners.PpoLearner replay doubles serve their fixtures; the golden-case store helper loads `tests/fixtures/rllab/TC-NN/`
+**Verify:** `pytest tests/contracts` · `scripts/check.sh gate`
+**Depends on:** — · **Writes:** src/rllab/__init__.py, src/rllab/__main__.py, src/rllab/core/**, src/rllab/worlds/**, src/rllab/baselines/**, src/rllab/store/**, src/rllab/evaluate/**, src/rllab/learners/**, src/rllab/coevo/**, src/rllab/reference/**, src/rllab/replay/**, src/rllab/signoff/**, tests/contracts/**, tests/conftest.py, tests/helpers/golden.py
+
+### Checkpoint after M1-T01 (barrier)
+- [ ] Interface review passed: the code is the contract, no more and no less (CONSTRAINTS.md Review, Interface)
+
+## Phase 1: Step spines
+
+### M1-T02: World order gate
+**Package:** rllab · **Step:** PL-01.may_start · **Kind:** thicken · **Covers:** DONE-02 · **Size:** XS · **Mode:** split
+**Reason:** fold: spine is the whole behavior
+**Read:** PL-01, TC-42, DONE-02, signoff.may_start, signoff.Status
+**Acceptance:**
+- [ ] TC-42&#x27;s DONE-02 ledgers pass: empty `notes/signoff.json` → snake open, tank1 blocked naming snake; {snake, tank1, tank5} → prey open
+- [ ] The signoff.may_start fake&#x27;s cases pass on the real `may_start`
+**Verify:** `pytest tests/intent/rllab tests/unit/rllab -k may_start` · `scripts/check.sh gate`
+**Depends on:** M1-T01 · **Writes:** src/rllab/signoff/order.py, tests/intent/rllab/test_may_start.py, tests/unit/rllab/test_may_start.py
+
+### M1-T03: ensure_may_start spine (raise on blockers)
+**Package:** rllab · **Step:** PL-01.ensure_may_start · **Kind:** spine · **Covers:** DONE-02 · **Size:** XS · **Mode:** solo
+**Read:** PL-01, signoff.may_start, signoff.Status
+**Acceptance:**
+- [ ] On the signoff.may_start fake, `ensure_may_start(&quot;snake&quot;)` returns the empty Status and `ensure_may_start(&quot;tank5&quot;)` raises listing the Status&#x27;s blockers; signature unchanged
+**Verify:** `pytest tests/unit/rllab -k ensure_may_start` · `scripts/check.sh gate`
+**Depends on:** M1-T01 · **Writes:** src/rllab/learners/gate.py, tests/unit/rllab/test_gate.py
+
+### M1-T04: train_settings spine (contract defaults)
+**Package:** rllab · **Step:** PL-01.train_settings · **Kind:** spine · **Covers:** DATA-01 · **Size:** XS · **Mode:** solo
+**Read:** PL-01, AD-09, AD-10, AD-18, learners.TrainSettings
+**Acceptance:**
+- [ ] `train_settings(&quot;snake&quot;, 1_000_000, 3600)` validates as learners.TrainSettings with a step budget, CPU and a fixed thread count; `train_settings(&quot;snake&quot;, 999_999, 60)` raises ValueError (TC-28&#x27;s seed rule); with `RLLAB_SMOKE=1` the budget is 2,000 steps
+**Verify:** `pytest tests/unit/rllab -k train_settings` · `scripts/check.sh gate`
+**Depends on:** M1-T01 · **Writes:** src/rllab/learners/settings.py, tests/unit/rllab/test_settings.py
+
+### M1-T05: Double DQN learner
+**Package:** rllab · **Step:** PL-01.train_dqn · **Kind:** thicken · **Covers:** LEARN-01, LEARN-02, LEARN-04 · **Size:** XS · **Mode:** split
+**Reason:** fold: the spine version is AD-03&#x27;s whole behavior; TC-29 and TC-31 need the real world and play, so they run in M1-T23
+**Read:** PL-01, AD-03, AD-04, AD-18, learners.train_dqn, learners.TrainSettings, learners.RunRecord, core.Env, core.Policy, core.GreedyNet, evaluate.play, evaluate.CurvePoint, worlds.make
+**Acceptance:**
+- [ ] Given a fixed batch from the core.Env replay double, the Double DQN target equals r + γ·Q_target(s′, argmax Q_online(s′)) (r alone at a terminal step), and the target net syncs every `target_sync` steps
+- [ ] On the worlds.make and evaluate.play fakes, a 2,000-step budget returns a `finished` RunRecord with ≥ 20 curve points evenly spaced in env steps and a Policy whose `network()` is an argmax core.GreedyNet acting as `act` does
+- [ ] A not-a-number loss ends the run `diverged`, naming the curve point, with no policy; a seed below 1,000,000 or a world with no `discrete3` role raises ValueError
+**Verify:** `pytest tests/intent/rllab tests/unit/rllab -k dqn` · `scripts/check.sh gate`
+**Depends on:** M1-T01 · **Writes:** src/rllab/learners/dqn/**, tests/intent/rllab/test_dqn.py, tests/unit/rllab/test_dqn.py
+
+### M1-T06: make spine (if-chain plus test registry)
+**Package:** rllab · **Step:** PL-01.make · **Kind:** spine · **Covers:** — · **Size:** XS · **Mode:** solo
+**Read:** PL-01, AD-17, worlds.make, worlds.register
+**Acceptance:**
+- [ ] After `register(&quot;test_x&quot;, factory)`, `make(&quot;test_x&quot;)` returns a fresh Env from `factory`; `register(&quot;x&quot;, …)` raises ValueError; an unknown name raises KeyError; &quot;snake&quot; routes to `SnakeEnv`, and tank1, tank5 and prey raise KeyError naming M3 or M4; the worlds.make fake&#x27;s cases pass on the real `make` for the registered names
+**Verify:** `pytest tests/unit/rllab -k make` · `scripts/check.sh gate`
+**Depends on:** M1-T01 · **Writes:** src/rllab/worlds/factory.py, tests/unit/rllab/test_factory.py
+
+### M1-T07: Snake world rules
+**Package:** rllab · **Step:** PL-01.SnakeEnv · **Kind:** thicken · **Covers:** SNAKE-01, SNAKE-02, SNAKE-03, SNAKE-04, SNAKE-05, SNAKE-06, SNAKE-07, BASE-06 · **Size:** S · **Mode:** split
+**Reason:** fold: spine is the whole behavior (AD-04 observation, AD-07 reward); also builds `worlds.decode`&#x27;s snake fields, which have no step row
+**Read:** PL-01, TC-01, TC-02, TC-03, TC-04, TC-05, TC-06, AD-04, AD-07, AD-16, core.Env, core.StepResult, core.Frame, worlds.SnakeState, worlds.from_state, worlds.state_of, worlds.decode
+**Acceptance:**
+- [ ] TC-01–TC-06 pass, the planted cases through `worlds.from_state`
+- [ ] `from_state(state_of(env), seed=s)` steps exactly as `env` does; an illegal SnakeState raises ValueError; `step` after `done` raises RuntimeError; `frame()` validates as core.Frame
+- [ ] `worlds.decode(&quot;snake&quot;, &quot;snake&quot;, obs)` names every AD-04 field and adds nothing; the worlds.decode fake&#x27;s snake case passes on the real `decode`
+**Verify:** `pytest tests/intent/rllab tests/unit/rllab -k snake` · `scripts/check.sh gate`
+**Depends on:** M1-T01 · **Writes:** src/rllab/worlds/snake.py, src/rllab/worlds/decode.py, tests/intent/rllab/test_snake.py, tests/unit/rllab/test_snake.py
+
+### M1-T08: play spine (one episode per seed)
+**Package:** rllab · **Step:** PL-01.play · **Kind:** spine · **Covers:** — · **Size:** XS · **Mode:** solo
+**Read:** PL-01, evaluate.play, evaluate.Scores, core.Env, core.Policy, worlds.make
+**Acceptance:**
+- [ ] On the worlds.make fake and the core.Policy replay double, `play` returns Scores with one value per seed in seed order, the same on a second call; a policy of another world or a missing role raises ValueError; the evaluate.play fake&#x27;s cases pass on the real `play`
+**Verify:** `pytest tests/unit/rllab -k play` · `scripts/check.sh gate`
+**Depends on:** M1-T01 · **Writes:** src/rllab/evaluate/play.py, tests/unit/rllab/test_play.py
+
+### M1-T09: FileRunDir spine (plain files)
+**Package:** rllab · **Step:** PL-01.FileRunDir · **Kind:** spine · **Covers:** LEARN-03 · **Size:** XS · **Mode:** solo
+**Read:** PL-01, AD-11, AD-15, store.RunDir, core.Policy, core.GreedyNet
+**Acceptance:**
+- [ ] `FileRunDir` satisfies store.RunDir: JSON and gzip JSON round-trip with arrays and dataclasses as plain JSON; `save_policy` writes the GreedyNet, world and role with `torch.save`; a policy with no network raises TypeError; reading a missing file raises FileNotFoundError
+**Verify:** `pytest tests/unit/rllab -k run_dir` · `scripts/check.sh gate`
+**Depends on:** M1-T01 · **Writes:** src/rllab/store/run_dir.py, tests/unit/rllab/test_run_dir.py
+
+### M1-T10: Run folder spine (new_run, open_run)
+**Package:** rllab · **Step:** PL-01.new_run, PL-04.open_run · **Kind:** spine · **Covers:** DATA-02 · **Size:** XS · **Mode:** solo
+**Reason:** both steps live in `store/runs.py`, so one spine builds them
+**Read:** PL-01, PL-04, store.new_run, store.open_run, store.RunDir
+**Acceptance:**
+- [ ] `new_run` makes a fresh empty `runs/&lt;world&gt;/&lt;UTC time&gt;-&lt;method&gt;/` each call (under `RLLAB_RUNS` when set); `open_run` reads world and run id from `record.json`, writes nothing, and raises FileNotFoundError for a missing folder; the store.new_run and store.open_run fakes&#x27; cases pass on the real functions
+**Verify:** `pytest tests/unit/rllab -k runs` · `scripts/check.sh gate`
+**Depends on:** M1-T09 · **Writes:** src/rllab/store/runs.py, tests/unit/rllab/test_runs.py
+
+### M1-T11: save_run spine (record always, policy when finished)
+**Package:** rllab · **Step:** PL-01.save_run · **Kind:** spine · **Covers:** LEARN-03, DATA-02 · **Size:** XS · **Mode:** solo
+**Read:** PL-01, learners.RunRecord, store.RunDir, core.Policy
+**Acceptance:**
+- [ ] On the store.RunDir replay double, a finished RunRecord writes `record.json` and `policy.pt`; a stopped or diverged one writes `record.json` only; signature unchanged
+**Verify:** `pytest tests/unit/rllab -k save_run` · `scripts/check.sh gate`
+**Depends on:** M1-T01 · **Writes:** src/rllab/learners/save.py, tests/unit/rllab/test_save.py
+
+### M1-T12: load_policy spine (rebuild from GreedyNet)
+**Package:** rllab · **Step:** PL-04.load_policy · **Kind:** spine · **Covers:** LEARN-03 · **Size:** XS · **Mode:** solo
+**Read:** PL-04, AD-15, store.load_policy, core.GreedyNet, core.Policy
+**Acceptance:**
+- [ ] A `policy.pt` saved from the core.GreedyNet samples reloads as a Policy whose actions equal the net&#x27;s head on the same observations; `world=&quot;tank1&quot;` on a snake policy raises ValueError naming both; a missing file raises FileNotFoundError; the store.load_policy fake&#x27;s cases pass on the real function
+**Verify:** `pytest tests/unit/rllab -k load_policy` · `scripts/check.sh gate`
+**Depends on:** M1-T01 · **Writes:** src/rllab/store/policies.py, tests/unit/rllab/test_policies.py
+
+### M1-T13: Random agent
+**Package:** rllab · **Step:** PL-04.random_policy · **Kind:** thicken · **Covers:** BASE-01 · **Size:** XS · **Mode:** split
+**Reason:** fold: spine is the whole behavior
+**Read:** PL-04, TC-18, BASE-01, baselines.random_policy, core.EnvSpec, core.Policy
+**Acceptance:**
+- [ ] TC-18 passes: each snake move chosen 900–1,100 times in 3,000
+- [ ] On the test_reach_target EnvSpec sample, headings are uniform and speeds in [0, top speed]; actions depend only on the `rng` passed to `act`; the baselines.random_policy fake&#x27;s cases pass on the real function
+**Verify:** `pytest tests/intent/rllab tests/unit/rllab -k random_policy` · `scripts/check.sh gate`
+**Depends on:** M1-T01 · **Writes:** src/rllab/baselines/random_policy.py, tests/intent/rllab/test_random_policy.py, tests/unit/rllab/test_random_policy.py
+
+### M1-T14: Scripted snake
+**Package:** rllab · **Step:** PL-04.scripted_policy · **Kind:** thicken · **Covers:** BASE-02, BASE-06 · **Size:** XS · **Mode:** split
+**Reason:** fold: spine is the whole behavior; TC-19 builds its observations from planted snake states, so it runs in M1-T24
+**Read:** PL-04, AD-04, BASE-02, BASE-06, baselines.scripted_policy, worlds.decode, core.Policy
+**Acceptance:**
+- [ ] Given decoded snake fields with food to the left and the wall ahead, it turns left; with no safe move, it goes straight; it reads only `worlds.decode` fields and is deterministic
+- [ ] Fish and prey roles raise KeyError naming M3 or M4; the baselines.scripted_policy fake&#x27;s cases pass on the real function
+**Verify:** `pytest tests/intent/rllab tests/unit/rllab -k scripted` · `scripts/check.sh gate`
+**Depends on:** M1-T01 · **Writes:** src/rllab/baselines/scripted.py, tests/intent/rllab/test_scripted.py, tests/unit/rllab/test_scripted.py
+
+### M1-T15: replay_policies spine (trained or baseline)
+**Package:** rllab · **Step:** PL-04.replay_policies · **Kind:** spine · **Covers:** REPLAY-01 · **Size:** XS · **Mode:** solo
+**Read:** PL-04, store.RunDir, store.load_policy, baselines.random_policy, baselines.scripted_policy, core.Policy
+**Acceptance:**
+- [ ] On the store.RunDir double and the load_policy, random_policy and scripted_policy fakes, `trained` loads `policy.pt` and `random` and `scripted` build the world&#x27;s baselines, one Policy per role; an unknown agent raises ValueError
+**Verify:** `pytest tests/unit/rllab -k replay_policies` · `scripts/check.sh gate`
+**Depends on:** M1-T01 · **Writes:** src/rllab/replay/agents.py, tests/unit/rllab/test_agents.py
+
+### M1-T16: Recording file spine (gzip JSON)
+**Package:** rllab · **Step:** PL-05.Recording.load · **Kind:** spine · **Covers:** REPLAY-05 · **Size:** XS · **Mode:** solo
+**Reason:** `Recording.save` shares `replay/recording.py`, so this spine builds it too
+**Read:** PL-05, replay.Recording, core.Frame, store.RunDir
+**Acceptance:**
+- [ ] On the replay.Recording samples, `Recording.load(rec.save(run))` equals `rec` frame for frame, saved at `recordings/&lt;agent&gt;-&lt;seed&gt;.json.gz`; a missing file raises FileNotFoundError and a corrupt one ValueError
+**Verify:** `pytest tests/unit/rllab -k recording` · `scripts/check.sh gate`
+**Depends on:** M1-T01 · **Writes:** src/rllab/replay/recording.py, tests/unit/rllab/test_recording.py
+
+### M1-T17: record_saved spine (frame every step)
+**Package:** rllab · **Step:** PL-04.record_saved · **Kind:** spine · **Covers:** REPLAY-01, REPLAY-05 · **Size:** XS · **Mode:** solo
+**Read:** PL-04, replay.record, replay.Recording, core.Frame, core.Env, core.Policy, worlds.make, store.RunDir
+**Acceptance:**
+- [ ] On the worlds.make fake and the scripted-snake core.Policy double, `record` gives frames whose steps run 0, 1, 2, … to the last without gaps; a policy of another world raises ValueError naming both; `record_saved` saves the Recording into the store.RunDir double
+**Verify:** `pytest tests/unit/rllab -k record` · `scripts/check.sh gate`
+**Depends on:** M1-T16 · **Writes:** src/rllab/replay/record.py, tests/unit/rllab/test_record.py
+
+### M1-T18: view spine (pygame-ce shapes)
+**Package:** rllab · **Step:** PL-04.view · **Kind:** spine · **Covers:** REPLAY-02 · **Size:** XS · **Mode:** solo
+**Read:** PL-04, AD-12, replay.view, replay.ViewStats, replay.Recording, core.Frame
+**Acceptance:**
+- [ ] Under SDL&#x27;s dummy video driver, `view` on the 30-frame snake Recording sample draws every frame with its step and score and returns ViewStats(30, …); out agents draw grey; speeds 0.4 and 5 raise ValueError, 0.5 and 4 are accepted; the replay.view fake&#x27;s case passes on the real `view`
+**Verify:** `pytest tests/unit/rllab -k view` · `scripts/check.sh gate`
+**Depends on:** M1-T01 · **Writes:** src/rllab/replay/viewer.py, tests/unit/rllab/test_viewer.py
+
+## Phase 2: Wiring and thicken
+
+### M1-T19: Wire PL-01
+**Package:** rllab · **Step:** PL-01, PL-01.train_world · **Kind:** wiring · **Covers:** LEARN-01 · **Size:** S · **Mode:** solo
+**Reason:** fold: trivial step (`train_world` routes snake to `train_dqn`; tank worlds raise ValueError naming M3)
+**Read:** PL-01, learners.train_dqn, learners.TrainSettings, learners.RunRecord, store.new_run, store.RunDir, signoff.may_start
+**Acceptance:**
+- [ ] `python -m rllab train snake --smoke` runs end to end (gate, settings, `train_world` → `train_dqn`, `new_run`, `save_run`) and is committed as PL-01&#x27;s smoke test, which checks the run folder holds `record.json` and `policy.pt`, not their values
+- [ ] `train_world` on a tank1 TrainSettings raises ValueError naming M3
+**Verify:** `python -m rllab train snake --smoke` · `scripts/check.sh gate`
+**Depends on:** M1-T02, M1-T03, M1-T04, M1-T05, M1-T06, M1-T07, M1-T08, M1-T09, M1-T10, M1-T11 · **Writes:** src/rllab/learners/pipeline.py, src/rllab/learners/train.py, tests/unit/rllab/test_pl01_smoke.py
+
+### M1-T20: Wire PL-04
+**Package:** rllab · **Step:** PL-04 · **Kind:** wiring · **Covers:** REPLAY-01 · **Size:** XS · **Mode:** solo
+**Read:** PL-04, store.open_run, store.RunDir, replay.record, replay.Recording, replay.view, replay.ViewStats
+**Acceptance:**
+- [ ] `python -m rllab replay &lt;run&gt; scripted 42 --smoke` runs end to end on a run folder the smoke test writes from a fixture `record.json`, and is committed as PL-04&#x27;s smoke test, which checks `recordings/scripted-42.json.gz` exists and a ViewStats comes back, not its values
+**Verify:** `python -m rllab replay &lt;run&gt; scripted 42 --smoke` · `scripts/check.sh gate`
+**Depends on:** M1-T06, M1-T07, M1-T10, M1-T12, M1-T13, M1-T14, M1-T15, M1-T17, M1-T18 · **Writes:** src/rllab/replay/pipelines/pl04_replay.py, tests/unit/rllab/test_pl04_smoke.py
+
+### M1-T21: Wire PL-05
+**Package:** rllab · **Step:** PL-05 · **Kind:** wiring · **Covers:** REPLAY-05 · **Size:** XS · **Mode:** solo
+**Read:** PL-05, replay.Recording, replay.view, replay.ViewStats
+**Acceptance:**
+- [ ] `python -m rllab watch &lt;file&gt; --smoke` runs end to end on the 30-frame snake Recording sample saved to a temp file, and is committed as PL-05&#x27;s smoke test, which checks a ViewStats comes back, not its values
+**Verify:** `python -m rllab watch &lt;file&gt; --smoke` · `scripts/check.sh gate`
+**Depends on:** M1-T16, M1-T18 · **Writes:** src/rllab/replay/pipelines/pl05_watch.py, tests/unit/rllab/test_pl05_smoke.py
+
+### M1-T22: Replay controls
+**Package:** rllab · **Step:** PL-04.view · **Kind:** thicken · **Covers:** REPLAY-03 · **Size:** XS · **Mode:** split
+**Read:** PL-04, REPLAY-03, AD-12, replay.view, replay.ViewStats
+**Acceptance:**
+- [ ] Given injected key events under SDL&#x27;s dummy driver: pause holds the frame and `frames_shown` excludes the repeats; single-step advances exactly one frame while paused
+- [ ] The speed keys move through 0.5×–4× and stop at either end (AD-12)
+**Verify:** `pytest tests/intent/rllab tests/unit/rllab -k view` · `scripts/check.sh gate`
+**Depends on:** M1-T18 · **Writes:** src/rllab/replay/viewer.py, tests/intent/rllab/test_viewer_controls.py, tests/unit/rllab/test_viewer.py
+
+### Checkpoint after M1-T22
+- [ ] Every pipeline in the milestone runs end to end (smoke commands)
+- [ ] All golden cases pass
+- [ ] Entry functions still read top to bottom as the step table says (Sync if not)
+- [ ] No new abstraction without a second implementation or an AD
+- [ ] contract.md matches the contract code (`dt status` freshness check)
+- [ ] `dt layout` output reviewed; Definition of Done holds
+- [ ] `scripts/check.sh full` passes; Review checklist done; every finding has a disposition
+
+## Phase 3: System
+
+### M1-T23: PL-01 on the real chain
+**Package:** rllab · **Step:** PL-01 · **Kind:** system · **Covers:** QR-03, LEARN-02, LEARN-03, DATA-02 · **Size:** XS · **Mode:** solo
+**Read:** PL-01, TC-29, TC-31, TC-32, worlds.register, signoff.may_start, worlds.make, store.new_run, evaluate.play
+**Acceptance:**
+- [ ] TC-29 (Double DQN on a registered `test_bandit3`), TC-31&#x27;s snake half and TC-32 pass on the real chain
+- [ ] Each fake&#x27;s contract cases pass on the real provider: may_start, make, new_run, play
+- [ ] The PL-01 smoke passes
+**Verify:** `python -m rllab train snake --smoke` · `pytest tests/intent/rllab -k pl01_system` · `scripts/check.sh gate`
+**Depends on:** M1-T19 · **Writes:** tests/intent/rllab/test_pl01_system.py, tests/unit/rllab/test_may_start_conformance.py, tests/unit/rllab/test_make_conformance.py, tests/unit/rllab/test_new_run_conformance.py, tests/unit/rllab/test_play_conformance.py
+
+### M1-T24: PL-04 on the real chain
+**Package:** rllab · **Step:** PL-04 · **Kind:** system · **Covers:** BASE-02, REPLAY-01, REPLAY-05 · **Size:** XS · **Mode:** solo
+**Reason:** system task; PL-05&#x27;s TC-38 replays the recording PL-04 makes
+**Read:** PL-04, PL-05, TC-19, TC-37, TC-38, store.open_run, store.load_policy, baselines.random_policy, baselines.scripted_policy, worlds.decode, replay.view
+**Acceptance:**
+- [ ] TC-19, TC-37 and TC-38 pass on the real chain (planted snake states, the scripted snake on seed 42, its saved recording)
+- [ ] Each fake&#x27;s contract cases pass on the real provider: open_run, load_policy, random_policy, scripted_policy, decode, view
+- [ ] The PL-04 and PL-05 smokes pass
+**Verify:** `python -m rllab replay &lt;run&gt; scripted 42 --smoke` · `python -m rllab watch &lt;file&gt; --smoke` · `pytest tests/intent/rllab -k pl04_system` · `scripts/check.sh gate`
+**Depends on:** M1-T20, M1-T21, M1-T22 · **Writes:** tests/intent/rllab/test_pl04_system.py, tests/unit/rllab/test_open_run_conformance.py, tests/unit/rllab/test_load_policy_conformance.py, tests/unit/rllab/test_random_policy_conformance.py, tests/unit/rllab/test_scripted_policy_conformance.py, tests/unit/rllab/test_decode_conformance.py, tests/unit/rllab/test_view_conformance.py
+
+### Checkpoint: milestone exit
+- [ ] Every pipeline in the milestone runs end to end (smoke commands)
+- [ ] All golden cases pass
+- [ ] Entry functions still read top to bottom as the step table says (Sync if not)
+- [ ] No new abstraction without a second implementation or an AD
+- [ ] contract.md matches the contract code (`dt status` freshness check)
+- [ ] `dt layout` output reviewed; Definition of Done holds
+- [ ] `scripts/check.sh full --exit` passes; Review checklist done; every finding has a disposition
+- [ ] The Scope&#x27;s Exit holds
+
+## Dependency graph
+| From | To | Kind | Mitigated by |
+|---|---|---|---|
+| M1-T03 ensure_may_start spine | M1-T02 world order gate | call | signoff.may_start fake (M1-T01) |
+| M1-T05 Double DQN learner | M1-T06 make spine | call | worlds.make fake (M1-T01) |
+| M1-T05 Double DQN learner | M1-T08 play spine | call | evaluate.play fake (M1-T01) |
+| M1-T08 play spine | M1-T06 make spine | call | worlds.make fake (M1-T01) |
+| M1-T10 run folder spine | M1-T09 FileRunDir spine | call | none: `new_run` and `open_run` construct `FileRunDir`; the store.RunDir double can&#x27;t stand in for its constructor |
+| M1-T11 save_run spine | M1-T09 FileRunDir spine | data | store.RunDir replay double (M1-T01) |
+| M1-T14 scripted snake | M1-T07 snake world rules | call | worlds.decode fake (M1-T01) |
+| M1-T15 replay_policies spine | M1-T12 load_policy spine | call | store.load_policy fake (M1-T01) |
+| M1-T15 replay_policies spine | M1-T13 random agent | call | baselines.random_policy fake (M1-T01) |
+| M1-T15 replay_policies spine | M1-T14 scripted snake | call | baselines.scripted_policy fake (M1-T01) |
+| M1-T17 record_saved spine | M1-T06 make spine | call | worlds.make fake (M1-T01) |
+| M1-T17 record_saved spine | M1-T16 Recording file spine | call | none: `record_saved` saves through `Recording.save`, which M1-T16 builds |
+| M1-T18 view spine | M1-T17 record_saved spine | data | replay.Recording sample (M1-T01) |
+| M1-T19 wire PL-01 | M1-T02 world order gate | order | none: integration: the smoke runs it |
+| M1-T19 wire PL-01 | M1-T03 ensure_may_start spine | order | none: integration: the smoke runs it |
+| M1-T19 wire PL-01 | M1-T04 train_settings spine | order | none: integration: the smoke runs it |
+| M1-T19 wire PL-01 | M1-T05 Double DQN learner | order | none: integration: the smoke runs it |
+| M1-T19 wire PL-01 | M1-T06 make spine | order | none: integration: the smoke runs it |
+| M1-T19 wire PL-01 | M1-T07 snake world rules | order | none: integration: the smoke runs it |
+| M1-T19 wire PL-01 | M1-T08 play spine | order | none: integration: the smoke runs it |
+| M1-T19 wire PL-01 | M1-T09 FileRunDir spine | order | none: integration: the smoke runs it |
+| M1-T19 wire PL-01 | M1-T10 run folder spine | order | none: integration: the smoke runs it |
+| M1-T19 wire PL-01 | M1-T11 save_run spine | order | none: integration: the smoke runs it |
+| M1-T20 wire PL-04 | M1-T06 make spine | order | none: integration: the smoke runs it |
+| M1-T20 wire PL-04 | M1-T07 snake world rules | order | none: integration: the smoke records a real snake episode |
+| M1-T20 wire PL-04 | M1-T10 run folder spine | order | none: integration: the smoke runs it |
+| M1-T20 wire PL-04 | M1-T12 load_policy spine | order | none: integration: the smoke runs it |
+| M1-T20 wire PL-04 | M1-T13 random agent | order | none: integration: the smoke runs it |
+| M1-T20 wire PL-04 | M1-T14 scripted snake | order | none: integration: the smoke runs it |
+| M1-T20 wire PL-04 | M1-T15 replay_policies spine | order | none: integration: the smoke runs it |
+| M1-T20 wire PL-04 | M1-T17 record_saved spine | order | none: integration: the smoke runs it |
+| M1-T20 wire PL-04 | M1-T18 view spine | order | none: integration: the smoke runs it |
+| M1-T20 wire PL-04 | M1-T19 wire PL-01 | data | store.RunDir replay double (M1-T01): the smoke writes its run folder from a fixture |
+| M1-T21 wire PL-05 | M1-T16 Recording file spine | order | none: integration: the smoke runs it |
+| M1-T21 wire PL-05 | M1-T18 view spine | order | none: integration: the smoke runs it |
+| M1-T22 replay controls | M1-T18 view spine | code | none: thickens the same module |
+| M1-T23 PL-01 system | M1-T19 wire PL-01 | order | none: integration: runs PL-01&#x27;s golden cases on the real chain |
+| M1-T24 PL-04 system | M1-T20 wire PL-04 | order | none: integration: runs PL-04&#x27;s golden cases on the real chain |
+| M1-T24 PL-04 system | M1-T21 wire PL-05 | order | none: integration: TC-38 watches the saved recording through PL-05 |
+| M1-T24 PL-04 system | M1-T22 replay controls | order | none: integration: TC-38 plays through the finished viewer |
+
+## Risks
+| Risk | Impact | Mitigation |
+|---|---|---|
+| The `--smoke` switches (`RLLAB_SMOKE`, `RLLAB_RUNS`) leak into a real run | A real run gets a 2,000-step budget or writes to a temp folder | M1-T04 and M1-T10 test both settings; M1-T23&#x27;s TC-32 runs without them |
+| pygame-ce misbehaves under SDL&#x27;s dummy driver in CI | Viewer tests flake | M1-T18 and M1-T22 run headless from the start; QR-04 is measured by hand in M3 (TC-39) |
+| Determinism (QR-03) breaks across torch thread counts | TC-31 fails | M1-T04 fixes threads and `torch.use_deterministic_algorithms`; M1-T23 runs TC-31 |
+
+## Open questions
+- `dataviz` is on S1–S3 but isn&#x27;t installed (`skills_missing`). M1 draws no chart, so it doesn&#x27;t block this plan; M2&#x27;s curve chart (EVAL-02) needs it or a replacement.
+- The `null-hypothesis-testing` skill is a placeholder (tests.md Open questions). M1 runs no comparison; M2&#x27;s `compare` needs a real test and correction.
+
+## Replan notes
+</pre><div class="hook">⛔ hook PostToolUse:Write blocked: dt lint found problems in tasks/plan.md:
+tasks/plan.md:6: exit-cases-in-scope M1&#x27;s Exit names TC-18, TC-19 of PL-02, which isn&#x27;t in M1&#x27;s Pipelines
+tasks/plan.md:73: covers-vs-deferred M1-T07 covers BASE-06, which the Covers cells of PL-02.scripted_policy list, not PL-01.SnakeEnv&#x27;s: cover what the step delivers, or route the step table to pipeline-design
+tasks/plan.md:117: covers-vs-deferred M1-T12 covers LEARN-03, which the Covers cells of PL-01.FileRunDir, PL-01.save_run, PL-02.load_policy list, not PL-04.load_policy&#x27;s: cover what the step delivers, or route the step table to pipeline-design
+tasks/plan.md:125: covers-vs-deferred M1-T13 covers BASE-01, which the Covers cells of PL-02.random_policy list, not PL-04.random_policy&#x27;s: cover what the step delivers, or route the step table to pipeline-design
+tasks/plan.md:135: covers-vs-deferred M1-T14 covers BASE-02, BASE-06, which the Covers cells of PL-02.scripted_policy list, not PL-04.scripted_policy&#x27;s: cover what the step delivers, or route the step table to pipeline-design
+tasks/plan.md:152: task-step M1-T16 Step PL-05.Recording: no step `Recording` in PL-05&#x27;s table
+tasks/plan.md:225: task-size M1-T23 Size XS wants 1 source files in Writes, has 0
+tasks/plan.md:235: task-size M1-T24 Size XS wants 1 source files in Writes, has 0
+3 errors, 5 warnings</div><details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-11/rl-all-at-once/with_skill/project/tasks/plan.md&quot;,
+  &quot;content&quot;: &quot;# M1: Train and watch a snake — Plan\n\n**Milestone:** M1 · **Status:** Draft · **Base:** — · **Last updated:** 2026-10-18 · **Roadmap:** [../docs/roadmap.md](../docs/roadmap.md)\n\n## Scope\n**Exit:** `rllab train snake` finishes and its run replays; TC-01–TC-06, TC-18, TC-19, TC-29, TC-31 (snake), TC-32, TC-37, TC-38 and TC-42 (DONE-02 ledgers) pass.\n**Covers:** SNAKE-01–SNAKE-07, LEARN-01–LEARN-04, BASE-01, BASE-02, BASE-06, DATA-01, DATA-02, DONE-02, QR-03, REPLAY-01–REPLAY-03, REPLAY-05 · **Deferred:** PL-01.train_ppo, PL-01.ppo_learner, PL-01.ClippedPPO, PL-01.TankEnv, TANK-01–TANK-09, LEARN-05 (to M3: the fish need the tank and PPO); DONE-04 (to M3: needs tank1&#x27;s comparisons); REPLAY-04 (to M3: sight circles need the five-fish tank); QR-04 (to M3: measured on a 1,000-step fish replay); QR-01 (to M2: TC-33 times the hour-long run); QR-02 (to M2: applies only if the hour-long run misses QR-01)\n**Skills:** none\n\n## Phase 0: Interface\n\n### M1-T01: M1 interface\n**Package:** rllab · **Step:** contract · **Kind:** interface · **Covers:** DATA-01 · **Size:** S · **Mode:** solo\n**Read:** PL-01, PL-04, PL-05, AD-15, AD-16, AD-17, core.EnvSpec, core.StepResult, core.Frame, core.Env, core.GreedyNet, core.Policy, core.seeds, worlds.make, worlds.decode, worlds.register, worlds.SnakeState, worlds.TankState, worlds.PreyState, worlds.from_state, worlds.state_of, baselines.random_policy, baselines.scripted_policy, store.RunDir, store.new_run, store.open_run, store.load_policy, evaluate.Scores, evaluate.CurvePoint, evaluate.play, evaluate.Comparison, evaluate.compare, evaluate.Chart, evaluate.curve_chart, learners.TrainSettings, learners.RunRecord, learners.train_dqn, learners.PpoLearner, learners.ppo_learner, replay.Recording, replay.record, replay.ViewStats, replay.view, signoff.Status, signoff.may_start\n**Acceptance:**\n- [ ] Each contract type is code in its component&#x27;s `types.py` (`core.Env` and `core.Policy` in `core/protocols.py`), with one sample per listed case in `tests/contracts/&lt;id&gt;.&lt;Type&gt;/` that validates against it; `core.seeds` is built whole (eval 0–99, curve 100–119)\n- [ ] Every M1 step and entry function imports and matches its contract or step-table signature, its body the CR-02 stub naming its task; `worlds.from_state` and `worlds.state_of` dispatch by state type to per-world stubs; each `__init__.py` exports its contract; `__main__.py` dispatches `train`, `replay` and `watch`, where `--smoke` sets `RLLAB_SMOKE=1`, points `RLLAB_RUNS` at a temp folder and selects SDL&#x27;s dummy video driver\n- [ ] Each boundary fake (may_start, make, new_run, open_run, load_policy, random_policy, scripted_policy, play, decode, view, compare, curve_chart, ppo_learner) passes its contract&#x27;s cases as one test that takes the provider; the core.Env, core.Policy, store.RunDir and learners.PpoLearner replay doubles serve their fixtures; the golden-case store helper loads `tests/fixtures/rllab/TC-NN/`\n**Verify:** `pytest tests/contracts` · `scripts/check.sh gate`\n**Depends on:** — · **Writes:** src/rllab/__init__.py, src/rllab/__main__.py, src/rllab/core/**, src/rllab/worlds/**, src/rllab/baselines/**, src/rllab/store/**, src/rllab/evaluate/**, src/rllab/learners/**, src/rllab/coevo/**, src/rllab/reference/**, src/rllab/replay/**, src/rllab/signoff/**, tests/contracts/**, tests/conftest.py, tests/helpers/golden.py\n\n### Checkpoint after M1-T01 (barrier)\n- [ ] Interface review passed: the code is the contract, no more and no less (CONSTRAINTS.md Review, Interface)\n\n## Phase 1: Step spines\n\n### M1-T02: World order gate\n**Package:** rllab · **Step:** PL-01.may_start · **Kind:** thicken · **Covers:** DONE-02 · **Size:** XS · **Mode:** split\n**Reason:** fold: spine is the whole behavior\n**Read:** PL-01, TC-42, DONE-02, signoff.may_start, signoff.Status\n**Acceptance:**\n- [ ] TC-42&#x27;s DONE-02 ledgers pass: empty `notes/signoff.json` → snake open, tank1 blocked naming snake; {snake, tank1, tank5} → prey open\n- [ ] The signoff.may_start fake&#x27;s cases pass on the real `may_start`\n**Verify:** `pytest tests/intent/rllab tests/unit/rllab -k may_start` · `scripts/check.sh gate`\n**Depends on:** M1-T01 · **Writes:** src/rllab/signoff/order.py, tests/intent/rllab/test_may_start.py, tests/unit/rllab/test_may_start.py\n\n### M1-T03: ensure_may_start spine (raise on blockers)\n**Package:** rllab · **Step:** PL-01.ensure_may_start · **Kind:** spine · **Covers:** DONE-02 · **Size:** XS · **Mode:** solo\n**Read:** PL-01, signoff.may_start, signoff.Status\n**Acceptance:**\n- [ ] On the signoff.may_start fake, `ensure_may_start(\&quot;snake\&quot;)` returns the empty Status and `ensure_may_start(\&quot;tank5\&quot;)` raises listing the Status&#x27;s blockers; signature unchanged\n**Verify:** `pytest tests/unit/rllab -k ensure_may_start` · `scripts/check.sh gate`\n**Depends on:** M1-T01 · **Writes:** src/rllab/learners/gate.py, tests/unit/rllab/test_gate.py\n\n### M1-T04: train_settings spine (contract defaults)\n**Package:** rllab · **Step:** PL-01.train_settings · **Kind:** spine · **Covers:** DATA-01 · **Size:** XS · **Mode:** solo\n**Read:** PL-01, AD-09, AD-10, AD-18, learners.TrainSettings\n**Acceptance:**\n- [ ] `train_settings(\&quot;snake\&quot;, 1_000_000, 3600)` validates as learners.TrainSettings with a step budget, CPU and a fixed thread count; `train_settings(\&quot;snake\&quot;, 999_999, 60)` raises ValueError (TC-28&#x27;s seed rule); with `RLLAB_SMOKE=1` the budget is 2,000 steps\n**Verify:** `pytest tests/unit/rllab -k train_settings` · `scripts/check.sh gate`\n**Depends on:** M1-T01 · **Writes:** src/rllab/learners/settings.py, tests/unit/rllab/test_settings.py\n\n### M1-T05: Double DQN learner\n**Package:** rllab · **Step:** PL-01.train_dqn · **Kind:** thicken · **Covers:** LEARN-01, LEARN-02, LEARN-04 · **Size:** XS · **Mode:** split\n**Reason:** fold: the spine version is AD-03&#x27;s whole behavior; TC-29 and TC-31 need the real world and play, so they run in M1-T23\n**Read:** PL-01, AD-03, AD-04, AD-18, learners.train_dqn, learners.TrainSettings, learners.RunRecord, core.Env, core.Policy, core.GreedyNet, evaluate.play, evaluate.CurvePoint, worlds.make\n**Acceptance:**\n- [ ] Given a fixed batch from the core.Env replay double, the Double DQN target equals r + γ·Q_target(s′, argmax Q_online(s′)) (r alone at a terminal step), and the target net syncs every `target_sync` steps\n- [ ] On the worlds.make and evaluate.play fakes, a 2,000-step budget returns a `finished` RunRecord with ≥ 20 curve points evenly spaced in env steps and a Policy whose `network()` is an argmax core.GreedyNet acting as `act` does\n- [ ] A not-a-number loss ends the run `diverged`, naming the curve point, with no policy; a seed below 1,000,000 or a world with no `discrete3` role raises ValueError\n**Verify:** `pytest tests/intent/rllab tests/unit/rllab -k dqn` · `scripts/check.sh gate`\n**Depends on:** M1-T01 · **Writes:** src/rllab/learners/dqn/**, tests/intent/rllab/test_dqn.py, tests/unit/rllab/test_dqn.py\n\n### M1-T06: make spine (if-chain plus test registry)\n**Package:** rllab · **Step:** PL-01.make · **Kind:** spine · **Covers:** — · **Size:** XS · **Mode:** solo\n**Read:** PL-01, AD-17, worlds.make, worlds.register\n**Acceptance:**\n- [ ] After `register(\&quot;test_x\&quot;, factory)`, `make(\&quot;test_x\&quot;)` returns a fresh Env from `factory`; `register(\&quot;x\&quot;, …)` raises ValueError; an unknown name raises KeyError; \&quot;snake\&quot; routes to `SnakeEnv`, and tank1, tank5 and prey raise KeyError naming M3 or M4; the worlds.make fake&#x27;s cases pass on the real `make` for the registered names\n**Verify:** `pytest tests/unit/rllab -k make` · `scripts/check.sh gate`\n**Depends on:** M1-T01 · **Writes:** src/rllab/worlds/factory.py, tests/unit/rllab/test_factory.py\n\n### M1-T07: Snake world rules\n**Package:** rllab · **Step:** PL-01.SnakeEnv · **Kind:** thicken · **Covers:** SNAKE-01, SNAKE-02, SNAKE-03, SNAKE-04, SNAKE-05, SNAKE-06, SNAKE-07, BASE-06 · **Size:** S · **Mode:** split\n**Reason:** fold: spine is the whole behavior (AD-04 observation, AD-07 reward); also builds `worlds.decode`&#x27;s snake fields, which have no step row\n**Read:** PL-01, TC-01, TC-02, TC-03, TC-04, TC-05, TC-06, AD-04, AD-07, AD-16, core.Env, core.StepResult, core.Frame, worlds.SnakeState, worlds.from_state, worlds.state_of, worlds.decode\n**Acceptance:**\n- [ ] TC-01–TC-06 pass, the planted cases through `worlds.from_state`\n- [ ] `from_state(state_of(env), seed=s)` steps exactly as `env` does; an illegal SnakeState raises ValueError; `step` after `done` raises RuntimeError; `frame()` validates as core.Frame\n- [ ] `worlds.decode(\&quot;snake\&quot;, \&quot;snake\&quot;, obs)` names every AD-04 field and adds nothing; the worlds.decode fake&#x27;s snake case passes on the real `decode`\n**Verify:** `pytest tests/intent/rllab tests/unit/rllab -k snake` · `scripts/check.sh gate`\n**Depends on:** M1-T01 · **Writes:** src/rllab/worlds/snake.py, src/rllab/worlds/decode.py, tests/intent/rllab/test_snake.py, tests/unit/rllab/test_snake.py\n\n### M1-T08: play spine (one episode per seed)\n**Package:** rllab · **Step:** PL-01.play · **Kind:** spine · **Covers:** — · **Size:** XS · **Mode:** solo\n**Read:** PL-01, evaluate.play, evaluate.Scores, core.Env, core.Policy, worlds.make\n**Acceptance:**\n- [ ] On the worlds.make fake and the core.Policy replay double, `play` returns Scores with one value per seed in seed order, the same on a second call; a policy of another world or a missing role raises ValueError; the evaluate.play fake&#x27;s cases pass on the real `play`\n**Verify:** `pytest tests/unit/rllab -k play` · `scripts/check.sh gate`\n**Depends on:** M1-T01 · **Writes:** src/rllab/evaluate/play.py, tests/unit/rllab/test_play.py\n\n### M1-T09: FileRunDir spine (plain files)\n**Package:** rllab · **Step:** PL-01.FileRunDir · **Kind:** spine · **Covers:** LEARN-03 · **Size:** XS · **Mode:** solo\n**Read:** PL-01, AD-11, AD-15, store.RunDir, core.Policy, core.GreedyNet\n**Acceptance:**\n- [ ] `FileRunDir` satisfies store.RunDir: JSON and gzip JSON round-trip with arrays and dataclasses as plain JSON; `save_policy` writes the GreedyNet, world and role with `torch.save`; a policy with no network raises TypeError; reading a missing file raises FileNotFoundError\n**Verify:** `pytest tests/unit/rllab -k run_dir` · `scripts/check.sh gate`\n**Depends on:** M1-T01 · **Writes:** src/rllab/store/run_dir.py, tests/unit/rllab/test_run_dir.py\n\n### M1-T10: Run folder spine (new_run, open_run)\n**Package:** rllab · **Step:** PL-01.new_run, PL-04.open_run · **Kind:** spine · **Covers:** DATA-02 · **Size:** XS · **Mode:** solo\n**Reason:** both steps live in `store/runs.py`, so one spine builds them\n**Read:** PL-01, PL-04, store.new_run, store.open_run, store.RunDir\n**Acceptance:**\n- [ ] `new_run` makes a fresh empty `runs/&lt;world&gt;/&lt;UTC time&gt;-&lt;method&gt;/` each call (under `RLLAB_RUNS` when set); `open_run` reads world and run id from `record.json`, writes nothing, and raises FileNotFoundError for a missing folder; the store.new_run and store.open_run fakes&#x27; cases pass on the real functions\n**Verify:** `pytest tests/unit/rllab -k runs` · `scripts/check.sh gate`\n**Depends on:** M1-T09 · **Writes:** src/rllab/store/runs.py, tests/unit/rllab/test_runs.py\n\n### M1-T11: save_run spine (record always, policy when finished)\n**Package:** rllab · **Step:** PL-01.save_run · **Kind:** spine · **Covers:** LEARN-03, DATA-02 · **Size:** XS · **Mode:** solo\n**Read:** PL-01, learners.RunRecord, store.RunDir, core.Policy\n**Acceptance:**\n- [ ] On the store.RunDir replay double, a finished RunRecord writes `record.json` and `policy.pt`; a stopped or diverged one writes `record.json` only; signature unchanged\n**Verify:** `pytest tests/unit/rllab -k save_run` · `scripts/check.sh gate`\n**Depends on:** M1-T01 · **Writes:** src/rllab/learners/save.py, tests/unit/rllab/test_save.py\n\n### M1-T12: load_policy spine (rebuild from GreedyNet)\n**Package:** rllab · **Step:** PL-04.load_policy · **Kind:** spine · **Covers:** LEARN-03 · **Size:** XS · **Mode:** solo\n**Read:** PL-04, AD-15, store.load_policy, core.GreedyNet, core.Policy\n**Acceptance:**\n- [ ] A `policy.pt` saved from the core.GreedyNet samples reloads as a Policy whose actions equal the net&#x27;s head on the same observations; `world=\&quot;tank1\&quot;` on a snake policy raises ValueError naming both; a missing file raises FileNotFoundError; the store.load_policy fake&#x27;s cases pass on the real function\n**Verify:** `pytest tests/unit/rllab -k load_policy` · `scripts/check.sh gate`\n**Depends on:** M1-T01 · **Writes:** src/rllab/store/policies.py, tests/unit/rllab/test_policies.py\n\n### M1-T13: Random agent\n**Package:** rllab · **Step:** PL-04.random_policy · **Kind:** thicken · **Covers:** BASE-01 · **Size:** XS · **Mode:** split\n**Reason:** fold: spine is the whole behavior\n**Read:** PL-04, TC-18, BASE-01, baselines.random_policy, core.EnvSpec, core.Policy\n**Acceptance:**\n- [ ] TC-18 passes: each snake move chosen 900–1,100 times in 3,000\n- [ ] On the test_reach_target EnvSpec sample, headings are uniform and speeds in [0, top speed]; actions depend only on the `rng` passed to `act`; the baselines.random_policy fake&#x27;s cases pass on the real function\n**Verify:** `pytest tests/intent/rllab tests/unit/rllab -k random_policy` · `scripts/check.sh gate`\n**Depends on:** M1-T01 · **Writes:** src/rllab/baselines/random_policy.py, tests/intent/rllab/test_random_policy.py, tests/unit/rllab/test_random_policy.py\n\n### M1-T14: Scripted snake\n**Package:** rllab · **Step:** PL-04.scripted_policy · **Kind:** thicken · **Covers:** BASE-02, BASE-06 · **Size:** XS · **Mode:** split\n**Reason:** fold: spine is the whole behavior; TC-19 builds its observations from planted snake states, so it runs in M1-T24\n**Read:** PL-04, AD-04, BASE-02, BASE-06, baselines.scripted_policy, worlds.decode, core.Policy\n**Acceptance:**\n- [ ] Given decoded snake fields with food to the left and the wall ahead, it turns left; with no safe move, it goes straight; it reads only `worlds.decode` fields and is deterministic\n- [ ] Fish and prey roles raise KeyError naming M3 or M4; the baselines.scripted_policy fake&#x27;s cases pass on the real function\n**Verify:** `pytest tests/intent/rllab tests/unit/rllab -k scripted` · `scripts/check.sh gate`\n**Depends on:** M1-T01 · **Writes:** src/rllab/baselines/scripted.py, tests/intent/rllab/test_scripted.py, tests/unit/rllab/test_scripted.py\n\n### M1-T15: replay_policies spine (trained or baseline)\n**Package:** rllab · **Step:** PL-04.replay_policies · **Kind:** spine · **Covers:** REPLAY-01 · **Size:** XS · **Mode:** solo\n**Read:** PL-04, store.RunDir, store.load_policy, baselines.random_policy, baselines.scripted_policy, core.Policy\n**Acceptance:**\n- [ ] On the store.RunDir double and the load_policy, random_policy and scripted_policy fakes, `trained` loads `policy.pt` and `random` and `scripted` build the world&#x27;s baselines, one Policy per role; an unknown agent raises ValueError\n**Verify:** `pytest tests/unit/rllab -k replay_policies` · `scripts/check.sh gate`\n**Depends on:** M1-T01 · **Writes:** src/rllab/replay/agents.py, tests/unit/rllab/test_agents.py\n\n### M1-T16: Recording file spine (gzip JSON)\n**Package:** rllab · **Step:** PL-05.Recording.load · **Kind:** spine · **Covers:** REPLAY-05 · **Size:** XS · **Mode:** solo\n**Reason:** `Recording.save` shares `replay/recording.py`, so this spine builds it too\n**Read:** PL-05, replay.Recording, core.Frame, store.RunDir\n**Acceptance:**\n- [ ] On the replay.Recording samples, `Recording.load(rec.save(run))` equals `rec` frame for frame, saved at `recordings/&lt;agent&gt;-&lt;seed&gt;.json.gz`; a missing file raises FileNotFoundError and a corrupt one ValueError\n**Verify:** `pytest tests/unit/rllab -k recording` · `scripts/check.sh gate`\n**Depends on:** M1-T01 · **Writes:** src/rllab/replay/recording.py, tests/unit/rllab/test_recording.py\n\n### M1-T17: record_saved spine (frame every step)\n**Package:** rllab · **Step:** PL-04.record_saved · **Kind:** spine · **Covers:** REPLAY-01, REPLAY-05 · **Size:** XS · **Mode:** solo\n**Read:** PL-04, replay.record, replay.Recording, core.Frame, core.Env, core.Policy, worlds.make, store.RunDir\n**Acceptance:**\n- [ ] On the worlds.make fake and the scripted-snake core.Policy double, `record` gives frames whose steps run 0, 1, 2, … to the last without gaps; a policy of another world raises ValueError naming both; `record_saved` saves the Recording into the store.RunDir double\n**Verify:** `pytest tests/unit/rllab -k record` · `scripts/check.sh gate`\n**Depends on:** M1-T16 · **Writes:** src/rllab/replay/record.py, tests/unit/rllab/test_record.py\n\n### M1-T18: view spine (pygame-ce shapes)\n**Package:** rllab · **Step:** PL-04.view · **Kind:** spine · **Covers:** REPLAY-02 · **Size:** XS · **Mode:** solo\n**Read:** PL-04, AD-12, replay.view, replay.ViewStats, replay.Recording, core.Frame\n**Acceptance:**\n- [ ] Under SDL&#x27;s dummy video driver, `view` on the 30-frame snake Recording sample draws every frame with its step and score and returns ViewStats(30, …); out agents draw grey; speeds 0.4 and 5 raise ValueError, 0.5 and 4 are accepted; the replay.view fake&#x27;s case passes on the real `view`\n**Verify:** `pytest tests/unit/rllab -k view` · `scripts/check.sh gate`\n**Depends on:** M1-T01 · **Writes:** src/rllab/replay/viewer.py, tests/unit/rllab/test_viewer.py\n\n## Phase 2: Wiring and thicken\n\n### M1-T19: Wire PL-01\n**Package:** rllab · **Step:** PL-01, PL-01.train_world · **Kind:** wiring · **Covers:** LEARN-01 · **Size:** S · **Mode:** solo\n**Reason:** fold: trivial step (`train_world` routes snake to `train_dqn`; tank worlds raise ValueError naming M3)\n**Read:** PL-01, learners.train_dqn, learners.TrainSettings, learners.RunRecord, store.new_run, store.RunDir, signoff.may_start\n**Acceptance:**\n- [ ] `python -m rllab train snake --smoke` runs end to end (gate, settings, `train_world` → `train_dqn`, `new_run`, `save_run`) and is committed as PL-01&#x27;s smoke test, which checks the run folder holds `record.json` and `policy.pt`, not their values\n- [ ] `train_world` on a tank1 TrainSettings raises ValueError naming M3\n**Verify:** `python -m rllab train snake --smoke` · `scripts/check.sh gate`\n**Depends on:** M1-T02, M1-T03, M1-T04, M1-T05, M1-T06, M1-T07, M1-T08, M1-T09, M1-T10, M1-T11 · **Writes:** src/rllab/learners/pipeline.py, src/rllab/learners/train.py, tests/unit/rllab/test_pl01_smoke.py\n\n### M1-T20: Wire PL-04\n**Package:** rllab · **Step:** PL-04 · **Kind:** wiring · **Covers:** REPLAY-01 · **Size:** XS · **Mode:** solo\n**Read:** PL-04, store.open_run, store.RunDir, replay.record, replay.Recording, replay.view, replay.ViewStats\n**Acceptance:**\n- [ ] `python -m rllab replay &lt;run&gt; scripted 42 --smoke` runs end to end on a run folder the smoke test writes from a fixture `record.json`, and is committed as PL-04&#x27;s smoke test, which checks `recordings/scripted-42.json.gz` exists and a ViewStats comes back, not its values\n**Verify:** `python -m rllab replay &lt;run&gt; scripted 42 --smoke` · `scripts/check.sh gate`\n**Depends on:** M1-T06, M1-T07, M1-T10, M1-T12, M1-T13, M1-T14, M1-T15, M1-T17, M1-T18 · **Writes:** src/rllab/replay/pipelines/pl04_replay.py, tests/unit/rllab/test_pl04_smoke.py\n\n### M1-T21: Wire PL-05\n**Package:** rllab · **Step:** PL-05 · **Kind:** wiring · **Covers:** REPLAY-05 · **Size:** XS · **Mode:** solo\n**Read:** PL-05, replay.Recording, replay.view, replay.ViewStats\n**Acceptance:**\n- [ ] `python -m rllab watch &lt;file&gt; --smoke` runs end to end on the 30-frame snake Recording sample saved to a temp file, and is committed as PL-05&#x27;s smoke test, which checks a ViewStats comes back, not its values\n**Verify:** `python -m rllab watch &lt;file&gt; --smoke` · `scripts/check.sh gate`\n**Depends on:** M1-T16, M1-T18 · **Writes:** src/rllab/replay/pipelines/pl05_watch.py, tests/unit/rllab/test_pl05_smoke.py\n\n### M1-T22: Replay controls\n**Package:** rllab · **Step:** PL-04.view · **Kind:** thicken · **Covers:** REPLAY-03 · **Size:** XS · **Mode:** split\n**Read:** PL-04, REPLAY-03, AD-12, replay.view, replay.ViewStats\n**Acceptance:**\n- [ ] Given injected key events under SDL&#x27;s dummy driver: pause holds the frame and `frames_shown` excludes the repeats; single-step advances exactly one frame while paused\n- [ ] The speed keys move through 0.5×–4× and stop at either end (AD-12)\n**Verify:** `pytest tests/intent/rllab tests/unit/rllab -k view` · `scripts/check.sh gate`\n**Depends on:** M1-T18 · **Writes:** src/rllab/replay/viewer.py, tests/intent/rllab/test_viewer_controls.py, tests/unit/rllab/test_viewer.py\n\n### Checkpoint after M1-T22\n- [ ] Every pipeline in the milestone runs end to end (smoke commands)\n- [ ] All golden cases pass\n- [ ] Entry functions still read top to bottom as the step table says (Sync if not)\n- [ ] No new abstraction without a second implementation or an AD\n- [ ] contract.md matches the contract code (`dt status` freshness check)\n- [ ] `dt layout` output reviewed; Definition of Done holds\n- [ ] `scripts/check.sh full` passes; Review checklist done; every finding has a disposition\n\n## Phase 3: System\n\n### M1-T23: PL-01 on the real chain\n**Package:** rllab · **Step:** PL-01 · **Kind:** system · **Covers:** QR-03, LEARN-02, LEARN-03, DATA-02 · **Size:** XS · **Mode:** solo\n**Read:** PL-01, TC-29, TC-31, TC-32, worlds.register, signoff.may_start, worlds.make, store.new_run, evaluate.play\n**Acceptance:**\n- [ ] TC-29 (Double DQN on a registered `test_bandit3`), TC-31&#x27;s snake half and TC-32 pass on the real chain\n- [ ] Each fake&#x27;s contract cases pass on the real provider: may_start, make, new_run, play\n- [ ] The PL-01 smoke passes\n**Verify:** `python -m rllab train snake --smoke` · `pytest tests/intent/rllab -k pl01_system` · `scripts/check.sh gate`\n**Depends on:** M1-T19 · **Writes:** tests/intent/rllab/test_pl01_system.py, tests/unit/rllab/test_may_start_conformance.py, tests/unit/rllab/test_make_conformance.py, tests/unit/rllab/test_new_run_conformance.py, tests/unit/rllab/test_play_conformance.py\n\n### M1-T24: PL-04 on the real chain\n**Package:** rllab · **Step:** PL-04 · **Kind:** system · **Covers:** BASE-02, REPLAY-01, REPLAY-05 · **Size:** XS · **Mode:** solo\n**Reason:** system task; PL-05&#x27;s TC-38 replays the recording PL-04 makes\n**Read:** PL-04, PL-05, TC-19, TC-37, TC-38, store.open_run, store.load_policy, baselines.random_policy, baselines.scripted_policy, worlds.decode, replay.view\n**Acceptance:**\n- [ ] TC-19, TC-37 and TC-38 pass on the real chain (planted snake states, the scripted snake on seed 42, its saved recording)\n- [ ] Each fake&#x27;s contract cases pass on the real provider: open_run, load_policy, random_policy, scripted_policy, decode, view\n- [ ] The PL-04 and PL-05 smokes pass\n**Verify:** `python -m rllab replay &lt;run&gt; scripted 42 --smoke` · `python -m rllab watch &lt;file&gt; --smoke` · `pytest tests/intent/rllab -k pl04_system` · `scripts/check.sh gate`\n**Depends on:** M1-T20, M1-T21, M1-T22 · **Writes:** tests/intent/rllab/test_pl04_system.py, tests/unit/rllab/test_open_run_conformance.py, tests/unit/rllab/test_load_policy_conformance.py, tests/unit/rllab/test_random_policy_conformance.py, tests/unit/rllab/test_scripted_policy_conformance.py, tests/unit/rllab/test_decode_conformance.py, tests/unit/rllab/test_view_conformance.py\n\n### Checkpoint: milestone exit\n- [ ] Every pipeline in the milestone runs end to end (smoke commands)\n- [ ] All golden cases pass\n- [ ] Entry functions still read top to bottom as the step table says (Sync if not)\n- [ ] No new abstraction without a second implementation or an AD\n- [ ] contract.md matches the contract code (`dt status` freshness check)\n- [ ] `dt layout` output reviewed; Definition of Done holds\n- [ ] `scripts/check.sh full --exit` passes; Review checklist done; every finding has a disposition\n- [ ] The Scope&#x27;s Exit holds\n\n## Dependency graph\n| From | To | Kind | Mitigated by |\n|---|---|---|---|\n| M1-T03 ensure_may_start spine | M1-T02 world order gate | call | signoff.may_start fake (M1-T01) |\n| M1-T05 Double DQN learner | M1-T06 make spine | call | worlds.make fake (M1-T01) |\n| M1-T05 Double DQN learner | M1-T08 play spine | call | evaluate.play fake (M1-T01) |\n| M1-T08 play spine | M1-T06 make spine | call | worlds.make fake (M1-T01) |\n| M1-T10 run folder spine | M1-T09 FileRunDir spine | call | none: `new_run` and `open_run` construct `FileRunDir`; the store.RunDir double can&#x27;t stand in for its constructor |\n| M1-T11 save_run spine | M1-T09 FileRunDir spine | data | store.RunDir replay double (M1-T01) |\n| M1-T14 scripted snake | M1-T07 snake world rules | call | worlds.decode fake (M1-T01) |\n| M1-T15 replay_policies spine | M1-T12 load_policy spine | call | store.load_policy fake (M1-T01) |\n| M1-T15 replay_policies spine | M1-T13 random agent | call | baselines.random_policy fake (M1-T01) |\n| M1-T15 replay_policies spine | M1-T14 scripted snake | call | baselines.scripted_policy fake (M1-T01) |\n| M1-T17 record_saved spine | M1-T06 make spine | call | worlds.make fake (M1-T01) |\n| M1-T17 record_saved spine | M1-T16 Recording file spine | call | none: `record_saved` saves through `Recording.save`, which M1-T16 builds |\n| M1-T18 view spine | M1-T17 record_saved spine | data | replay.Recording sample (M1-T01) |\n| M1-T19 wire PL-01 | M1-T02 world order gate | order | none: integration: the smoke runs it |\n| M1-T19 wire PL-01 | M1-T03 ensure_may_start spine | order | none: integration: the smoke runs it |\n| M1-T19 wire PL-01 | M1-T04 train_settings spine | order | none: integration: the smoke runs it |\n| M1-T19 wire PL-01 | M1-T05 Double DQN learner | order | none: integration: the smoke runs it |\n| M1-T19 wire PL-01 | M1-T06 make spine | order | none: integration: the smoke runs it |\n| M1-T19 wire PL-01 | M1-T07 snake world rules | order | none: integration: the smoke runs it |\n| M1-T19 wire PL-01 | M1-T08 play spine | order | none: integration: the smoke runs it |\n| M1-T19 wire PL-01 | M1-T09 FileRunDir spine | order | none: integration: the smoke runs it |\n| M1-T19 wire PL-01 | M1-T10 run folder spine | order | none: integration: the smoke runs it |\n| M1-T19 wire PL-01 | M1-T11 save_run spine | order | none: integration: the smoke runs it |\n| M1-T20 wire PL-04 | M1-T06 make spine | order | none: integration: the smoke runs it |\n| M1-T20 wire PL-04 | M1-T07 snake world rules | order | none: integration: the smoke records a real snake episode |\n| M1-T20 wire PL-04 | M1-T10 run folder spine | order | none: integration: the smoke runs it |\n| M1-T20 wire PL-04 | M1-T12 load_policy spine | order | none: integration: the smoke runs it |\n| M1-T20 wire PL-04 | M1-T13 random agent | order | none: integration: the smoke runs it |\n| M1-T20 wire PL-04 | M1-T14 scripted snake | order | none: integration: the smoke runs it |\n| M1-T20 wire PL-04 | M1-T15 replay_policies spine | order | none: integration: the smoke runs it |\n| M1-T20 wire PL-04 | M1-T17 record_saved spine | order | none: integration: the smoke runs it |\n| M1-T20 wire PL-04 | M1-T18 view spine | order | none: integration: the smoke runs it |\n| M1-T20 wire PL-04 | M1-T19 wire PL-01 | data | store.RunDir replay double (M1-T01): the smoke writes its run folder from a fixture |\n| M1-T21 wire PL-05 | M1-T16 Recording file spine | order | none: integration: the smoke runs it |\n| M1-T21 wire PL-05 | M1-T18 view spine | order | none: integration: the smoke runs it |\n| M1-T22 replay controls | M1-T18 view spine | code | none: thickens the same module |\n| M1-T23 PL-01 system | M1-T19 wire PL-01 | order | none: integration: runs PL-01&#x27;s golden cases on the real chain |\n| M1-T24 PL-04 system | M1-T20 wire PL-04 | order | none: integration: runs PL-04&#x27;s golden cases on the real chain |\n| M1-T24 PL-04 system | M1-T21 wire PL-05 | order | none: integration: TC-38 watches the saved recording through PL-05 |\n| M1-T24 PL-04 system | M1-T22 replay controls | order | none: integration: TC-38 plays through the finished viewer |\n\n## Risks\n| Risk | Impact | Mitigation |\n|---|---|---|\n| The `--smoke` switches (`RLLAB_SMOKE`, `RLLAB_RUNS`) leak into a real run | A real run gets a 2,000-step budget or writes to a temp folder | M1-T04 and M1-T10 test both settings; M1-T23&#x27;s TC-32 runs without them |\n| pygame-ce misbehaves under SDL&#x27;s dummy driver in CI | Viewer tests flake | M1-T18 and M1-T22 run headless from the start; QR-04 is measured by hand in M3 (TC-39) |\n| Determinism (QR-03) breaks across torch thread counts | TC-31 fails | M1-T04 fixes threads and `torch.use_deterministic_algorithms`; M1-T23 runs TC-31 |\n\n## Open questions\n- `dataviz` is on S1–S3 but isn&#x27;t installed (`skills_missing`). M1 draws no chart, so it doesn&#x27;t block this plan; M2&#x27;s curve chart (EVAL-02) needs it or a replacement.\n- The `null-hypothesis-testing` skill is a placeholder (tests.md Open questions). M1 runs no comparison; M2&#x27;s `compare` needs a real test and correction.\n\n## Replan notes\n&quot;
+}</pre><div class="lbl">output</div><pre>File created successfully at: /Users/connorott/plugins/dev-team-workspace/iteration-11/rl-all-at-once/with_skill/project/tasks/plan.md (file state is current in your context — no need to Read it back)</pre></details></div><div class="step" id="SD327"><span class="sid">D327</span><span class="kind">Bash</span>cd /Users/connorott/plugins/dev-team-workspace/iteration-11/rl-all-at-once/with_skill/plugin/dev-team/scripts &amp;&amp; sed -n 25,45p devteam/commands/lint.py | tr &#x27;,&#x27; &#x27;\n&#x27; | grep -E &quot;exit-cases|covers-vs|task-size|task-step&quot;; grep -n &quot;exit-cases-in-scope\|task-size&quot; README.md | head<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;cd /Users/connorott/plugins/dev-team-workspace/iteration-11/rl-all-at-once/with_skill/plugin/dev-team/scripts &amp;&amp; sed -n 25,45p devteam/commands/lint.py | tr &#x27;,&#x27; &#x27;\\n&#x27; | grep -E \&quot;exit-cases|covers-vs|task-size|task-step\&quot;; grep -n \&quot;exit-cases-in-scope\\|task-size\&quot; README.md | head&quot;
+}</pre><div class="lbl">output</div><pre> &quot;task-size&quot;: &quot;E&quot;
+    &quot;task-step&quot;: &quot;W&quot;
+302:  - `task-size` E — Size not XS/S/M, or the source files it writes outside the size&#x27;s range (XS 1, S 1–2, M 3–5): `Writes:` (else `Files likely`) minus test files (`tests/**`, `test_*.py`). An interface task is sized by judgment
+335:  - `exit-cases-in-scope` E — a TC that a milestone&#x27;s roadmap Exit or Outline, or its plan&#x27;s Scope Exit, names (ranges expanded) that no tests.md defines, or whose Pipeline isn&#x27;t in the milestone&#x27;s Pipelines (its row&#x27;s cell, else the inferred set)
+Shell cwd was reset to /Users/connorott/plugins/dev-team-workspace/iteration-11/rl-all-at-once/with_skill/project</pre></details></div><div class="step" id="SD328"><span class="sid">D328</span><span class="kind">think</span>I found two lint issues: TC-18/TC-19 don&#x27;t belong to M1&#x27;s pipelines, so I&#x27;ll remove them from the Exit text while keeping them on baseline/system tasks (flagging this at the gate), and I&#x27;ll point baseline Steps to PL-02&#x27;s rows and give the system tasks their pipeline&#x27;s entry module as a source file.<details><summary>full text</summary><pre>I found two lint issues: TC-18/TC-19 don&#x27;t belong to M1&#x27;s pipelines, so I&#x27;ll remove them from the Exit text while keeping them on baseline/system tasks (flagging this at the gate), and I&#x27;ll point baseline Steps to PL-02&#x27;s rows and give the system tasks their pipeline&#x27;s entry module as a source file.
+
+</pre></details></div><div class="step" id="SD329"><span class="sid">D329</span><span class="kind">Bash</span>python3 - &lt;&lt;&#x27;EOF&#x27;
+p=&#x27;tasks/plan.md&#x27;; s=open(p).read()
+R=[
+(&quot;Exit: `rllab train snake` finishes and its run replays; TC-01–TC-06, TC-18, TC-19, TC-29, TC-31 (snake), TC-32, TC-37, TC-38 and TC-42 (DONE-02 ledgers) pass.&quot;,
+ &quot;Exit: `rllab train snake` finishes and its run replays; TC-01–TC-06, TC-29, TC-31 (snake), TC-32, TC-37, TC-38 and TC-42 (DONE-02 ledgers) pass, and the random and scripted snakes pass their PL-02 cases on M1-T13 and M1-T24.&quot;),
+(&quot;SNAKE-05, SNAKE-06, SNAKE-07, BASE-06 · …[+3596 chars]<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;python3 - &lt;&lt;&#x27;EOF&#x27;\np=&#x27;tasks/plan.md&#x27;; s=open(p).read()\nR=[\n(\&quot;**Exit:** `rllab train snake` finishes and its run replays; TC-01–TC-06, TC-18, TC-19, TC-29, TC-31 (snake), TC-32, TC-37, TC-38 and TC-42 (DONE-02 ledgers) pass.\&quot;,\n \&quot;**Exit:** `rllab train snake` finishes and its run replays; TC-01–TC-06, TC-29, TC-31 (snake), TC-32, TC-37, TC-38 and TC-42 (DONE-02 ledgers) pass, and the random and scripted snakes pass their PL-02 cases on M1-T13 and M1-T24.\&quot;),\n(\&quot;SNAKE-05, SNAKE-06, SNAKE-07, BASE-06 · **Size:** S\&quot;,\&quot;SNAKE-05, SNAKE-06, SNAKE-07 · **Size:** S\&quot;),\n(\&quot;**Step:** PL-04.load_policy\&quot;,\&quot;**Step:** PL-02.load_policy\&quot;),\n(\&quot;**Step:** PL-04.random_policy\&quot;,\&quot;**Step:** PL-02.random_policy\&quot;),\n(\&quot;**Step:** PL-04.scripted_policy\&quot;,\&quot;**Step:** PL-02.scripted_policy\&quot;),\n(\&quot;**Read:** PL-04, AD-15, store.load_policy\&quot;,\&quot;**Read:** PL-02, PL-04, AD-15, store.load_policy\&quot;),\n(\&quot;**Read:** PL-04, TC-18, BASE-01\&quot;,\&quot;**Read:** PL-02, PL-04, TC-18, BASE-01\&quot;),\n(\&quot;**Read:** PL-04, AD-04, BASE-02\&quot;,\&quot;**Read:** PL-02, PL-04, AD-04, BASE-02\&quot;),\n(\&quot;**Depends on:** M1-T19 · **Writes:** tests/intent/rllab/test_pl01_system.py\&quot;,\&quot;**Depends on:** M1-T19 · **Writes:** src/rllab/learners/pipeline.py, tests/intent/rllab/test_pl01_system.py\&quot;),\n(\&quot;**Depends on:** M1-T20, M1-T21, M1-T22 · **Writes:** tests/intent/rllab/test_pl04_system.py\&quot;,\&quot;**Depends on:** M1-T20, M1-T21, M1-T22 · **Writes:** src/rllab/replay/pipelines/pl04_replay.py, tests/intent/rllab/test_pl04_system.py\&quot;),\n(\&quot;| M1-T23 PL-01 system | M1-T19 wire PL-01 | order | none: integration: runs PL-01&#x27;s golden cases on the real chain |\&quot;,\n \&quot;| M1-T23 PL-01 system | M1-T19 wire PL-01 | file | none: runs PL-01&#x27;s golden cases on the real chain and may adjust the entry M1-T19 wrote |\&quot;),\n(\&quot;| M1-T24 PL-04 system | M1-T20 wire PL-04 | order | none: integration: runs PL-04&#x27;s golden cases on the real chain |\&quot;,\n \&quot;| M1-T24 PL-04 system | M1-T20 wire PL-04 | file | none: runs PL-04&#x27;s golden cases on the real chain and may adjust the entry M1-T20 wrote |\&quot;),\n]\nfor a,b in R:\n    assert a in s, a[:60]; s=s.replace(a,b)\nopen(p,&#x27;w&#x27;).write(s)\np=&#x27;docs/roadmap.md&#x27;; s=open(p).read()\na=\&quot;**Exit:** `rllab train snake` finishes and its run replays; TC-01–TC-06, TC-18, TC-19, TC-29, TC-31 (snake), TC-32, TC-37, TC-38 and TC-42 (DONE-02 ledgers) pass.\&quot;\nassert a in s\ns=s.replace(a,\&quot;**Exit:** `rllab train snake` finishes and its run replays; TC-01–TC-06, TC-29, TC-31 (snake), TC-32, TC-37, TC-38 and TC-42 (DONE-02 ledgers) pass, and the random and scripted snakes pass their PL-02 cases.\&quot;)\nopen(p,&#x27;w&#x27;).write(s)\nEOF\ncat &gt; tasks/todo.md &lt;&lt;&#x27;EOF&#x27;\n# M1: Train and watch a snake — Todo\n\n- [ ] M1-T01 M1 interface (rllab, S, solo)\n- [ ] M1-T02 World order gate (rllab, XS, split)\n- [ ] M1-T03 ensure_may_start spine (raise on blockers) (rllab, XS, solo)\n- [ ] M1-T04 train_settings spine (contract defaults) (rllab, XS, solo)\n- [ ] M1-T05 Double DQN learner (rllab, XS, split)\n- [ ] M1-T06 make spine (if-chain plus test registry) (rllab, XS, solo)\n- [ ] M1-T07 Snake world rules (rllab, S, split)\n- [ ] M1-T08 play spine (one episode per seed) (rllab, XS, solo)\n- [ ] M1-T09 FileRunDir spine (plain files) (rllab, XS, solo)\n- [ ] M1-T10 Run folder spine (new_run, open_run) (rllab, XS, solo)\n- [ ] M1-T11 save_run spine (record always, policy when finished) (rllab, XS, solo)\n- [ ] M1-T12 load_policy spine (rebuild from GreedyNet) (rllab, XS, solo)\n- [ ] M1-T13 Random agent (rllab, XS, split)\n- [ ] M1-T14 Scripted snake (rllab, XS, split)\n- [ ] M1-T15 replay_policies spine (trained or baseline) (rllab, XS, solo)\n- [ ] M1-T16 Recording file spine (gzip JSON) (rllab, XS, solo)\n- [ ] M1-T17 record_saved spine (frame every step) (rllab, XS, solo)\n- [ ] M1-T18 view spine (pygame-ce shapes) (rllab, XS, solo)\n- [ ] M1-T19 Wire PL-01 (rllab, S, solo)\n- [ ] M1-T20 Wire PL-04 (rllab, XS, solo)\n- [ ] M1-T21 Wire PL-05 (rllab, XS, solo)\n- [ ] M1-T22 Replay controls (rllab, XS, split)\n- [ ] M1-T23 PL-01 on the real chain (rllab, XS, solo)\n- [ ] M1-T24 PL-04 on the real chain (rllab, XS, solo)\nEOF\npython3 ../plugin/dev-team/scripts/dt.py lint tasks/ docs/roadmap.md AGENTS.md 2&gt;&amp;1 | tail -20&quot;
+}</pre><div class="lbl">output</div><pre>docs/roadmap.md:22: roadmap-skill S1 Skills names dataviz: not installed (.claude/skills or the plugin)
+docs/roadmap.md:26: roadmap-skill S2 Skills names dataviz: not installed (.claude/skills or the plugin)
+docs/roadmap.md:30: roadmap-skill S3 Skills names dataviz: not installed (.claude/skills or the plugin)
+docs/roadmap.md:39: milestone-lines M2 has no **Exit:** line (Designed)
+docs/roadmap.md:40: exit-cases-in-scope M2&#x27;s Exit names TC-33 of PL-01, which isn&#x27;t in M2&#x27;s Pipelines
+docs/roadmap.md:41: roadmap-skill M2 Skills names dataviz: not installed (.claude/skills or the plugin)
+docs/roadmap.md:44: milestone-lines M3 has no **Exit:** line (Designed)
+docs/roadmap.md:47: milestone-lines M4 has no **Exit:** line (Designed)
+tasks/plan.md:152: task-step M1-T16 Step PL-05.Recording: no step `Recording` in PL-05&#x27;s table
+4 errors, 5 warnings</pre></details></div><div class="step" id="SD330"><span class="sid">D330</span><span class="kind">Bash</span>python3 - &lt;&lt;&#x27;EOF&#x27;
+p=&#x27;docs/roadmap.md&#x27;; s=open(p).read()
+R=[
+(&quot;| M2 | S1 | Judge and sign off the snake | rllab | PL-02, PL-03, PL-06, PL-07 |&quot;,&quot;| M2 | S1 | Judge and sign off the snake | rllab | PL-01, PL-02, PL-03, PL-06, PL-07 |&quot;),
+(&quot;Its exit holds the stage&#x27;s bar: the snake beats both baselines and lands in the reference&#x27;s range within the hour (TC-33).\nSkills: null-hypothesis-testing, dataviz\nReferences: —&quot;,
+ &quot;Its exit holds the stage&#x27;s bar: the snake beats both baselines and lands …[+1031 chars]<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;python3 - &lt;&lt;&#x27;EOF&#x27;\np=&#x27;docs/roadmap.md&#x27;; s=open(p).read()\nR=[\n(\&quot;| M2 | S1 | Judge and sign off the snake | rllab | PL-02, PL-03, PL-06, PL-07 |\&quot;,\&quot;| M2 | S1 | Judge and sign off the snake | rllab | PL-01, PL-02, PL-03, PL-06, PL-07 |\&quot;),\n(\&quot;Its exit holds the stage&#x27;s bar: the snake beats both baselines and lands in the reference&#x27;s range within the hour (TC-33).\\n**Skills:** null-hypothesis-testing, dataviz\\n**References:** —\&quot;,\n \&quot;Its exit holds the stage&#x27;s bar: the snake beats both baselines and lands in the reference&#x27;s range within the hour.\\n**Skills:** null-hypothesis-testing, dataviz\\n**References:** —\\n**Exit:** The snake is signed off: TC-33 passes by hand within the hour, and TC-20 aside, every snake case of PL-02, PL-03, PL-06 and PL-07 passes (TC-22–TC-28, TC-36, TC-40, TC-41).\&quot;),\n(\&quot;sight circles in the replay and both tanks&#x27; sign-off, so the fish beat random and match the scripted fish (TC-34, TC-35).\&quot;,\n \&quot;sight circles in the replay and both tanks&#x27; sign-off, so the fish beat random and match the scripted fish.\\n**Exit:** Both tanks are signed off: TC-07–TC-12, TC-20, TC-30 and TC-31 (tank1) pass, and TC-34, TC-35 and TC-39 pass by hand.\&quot;),\n(\&quot;are reported (TC-43, TC-44), and the world finishes under DONE-03.\&quot;,\n \&quot;are reported, and the world finishes under DONE-03.\\n**Exit:** Predator and prey finishes under DONE-03: TC-13–TC-17, TC-21 and TC-43 pass, and TC-44 is reported by hand.\&quot;),\n]\nfor a,b in R:\n    assert a in s, a[:50]; s=s.replace(a,b)\nopen(p,&#x27;w&#x27;).write(s)\nEOF\ngrep -n \&quot;TC-20 aside\&quot; docs/roadmap.md&quot;
+}</pre><div class="lbl">output</div><pre>43:**Exit:** The snake is signed off: TC-33 passes by hand within the hour, and TC-20 aside, every snake case of PL-02, PL-03, PL-06 and PL-07 passes (TC-22–TC-28, TC-36, TC-40, TC-41).</pre></details></div><div class="step" id="SD331"><span class="sid">D331</span><span class="kind">Bash</span>python3 - &lt;&lt;&#x27;EOF&#x27;
+p=&#x27;docs/roadmap.md&#x27;; s=open(p).read()
+s=s.replace(&quot;TC-33 passes by hand within the hour, and TC-20 aside, every snake case of PL-02, PL-03, PL-06 and PL-07 passes (TC-22–TC-28, TC-36, TC-40, TC-41).&quot;,&quot;TC-33 passes by hand within the hour, and TC-22–TC-28, TC-36, TC-40 and TC-41 pass.&quot;)
+s=s.replace(&quot;| M4 | S3 | Predator and prey | rllab | PL-08 |&quot;,&quot;| M4 | S3 | Predator and prey | rllab | PL-02, PL-08 |&quot;)
+open(p,&#x27;w&#x27;).write(s)
+EOF
+python3 ../plugin/dev-team/scripts/dt.py roadmap | …[+175 chars]<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;python3 - &lt;&lt;&#x27;EOF&#x27;\np=&#x27;docs/roadmap.md&#x27;; s=open(p).read()\ns=s.replace(\&quot;TC-33 passes by hand within the hour, and TC-20 aside, every snake case of PL-02, PL-03, PL-06 and PL-07 passes (TC-22–TC-28, TC-36, TC-40, TC-41).\&quot;,\&quot;TC-33 passes by hand within the hour, and TC-22–TC-28, TC-36, TC-40 and TC-41 pass.\&quot;)\ns=s.replace(\&quot;| M4 | S3 | Predator and prey | rllab | PL-08 |\&quot;,\&quot;| M4 | S3 | Predator and prey | rllab | PL-02, PL-08 |\&quot;)\nopen(p,&#x27;w&#x27;).write(s)\nEOF\npython3 ../plugin/dev-team/scripts/dt.py roadmap | tail -3; python3 ../plugin/dev-team/scripts/dt.py lint tasks/ docs/roadmap.md AGENTS.md 2&gt;&amp;1 | tail -8; python3 ../plugin/dev-team/scripts/dt.py status --skill build-planning&quot;
+}</pre><div class="lbl">output</div><pre>S1: Split → Planned
+M1: Designed → Planned
+roadmap: updated 2
+docs/roadmap.md:22: roadmap-skill S1 Skills names dataviz: not installed (.claude/skills or the plugin)
+docs/roadmap.md:26: roadmap-skill S2 Skills names dataviz: not installed (.claude/skills or the plugin)
+docs/roadmap.md:30: roadmap-skill S3 Skills names dataviz: not installed (.claude/skills or the plugin)
+docs/roadmap.md:41: roadmap-skill M2 Skills names dataviz: not installed (.claude/skills or the plugin)
+tasks/plan.md:152: task-step M1-T16 Step PL-05.Recording: no step `Recording` in PL-05&#x27;s table
+0 errors, 5 warnings
+skill: build-planning
+mode: extend
+docs: brief Accepted · spec Approved · architecture Approved (Single package) · roadmap ok · plan M1 Draft · constraints missing
+next ids: AD-20 PL-09 TC-45 S4 M5 M1-T25
+references_unindexed: none
+references_changed: none
+references_missing: none
+milestone: M1 Draft
+progress: 0/24
+next_task: M1-T01 M1 interface
+blocked_tasks: none
+uncovered: none
+no_spine: none
+steps_unplanned: none
+mode_violations: none
+boundaries_unfrozen: none
+draft_pipelines: none
+changed_since_plan: none
+interfaces_changed: none
+probes_blocking: none
+stage_to_cut: none
+pipelines_inferred: none
+milestone_references: none
+milestone_skills: null-hypothesis-testing, dataviz
+references_unrouted: none
+skills_unrouted: none
+stage_unrouted: none
+skills_missing: dataviz
+skills_available: null-hypothesis-testing
+grow_triggers: none
+grow_held: UR-44 &quot;Yes, keep rllab as one package.&quot;, AD-19 &quot;rllab stays one package&quot;
+drift: none
+stale_contracts: none
+queued: none
+base: pending
+critical_path: M1-T01 → M1-T09 → M1-T10 → M1-T19 → M1-T23
+waves: M1-T01 | M1-T02, M1-T03, M1-T04, M1-T05, M1-T06, M1-T07, M1-T08, M1-T09, M1-T11, M1-T12, M1-T13, M1-T14, M1-T15, M1-T16, M1-T18 | M1-T10, M1-T17, M1-T21, M1-T22 | M1-T19, M1-T20 | M1-T23, M1-T24
+width: 15
+parallelism: 4.8
+graph_warning: none
+requests_open: UR-45 &quot;Yes, use the cut and the M1 scope as written.&quot; [Cut: M1 Train and watch a snake (PL-01, PL-04, PL-05), M2 Judge and sign off the snake (PL-02, PL-03, PL-06, PL-07), M3 Fish tank, M4 Predator and prey; M1 covers and exit as proposed, QR-01/QR-02 to M2, QR-04 to M3]</pre></details></div><div class="step" id="SD332"><span class="sid">D332</span><span class="kind">think</span>The plan lints clean with 0 errors, empty coverage lists, and a 5-task critical path. Next I&#x27;ll link the answer to milestones, write the AGENTS.md doc map, and verify `dt ready` plus each task&#x27;s context packet.<details><summary>full text</summary><pre>The plan lints clean with 0 errors, empty coverage lists, and a 5-task critical path. Next I&#x27;ll link the answer to milestones, write the AGENTS.md doc map, and verify `dt ready` plus each task&#x27;s context packet.
+
+</pre></details></div><div class="step" id="SD333"><span class="sid">D333</span><span class="kind">Bash</span>python3 ../plugin/dev-team/scripts/dt.py request trace UR-45 M1 M2 M3 M4; cat &gt; AGENTS.md &lt;&lt;&#x27;EOF&#x27;
+# RL Lab — Agents
+
+## Docs
+- Plan with dev-team2&#x27;s `build-planning`, not agent-skills&#x27; `/plan`.
+- Your task&#x27;s context: `dt context &lt;M#-T##&gt;`. Read only what it prints.
+- Any section by ID: `dt section &lt;ID&gt;...` (e.g. PL-01 TC-29 SNAKE-05 AD-03 core.Env)
+- Package docs: `docs/packages/rllab/{contract,pipelines,tests}.md`; the architecture is `docs/architecture.md` (single package)
+- Real layout: `dt l …[+638 chars]<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;python3 ../plugin/dev-team/scripts/dt.py request trace UR-45 M1 M2 M3 M4; cat &gt; AGENTS.md &lt;&lt;&#x27;EOF&#x27;\n# RL Lab — Agents\n\n## Docs\n- Plan with dev-team2&#x27;s `build-planning`, not agent-skills&#x27; `/plan`.\n- Your task&#x27;s context: `dt context &lt;M#-T##&gt;`. Read only what it prints.\n- Any section by ID: `dt section &lt;ID&gt;...` (e.g. PL-01 TC-29 SNAKE-05 AD-03 core.Env)\n- Package docs: `docs/packages/rllab/{contract,pipelines,tests}.md`; the architecture is `docs/architecture.md` (single package)\n- Real layout: `dt layout rllab` (planned layouts are gone once the wiring lands)\n- Quality bar: CONSTRAINTS.md. Oracle files (tests/fixtures/*/expected.json) need user approval to change.\n## Project skills\n- null-hypothesis-testing — `evaluate.compare` and the world comparisons (M2 onward)\n- dataviz (not installed) — `evaluate.curve_chart` learning curves (M2 onward)\nEOF\npython3 ../plugin/dev-team/scripts/dt.py ready; for i in $(seq -w 1 24); do n=$(python3 ../plugin/dev-team/scripts/dt.py context M1-T$i 2&gt;&amp;1 | wc -l); e=$(python3 ../plugin/dev-team/scripts/dt.py context M1-T$i 2&gt;&amp;1 | grep -ci \&quot;unresolved\\|not found\\|error\&quot; ); echo \&quot;T$i $n $e\&quot;; done&quot;
+}</pre><div class="lbl">output</div><pre>dt request: UR-45 (plan) needs a live ID defined in plan, queued-plan, archived-plan
+usage: dt request add &lt;owner&gt; &quot;&lt;words&gt;&quot; --skill S [--about TEXT] [--replaces UR-NN] · dt request trace UR-NN ID… · dt request change UR-NN &quot;&lt;what instead&gt;&quot; --approved &quot;&lt;words&gt;&quot; --skill S --into ID… · dt request change UR-NN --into ID… (add IDs to a change) · dt request [list] [--open] [--owner O] [--json]
+M1-T01 [interface] M1 interface · writes: src/rllab/__init__.py, src/rllab/__main__.py, src/rllab/core/**, src/rllab/worlds/**, src/rllab/baselines/**, src/rllab/store/**, src/rllab/evaluate/**, src/rllab/learners/**, src/rllab/coevo/**, src/rllab/reference/**, src/rllab/replay/**, src/rllab/signoff/**, tests/contracts/**, tests/conftest.py, tests/helpers/golden.py
+T01      418 20
+T02       76 0
+T03       63 0
+T04       80 1
+T05      176 5
+T06      106 4
+T07      190 5
+T08      120 4
+T09       88 2
+T10      116 3
+T11       96 1
+T12      104 2
+T13      117 1
+T14      124 3
+T15       97 5
+T16       73 3
+T17      118 6
+T18      105 4
+T19      211 10
+T20      172 10
+T21       89 3
+T22      113 3
+T23      240 9
+T24      218 13</pre></details></div><div class="step" id="SD334"><span class="sid">D334</span><span class="kind">Bash</span>for i in $(seq -w 1 24); do python3 ../plugin/dev-team/scripts/dt.py context M1-T$i 2&gt;&amp;1 | grep -iE &quot;unresolved|no section|not defined|missing&quot; | sed &quot;s/^/T$i: /&quot;; done | head; python3 ../plugin/dev-team/scripts/dt.py request trace UR-45 M1-T01 2&gt;&amp;1 | tail -2<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;for i in $(seq -w 1 24); do python3 ../plugin/dev-team/scripts/dt.py context M1-T$i 2&gt;&amp;1 | grep -iE \&quot;unresolved|no section|not defined|missing\&quot; | sed \&quot;s/^/T$i: /\&quot;; done | head; python3 ../plugin/dev-team/scripts/dt.py request trace UR-45 M1-T01 2&gt;&amp;1 | tail -2&quot;
+}</pre><div class="lbl">output</div><pre>T01: - **Errors:** `TypeError` saving a policy with no weights; `FileNotFoundError` reading a missing file
+T01: - **Errors:** `FileNotFoundError` when `root` or its `record.json` is missing
+T01: - **Boundary:** evaluate, replay, signoff · **Fixtures:** tests/contracts/store.open_run/ · **Cases:** a fake returning the finished-snake RunDir double; a missing folder
+T01: - **Errors:** `ValueError` for a policy of another world or a missing role
+T01: `@dataclass(frozen=True) class Status: world: str; missing: tuple[str, ...]`
+T01: - **Invariants:** empty `missing` means ready (`may_start`, `scaffold_note`) or signed off (`check_world`); each entry names one blocker or blank, citing its requirement ID
+T01: - **Boundary:** learners, coevo, PL-06, PL-07 · **Fixtures:** tests/contracts/signoff.Status/ · **Cases:** snake open (nothing missing); tank5 blocked on tank1; a note missing its replay seed
+T01: - **Invariants:** `missing` lists what blocks the world, empty when it may start; order snake → tank1 → tank5 → prey (DONE-02); tank5 also needs tank1&#x27;s EVAL-05 and EVAL-06 passes (DONE-04)
+T02: **Expected:** empty ledger: snake open, tank1 blocked naming snake; ledger {snake} with tank1 passing beats-random but failing the scripted margin: tank5 blocked, missing cites DONE-04; ledger {snake, tank1, tank5}: prey open · **Tolerance:** exact, lists
+T02: - **Invariants:** `missing` lists what blocks the world, empty when it may start; order snake → tank1 → tank5 → prey (DONE-02); tank5 also needs tank1&#x27;s EVAL-05 and EVAL-06 passes (DONE-04)
+UR-45 → M1-T01</pre></details></div><div class="step" id="SD335"><span class="sid">D335</span><span class="kind">say</span>The M1 plan is written as a Draft and passes the review checks. It needs your approval or changes. ⏎ What was written ⏎ - Roadmap (the cut): M1 Train and watch a snake and M2 Judge and sign off the snake (both S1), M3 Fish tank (S2), M4 Predator and prey (S3). Each has an outline and an Exit; `dt roadmap` now shows S1 and M1 as Planned. Only M1 has a plan. ⏎ - `tasks/plan.md`: 24 tasks: ⏎   - 1 interface task (M1-T01); ⏎   - 17 step tasks: 11 basic first versions (&quot;spines&quot;) and 6 that also take their golden cases (world order gate, Double DQN, Snake rules, random agent, scripted sn …[+3724 chars]<details><summary>full text</summary><pre>The M1 plan is written as a Draft and passes the review checks. It needs your approval or changes.
+
+**What was written**
+- **Roadmap (the cut):** M1 Train and watch a snake and M2 Judge and sign off the snake (both S1), M3 Fish tank (S2), M4 Predator and prey (S3). Each has an outline and an Exit; `dt roadmap` now shows S1 and M1 as Planned. Only M1 has a plan.
+- **`tasks/plan.md`:** 24 tasks:
+  - 1 interface task (M1-T01);
+  - 17 step tasks: 11 basic first versions (&quot;spines&quot;) and 6 that also take their golden cases (world order gate, Double DQN, Snake rules, random agent, scripted snake);
+  - 3 wiring tasks (PL-01, PL-04, PL-05);
+  - 1 later upgrade (replay controls);
+  - 2 system tasks that run the golden cases on the real chain.
+- **Shape:** the critical path is 5 tasks (T01 → FileRunDir → run folder → wire PL-01 → PL-01 system). The widest wave has 15 tasks running at once. Reviews come after T01 (nothing builds on it until it&#x27;s reviewed), after T22, and at the milestone exit.
+- **Other files:** `tasks/todo.md` with 24 unchecked lines, and `AGENTS.md` with the doc map and the two project skills.
+
+**Checks:** `dt lint` gives 0 errors. Coverage, steps, build modes, unfrozen boundaries and routing all come back empty in `dt status`. `dt ready` lists only M1-T01. Every task&#x27;s context packet resolves, and the largest is T01&#x27;s at 418 lines.
+
+**Changes from what you approved**
+1. **M1&#x27;s Exit no longer names TC-18 and TC-19.** They belong to PL-02, which isn&#x27;t one of M1&#x27;s pipelines, so `dt` rejects them in the Exit. They&#x27;re still M1&#x27;s work: TC-18 is on M1-T13 and TC-19 on M1-T24. The Exit now says &quot;the random and scripted snakes pass their PL-02 cases.&quot;
+2. **M2 now lists PL-01 among its pipelines.** The stage&#x27;s bar, TC-33, is a PL-01 case, and M2 may have to tune the DQN to beat the scripted snake.
+3. **M4 now lists PL-02.** It extends the scripted policies to the predator and prey, and its Exit uses TC-21.
+
+**Assumptions**
+- **What T01 freezes:** every contract boundary, including later milestones&#x27; (Comparison, compare, Chart, PpoLearner, TankState, PreyState). In a single package, `dt` requires all of them in M1.
+- **The `--smoke` switch:** in `__main__.py`, `--smoke` sets `RLLAB_SMOKE` (2,000-step budget), sets `RLLAB_RUNS` to a temp folder, and picks SDL&#x27;s dummy video driver so tests can run the viewer without a screen. The PL-04 and PL-05 smoke tests write their own run folder or recording from fixtures.
+- **Merged tasks:** `train_world` is built by the PL-01 wiring, since it only routes snake to the DQN. `worlds.decode` is built with the Snake rules. `new_run` and `open_run` share one task, as do `Recording.save` and `load`.
+- **Golden cases moved to the system tasks:** TC-29, TC-31 and TC-32 (on M1-T23), and TC-19, TC-37 and TC-38 (on M1-T24). Each needs the real world, scorer or recorder, not a stand-in.
+- **Tasks that must wait:**
+  - `new_run`/`open_run` must wait for FileRunDir, because they construct it.
+  - `record_saved` must wait for `Recording.save`.
+  - The wiring and system tasks wait for the steps their smoke runs use.
+  - Every other edge is covered by T01&#x27;s fakes, replay doubles and samples, so those tasks run side by side.
+- **Placeholder behaviour until later milestones:** in M1, `may_start` builds only the DONE-02 order; the DONE-04 tank5 check comes in M3. Tank and prey world names raise errors naming M3 or M4 until those milestones add them.
+- **One remaining lint warning:** a `task-step` warning on M1-T16. The step&#x27;s name, `Recording.load`, contains a dot, which `dt`&#x27;s lint doesn&#x27;t parse; the coverage check (`steps_unplanned`) does read it, so nothing is missing.
+
+**Open questions**
+- **`dataviz` isn&#x27;t installed,** though it&#x27;s listed on S1–S3. It doesn&#x27;t block M1, but M2&#x27;s learning-curve chart needs it or a replacement.
+- **The `null-hypothesis-testing` skill is a placeholder.** M2&#x27;s comparisons need a real test and correction.
+
+**Deferred**
+- **To M3:** the tank and PPO steps (`train_ppo`, `ppo_learner`, `ClippedPPO`, `TankEnv`), TANK-01–09, LEARN-05, DONE-04, REPLAY-04 (sight circles) and QR-04 (30 fps on a fish replay).
+- **To M2:** QR-01 (TC-33 times the hour-long run) and QR-02 (applies only if that run misses the hour).
+
+Approve, or tell me what to change.</pre></details></div><div class="step" id="SD336"><span class="sid">D336</span><span class="kind">hook</span><span class="hook">Stop said: {&quot;systemMessage&quot;: &quot;dt lint: 5 problems\ndocs/roadmap.md:22: roadmap-skill S1 Skills names dataviz: not installed (.claude/skills or the plugin)\ndocs/roadmap.md:26: roadmap-skill S2 Skills names dataviz: not installed (.claude/skills or the plugin)\ndocs/roadmap.md:30: roadmap-skill S3 Skills names dataviz: not installed (.claude/skills or the plugin)\ndocs/roadmap.md:41: roadmap-skill M2 Skills names dataviz: not installed (.claude/skills or the plugin)\ntasks/plan.md:152: task-step M1-T16 Step PL-05.Recording: no step `Recording` in PL-05&#x27;s table&quot;}
+</span></div><div class="step" id="SD337"><span class="sid">D337</span><span class="kind">hook</span><span class="hook">SessionStart:resume said: milestone: M1 Train and watch a snake · plan Draft
+progress: 0/24 · next: M1-T01 M1 interface
+blocked: none
+draft (waiting for approval): tasks/plan.md
+dt: /Users/connorott/plugins/dev-team-workspace/iteration-11/rl-all-at-once/with_skill/plugin/dev-team/scripts/dt
+</span></div>
+<h2>Commits</h2>
+<p>None.</p>
+<h2>Returned</h2>
+<pre>The M1 plan is written as a Draft and passes the review checks. It needs your approval or changes.
+
+**What was written**
+- **Roadmap (the cut):** M1 Train and watch a snake and M2 Judge and sign off the snake (both S1), M3 Fish tank (S2), M4 Predator and prey (S3). Each has an outline and an Exit; `dt roadmap` now shows S1 and M1 as Planned. Only M1 has a plan.
+- **`tasks/plan.md`:** 24 tasks:
+  - 1 interface task (M1-T01);
+  - 17 step tasks: 11 basic first versions (&quot;spines&quot;) and 6 that also take their golden cases (world order gate, Double DQN, Snake rules, random agent, scripted snake);
+  - 3 wiring tasks (PL-01, PL-04, PL-05);
+  - 1 later upgrade (replay controls);
+  - 2 system tasks that run the golden cases on the real chain.
+- **Shape:** the critical path is 5 tasks (T01 → FileRunDir → run folder → wire PL-01 → PL-01 system). The widest wave has 15 tasks running at once. Reviews come after T01 (nothing builds on it until it&#x27;s reviewed), after T22, and at the milestone exit.
+- **Other files:** `tasks/todo.md` with 24 unchecked lines, and `AGENTS.md` with the doc map and the two project skills.
+
+**Checks:** `dt lint` gives 0 errors. Coverage, steps, build modes, unfrozen boundaries and routing all come back empty in `dt status`. `dt ready` lists only M1-T01. Every task&#x27;s context packet resolves, and the largest is T01&#x27;s at 418 lines.
+
+**Changes from what you approved**
+1. **M1&#x27;s Exit no longer names TC-18 and TC-19.** They belong to PL-02, which isn&#x27;t one of M1&#x27;s pipelines, so `dt` rejects them in the Exit. They&#x27;re still M1&#x27;s work: TC-18 is on M1-T13 and TC-19 on M1-T24. The Exit now says &quot;the random and scripted snakes pass their PL-02 cases.&quot;
+2. **M2 now lists PL-01 among its pipelines.** The stage&#x27;s bar, TC-33, is a PL-01 case, and M2 may have to tune the DQN to beat the scripted snake.
+3. **M4 now lists PL-02.** It extends the scripted policies to the predator and prey, and its Exit uses TC-21.
+
+**Assumptions**
+- **What T01 freezes:** every contract boundary, including later milestones&#x27; (Comparison, compare, Chart, PpoLearner, TankState, PreyState). In a single package, `dt` requires all of them in M1.
+- **The `--smoke` switch:** in `__main__.py`, `--smoke` sets `RLLAB_SMOKE` (2,000-step budget), sets `RLLAB_RUNS` to a temp folder, and picks SDL&#x27;s dummy video driver so tests can run the viewer without a screen. The PL-04 and PL-05 smoke tests write their own run folder or recording from fixtures.
+- **Merged tasks:** `train_world` is built by the PL-01 wiring, since it only routes snake to the DQN. `worlds.decode` is built with the Snake rules. `new_run` and `open_run` share one task, as do `Recording.save` and `load`.
+- **Golden cases moved to the system tasks:** TC-29, TC-31 and TC-32 (on M1-T23), and TC-19, TC-37 and TC-38 (on M1-T24). Each needs the real world, scorer or recorder, not a stand-in.
+- **Tasks that must wait:**
+  - `new_run`/`open_run` must wait for FileRunDir, because they construct it.
+  - `record_saved` must wait for `Recording.save`.
+  - The wiring and system tasks wait for the steps their smoke runs use.
+  - Every other edge is covered by T01&#x27;s fakes, replay doubles and samples, so those tasks run side by side.
+- **Placeholder behaviour until later milestones:** in M1, `may_start` builds only the DONE-02 order; the DONE-04 tank5 check comes in M3. Tank and prey world names raise errors naming M3 or M4 until those milestones add them.
+- **One remaining lint warning:** a `task-step` warning on M1-T16. The step&#x27;s name, `Recording.load`, contains a dot, which `dt`&#x27;s lint doesn&#x27;t parse; the coverage check (`steps_unplanned`) does read it, so nothing is missing.
+
+**Open questions**
+- **`dataviz` isn&#x27;t installed,** though it&#x27;s listed on S1–S3. It doesn&#x27;t block M1, but M2&#x27;s learning-curve chart needs it or a replacement.
+- **The `null-hypothesis-testing` skill is a placeholder.** M2&#x27;s comparisons need a real test and correction.
+
+**Deferred**
+- **To M3:** the tank and PPO steps (`train_ppo`, `ppo_learner`, `ClippedPPO`, `TankEnv`), TANK-01–09, LEARN-05, DONE-04, REPLAY-04 (sight circles) and QR-04 (30 fps on a fish replay).
+- **To M2:** QR-01 (TC-33 times the hour-long run) and QR-02 (applies only if that run misses the hour).
+
+Approve, or tell me what to change.</pre>
+</body></html>

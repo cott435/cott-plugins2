@@ -1,0 +1,684 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1"><title>T20 turn</title>
+<style>
+:root{--bg:#fbfbfa;--fg:#1d1d1f;--muted:#6b6b70;--line:#d9d9de;--box:#fff;--rowp:#eef3fb;--band:#fff4d6;
+--ok:#2e7d32;--bad:#c62828;--warn:#b26a00;--idle:#6b6b70}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#17171a;--fg:#ececf0;--muted:#9a9aa3;
+--line:#34343a;--box:#222227;--rowp:#1d2433;--band:#3a3015;--ok:#6fcf73;--bad:#ff6b6b;--warn:#f0b35a;--idle:#9a9aa3}}
+:root[data-theme="dark"]{--bg:#17171a;--fg:#ececf0;--muted:#9a9aa3;--line:#34343a;--box:#222227;--rowp:#1d2433;
+--band:#3a3015;--ok:#6fcf73;--bad:#ff6b6b;--warn:#f0b35a;--idle:#9a9aa3}
+body{margin:0;padding:16px;background:var(--bg);color:var(--fg);font:14px/1.45 -apple-system,system-ui,sans-serif}
+h1{font-size:18px;margin:0 0 4px}h2{font-size:15px;margin:22px 0 8px}.sub{color:var(--muted)}
+table{border-collapse:collapse;margin:4px 0 8px}td,th{border-bottom:1px solid var(--line);padding:4px 10px;text-align:left;
+vertical-align:top}th{color:var(--muted);font-weight:600}.chips span{display:inline-block;margin:0 4px 2px 0}
+.legend span{margin-right:14px;white-space:nowrap}.sw{display:inline-block;width:10px;height:10px;border-radius:2px;
+margin-right:4px;vertical-align:-1px}.scroll{overflow:auto;max-height:88vh;border:1px solid var(--line);border-radius:8px}
+.chart{display:grid;width:max-content}.chart>div{line-height:0}.corner{position:sticky;top:0;left:0;z-index:3}
+.colhead{position:sticky;top:0;z-index:2}.rowhead{position:sticky;left:0;z-index:2}
+svg.bg{background:var(--bg)}.colhead svg{border-bottom:1px solid var(--line)}.rowhead svg{border-right:1px solid var(--line)}
+.ok{color:var(--ok);fill:var(--ok)}.bad{color:var(--bad);fill:var(--bad)}.warn{color:var(--warn);fill:var(--warn)}
+.idle{color:var(--idle);fill:var(--idle)}
+svg text{fill:var(--fg);font-family:-apple-system,system-ui,sans-serif}
+.box{fill:var(--box);stroke:var(--line)}.unit:hover .box{stroke:var(--fg)}
+.role{font-size:12px;font-weight:600}.uid,.wmeta,.lmeta,.meta{font-size:10px;fill:var(--muted)}
+.sub{font-size:10.5px;fill:var(--muted)}.badge{font-size:11px;font-weight:600}
+.meta.bad{fill:var(--bad);font-weight:600}.lane{font-size:13px;font-weight:700}.wave{font-size:13px;font-weight:700}
+.par{fill:#4e79a7}.ser{fill:var(--muted)}.rowp{fill:var(--rowp)}.rows{fill:transparent}.band{fill:var(--band)}
+.bandt{font-size:11.5px}.grid{stroke:var(--line)}.link{stroke:var(--muted);stroke-width:1.2;opacity:.55}
+.arrowhead{fill:var(--muted)}.marks{font-size:10.5px}.audit{stroke:var(--box);stroke-width:2}.auditn{font-size:10px;font-weight:700;fill:#fff}
+a{color:inherit}svg a .box{cursor:pointer}
+
+:root{--c0:#2a78d6;--c1:#eb6834;--c2:#1baf7a;--c3:#eda100;--c4:#e87ba4;--c5:#008300;--c6:#6250d6;--c7:#e34948;
+--cx:#8a8985;--main:#52514e;--read:#dcdbd5;--readfg:#1d1d1f}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--c0:#3987e5;--c1:#d95926;--c2:#199e70;
+--c3:#c98500;--c4:#d55181;--c5:#008300;--c6:#9085e9;--c7:#e66767;--cx:#77766f;--main:#c3c2b7;--read:#3b3b40;
+--readfg:#ececf0}}
+:root[data-theme="dark"]{--c0:#3987e5;--c1:#d95926;--c2:#199e70;--c3:#c98500;--c4:#d55181;--c5:#008300;
+--c6:#9085e9;--c7:#e66767;--cx:#77766f;--main:#c3c2b7;--read:#3b3b40;--readfg:#ececf0}
+.c0{fill:var(--c0);background:var(--c0)}.c1{fill:var(--c1);background:var(--c1)}.c2{fill:var(--c2);background:var(--c2)}
+.c3{fill:var(--c3);background:var(--c3)}.c4{fill:var(--c4);background:var(--c4)}.c5{fill:var(--c5);background:var(--c5)}
+.c6{fill:var(--c6);background:var(--c6)}.c7{fill:var(--c7);background:var(--c7)}.cx{fill:var(--cx);background:var(--cx)}
+.cmain{fill:var(--main)}.sc0{stroke:var(--c0)}.sc1{stroke:var(--c1)}.sc2{stroke:var(--c2)}
+.tl text,.sm text,.lc text{font-size:10.5px;fill:var(--muted)}.tl .lbl-in,.sm .lbl-in{fill:#fff;font-size:10.5px;font-weight:600}
+.tl .rowl,.sm .rowl,.lc .rowl{fill:var(--fg);font-size:11.5px;font-weight:600}.tl .band{fill:var(--rowp)}
+.tl .brk{stroke:var(--muted);stroke-dasharray:2 3}.tl a:hover rect,.sm a:hover rect{stroke:var(--fg);stroke-width:1.5}
+.axis{stroke:var(--line)}.sm .val{fill:var(--fg);font-weight:600}.lc path.ln{fill:none;stroke-width:2}
+.lc circle{stroke:var(--bg);stroke-width:2}.lc .end{font-weight:600;fill:var(--fg)}
+.tiles{display:flex;flex-wrap:wrap;gap:10px;margin:12px 0}.tile{border:1px solid var(--line);border-radius:8px;
+padding:8px 12px;min-width:110px;background:var(--box)}.tile b{display:block;font-size:20px;line-height:1.2}
+.tile span{font-size:12px;color:var(--muted)}.tile i{font-style:normal;font-size:12px;margin-left:6px}
+.fm{border-collapse:separate;border-spacing:2px}.fm td,.fm th{border:0;padding:0;text-align:center;font-size:11px}
+.fm th{padding:0 2px;font-weight:600}.fm td.f,.fm th.f{text-align:left;padding-right:10px;white-space:nowrap;
+position:sticky;left:0;background:var(--bg);font:11.5px ui-monospace,Menlo,monospace;
+max-width:380px;overflow:hidden;text-overflow:ellipsis}
+.fm td.cell{min-width:22px;height:20px;border-radius:3px}.fm td.fw{background:var(--c0);color:#fff;font-weight:700}
+.fm td.fe{background:var(--c1);color:#fff;font-weight:700}.fm td.fr{background:var(--read);color:var(--readfg)}
+.fm td.n{color:var(--muted);padding:0 6px}.fm tr.grp td{text-align:left;padding-top:8px;color:var(--muted);
+font-weight:600}
+.key{display:inline-block;min-width:18px;text-align:center;border-radius:3px;font-size:11px;margin-right:4px}
+.bar{display:inline-block;height:9px;border-radius:2px;vertical-align:0}
+
+pre{white-space:pre-wrap;word-break:break-word;background:var(--box);border:1px solid var(--line);border-radius:6px;
+padding:8px 10px;margin:4px 0;font:12px/1.45 ui-monospace,SFMono-Regular,Menlo,monospace;max-width:100%;overflow:auto}
+.step{border-top:1px solid var(--line);padding:6px 0}.step:target{background:var(--rowp)}
+.sid{font:12px ui-monospace,Menlo,monospace;color:var(--muted);margin-right:8px}.kind{font-weight:600;margin-right:8px}
+.err{color:var(--bad);font-weight:600}.hook{color:var(--bad);margin:4px 0 0 16px}.lbl{font-size:12px;color:var(--muted);margin-top:6px}
+details summary{cursor:pointer;color:var(--muted);font-size:12px}.head td:first-child{color:var(--muted)}
+.top{font-size:13px}.narr{list-style:none;padding-left:0}.narr li{margin:3px 0}
+</style></head>
+<body>
+<p class="top"><a href="../flow.html">← the run's flow chart</a></p>
+<p class="top"><a href="../plan/T18.html">The plan as of T20</a>: unchanged since T18 · <a href="../plan/index.html">plan map</a></p>
+<h1>T20 · turn · /dev-team:build-planning Continue.</h1>
+<table class="head"><tr><td>Type</td><td>turn</td></tr><tr><td>Description</td><td>/dev-team:build-planning Continue.</td></tr><tr><td>Spawned by</td><td>user</td></tr><tr><td>Model</td><td>claude-opus-5-5</td></tr><tr><td>Start</td><td>2026-10-19 02:59:28 UTC</td></tr><tr><td>Duration</td><td>1 min</td></tr><tr><td>Tool calls</td><td>11</td></tr><tr><td>Errors</td><td>1</td></tr><tr><td>Hook blocks</td><td>0</td></tr><tr><td>Tokens</td><td>3.1k out · 39.1k new in · 527k cached in · peak context 63.6k</td></tr><tr><td>Skills invoked</td><td>dev-team:architecture-design</td></tr><tr><td>Files written or edited</td><td>none</td></tr><tr><td>Definition</td><td>none</td></tr><tr><td>Steps</td><td>17</td></tr><tr><td>Finished</td><td>yes</td></tr></table>
+
+
+<h2>Prompt</h2>
+<pre>/dev-team:build-planning Continue.</pre>
+<h2>Files</h2>
+<table><tr><th>Op</th><th>File</th><th>Calls</th><th>By</th><th>Via</th><th>Steps</th></tr><tr><td>read</td><td><code>../plugin/dev-team/skills/architecture-design/references/grow.md</code></td><td>1</td><td>main</td><td>Bash</td><td><a href="#D286">D286</a></td></tr><tr><td>read</td><td><code>../plugin/dev-team/skills/build-planning/SKILL.md</code></td><td>1</td><td>main</td><td>Bash</td><td><a href="#D275">D275</a></td></tr><tr><td>read</td><td><code>../plugin/dev-team/skills/build-planning/references/cut.md</code></td><td>1</td><td>main</td><td>Bash</td><td><a href="#D276">D276</a></td></tr><tr><td>read</td><td><code>../plugin/dev-team/skills/build-planning/references/new.md</code></td><td>1</td><td>main</td><td>Bash</td><td><a href="#D275">D275</a></td></tr><tr><td>read</td><td><code>../plugin/dev-team/skills/build-planning/references/phase0.md</code></td><td>1</td><td>main</td><td>Bash</td><td><a href="#D276">D276</a></td></tr><tr><td>read</td><td><code>../plugin/dev-team/skills/build-planning/references/tasks.md</code></td><td>1</td><td>main</td><td>Bash</td><td><a href="#D276">D276</a></td></tr><tr><td>read</td><td><code>AGENTS.md</code></td><td>1</td><td>main</td><td>Bash</td><td><a href="#D277">D277</a></td></tr><tr><td>read</td><td><code>CLAUDE.md</code></td><td>1</td><td>main</td><td>Bash</td><td><a href="#D277">D277</a></td></tr><tr><td>read</td><td><code>docs/architecture.md</code></td><td>1</td><td>main</td><td>Bash</td><td><a href="#D279">D279</a></td></tr><tr><td>read</td><td><code>docs/requests.md</code></td><td>1</td><td>main</td><td>Bash</td><td><a href="#D278">D278</a></td></tr><tr><td>read</td><td><code>docs/roadmap.md</code></td><td>1</td><td>main</td><td>Bash</td><td><a href="#D277">D277</a></td></tr><tr><td>read</td><td><code>docs/routes.md</code></td><td>1</td><td>main</td><td>Bash</td><td><a href="#D278">D278</a></td></tr></table>
+<h2>Steps</h2>
+<div class="step" id="SD272"><span class="sid">D272</span><span class="kind">command</span>USER TYPED `/dev-team:build-planning Continue.`</div><div class="step" id="SD273"><span class="sid">D273</span><span class="kind">skill-body</span>skill loaded from `/Users/connorott/plugins/dev-team-workspace/iteration-11/rl-all-at-once/with_skill/plugin/dev-team/skills/build-planning`</div><div class="step" id="SD274"><span class="sid">D274</span><span class="kind">Bash</span>python3 ../plugin/dev-team/scripts/dt.py status --skill build-planning 2&gt;&amp;1 | head -100; ls ../plugin/dev-team/skills/build-planning/references<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;python3 ../plugin/dev-team/scripts/dt.py status --skill build-planning 2&gt;&amp;1 | head -100; ls ../plugin/dev-team/skills/build-planning/references&quot;
+}</pre><div class="lbl">output</div><pre>skill: build-planning
+mode: new
+docs: brief Accepted · spec Approved · architecture Approved (Single package) · roadmap stale (run dt roadmap) · plan missing · constraints missing
+next ids: AD-19 PL-09 TC-45 S4 M1
+references_unindexed: none
+references_changed: none
+references_missing: none
+milestone: none
+progress: 0/0
+next_task: none
+blocked_tasks: none
+uncovered: none
+no_spine: none
+steps_unplanned: none
+mode_violations: none
+boundaries_unfrozen: none
+draft_pipelines: none
+changed_since_plan: none
+interfaces_changed: none
+probes_blocking: none
+stage_to_cut: S1 Snake
+pipelines_inferred: PL-01, PL-02, PL-03, PL-04, PL-05, PL-06, PL-07, PL-08
+milestone_references: none
+milestone_skills: null-hypothesis-testing, dataviz
+references_unrouted: none
+skills_unrouted: none
+stage_unrouted: none
+skills_missing: dataviz
+skills_available: null-hypothesis-testing
+grow_triggers: rllab: 8 pipelines &gt; 3
+grow_held: none
+drift: none
+stale_contracts: none
+queued: none
+base: pending
+critical_path: none
+waves: none
+width: 0
+parallelism: 0.0
+graph_warning: none
+requests_open: none
+advance.md
+cut.md
+examples-advance.md
+examples-cut.md
+examples-foreign.md
+examples-new.md
+examples-phase0.md
+examples-replan.md
+examples-routing.md
+extend.md
+new.md
+phase0.md
+replan.md
+tasks.md</pre></details></div><div class="step" id="SD275"><span class="sid">D275</span><span class="kind">Bash</span>cd /Users/connorott/plugins/dev-team-workspace/iteration-11/rl-all-at-once/with_skill/plugin/dev-team/skills/build-planning &amp;&amp; cat references/new.md; echo ======; cat SKILL.md | wc -l; ls; <span class="err">error</span><details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;cd /Users/connorott/plugins/dev-team-workspace/iteration-11/rl-all-at-once/with_skill/plugin/dev-team/skills/build-planning &amp;&amp; cat references/new.md; echo ======; cat SKILL.md | wc -l; ls; &quot;
+}</pre><div class="lbl">output</div><pre>Exit code 1
+# New
+
+`dt status` says `new`: no active or archived plan, and the roadmap has stages. Cut every designed stage, plan M1 and its todo, and write the AGENTS.md doc map. Example: `examples-new.md`.
+
+1. **Every stage designed first.** When the stages come from the brief (Source `brief`, planned up front), a stage below Designed stops New: `dt status` reports `blocked`, naming each stage&#x27;s gap: packages with no Approved `pipelines.md`, or spec IDs on no step (a QR- limit included). Route to `pipeline-design`, or the first upstream skill whose doc isn&#x27;t Approved.
+2. **Grow check, cut the stage, scope the milestone:** `cut.md`. Up front, cut every designed stage, not only the first.
+3. **Milestone shape** (interface task, one spine per step, wiring per pipeline, system task, folds): `phase0.md`.
+4. **Thicken, route skills and references, build modes, checkpoints, `Writes:`, the dependency graph, write:** `tasks.md`.
+5. **The AGENTS.md doc map** (below).
+6. Run the Review Gate.
+
+## AGENTS.md doc map
+
+`## Docs` and `## Project skills`, ≤ 25 lines, no script paths (the session-start hook supplies them). Replace only these two sections; leave every other section of the file alone. If the repo has `CLAUDE.md` and no `AGENTS.md`, write them there.
+
+```markdown
+## Docs
+- Plan with dev-team2&#x27;s `build-planning`, not agent-skills&#x27; `/plan`.
+- Your task&#x27;s context: `dt context &lt;M#-T##&gt;`. Read only what it prints.
+- Any section by ID: `dt section &lt;ID&gt;...` (e.g. PL-02 TC-02 STAT-02 AD-03)
+- Package docs: `docs/packages/&lt;pkg&gt;/{architecture,contract,pipelines,tests}.md`
+- Real layout: `dt layout &lt;pkg&gt;` (planned layouts are gone once the wiring lands)
+- Quality bar: CONSTRAINTS.md. Oracle files (tests/fixtures/*/expected.json) need user approval to change.
+## Project skills
+- data-science — stats steps
+```
+
+Use real IDs from the project in the `dt section` example. List each project skill with the steps it&#x27;s routed to.
+(eval):1: ===== not found</pre></details></div><div class="step" id="SD276"><span class="sid">D276</span><span class="kind">Bash</span>cd /Users/connorott/plugins/dev-team-workspace/iteration-11/rl-all-at-once/with_skill/plugin/dev-team/skills/build-planning &amp;&amp; cat references/cut.md references/phase0.md references/tasks.md<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;cd /Users/connorott/plugins/dev-team-workspace/iteration-11/rl-all-at-once/with_skill/plugin/dev-team/skills/build-planning &amp;&amp; cat references/cut.md references/phase0.md references/tasks.md&quot;
+}</pre><div class="lbl">output</div><pre># Grow check, cutting a stage, scoping a milestone
+
+Read before planning a milestone, before any task is written. Example: `examples-cut.md` (a large stage cut into slices).
+
+Read only `dt status`, the roadmap, the packages&#x27; `pipelines.md`, `contract.md` headings and `tests.md`, the spec sections they cover, the skill list and the `milestone_references` entries.
+
+## 1. Grow check
+
+Before planning, check the Grow triggers. `grow_triggers` lists the measurable ones (&gt; 3 pipelines, &gt; 12 modules, package docs &gt; 2,000 lines). Check the others yourself:
+- The milestone brings a dependency stack the rest shouldn&#x27;t carry (torch, CUDA).
+- A part runs or deploys on its own (a paper-trading service).
+
+If one fires and no `AD-NN` already records the decision to stay single, **stop** and route to `architecture-design` Grow. Plan after Grow, pipeline-design Grow and build-setup Extend have caught up.
+
+## 2. Cut the stage into milestones
+
+When `stage_to_cut` names a stage, its pipelines are `pipelines_inferred`: the ones covering the stage&#x27;s spec IDs. When the brief lists every stage, each stage&#x27;s Source is `brief` and the spec&#x27;s only Changelog row says IDs `all`, so `dt` can&#x27;t tell which pipelines belong to which stage and `pipelines_inferred` comes back empty: assign each approved pipeline to the stage whose outcome it delivers, by its Covers.
+
+- **Order by dependency.** Which pipeline needs another&#x27;s outputs? A consumer needs its provider&#x27;s *interface*, not its finished build: a boundary the interface task freezes lets both sides build in the same milestone.
+- **The first milestone is a walking skeleton:** the thinnest end-to-end path through every package the stage touches, one pipeline per package at spine version, joined across each boundary, so the user can run it end to end.
+- **Each later milestone is a vertical slice:** it adds a capability the user can run end to end (categories, transfers, the review screen), thickening the skeleton. Never a horizontal layer (&quot;all of the relay&quot;, &quot;every model&quot;), which can&#x27;t run on its own, and never a leftover of what didn&#x27;t fit: viewers, reference checks and write-ups go in the milestone that builds what they show, and that milestone&#x27;s exit holds the stage&#x27;s quality bar (the snake beats both baselines).
+- **Cut along dependency lines,** only where a later milestone needs an earlier one&#x27;s outputs, and name them in the row&#x27;s `Depends`: `M1 (profile.Profile, PL-01 output)`. Depends lists only the milestones whose outputs this one needs, never a build order or a note naming another milestone: `dt` reads every `M&lt;n&gt;` in the cell as an edge. Independent tracks stay in one milestone as parallel waves: one milestone is active at a time, so splitting them only serializes them.
+- **Size each one** against the cap (step 3): a critical path of at most about 15 tasks. Cut until each fits; fewer, larger milestones beat many thin ones. A stage that fits one milestone gets one.
+- **Every pipeline lands** in the milestone that first wires it; a later slice that thickens it lists it again. Every spec ID of the stage lands in a milestone or is Deferred later.
+
+Write each milestone, IDs from `dt next-id M` (write the row before asking again). If the roadmap has no milestone table, add it under the stage table:
+
+```markdown
+| Milestone | Stage | Name | Packages | Pipelines | Depends | Status* |
+|---|---|---|---|---|---|---|
+| M1 | S1 | Walking skeleton | relay, core, app | PL-01, PL-08, PL-15 | — | |
+| M2 | S1 | Categories | core, app | PL-09, PL-21 | M1 (core.Transaction, PL-08 output) | |
+
+## M1: Walking skeleton
+**Outline:** One linked account syncs through the relay and its transactions list in the app.
+```
+
+When a stage gets more than one milestone, give each section a `**Skills:**` and a `**References:**` line from the stage&#x27;s (`milestone_skills`, `milestone_references`); every stage skill and reference lands on at least one milestone (`stage_unrouted` empty). A single milestone inherits its stage&#x27;s. Then `dt roadmap` (the stage → Split). The cut is presented with the first plan at the gate; until a milestone is Planned, its row may be re-cut, and a dropped row becomes a retired line whose ID is never reused.
+
+## 3. Scope the milestone
+
+From the milestone row and the pipelines: the spec IDs, packages, pipelines and exit criteria. A milestone row from before stages may still have Packages or Pipelines `—`; `dt` then infers them as `pipelines_inferred`: confirm them and write them into the row.
+
+**Size is the critical path:** the longest `Depends on` chain, interface and system tasks included, at most about 15 (`dt status` `critical_path`; `dt lint` errors `milestone-size` above 15). Tasks that don&#x27;t depend on each other don&#x27;t add up, so independent tracks (relay beside core, meter readings beside weather) stay in one milestone, whatever the plan&#x27;s total. Over the cap: mitigate an edge with an interface, fold (`phase0.md`), or re-cut the stage (step 2) along a dependency line. A single task belongs in an existing milestone.
+
+Every spec ID the milestone&#x27;s pipelines cover lands on a task or under `**Deferred:**` with a target and reason (`RES-07 (to M4: needs day-ahead forecasts)`), and so does every step of those pipelines that gets no task, by name (`PL-03.PPOAgent (to M3: fish need it first)`). Check each pipeline&#x27;s step table row by row, rows a later stage&#x27;s design added included (a library call such as `PL-07.daily_bars`). `uncovered` and `steps_unplanned` must end empty.
+# Milestone shape: interface, step spines, wiring, system
+
+Read when writing a milestone&#x27;s tasks. Examples: `examples-phase0.md`.
+
+A milestone is planned from its pipelines&#x27; steps: each step has one owner, one module and typed `In → Out`, so it is the unit of work. The plan freezes every boundary between steps first, so the work on both sides starts at once instead of queueing behind one spine. Every task carries `**Kind:**`:
+
+```
+## Phase 0: Interface              interface (solo, first)       types, signatures, samples, fakes, exports, __main__
+## Phase 1: Step spines            spine, one per step           each writes its owner module only
+## Phase 2: Wiring and thicken     wiring, one per pipeline      its entry module, smoke test
+                                   thicken (tasks.md)            each after its step&#x27;s spine
+## Phase 3: System                 system (solo, last)           fakes swapped for real providers
+```
+
+Phases name the usual waves; the dependency graph (`tasks.md` step 9) decides what may start. Tester halves of split tasks start right after the interface.
+
+**a. Interface task** (`**Kind:** interface`, `**Step:** contract`, solo, `**Depends on:** —`). It freezes, as code, every boundary in the milestone whose two sides belong to different tasks:
+- each contract `type` section named in a milestone step&#x27;s `In → Out`, every one, since the step&#x27;s signature needs it, written into its owner&#x27;s `types.py`, with a schema (pandera for a frame, JSON Schema across runtimes) and one sample per case in `tests/contracts/&lt;component&gt;.&lt;Type&gt;/`. A case naming a probe sample (`PB-01 samples/sync_added.json#0`) puts `PB-01:samples` in `Read:`; the task derives the type&#x27;s sample from it, never copies it
+- each new step&#x27;s signature in its owner module, its body `raise NotImplementedError(&quot;&lt;task id&gt;&quot;)` naming the task that replaces it (Fakes and stubs)
+- for each function another pipeline or package calls (its `**Boundary:**` line names that consumer): a fixture-backed fake serving its fixtures, where the caller&#x27;s tests load it, and its contract&#x27;s cases as one test that takes the provider
+- for each object with behavior a step passes (a Protocol or class: `core.Dataset`, `runstore.RunWriter`) and each call to a function another task builds in the caller&#x27;s own pipeline and package (a `**Boundary:**` line naming a component too): the Protocol or signature plus a fixture-backed replay double in `tests/contracts/&lt;component&gt;.&lt;Type&gt;/`. The double is that type&#x27;s sample, not a fake: the system task never swaps it
+- each component&#x27;s `__init__.py` exports, and the package&#x27;s `__main__.py`: the dispatch from each pipeline&#x27;s trigger to its entry function, whose signature it stubs naming the wiring task, in that pipeline&#x27;s own entry module
+
+Not frozen: helpers, private functions, anything one task owns end to end, and boundaries an earlier milestone froze. `Read:` the type and boundary symbols. Acceptance: every sample validates against its type; every signature imports and matches the contract; each fake passes its contract&#x27;s cases, and each replay double serves its fixtures. A human approval a requirement places before several steps (a design direction) is asked during planning or is this task&#x27;s acceptance (&quot;direction approved; `design.Theme` sample written&quot;); those steps build on the sample, with no edge to the step that sets it. `Writes:` each component folder as one glob (`src/gridload/profile/**`) plus its contract folders; `task-size` doesn&#x27;t count them. A milestone across packages may have one interface task per provider, all solo and first; interface tasks never depend on each other. When one runtime&#x27;s types are generated from another&#x27;s schema, the providing interface task runs the generator and writes the generated file too (its `Writes:` claims it).
+
+**b. Step spines** (`**Kind:** spine`, `**Step:** PL-NN.&lt;function&gt;`, solo, XS or S). One per new step, library class rows included, each depending only on the interface task: it replaces the stub naming it with the step&#x27;s spine version from the step table. `Writes:` its owner module, or its owner folder as one glob (`src/leaflab/core/train/**`), and its unit test, nothing else; steps sharing one module share one spine task. A provider waiting on a probe gets no spine: its stand-in row (`pipeline-design`&#x27;s `steps.md`) is built instead, and the real spine goes in the milestone the probe&#x27;s Answer unblocks. Acceptance: the step&#x27;s input sample gives a schema-valid output; the signature is unchanged. A step another pipeline provides (`PL-01 as built`) gets no spine.
+
+**c. Wiring** (`**Kind:** wiring`, `**Step:** PL-NN`, solo). One per new pipeline: the entry function in the pipeline&#x27;s own entry module (the layout&#x27;s, never one module shared by several pipelines), so wiring tasks run side by side, and its smoke test. `__main__.py` is the interface task&#x27;s. It depends on its pipeline&#x27;s spines, since the smoke runs them (`order`, `none: integration: …`), never on their thicken tasks. A call to another pipeline or package runs against that boundary&#x27;s fake, so wiring PL-02 never waits for PL-01. Acceptance: the smoke command runs end to end and is committed as the pipeline&#x27;s smoke test, which checks that the pipeline runs and the shape of what it writes, never a value a thicken changes. `dt prebuild-clear` replaces the pipeline&#x27;s pre-build sections once the wiring lands; that is dt&#x27;s step, not an acceptance bullet.
+
+**d. System task** (`**Kind:** system`, solo, last). It swaps each fake for the real provider, in the entry its wiring wrote (a `file` edge), and runs every smoke command and the milestone&#x27;s golden cases on the real chain. Its `Writes:` name each fake&#x27;s conformance test (`tests/unit/&lt;pkg&gt;/test_&lt;symbol&gt;_conformance.py`), and its acceptance reads &quot;each fake&#x27;s contract cases pass on the real provider&quot;. Its row to the provider&#x27;s wiring is `order` · `none: integration: swaps in the real &lt;provider&gt;`. System tasks never depend on each other: each builds its golden-case stores from fixtures, and a case that needs another system pipeline&#x27;s real output joins that pipeline&#x27;s system task. Multi-package: one per new system pipeline, `**Step:**` that pipeline, `**Package:**` the owner of its first step, `**Reason:** system task`. Single package: `**Step:**` the calling pipeline. A golden case that needs real collaborators (a thickened step, a class&#x27;s real upgrade) is the system task&#x27;s acceptance, never the wiring&#x27;s, so wiring depends only on its pipeline&#x27;s spines and fold tasks. A milestone with no fake and no such case has no system task.
+
+**Folds** keep the task count down. The pipeline&#x27;s wiring depends on a fold task, so a fold is allowed only where that task is XS and the critical path doesn&#x27;t grow. Record each on its task as `**Reason:** fold: &lt;rule&gt;`:
+- A step with a golden case whose spine and thicken are both in the milestone, or whose spine version is its whole behavior, may be one task that replaces the stub itself, `**Kind:** thicken` and `**Mode:** split`, never a spine; with a thicken folded in, its acceptance keeps the baseline selectable.
+- A trivial step (pass-through, print) is built by its pipeline&#x27;s wiring task; its stub names the wiring task.
+
+**Fakes and stubs.** A fake is allowed only where a pipeline calls another pipeline or package. Shared fixtures don&#x27;t stop it drifting: whatever it does beyond echoing one (filtering, ordering, an error) is one of its contract&#x27;s cases, and the system task runs those cases on the real provider (`dt context`&#x27;s Conformance block). Each case is also named in the acceptance of a task that builds that behavior in the real provider (its spine, a thicken or the wiring, or Deferred with it), so a drift fails there first; a case with no such task is a plan gap, like an uncovered ID. Mocking a step is forbidden: a step&#x27;s spine is the real baseline, and its consumer builds against the type&#x27;s sample (for a Protocol or class, its replay double). The interface stubs are the floor&#x27;s one stub carve-out (`build-setup`&#x27;s CR-02): allowed while the task they name is open; the gate fails on one naming a done task, the milestone exit on any. No test checks a stub (`stub-pinned`): it would fail once its task lands, so an acceptance names the signature, never the body.
+
+**Frozen means frozen.** Changing a frozen type, sample, signature or fake is a `contract-change`: `architecture-design` Revise, then a new interface task naming the symbol in `Read:`, never an edit to make a test pass. The bar enforces it (CR-09): once a contract folder exists at a task&#x27;s base the implementer can&#x27;t write it, and `dt guard` asks before any edit no open interface task covers. The re-freeze runs in the main session, since the implementer&#x27;s guard blocks a folder frozen at the base.
+# Thickening, routing, modes, checkpoints, the graph, writing
+
+Read when writing thicken tasks, the dependency graph and the files. Templates: `../examples.md`; graph example: `examples-phase0.md`; routing example: `examples-routing.md`.
+
+## 5. Thicken
+
+`**Kind:** thicken`, under Phase 2: one task per step upgrade, depending on its step&#x27;s spine. Order in the file sets nothing: every thicken task can start once its spine lands. Risk orders tasks only when a later one must learn from an earlier one, as an `order` edge with its reason (step 9). In data and ML work, data loading, leak checks and the evaluation get thicken tasks of their own, never left until after the model.
+
+**Split a task** when it needs more than one session, has more than 3 acceptance bullets, touches two packages or two steps, or has &quot;and&quot; in its title. Sizes count `Writes:` entries outside `tests/` (`task-size`; a folder glob counts as one): XS = 1, S = 1–2, M = 3–5. Nothing larger. Spine and thicken tasks are XS or S.
+
+**Acceptance is test-backed.** Each bullet is checkable: a `TC-NN` passes, a Given/When/Then, a model criterion by ID, the smoke command. With no `tests.md`, write the criterion so a tester can encode it. A TC that runs the whole pipeline is the wiring or system task&#x27;s acceptance (`phase0.md`), never a thicken&#x27;s. A thicken&#x27;s golden case builds its store from its own fixture (`input.json`) through a shared test helper, never through a wiring task&#x27;s run, so no thicken waits on wiring.
+
+## 6. Route skills and references
+
+**Skills.** Start from `milestone_skills` (the milestone&#x27;s `**Skills:**` line, else its stage&#x27;s): each goes on the `**Skills:**` of every task it fits, and at least one. Then add others whose descriptions fit a task (project `.claude/skills/*/SKILL.md`, `skills_available`). The plan&#x27;s Scope lists the milestone&#x27;s skills. A task that needs a skill that isn&#x27;t installed names it anyway (`dt status` reports it under `skills_missing`) and goes under Open questions. Never quietly plan the step without it.
+
+**References.** Each `RF-NN` or `PB-NN` in `milestone_references` goes in the `Read:` of the tasks whose step it informs; an RF entry&#x27;s *Use for* and *Key parts* say which, a PB entry&#x27;s *Informs* and *Caveats*. Cite the ID, never the `references/` or `probes/` path. A probe&#x27;s code goes to the step that calls the same API (`PB-01:probe.py:sync_all`); its redacted samples (`PB-01:samples`) go to the interface task (`phase0.md`) and, as raw-shaped test input, to that step&#x27;s spine and thicken tasks. Over 300 lines, add a selector so the packet stays small: `RF-01:deseasonalize` (one function or class), `RF-01:outline`, or `RF-03:&lt;heading&gt;` for a doc. With no selector a long file prints as its outline and `dt lint` warns `ref-large`. Whether to reuse the code is the builder&#x27;s call; don&#x27;t write it into Acceptance. A decision whose Consequences adopt what a probe spent (Plaid Items it linked) gets its own task in the milestone that builds that step.
+
+## 7. Build mode
+
+- `split` (tester, then implementer) when the task adds or changes behavior with a checkable outcome: anything a TC case, Given/When/Then or model criterion covers.
+- `solo` for interface, spine, wiring, system, refactor, glue and doc-sync tasks.
+
+`mode_violations` flags a task that breaks the rule. An override needs `**Reason:** &lt;one line&gt;` on the task. **A split task tests symbols a frozen interface declares** (the interface task&#x27;s types and signatures), so the tester never writes against a guess and starts right after the interface, beside the implementers. Its `Depends on` is the implementer half&#x27;s; the tester half waits only on the interface.
+
+## 8. Checkpoints
+
+`### Checkpoint after M&lt;n&gt;-T&lt;nn&gt;` at the end of a wave, naming the wave&#x27;s last task in plan order: `### Checkpoint after M&lt;n&gt;-T&lt;nn&gt; (barrier)` after the interface task(s), so nothing builds on an unreviewed interface, and usually once after the wiring and thicken wave, when every pipeline runs end to end. A plan without the barrier still gets the review: `dt` adds the barrier. `### Checkpoint: milestone exit` last. Use the blocks in `../examples.md`. A separate read-only reviewer runs each one; the orchestrator records its findings with `dt finding`, not this skill.
+
+## 9. Dependencies, Writes, the graph, Verify
+
+- **`Depends on:`** resolves, points only backward (position counts, not ID number), is acyclic, and holds only edges nothing mitigates.
+- **`Writes:`** is exact paths, or a folder glob the task owns, and is an exclusive claim: two tasks with no `Depends on` path between them never write the same path (`writes`). Shared files (`__init__.py`, `types.py`, `__main__.py`, and shared test helpers: `conftest.py`, a golden-case store builder) belong to the interface task; each pipeline&#x27;s entry module to its wiring and system tasks (`phase0.md`). No `Writes:` under `tasks/`: builders never tick `todo.md` or record findings; the orchestrator does after each merge.
+- **`## Dependency graph`**, after the last checkpoint: one row per edge between tasks, `| From | To | Kind | Mitigated by |`. From is the task that needs, To the one it needs; each cell starts with the task ID. Mitigated by names the interface and the task freezing it (`profile.Profile sample (M1-T01)`), or says `none: &lt;reason&gt;`.
+
+| Kind | Meaning | Mitigation |
+|---|---|---|
+| `data` | One step&#x27;s output feeds another&#x27;s input | The type and its sample |
+| `call` | A step calls a function another task builds | Across pipelines or packages, its fixture-backed fake; in the caller&#x27;s own pipeline and package, its replay double (`phase0.md` a), never a fake |
+| `file` | Two tasks must write one file | Move the shared part to the interface task; else serial. Two wiring tasks never share a file: each writes its own entry module. Two steps&#x27; thicken tasks on one module: the interface task&#x27;s layout splits it (each step its own file, the old module re-exporting); never chain them |
+| `code` | A task changes code another task wrote (a thicken after its step&#x27;s spine or an earlier thicken of that step) | None: serial |
+| `contract-change` | A task changes a frozen interface | None: serial, plus a new interface task |
+| `order` | Integration (a wiring or system task runs the steps it wires: `none: integration: the smoke runs it`), or risk or learning (&quot;do X first to learn Y&quot;; never a human approval: `phase0.md` a) | None: reason required |
+
+A spine never has an edge to another step&#x27;s task: it builds against the interface&#x27;s samples and doubles. A mitigated edge documents why two tasks run side by side and never appears in `Depends on`; an unmitigated one must (`edges`). Every `Depends on` has its row, except a dependency on the interface task, which every task has and needs none. The table is the reviewable argument for every serial step.
+- **Width.** `dt status` gives `critical_path`, `waves`, `width` and `parallelism`; on the fresh plan `dt ready` lists only the interface task(s). Mostly width-1 waves mean an edge an interface could mitigate is ordering tasks.
+- **`Verify:`** The interface task&#x27;s runs the schema check over every sample and each fake&#x27;s contract cases; every other task&#x27;s runs its focused tests and `scripts/check.sh gate` (`--pkg &lt;pkg&gt;` in multi-package), plus its pipeline&#x27;s smoke command (tests.md Strategy, else the Trigger plus ` --smoke`) once its `Depends on` path reaches that pipeline&#x27;s wiring task: wiring and system tasks always. A thicken task running beside the wiring is smoke-tested by the gate after each merge. Only the modes `fast`, `gate` and `full` exist.
+- **`Read:`** lists the IDs (references as `RF-NN[:selector]`, probes as `PB-NN:&lt;file&gt;[:&lt;symbol&gt;]`, `PB-NN:outline` or `PB-NN:samples`) and paths a builder needs, and nothing else. A split task&#x27;s names its step&#x27;s function, so the tester knows the signature it tests. Check each packet with `dt context &lt;task&gt;`: it must resolve and stay under 2,000 lines.
+
+## 10. Write
+
+Task IDs start at `dt next-id M&lt;n&gt;-T` and count up, in phase order.
+- **Next milestone only.** Later milestones stay as roadmap outlines. Write `tasks/queued/M&lt;n&gt;-&lt;slug&gt;.md` only when the user asks.
+- `tasks/plan.md` with Status `Draft` and `**Base:** —` (pending). Never record a sha yourself: `build-setup` runs `dt base` after its bar is approved and committed.
+- `tasks/todo.md`: one unchecked line per task, IDs matching the plan.
+- Milestone rows and sections (`cut.md` step 2), the planned milestone&#x27;s `**Exit:**` and `**Plan:**`, then `dt roadmap`.
+Shell cwd was reset to /Users/connorott/plugins/dev-team-workspace/iteration-11/rl-all-at-once/with_skill/project</pre></details></div><div class="step" id="SD277"><span class="sid">D277</span><span class="kind">Bash</span>cat docs/roadmap.md; ls -R docs tasks 2&gt;&amp;1 | head -50; git log --oneline | head -30; cat AGENTS.md CLAUDE.md 2&gt;&amp;1 | head -60<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;cat docs/roadmap.md; ls -R docs tasks 2&gt;&amp;1 | head -50; git log --oneline | head -30; cat AGENTS.md CLAUDE.md 2&gt;&amp;1 | head -60&quot;
+}</pre><div class="lbl">output</div><pre># RL Lab — Roadmap
+
+**Last updated:** 2026-10-18
+
+| Stage | Name | Source | Status* |
+|---|---|---|---|
+| S1 | Snake | brief | Specced |
+| S2 | Fish tank | brief | Specced |
+| S3 | Predator and prey | brief | Specced |
+
+*Written by `dt roadmap` from doc statuses and todo checkboxes; never hand-edited.
+
+## S1: Snake
+**Outline:** A hand-written value-learning agent plays Snake, eating food and avoiding walls and itself; it beats the random and scripted baselines, has a replay and a note, and is checked against a library&#x27;s version.
+**Skills:** null-hypothesis-testing, dataviz
+
+## S2: Fish tank
+**Outline:** In a circular tank with a bouncing ball, one fish that sees everything, then several fish that see only what&#x27;s nearby, learn by a hand-written policy-gradient method to survive; they beat random and at least match the scripted fish, with a replay, a note and a library check.
+**Skills:** null-hypothesis-testing, dataviz
+
+## S3: Predator and prey
+**Outline:** Prey forage for food while a predator hunts them, both learning; both sides learning at once is compared side by side with training against past versions of the opponent, and the result is explained.
+**Skills:** null-hypothesis-testing, dataviz
+ls: tasks: No such file or directory
+docs:
+architecture.md
+brief.md
+explained
+packages
+requests.md
+roadmap.md
+routes.md
+spec.md
+
+docs/explained:
+rllab.md
+
+docs/packages:
+rllab
+
+docs/packages/rllab:
+contract.md
+pipelines.md
+tests.md
+db25e78 turn 19
+afec99d Approve architecture revision: planted states, test worlds, step budget (AD-16–AD-18)
+bdf953a turn 18
+9f59ce3 turn 17
+f6c0aeb Approve spec: touching rule and predator-prey radii
+7fb07a2 turn 16
+2568ade turn 15
+d8c2a77 Approve rllab test plan: 44 golden cases
+5e66147 turn 14
+9ae9825 turn 13
+6ee203a turn 12
+e408da6 Approve rllab contract revisions and AD-15
+ed88707 turn 11
+cd7ef46 turn 10
+0a9ce31 Approve rllab pipelines
+1b704aa turn 9
+835e3d6 turn 8
+3c763cd turn 7
+542c50c Approve RL Lab architecture and rllab contract
+e9c73eb turn 6
+cca4e7c turn 5
+b23b9c4 Approve RL Lab spec
+8e1ff6f turn 4
+36e44ed turn 3
+1071438 Accept RL Lab brief and add roadmap stages S1-S3
+210bbf3 turn 2
+ec7a88d turn 1
+6689bba turn 0
+cat: AGENTS.md: No such file or directory
+cat: CLAUDE.md: No such file or directory</pre></details></div><div class="step" id="SD278"><span class="sid">D278</span><span class="kind">Bash</span>grep -n &quot;^#\|single\|Single\|Grow\|torch\|stable&quot; docs/architecture.md | head -80; wc -l docs/*.md docs/packages/rllab/*.md; cat docs/routes.md docs/requests.md<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;grep -n \&quot;^#\\|single\\|Single\\|Grow\\|torch\\|stable\&quot; docs/architecture.md | head -80; wc -l docs/*.md docs/packages/rllab/*.md; cat docs/routes.md docs/requests.md&quot;
+}</pre><div class="lbl">output</div><pre>1:# RL Lab — Architecture
+3:**Status:** Approved · **Shape:** Single package · **Last updated:** 2026-10-18 · **Spec:** [spec.md](spec.md)
+5:## Overview
+21:## Tech stack
+31:| Run storage | JSON, gzip JSON and `torch.save` files under `runs/` | AD-11, AD-15 |
+34:## Components
+48:## Interfaces
+51:## Data
+57:## Cross-cutting concerns
+59:- **Reproducibility (QR-03):** one `np.random.Generator` and one `torch.Generator` per run from the run seed, no global random state; `torch.use_deterministic_algorithms(True)` and a fixed thread count in the settings. The run length and curve points are counted in environment steps, never wall-clock time (AD-18); a run cut short by the time limit says so in its record and doesn&#x27;t count as a repeat.
+64:## Project layout
+72:## Decisions
+73:### AD-01: One Python 3.12 package, `rllab`
+76:- **Decision:** One package `rllab` with one folder per component. The `reference` component is the seam that carries Stable-Baselines3; it is the only importer of `stable_baselines3` and `gymnasium`, so it could move out if that stack ever gets in the way.
+80:### AD-02: Learners written by hand on PyTorch autograd; worlds in NumPy
+83:- **Decision:** Networks are `torch.nn` layers trained with `torch.optim` and autograd; every RL piece (replay buffer, targets, advantage estimation, clipped loss, exploration) is our own code in `learners` and `coevo`. Worlds are plain NumPy. No module outside `reference` imports an RL library.
+87:### AD-03: Double DQN for Snake
+94:### AD-04: Snake sees the whole grid plus a few direct features
+101:### AD-05: PPO with a squashed Gaussian movement action, shared within a role
+108:### AD-06: Nearby things fill fixed slots with a presence flag
+110:- **Context:** TANK-07 and PREY-05 hide anything beyond 0.5; TANK-05&#x27;s single fish sees everything. An MLP needs a fixed input size.
+111:- **Decision:** Each observation starts with the agent&#x27;s own position, velocity and distance to the wall, then fixed slots per kind of thing, nearest first, each holding relative position, relative velocity and a present flag; an empty slot is all zeros. Slots: single fish — 1 ball, always present; several fish — 1 ball, 4 other fish; prey — 1 predator, 4 other prey, 3 pellets; predator — 5 prey, 3 pellets. `worlds.decode` names the fields so scripted agents read the same array (BASE-06).
+115:### AD-07: Rewards follow each world&#x27;s score
+122:### AD-08: Stable-Baselines3 is the reference
+124:- **Context:** CHECK-01–CHECK-03 need an established implementation of the same kind of method on the same world. SB3&#x27;s DQN supports Discrete actions only and PPO supports Discrete and Box (&quot;Can I use?&quot; tables, https://stable-baselines3.readthedocs.io/en/master/modules/dqn.html and https://stable-baselines3.readthedocs.io/en/master/modules/ppo.html, read 2026-10-18). A custom environment subclasses `gymnasium.Env` with `reset(seed, options) → (obs, info)` and `step → (obs, reward, terminated, truncated, info)`, checked by `check_env` (https://stable-baselines3.readthedocs.io/en/master/guide/custom_env.html, read 2026-10-18). A custom `VecEnv` implements `reset`, `step_async`, `step_wait` and five attribute methods, and must put `terminal_observation` in the info dicts (https://stable-baselines3.readthedocs.io/en/master/guide/vec_envs.html, read 2026-10-18). `learn(total_timesteps, callback)` trains for a set number of environment steps, and a callback returning False from `_on_step` stops training early (https://stable-baselines3.readthedocs.io/en/master/modules/base.html and https://stable-baselines3.readthedocs.io/en/master/guide/callbacks.html, read 2026-10-18).
+125:- **Decision:** `reference` wraps a world as a `gymnasium.Env` for single-agent worlds (Snake: SB3 DQN; single fish: SB3 PPO with a Box action) and as a custom `VecEnv` with one slot per fish for the several-fish version, so SB3&#x27;s PPO shares one policy across the fish as AD-05 does. Same observations, rewards, seeds and step budget: SB3&#x27;s `learn(total_timesteps=…)` takes the run&#x27;s `total_steps` (AD-18), with a wall-clock callback as the time-limit backstop. The trained SB3 model is wrapped as a `Policy`. Predator and prey has no reference check (DONE-03 doesn&#x27;t require one).
+126:- **Alternatives:** CleanRL — single-file scripts to copy, not a library to call. RLlib — handles multi-agent natively but is heavy for a laptop and a bigger stack.
+130:### AD-09: CPU training, a rented GPU only as fallback
+137:### AD-10: Fixed seed ranges keep evaluation seeds out of training
+144:### AD-11: Plain files per run
+151:### AD-12: Replays are recorded frames played in a pygame window
+153:- **Context:** REPLAY-05 needs a replay without the agent; REPLAY-03 needs pause, single-step and 0.5×–4×; QR-04 ≥ 30 frames per second; the brief rules out a polished app.
+158:### AD-13: Two co-evolution regimes on the same PPO
+165:### AD-14: Statistics and charts follow the installed skills
+172:### AD-15: A saved policy is a plain network plus an output rule
+174:- **Context:** PL-02 scores the SB3 reference from its run folder (CHECK-02), so `store.save_policy` and `store.load_policy` must round-trip `reference.train_reference`&#x27;s SB3-backed `Policy`. AD-11 saved a state dict plus our own architecture, which can&#x27;t rebuild an SB3 model, and AD-01 lets only `reference` import SB3. SB3&#x27;s deterministic action is the argmax of DQN&#x27;s `q_net`, and PPO&#x27;s action-network mean clipped to the Box bounds (https://stable-baselines3.readthedocs.io/en/master/modules/dqn.html and https://stable-baselines3.readthedocs.io/en/master/modules/ppo.html, read 2026-10-18).
+175:- **Decision:** Every trained `Policy` hands over its greedy path as a `core.GreedyNet`: a `torch.nn.Sequential` of Linear and activation layers plus a head (`argmax`, `tanh` or `clip`). Our DQN gives its Q network with `argmax`, our PPO its actor mean with `tanh` (AD-05), and `reference` copies the SB3 model&#x27;s layers into the same form with `argmax` or `clip`. `policy.pt` stores the GreedyNet, world and role; `load_policy` rebuilds one generic `Policy` from it.
+180:### AD-16: Worlds start from a planted state
+187:### AD-17: Test worlds are registered by name
+194:### AD-18: A run&#x27;s length is a step budget; the time limit is a backstop
+201:## Risks and open questions
+207:- Reference check for the several-fish version depends on our `VecEnv` adapter (AD-08); `check_env` covers single-agent worlds only, so the adapter gets its own tests.
+210:## Changelog
+     215 docs/architecture.md
+      37 docs/brief.md
+      49 docs/requests.md
+      23 docs/roadmap.md
+      17 docs/routes.md
+     308 docs/spec.md
+     311 docs/packages/rllab/contract.md
+     228 docs/packages/rllab/pipelines.md
+     254 docs/packages/rllab/tests.md
+    1442 total
+# Routed changes
+
+Changes a skill found that another skill owns, waiting for the owner&#x27;s Revise. Written by `dt route`; the owner ticks its items (`dt route --done &lt;skill&gt;`) when the user approves that Revise.
+
+- [x] architecture-design · Make core.Env, core.Policy, store.RunDir and learners.PPOLearner type sections (they are boundaries pipeline steps pass and already carry Cases), so the interface task freezes Env, Policy, RunDir and PPOLearner with samples (PL-01–PL-08) (from pipeline-design, 2026-10-18)
+- [x] architecture-design · Add signoff.Status: type (world: str; missing: tuple[str, ...]; empty missing = ready/signed off); signoff.may_start, signoff.check_world and signoff.scaffold_note return Status instead of tuple[str, ...] / Path (PL-01, PL-06, PL-07, PL-08) (from pipeline-design, 2026-10-18)
+- [x] architecture-design · Add store.open_run(root: Path) -&gt; RunDir to reopen an existing run folder (world and run_id from record.json; FileNotFoundError when missing), for PL-02, PL-04, PL-06, PL-07 (from pipeline-design, 2026-10-18)
+- [x] architecture-design · Add evaluate.Chart: type (path: Path; curves: tuple[str, ...]; baselines: dict[str, float]) and have evaluate.curve_chart return Chart instead of Path (PL-02, PL-08) (from pipeline-design, 2026-10-18)
+- [x] architecture-design · Add replay.ViewStats: type (frames_shown: int; mean_fps: float) and have replay.view return ViewStats instead of None, so QR-04&#x27;s 30 fps is measured from the call (PL-04, PL-05) (from pipeline-design, 2026-10-18)
+- [x] architecture-design · coevo.train_regime takes the run&#x27;s RunDir (train_regime(regime, settings, run)) to save snapshots under snapshots/&lt;regime&gt;/&lt;role&gt;/, and both regimes save them so COEVO-05&#x27;s sweep works for either regime&#x27;s finals (PL-08) (from pipeline-design, 2026-10-18)
+- [x] architecture-design · store.RunDir.save_policy and store.load_policy must round-trip reference.train_reference&#x27;s SB3-backed Policy, so PL-02 can score the reference from its run folder (CHECK-02) (from pipeline-design, 2026-10-18)
+- [x] architecture-design · Rename learners.PPOLearner to learners.PpoLearner (and ppo_learner&#x27;s return type with it): dt reads step types as CamelCase, so an all-caps run like PPO hides the type from step-io-types (PL-01, PL-08) (from pipeline-design, 2026-10-18)
+- [x] architecture-design · Give replay.view (used by PL-04, PL-05) and signoff.may_start (used by PL-01, PL-08) Boundary lines with Fixtures and Cases (view: a 30-frame snake Recording → ViewStats; may_start: snake open, tank5 blocked on tank1), so the interface task freezes their fakes (from pipeline-design, 2026-10-18)
+- [x] architecture-design · Worlds need a way to start from a planted state (e.g. a test-only set_state/from_state on SnakeEnv, TankEnv, PreyEnv: snake body, heading, food, steps since food, score; ball and fish positions, velocities, alive, survival; predator, prey, pellets, counts; step) so golden cases TC-02–TC-06, TC-08–TC-12, TC-14–TC-21 can run (core.Env, worlds.make; PL-01.SnakeEnv, PL-01.TankEnv, PL-08.PreyEnv) (from test-planning, 2026-10-18)
+- [x] architecture-design · Learners need a toy-world entry for known-answer cases: train_dqn trains on a given Env (TC-29 3-arm bandit) and EnvSpec.world admits a test world so ppo_learner can run on reach_target (TC-30) (learners.train_dqn, core.EnvSpec) (from test-planning, 2026-10-18)
+- [x] architecture-design · QR-03 needs a step budget: a run stopped by time_limit_s varies in steps, so its curve can&#x27;t repeat; give TrainSettings a total env-step budget (or hparams[&#x27;total_steps&#x27;]) that ends the run before the time limit, with curve points spaced by steps (learners.TrainSettings; TC-31, TC-32) (from test-planning, 2026-10-18)
+- [x] spec-writing · Add to Assumptions: two things touch when their centres are at most the sum of their radii apart (UR-41; TANK-04, PREY-02, PREY-03); and state the prey, predator and pellet radii, which PREY-02/03 need and the spec doesn&#x27;t give (from test-planning, 2026-10-18)
+# User requests
+
+**Last updated:** 2026-10-18
+
+The user&#x27;s words, verbatim: one line per fact, constraint, tool, choice or answer, with the skill that heard it and the date. The words never change; only the trace after → does. Written with `dt request`.
+
+- **UR-01** brief · &quot;I want to start a small ML project&quot; · idea-refine 2026-10-18 → §The problem
+- **UR-02** brief · &quot;so I can learn RL by building&quot; · idea-refine 2026-10-18 → §The problem, §Goals
+- **UR-03** spec · &quot;an RL lab of little 2D environments where agents learn a concept through reinforcement learning&quot; · idea-refine 2026-10-18 → SNAKE-01, TANK-01, PREY-01, LEARN-01
+- **UR-04** spec · &quot;Environment 1: classic Snake on a grid. The agent learns to eat food and avoid itself/walls.&quot; · idea-refine 2026-10-18 → SNAKE-01, SNAKE-04, SNAKE-05
+- **UR-05** architecture · &quot;Good first env for DQN-style value learning.&quot; [Environment 1 (Snake): learning method] · idea-refine 2026-10-18 → AD-03
+- **UR-06** spec · &quot;Environment 2: a circular tank with a ball bouncing around inside it&quot; · idea-refine 2026-10-18 → TANK-01, TANK-02
+- **UR-07** spec · &quot;little &#x27;fish&#x27; agents must learn to swim away from the ball and survive as long as possible&quot; [Environment 2] · idea-refine 2026-10-18 → TANK-04, TANK-09
+- **UR-08** spec · &quot;Continuous movement&quot; [Environment 2 fish] · idea-refine 2026-10-18 → TANK-03, LEARN-05
+- **UR-09** spec · &quot;several fish at once&quot; [Environment 2] · idea-refine 2026-10-18 → TANK-06
+- **UR-10** spec · &quot;each fish sees only nearby things&quot; [Environment 2 observations] · idea-refine 2026-10-18 → TANK-07
+- **UR-11** architecture · &quot;Good for policy-gradient / PPO and continuous control.&quot; [Environment 2: learning method] · idea-refine 2026-10-18 → AD-05
+- **UR-12** spec · &quot;Environment 3: predator-prey foraging — prey fish forage for food pellets while a learning predator hunts them&quot; · idea-refine 2026-10-18 → PREY-01, PREY-02, PREY-03
+- **UR-13** spec · &quot;both sides learn at once (multi-agent, non-stationary)&quot; [Environment 3] · idea-refine 2026-10-18 → COEVO-01
+- **UR-14** spec · &quot;Concept: co-evolution / self-play.&quot; [Environment 3] · idea-refine 2026-10-18 → COEVO-01, COEVO-02
+- **UR-15** architecture · &quot;From scratch in NumPy/PyTorch for all of them.&quot; [Q1: who writes the learning algorithms] · idea-refine 2026-10-18 → AD-02
+- **UR-16** spec · &quot;Compare against a library afterward.&quot; [Q1: from-scratch algorithms checked against a library implementation] · idea-refine 2026-10-18 → CHECK-01, CHECK-03
+- **UR-17** spec · &quot;a watchable replay&quot; [Q2: what done looks like for an environment (all three required)] · idea-refine 2026-10-18 → REPLAY-01, REPLAY-05
+- **UR-18** spec · &quot;a learning curve that beats random and the scripted baseline&quot; [Q2: what done looks like for an environment (all three required)] · idea-refine 2026-10-18 → EVAL-02, EVAL-04, EVAL-05, EVAL-07
+- **UR-19** spec · &quot;a short note explaining why it works&quot; [Q2: what done looks like for an environment (all three required)] · idea-refine 2026-10-18 → NOTE-01
+- **UR-20** architecture · &quot;MacBook Pro, Apple Silicon, CPU only.&quot; [Q3: hardware] · idea-refine 2026-10-18 → AD-09
+- **UR-21** architecture · &quot;I can rent a cloud GPU for a few dollars if needed.&quot; [Q3: hardware] · idea-refine 2026-10-18 → AD-09
+- **UR-22** brief · &quot;I work evenings and weekends, and each environment takes a few weeks.&quot; [Q3: time available] · idea-refine 2026-10-18 → §Who it&#x27;s for
+- **UR-23** brief · &quot;I know Python. I&#x27;m learning the RL and quant side.&quot; [Q3: experience] · idea-refine 2026-10-18 → §Who it&#x27;s for
+- **UR-24** spec · &quot;Each environment should train in under about 1 hour on the laptop.&quot; [Q3: training time limit] · idea-refine 2026-10-18 → QR-01
+- **UR-25** spec · &quot;Both, compared side by side.&quot; [Q4 Environment 3: simultaneous co-evolution (both learn at once) vs training against past versions (self-play)] · idea-refine 2026-10-18 → COEVO-03, COEVO-04
+- **UR-26** brief · &quot;Yes, the order is fixed: Snake, then fish, then predator-prey. Finish each before starting the next.&quot; [Q5: environment order] · idea-refine 2026-10-18 → §Goals
+- **UR-27** spec · &quot;one fish that sees everything first is fine&quot; [Pushback: Environment 2 starts with a single fully-observing fish before several fish with local vision] · idea-refine 2026-10-18 → TANK-05, DONE-04
+- **UR-28** spec · &quot;Baselines for every environment are fine.&quot; [Pushback: random and scripted baseline agents per environment] · idea-refine 2026-10-18 → BASE-01, BASE-02, BASE-03, BASE-04, BASE-05
+- **UR-29** brief · &quot;Environment 3 shouldn&#x27;t decide whether the project counts as a success.&quot; [Pushback: Environment 3 is research-grade] · idea-refine 2026-10-18 → §What success looks like
+- **UR-30** spec · &quot;Fish tank: matching the scripted baseline counts as passing.&quot; [Gate: fish tank pass bar vs scripted baseline (refines UR-18 for Environment 2)] · idea-refine 2026-10-18 → EVAL-06
+- **UR-31** brief · &quot;Approved, looks good.&quot; [Gate: stages S1 Snake, S2 Fish tank, S3 Predator and prey; null-hypothesis-testing and dataviz on each; defaults: compact world description not pixels, library comparison at the end of each environment&#x27;s stage] · idea-refine 2026-10-18 → §Not doing, S1, S2, S3
+- **UR-32** spec · &quot;yes, ≤ $5 per world for the cloud GPU&quot; [Spec open question: cloud GPU spend limit (QR-02)] · spec-writing 2026-10-18 → QR-02
+- **UR-33** spec · &quot;Yes, predator and prey comparisons against baselines are reported but don&#x27;t block finishing that world.&quot; [Spec open question: whether EVAL-07 blocks predator and prey sign-off] · spec-writing 2026-10-18 → DONE-03, EVAL-07
+- **UR-34** spec · &quot;Your assumptions are fine.&quot; [Spec assumptions: Snake 10x10/length 3/3 moves/100-step starvation; tank radius 1, ball 0.02, fish 0.015, 1,000 steps, 5 fish, sight 0.5; predator-prey 5 prey, 1 predator 1.2x, 8 pellets; 100 eval episodes, 5% corrected, 95% scripted-fish margin, 80% reference margin; 1 hour per training run; learner writes notes] · spec-writing 2026-10-18 → §Assumptions
+- **UR-35** tests · &quot;I want known-answer cases planned before any code.&quot; [test plan with golden test cases] · test-planning 2026-10-18 → TC-01, TC-22, TC-29, TC-30
+- **UR-36** tests · &quot;weight world rules and PL-02 compare most&quot; [Q1: which workflows matter most] · test-planning 2026-10-18 → TC-01, TC-02, TC-03, TC-04, TC-05, TC-06, TC-07, TC-08, TC-09, TC-10, TC-11, TC-12, TC-13, TC-14, TC-15, TC-16, TC-17, TC-22, TC-23, TC-24, TC-25, TC-26, TC-27
+- **UR-37** tests · &quot;no trusted pairs, use the spec examples&quot; [Q2: trusted input/output pairs] · test-planning 2026-10-18 → TC-01, TC-02, TC-03, TC-04, TC-05, TC-06, TC-10, TC-11, TC-14, TC-16, TC-19, TC-20, TC-21
+- **UR-38** tests · &quot;the four synthetic cases&quot; [Q3: compare cases: planted difference passes; same-distribution passes in at most ~5% of 20 seeds; identical scores give no difference; ratio margin ~0.99x passes 0.95, ~0.85x fails] · test-planning 2026-10-18 → TC-22, TC-23, TC-24, TC-25
+- **UR-39** tests · &quot;both kinds, with the hour-long runs by hand&quot; [Q4: model-evaluation cases for EVAL-04/05/06 and CHECK-03 plus fast sanity cases (DQN toy, PPO target, same-seed curve)] · test-planning 2026-10-18 → TC-29, TC-30, TC-31, TC-33, TC-34, TC-35, TC-39, TC-44
+- **UR-40** tests · &quot;pin all those edge cases&quot; [Q5: tail-cell move allowed, 97-point win, 100-step starvation, fish at 0.13 from ball, two prey on one pellet tie rule] · test-planning 2026-10-18 → TC-05, TC-06, TC-10, TC-14
+- **UR-41** spec · &quot;touching at ≤ the sum of the radii as an assumption&quot; [Q5: when two circles touch (TANK-04, PREY-02, PREY-03)] · test-planning 2026-10-18 → §Assumptions, TANK-04, PREY-02, PREY-03
+- **UR-42** tests · &quot;one training seed per hour-long run is fine&quot; [Open question: model evaluations TC-33–TC-35, TC-44 use one training seed (1,000,000)] · test-planning 2026-10-18 → TC-33, TC-34, TC-35, TC-44
+- **UR-43** spec · &quot;Radii 0.03 / 0.04 / 0.02 are fine.&quot; [Spec assumptions: prey radius 0.03, predator radius 0.04, pellet radius 0.02] · spec-writing 2026-10-18 → §Assumptions, PREY-02, PREY-03</pre></details></div><div class="step" id="SD279"><span class="sid">D279</span><span class="kind">Bash</span>sed -n 1,80p docs/architecture.md; grep -n &quot;grow_held\|grow_triggers&quot; ../plugin/dev-team/scripts/*.py | head -20<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;sed -n 1,80p docs/architecture.md; grep -n \&quot;grow_held\\|grow_triggers\&quot; ../plugin/dev-team/scripts/*.py | head -20&quot;
+}</pre><div class="lbl">output</div><pre># RL Lab — Architecture
+
+**Status:** Approved · **Shape:** Single package · **Last updated:** 2026-10-18 · **Spec:** [spec.md](spec.md)
+
+## Overview
+Three NumPy worlds (Snake, fish tank, predator and prey) sit behind one `Env` protocol that hands each role a compact observation array, never pixels. Hand-written PyTorch learners (DQN for Snake, PPO for the fish and both predator-prey sides) train against batched world copies on the laptop CPU for a fixed number of environment steps, record a learning curve on held-out curve seeds, and save the agent into a plain-file run folder. Every agent, trained, baseline or reference, is a `Policy`, so evaluation, replay and the statistics treat them alike. A world is signed off when its run folder holds every artefact DONE-01 names and the learner&#x27;s note passes its checks. Tests can start a world from a planted state and train the learners on small registered test worlds.
+
+```mermaid
+flowchart LR
+  worlds --&gt; core
+  baselines --&gt; worlds
+  learners --&gt; evaluate
+  coevo --&gt; learners
+  reference --&gt; evaluate
+  evaluate --&gt; store
+  replay --&gt; store
+  signoff --&gt; store
+  store --&gt; core
+```
+
+## Tech stack
+| Area | Choice | Decision |
+|---|---|---|
+| Language | Python 3.12 | AD-01 |
+| Worlds and arrays | NumPy ≥ 2.0 | AD-02 |
+| Networks and gradients | PyTorch ≥ 2.4, CPU wheels | AD-02, AD-09 |
+| Reference implementations | Stable-Baselines3 ≥ 2.3, Gymnasium ≥ 1.0 | AD-08 |
+| Statistics | SciPy ≥ 1.13, as the `null-hypothesis-testing` skill specifies | AD-14 |
+| Charts | Matplotlib ≥ 3.9, PNG, as the `dataviz` skill specifies | AD-14 |
+| Replay viewer | pygame-ce ≥ 2.5 | AD-12 |
+| Run storage | JSON, gzip JSON and `torch.save` files under `runs/` | AD-11, AD-15 |
+| Tests | pytest, hypothesis | — |
+
+## Components
+| Component | Responsibility | Covers | Depends on |
+|---|---|---|---|
+| `core` | `Env` and `Policy` protocols, the step, frame and spec types, and the seed ranges | DATA-01, QR-03 | — |
+| `worlds` | The three worlds&#x27; rules, observations and rewards, `make(name)`, planted states and test-world registration | SNAKE-01–SNAKE-07, TANK-01–TANK-09, PREY-01–PREY-07 | `core` |
+| `baselines` | Random and scripted policies per world and role, reading only the role&#x27;s observation | BASE-01–BASE-06 | `core`, `worlds` |
+| `store` | Run folders: records, saved policies, results and recordings on disk | LEARN-03, DATA-02 | `core` |
+| `evaluate` | Plays policies on seeds; runs the comparisons (`null-hypothesis-testing`) and draws the charts (`dataviz`) | EVAL-01–EVAL-07, CHECK-02, CHECK-03, COEVO-04, COEVO-06 | `core`, `store` |
+| `learners` | Hand-written DQN and PPO, the time-boxed training loop, curve points, divergence stop | LEARN-01, LEARN-02, LEARN-04, LEARN-05, QR-01, QR-02 | `core`, `evaluate`, `store` |
+| `coevo` | The simultaneous and past-versions regimes, snapshot pools, cross-play table and snapshot sweep | COEVO-01–COEVO-03, COEVO-05 | `core`, `learners`, `evaluate`, `store` |
+| `reference` | Trains Stable-Baselines3&#x27;s DQN or PPO on the same world through a Gymnasium adapter, as a `Policy` | CHECK-01 | `core`, `evaluate`, `store` |
+| `replay` | Records an episode&#x27;s frames, saves them, and plays them back in a window with controls | REPLAY-01–REPLAY-05, QR-04 | `core`, `store` |
+| `signoff` | Scaffolds each world&#x27;s note with its results, checks the note, and gates sign-off and world order | NOTE-01–NOTE-04, DONE-01–DONE-04 | `store` |
+
+## Interfaces
+See [packages/rllab/contract.md](packages/rllab/contract.md).
+
+## Data
+- **Worlds are generated, not downloaded.** Every episode is set by one integer seed (AD-10), or starts from a planted state in tests (AD-16).
+- **Seeds (DATA-01):** per world, evaluation seeds are 0–99, learning-curve seeds 100–119, training seeds 1,000,000 and up; `core.seeds` is the only source, and `learners` refuses a training seed below 1,000,000.
+- **Observations** are float32 arrays per role, shape (agents, features): Snake per AD-04, fish and predator-prey per AD-06. Rewards per AD-07.
+- **Run folder** `runs/&lt;world&gt;/&lt;run-id&gt;/` (AD-11): `record.json` (seed, settings, duration, curves, status: DATA-02), `policy.pt` only for a finished run (LEARN-03, AD-15), `scores/&lt;agent&gt;.json`, `comparisons.json`, `curve.png`, `recordings/&lt;agent&gt;-&lt;seed&gt;.json.gz`; a prey run adds `snapshots/&lt;regime&gt;/&lt;role&gt;/` (AD-13). Notes live in `notes/&lt;world&gt;.md`, committed; `runs/` is git-ignored.
+
+## Cross-cutting concerns
+- **Speed (QR-01):** training steps 16 world copies and makes one batched policy call per step; the loop ends at the run&#x27;s `total_steps`, set per world from measured steps per second so the run fits the hour, and `time_limit_s` (3,600 by default) is the backstop (AD-18). The duration is recorded. Small MLPs run on CPU (AD-09).
+- **Reproducibility (QR-03):** one `np.random.Generator` and one `torch.Generator` per run from the run seed, no global random state; `torch.use_deterministic_algorithms(True)` and a fixed thread count in the settings. The run length and curve points are counted in environment steps, never wall-clock time (AD-18); a run cut short by the time limit says so in its record and doesn&#x27;t count as a repeat.
+- **Errors:** a not-a-number loss or score stops the run with status `diverged` and the curve point where it happened; an interrupted run keeps its curve with status `stopped` and no `policy.pt`. A policy loaded into the wrong world raises `ValueError` naming both worlds.
+- **Skills:** `evaluate` runs every significance claim as the `null-hypothesis-testing` skill specifies and draws every chart as the `dataviz` skill specifies (AD-14).
+- **Testing:** world rules are tested on planted states from `worlds.from_state` (AD-16; each spec Given/When/Then is a test); learners on test worlds registered with `worlds.register` (AD-17); the reference adapter with SB3&#x27;s `check_env`.
+
+## Project layout
+```
+src/rllab/   → core/ worlds/ baselines/ store/ evaluate/ learners/ coevo/ reference/ replay/ signoff/ — one folder per component; __init__ exports its contract
+notes/       → one note per world, written by the learner
+runs/        → run folders (git-ignored)
+tests/
+```
+
+## Decisions
+### AD-01: One Python 3.12 package, `rllab`
+**Status:** Accepted · **Date:** 2026-10-18 · **Scope:** system
+- **Context:** A one-person learning lab on one laptop, with no separate install, deployment or owner (brief: Not doing, a framework). PyTorch, SB3 and pygame-ce all ship 3.12 wheels for Apple Silicon.
+- **Decision:** One package `rllab` with one folder per component. The `reference` component is the seam that carries Stable-Baselines3; it is the only importer of `stable_baselines3` and `gymnasium`, so it could move out if that stack ever gets in the way.
+- **Alternatives:** A package per world — no real boundary; the worlds share every protocol. Python 3.13 — wheel coverage lags for some of the stack.
+- **Consequences:** `requires-python = &quot;&gt;=3.12,&lt;3.13&quot;`. The import rule (only `reference` imports SB3) is checked by import-linter.
+
+### AD-02: Learners written by hand on PyTorch autograd; worlds in NumPy</pre></details></div><div class="step" id="SD280"><span class="sid">D280</span><span class="kind">say</span>Checking the Grow trigger (8 pipelines &gt; 3) against AD-01 before cutting S1.<details><summary>full text</summary><pre>Checking the Grow trigger (8 pipelines &gt; 3) against AD-01 before cutting S1.</pre></details></div><div class="step" id="SD281"><span class="sid">D281</span><span class="kind">Bash</span>cd /Users/connorott/plugins/dev-team-workspace/iteration-11/rl-all-at-once/with_skill/plugin/dev-team/scripts &amp;&amp; grep -rn &quot;grow_held&quot; . | head; grep -rln &quot;grow_held&quot; .<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;cd /Users/connorott/plugins/dev-team-workspace/iteration-11/rl-all-at-once/with_skill/plugin/dev-team/scripts &amp;&amp; grep -rn \&quot;grow_held\&quot; . | head; grep -rln \&quot;grow_held\&quot; .&quot;
+}</pre><div class="lbl">output</div><pre>devteam/status/architecture_design.py:18:        &quot;broken_fences&quot;, &quot;contracts_missing&quot;, &quot;legacy_layout&quot;, &quot;grow_triggers&quot;, &quot;grow_held&quot;, &quot;stale_contracts&quot;, &quot;probes_answered&quot;,
+devteam/status/architecture_design.py:94:    r.add(&quot;grow_held&quot;, shape_kept(repo))
+devteam/status/build_planning.py:461:    r.add(&quot;grow_held&quot;, shape_kept(repo))
+README.md:121:| `architecture-design` | blocked · new · revise · extend · current | everything the old `arch-status.py` reported (`uncovered`, `changed_since`, `spec_rows_pending`, `stale`, `next_decision`, `package_docs`, `packages_found`, `skills`, `broken_fences`), plus `contracts_missing` (packages with no `contract.md`; `(no package id yet)` when no id can be found or inferred), `legacy_layout` (`docs/architecture/&lt;pkg&gt;.md` files to move), `grow_triggers` (a package over 3 pipelines, 12 modules or 2,000 doc lines; none while `grow_held` is set), `grow_held` (in a single-package architecture, what records the user&#x27;s one package: a request in force whose words keep it, `UR-34 &quot;Keep it as one package, no split.&quot;`, or an Accepted decision whose text declines the split, `stays one package`, `no split`; a decision only naming the shape doesn&#x27;t count), `stale_contracts`, `probes_answered` (`PB-01 pass (AD-04)`, `PB-01 waived (AD-04)`: Answered or Waived probes whose decisions are still Proposed), `probes_failed` (`PB-01 (AD-04)`: Answered fail with a decision still Proposed; must be empty at its gate) |
+README.md:124:| `build-planning` | blocked · new · extend · replan · advance · foreign · current | `milestone` (active M and status), `progress` (done/total), `next_task`, `blocked_tasks`, `uncovered` (milestone spec IDs on no task and not Deferred), `no_spine` (milestone pipelines with no task that builds them: a wiring task, a `Kind: system` task for each system pipeline its Step, Read or Reason names, or with no Kind a Phase 0 task; archive included), `steps_unplanned` (`PL-07.daily_bars`: a step of the milestone&#x27;s pipelines that no task&#x27;s Step names and the Scope&#x27;s Deferred doesn&#x27;t name; a spine task on the whole pipeline builds every step, and a step needs none when its Spine version reuses one, `as PL-05` or `PL-01 as built`, or a task of any plan, archive included, names its name on another pipeline), `mode_violations`, `boundaries_unfrozen` (`pkg.symbol (consumers)`: a contract symbol whose `**Boundary:**` line names a milestone package (in a single-package architecture, also any of its components), with no `**Fixtures:**` folder yet and in no contract task&#x27;s `Read:`; the contract task is the interface task, or with no Kind the Phase 0 `**Step:** contract` task; and in an interface-first plan `pkg.Type (PL-NN.step)`: a contract type a step of the milestone&#x27;s pipelines (its roadmap row&#x27;s, and every task&#x27;s Step pipeline) names in `In → Out`, in no contract task&#x27;s `Read:` or `tests/contracts/&lt;pkg.Type&gt;/` Writes, with no fixtures folder yet), `draft_pipelines`, `changed_since_plan` (milestone docs Approved after the plan&#x27;s Last updated), `probes_blocking` (`PB-01 → service, ledger.BankTxn (M1)`: probes the milestone to plan meets, below), `interfaces_changed` (`stats.Cov (M1-T04, M1-T05)`: a symbol the plan&#x27;s interface task froze whose contract section, `**Used by:**` lines aside, differs from its text at the plan&#x27;s last commit, with the tasks that read it or whose steps&#x27; `In → Out` cells name it; outside git, or with the plan uncommitted, every frozen symbol of a contract.md in `changed_since_plan`), `stage_to_cut` (`S&lt;n&gt; name`: the first stage with no milestone rows that is Designed, whatever earlier milestones still wait for their plans; or `none`), `pipelines_inferred` (that stage&#x27;s pipelines, inferred from its Source, for build-planning to divide among the milestones it cuts; or a milestone&#x27;s when its Pipelines cell is empty), `milestone_references` and `milestone_skills` (the references and skills serving that same stage or milestone; references include PB entries whose Milestones name it), `references_unrouted` (`RF-NN (M&lt;n&gt;)`, `PB-NN (M&lt;n&gt;)`: for the active and each queued plan, a milestone reference in no task&#x27;s `Read:`, selector ignored), `skills_unrouted` (`skill (M&lt;n&gt;)`: a milestone skill on no task&#x27;s `**Skills:**`), `stage_unrouted` (`skill (S&lt;n&gt;)`, `RF-NN (S&lt;n&gt;)`: for each cut stage, a stage skill or reference that none of its milestones carries), `skills_missing` (referenced by the plan, its tasks or the milestone&#x27;s `**Skills:**`, not installed), `skills_available`, `grow_triggers` and `grow_held` (as architecture-design&#x27;s), `drift` (milestone pipelines), `stale_contracts`, `queued`, `base` |
+README.md:294:- `grow-size` W — a package doc over a per-file ceiling (contract.md 200, pipelines.md 300, tests.md 300 lines), however well it keeps to its per-unit budget: the package holds too much for one set of docs, though size alone never splits a package: the message says to trim the doc or split a module; silent while `grow_held` (above) records the user&#x27;s one package
+README.md
+devteam/status/architecture_design.py
+devteam/status/build_planning.py
+Shell cwd was reset to /Users/connorott/plugins/dev-team-workspace/iteration-11/rl-all-at-once/with_skill/project</pre></details></div><div class="step" id="SD282"><span class="sid">D282</span><span class="kind">Bash</span>python3 ../plugin/dev-team/scripts/dt.py next 2&gt;&amp;1 | head -20<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;python3 ../plugin/dev-team/scripts/dt.py next 2&gt;&amp;1 | head -20&quot;
+}</pre><div class="lbl">output</div><pre>next: build-planning (new)
+reason: build-planning reports new: stage_to_cut S1 Snake
+waiting on user: no
+run: /dev-team:build-planning</pre></details></div><div class="step" id="SD283"><span class="sid">D283</span><span class="kind">think</span>`rllab` has grown to 8 pipelines, exceeding the limit of 3, and there&#x27;s no decision record justifying keeping it as a single package—AD-01 only defines its shape, not this. I&#x27;m handing off to architecture-design&#x27;s Grow step since planning can&#x27;t proceed until that&#x27;s resolved.<details><summary>full text</summary><pre>`rllab` has grown to 8 pipelines, exceeding the limit of 3, and there&#x27;s no decision record justifying keeping it as a single package—AD-01 only defines its shape, not this. I&#x27;m handing off to architecture-design&#x27;s Grow step since planning can&#x27;t proceed until that&#x27;s resolved.
+
+</pre></details></div><div class="step" id="SD284"><span class="sid">D284</span><span class="kind">Skill</span>dev-team:architecture-design Grow: build-planning (New, cutting S1 Snake) stopped on grow_triggers &quot;rllab: 8 pipelines &gt; 3&quot;; grow_held is none (AD-01 names the single-package shape but no decision or request declines the split). Decide split vs. stay single with the user, then build-planning resumes.<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;skill&quot;: &quot;dev-team:architecture-design&quot;,
+  &quot;args&quot;: &quot;Grow: build-planning (New, cutting S1 Snake) stopped on grow_triggers \&quot;rllab: 8 pipelines &gt; 3\&quot;; grow_held is none (AD-01 names the single-package shape but no decision or request declines the split). Decide split vs. stay single with the user, then build-planning resumes.&quot;
+}</pre><div class="lbl">output</div><pre>Launching skill: dev-team:architecture-design</pre></details></div><div class="step" id="SD285"><span class="sid">D285</span><span class="kind">skill-body</span>skill loaded from `/Users/connorott/plugins/dev-team-workspace/iteration-11/rl-all-at-once/with_skill/plugin/dev-team/skills/architecture-design`</div><div class="step" id="SD286"><span class="sid">D286</span><span class="kind">Bash</span>python3 ../plugin/dev-team/scripts/dt.py status --skill architecture-design; cat ../plugin/dev-team/skills/architecture-design/references/grow.md<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;python3 ../plugin/dev-team/scripts/dt.py status --skill architecture-design; cat ../plugin/dev-team/skills/architecture-design/references/grow.md&quot;
+}</pre><div class="lbl">output</div><pre>skill: architecture-design
+mode: current
+docs: brief Accepted · spec Approved · architecture Approved (Single package) · roadmap stale (run dt roadmap) · plan missing · constraints missing
+next ids: AD-19 PL-09 TC-45 S4 M1
+references_unindexed: none
+references_changed: none
+references_missing: none
+spec: Approved, 69 live requirements
+architecture: Approved
+next_decision: AD-19
+uncovered: none
+changed_since: none
+spec_rows_pending: none
+stale: none
+package_docs: none
+packages_found: none
+skills: null-hypothesis-testing
+broken_fences: none
+contracts_missing: none
+legacy_layout: none
+grow_triggers: rllab: 8 pipelines &gt; 3
+grow_held: none
+stale_contracts: none
+probes_answered: none
+probes_failed: none
+routed_changes: none
+requests_open: none
+# Grow: single package to multi-package
+
+Read when a Grow trigger in `shape.md` fires or the user wants a split. It ends at the Review Gate in `../SKILL.md`, following `writing-rules.md`. Example: `examples-grow.md`; the multi-package result looks like `examples-new-multi.md`.
+
+1. Write a decision (`AD-NN`, scope `system`, as `decisions.md` says) explaining why now: the trigger, and the new boundary, owner, runtime, or release need.
+2. Propose the package list and dependency rules. Component ids become package ids where possible, so Covers entries and contract IDs (`profile.fit_seasonality`) carry over unchanged.
+3. Move each package&#x27;s detail from `docs/architecture.md` into `docs/packages/&lt;pkg&gt;/architecture.md`, and each `## &lt;component&gt;` group of the old contract into `docs/packages/&lt;pkg&gt;/contract.md` (`contracts.md`). Rewrite the root as the system map (the multi-package templates in `templates.md`).
+4. Add System pipelines for the flows that now cross packages, each with a new ID from `dt next-id PL`. A package pipeline whose flow now crosses keeps its own `PL-NN` ID: it stays the segment of the package that owns its entry, and `pipeline-design` Grow marks it `**Part of:**` the new system pipeline. Name that source pipeline at the gate. Never give a system pipeline an ID a package pipeline already holds.
+5. Change the header to `**Shape:** Multi-package`, add a Changelog row, and run the Review Gate. After approval, point to `pipeline-design` (Grow mode).</pre></details></div><div class="step" id="SD287"><span class="sid">D287</span><span class="kind">Bash</span>cd /Users/connorott/plugins/dev-team-workspace/iteration-11/rl-all-at-once/with_skill/plugin/dev-team/skills/architecture-design &amp;&amp; grep -n -i -A3 &quot;grow\|trigger\|size alone&quot; references/shape.md | head -60<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;cd /Users/connorott/plugins/dev-team-workspace/iteration-11/rl-all-at-once/with_skill/plugin/dev-team/skills/architecture-design &amp;&amp; grep -n -i -A3 \&quot;grow\\|trigger\\|size alone\&quot; references/shape.md | head -60&quot;
+}</pre><div class="lbl">output</div><pre>3:Read before proposing the shape, and when weighing Grow.
+4-
+5-- **Single package** (proof of concept, library, one service, research code): `docs/architecture.md` plus `docs/packages/&lt;pkg&gt;/contract.md`. Components are modules, one subfolder each; decisions live in the one doc. 1-3 pages.
+6-- **Multi-package** (a platform or monorepo of separately installed or deployed packages): a root `docs/architecture.md` system map with dependency rules, System pipelines and every decision (each scoped `system` or a package id), plus `architecture.md` and `contract.md` per package. Root 2-4 pages, each package 1-3.
+--
+12:## Grow triggers
+13-
+14:A single package grows into several when the user asks, or when one of these arrives and no recorded shape says otherwise (`grow_held` in `dt status`: while it is set, raise no Grow):
+15-
+16-- New requirements bring a dependency stack the rest shouldn&#x27;t carry (torch, torchvision).
+17-- A part runs or deploys on its own (a day-ahead forecast service), or needs its own install, release or owner.
+--
+19:`grow_triggers` in `dt status` and `dt lint`&#x27;s `grow-size` measure size, so neither is a trigger: answer them by trimming the doc or splitting a component&#x27;s modules, and say so at the gate.
+Shell cwd was reset to /Users/connorott/plugins/dev-team-workspace/iteration-11/rl-all-at-once/with_skill/project</pre></details></div><div class="step" id="SD288"><span class="sid">D288</span><span class="kind">say</span>No split is warranted, but the package&#x27;s shape is your call, so I need one answer before planning can go on. ⏎ Why it stopped: `dt` flags `rllab` because it has 8 pipelines and the size limit is 3. The architecture rules don&#x27;t treat size alone as a reason to split. A split is warranted when part of the code needs a dependency stack the rest shouldn&#x27;t carry, or when part runs, installs or ships separately. Neither applies here: ⏎ - Dependencies: Stable-Baselines3 and Gymnasium are already confined to the `reference` component, and an import check enforces that (AD-01). PyTorch is used b …[+822 chars]<details><summary>full text</summary><pre>No split is warranted, but the package&#x27;s shape is your call, so I need one answer before planning can go on.
+
+**Why it stopped:** `dt` flags `rllab` because it has 8 pipelines and the size limit is 3. The architecture rules don&#x27;t treat size alone as a reason to split. A split is warranted when part of the code needs a dependency stack the rest shouldn&#x27;t carry, or when part runs, installs or ships separately. Neither applies here:
+- **Dependencies:** Stable-Baselines3 and Gymnasium are already confined to the `reference` component, and an import check enforces that (AD-01). PyTorch is used by the learners, the run store and the reference check alike.
+- **Running separately:** it&#x27;s a one-person lab on one laptop. Nothing installs, deploys or has an owner of its own.
+- **Splitting the worlds apart:** AD-01 already turned down a package per world because all the worlds share the same core types.
+
+**Question:** should `rllab` stay one package?
+
+- **My recommendation (the default):** yes, keep one package. I&#x27;d add decision AD-19 (&quot;rllab stays one package; 8 pipelines is size, not a boundary&quot;) so this stops coming up. Then build-planning resumes cutting S1 Snake into milestones.
+- **The alternative:** split now, for example the worlds in one package and the learning, evaluation and reference code in another. That means rewriting the architecture and redesigning the pipelines before any planning.</pre></details></div>
+<h2>Commits</h2>
+<p>None.</p>
+<h2>Returned</h2>
+<pre>No split is warranted, but the package&#x27;s shape is your call, so I need one answer before planning can go on.
+
+**Why it stopped:** `dt` flags `rllab` because it has 8 pipelines and the size limit is 3. The architecture rules don&#x27;t treat size alone as a reason to split. A split is warranted when part of the code needs a dependency stack the rest shouldn&#x27;t carry, or when part runs, installs or ships separately. Neither applies here:
+- **Dependencies:** Stable-Baselines3 and Gymnasium are already confined to the `reference` component, and an import check enforces that (AD-01). PyTorch is used by the learners, the run store and the reference check alike.
+- **Running separately:** it&#x27;s a one-person lab on one laptop. Nothing installs, deploys or has an owner of its own.
+- **Splitting the worlds apart:** AD-01 already turned down a package per world because all the worlds share the same core types.
+
+**Question:** should `rllab` stay one package?
+
+- **My recommendation (the default):** yes, keep one package. I&#x27;d add decision AD-19 (&quot;rllab stays one package; 8 pipelines is size, not a boundary&quot;) so this stops coming up. Then build-planning resumes cutting S1 Snake into milestones.
+- **The alternative:** split now, for example the worlds in one package and the learning, evaluation and reference code in another. That means rewriting the architecture and redesigning the pipelines before any planning.</pre>
+</body></html>

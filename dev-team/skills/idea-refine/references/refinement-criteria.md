@@ -84,7 +84,7 @@ Apply this when the idea depends on data or a learned model. For these projects 
 - What does a wrong prediction cost, and who catches it?
 
 **Does the data exist?**
-- Where would the data come from — data we own, a public dataset, a paid API? (Name candidates to test feasibility, checked from their public docs and pricing pages only; the final choice is made in the architecture. A risk that could kill the idea and that the docs can't settle goes under Open questions, for the architecture to probe.)
+- Where would the data come from — data we own, a public dataset, a paid API? (Name candidates to test feasibility, checked from their public docs and pricing pages only; the final choice is made in the architecture. When the user hasn't picked a source for a kind of data the idea needs ("no fundamentals source yet"), suggest two or three with their cost and licence and ask which; one still unpicked goes under Open questions with its candidates. A risk that could kill the idea and that the docs can't settle goes under Open questions, for the architecture to probe.)
 - Is there enough history and coverage (time span, entities, classes, regions)?
 - For supervised learning: are there labels? Who made them, and would two people agree?
 - Can we legally use it for this purpose? Licensing, terms of service, personal or patient data?

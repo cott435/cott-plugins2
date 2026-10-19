@@ -98,7 +98,10 @@ def decide(repo, skip=()) -> dict:
         elif skill == "pipeline-design":
             # A component on no step is a gap the gate lets stand with a reason; a spec ID on no pipeline is work.
             if mode not in IDLE and (mode != "extend" or r["uncovered_ids"]):
-                why = f"spec IDs on no pipeline: {', '.join(r['uncovered_ids'])}" if r["uncovered_ids"] else ""
+                # A stage's ID on no component is shown with its stages and the decisions that meet it.
+                staged = {s.split(" ")[0]: s for s in r["stage_ids_unplaced"]}
+                ids = [staged.get(i, i) for i in r["uncovered_ids"]]
+                why = f"spec IDs on no pipeline: {', '.join(ids)}" if ids else ""
                 return _per_package(skill, r, why or "pipelines to design")
         elif mode not in IDLE:
             return _out(skill, mode, _why(skill, r))

@@ -275,6 +275,24 @@ def brief_stages_undesigned(repo: Repo) -> list[str]:
     return [st.id for st in sts if roadmap_cmd.stage_status(repo, st) in ("Idea", "Specced")]
 
 
+def stage_gaps(repo: Repo, stage_ids: list[str]) -> str:
+    """What keeps each stage below Designed, stages with the same gap grouped: `S1, S2: QR-04 on no Approved
+    pipeline`, `S3: PL-05, PL-06 not Approved`."""
+    by_gap: dict[str, list[str]] = {}
+    for st in (s for s in model.stages(repo.roadmap) if s.id in stage_ids):
+        draft = [p for p in roadmap_cmd.milestone_pipelines(repo, st)[0] if not repo.is_retired(p)
+                 and not ((d := repo.lookup(p, archive=False)) and d.doc.status == "Approved")]
+        off = roadmap_cmd.ids_off_approved(repo, st)
+        if draft:
+            gap = f"{', '.join(draft[:8])}{f' and {len(draft) - 8} more' if len(draft) > 8 else ''} not Approved"
+        elif off:
+            gap = f"{', '.join(off[:8])}{f' and {len(off) - 8} more' if len(off) > 8 else ''} on no Approved pipeline"
+        else:
+            gap = "no pipeline inferred from its Source"
+        by_gap.setdefault(gap, []).append(st.id)
+    return "; ".join(f"{', '.join(sts)}: {gap}" for gap, sts in by_gap.items())
+
+
 def unit_blocked_reason(repo: Repo, unit: model.Milestone | model.Stage) -> str:
     """Why the next unit can't be planned or cut yet: pipelines not all Approved, or (a stage) spec IDs its
     Source adds that no Approved pipeline carries."""
@@ -330,7 +348,7 @@ def build_planning(repo: Repo, r: Report) -> None:
         mode = "blocked"
         no_pl = [pkg for pkg in known_packages(repo) if repo.package_doc(pkg, "pipelines") is None]
         blocked = (f"{', '.join(undesigned)} below Designed: every stage comes from the brief, so all are "
-                   "designed before the first cut"
+                   f"designed before the first cut; {stage_gaps(repo, undesigned)}"
                    + (f"; no pipelines.md for {', '.join(no_pl)}" if no_pl else "") + "; run pipeline-design")
     elif cut is not None:
         if not active and not queued and never_planned:

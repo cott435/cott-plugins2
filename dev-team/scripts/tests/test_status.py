@@ -276,6 +276,22 @@ class PipelineDesignTest(Base):
         self.assertEqual(d["components_unowned"], ["risk"])
         self.assertEqual(d["retired_refs"], ["docs/packages/quant/pipelines.md:7 PL-04"])
 
+    def test_coverage_and_owners_across_packages(self):
+        # iteration 10 D8: `worlds` has no pipeline of its own; quant's PL-03 runs its component as a step.
+        self.write("docs/packages/worlds/architecture.md", "# worlds — Architecture\n\n**Package:** worlds · "
+                   "**Status:** Approved\n\n## Components\n| Component | Responsibility | Covers | Depends on |\n"
+                   "|---|---|---|---|\n| `prey` | Prey world | PORT-02 | — |\n")
+        self.write("docs/packages/worlds/pipelines.md", "# worlds — Pipelines\n\n**Package:** worlds · "
+                   "**Status:** Approved\n")
+        self.edit("docs/packages/quant/pipelines.md", "| realized variance only | PORT-02 |",
+                  "| realized variance only | PORT-02 |\n| 4 | `pick_prey` | prey | Weights → Weights | identity | — |")
+        d = self.status("pipeline-design")
+        self.assertEqual((d["uncovered_ids"], d["components_unowned"]), ([], ["prey"]))
+        self.edit("docs/packages/quant/pipelines.md", "| `pick_prey` | prey |", "| `pick_prey` | worlds.prey |")
+        d = self.status("pipeline-design")
+        self.assertEqual((d["uncovered_ids"], d["components_unowned"]), ([], []))
+        self.assertEqual(d["packages"], {"quant": "current", "worlds": "current"})
+
     def test_misplaced_pipeline_is_grow(self):
         self.write("docs/packages/other/pipelines.md", "# other — Pipelines\n\n**Package:** other · **Status:** Approved\n\n"
                    "## PL-09: Stray\n**Entry:** `src/quant/data/x.py::run` · **Trigger:** `x`\n")
@@ -617,7 +633,8 @@ class BuildPlanningModesTest(Base):
         d = self.status("build-planning")
         self.assertEqual((d["mode"], d["stage_to_cut"]), ("blocked", "none"))
         self.assertEqual(d["blocked"], "S1, S2 below Designed: every stage comes from the brief, so all are "
-                                       "designed before the first cut; no pipelines.md for web; run pipeline-design")
+                                       "designed before the first cut; S1, S2: PORT-03 on no Approved pipeline; "
+                                       "no pipelines.md for web; run pipeline-design")
         # One stage from an idea file: an incremental project, cut stage by stage.
         self.edit("docs/roadmap.md", "| S2 | Classical portfolios | brief |", "| S2 | Classical portfolios | ideas/classical-portfolios.md |")
         self.assertNotIn("from the brief", self.status("build-planning")["blocked"] or "")

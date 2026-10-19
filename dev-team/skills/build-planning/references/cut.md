@@ -2,7 +2,7 @@
 
 Read before planning a milestone, before any task is written. Example: `examples-cut.md` (a large stage cut into slices).
 
-Read only `dt status`, the roadmap, the stage's Source (*What success looks like*), the packages' `pipelines.md`, `contract.md` headings and `tests.md`, the spec sections they cover, the skill list and the `milestone_references` entries.
+Read only `dt status`, the roadmap, the stage's Source (*What success looks like*), the packages' `pipelines.md`, `contract.md` headings and settings types, `tests.md`, the spec sections they cover, the skill list and the `milestone_references` entries.
 
 ## 1. Grow check
 
@@ -46,3 +46,5 @@ From the milestone row and the pipelines: the spec IDs, packages, pipelines and 
 **Size is the critical path:** the longest `Depends on` chain, interface and system tasks included, at most about 15 (`dt status` `critical_path`; `dt lint` errors `milestone-size` above 15). Tasks that don't depend on each other don't add up, so independent tracks (relay beside core, meter readings beside weather) stay in one milestone, whatever the plan's total. Over the cap: mitigate an edge with an interface, fold (`phase0.md`), or re-cut the stage (step 2) along a dependency line. A single task belongs in an existing milestone.
 
 Every spec ID the milestone's pipelines cover lands on a task or under `**Deferred:**` with a target and reason (`RES-07 (to M4: needs day-ahead forecasts)`), and so does every step of those pipelines that gets no task, by name (`PL-03.PPOAgent (to M3: fish need it first)`). Check each pipeline's step table row by row, rows a later stage's design added included (a library call such as `PL-07.daily_bars`). `uncovered` and `steps_unplanned` must end empty.
+
+**Settings are typed before planning.** Every setting a step's acceptance needs (a hyperparameter, schedule or threshold) is a contract field with a default (`TrainSettings.target_sync: int = 1000`), and its task names that field. Where the contract holds settings only in an untyped map (`hparams: Mapping[str, Any]`) or not at all, route the type: `dt route architecture-design "type <Type>'s settings as fields with defaults: <names>" --from build-planning`, and stop: the milestone is planned after that Revise. Never leave a setting's name or default to the builder.

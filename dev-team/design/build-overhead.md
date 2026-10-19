@@ -1,11 +1,15 @@
 # Build overhead: what to cut
 
-**Status:** Draft for the user's decision · **Date:** 2026-10-19 · **Branch:** `build-overhead` (from `build-phase`)
+**Status:** Decided 2026-10-19 · **Date:** 2026-10-19 · **Branch:** `build-overhead` (from `build-phase`)
 **Evidence:** [findings-stage5.md](../evals/results-iteration-b1/findings-stage5.md),
 [findings-stage6.md](../evals/results-iteration-b1/findings-stage6.md),
 [findings-stage6b.md](../evals/results-iteration-b1/findings-stage6b.md), and each run's
 `.git/dt-build/log.jsonl` and `agent_stream.jsonl` under `dev-team-workspace/iteration-b1/` (times below are
 seconds from `dt build start`).
+
+**Decision (the user, 2026-10-19):** make cuts 1, 2, 3 and 6 on this branch; 4 and 5's planning parts go to
+[build-overhead-proposals.md](build-overhead-proposals.md) (5's spec-writing line with them, not made here);
+7 isn't made; no small-milestone path for now: measure these cuts in the next build eval first.
 
 ## The problem
 

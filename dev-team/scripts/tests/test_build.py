@@ -685,6 +685,32 @@ class FindingFromTest(BuildCase):
         self.assertIn("A checkpoint already reviewed M1-T01: run the Milestone exit list over the whole diff, and "
                       "review and mutation-check code only for M1-T02, M1-T03, M1-T04.", rows[0]["prompt"])
 
+    def test_a_chain_of_interface_tasks(self):
+        """design/build-overhead.md, cut 4: a types task, then a contract task depending on it. One barrier
+        after the last reviews both; a tester waits for the interface tasks its task depends on."""
+        self.edit("tasks/plan.md", "### Checkpoint after M1-T01 (barrier)",
+                  "### M1-T05: Freeze the summary contract tests\n"
+                  "**Package:** mini · **Step:** contract · **Kind:** interface · **Size:** S · **Mode:** solo\n"
+                  "**Read:** core.Summary\n**Acceptance:**\n- [ ] the Summary sample validates\n"
+                  "**Verify:** `pytest tests/contracts`\n"
+                  "**Depends on:** M1-T01 · **Writes:** tests/contracts/core.Summary/**\n\n"
+                  "### Checkpoint after M1-T05 (barrier)")
+        self.edit("tasks/plan.md", "**Depends on:** M1-T02 · **Writes:** src/mini/summary.py, tests/unit/mini/test_summary.py, "
+                  "tests/intent", "**Depends on:** M1-T02, M1-T05 · **Writes:** src/mini/summary.py, "
+                  "tests/unit/mini/test_summary.py, tests/intent")
+        self.edit("tasks/todo.md", "- [ ] M1-T02", "- [ ] M1-T05 Freeze the summary contract tests (mini, S, solo)\n- [ ] M1-T02")
+        self.commit("two interface tasks")
+        self.assertEqual(self.dt_json("build", "go")[0], 0)
+        self.assertEqual([(x["id"], x["role"]) for x in self.ready()["rows"]], [("M1-T01", "solo")])
+        self.fake_land("M1-T01")
+        r = self.ready()
+        self.assertEqual([(x["id"], x["role"]) for x in r["rows"]], [("M1-T05", "solo")])
+        self.assertEqual({(h["id"], h["why"]) for h in r["held"]}, {("M1-T02", "barrier: checkpoint after M1-T05 not passed")})
+        self.fake_land("M1-T05")
+        r = self.ready()
+        self.assertEqual([(x["id"], x["role"]) for x in r["rows"]], [("M1-T05.mini", "reviewer"), ("M1-T03", "tester")])
+        self.assertEqual(r["rows"][0]["tasks"], ["M1-T01", "M1-T05"])
+
     def test_phase_review_rows_name_no_reviewed_tasks(self):
         self.fake_land("M1-T01")
         row = self.ready()["rows"][0]

@@ -225,6 +225,11 @@ class SingleProject(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr[-2000:])
         self.assertNotIn("-> pytest", result.stderr)
 
+    def test_own_package_id_scopes_to_every_test(self) -> None:
+        result = check(self.root, "gate", "--pkg", "tinyq")  # what dt claim passes for a single package
+        self.assertEqual(result.returncode, 0, result.stderr[-2000:])
+        self.assertIn("-> pytest tests/intent tests/unit ", result.stderr)
+
     def test_unknown_pkg_is_a_usage_error(self) -> None:
         result = check(self.root, "gate", "--pkg", "nope")
         self.assertEqual(result.returncode, 64)

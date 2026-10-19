@@ -40,7 +40,14 @@ TYPE_GATE="{{type_gate}}"          # mypy | pyright: the type checker that gates
 
 # A package (or, in a single package, a component) and every package that depends on it,
 # from the architecture's dependency rules.
+# One package: its own id (a task's Package, which dt claim passes) scopes to every test.
+own_package() {
+  awk -F'"' '/^\[project\]/ { p = 1; next } /^\[/ { p = 0 } p && /^name *=/ { gsub("-", "_", $2); print $2; exit }' \
+    pyproject.toml 2>/dev/null
+}
+
 pkg_scope() {
+  if [ -z "$PACKAGES_DIR" ] && [ "$1" = "$(own_package)" ]; then return 0; fi
   case "$1" in
 {{pkg_scope_cases}}
     *) return 1 ;;

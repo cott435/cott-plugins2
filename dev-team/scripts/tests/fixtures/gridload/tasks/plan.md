@@ -18,6 +18,9 @@
 **Verify:** `pytest tests/contracts` · `scripts/check.sh gate`
 **Depends on:** — · **Writes:** src/gridload/__init__.py, src/gridload/__main__.py, src/gridload/pipeline.py, src/gridload/ingest/**, src/gridload/profile/**, src/gridload/pipelines/**, tests/contracts/**
 
+### Checkpoint after M1-T01 (barrier)
+- [ ] Every frozen type and signature matches contract.md; no test pins a stub
+
 ## Phase 1: Step spines
 
 ### M1-T02: read_export spine on a synthetic export

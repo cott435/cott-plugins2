@@ -8,10 +8,17 @@ import re
 from collections import Counter
 from pathlib import Path
 
-from .. import git, model
+from .. import git, md, model
+from .. import requests as rq
 from ..repo import Doc, Repo
 
 GROW_PIPELINES, GROW_MODULES, GROW_DOC_LINES = 3, 12, 2000
+# A request keeping one package: "one package", "a single package", "no split" (not "one package per component").
+KEEP_ONE = re.compile(r"\b(?:one|single)\s+package\b(?!\s+(?:per|for|each)\b)|\b(?:no|not|don'?t|never)\s+split\b",
+                      re.IGNORECASE)
+# A decision declining the split: "keeps one package", "no split" (a decision only naming the shape doesn't).
+SPLIT_DECLINED = re.compile(r"\b(?:no|not|don'?t|never|without)\s+(?:a\s+)?split\b|\b(?:keeps?|kept|keeping|stays?|"
+                            r"remains?)\s+(?:as\s+)?(?:one|a single|single)\s+package\b", re.IGNORECASE)
 WALK_IGNORE = {"node_modules", ".venv", "venv", ".git", "dist", "build", "__pycache__", ".tox"}
 
 
@@ -101,8 +108,28 @@ def py_files(base: Path) -> list[Path]:
     return out
 
 
+def shape_kept(repo: Repo) -> list[str]:
+    """What records the user's choice of one package, while the architecture is single-package: a request in force
+    whose words keep it (`UR-34 "Keep it as one package, no split."`), or an Accepted decision whose text declines
+    the split (`AD-15 "Grow declined: rllab stays one package"`). The Grow triggers are held while any does."""
+    arch = repo.architecture
+    if arch is None or is_multi(repo):
+        return []
+    out = [f'{r.id} "{r.words}"' for r in rq.all_requests(repo)
+           if r.state not in ("changed", "superseded") and KEEP_ONE.search(r.words)]
+    for d in arch.definitions():
+        status = md.strip_md(md.fields_in(arch.lines, d.start + 1, d.end).get("Status", ""))
+        if (d.id.startswith("AD-") and d.how == "heading" and not d.retired and status.startswith("Accepted")
+                and SPLIT_DECLINED.search(d.text)):
+            out.append(f'{d.id} "{md.strip_md(d.title)}"')
+    return out
+
+
 def grow_triggers(repo: Repo) -> list[str]:
+    """The measurable Grow triggers per package; none while `shape_kept` holds the user's one package."""
     out = []
+    if shape_kept(repo):
+        return out
     for pkg in known_packages(repo):
         n_pl = len(package_pipelines(repo, pkg))
         if n_pl > GROW_PIPELINES:

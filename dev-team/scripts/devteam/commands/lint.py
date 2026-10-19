@@ -7,6 +7,7 @@ problems located in the files asked for. Cross-doc checks always read the whole 
 from __future__ import annotations
 
 import json
+import math
 import os
 import re
 import sys
@@ -21,6 +22,8 @@ from .. import requests as rq
 from .. import routes as rt
 from ..repo import Doc, Repo
 from ..status.common import available_skills
+from ..status.build_planning import steps_unplanned
+from ..status.packages import shape_kept
 from . import roadmap as roadmap_cmd
 
 # code → severity (E fails the run, W doesn't)
@@ -41,13 +44,16 @@ SEVERITY = {
     "request-number": "W", "request-cite": "W", "request-source": "W",
     "packet-type-closure": "W", "parallel-step": "W", "milestone-lines": "E", "milestone-order": "E",
     "exit-cases-in-scope": "E", "kind-title": "E", "covers-vs-deferred": "E", "closed-open-question": "W",
-    "process-narration": "W", "explain-stale": "W", "spine-claim": "W",
+    "process-narration": "W", "explain-stale": "W", "spine-claim": "W", "step-unplanned": "W",
+    "interface-barrier": "W",
 }
 
 # Size budgets (planning-stage.md §3), in lines. Package docs are budgeted per unit (lines per unit × units +
 # an allowance for the header, groups and Retired lines); pipelines.md's pre-build layout section is extra.
 BUDGETS = {"plan": 400, "queued-plan": 400}
 UNIT_BUDGETS = {"contract": (8, 12, "symbol"), "pipelines": (35, 10, "pipeline"), "tests": (10, 15, "test case")}
+# A pipeline with many step rows (library classes and called contract functions are steps) gets 20 + 1.5 a row.
+PIPELINE_BASE, PER_STEP_ROW = 20, 1.5
 # Past these a package holds too much for one set of docs: consider a Grow.
 GROW_CEILINGS = {"contract": 200, "pipelines": 300, "tests": 300}
 ROADMAP_SECTION_MAX = 6
@@ -258,15 +264,22 @@ def _units(doc) -> int:
 
 
 def _unit_budget(doc) -> tuple[int, str]:
-    """(budget in lines, how it was worked out) for a contract, pipelines or tests doc."""
+    """(budget in lines, how it was worked out) for a contract, pipelines or tests doc. A pipeline gets the larger
+    of its per-unit lines and `PIPELINE_BASE` + `PER_STEP_ROW` a step row."""
     per, allowance, unit = UNIT_BUDGETS[doc.kind]
     n = _units(doc)
     layout = sum(h.end - h.line for h in doc.prebuild_sections() if h.level == 2) if doc.kind == "pipelines" else 0
-    how = f"{per} per {unit} × {n} + {allowance}" + (f" + {layout} layout" if layout else "")
-    return per * n + allowance + layout, how
+    rows = [len(p.steps) for p in model.pipelines(doc)] if doc.kind == "pipelines" else []
+    long = [r for r in rows if PIPELINE_BASE + math.ceil(PER_STEP_ROW * r) > per]
+    units = per * (n - len(long)) + sum(PIPELINE_BASE + math.ceil(PER_STEP_ROW * r) for r in long)
+    how = f"{per} per {unit} × {n - len(long)}" + (f" + ({PIPELINE_BASE} + {PER_STEP_ROW:g} per step row) × "
+                                                   f"{len(long)} ({sum(long)} rows)" if long else "")
+    how += f" + {allowance}" + (f" + {layout} layout" if layout else "")
+    return units + allowance + layout, how
 
 
 def check_budget(ctx: Context):
+    kept = shape_kept(ctx.repo)       # the user kept one package: no Grow nudge
     for doc in ctx.scoped_docs:
         limit = BUDGETS.get(doc.kind)
         if limit and len(doc.lines) > limit:
@@ -276,9 +289,10 @@ def check_budget(ctx: Context):
             if len(doc.lines) > limit:
                 yield _p(doc, 0, "budget", f"{len(doc.lines)} lines, budget {limit} ({how})")
             ceiling = GROW_CEILINGS[doc.kind]
-            if len(doc.lines) > ceiling:
+            if len(doc.lines) > ceiling and not kept:
                 yield _p(doc, 0, "grow-size", f"{len(doc.lines)} lines, over the {ceiling}-line ceiling for one "
-                         f"package's {doc.kind} doc: architecture-design should consider a Grow")
+                         f"package's {doc.kind} doc: size alone never splits a package; trim the doc, or split a "
+                         "module")
         if doc.kind == "brief":
             words, goals = len(doc.text.split()), model.goal_count(doc)
             if words > BRIEF_WORDS:
@@ -780,7 +794,7 @@ def check_request_trace(ctx: Context):
     for r in reqs:
         if r.superseded_by and (r.superseded_by not in ids or r.superseded_by == r.id):
             yield _p(doc, r.line, "request-trace", f"{r.id} is superseded by {r.superseded_by}: no such later request")
-        defs = {i: ctx.repo.lookup(i, archive=False) for i in r.honoured_by if not rq.is_section(i)}
+        defs = {i: ctx.repo.lookup(i) for i in r.honoured_by if not rq.is_section(i)}
         for i, d in defs.items():
             if d is None:
                 yield _p(doc, r.line, "request-trace", f"{r.id} → {i}: {i} is not defined")
@@ -789,7 +803,7 @@ def check_request_trace(ctx: Context):
                 yield _p(doc, r.line, "request-trace",
                          f"{r.id} → {i}: no such heading in {', '.join(rq.HONOUR_KINDS[r.owner])}")
         for i in r.into:
-            if (d := ctx.repo.lookup(i, archive=False)) is None or d.retired:
+            if (d := ctx.repo.lookup(i)) is None or d.retired:
                 yield _p(doc, r.line, "request-trace", f"{r.id} was changed in {i}: {i} is not defined")
         if (defs and len(defs) == len(r.honoured_by) and all(d is not None and not d.retired for d in defs.values())
                 and not rq.honouring(ctx.repo, r)):
@@ -847,7 +861,7 @@ def check_request_number(ctx: Context):
         texts = [rq.definition_text(ctx.repo, i) for i in ids]
         if not ids or not all(texts):
             continue
-        for shown in rq.unstated(r.changed or r.words, texts):
+        for shown in rq.unstated(rq.strip_labels(r.changed or r.words, r.about), texts):
             yield _p(doc, r.line, "request-number",
                      f"{r.id} says {shown!r}, which {', '.join(ids)} doesn't state: honour the number, or change it "
                      "with the user's yes")
@@ -1319,6 +1333,33 @@ def check_covers_vs_deferred(ctx: Context):
                               "W")
 
 
+def check_step_unplanned(ctx: Context):
+    """A step of the milestone's pipelines that no task builds and the Scope doesn't defer by name
+    (`build_planning.steps_unplanned`): spec IDs can all be covered while a step is left out."""
+    for doc in ctx.plan_docs:
+        at = md.field_line(doc.lines, 0, len(doc.lines), "Deferred")
+        if at is None:
+            at = md.field_line(doc.lines, 0, len(doc.lines), "Covers")
+        for pid, names in steps_unplanned(ctx.repo, doc).items():
+            shown = ", ".join(names[:6]) + (f" and {len(names) - 6} more" if len(names) > 6 else "")
+            yield _p(doc, at or 0, "step-unplanned",
+                     f"{pid} steps on no task and not Deferred by name: {shown}: give each a task, or defer it "
+                     f"(`{pid}.{names[0]} (to M<n>: why)`)")
+
+
+def check_interface_barrier(ctx: Context):
+    """An interface task followed straight, in plan order, by a non-interface task with no checkpoint between them
+    (`### Checkpoint after M1-T01 (barrier)`): the build adds the review anyway; the block's items guide it."""
+    for doc in ctx.plan_docs:
+        tasks = sorted(model.tasks(doc), key=lambda t: t.start)
+        marks = [c.start for c in model.checkpoints(doc)]
+        for a, b in zip(tasks, tasks[1:]):
+            if a.kind == "interface" and b.kind != "interface" and not any(a.start < m < b.start for m in marks):
+                yield _p(doc, a.start, "interface-barrier",
+                         f"{a.id} (interface) is followed by {b.id} with no checkpoint between: add "
+                         f"`### Checkpoint after {a.id} (barrier)` so the interface is reviewed before it is built on")
+
+
 def check_parallel_step(ctx: Context):
     """Two thicken tasks on one step (`PL-NN.<name>`) with no `Depends on` path between them: the step is one
     function, so each needs the file the other changes even when their Writes don't overlap."""
@@ -1480,17 +1521,23 @@ def check_packet_type_closure(ctx: Context):
 def check_step_io_types(ctx: Context):
     """Every type a package step's `In → Out` cell names is a contract type section, and every step's Out names
     one: the boundaries an interface task freezes (entry arguments on the In side may stay plain). A project with
-    no type sections yet gets warnings, not errors."""
+    no type sections yet gets warnings, not errors, and so does a type an open route (docs/routes.md) names: the
+    addition waits for its owner's Revise."""
     types = model.contract_types(ctx.repo)
     sev = "" if types else "W"
+    routed = " ".join(r.change for r in rt.routes(ctx.repo) if not r.done)
     for doc in ctx.repo.docs("pipelines"):
         for p in model.pipelines(doc):
             for s in p.steps:
                 for name in s.in_types + s.out_types:
                     if model.resolve_type(types, name) is None:
+                        short = name.rsplit(".", 1)[-1]
+                        waiting = bool(re.search(rf"(?<![\w.]){re.escape(short)}\b|\b{re.escape(name)}\b", routed))
                         yield Problem(doc.rel, s.line + 1, "step-io-types",
                                       f"{p.id} step `{s.name}` names {name}, which no contract.md type section "
-                                      f"defines (`### <component>.{name.rsplit('.', 1)[-1]}: type`)", sev)
+                                      f"defines (`### <component>.{short}: type`)"
+                                      + ("; routed, waiting for its owner's Revise" if waiting else ""),
+                                      "W" if waiting else sev)
                 if not s.out_types:
                     yield Problem(doc.rel, s.line + 1, "step-io-types",
                                   f"{p.id} step `{s.name}`: its Out names no contract type", sev)
@@ -1744,7 +1791,7 @@ CHECKS = [
     check_todo_mismatch, check_finding_disposition, check_foreign_plan,
     check_ref_file, check_ref_hash, check_ref_large, check_ref_prefix, check_roadmap_skill, check_roadmap_stage,
     check_spec_stage, check_milestone_lines, check_milestone_order, check_exit_cases_in_scope,
-    check_kind_title, check_covers_vs_deferred, check_closed_open_question, check_process_narration,
+    check_kind_title, check_covers_vs_deferred, check_step_unplanned, check_interface_barrier, check_closed_open_question, check_process_narration,
     check_probe_fields, check_probe_informs, check_probe_cite, check_probe_runner, check_probe_leak,
     check_probe_sample, check_probe_results, check_probe_stale, check_probe_large,
     check_boundaries, check_probe_open, check_milestone_depends,

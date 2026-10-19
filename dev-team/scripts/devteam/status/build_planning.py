@@ -12,7 +12,7 @@ from ..commands import roadmap as roadmap_cmd
 from ..repo import Doc, Repo
 from .common import (OWN_SKILLS, Report, add_common, add_graph, advance_ready, available_skills, blocked_reason,
                      live_spec_ids, milestone_row, next_task, plan_base)
-from .packages import drift, grow_triggers, known_packages, stale_contracts
+from .packages import drift, grow_triggers, known_packages, shape_kept, stale_contracts
 
 
 def expected_mode(task: model.Task) -> str:
@@ -48,6 +48,39 @@ def uncovered(repo: Repo, plan: Doc, tasks: list[model.Task], pipelines: list[st
     deferred = set(md.expand_refs(scope.get("Deferred", "")))
     left = wanted - on_tasks - deferred
     return sorted(left & live if live else left)
+
+
+REUSED = re.compile(r"\bas built\b|^\s*as PL-\d{2,}", re.IGNORECASE)
+
+
+def steps_unplanned(repo: Repo, plan: Doc) -> dict[str, list[str]]:
+    """Pipeline → the steps of the plan's milestone pipelines that no task builds and the Scope doesn't defer by
+    name (`PL-07.daily_bars (to M3: …)`). A task builds a step its Step names (`PL-07.daily_bars`); a spine task
+    on the whole pipeline (`PL-07`) builds all of them; a step another milestone built (a task of this, a queued or
+    an archived plan names the step's name on another pipeline) or whose Spine version reuses one (`as PL-05`,
+    `PL-01 as built`) needs none."""
+    row = milestone_row(repo, model.milestone_of(plan))
+    if row is None:
+        return {}
+    tasks = model.tasks(plan)
+    others = [t for d in repo.docs("plan", "queued-plan", "archived-plan", archive=True) for t in model.tasks(d)]
+    named = {m.group(0) for t in tasks for m in re.finditer(r"PL-\d{2,}\.[\w.]+", t.step)}
+    refs = {(m.group(1), m.group(2)) for t in tasks + others for m in re.finditer(r"(PL-\d{2,})\.([\w.]+)", t.step)}
+    whole = {t.step.strip() for t in tasks if re.fullmatch(r"PL-\d{2,}", t.step.strip())
+             and (t.kind == "spine" or (not t.kind and t.is_spine))}
+    deferred = set(re.findall(r"PL-\d{2,}\.[\w.]+", md.fields_in(plan.lines, 0, len(plan.lines)).get("Deferred", "")))
+    by_id = {p.id: p for p in model.all_pipelines(repo)}
+    out: dict[str, list[str]] = {}
+    for pid in roadmap_cmd.milestone_pipelines(repo, row)[0]:
+        p = by_id.get(pid)
+        if p is None or repo.is_retired(pid) or pid in whole:
+            continue
+        left = [s.name for s in p.steps if f"{pid}.{s.name}" not in named | deferred
+                and not REUSED.search(md.strip_md(s.spine))
+                and not any(name == s.name and pl != pid for pl, name in refs)]
+        if left:
+            out[pid] = left
+    return out
 
 
 def skills_missing(plan: Doc | None, tasks: list[model.Task], available: list[str],
@@ -275,6 +308,24 @@ def brief_stages_undesigned(repo: Repo) -> list[str]:
     return [st.id for st in sts if roadmap_cmd.stage_status(repo, st) in ("Idea", "Specced")]
 
 
+def stage_gaps(repo: Repo, stage_ids: list[str]) -> str:
+    """What keeps each stage below Designed, stages with the same gap grouped: `S1, S2: QR-04 on no Approved
+    pipeline`, `S3: PL-05, PL-06 not Approved`."""
+    by_gap: dict[str, list[str]] = {}
+    for st in (s for s in model.stages(repo.roadmap) if s.id in stage_ids):
+        draft = [p for p in roadmap_cmd.milestone_pipelines(repo, st)[0] if not repo.is_retired(p)
+                 and not ((d := repo.lookup(p, archive=False)) and d.doc.status == "Approved")]
+        off = roadmap_cmd.ids_off_approved(repo, st)
+        if draft:
+            gap = f"{', '.join(draft[:8])}{f' and {len(draft) - 8} more' if len(draft) > 8 else ''} not Approved"
+        elif off:
+            gap = f"{', '.join(off[:8])}{f' and {len(off) - 8} more' if len(off) > 8 else ''} on no Approved pipeline"
+        else:
+            gap = "no pipeline inferred from its Source"
+        by_gap.setdefault(gap, []).append(st.id)
+    return "; ".join(f"{', '.join(sts)}: {gap}" for gap, sts in by_gap.items())
+
+
 def unit_blocked_reason(repo: Repo, unit: model.Milestone | model.Stage) -> str:
     """Why the next unit can't be planned or cut yet: pipelines not all Approved, or (a stage) spec IDs its
     Source adds that no Approved pipeline carries."""
@@ -330,8 +381,10 @@ def build_planning(repo: Repo, r: Report) -> None:
         mode = "blocked"
         no_pl = [pkg for pkg in known_packages(repo) if repo.package_doc(pkg, "pipelines") is None]
         blocked = (f"{', '.join(undesigned)} below Designed: every stage comes from the brief, so all are "
-                   "designed before the first cut"
+                   f"designed before the first cut; {stage_gaps(repo, undesigned)}"
                    + (f"; no pipelines.md for {', '.join(no_pl)}" if no_pl else "") + "; run pipeline-design")
+    elif active and (changed or moved) and not any(i.checked for i in items):
+        mode = "replan"     # an unbuilt plan the docs moved under is replanned before the next stage is cut
     elif cut is not None:
         if not active and not queued and never_planned:
             # New plans the first unit and cuts every designed stage; the first unit must be Designed too.
@@ -387,6 +440,8 @@ def build_planning(repo: Repo, r: Report) -> None:
     r.add("blocked_tasks", blocked_tasks)
     r.add("uncovered", uncovered(repo, active, tasks, milestone_pls) if active else [])
     r.add("no_spine", [p for p in milestone_pls if p not in spined])
+    r.add("steps_unplanned", [f"{pid}.{s}" for pid, ss in (steps_unplanned(repo, active) if active else {}).items()
+                              for s in ss])
     r.add("mode_violations", mode_violations(tasks))
     r.add("boundaries_unfrozen", boundaries_unfrozen(repo, pkgs, tasks) if active else [])
     r.add("draft_pipelines", drafts)
@@ -403,6 +458,7 @@ def build_planning(repo: Repo, r: Report) -> None:
     r.add("skills_missing", skills_missing(active, tasks, available, focus_skills))
     r.add("skills_available", available)
     r.add("grow_triggers", grow_triggers(repo))
+    r.add("grow_held", shape_kept(repo))
     pl_drift = drift(repo, [p for p in model.all_pipelines(repo) if p.id in milestone_pls])
     r.add("drift", "unknown" if pl_drift is None else pl_drift)
     r.add("stale_contracts", stale_contracts(repo))

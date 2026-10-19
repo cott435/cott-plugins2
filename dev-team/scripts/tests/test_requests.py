@@ -247,6 +247,19 @@ class LintTest(Base):
         self.assertEqual(sorted(p.message.split(" ")[0] for p in self.problems("request-open")),
                          ["UR-01", "UR-02", "UR-03"])
 
+    def test_plan_trace_survives_archive(self):
+        # iteration 10 D3: `dt archive` moves the plan's task IDs to tasks/archive/; a trace to them still holds.
+        self.write(PATH, DOC.replace(" · architecture-design 2026-10-18\n", " · architecture-design 2026-10-18 → AD-03\n")
+                   + '- **UR-07** plan · "build the loader first" · build-planning 2026-10-19 → M1-T01\n')
+        self.assertEqual(self.problems("request-trace"), [])
+        self.write("tasks/archive/M1-data-stats.md", self.read("tasks/plan.md"))
+        self.write("tasks/plan.md", "# Between milestones\n\n**Status:** Between milestones · **Last updated:** "
+                   "2026-11-02\n")
+        self.assertEqual(self.problems("request-trace"), [])
+        self.assertEqual([r.id for r in rq.open_requests(Repo(self.root), "plan")], [])
+        self.assertEqual(self.dt("request", "trace", "UR-07", "M1-T02")[0], 0)
+        self.assertEqual(self.requests()["UR-07"].honoured_by, ["M1-T01", "M1-T02"])
+
     def test_trace_to_a_missing_section(self):
         self.write(PATH, DOC.replace("→ DATA-02", "→ §Out of scope"))
         self.assertEqual([p.message for p in self.problems("request-trace")],
@@ -291,6 +304,22 @@ class LintTest(Base):
         self.assertIn("UR-07 says '10', which DATA-01 doesn't state", msgs[0])
         self.assertIn("UR-09 says 'three', which STAT-01 doesn't state", msgs[1])
         self.assertEqual(lint.SEVERITY["request-number"], "W")
+
+    def test_number_ignores_labels_and_counts(self):
+        # Option labels, numbered things, sequences and counts of the choices asked name; they don't state.
+        self.write(PATH, DOC + '- **UR-07** spec · "Go with 2 + 4." [factors: 1 = one; 2 = PCA; 4 = MP edge] · '
+                   "idea-refine 2026-10-19 → STAT-01\n"
+                   '- **UR-08** spec · "Stage 3 is fine, the ladder 1 → 2, all seven assumptions" · idea-refine '
+                   "2026-10-19 → STAT-01\n"
+                   '- **UR-09** spec · "A report in under ~1 hour, 2 factors" [1 = fast; 2 = slow] · idea-refine '
+                   "2026-10-19 → STAT-04\n")
+        self.replace("docs/spec.md", "then a report lists the top factors.", "then a report lists the top factors "
+                     "within 90 minutes.")
+        msgs = [p.message for p in self.problems("request-number")]
+        self.assertEqual(len(msgs), 1, msgs)
+        self.assertIn("UR-09 says '1 hour', which STAT-04 doesn't state", msgs[0])
+        self.assertEqual(rq.strip_labels("Go with 2 + 4.", "1 = a; 2 = b; 4 = c"), "Go with   +  .")
+        self.assertEqual(rq.unstated(rq.strip_labels("5 seeds"), ["three seeds"]), ["5"])
 
     def test_cite(self):
         changed = 'spec-writing 2026-10-19; in DATA-01)'

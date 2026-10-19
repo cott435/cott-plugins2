@@ -98,7 +98,10 @@ def decide(repo, skip=()) -> dict:
         elif skill == "pipeline-design":
             # A component on no step is a gap the gate lets stand with a reason; a spec ID on no pipeline is work.
             if mode not in IDLE and (mode != "extend" or r["uncovered_ids"]):
-                why = f"spec IDs on no pipeline: {', '.join(r['uncovered_ids'])}" if r["uncovered_ids"] else ""
+                # A stage's ID on no component is shown with its stages and the decisions that meet it.
+                staged = {s.split(" ")[0]: s for s in r["stage_ids_unplaced"]}
+                ids = [staged.get(i, i) for i in r["uncovered_ids"]]
+                why = f"spec IDs on no pipeline: {', '.join(ids)}" if ids else ""
                 return _per_package(skill, r, why or "pipelines to design")
         elif mode not in IDLE:
             return _out(skill, mode, _why(skill, r))
@@ -109,15 +112,17 @@ def decide(repo, skip=()) -> dict:
 def _test_scope(repo) -> tuple[list[str], set[str] | None]:
     """(units, packages) that optional test-planning covers: the active milestone's and the next unit
     build-planning plans (a milestone, or a stage to cut); a later milestone's packages wait until it comes next.
-    Packages are a unit's Packages cell, its pipelines' packages and those of package pipelines Part of its system
-    pipelines. (_, None), every package, when the project has no roadmap unit to scope by."""
+    Packages are a unit's Packages cell, its pipelines' packages (a brief stage's are those of its features,
+    `roadmap.staged_pipelines`) and those of package pipelines Part of its system pipelines. (_, None), every
+    package, when the project has no roadmap unit to scope by."""
     active = roadmap_cmd.active_plan(repo)
     units = [u for u in (milestone_row(repo, model.milestone_of(active)) if active else None,
                          roadmap_cmd.next_unit(repo)) if u is not None]
     by_id = {p.id: p for p in model.all_pipelines(repo)}
     pkgs: set[str] = set()
     for u in units:
-        pls = set(roadmap_cmd.milestone_pipelines(repo, u)[0])
+        staged = roadmap_cmd.staged_pipelines(repo, u) if isinstance(u, model.Stage) else None
+        pls = set(roadmap_cmd.milestone_pipelines(repo, u)[0] if staged is None else staged)
         pkgs |= set(getattr(u, "packages", []))
         pkgs |= {p.package for p in by_id.values() if p.package and (p.id in pls or set(
             re.findall(r"PL-\d{2,}", p.fields.get("Part of", ""))) & pls)}

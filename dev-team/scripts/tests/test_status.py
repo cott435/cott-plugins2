@@ -36,7 +36,7 @@ KEYS = {
                         "routed_changes"],
     "test-planning": ["packages", "pipelines_no_smoke", "pipelines_no_golden", "cases_no_source",
                       "cases_no_tolerance", "fixtures_missing", "fixtures_orphan", "skills", "routed_changes"],
-    "build-planning": ["milestone", "progress", "next_task", "blocked_tasks", "uncovered", "no_spine",
+    "build-planning": ["milestone", "progress", "next_task", "blocked_tasks", "uncovered", "no_spine", "steps_unplanned",
                        "mode_violations", "boundaries_unfrozen", "draft_pipelines", "changed_since_plan", "stage_to_cut",
                        "pipelines_inferred",
                        "milestone_references", "milestone_skills", "references_unrouted", "skills_unrouted",
@@ -217,6 +217,23 @@ class ArchitectureTest(Base):
         for n in range(13):
             self.write(f"src/quant/stats/m{n}.py", '"""m."""\n')
         self.assertEqual(self.status("architecture-design")["grow_triggers"], ["quant: 15 modules > 12"])
+        # iteration 10 D5: the user's "one package" holds the triggers until a later request replaces it.
+        self.write("docs/requests.md", "# Quant Lab — User requests\n\n**Last updated:** 2026-10-18\n\n"
+                   '- **UR-01** architecture · "Keep it as one package, no split." · architecture-design 2026-10-18 '
+                   "→ AD-01\n")
+        d = self.status("architecture-design")
+        self.assertEqual((d["grow_triggers"], d["grow_held"]), ([], ['UR-01 "Keep it as one package, no split."']))
+        self.assertEqual(self.status("build-planning")["grow_triggers"], [])
+        self.edit("docs/requests.md", "→ AD-01\n", "→ superseded by UR-02\n"
+                  '- **UR-02** architecture · "Yes, go with one package per component." · architecture-design '
+                  "2026-10-19\n")
+        d = self.status("architecture-design")
+        self.assertEqual((d["grow_triggers"], d["grow_held"]), (["quant: 15 modules > 12"], []))
+        # An Accepted decision that declines the split holds them too; one that only names the shape doesn't.
+        self.edit("docs/architecture.md", "- **Decision:** One package, uv.",
+                  "- **Decision:** One package, uv. Grow declined: quant stays one package.")
+        self.assertEqual(self.status("architecture-design")["grow_held"],
+                         ['AD-01 "Python 3.12 single package, managed with uv"'])
 
     def test_changelog_same_day_order(self):
         spec = [specdocs.ChangelogRow("2026-10-15", "a", "brief.md", {"brief.md"}, {"A-01": "added"}),
@@ -275,6 +292,22 @@ class PipelineDesignTest(Base):
         self.assertEqual(d["uncovered_ids"], ["QR-01"])
         self.assertEqual(d["components_unowned"], ["risk"])
         self.assertEqual(d["retired_refs"], ["docs/packages/quant/pipelines.md:7 PL-04"])
+
+    def test_coverage_and_owners_across_packages(self):
+        # iteration 10 D8: `worlds` has no pipeline of its own; quant's PL-03 runs its component as a step.
+        self.write("docs/packages/worlds/architecture.md", "# worlds — Architecture\n\n**Package:** worlds · "
+                   "**Status:** Approved\n\n## Components\n| Component | Responsibility | Covers | Depends on |\n"
+                   "|---|---|---|---|\n| `prey` | Prey world | PORT-02 | — |\n")
+        self.write("docs/packages/worlds/pipelines.md", "# worlds — Pipelines\n\n**Package:** worlds · "
+                   "**Status:** Approved\n")
+        self.edit("docs/packages/quant/pipelines.md", "| realized variance only | PORT-02 |",
+                  "| realized variance only | PORT-02 |\n| 4 | `pick_prey` | prey | Weights → Weights | identity | — |")
+        d = self.status("pipeline-design")
+        self.assertEqual((d["uncovered_ids"], d["components_unowned"]), ([], ["prey"]))
+        self.edit("docs/packages/quant/pipelines.md", "| `pick_prey` | prey |", "| `pick_prey` | worlds.prey |")
+        d = self.status("pipeline-design")
+        self.assertEqual((d["uncovered_ids"], d["components_unowned"]), ([], []))
+        self.assertEqual(d["packages"], {"quant": "current", "worlds": "current"})
 
     def test_misplaced_pipeline_is_grow(self):
         self.write("docs/packages/other/pipelines.md", "# other — Pipelines\n\n**Package:** other · **Status:** Approved\n\n"
@@ -388,6 +421,14 @@ class BuildPlanningTest(Base):
         self.assertEqual(d["skills_missing"], ["rmt-tools"])
         self.assertEqual(d["no_spine"], ["PL-02"])          # no wiring task builds PL-02 now
         self.assertEqual(d["uncovered"], ["STAT-03"])
+
+    def test_steps_unplanned(self):
+        self.edit("docs/packages/quant/pipelines.md", "| print table | STAT-04 |",
+                  "| print table | STAT-04 |\n| 6 | `plot_spectrum` | stats | Factors → Figure | no plot | — |")
+        self.assertEqual(self.status("build-planning")["steps_unplanned"], ["PL-02.plot_spectrum"])
+        # A Spine version reusing another pipeline's step needs no task of its own.
+        self.edit("docs/packages/quant/pipelines.md", "| no plot | — |", "| as PL-01 | — |")
+        self.assertEqual(self.status("build-planning")["steps_unplanned"], [])
 
     def test_boundaries_unfrozen(self):
         self.write("docs/packages/feed/contract.md",
@@ -586,6 +627,20 @@ class BuildPlanningModesTest(Base):
         d = self.status("build-planning")
         self.assertEqual((d["mode"], d["stage_to_cut"]), ("extend", "S2 Classical portfolios"))
 
+    def test_stale_unbuilt_plan_replans_before_the_cut(self):
+        # iteration 10 D4: M1 is unbuilt and its docs changed after it was planned: Replan before cutting S2.
+        self.staged()
+        self.edit("docs/roadmap.md", "| M1 | S1 | Prices to covariance | quant | PL-01, PL-02 | — | Building |",
+                  "| M1 | S1 | Prices to covariance | quant | PL-01, PL-02 | — | Planned |")
+        todo = self.root / "tasks/todo.md"
+        todo.write_text(todo.read_text(encoding="utf-8").replace("- [x]", "- [ ]"), encoding="utf-8")
+        self.edit("docs/packages/quant/pipelines.md", "**Last updated:** 2026-10-16", "**Last updated:** 2026-10-20")
+        d = self.status("build-planning")
+        self.assertEqual((d["mode"], d["stage_to_cut"]), ("replan", "S2 Classical portfolios"))
+        # Once building, the cut goes first and the replan follows.
+        todo.write_text(todo.read_text(encoding="utf-8").replace("- [ ]", "- [x]", 1), encoding="utf-8")
+        self.assertEqual(self.status("build-planning")["mode"], "extend")
+
     def test_stage_with_ids_off_approved_pipelines_is_not_cut(self):
         # flow-F1b: PL-03 is Approved, but the PORT-03 S2 adds is on no pipeline yet.
         self.staged()
@@ -617,7 +672,8 @@ class BuildPlanningModesTest(Base):
         d = self.status("build-planning")
         self.assertEqual((d["mode"], d["stage_to_cut"]), ("blocked", "none"))
         self.assertEqual(d["blocked"], "S1, S2 below Designed: every stage comes from the brief, so all are "
-                                       "designed before the first cut; no pipelines.md for web; run pipeline-design")
+                                       "designed before the first cut; S1, S2: PORT-03 on no Approved pipeline; "
+                                       "no pipelines.md for web; run pipeline-design")
         # One stage from an idea file: an incremental project, cut stage by stage.
         self.edit("docs/roadmap.md", "| S2 | Classical portfolios | brief |", "| S2 | Classical portfolios | ideas/classical-portfolios.md |")
         self.assertNotIn("from the brief", self.status("build-planning")["blocked"] or "")

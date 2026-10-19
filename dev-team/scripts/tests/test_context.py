@@ -18,7 +18,7 @@ class ContextFixtureTest(unittest.TestCase):
                  "### TC-01: Delisted name drops out", "- **DATA-02** Delisted names",
                  "### data.Prices: type", "## Layout (`dt layout quant`)",
                  "## Interfaces (frozen", "### data.RawPrices: type",
-                 "## Writes (edit only these files", "<!-- tasks/plan.md:92 -->", "### M1-T10: Delisting-aware universe"]
+                 "## Writes (edit only these files", "<!-- tasks/plan.md:95 -->", "### M1-T10: Delisting-aware universe"]
         positions = [out.index(s) for s in order]
         self.assertEqual(positions, sorted(positions))
         self.assertIn("Sample: tests/contracts/data.RawPrices/ (exists)\n", out)

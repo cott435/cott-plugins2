@@ -44,7 +44,7 @@ SEVERITY = {
     "request-number": "W", "request-cite": "W", "request-source": "W",
     "packet-type-closure": "W", "parallel-step": "W", "milestone-lines": "E", "milestone-order": "E",
     "exit-cases-in-scope": "E", "kind-title": "E", "covers-vs-deferred": "E", "closed-open-question": "W",
-    "process-narration": "W", "explain-stale": "W", "spine-claim": "W", "step-unplanned": "W",
+    "process-narration": "E", "explain-stale": "W", "spine-claim": "W", "step-unplanned": "W",
     "interface-barrier": "W",
 }
 
@@ -142,8 +142,8 @@ class Context:
         return self.repo.lookup(id_) is not None
 
 
-def _p(doc, line_index: int, code: str, message: str) -> Problem:
-    return Problem(doc.rel, line_index + 1, code, message)
+def _p(doc, line_index: int, code: str, message: str, sev: str = "") -> Problem:
+    return Problem(doc.rel, line_index + 1, code, message, sev)
 
 
 def _changelog_ranges(doc) -> list[tuple[int, int]]:
@@ -741,21 +741,31 @@ def check_closed_open_question(ctx: Context):
                          f"({rt.PATH}): drop the question or say what is still open")
 
 
+# Narration that only ever tells the story of the planning (an error), and wording that usually does (a warning:
+# "previously", "as of <date>" and a TC that "doesn't change" also state facts).
 NARRATION = re.compile(
     r"\brevised\s+\d{4}-\d{2}-\d{2}|\b(?:adopted|added|changed)\s+before\s+M\d+|\bbefore\s+M\d+\s+is\s+built\b"
     r"|\b(?:confirmed|approved|agreed|decided|chosen)\s+by\s+the\s+user,?\s*(?:on\s+)?\d{4}-\d{2}-\d{2}"
-    r"|(?:TC-\d{2,}|golden|expected\s+values?)[^.;]{0,60}?\b(?:(?:don't|do\s+not|doesn't|does\s+not)\s+change"
+    r"|\bnothing\s+(?:is|has\s+been)\s+built\b|\bno\s+code\s+exists\s+yet\b"
+    r"|\b\d+\s+of\s+\d+\s+tasks\s+(?:(?:are|is)\s+)?(?:done|built|finished|complete)\b|\bM\d+\s+is\s+at\s+\d+\s+of\s+\d+\s+tasks\b"
+    r"|\bdocs?\s+to\s+rework\b|\bthe\s+build\s+waits\s+for\b|\bwith\s+the\s+[\w-]+(?:\s+[\w-]+)?\s+as\s+it\s+stood\b",
+    re.IGNORECASE)
+# "The user chose X" with no request cited tells the conversation; with its UR-NN it is the trace, and passes.
+USER_CHOSE = re.compile(r"\bthe\s+user\s+(?:chose|picked|opted)\b", re.IGNORECASE)
+NARRATION_SOFT = re.compile(
+    r"(?:TC-\d{2,}|golden|expected\s+values?)[^.;]{0,60}?\b(?:(?:don't|do\s+not|doesn't|does\s+not)\s+change"
     r"|(?:are|stay|remain)\s+unchanged)\b|\bpreviously\b|\bas\s+of\s+\d{4}-\d{2}", re.IGNORECASE)
-# Docs where dates and the user's words are the content, and the plan's own `## Replan notes` log (replan.md).
-NARRATION_EXEMPT = ("requests", "routes", "todo")
+# Docs where dates and the user's words are the content (an idea file is the record of why, as it was that day).
+NARRATION_EXEMPT = ("requests", "routes", "todo", "idea")
 
 
 def check_process_narration(ctx: Context):
-    """History in a doc that states what holds: "revised 2026-10-18", "confirmed by the user, 2026-10-17", "adopted
-    before M1", "TC-01–TC-49 don't change", "previously", "as of 2026-10", or a `## Replan notes` section outside a
-    plan.
-    Changelog sections, code, `**Source:**` lines (a test case's provenance) and the plan's Replan notes are left
-    alone. A warning: the changelog holds the history."""
+    """History in a doc that states what holds, an error: "revised 2026-10-18", "confirmed by the user, 2026-10-17",
+    "adopted before M1", "Nothing is built yet", "M1 has 0 of 22 tasks done", "Docs to rework", "the build waits
+    for", "With the table as it stood", "The user chose", or a `## Replan notes` section outside a plan. A warning
+    for "previously", "as of 2026-10" and "TC-01–TC-49 don't change", which can also state a fact.
+    Changelog sections, code, `**Source:**` lines (a test case's provenance) and the plan's Replan notes (its
+    changelog, replan.md) are left alone: the changelog holds the history."""
     for doc in ctx.scoped_docs:
         if doc.kind in NARRATION_EXEMPT:
             continue
@@ -771,10 +781,16 @@ def check_process_narration(ctx: Context):
         for i, line in enumerate(doc.lines):
             if doc.mask[i] or _inside(i, skip) or "**Source:**" in line:
                 continue
-            m = NARRATION.search(re.sub(r"`[^`]*`", "", line))
+            text = re.sub(r"`[^`]*`", "", line)
+            m, sev, fix = NARRATION.search(text), "", "state what holds now"
+            if not m and not re.search(r"\bUR-\d{2,}", text):
+                m, fix = USER_CHOSE.search(text), "state the choice and cite the user's request (UR-NN)"
+            if not m:
+                m, sev = NARRATION_SOFT.search(text), "W"
             if m:
                 yield _p(doc, i, "process-narration",
-                         f"{m.group(0)!r} narrates history: state what holds now (the Changelog holds what changed)")
+                         f"{m.group(0)!r} narrates history: {fix} (the Changelog holds what changed, docs/routes.md "
+                         f"what goes back)", sev)
 
 
 # ---- request checks (design/requests.md) ----------------------------------------------------------

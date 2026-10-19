@@ -1084,12 +1084,16 @@ class ScopeAndTitleChecks(LintCase):
 
 
 class NarrationChecks(LintCase):
-    """`closed-open-question` and `process-narration`, both warnings."""
+    """`closed-open-question` (a warning) and `process-narration` (an error, a warning for wording that can also
+    state a fact)."""
     ROUTES = "docs/routes.md"
     QUESTION = "- Should `clean_eigen` take T from Returns instead of a parameter? (assumed: parameter)"
 
     def messages(self, code):
         return [(p.path, p.line, p.message) for p in self.problems() if p.code == code]
+
+    def severities(self, code):
+        return [(p.line, p.severity, p.message.split("'")[1]) for p in self.problems() if p.code == code]
 
     def route(self, box: str):
         self.p.write(self.ROUTES, "# Routed changes\n\nWritten by `dt route`.\n\n"
@@ -1111,7 +1115,8 @@ class NarrationChecks(LintCase):
                     "- **Decision:** Parquet via pyarrow, revised 2026-10-18; TC-01–TC-03 don't change.")
         self.p.edit(ARCH, "## Risks and open questions", "## Replan notes\n- moved\n\n## Risks and open questions")
         self.assertEqual(self.messages("process-narration"), [
-            (ARCH, 44, "'revised 2026-10-18' narrates history: state what holds now (the Changelog holds what changed)"),
+            (ARCH, 44, "'revised 2026-10-18' narrates history: state what holds now (the Changelog holds what changed, "
+                       "docs/routes.md what goes back)"),
             (ARCH, 48, "a `## Replan notes` section outside a plan: the doc states what holds, the Changelog what "
                        "changed")])
 
@@ -1121,6 +1126,34 @@ class NarrationChecks(LintCase):
                     "before M1 merges.")
         self.p.edit("docs/packages/quant/tests.md", "(given 2026-10-15)", "(confirmed by the user 2026-10-15)")
         self.p.edit(PLAN, "## Replan notes\n", "## Replan notes\n- 2026-10-16: AD-03 adopted before M1 is built\n")
+        self.assertEqual(self.messages("process-narration"), [])
+
+    def test_stale_process_text_fails(self):
+        """The phrases iteration 11's judges quoted are errors; "previously" stays a warning."""
+        self.p.edit(ARCH, "- **Decision:** Parquet via pyarrow.",
+                    "- **Decision:** Parquet via pyarrow. Nothing is built yet (M1 has 0 of 22 tasks done).")
+        self.p.edit(ARCH, "- **Consequences:** Binary files; needs pyarrow.",
+                    "- **Consequences:** Binary files. Docs to rework: the build waits for pipeline-design.")
+        self.p.edit(ARCH, "## Risks and open questions",
+                    "With the table as it stood, M1-T03 would fail CR-04. The user chose to add it.\n"
+                    "The format was previously CSV.\n\n## Risks and open questions")
+        self.assertEqual(self.severities("process-narration"), [
+            (44, "E", "Nothing is built"), (46, "E", "Docs to rework"), (48, "E", "With the table as it stood"),
+            (49, "W", "previously")])
+        self.assertEqual([p.code for p in self.problems() if p.severity == "E"], ["process-narration"] * 3)
+
+    def test_user_choice_with_its_request_passes(self):
+        self.p.edit(ARCH, "- **Decision:** Parquet via pyarrow.",
+                    "- **Decision:** Parquet via pyarrow; the user chose it (UR-04).")
+        self.assertEqual(self.messages("process-narration"), [])
+        self.p.edit(ARCH, "the user chose it (UR-04)", "the user chose it")
+        self.assertEqual(self.severities("process-narration"), [(44, "E", "the user chose")])
+
+    def test_changelog_rows_and_ideas_are_exempt(self):
+        self.p.edit(ARCH, "## Risks and open questions",
+                    "## Changelog\n- 2026-10-18: Docs to rework; nothing is built yet\n\n## Risks and open questions")
+        self.p.write("docs/ideas/x.md", "# Idea: x\n\n**Status:** Specced · **Last updated:** 2026-10-18\n\n"
+                     "Nothing is built yet, and the user chose the parquet store.\n")
         self.assertEqual(self.messages("process-narration"), [])
 
 

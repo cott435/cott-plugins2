@@ -1,0 +1,1197 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1"><title>U27 implementer</title>
+<style>
+:root{--bg:#fbfbfa;--fg:#1d1d1f;--muted:#6b6b70;--line:#d9d9de;--box:#fff;--rowp:#eef3fb;--band:#fff4d6;
+--ok:#2e7d32;--bad:#c62828;--warn:#b26a00;--idle:#6b6b70}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#17171a;--fg:#ececf0;--muted:#9a9aa3;
+--line:#34343a;--box:#222227;--rowp:#1d2433;--band:#3a3015;--ok:#6fcf73;--bad:#ff6b6b;--warn:#f0b35a;--idle:#9a9aa3}}
+:root[data-theme="dark"]{--bg:#17171a;--fg:#ececf0;--muted:#9a9aa3;--line:#34343a;--box:#222227;--rowp:#1d2433;
+--band:#3a3015;--ok:#6fcf73;--bad:#ff6b6b;--warn:#f0b35a;--idle:#9a9aa3}
+body{margin:0;padding:16px;background:var(--bg);color:var(--fg);font:14px/1.45 -apple-system,system-ui,sans-serif}
+h1{font-size:18px;margin:0 0 4px}h2{font-size:15px;margin:22px 0 8px}.sub{color:var(--muted)}
+table{border-collapse:collapse;margin:4px 0 8px}td,th{border-bottom:1px solid var(--line);padding:4px 10px;text-align:left;
+vertical-align:top}th{color:var(--muted);font-weight:600}.chips span{display:inline-block;margin:0 4px 2px 0}
+.legend span{margin-right:14px;white-space:nowrap}.sw{display:inline-block;width:10px;height:10px;border-radius:2px;
+margin-right:4px;vertical-align:-1px}.scroll{overflow:auto;max-height:88vh;border:1px solid var(--line);border-radius:8px}
+.chart{display:grid;width:max-content}.chart>div{line-height:0}.corner{position:sticky;top:0;left:0;z-index:3}
+.colhead{position:sticky;top:0;z-index:2}.rowhead{position:sticky;left:0;z-index:2}
+svg.bg{background:var(--bg)}.colhead svg{border-bottom:1px solid var(--line)}.rowhead svg{border-right:1px solid var(--line)}
+.ok{color:var(--ok);fill:var(--ok)}.bad{color:var(--bad);fill:var(--bad)}.warn{color:var(--warn);fill:var(--warn)}
+.idle{color:var(--idle);fill:var(--idle)}
+svg text{fill:var(--fg);font-family:-apple-system,system-ui,sans-serif}
+.box{fill:var(--box);stroke:var(--line)}.unit:hover .box{stroke:var(--fg)}
+.role{font-size:12px;font-weight:600}.uid,.wmeta,.lmeta,.meta{font-size:10px;fill:var(--muted)}
+.sub{font-size:10.5px;fill:var(--muted)}.badge{font-size:11px;font-weight:600}
+.meta.bad{fill:var(--bad);font-weight:600}.lane{font-size:13px;font-weight:700}.wave{font-size:13px;font-weight:700}
+.par{fill:#4e79a7}.ser{fill:var(--muted)}.rowp{fill:var(--rowp)}.rows{fill:transparent}.band{fill:var(--band)}
+.bandt{font-size:11.5px}.grid{stroke:var(--line)}.link{stroke:var(--muted);stroke-width:1.2;opacity:.55}
+.arrowhead{fill:var(--muted)}.marks{font-size:10.5px}.audit{stroke:var(--box);stroke-width:2}.auditn{font-size:10px;font-weight:700;fill:#fff}
+a{color:inherit}svg a .box{cursor:pointer}
+
+:root{--c0:#2a78d6;--c1:#eb6834;--c2:#1baf7a;--c3:#eda100;--c4:#e87ba4;--c5:#008300;--c6:#6250d6;--c7:#e34948;
+--cx:#8a8985;--main:#52514e;--read:#dcdbd5;--readfg:#1d1d1f}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--c0:#3987e5;--c1:#d95926;--c2:#199e70;
+--c3:#c98500;--c4:#d55181;--c5:#008300;--c6:#9085e9;--c7:#e66767;--cx:#77766f;--main:#c3c2b7;--read:#3b3b40;
+--readfg:#ececf0}}
+:root[data-theme="dark"]{--c0:#3987e5;--c1:#d95926;--c2:#199e70;--c3:#c98500;--c4:#d55181;--c5:#008300;
+--c6:#9085e9;--c7:#e66767;--cx:#77766f;--main:#c3c2b7;--read:#3b3b40;--readfg:#ececf0}
+.c0{fill:var(--c0);background:var(--c0)}.c1{fill:var(--c1);background:var(--c1)}.c2{fill:var(--c2);background:var(--c2)}
+.c3{fill:var(--c3);background:var(--c3)}.c4{fill:var(--c4);background:var(--c4)}.c5{fill:var(--c5);background:var(--c5)}
+.c6{fill:var(--c6);background:var(--c6)}.c7{fill:var(--c7);background:var(--c7)}.cx{fill:var(--cx);background:var(--cx)}
+.cmain{fill:var(--main)}.sc0{stroke:var(--c0)}.sc1{stroke:var(--c1)}.sc2{stroke:var(--c2)}
+.tl text,.sm text,.lc text{font-size:10.5px;fill:var(--muted)}.tl .lbl-in,.sm .lbl-in{fill:#fff;font-size:10.5px;font-weight:600}
+.tl .rowl,.sm .rowl,.lc .rowl{fill:var(--fg);font-size:11.5px;font-weight:600}.tl .band{fill:var(--rowp)}
+.tl .brk{stroke:var(--muted);stroke-dasharray:2 3}.tl a:hover rect,.sm a:hover rect{stroke:var(--fg);stroke-width:1.5}
+.axis{stroke:var(--line)}.sm .val{fill:var(--fg);font-weight:600}.lc path.ln{fill:none;stroke-width:2}
+.lc circle{stroke:var(--bg);stroke-width:2}.lc .end{font-weight:600;fill:var(--fg)}
+.tiles{display:flex;flex-wrap:wrap;gap:10px;margin:12px 0}.tile{border:1px solid var(--line);border-radius:8px;
+padding:8px 12px;min-width:110px;background:var(--box)}.tile b{display:block;font-size:20px;line-height:1.2}
+.tile span{font-size:12px;color:var(--muted)}.tile i{font-style:normal;font-size:12px;margin-left:6px}
+.fm{border-collapse:separate;border-spacing:2px}.fm td,.fm th{border:0;padding:0;text-align:center;font-size:11px}
+.fm th{padding:0 2px;font-weight:600}.fm td.f,.fm th.f{text-align:left;padding-right:10px;white-space:nowrap;
+position:sticky;left:0;background:var(--bg);font:11.5px ui-monospace,Menlo,monospace;
+max-width:380px;overflow:hidden;text-overflow:ellipsis}
+.fm td.cell{min-width:22px;height:20px;border-radius:3px}.fm td.fw{background:var(--c0);color:#fff;font-weight:700}
+.fm td.fe{background:var(--c1);color:#fff;font-weight:700}.fm td.fr{background:var(--read);color:var(--readfg)}
+.fm td.n{color:var(--muted);padding:0 6px}.fm tr.grp td{text-align:left;padding-top:8px;color:var(--muted);
+font-weight:600}
+.key{display:inline-block;min-width:18px;text-align:center;border-radius:3px;font-size:11px;margin-right:4px}
+.bar{display:inline-block;height:9px;border-radius:2px;vertical-align:0}
+
+pre{white-space:pre-wrap;word-break:break-word;background:var(--box);border:1px solid var(--line);border-radius:6px;
+padding:8px 10px;margin:4px 0;font:12px/1.45 ui-monospace,SFMono-Regular,Menlo,monospace;max-width:100%;overflow:auto}
+.step{border-top:1px solid var(--line);padding:6px 0}.step:target{background:var(--rowp)}
+.sid{font:12px ui-monospace,Menlo,monospace;color:var(--muted);margin-right:8px}.kind{font-weight:600;margin-right:8px}
+.err{color:var(--bad);font-weight:600}.hook{color:var(--bad);margin:4px 0 0 16px}.lbl{font-size:12px;color:var(--muted);margin-top:6px}
+details summary{cursor:pointer;color:var(--muted);font-size:12px}.head td:first-child{color:var(--muted)}
+.top{font-size:13px}.narr{list-style:none;padding-left:0}.narr li{margin:3px 0}
+</style></head>
+<body>
+<p class="top"><a href="../flow.html">← the run's flow chart</a></p>
+
+<h1>U27 · implementer · M1-T19 implementer</h1>
+<table class="head"><tr><td>Type</td><td>implementer</td></tr><tr><td>Description</td><td>M1-T19 implementer</td></tr><tr><td>Spawned by</td><td>driver at D180</td></tr><tr><td>Turn</td><td><a href="../turns/T08.html">T08</a></td></tr><tr><td>Model</td><td>claude-opus-5-5</td></tr><tr><td>Start</td><td>2026-10-19 05:40:43 UTC</td></tr><tr><td>Duration</td><td>2 min</td></tr><tr><td>Tool calls</td><td>12</td></tr><tr><td>Errors</td><td>1</td></tr><tr><td>Hook blocks</td><td>0</td></tr><tr><td>Tokens</td><td>7.3k out · 29.8k new in · 179k cached in · peak context 34.5k</td></tr><tr><td>Skills invoked</td><td>none</td></tr><tr><td>Files written or edited</td><td>.claude/worktrees/agent-a855a52355611ef21/src/rllab/compare/claims.py, .claude/worktrees/agent-a855a52355611ef21/tests/unit/rllab/test_claims.py</td></tr><tr><td>Definition</td><td>none</td></tr><tr><td>Steps</td><td>14</td></tr><tr><td>Finished</td><td>yes</td></tr></table>
+
+
+<h2>Prompt</h2>
+<pre>You are the implementer for M1-T19. Run `python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/plugin/dev-team/scripts/dt.py claim M1-T19 --role implementer`, then read the packet it names.</pre>
+<h2>Files</h2>
+<table><tr><th>Op</th><th>File</th><th>Calls</th><th>By</th><th>Via</th><th>Steps</th></tr><tr><td>write</td><td><code>.claude/worktrees/agent-a855a52355611ef21/src/rllab/compare/claims.py</code></td><td>1</td><td>U27</td><td>Write</td><td><a href="#10">U27.S10</a></td></tr><tr><td>write</td><td><code>.claude/worktrees/agent-a855a52355611ef21/tests/unit/rllab/test_claims.py</code></td><td>1</td><td>U27</td><td>Write</td><td><a href="#11">U27.S11</a></td></tr><tr><td>read</td><td><code>.claude/worktrees/agent-a855a52355611ef21/.claude/packet.md</code></td><td>1</td><td>U27</td><td>Read</td><td><a href="#3">U27.S3</a></td></tr><tr><td>read</td><td><code>.claude/worktrees/agent-a855a52355611ef21/CONSTRAINTS.md</code></td><td>1</td><td>U27</td><td>Read</td><td><a href="#4">U27.S4</a></td></tr><tr><td>read</td><td><code>.claude/worktrees/agent-a855a52355611ef21/src/rllab/evaluate/types.py</code></td><td>1</td><td>U27</td><td>Bash</td><td><a href="#7">U27.S7</a></td></tr><tr><td>read</td><td><code>.claude/worktrees/agent-a855a52355611ef21/src/rllab/viz/types.py</code></td><td>1</td><td>U27</td><td>Bash</td><td><a href="#7">U27.S7</a></td></tr><tr><td>read</td><td><code>.claude/worktrees/agent-a855a52355611ef21/tests/fixtures/rllab/TC-21/expected.json</code></td><td>1</td><td>U27</td><td>Bash</td><td><a href="#7">U27.S7</a></td></tr><tr><td>read</td><td><code>.claude/worktrees/agent-a855a52355611ef21/tests/fixtures/rllab/TC-21/input.json</code></td><td>1</td><td>U27</td><td>Bash</td><td><a href="#7">U27.S7</a></td></tr><tr><td>read</td><td><code>.claude/worktrees/agent-a855a52355611ef21/tests/fixtures/rllab/TC-22/expected.json</code></td><td>1</td><td>U27</td><td>Bash</td><td><a href="#7">U27.S7</a></td></tr><tr><td>read</td><td><code>.claude/worktrees/agent-a855a52355611ef21/tests/fixtures/rllab/TC-22/input.json</code></td><td>1</td><td>U27</td><td>Bash</td><td><a href="#7">U27.S7</a></td></tr><tr><td>read</td><td><code>.claude/worktrees/agent-a855a52355611ef21/tests/fixtures/rllab/TC-23/expected.json</code></td><td>1</td><td>U27</td><td>Bash</td><td><a href="#7">U27.S7</a></td></tr><tr><td>read</td><td><code>.claude/worktrees/agent-a855a52355611ef21/tests/fixtures/rllab/TC-23/input.json</code></td><td>1</td><td>U27</td><td>Bash</td><td><a href="#7">U27.S7</a></td></tr><tr><td>read</td><td><code>.claude/worktrees/agent-a855a52355611ef21/tests/fixtures/rllab/TC-24/expected.json</code></td><td>1</td><td>U27</td><td>Bash</td><td><a href="#7">U27.S7</a></td></tr><tr><td>read</td><td><code>.claude/worktrees/agent-a855a52355611ef21/tests/fixtures/rllab/TC-24/input.json</code></td><td>1</td><td>U27</td><td>Bash</td><td><a href="#7">U27.S7</a></td></tr><tr><td>read</td><td><code>.claude/worktrees/agent-a855a52355611ef21/tests/intent/rllab/test_claims.py</code></td><td>1</td><td>U27</td><td>Read</td><td><a href="#6">U27.S6</a></td></tr></table>
+<h2>Steps</h2>
+<div class="step" id="S1"><span class="sid">U27.S1</span><span class="kind">user</span>You are the implementer for M1-T19. Run `python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/plugin/dev-team/scripts/dt.py claim M1-T19 --role implementer`, then read the packet it names.<details><summary>full text</summary><pre>You are the implementer for M1-T19. Run `python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/plugin/dev-team/scripts/dt.py claim M1-T19 --role implementer`, then read the packet it names.</pre></details></div><div class="step" id="S2"><span class="sid">U27.S2</span><span class="kind">Bash</span>python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/plugin/dev-team/scripts/dt.py claim M1-T19 --role implementer<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/plugin/dev-team/scripts/dt.py claim M1-T19 --role implementer&quot;,
+  &quot;description&quot;: &quot;Claim task M1-T19 as implementer&quot;
+}</pre><div class="lbl">output</div><pre>packet: /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/project/.claude/worktrees/agent-a855a52355611ef21/.claude/packet.md (173 lines; read it in full)
+task: M1-T19 Tested claims through the hypothesis skill · role implementer · package rllab · kind thicken
+writes: src/rllab/compare/claims.py, tests/unit/rllab/test_claims.py
+done: Done when `scripts/check.sh gate` passes (the gate passes on your Writes); the Stop hook runs it. End with one line: `DONE M1-T19 implementer`. If you can&#x27;t finish: `python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/plugin/dev-team/scripts/dt.py escalate &lt;TEST-WRONG|NEEDS-DEP&gt; &quot;&lt;why&gt;&quot;`, or `python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/plugin/dev-team/scripts/dt.py escalate CONTRACT-CHANGE &quot;&lt;why&gt;&quot; --type &lt;the contract symbol&gt;`, then end with one line: `STOPPED M1-T19 implementer: see dt escalate`.</pre></details></div><div class="step" id="S3"><span class="sid">U27.S3</span><span class="kind">Read</span>/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/project/.claude/worktrees/agent-a855a52355611ef21/.claude/packet.md<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/project/.claude/worktrees/agent-a855a52355611ef21/.claude/packet.md&quot;
+}</pre><div class="lbl">output</div><pre>1	# Packet: M1-T19 implementer
+2	You are the implementer for M1-T19. Your edit boundary is your Writes below (`.claude/.task_writes`); the guard blocks everything else.
+3	
+4	Done when `scripts/check.sh gate` passes (the gate passes on your Writes); the Stop hook runs it. End with one line: `DONE M1-T19 implementer`. If you can&#x27;t finish: `python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/plugin/dev-team/scripts/dt.py escalate &lt;TEST-WRONG|NEEDS-DEP&gt; &quot;&lt;why&gt;&quot;`, or `python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/plugin/dev-team/scripts/dt.py escalate CONTRACT-CHANGE &quot;&lt;why&gt;&quot; --type &lt;the contract symbol&gt;`, then end with one line: `STOPPED M1-T19 implementer: see dt escalate`.
+5	
+6	# Context for M1-T19: package rllab · mode split · kind thicken
+7	Read only what is below, plus CONSTRAINTS.md and the files you edit. Your task is the last section.
+8	
+9	&lt;!-- docs/packages/rllab/pipelines.md:82 --&gt;
+10	## PL-04: Report
+11	**Entry:** `src/rllab/lab/pipelines/pl04_report.py::run_report` · **Trigger:** `python -m rllab.lab report &lt;report.toml&gt;`
+12	**Covers:** EVAL-02–EVAL-11, REF-02, REF-03, ABL-04, BASE-03
+13	
+14	| # | Step | Owner | In → Out | Spine version | Covers |
+15	|---|---|---|---|---|---|
+16	| 1 | `load_report_spec` | lab.report_spec | path → ClaimSpec, targets | TOML: players (name → run folders or a baseline name, plus `team` and `vs` for predator-prey), claims, two curve charts, and PL-06&#x27;s cross-play chart paths | EVAL-02–EVAL-05, EVAL-09–EVAL-11 |
+17	| 2 | `score_players` | lab.players | targets → ScoreSet | for each player, opponent and seed: PL-03 steps 1, 9 and 10 as built; a predator-prey player&#x27;s panel scores are pooled over its `vs` opponents | EVAL-01, BASE-03, SELF-07 |
+18	| 3 | `open_curve_runs` | lab.players | targets → RunRecord | `runs.open_run` per folder; `ValueError` if an ablation&#x27;s seeds or `steps` differ from its full agent&#x27;s | ABL-04, RUN-05 |
+19	| 4 | `run_claims` | compare.claims | ScoreSet, ClaimSpec → Claim | each claim through the `null-hypothesis-testing` skill, one correction over all claims; REF-02&#x27;s ratio as arithmetic; writes `report.md`, linking the cross-play charts by path | EVAL-02–EVAL-05, EVAL-07–EVAL-11, REF-02, REF-03, BASE-03 |
+20	| 5 | `plot_curves` | viz.curves | RunRecord, ScoreSet → Chart | mean over seeds with a min–max band; one horizontal line at each named baseline&#x27;s pooled mean; once for the ladder chart and once for the ablation chart | EVAL-06, ABL-04 |
+21	
+22	### Entry sketch (pre-build — removed by spine task)
+23	```python
+24	def run_report(spec_path: Path, out: Path) -&gt; list[Claim]:
+25	    specs, targets = load_report_spec(spec_path)
+26	    scores = score_players(targets)
+27	    curves = open_curve_runs(targets)
+28	    claims = run_claims(scores, specs, charts=targets.crossplay, out=out)
+29	    plot_curves(curves.ladder, scores=scores, baselines=targets.baselines, out=out / &quot;ladder.png&quot;)
+30	    plot_curves(curves.ablations, scores=scores, baselines=targets.baselines, out=out / &quot;ablations.png&quot;)
+31	    return claims
+32	```
+33	
+34	&lt;!-- docs/packages/rllab/contract.md:417 --&gt;
+35	### compare.run_claims: Tested claims and report
+36	`def run_claims(scores: Mapping[str, Sequence[ScoreSet]], specs: Sequence[ClaimSpec], *, alpha: float = 0.05, charts: Sequence[Chart] = (), out: Path) -&gt; list[Claim]`
+37	- **Invariants:** each player&#x27;s scores are pooled across its 5 training seeds. The correction covers every spec in one call. Writes `out/report.md` listing every player&#x27;s mean and spread (BASE-03) and every claim, with stretch claims labelled &quot;stretch&quot; (EVAL-05), and links each chart in `charts` by its path under a &quot;Cross-play&quot; section (EVAL-11).
+38	- **Errors:** `ValueError` if a spec names a player missing from `scores`
+39	- **Boundary:** lab · **Fixtures:** tests/contracts/compare.run_claims/ · **Cases:** a fake returning one passed and one failed Claim
+40	- **Used by:** lab; PL-04
+41	
+42	&lt;!-- docs/packages/rllab/contract.md:405 --&gt;
+43	### compare.ClaimSpec: type
+44	`@dataclass(frozen=True) class ClaimSpec: name: str; a: str; b: str; direction: Literal[&quot;greater&quot;, &quot;not_worse&quot;]; stretch: bool = False; min_ratio: float | None = None`
+45	- **Invariants:** `a` and `b` are player names present in the score input. `min_ratio` (REF-02&#x27;s 0.9) checks `mean(a) ≥ min_ratio · mean(b)` on top of the test.
+46	- **Boundary:** lab · **Fixtures:** tests/contracts/compare.ClaimSpec/ · **Cases:** &quot;dqn-compact greater than random&quot;; &quot;dqn-compact not worse than reference with min_ratio 0.9&quot;; the stretch claim for dqn-grid
+47	- **Used by:** lab; PL-04
+48	
+49	&lt;!-- docs/packages/rllab/contract.md:411 --&gt;
+50	### compare.Claim: type
+51	`@dataclass(frozen=True) class Claim: spec: ClaimSpec; mean_a: float; mean_b: float; p_value: float; p_corrected: float; passed: bool; method: str`
+52	- **Invariants:** `method` names what the `null-hypothesis-testing` skill chose (statistic, null distribution, correction). For `greater`, `passed` means significant at 0.05 after correction. For `not_worse`, it means &quot;a worse than b&quot; is not significant, and `min_ratio` holds when set.
+53	- **Boundary:** lab, viz · **Fixtures:** tests/contracts/compare.Claim/ · **Cases:** a passed &quot;greater&quot; claim; a failed &quot;not_worse&quot; claim; a stretch claim that failed
+54	- **Used by:** lab; PL-04
+55	
+56	&lt;!-- docs/packages/rllab/contract.md:315 --&gt;
+57	### evaluate.ScoreSet: type
+58	`@dataclass(frozen=True) class ScoreSet: player: str; train_seed: int; scores: np.ndarray; games: tuple[GameRecording, ...]`
+59	- **Invariants:** `scores` has one float score per evaluation game (food eaten, or mean survival steps per fish). `games` holds the first `record` games played.
+60	- **Boundary:** compare, lab · **Fixtures:** tests/contracts/evaluate.ScoreSet/ · **Cases:** 200 scripted-player scores for seed 0; 200 random-player scores for seed 0; 200 scripted-fish scores for seed 0
+61	- **Used by:** compare, train, lab; PL-03, PL-04
+62	
+63	&lt;!-- docs/packages/rllab/tests.md:125 --&gt;
+64	### TC-21: A planted score gap is detected
+65	**Pipeline:** PL-04 · **Covers:** EVAL-02, EVAL-04 · **Kind:** synthetic known-answer · **Fixture:** tests/fixtures/rllab/TC-21/
+66	**Source:** generator `poisson_scores` (player a λ = 10, player b λ = 8, 5 seeds × 200 games, seed 21). The skill is given H0 &quot;mean score of a ≤ that of b&quot; and H1 &quot;a &gt; b&quot;, with mean score difference as the statistic, the skill&#x27;s own null construction, and games pooled across seeds
+67	**Expected:** the &quot;a greater than b&quot; claim has `passed=True` · **Tolerance:** α = 0.05 after the skill&#x27;s correction; the planted gap is about 15 standard errors, so any sound test rejects
+68	**Skills:** null-hypothesis-testing
+69	
+70	&lt;!-- docs/packages/rllab/tests.md:131 --&gt;
+71	### TC-22: Pure noise is not called significant
+72	**Pipeline:** PL-04 · **Covers:** EVAL-02, EVAL-04 · **Kind:** synthetic known-answer · **Fixture:** tests/fixtures/rllab/TC-22/
+73	**Source:** generator `poisson_scores` (a and b both λ = 10, 5 seeds × 200 games) on generator seeds 100–119, one `run_claims` call each, with the same H0, statistic and null as TC-21
+74	**Expected:** at most 3 of the 20 &quot;a greater than b&quot; claims pass · **Tolerance:** at α = 0.05, 4 or more false passes in 20 has probability ≈ 0.016
+75	**Skills:** null-hypothesis-testing
+76	
+77	&lt;!-- docs/packages/rllab/tests.md:137 --&gt;
+78	### TC-23: &quot;Not worse than&quot; passes on equal players and fails on a worse one
+79	**Pipeline:** PL-04 · **Covers:** EVAL-03, REF-03 · **Kind:** synthetic known-answer · **Fixture:** tests/fixtures/rllab/TC-23/
+80	**Source:** generator `poisson_scores`, seed 31, 5 seeds × 200 games. (a) a λ = 10 vs b λ = 10. (b) a λ = 8 vs b λ = 10. The skill is given H0 &quot;a ≥ b&quot; and H1 &quot;a &lt; b&quot;. The claim passes when H0 is *not* rejected, per the spec&#x27;s assumption
+81	**Expected:** (a) `passed=True`; (b) `passed=False` · **Tolerance:** α = 0.05 after correction; (b)&#x27;s gap is about 15 standard errors, and (a) passes unless a 5% false alarm occurs, which the fixed seed makes reproducible
+82	**Skills:** null-hypothesis-testing
+83	
+84	&lt;!-- docs/packages/rllab/tests.md:143 --&gt;
+85	### TC-24: The 90% ratio bar is inclusive
+86	**Pipeline:** PL-04 · **Covers:** REF-02 · **Kind:** closed form · **Fixture:** tests/fixtures/rllab/TC-24/
+87	**Source:** spec REF-02 (`agent mean ≥ 0.9 × reference mean`), approved 2026-10-17; fixed score lists, 20 games each
+88	**Expected:** a = `[0,18]`×10 (mean 9) vs b = `[0,20]`×10 (mean 10) with `min_ratio=0.9` → `passed=True`; a = `[0,17]`×10 (mean 8.5) → `passed=False` · **Tolerance:** exact for the ratio; the &quot;worse&quot; test is non-significant in both (a gap of 1 against a standard error of about 3)
+89	**Skills:** null-hypothesis-testing
+90	
+91	## Layout (`dt layout rllab`)
+92	src/rllab/
+93	  __init__.py — rllab: a reinforcement-learning lab for Snake and the fish tank.
+94	  agents/
+95	    __init__.py — The learning agents.
+96	    tabular.py — The table-based value learner (AGENT-01, AGENT-02, ABL-03).
+97	    dqn/
+98	      __init__.py — The neural value learner.
+99	      agent.py — The neural value learner (AGENT-03 to AGENT-05, ABL-01, ABL-02).
+100	      networks.py — The value networks: one output per action from a flattened observation (AD-05).
+101	  baselines/
+102	    __init__.py — The baseline players.
+103	    random.py — The random baseline (BASE-01).
+104	    scripted.py — The scripted baseline on the compact view (BASE-02).
+105	  compare/
+106	    __init__.py — Claims between players, tested and reported.
+107	    claims.py — Tested claims over pooled scores, and the report (PL-04 step 4).
+108	    types.py — A claim to test between two players, and its tested result.
+109	  core/
+110	    __init__.py — The core: environment and agent interfaces, and run settings.
+111	    protocols.py — The two interfaces every environment and every player implements (AD-03, AD-09, AD-13).
+112	    settings.py — Run settings from TOML (PL-01 step 1).
+113	    types.py — The core&#x27;s data types: teams, actions, steps, transitions and run settings (AD-09, AD-13).
+114	  envs/
+115	    __init__.py — The environments: Snake and the corridor.
+116	    corridor.py — A 1-D corridor with the goal at its far end (CORE-03).
+117	    snake.py — Snake on a square grid, one agent, compact or grid view (SNAKE-01 to SNAKE-09).
+118	    types.py — Observation layouts shared with the players that read them.
+119	  evaluate/
+120	    __init__.py — Held-out greedy evaluation.
+121	    protocol.py — Greedy evaluation on held-out seeds (EVAL-01, DATA-01, AGENT-07).
+122	    types.py — What one evaluation asks for and what it returns.
+123	  lab/
+124	    __init__.py — The lab: the command line and the pipelines it runs.
+125	    __main__.py — `python -m rllab.lab`: dispatch `train`, `eval`, `replay` and `report`.
+126	    build.py — The environment and the agents a run&#x27;s settings name (PL-01 steps 2 and 7).
+127	    cli.py — The command line: `python -m rllab.lab &lt;train | eval | replay | report&gt; ...`.
+128	    players.py — Players from run folders or baseline names, scored or opened (PL-03 step 1, PL-04 steps 2-3).
+129	    printing.py — One line of scores (PL-03 step 11).
+130	    replay.py — The game a replay shows (PL-05 step 2).
+131	    report_spec.py — A report&#x27;s TOML: players, claims and chart groups (PL-04 step 1).
+132	    types.py — What a report names: its players, baselines and chart groups (PL-04).
+133	    pipelines/
+134	      __init__.py — One entry function per pipeline.
+135	      pl01_train.py — PL-01: train a run.
+136	      pl02_train_reference.py — PL-02: train the reference.
+137	      pl03_evaluate.py — PL-03: evaluate.
+138	      pl04_report.py — PL-04: report.
+139	      pl05_replay.py — PL-05: replay.
+140	  reference/
+141	    __init__.py — The reference: a library agent trained and played on the lab&#x27;s environments.
+142	    player.py — A trained library model as an Agent (REF-01).
+143	    train/
+144	      __init__.py — The library agent&#x27;s training through the gymnasium adapter (AD-03, AD-04).
+145	  runs/
+146	    __init__.py — Run folders: settings, curve, checkpoints and recorded games.
+147	    store.py — One folder per run: create it, write it as the run goes, read it back (AD-06).
+148	    types.py — What a run folder holds: its curve, its recorded games and the run itself (AD-06).
+149	  train/
+150	    __init__.py — The training loop.
+151	    loop.py — The training loop over every team (PL-01 step 15).
+152	  viz/
+153	    __init__.py — Charts and the replay window.
+154	    curves.py — Learning curves with baseline lines (PL-04 step 5).
+155	    replay.py — The interactive replay window (REPLAY-01, REPLAY-02).
+156	    types.py — A written chart and what it draws.
+157	
+158	## Writes (edit only these files; the plan gives every other file to another task)
+159	- src/rllab/compare/claims.py (exists)
+160	- tests/unit/rllab/test_claims.py (new)
+161	
+162	&lt;!-- tasks/plan.md:188 --&gt;
+163	### M1-T19: Tested claims through the hypothesis skill
+164	**Package:** rllab · **Step:** PL-04.run_claims · **Kind:** thicken · **Covers:** EVAL-02, EVAL-03, EVAL-04, EVAL-05, REF-02, REF-03, BASE-03 · **Size:** XS · **Mode:** split
+165	**Reason:** fold: spine is the whole behavior
+166	**Skills:** null-hypothesis-testing
+167	**Read:** PL-04, compare.run_claims, compare.ClaimSpec, compare.Claim, evaluate.ScoreSet, TC-21, TC-22, TC-23, TC-24
+168	**Acceptance:**
+169	- [ ] TC-21 and TC-22 pass (planted gap found; ≤ 3 of 20 noise claims pass), with the test chosen by `null-hypothesis-testing` and recorded in `Claim.method`
+170	- [ ] TC-23 and TC-24 pass (&quot;not worse&quot; both ways; the 0.9 ratio is inclusive)
+171	- [ ] `report.md` lists every player&#x27;s mean and spread and labels stretch claims &quot;stretch&quot;
+172	**Verify:** `pytest tests/intent/rllab tests/unit/rllab -k claims` · `scripts/check.sh gate`
+173	**Depends on:** M1-T01 · **Writes:** src/rllab/compare/claims.py, tests/intent/rllab/test_claims.py, tests/unit/rllab/test_claims.py
+174	</pre></details></div><div class="step" id="S4"><span class="sid">U27.S4</span><span class="kind">Read</span>/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/project/.claude/worktrees/agent-a855a52355611ef21/CONSTRAINTS.md<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/project/.claude/worktrees/agent-a855a52355611ef21/CONSTRAINTS.md&quot;
+}</pre><div class="lbl">output</div><pre>1	# Constraints
+2	**Status:** Approved · **Last reviewed:** 2026-10-19 by @connorott · **Ratcheted:** —
+3	
+4	The standing quality bar. `pyproject.toml` and `scripts/check.sh` enforce it; every number here names its config key, and `dt status` fails if the two disagree. Only `build-setup` changes this file, with the user: tightening is routine, loosening needs an explicit yes.
+5	
+6	## Floor
+7	- **CR-01** No new suppressions. Ruff runs with `--ignore-noqa` in gate and full, so a Ruff exception is a `per-file-ignores` entry in protected config with a row in Exceptions. `floor_guard.sh` catches the other suppressions on the diff
+8	- **CR-02** No stubs: `raise NotImplementedError` outside abstract methods, `pass`-only bodies, bare `except: pass`. One carve-out: the interface task&#x27;s step signatures, whose body is only `raise NotImplementedError(&quot;&lt;task id&gt;&quot;)` naming the open task that replaces it. `check.sh gate` fails on one naming a task that isn&#x27;t open in `tasks/todo.md`, and on a test that expects one (`stub-pinned`); `check.sh full --exit` fails on any
+9	- **CR-03** No skipped, deleted or assertion-free tests, unless a row in Exceptions names the test file
+10	- **CR-04** No secrets in source
+11	- **CR-05** Oracle files (`tests/fixtures/**/expected.json`) change only with the user&#x27;s approval
+12	- **CR-06** The implementer never changes `tests/intent/**`
+13	- **CR-07** This file, `pyproject.toml` tool config, `scripts/` and `.claude/agents/` are not weakened to make a change pass
+14	- **CR-08** Nothing imports from `references/` or `probes/`, or adds either to `sys.path` (or `PYTHONPATH`, pytest `pythonpath`). `floor_guard.sh` checks the diff for both. Code copied from either is project code and meets the same bar
+15	- **CR-09** A frozen interface (`tests/contracts/&lt;id&gt;.&lt;symbol&gt;/`: schema, samples, fake; and the types, signatures and exports the interface task wrote) is frozen once it exists at the task&#x27;s base. Only the interface task freezing it (`**Kind:** interface`) writes a new folder, and no other task&#x27;s `Writes:` names its `types.py` or `__init__.py`; a frozen interface changes only through `architecture-design` Revise, never to make a test pass
+16	
+17	## Readability
+18	- **CR-10** One entry function per pipeline; it reads top to bottom as its named steps (reviewer + `dt layout`)
+19	- **CR-11** No registries, plugin dispatch or config-driven wiring without an AD
+20	- **CR-12** New abstraction only with a second real implementation or a named seam
+21	
+22	
+23	## Enforced with numbers
+24	| ID | Dimension | Rule | Checked by | Config key | Runs at |
+25	|---|---|---|---|---|---|
+26	| CR-20 | Lint | zero errors; standing per-file-ignores only for `tests/**` and `__init__.py` | ruff | `tool.ruff.lint.select` | edit, gate |
+27	| CR-21 | Complexity | ≤ 10 per function | ruff C901 | `tool.ruff.lint.mccabe.max-complexity` | gate |
+28	| CR-22 | Size | ≤ 500 lines/module, ≤ 60/function | check_size.py | `tool.size_limits` | edit, gate |
+29	| CR-23 | Types | zero errors, strict | mypy | `tool.mypy.strict` | gate |
+30	| CR-24 | Boundaries | import contracts hold | import-linter | `tool.importlinter.contracts` | gate |
+31	| CR-25 | Dependencies | none missing or unused | deptry | `tool.deptry` | gate |
+32	| CR-26 | Deps security | nothing known-vulnerable | pip-audit | — | full, CI nightly |
+33	| CR-27 | Reproducibility | same settings and seed give the same run (RUN-03, AD-08) | pytest `-m repro` | `tool.pytest.ini_options.markers` | gate |
+34	
+35	## Measured, not yet enforced
+36	| ID | Metric | Today | Direction |
+37	|---|---|---|---|
+38	| CR-40 | Coverage (branch) | — (no code) (`tool.coverage.report.fail_under`, raised by Ratchet) | must not fall |
+39	| CR-41 | vulture findings at `min_confidence = 60` (`scripts/vulture_whitelist.py`) | 0 | must not grow by `full --exit` (earlier `full` runs report) |
+40	| CR-42 | Duplicate blocks of ≥ 8 similar source lines (pylint `duplicate-code`, `[tool.pylint.similarities]` in pyproject.toml) | 0 | must not grow |
+41	
+42	## Boundaries (generated from architecture — do not edit)
+43	- `rllab.core` imports nothing first-party · `envs`, `agents`, `runs` → core · `evaluate` → core, runs · `baselines` → core, envs · `train` → core, runs, evaluate · `reference` → core, envs, runs, evaluate · `compare` → evaluate · `viz` → runs · `lab` → all
+44	- Only `rllab.reference` imports `stable_baselines3` or `gymnasium`; only `rllab.agents` imports `torch`
+45	
+46	## Roles and protected paths
+47	| Role | May edit | May not edit | Stop gate |
+48	|---|---|---|---|
+49	| tester | `tests/intent/**`, within the task&#x27;s `Writes:` | everything else; reads no source | `check.sh collect` (lint, collect, red for the right reason) |
+50	| implementer / solo | `src/**`, `tests/unit/**`, within the task&#x27;s `Writes:`; an interface task also the `tests/contracts/&lt;id&gt;.&lt;symbol&gt;/` its `Writes:` names | the protected list; `tasks/` | `check.sh gate` + protected-path diff against the worktree&#x27;s base |
+51	| reviewer | its worktree, for the mutation check, and its findings file; nothing lands (the orchestrator records findings with `dt finding`) | everything else | runs `check.sh full` by hand |
+52	
+53	**Protected list** (`PROTECTED` in `scripts/check.sh`; `path_guard.sh deny --protected` reads the same list): `tests/intent/**`, `tests/fixtures/**`, `tests/conftest.py`, `pyproject.toml`, `uv.lock`, `CONSTRAINTS.md`, `scripts/**`, `.claude/agents/**`, `.claude/settings.json`, `references/**`, `probes/**`, `tests/contracts/**`. `tests/contracts/**` covers the contract folders that exist at the task&#x27;s base (CR-09). **`Writes:`**: `dt claim` writes the role&#x27;s share of the task&#x27;s `Writes:` to `.claude/.task_writes` and sets the worktree&#x27;s base; `path_guard.sh writes` blocks edits outside it, and builder edits before the claim. Only the orchestrator writes `tasks/` (`dt land`, `dt finding`).
+54	
+55	**Worktree links:** none
+56	
+57	## Review
+58	Run by the reviewer agent: the interface review after Phase 0, a phase review per package at each checkpoint, and the milestone exit. `dt land` already checked each landing&#x27;s `Writes:`, protected paths and gates; review judges what tools can&#x27;t.
+59	
+60	**Interface** (after Phase 0): the code is the contract, no more and no less.
+61	1. Types match `contract.md`: fields, types, invariants. Nothing a step&#x27;s In → Out needs is missing; no helper is frozen.
+62	2. Signatures match the step tables, in their owner modules. Each stub names the open task that owns its step; no logic beyond types and validation.
+63	3. One sample per case the contract names, valid and realistic, never holding a TC&#x27;s expected value. Replay doubles replay an interaction the Protocol allows. Each fake passes its contract&#x27;s cases; anything it does beyond echoing a fixture (filtering, ordering, an error) is a case the real provider must pass too. Contract tests check shape only, never a stub or other state a later task changes.
+64	4. `__init__.py` exports exactly the contract; each `Mitigated by` in the plan&#x27;s dependency graph exists; each split task&#x27;s tester can write its tests from the frozen interface and its `Read:`.
+65	
+66	**Each phase**, per package, tests before code:
+67	1. **Interfaces followed** (CR-09): no frozen type, signature or contract folder changed outside a Revise. Consumers use the declared types: no dict for a dataclass, no reaching into a provider&#x27;s internals, no local redefinition. A stub is replaced only by the task it names; no cross-package import outside the contract; spine tests run on samples and doubles, not another step&#x27;s code.
+68	2. **Tests prove something:** each intent test asserts its TC case or acceptance bullet, loading expected values and tolerances from fixtures; none is assertion-free or weakened; Hypothesis runs the `ci` profile. Unit tests are specific, never computing the expected value with the code under test or testing only a mock. **Mutation check** (`.claude/agents/reviewer.md`): per acceptance bullet, the smallest change that should break it; a mutation no test catches is a finding.
+69	3. **Correct to the spec:** each acceptance bullet truly met, not special-cased to the sample; the error paths the requirement names; seeding and determinism; numerical edge cases.
+70	4. **Simple** (CR-11, CR-12, CR-42): no abstraction with one implementation outside the contract or an AD; no forwarding wrapper, one-method class, or class where a function does; no parameter, flag or config key every caller sets the same; no `try/except` that only re-raises or swallows, no checks the types already guarantee; no loop the library already provides. No near-copies within or across the phase&#x27;s tasks: one concept is one function in its owner module (tests may repeat for readability). Each finding names the simpler form, with the same tests passing.
+71	5. **Pipelines** (CR-10): entry functions read as their step tables (`dt layout`); step owners respected; spine baselines still selectable.
+72	6. **The bar** (CR-07): diff this file, `pyproject.toml`, `scripts/` and `.claude/agents/` against the milestone&#x27;s Base. Any loosening is Critical; new exceptions need an owner and expiry.
+73	7. **Hidden and parallel risks:** where a real provider could act differently from its double; fixed output paths, global state, test-order dependence.
+74	8. **The rest:** readability, security, performance where a QR sets a number; reused reference or probe code has its Caveats handled and fits the contract; `dt lint` clean, pre-build sections replaced by `dt layout` pointers.
+75	
+76	**Milestone exit**, over the whole diff, adds: the Scope&#x27;s Exit holds; every Covers ID has a test; `check.sh full --exit` finds no stub; system tests use real providers; the same sample through a real provider and its double agrees; deferred requirements untouched; pip-audit ran.
+77	
+78	**Severity:** Critical: a frozen interface changed, a contract test pinning a transient state, a weakened test, an intent test that misses a mutation changing its TC&#x27;s expected output, a wrong answer, a loosened bar, a security hole, lost data; it stops the build. Important: a consumer bypassing a type, any other surviving mutation, an unneeded abstraction, a duplicate across tasks. Suggestion and Nit: local. Findings go under the checkpoint block in `tasks/plan.md` (`dt finding`), each with a fix task or a reason.
+79	
+80	## Done
+81	agent-skills `references/definition-of-done.md`, tailored once:
+82	- **Correctness and Quality:** checked per task by the gate.
+83	- **Integration and Documentation:** checked at each checkpoint.
+84	- **The full list:** checked at milestone exit.
+85	
+86	## Exceptions
+87	| ID | Rule | Path | Reason | Owner | Expires |
+88	|---|---|---|---|---|---|
+89	| EX-01 | CR-25 DEP002 | `numpy`, `torch`, `matplotlib`, `stable-baselines3`, `gymnasium` | M1 dependencies, declared before the code imports them | @connorott | M1 exit |
+90	| EX-02 | CR-24 layers | `rllab.compare` → `rllab.viz` | `compare.run_claims` takes `charts: Sequence[viz.Chart]` (contract); the sibling layers forbid it (M1-T01 escalation) | @connorott | M1 exit |
+91	</pre></details></div><div class="step" id="S5"><span class="sid">U27.S5</span><span class="kind">Bash</span>git ls-files src/rllab/compare tests/intent/rllab tests/fixtures/rllab tests/contracts | grep -iE &quot;compare|claim|TC-2[1-4]&quot;; cat src/rllab/compare/*.py<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;git ls-files src/rllab/compare tests/intent/rllab tests/fixtures/rllab tests/contracts | grep -iE \&quot;compare|claim|TC-2[1-4]\&quot;; cat src/rllab/compare/*.py&quot;,
+  &quot;description&quot;: &quot;List claim-related files and show compare package&quot;
+}</pre><div class="lbl">output</div><pre>src/rllab/compare/__init__.py
+src/rllab/compare/claims.py
+src/rllab/compare/types.py
+tests/contracts/compare.Claim/samples.json
+tests/contracts/compare.Claim/schema.json
+tests/contracts/compare.Claim/test_compare_claim.py
+tests/contracts/compare.ClaimSpec/samples.json
+tests/contracts/compare.ClaimSpec/schema.json
+tests/contracts/compare.ClaimSpec/test_compare_claimspec.py
+tests/contracts/compare.run_claims/fake.py
+tests/contracts/compare.run_claims/samples.json
+tests/contracts/compare.run_claims/schema.json
+tests/contracts/compare.run_claims/test_compare_run_claims.py
+tests/fixtures/rllab/TC-21/expected.json
+tests/fixtures/rllab/TC-21/input.json
+tests/fixtures/rllab/TC-22/expected.json
+tests/fixtures/rllab/TC-22/input.json
+tests/fixtures/rllab/TC-23/expected.json
+tests/fixtures/rllab/TC-23/input.json
+tests/fixtures/rllab/TC-24/expected.json
+tests/fixtures/rllab/TC-24/input.json
+tests/intent/rllab/test_claims.py
+&quot;&quot;&quot;Claims between players, tested and reported.&quot;&quot;&quot;
+
+from rllab.compare.claims import run_claims
+from rllab.compare.types import Claim, ClaimSpec
+
+__all__ = [&quot;Claim&quot;, &quot;ClaimSpec&quot;, &quot;run_claims&quot;]
+&quot;&quot;&quot;Tested claims over pooled scores, and the report (PL-04 step 4).&quot;&quot;&quot;
+
+from collections.abc import Mapping, Sequence
+from pathlib import Path
+
+from rllab.compare.types import Claim, ClaimSpec
+from rllab.evaluate import ScoreSet
+from rllab.viz import Chart
+
+
+def run_claims(
+    scores: Mapping[str, Sequence[ScoreSet]],
+    specs: Sequence[ClaimSpec],
+    *,
+    alpha: float = 0.05,
+    charts: Sequence[Chart] = (),
+    out: Path,
+) -&gt; list[Claim]:
+    &quot;&quot;&quot;Test every claim with one correction over all of them, and write `out/report.md`.&quot;&quot;&quot;
+    raise NotImplementedError(&quot;M1-T19&quot;)
+&quot;&quot;&quot;A claim to test between two players, and its tested result.&quot;&quot;&quot;
+
+from dataclasses import dataclass
+from typing import Literal
+
+
+@dataclass(frozen=True)
+class ClaimSpec:
+    &quot;&quot;&quot;Player `a` against player `b`; `min_ratio` also asks `mean(a) &gt;= min_ratio * mean(b)`.&quot;&quot;&quot;
+
+    name: str
+    a: str
+    b: str
+    direction: Literal[&quot;greater&quot;, &quot;not_worse&quot;]
+    stretch: bool = False
+    min_ratio: float | None = None
+
+
+@dataclass(frozen=True)
+class Claim:
+    &quot;&quot;&quot;A tested claim; `method` names the statistic, null distribution and correction.&quot;&quot;&quot;
+
+    spec: ClaimSpec
+    mean_a: float
+    mean_b: float
+    p_value: float
+    p_corrected: float
+    passed: bool
+    method: str</pre></details></div><div class="step" id="S6"><span class="sid">U27.S6</span><span class="kind">Read</span>/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/project/.claude/worktrees/agent-a855a52355611ef21/tests/intent/rllab/test_claims.py<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/project/.claude/worktrees/agent-a855a52355611ef21/tests/intent/rllab/test_claims.py&quot;
+}</pre><div class="lbl">output</div><pre>1	&quot;&quot;&quot;Intent tests for compare.run_claims (M1-T19): TC-21 to TC-24 and the report.&quot;&quot;&quot;
+2	
+3	import json
+4	import re
+5	from pathlib import Path
+6	from typing import Any
+7	
+8	import numpy as np
+9	import pytest
+10	
+11	from rllab.compare import Claim, ClaimSpec, run_claims
+12	from rllab.evaluate import ScoreSet
+13	
+14	FIXTURES = Path(__file__).resolve().parents[2] / &quot;fixtures&quot; / &quot;rllab&quot;
+15	
+16	
+17	def _load(case: str) -&gt; tuple[dict[str, Any], dict[str, Any]]:
+18	    folder = FIXTURES / case
+19	    inputs = json.loads((folder / &quot;input.json&quot;).read_text())
+20	    expected = json.loads((folder / &quot;expected.json&quot;).read_text())
+21	    return inputs, expected
+22	
+23	
+24	def _spec(raw: dict[str, Any]) -&gt; ClaimSpec:
+25	    return ClaimSpec(
+26	        name=raw[&quot;name&quot;],
+27	        a=raw[&quot;a&quot;],
+28	        b=raw[&quot;b&quot;],
+29	        direction=raw[&quot;direction&quot;],
+30	        stretch=raw.get(&quot;stretch&quot;, False),
+31	        min_ratio=raw.get(&quot;min_ratio&quot;),
+32	    )
+33	
+34	
+35	def _poisson_scores(
+36	    players: dict[str, float], seeds: int, games: int, seed: int
+37	) -&gt; dict[str, tuple[ScoreSet, ...]]:
+38	    &quot;&quot;&quot;Generator `poisson_scores`: per player, `seeds` ScoreSets of `games` Poisson draws.&quot;&quot;&quot;
+39	    rng = np.random.default_rng(seed)
+40	    out: dict[str, tuple[ScoreSet, ...]] = {}
+41	    for name, lam in players.items():
+42	        out[name] = tuple(
+43	            ScoreSet(
+44	                player=name,
+45	                train_seed=train_seed,
+46	                scores=rng.poisson(lam, games).astype(np.float64),
+47	                games=(),
+48	            )
+49	            for train_seed in range(seeds)
+50	        )
+51	    return out
+52	
+53	
+54	def _fixed_scores(name: str, values: list[float], seeds: int = 5) -&gt; tuple[ScoreSet, ...]:
+55	    &quot;&quot;&quot;Split a fixed score list evenly over training seeds (pooling restores the list).&quot;&quot;&quot;
+56	    chunks = np.array_split(np.asarray(values, dtype=np.float64), seeds)
+57	    return tuple(
+58	        ScoreSet(player=name, train_seed=i, scores=chunk, games=())
+59	        for i, chunk in enumerate(chunks)
+60	    )
+61	
+62	
+63	def _seed_range(text: str) -&gt; range:
+64	    lo, hi = (int(part) for part in text.split(&quot;-&quot;))
+65	    return range(lo, hi + 1)
+66	
+67	
+68	def _only(claims: list[Claim]) -&gt; Claim:
+69	    assert len(claims) == 1
+70	    return claims[0]
+71	
+72	
+73	@pytest.mark.intent
+74	def test_tc21_planted_gap_is_detected(tmp_path: Path) -&gt; None:
+75	    inputs, expected = _load(&quot;TC-21&quot;)
+76	    scores = _poisson_scores(
+77	        inputs[&quot;players&quot;], inputs[&quot;seeds&quot;], inputs[&quot;games_per_seed&quot;], inputs[&quot;seed&quot;]
+78	    )
+79	    spec = _spec(inputs[&quot;claim&quot;])
+80	    claim = _only(run_claims(scores, [spec], alpha=expected[&quot;alpha&quot;], out=tmp_path))
+81	    assert claim.spec == spec
+82	    assert claim.passed is expected[&quot;passed&quot;]
+83	    assert claim.p_corrected &lt;= expected[&quot;alpha&quot;]
+84	    assert claim.mean_a &gt; claim.mean_b
+85	    assert isinstance(claim.method, str)
+86	    assert claim.method.strip() != &quot;&quot;
+87	
+88	
+89	@pytest.mark.intent
+90	def test_tc21_means_are_pooled_over_seeds(tmp_path: Path) -&gt; None:
+91	    inputs, expected = _load(&quot;TC-21&quot;)
+92	    scores = _poisson_scores(
+93	        inputs[&quot;players&quot;], inputs[&quot;seeds&quot;], inputs[&quot;games_per_seed&quot;], inputs[&quot;seed&quot;]
+94	    )
+95	    spec = _spec(inputs[&quot;claim&quot;])
+96	    claim = _only(run_claims(scores, [spec], alpha=expected[&quot;alpha&quot;], out=tmp_path))
+97	    pooled_a = np.concatenate([s.scores for s in scores[spec.a]])
+98	    pooled_b = np.concatenate([s.scores for s in scores[spec.b]])
+99	    assert claim.mean_a == pytest.approx(float(pooled_a.mean()), rel=1e-9)
+100	    assert claim.mean_b == pytest.approx(float(pooled_b.mean()), rel=1e-9)
+101	
+102	
+103	@pytest.mark.intent
+104	def test_tc22_pure_noise_is_rarely_significant(tmp_path: Path) -&gt; None:
+105	    inputs, expected = _load(&quot;TC-22&quot;)
+106	    spec = _spec(inputs[&quot;claim&quot;])
+107	    passed = 0
+108	    for gen_seed in _seed_range(inputs[&quot;generator_seeds&quot;]):
+109	        scores = _poisson_scores(
+110	            inputs[&quot;players&quot;], inputs[&quot;seeds&quot;], inputs[&quot;games_per_seed&quot;], gen_seed
+111	        )
+112	        out = tmp_path / str(gen_seed)
+113	        out.mkdir()
+114	        claim = _only(run_claims(scores, [spec], alpha=expected[&quot;alpha&quot;], out=out))
+115	        assert claim.method.strip() != &quot;&quot;
+116	        passed += int(claim.passed)
+117	    assert passed &lt;= expected[&quot;max_passed&quot;]
+118	
+119	
+120	@pytest.mark.intent
+121	@pytest.mark.parametrize(&quot;case&quot;, [&quot;a&quot;, &quot;b&quot;])
+122	def test_tc23_not_worse_both_ways(case: str, tmp_path: Path) -&gt; None:
+123	    inputs, expected = _load(&quot;TC-23&quot;)
+124	    scores = _poisson_scores(
+125	        inputs[&quot;cases&quot;][case][&quot;players&quot;],
+126	        inputs[&quot;seeds&quot;],
+127	        inputs[&quot;games_per_seed&quot;],
+128	        inputs[&quot;seed&quot;],
+129	    )
+130	    spec = _spec(inputs[&quot;claim&quot;])
+131	    claim = _only(run_claims(scores, [spec], alpha=expected[&quot;alpha&quot;], out=tmp_path))
+132	    assert claim.passed is expected[case][&quot;passed&quot;]
+133	    assert claim.method.strip() != &quot;&quot;
+134	
+135	
+136	@pytest.mark.intent
+137	@pytest.mark.parametrize(&quot;case&quot;, [&quot;pass&quot;, &quot;fail&quot;])
+138	def test_tc24_ratio_bar_is_inclusive(case: str, tmp_path: Path) -&gt; None:
+139	    inputs, expected = _load(&quot;TC-24&quot;)
+140	    raw = inputs[&quot;cases&quot;][case]
+141	    scores = {
+142	        &quot;a&quot;: _fixed_scores(&quot;a&quot;, raw[&quot;a&quot;]),
+143	        &quot;b&quot;: _fixed_scores(&quot;b&quot;, raw[&quot;b&quot;]),
+144	    }
+145	    spec = _spec(inputs[&quot;claim&quot;])
+146	    assert spec.min_ratio == expected[&quot;min_ratio&quot;]
+147	    claim = _only(run_claims(scores, [spec], out=tmp_path))
+148	    tol = expected[&quot;tol&quot;]
+149	    assert claim.mean_a == pytest.approx(expected[case][&quot;mean_a&quot;], abs=tol)
+150	    assert claim.mean_b == pytest.approx(expected[case][&quot;mean_b&quot;], abs=tol)
+151	    assert claim.passed is expected[case][&quot;passed&quot;]
+152	
+153	
+154	@pytest.mark.intent
+155	def test_one_correction_covers_every_claim(tmp_path: Path) -&gt; None:
+156	    inputs, _ = _load(&quot;TC-21&quot;)
+157	    players = {&quot;a&quot;: 10.0, &quot;b&quot;: 8.0, &quot;c&quot;: 10.0}
+158	    scores = _poisson_scores(players, inputs[&quot;seeds&quot;], inputs[&quot;games_per_seed&quot;], inputs[&quot;seed&quot;])
+159	    specs = [
+160	        ClaimSpec(name=&quot;a greater than b&quot;, a=&quot;a&quot;, b=&quot;b&quot;, direction=&quot;greater&quot;),
+161	        ClaimSpec(name=&quot;a greater than c&quot;, a=&quot;a&quot;, b=&quot;c&quot;, direction=&quot;greater&quot;),
+162	        ClaimSpec(name=&quot;c not worse than a&quot;, a=&quot;c&quot;, b=&quot;a&quot;, direction=&quot;not_worse&quot;),
+163	    ]
+164	    claims = run_claims(scores, specs, out=tmp_path)
+165	    assert [c.spec for c in claims] == specs
+166	    for claim in claims:
+167	        assert 0.0 &lt;= claim.p_value &lt;= 1.0
+168	        assert claim.p_value &lt;= claim.p_corrected &lt;= 1.0
+169	        assert claim.method.strip() != &quot;&quot;
+170	    # Corrected together, at least one interior p-value must grow (Holm, Bonferroni, BH all do).
+171	    interior = [c for c in claims if 0.0 &lt; c.p_value &lt; 1.0]
+172	    assert len(interior) &gt;= 2
+173	    assert any(c.p_corrected &gt; c.p_value for c in interior)
+174	
+175	
+176	@pytest.mark.intent
+177	def test_missing_player_raises(tmp_path: Path) -&gt; None:
+178	    scores = {&quot;a&quot;: _fixed_scores(&quot;a&quot;, [1.0] * 10)}
+179	    spec = ClaimSpec(name=&quot;a greater than ghost&quot;, a=&quot;a&quot;, b=&quot;ghost&quot;, direction=&quot;greater&quot;)
+180	    with pytest.raises(ValueError, match=&quot;ghost&quot;):
+181	        run_claims(scores, [spec], out=tmp_path)
+182	
+183	
+184	def _numbers(line: str) -&gt; list[float]:
+185	    return [float(x) for x in re.findall(r&quot;-?\d+(?:\.\d+)?&quot;, line)]
+186	
+187	
+188	@pytest.mark.intent
+189	def test_report_lists_player_means_and_labels_stretch(tmp_path: Path) -&gt; None:
+190	    inputs, _ = _load(&quot;TC-24&quot;)
+191	    raw = inputs[&quot;cases&quot;][&quot;pass&quot;]
+192	    scores = {
+193	        &quot;alpha-player&quot;: _fixed_scores(&quot;alpha-player&quot;, raw[&quot;a&quot;]),
+194	        &quot;beta-player&quot;: _fixed_scores(&quot;beta-player&quot;, raw[&quot;b&quot;]),
+195	    }
+196	    means = {
+197	        &quot;alpha-player&quot;: float(np.mean(raw[&quot;a&quot;])),
+198	        &quot;beta-player&quot;: float(np.mean(raw[&quot;b&quot;])),
+199	    }
+200	    regular = ClaimSpec(
+201	        name=&quot;alpha-player not worse than beta-player&quot;,
+202	        a=&quot;alpha-player&quot;,
+203	        b=&quot;beta-player&quot;,
+204	        direction=&quot;not_worse&quot;,
+205	    )
+206	    stretch = ClaimSpec(
+207	        name=&quot;alpha-player beats beta-player&quot;,
+208	        a=&quot;alpha-player&quot;,
+209	        b=&quot;beta-player&quot;,
+210	        direction=&quot;greater&quot;,
+211	        stretch=True,
+212	    )
+213	    run_claims(scores, [regular, stretch], out=tmp_path)
+214	    report = tmp_path / &quot;report.md&quot;
+215	    assert report.is_file()
+216	    lines = report.read_text().splitlines()
+217	
+218	    for player, mean in means.items():
+219	        player_lines = [line for line in lines if player in line and len(_numbers(line)) &gt;= 2]
+220	        assert player_lines, f&quot;no line with {player}&#x27;s mean and spread&quot;
+221	        assert any(any(abs(n - mean) &lt;= 0.01 for n in _numbers(line)) for line in player_lines), (
+222	            f&quot;{player}&#x27;s mean {mean} not reported&quot;
+223	        )
+224	
+225	    stretch_lines = [line for line in lines if stretch.name in line]
+226	    assert stretch_lines
+227	    assert any(&quot;stretch&quot; in line.lower() for line in stretch_lines)
+228	    regular_lines = [line for line in lines if regular.name in line]
+229	    assert regular_lines
+230	    assert all(&quot;stretch&quot; not in line.lower() for line in regular_lines)
+231	</pre></details></div><div class="step" id="S7"><span class="sid">U27.S7</span><span class="kind">Bash</span>cat tests/fixtures/rllab/TC-21/expected.json tests/fixtures/rllab/TC-21/input.json tests/fixtures/rllab/TC-22/expected.json tests/fixtures/rllab/TC-22/input.json tests/fixtures/rllab/TC-23/expected.json tests/fixtures/rllab/TC-23/input.json tests/fixtures/rllab/TC-24/expected.json tests/fixtures/rllab/TC-24/input.json src/rllab/viz/types.py src/rllab/evaluate/types.py<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;cat tests/fixtures/rllab/TC-21/expected.json tests/fixtures/rllab/TC-21/input.json tests/fixtures/rllab/TC-22/expected.json tests/fixtures/rllab/TC-22/input.json tests/fixtures/rllab/TC-23/expected.json tests/fixtures/rllab/TC-23/input.json tests/fixtures/rllab/TC-24/expected.json tests/fixtures/rllab/TC-24/input.json src/rllab/viz/types.py src/rllab/evaluate/types.py&quot;,
+  &quot;description&quot;: &quot;Show fixtures and related types&quot;
+}</pre><div class="lbl">output</div><pre>{&quot;passed&quot;: true, &quot;alpha&quot;: 0.05}
+{
+ &quot;generator&quot;: &quot;poisson_scores&quot;,
+ &quot;players&quot;: {
+  &quot;a&quot;: 10,
+  &quot;b&quot;: 8
+ },
+ &quot;seeds&quot;: 5,
+ &quot;games_per_seed&quot;: 200,
+ &quot;seed&quot;: 21,
+ &quot;claim&quot;: {
+  &quot;name&quot;: &quot;a&gt;b&quot;,
+  &quot;a&quot;: &quot;a&quot;,
+  &quot;b&quot;: &quot;b&quot;,
+  &quot;direction&quot;: &quot;greater&quot;
+ }
+}
+{&quot;property&quot;: &quot;passed claims among the 20 generator seeds &lt;= 3&quot;, &quot;max_passed&quot;: 3, &quot;alpha&quot;: 0.05}
+{
+ &quot;generator&quot;: &quot;poisson_scores&quot;,
+ &quot;players&quot;: {
+  &quot;a&quot;: 10,
+  &quot;b&quot;: 10
+ },
+ &quot;seeds&quot;: 5,
+ &quot;games_per_seed&quot;: 200,
+ &quot;generator_seeds&quot;: &quot;100-119&quot;,
+ &quot;claim&quot;: {
+  &quot;name&quot;: &quot;a&gt;b&quot;,
+  &quot;a&quot;: &quot;a&quot;,
+  &quot;b&quot;: &quot;b&quot;,
+  &quot;direction&quot;: &quot;greater&quot;
+ }
+}
+{&quot;a&quot;: {&quot;passed&quot;: true}, &quot;b&quot;: {&quot;passed&quot;: false}, &quot;alpha&quot;: 0.05}
+{
+ &quot;generator&quot;: &quot;poisson_scores&quot;,
+ &quot;seeds&quot;: 5,
+ &quot;games_per_seed&quot;: 200,
+ &quot;seed&quot;: 31,
+ &quot;cases&quot;: {
+  &quot;a&quot;: {
+   &quot;players&quot;: {
+    &quot;a&quot;: 10,
+    &quot;b&quot;: 10
+   }
+  },
+  &quot;b&quot;: {
+   &quot;players&quot;: {
+    &quot;a&quot;: 8,
+    &quot;b&quot;: 10
+   }
+  }
+ },
+ &quot;claim&quot;: {
+  &quot;name&quot;: &quot;a not worse than b&quot;,
+  &quot;a&quot;: &quot;a&quot;,
+  &quot;b&quot;: &quot;b&quot;,
+  &quot;direction&quot;: &quot;not_worse&quot;
+ }
+}
+{&quot;pass&quot;: {&quot;passed&quot;: true, &quot;mean_a&quot;: 9.0, &quot;mean_b&quot;: 10.0}, &quot;fail&quot;: {&quot;passed&quot;: false, &quot;mean_a&quot;: 8.5, &quot;mean_b&quot;: 10.0}, &quot;min_ratio&quot;: 0.9, &quot;tol&quot;: 0}
+{
+ &quot;cases&quot;: {
+  &quot;pass&quot;: {
+   &quot;a&quot;: [
+    0,
+    18,
+    0,
+    18,
+    0,
+    18,
+    0,
+    18,
+    0,
+    18,
+    0,
+    18,
+    0,
+    18,
+    0,
+    18,
+    0,
+    18,
+    0,
+    18
+   ],
+   &quot;b&quot;: [
+    0,
+    20,
+    0,
+    20,
+    0,
+    20,
+    0,
+    20,
+    0,
+    20,
+    0,
+    20,
+    0,
+    20,
+    0,
+    20,
+    0,
+    20,
+    0,
+    20
+   ]
+  },
+  &quot;fail&quot;: {
+   &quot;a&quot;: [
+    0,
+    17,
+    0,
+    17,
+    0,
+    17,
+    0,
+    17,
+    0,
+    17,
+    0,
+    17,
+    0,
+    17,
+    0,
+    17,
+    0,
+    17,
+    0,
+    17
+   ],
+   &quot;b&quot;: [
+    0,
+    20,
+    0,
+    20,
+    0,
+    20,
+    0,
+    20,
+    0,
+    20,
+    0,
+    20,
+    0,
+    20,
+    0,
+    20,
+    0,
+    20,
+    0,
+    20
+   ]
+  }
+ },
+ &quot;claim&quot;: {
+  &quot;name&quot;: &quot;a ratio vs b&quot;,
+  &quot;a&quot;: &quot;a&quot;,
+  &quot;b&quot;: &quot;b&quot;,
+  &quot;direction&quot;: &quot;not_worse&quot;,
+  &quot;min_ratio&quot;: 0.9
+ }
+}
+&quot;&quot;&quot;A written chart and what it draws.&quot;&quot;&quot;
+
+from dataclasses import dataclass
+from pathlib import Path
+
+
+@dataclass(frozen=True)
+class Chart:
+    &quot;&quot;&quot;A written PNG; `groups` and `baselines` in legend order.&quot;&quot;&quot;
+
+    path: Path
+    groups: tuple[str, ...]
+    baselines: tuple[str, ...]
+&quot;&quot;&quot;What one evaluation asks for and what it returns.&quot;&quot;&quot;
+
+from dataclasses import dataclass
+
+import numpy as np
+
+from rllab.core import SOLO
+from rllab.runs import GameRecording
+
+
+@dataclass(frozen=True)
+class EvalSpec:
+    &quot;&quot;&quot;`n_games` games of `team` on `eval_seeds(train_seed, n_games)`, the first `record` recorded.&quot;&quot;&quot;
+
+    player: str
+    train_seed: int
+    team: str = SOLO
+    n_games: int = 200
+    record: int = 0
+
+    def __post_init__(self) -&gt; None:
+        if self.n_games &lt; 1:
+            raise ValueError(f&quot;n_games must be at least 1, got {self.n_games}&quot;)
+        if not 0 &lt;= self.record &lt;= self.n_games:
+            raise ValueError(f&quot;record must be within 0..{self.n_games}, got {self.record}&quot;)
+
+
+@dataclass(frozen=True)
+class ScoreSet:
+    &quot;&quot;&quot;One score per evaluation game, and the first recorded games.&quot;&quot;&quot;
+
+    player: str
+    train_seed: int
+    scores: np.ndarray
+    games: tuple[GameRecording, ...]</pre></details></div><div class="step" id="S8"><span class="sid">U27.S8</span><span class="kind">Bash</span>find /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill -path &quot;*null-hypothesis*&quot; -name &quot;*.md&quot; -not -path &quot;*/worktrees/*&quot; <span class="err">error</span><details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;find /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill -path \&quot;*null-hypothesis*\&quot; -name \&quot;*.md\&quot; -not -path \&quot;*/worktrees/*\&quot;&quot;,
+  &quot;description&quot;: &quot;Find null-hypothesis-testing skill files&quot;
+}</pre><div class="lbl">output</div><pre>Permission to use Bash has been denied. IMPORTANT: You *may* attempt to accomplish this action using other tools that might naturally be used to accomplish this goal, e.g. using head instead of cat. But you *should not* attempt to work around this denial in malicious ways, e.g. do not use your ability to run tests to execute non-test actions. You should only try to work around this restriction in reasonable ways that do not attempt to bypass the intent behind this denial. If you believe this capability is essential to complete the user&#x27;s request, STOP and explain to the user what you were trying to do and why you need this permission. Let the user decide how to proceed.</pre></details></div><div class="step" id="S9"><span class="sid">U27.S9</span><span class="kind">Bash</span>grep -n -A12 &quot;dependencies&quot; pyproject.toml<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;grep -n -A12 \&quot;dependencies\&quot; pyproject.toml&quot;,
+  &quot;description&quot;: &quot;Show declared dependencies&quot;
+}</pre><div class="lbl">output</div><pre>2:# section; [project] dependencies come from the plan (Extend adds each milestone&#x27;s).
+3-# CONSTRAINTS.md cites these keys: change a number in both, through build-setup.
+4-# references/ (reference files from docs/references.md) and probes/ (probe scripts from
+5-# docs/probes.md) are not project code: every tool below excludes them, they are protected, and
+6-# nothing imports from them (CR-08).
+7-[project]
+8-name = &quot;rllab&quot;
+9-version = &quot;0.1.0&quot;
+10-requires-python = &quot;&gt;=3.12,&lt;3.13&quot;  # AD-01
+11:dependencies = [
+12-    &quot;numpy&gt;=2.0&quot;,
+13-    &quot;torch&gt;=2.5&quot;,
+14-    &quot;matplotlib&gt;=3.9&quot;,
+15-]
+16-
+17:[project.optional-dependencies]
+18-# AD-04: the reference library is an optional extra; only rllab.reference imports it
+19-reference = [
+20-    &quot;stable-baselines3&gt;=2.4&quot;,
+21-    &quot;gymnasium&gt;=1.0&quot;,
+22-]
+23-
+24-[build-system]
+25-requires = [&quot;uv_build&gt;=0.11,&lt;0.12&quot;]
+26-build-backend = &quot;uv_build&quot;
+27-
+28-[dependency-groups]
+29-dev = [</pre></details></div><div class="step" id="S10"><span class="sid">U27.S10</span><span class="kind">Write</span>/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/project/.claude/worktrees/agent-a855a52355611ef21/src/rllab/compare/claims.py (152 lines)<div class="lbl">wrote /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/project/.claude/worktrees/agent-a855a52355611ef21/src/rllab/compare/claims.py</div><pre>&quot;&quot;&quot;Tested claims over pooled scores, and the report (PL-04 step 4).&quot;&quot;&quot;
+
+import math
+from collections.abc import Mapping, Sequence
+from pathlib import Path
+
+import numpy as np
+
+from rllab.compare.types import Claim, ClaimSpec
+from rllab.evaluate import ScoreSet
+from rllab.viz import Chart
+
+PERMUTATIONS = 9999
+PERMUTATION_BATCH = 1000
+PERMUTATION_SEED = 0
+
+
+def run_claims(
+    scores: Mapping[str, Sequence[ScoreSet]],
+    specs: Sequence[ClaimSpec],
+    *,
+    alpha: float = 0.05,
+    charts: Sequence[Chart] = (),
+    out: Path,
+) -&gt; list[Claim]:
+    &quot;&quot;&quot;Test every claim with one correction over all of them, and write `out/report.md`.&quot;&quot;&quot;
+    pooled = pool_scores(scores)
+    check_players(specs, pooled)
+    p_values = [permutation_p_value(*tested_pair(spec, pooled)) for spec in specs]
+    corrected = holm(p_values)
+    method = (
+        &quot;statistic: difference in pooled mean score (one-sided); &quot;
+        f&quot;null: permutation of player labels over pooled games ({PERMUTATIONS} shuffles); &quot;
+        f&quot;correction: Holm over {len(specs)} claim(s)&quot;
+    )
+    claims = [
+        Claim(
+            spec=spec,
+            mean_a=float(pooled[spec.a].mean()),
+            mean_b=float(pooled[spec.b].mean()),
+            p_value=p,
+            p_corrected=p_corr,
+            passed=claim_passed(spec, pooled, p_corr, alpha),
+            method=method,
+        )
+        for spec, p, p_corr in zip(specs, p_values, corrected, strict=True)
+    ]
+    write_report(out / &quot;report.md&quot;, pooled, claims, charts)
+    return claims
+
+
+def pool_scores(scores: Mapping[str, Sequence[ScoreSet]]) -&gt; dict[str, np.ndarray]:
+    &quot;&quot;&quot;Each player&#x27;s games pooled across its training seeds.&quot;&quot;&quot;
+    return {
+        player: np.concatenate([s.scores for s in sets]).astype(np.float64)
+        for player, sets in scores.items()
+    }
+
+
+def check_players(specs: Sequence[ClaimSpec], pooled: Mapping[str, np.ndarray]) -&gt; None:
+    &quot;&quot;&quot;Raise `ValueError` naming any player a spec uses that has no scores.&quot;&quot;&quot;
+    for spec in specs:
+        missing = [p for p in (spec.a, spec.b) if p not in pooled]
+        if missing:
+            raise ValueError(f&quot;claim {spec.name!r} names players without scores: {missing}&quot;)
+
+
+def tested_pair(
+    spec: ClaimSpec, pooled: Mapping[str, np.ndarray]
+) -&gt; tuple[np.ndarray, np.ndarray]:
+    &quot;&quot;&quot;The (x, y) whose H1 is mean(x) &gt; mean(y): a over b, or b over a for &quot;not worse&quot;.&quot;&quot;&quot;
+    if spec.direction == &quot;greater&quot;:
+        return pooled[spec.a], pooled[spec.b]
+    return pooled[spec.b], pooled[spec.a]
+
+
+def permutation_p_value(x: np.ndarray, y: np.ndarray) -&gt; float:
+    &quot;&quot;&quot;One-sided p-value of mean(x) - mean(y) under shuffled labels, (hits + 1) / (n + 1).&quot;&quot;&quot;
+    rng = np.random.default_rng(PERMUTATION_SEED)
+    both = np.concatenate([x, y])
+    observed = x.mean() - y.mean()
+    hits = 0
+    for start in range(0, PERMUTATIONS, PERMUTATION_BATCH):
+        n = min(PERMUTATION_BATCH, PERMUTATIONS - start)
+        shuffled = rng.permuted(np.tile(both, (n, 1)), axis=1)
+        diffs = shuffled[:, : len(x)].mean(axis=1) - shuffled[:, len(x) :].mean(axis=1)
+        hits += int(np.count_nonzero(diffs &gt;= observed))
+    return (hits + 1) / (PERMUTATIONS + 1)
+
+
+def holm(p_values: Sequence[float]) -&gt; list[float]:
+    &quot;&quot;&quot;Holm step-down adjusted p-values, in input order.&quot;&quot;&quot;
+    m = len(p_values)
+    adjusted = [0.0] * m
+    running = 0.0
+    for rank, i in enumerate(sorted(range(m), key=lambda k: p_values[k])):
+        running = max(running, min(1.0, (m - rank) * p_values[i]))
+        adjusted[i] = running
+    return adjusted
+
+
+def claim_passed(
+    spec: ClaimSpec, pooled: Mapping[str, np.ndarray], p_corrected: float, alpha: float
+) -&gt; bool:
+    &quot;&quot;&quot;`greater`: significant; `not_worse`: &quot;a worse&quot; not significant and the ratio bar holds.&quot;&quot;&quot;
+    significant = p_corrected &lt;= alpha
+    if spec.direction == &quot;greater&quot;:
+        return significant
+    if spec.min_ratio is None:
+        return not significant
+    return not significant and ratio_holds(
+        float(pooled[spec.a].mean()), float(pooled[spec.b].mean()), spec.min_ratio
+    )
+
+
+def ratio_holds(mean_a: float, mean_b: float, min_ratio: float) -&gt; bool:
+    &quot;&quot;&quot;`mean_a &gt;= min_ratio * mean_b`, inclusive up to float rounding.&quot;&quot;&quot;
+    bar = min_ratio * mean_b
+    return mean_a &gt;= bar or math.isclose(mean_a, bar)
+
+
+def write_report(
+    path: Path, pooled: Mapping[str, np.ndarray], claims: Sequence[Claim], charts: Sequence[Chart]
+) -&gt; None:
+    &quot;&quot;&quot;Write each player&#x27;s mean and spread, each claim, and a link to each cross-play chart.&quot;&quot;&quot;
+    lines = [&quot;# Report&quot;, &quot;&quot;, &quot;## Players&quot;, &quot;&quot;]
+    lines += [
+        f&quot;- {player}: mean {s.mean():.3f}, std {s.std():.3f}, &quot;
+        f&quot;min {s.min():.3f}, max {s.max():.3f} over {s.size} games&quot;
+        for player, s in pooled.items()
+    ]
+    lines += [&quot;&quot;, &quot;## Claims&quot;, &quot;&quot;]
+    lines += [claim_line(claim) for claim in claims]
+    if claims:
+        lines += [&quot;&quot;, f&quot;Method: {claims[0].method}&quot;]
+    if charts:
+        lines += [&quot;&quot;, &quot;## Cross-play&quot;, &quot;&quot;]
+        lines += [f&quot;- [{chart.path.name}]({chart.path})&quot; for chart in charts]
+    path.write_text(&quot;\n&quot;.join(lines) + &quot;\n&quot;)
+
+
+def claim_line(claim: Claim) -&gt; str:
+    &quot;&quot;&quot;One report line for a claim, labelled &quot;stretch&quot; when it is one.&quot;&quot;&quot;
+    spec = claim.spec
+    label = &quot; (stretch)&quot; if spec.stretch else &quot;&quot;
+    verdict = &quot;PASSED&quot; if claim.passed else &quot;FAILED&quot;
+    ratio = f&quot;, min ratio {spec.min_ratio}&quot; if spec.min_ratio is not None else &quot;&quot;
+    return (
+        f&quot;- {spec.name}{label}: {verdict} ({spec.direction}{ratio}); &quot;
+        f&quot;mean {spec.a} {claim.mean_a:.3f} vs {spec.b} {claim.mean_b:.3f}; &quot;
+        f&quot;p {claim.p_value:.4g}, corrected {claim.p_corrected:.4g}&quot;
+    )
+</pre><details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/project/.claude/worktrees/agent-a855a52355611ef21/src/rllab/compare/claims.py&quot;,
+  &quot;content&quot;: &quot;\&quot;\&quot;\&quot;Tested claims over pooled scores, and the report (PL-04 step 4).\&quot;\&quot;\&quot;\n\nimport math\nfrom collections.abc import Mapping, Sequence\nfrom pathlib import Path\n\nimport numpy as np\n\nfrom rllab.compare.types import Claim, ClaimSpec\nfrom rllab.evaluate import ScoreSet\nfrom rllab.viz import Chart\n\nPERMUTATIONS = 9999\nPERMUTATION_BATCH = 1000\nPERMUTATION_SEED = 0\n\n\ndef run_claims(\n    scores: Mapping[str, Sequence[ScoreSet]],\n    specs: Sequence[ClaimSpec],\n    *,\n    alpha: float = 0.05,\n    charts: Sequence[Chart] = (),\n    out: Path,\n) -&gt; list[Claim]:\n    \&quot;\&quot;\&quot;Test every claim with one correction over all of them, and write `out/report.md`.\&quot;\&quot;\&quot;\n    pooled = pool_scores(scores)\n    check_players(specs, pooled)\n    p_values = [permutation_p_value(*tested_pair(spec, pooled)) for spec in specs]\n    corrected = holm(p_values)\n    method = (\n        \&quot;statistic: difference in pooled mean score (one-sided); \&quot;\n        f\&quot;null: permutation of player labels over pooled games ({PERMUTATIONS} shuffles); \&quot;\n        f\&quot;correction: Holm over {len(specs)} claim(s)\&quot;\n    )\n    claims = [\n        Claim(\n            spec=spec,\n            mean_a=float(pooled[spec.a].mean()),\n            mean_b=float(pooled[spec.b].mean()),\n            p_value=p,\n            p_corrected=p_corr,\n            passed=claim_passed(spec, pooled, p_corr, alpha),\n            method=method,\n        )\n        for spec, p, p_corr in zip(specs, p_values, corrected, strict=True)\n    ]\n    write_report(out / \&quot;report.md\&quot;, pooled, claims, charts)\n    return claims\n\n\ndef pool_scores(scores: Mapping[str, Sequence[ScoreSet]]) -&gt; dict[str, np.ndarray]:\n    \&quot;\&quot;\&quot;Each player&#x27;s games pooled across its training seeds.\&quot;\&quot;\&quot;\n    return {\n        player: np.concatenate([s.scores for s in sets]).astype(np.float64)\n        for player, sets in scores.items()\n    }\n\n\ndef check_players(specs: Sequence[ClaimSpec], pooled: Mapping[str, np.ndarray]) -&gt; None:\n    \&quot;\&quot;\&quot;Raise `ValueError` naming any player a spec uses that has no scores.\&quot;\&quot;\&quot;\n    for spec in specs:\n        missing = [p for p in (spec.a, spec.b) if p not in pooled]\n        if missing:\n            raise ValueError(f\&quot;claim {spec.name!r} names players without scores: {missing}\&quot;)\n\n\ndef tested_pair(\n    spec: ClaimSpec, pooled: Mapping[str, np.ndarray]\n) -&gt; tuple[np.ndarray, np.ndarray]:\n    \&quot;\&quot;\&quot;The (x, y) whose H1 is mean(x) &gt; mean(y): a over b, or b over a for \&quot;not worse\&quot;.\&quot;\&quot;\&quot;\n    if spec.direction == \&quot;greater\&quot;:\n        return pooled[spec.a], pooled[spec.b]\n    return pooled[spec.b], pooled[spec.a]\n\n\ndef permutation_p_value(x: np.ndarray, y: np.ndarray) -&gt; float:\n    \&quot;\&quot;\&quot;One-sided p-value of mean(x) - mean(y) under shuffled labels, (hits + 1) / (n + 1).\&quot;\&quot;\&quot;\n    rng = np.random.default_rng(PERMUTATION_SEED)\n    both = np.concatenate([x, y])\n    observed = x.mean() - y.mean()\n    hits = 0\n    for start in range(0, PERMUTATIONS, PERMUTATION_BATCH):\n        n = min(PERMUTATION_BATCH, PERMUTATIONS - start)\n        shuffled = rng.permuted(np.tile(both, (n, 1)), axis=1)\n        diffs = shuffled[:, : len(x)].mean(axis=1) - shuffled[:, len(x) :].mean(axis=1)\n        hits += int(np.count_nonzero(diffs &gt;= observed))\n    return (hits + 1) / (PERMUTATIONS + 1)\n\n\ndef holm(p_values: Sequence[float]) -&gt; list[float]:\n    \&quot;\&quot;\&quot;Holm step-down adjusted p-values, in input order.\&quot;\&quot;\&quot;\n    m = len(p_values)\n    adjusted = [0.0] * m\n    running = 0.0\n    for rank, i in enumerate(sorted(range(m), key=lambda k: p_values[k])):\n        running = max(running, min(1.0, (m - rank) * p_values[i]))\n        adjusted[i] = running\n    return adjusted\n\n\ndef claim_passed(\n    spec: ClaimSpec, pooled: Mapping[str, np.ndarray], p_corrected: float, alpha: float\n) -&gt; bool:\n    \&quot;\&quot;\&quot;`greater`: significant; `not_worse`: \&quot;a worse\&quot; not significant and the ratio bar holds.\&quot;\&quot;\&quot;\n    significant = p_corrected &lt;= alpha\n    if spec.direction == \&quot;greater\&quot;:\n        return significant\n    if spec.min_ratio is None:\n        return not significant\n    return not significant and ratio_holds(\n        float(pooled[spec.a].mean()), float(pooled[spec.b].mean()), spec.min_ratio\n    )\n\n\ndef ratio_holds(mean_a: float, mean_b: float, min_ratio: float) -&gt; bool:\n    \&quot;\&quot;\&quot;`mean_a &gt;= min_ratio * mean_b`, inclusive up to float rounding.\&quot;\&quot;\&quot;\n    bar = min_ratio * mean_b\n    return mean_a &gt;= bar or math.isclose(mean_a, bar)\n\n\ndef write_report(\n    path: Path, pooled: Mapping[str, np.ndarray], claims: Sequence[Claim], charts: Sequence[Chart]\n) -&gt; None:\n    \&quot;\&quot;\&quot;Write each player&#x27;s mean and spread, each claim, and a link to each cross-play chart.\&quot;\&quot;\&quot;\n    lines = [\&quot;# Report\&quot;, \&quot;\&quot;, \&quot;## Players\&quot;, \&quot;\&quot;]\n    lines += [\n        f\&quot;- {player}: mean {s.mean():.3f}, std {s.std():.3f}, \&quot;\n        f\&quot;min {s.min():.3f}, max {s.max():.3f} over {s.size} games\&quot;\n        for player, s in pooled.items()\n    ]\n    lines += [\&quot;\&quot;, \&quot;## Claims\&quot;, \&quot;\&quot;]\n    lines += [claim_line(claim) for claim in claims]\n    if claims:\n        lines += [\&quot;\&quot;, f\&quot;Method: {claims[0].method}\&quot;]\n    if charts:\n        lines += [\&quot;\&quot;, \&quot;## Cross-play\&quot;, \&quot;\&quot;]\n        lines += [f\&quot;- [{chart.path.name}]({chart.path})\&quot; for chart in charts]\n    path.write_text(\&quot;\\n\&quot;.join(lines) + \&quot;\\n\&quot;)\n\n\ndef claim_line(claim: Claim) -&gt; str:\n    \&quot;\&quot;\&quot;One report line for a claim, labelled \&quot;stretch\&quot; when it is one.\&quot;\&quot;\&quot;\n    spec = claim.spec\n    label = \&quot; (stretch)\&quot; if spec.stretch else \&quot;\&quot;\n    verdict = \&quot;PASSED\&quot; if claim.passed else \&quot;FAILED\&quot;\n    ratio = f\&quot;, min ratio {spec.min_ratio}\&quot; if spec.min_ratio is not None else \&quot;\&quot;\n    return (\n        f\&quot;- {spec.name}{label}: {verdict} ({spec.direction}{ratio}); \&quot;\n        f\&quot;mean {spec.a} {claim.mean_a:.3f} vs {spec.b} {claim.mean_b:.3f}; \&quot;\n        f\&quot;p {claim.p_value:.4g}, corrected {claim.p_corrected:.4g}\&quot;\n    )\n&quot;
+}</pre><div class="lbl">output</div><pre>The file /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/project/.claude/worktrees/agent-a855a52355611ef21/src/rllab/compare/claims.py has been updated successfully. (file state is current in your context — no need to Read it back)</pre></details></div><div class="step" id="S11"><span class="sid">U27.S11</span><span class="kind">Write</span>/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/project/.claude/worktrees/agent-a855a52355611ef21/tests/unit/rllab/test_claims.py (71 lines)<div class="lbl">wrote /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/project/.claude/worktrees/agent-a855a52355611ef21/tests/unit/rllab/test_claims.py</div><pre>&quot;&quot;&quot;Unit tests for the helpers behind compare.run_claims.&quot;&quot;&quot;
+
+from pathlib import Path
+
+import numpy as np
+import pytest
+
+from rllab.compare import ClaimSpec, run_claims
+from rllab.compare.claims import PERMUTATIONS, holm, permutation_p_value, ratio_holds
+from rllab.evaluate import ScoreSet
+from rllab.viz import Chart
+
+
+def _sets(name: str, *chunks: list[float]) -&gt; tuple[ScoreSet, ...]:
+    return tuple(
+        ScoreSet(player=name, train_seed=i, scores=np.asarray(c, dtype=np.float64), games=())
+        for i, c in enumerate(chunks)
+    )
+
+
+def test_holm_matches_hand_computed_values() -&gt; None:
+    # sorted 0.01, 0.02, 0.04 -&gt; 3*0.01, 2*0.02, max(0.04, 1*0.04)
+    assert holm([0.04, 0.01, 0.02]) == pytest.approx([0.04, 0.03, 0.04])
+
+
+def test_holm_is_monotone_and_capped_at_one() -&gt; None:
+    assert holm([0.5, 0.6]) == pytest.approx([1.0, 1.0])
+    assert holm([0.001]) == pytest.approx([0.001])
+
+
+def test_permutation_p_value_is_smallest_possible_for_separated_samples() -&gt; None:
+    x = np.full(50, 10.0)
+    y = np.zeros(50)
+    assert permutation_p_value(x, y) == pytest.approx(1 / (PERMUTATIONS + 1))
+
+
+def test_permutation_p_value_is_one_when_x_is_lower() -&gt; None:
+    assert permutation_p_value(np.zeros(50), np.full(50, 10.0)) == 1.0
+
+
+def test_ratio_bar_is_inclusive_and_strict_below() -&gt; None:
+    assert ratio_holds(9.0, 10.0, 0.9)
+    assert ratio_holds(2.7, 3.0, 0.9)
+    assert not ratio_holds(8.99, 10.0, 0.9)
+
+
+def test_scores_are_pooled_across_seeds(tmp_path: Path) -&gt; None:
+    scores = {&quot;a&quot;: _sets(&quot;a&quot;, [1.0, 2.0], [6.0]), &quot;b&quot;: _sets(&quot;b&quot;, [0.0], [0.0, 0.0])}
+    spec = ClaimSpec(name=&quot;a&gt;b&quot;, a=&quot;a&quot;, b=&quot;b&quot;, direction=&quot;greater&quot;)
+    (claim,) = run_claims(scores, [spec], out=tmp_path)
+    assert claim.mean_a == pytest.approx(3.0)
+    assert claim.mean_b == 0.0
+
+
+def test_not_worse_fails_when_ratio_bar_missed(tmp_path: Path) -&gt; None:
+    scores = {&quot;a&quot;: _sets(&quot;a&quot;, [8.0, 9.0]), &quot;b&quot;: _sets(&quot;b&quot;, [10.0, 9.0])}
+    spec = ClaimSpec(name=&quot;a~b&quot;, a=&quot;a&quot;, b=&quot;b&quot;, direction=&quot;not_worse&quot;, min_ratio=0.95)
+    (claim,) = run_claims(scores, [spec], out=tmp_path)
+    assert claim.p_corrected &gt; 0.05
+    assert claim.passed is False
+
+
+def test_report_links_cross_play_charts(tmp_path: Path) -&gt; None:
+    scores = {&quot;a&quot;: _sets(&quot;a&quot;, [1.0, 2.0]), &quot;b&quot;: _sets(&quot;b&quot;, [1.0, 2.0])}
+    spec = ClaimSpec(name=&quot;a&gt;b&quot;, a=&quot;a&quot;, b=&quot;b&quot;, direction=&quot;greater&quot;)
+    chart = Chart(path=Path(&quot;crossplay/fish.png&quot;), groups=(&quot;a&quot;,), baselines=())
+    run_claims(scores, [spec], charts=[chart], out=tmp_path)
+    text = (tmp_path / &quot;report.md&quot;).read_text()
+    assert &quot;## Cross-play&quot; in text
+    assert &quot;(crossplay/fish.png)&quot; in text
+    assert &quot;Holm over 1 claim&quot; in text
+</pre><details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/project/.claude/worktrees/agent-a855a52355611ef21/tests/unit/rllab/test_claims.py&quot;,
+  &quot;content&quot;: &quot;\&quot;\&quot;\&quot;Unit tests for the helpers behind compare.run_claims.\&quot;\&quot;\&quot;\n\nfrom pathlib import Path\n\nimport numpy as np\nimport pytest\n\nfrom rllab.compare import ClaimSpec, run_claims\nfrom rllab.compare.claims import PERMUTATIONS, holm, permutation_p_value, ratio_holds\nfrom rllab.evaluate import ScoreSet\nfrom rllab.viz import Chart\n\n\ndef _sets(name: str, *chunks: list[float]) -&gt; tuple[ScoreSet, ...]:\n    return tuple(\n        ScoreSet(player=name, train_seed=i, scores=np.asarray(c, dtype=np.float64), games=())\n        for i, c in enumerate(chunks)\n    )\n\n\ndef test_holm_matches_hand_computed_values() -&gt; None:\n    # sorted 0.01, 0.02, 0.04 -&gt; 3*0.01, 2*0.02, max(0.04, 1*0.04)\n    assert holm([0.04, 0.01, 0.02]) == pytest.approx([0.04, 0.03, 0.04])\n\n\ndef test_holm_is_monotone_and_capped_at_one() -&gt; None:\n    assert holm([0.5, 0.6]) == pytest.approx([1.0, 1.0])\n    assert holm([0.001]) == pytest.approx([0.001])\n\n\ndef test_permutation_p_value_is_smallest_possible_for_separated_samples() -&gt; None:\n    x = np.full(50, 10.0)\n    y = np.zeros(50)\n    assert permutation_p_value(x, y) == pytest.approx(1 / (PERMUTATIONS + 1))\n\n\ndef test_permutation_p_value_is_one_when_x_is_lower() -&gt; None:\n    assert permutation_p_value(np.zeros(50), np.full(50, 10.0)) == 1.0\n\n\ndef test_ratio_bar_is_inclusive_and_strict_below() -&gt; None:\n    assert ratio_holds(9.0, 10.0, 0.9)\n    assert ratio_holds(2.7, 3.0, 0.9)\n    assert not ratio_holds(8.99, 10.0, 0.9)\n\n\ndef test_scores_are_pooled_across_seeds(tmp_path: Path) -&gt; None:\n    scores = {\&quot;a\&quot;: _sets(\&quot;a\&quot;, [1.0, 2.0], [6.0]), \&quot;b\&quot;: _sets(\&quot;b\&quot;, [0.0], [0.0, 0.0])}\n    spec = ClaimSpec(name=\&quot;a&gt;b\&quot;, a=\&quot;a\&quot;, b=\&quot;b\&quot;, direction=\&quot;greater\&quot;)\n    (claim,) = run_claims(scores, [spec], out=tmp_path)\n    assert claim.mean_a == pytest.approx(3.0)\n    assert claim.mean_b == 0.0\n\n\ndef test_not_worse_fails_when_ratio_bar_missed(tmp_path: Path) -&gt; None:\n    scores = {\&quot;a\&quot;: _sets(\&quot;a\&quot;, [8.0, 9.0]), \&quot;b\&quot;: _sets(\&quot;b\&quot;, [10.0, 9.0])}\n    spec = ClaimSpec(name=\&quot;a~b\&quot;, a=\&quot;a\&quot;, b=\&quot;b\&quot;, direction=\&quot;not_worse\&quot;, min_ratio=0.95)\n    (claim,) = run_claims(scores, [spec], out=tmp_path)\n    assert claim.p_corrected &gt; 0.05\n    assert claim.passed is False\n\n\ndef test_report_links_cross_play_charts(tmp_path: Path) -&gt; None:\n    scores = {\&quot;a\&quot;: _sets(\&quot;a\&quot;, [1.0, 2.0]), \&quot;b\&quot;: _sets(\&quot;b\&quot;, [1.0, 2.0])}\n    spec = ClaimSpec(name=\&quot;a&gt;b\&quot;, a=\&quot;a\&quot;, b=\&quot;b\&quot;, direction=\&quot;greater\&quot;)\n    chart = Chart(path=Path(\&quot;crossplay/fish.png\&quot;), groups=(\&quot;a\&quot;,), baselines=())\n    run_claims(scores, [spec], charts=[chart], out=tmp_path)\n    text = (tmp_path / \&quot;report.md\&quot;).read_text()\n    assert \&quot;## Cross-play\&quot; in text\n    assert \&quot;(crossplay/fish.png)\&quot; in text\n    assert \&quot;Holm over 1 claim\&quot; in text\n&quot;
+}</pre><div class="lbl">output</div><pre>File created successfully at: /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/project/.claude/worktrees/agent-a855a52355611ef21/tests/unit/rllab/test_claims.py (file state is current in your context — no need to Read it back)</pre></details></div><div class="step" id="S12"><span class="sid">U27.S12</span><span class="kind">Bash</span>uv run pytest tests/intent/rllab tests/unit/rllab -k claims -q<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;uv run pytest tests/intent/rllab tests/unit/rllab -k claims -q&quot;,
+  &quot;description&quot;: &quot;Run claims tests&quot;
+}</pre><div class="lbl">output</div><pre>...................                                                      [100%]
+19 passed, 94 deselected in 24.35s</pre></details></div><div class="step" id="S13"><span class="sid">U27.S13</span><span class="kind">Bash</span>scripts/check.sh gate<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;scripts/check.sh gate&quot;,
+  &quot;description&quot;: &quot;Run the gate checks&quot;,
+  &quot;timeout&quot;: 600000
+}</pre><div class="lbl">output</div><pre>-&gt; ruff check --ignore-noqa .
+All checks passed!
+-&gt; ruff format --check .
+122 files already formatted
+-&gt; mypy
+Success: no issues found in 50 source files
+-&gt; python scripts/check_size.py src
+-&gt; deptry . --no-ansi
+Scanning 54 files...
+
+Success! No dependency issues found.
+-&gt; lint-imports --no-logo
+
+---------
+Contracts
+---------
+
+Analyzed 69 files, 160 dependencies.
+------------------------------------
+
+Layers: lab &gt; train | reference | compare | viz | baselines &gt; evaluate | envs | 
+agents &gt; runs &gt; core KEPT (1 ignored import)
+Hand-written code stays free of the reference library (AGENT-06, AD-04) KEPT
+Only agents imports PyTorch (AD-02) KEPT
+envs → core only KEPT
+agents → core only KEPT
+baselines → core, envs KEPT
+train → core, runs, evaluate KEPT
+reference → core, envs, runs, evaluate KEPT
+compare → evaluate KEPT
+viz → runs, evaluate KEPT
+
+Contracts: 10 kept, 0 broken.
+-&gt; pytest tests/intent tests/unit tests/contracts --no-cov -q -x
+........................................................................ [ 22%]
+........................................................................ [ 44%]
+........................................................................ [ 66%]
+........................................................................ [ 88%]
+.......................................                                  [100%]
+327 passed in 8.49s
+-&gt; bash scripts/floor_guard.sh
+floor_guard: clean
+-&gt; protected files unchanged since refs/worktree/checks-base</pre></details></div><div class="step" id="S14"><span class="sid">U27.S14</span><span class="kind">say</span>DONE M1-T19 implementer<details><summary>full text</summary><pre>DONE M1-T19 implementer</pre></details></div>
+<h2>Commits</h2>
+<p>None.</p>
+<h2>Returned</h2>
+<pre>DONE M1-T19 implementer</pre>
+</body></html>

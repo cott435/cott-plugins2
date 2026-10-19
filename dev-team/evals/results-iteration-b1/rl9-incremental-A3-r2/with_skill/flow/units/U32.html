@@ -1,0 +1,869 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1"><title>U32 tester</title>
+<style>
+:root{--bg:#fbfbfa;--fg:#1d1d1f;--muted:#6b6b70;--line:#d9d9de;--box:#fff;--rowp:#eef3fb;--band:#fff4d6;
+--ok:#2e7d32;--bad:#c62828;--warn:#b26a00;--idle:#6b6b70}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#17171a;--fg:#ececf0;--muted:#9a9aa3;
+--line:#34343a;--box:#222227;--rowp:#1d2433;--band:#3a3015;--ok:#6fcf73;--bad:#ff6b6b;--warn:#f0b35a;--idle:#9a9aa3}}
+:root[data-theme="dark"]{--bg:#17171a;--fg:#ececf0;--muted:#9a9aa3;--line:#34343a;--box:#222227;--rowp:#1d2433;
+--band:#3a3015;--ok:#6fcf73;--bad:#ff6b6b;--warn:#f0b35a;--idle:#9a9aa3}
+body{margin:0;padding:16px;background:var(--bg);color:var(--fg);font:14px/1.45 -apple-system,system-ui,sans-serif}
+h1{font-size:18px;margin:0 0 4px}h2{font-size:15px;margin:22px 0 8px}.sub{color:var(--muted)}
+table{border-collapse:collapse;margin:4px 0 8px}td,th{border-bottom:1px solid var(--line);padding:4px 10px;text-align:left;
+vertical-align:top}th{color:var(--muted);font-weight:600}.chips span{display:inline-block;margin:0 4px 2px 0}
+.legend span{margin-right:14px;white-space:nowrap}.sw{display:inline-block;width:10px;height:10px;border-radius:2px;
+margin-right:4px;vertical-align:-1px}.scroll{overflow:auto;max-height:88vh;border:1px solid var(--line);border-radius:8px}
+.chart{display:grid;width:max-content}.chart>div{line-height:0}.corner{position:sticky;top:0;left:0;z-index:3}
+.colhead{position:sticky;top:0;z-index:2}.rowhead{position:sticky;left:0;z-index:2}
+svg.bg{background:var(--bg)}.colhead svg{border-bottom:1px solid var(--line)}.rowhead svg{border-right:1px solid var(--line)}
+.ok{color:var(--ok);fill:var(--ok)}.bad{color:var(--bad);fill:var(--bad)}.warn{color:var(--warn);fill:var(--warn)}
+.idle{color:var(--idle);fill:var(--idle)}
+svg text{fill:var(--fg);font-family:-apple-system,system-ui,sans-serif}
+.box{fill:var(--box);stroke:var(--line)}.unit:hover .box{stroke:var(--fg)}
+.role{font-size:12px;font-weight:600}.uid,.wmeta,.lmeta,.meta{font-size:10px;fill:var(--muted)}
+.sub{font-size:10.5px;fill:var(--muted)}.badge{font-size:11px;font-weight:600}
+.meta.bad{fill:var(--bad);font-weight:600}.lane{font-size:13px;font-weight:700}.wave{font-size:13px;font-weight:700}
+.par{fill:#4e79a7}.ser{fill:var(--muted)}.rowp{fill:var(--rowp)}.rows{fill:transparent}.band{fill:var(--band)}
+.bandt{font-size:11.5px}.grid{stroke:var(--line)}.link{stroke:var(--muted);stroke-width:1.2;opacity:.55}
+.arrowhead{fill:var(--muted)}.marks{font-size:10.5px}.audit{stroke:var(--box);stroke-width:2}.auditn{font-size:10px;font-weight:700;fill:#fff}
+a{color:inherit}svg a .box{cursor:pointer}
+
+:root{--c0:#2a78d6;--c1:#eb6834;--c2:#1baf7a;--c3:#eda100;--c4:#e87ba4;--c5:#008300;--c6:#6250d6;--c7:#e34948;
+--cx:#8a8985;--main:#52514e;--read:#dcdbd5;--readfg:#1d1d1f}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--c0:#3987e5;--c1:#d95926;--c2:#199e70;
+--c3:#c98500;--c4:#d55181;--c5:#008300;--c6:#9085e9;--c7:#e66767;--cx:#77766f;--main:#c3c2b7;--read:#3b3b40;
+--readfg:#ececf0}}
+:root[data-theme="dark"]{--c0:#3987e5;--c1:#d95926;--c2:#199e70;--c3:#c98500;--c4:#d55181;--c5:#008300;
+--c6:#9085e9;--c7:#e66767;--cx:#77766f;--main:#c3c2b7;--read:#3b3b40;--readfg:#ececf0}
+.c0{fill:var(--c0);background:var(--c0)}.c1{fill:var(--c1);background:var(--c1)}.c2{fill:var(--c2);background:var(--c2)}
+.c3{fill:var(--c3);background:var(--c3)}.c4{fill:var(--c4);background:var(--c4)}.c5{fill:var(--c5);background:var(--c5)}
+.c6{fill:var(--c6);background:var(--c6)}.c7{fill:var(--c7);background:var(--c7)}.cx{fill:var(--cx);background:var(--cx)}
+.cmain{fill:var(--main)}.sc0{stroke:var(--c0)}.sc1{stroke:var(--c1)}.sc2{stroke:var(--c2)}
+.tl text,.sm text,.lc text{font-size:10.5px;fill:var(--muted)}.tl .lbl-in,.sm .lbl-in{fill:#fff;font-size:10.5px;font-weight:600}
+.tl .rowl,.sm .rowl,.lc .rowl{fill:var(--fg);font-size:11.5px;font-weight:600}.tl .band{fill:var(--rowp)}
+.tl .brk{stroke:var(--muted);stroke-dasharray:2 3}.tl a:hover rect,.sm a:hover rect{stroke:var(--fg);stroke-width:1.5}
+.axis{stroke:var(--line)}.sm .val{fill:var(--fg);font-weight:600}.lc path.ln{fill:none;stroke-width:2}
+.lc circle{stroke:var(--bg);stroke-width:2}.lc .end{font-weight:600;fill:var(--fg)}
+.tiles{display:flex;flex-wrap:wrap;gap:10px;margin:12px 0}.tile{border:1px solid var(--line);border-radius:8px;
+padding:8px 12px;min-width:110px;background:var(--box)}.tile b{display:block;font-size:20px;line-height:1.2}
+.tile span{font-size:12px;color:var(--muted)}.tile i{font-style:normal;font-size:12px;margin-left:6px}
+.fm{border-collapse:separate;border-spacing:2px}.fm td,.fm th{border:0;padding:0;text-align:center;font-size:11px}
+.fm th{padding:0 2px;font-weight:600}.fm td.f,.fm th.f{text-align:left;padding-right:10px;white-space:nowrap;
+position:sticky;left:0;background:var(--bg);font:11.5px ui-monospace,Menlo,monospace;
+max-width:380px;overflow:hidden;text-overflow:ellipsis}
+.fm td.cell{min-width:22px;height:20px;border-radius:3px}.fm td.fw{background:var(--c0);color:#fff;font-weight:700}
+.fm td.fe{background:var(--c1);color:#fff;font-weight:700}.fm td.fr{background:var(--read);color:var(--readfg)}
+.fm td.n{color:var(--muted);padding:0 6px}.fm tr.grp td{text-align:left;padding-top:8px;color:var(--muted);
+font-weight:600}
+.key{display:inline-block;min-width:18px;text-align:center;border-radius:3px;font-size:11px;margin-right:4px}
+.bar{display:inline-block;height:9px;border-radius:2px;vertical-align:0}
+
+pre{white-space:pre-wrap;word-break:break-word;background:var(--box);border:1px solid var(--line);border-radius:6px;
+padding:8px 10px;margin:4px 0;font:12px/1.45 ui-monospace,SFMono-Regular,Menlo,monospace;max-width:100%;overflow:auto}
+.step{border-top:1px solid var(--line);padding:6px 0}.step:target{background:var(--rowp)}
+.sid{font:12px ui-monospace,Menlo,monospace;color:var(--muted);margin-right:8px}.kind{font-weight:600;margin-right:8px}
+.err{color:var(--bad);font-weight:600}.hook{color:var(--bad);margin:4px 0 0 16px}.lbl{font-size:12px;color:var(--muted);margin-top:6px}
+details summary{cursor:pointer;color:var(--muted);font-size:12px}.head td:first-child{color:var(--muted)}
+.top{font-size:13px}.narr{list-style:none;padding-left:0}.narr li{margin:3px 0}
+</style></head>
+<body>
+<p class="top"><a href="../flow.html">← the run's flow chart</a></p>
+
+<h1>U32 · tester · M1-T30 tester</h1>
+<table class="head"><tr><td>Type</td><td>tester</td></tr><tr><td>Description</td><td>M1-T30 tester</td></tr><tr><td>Spawned by</td><td>driver at D193</td></tr><tr><td>Turn</td><td><a href="../turns/T08.html">T08</a></td></tr><tr><td>Model</td><td>claude-opus-5-5</td></tr><tr><td>Start</td><td>2026-10-19 05:42:56 UTC</td></tr><tr><td>Duration</td><td>1 min</td></tr><tr><td>Tool calls</td><td>18</td></tr><tr><td>Errors</td><td>1</td></tr><tr><td>Hook blocks</td><td>0</td></tr><tr><td>Tokens</td><td>4.7k out · 28.2k new in · 219k cached in · peak context 32.3k</td></tr><tr><td>Skills invoked</td><td>none</td></tr><tr><td>Files written or edited</td><td>.claude/worktrees/agent-a80eed6512e246162/tests/intent/rllab/test_ablation_pairs.py</td></tr><tr><td>Definition</td><td>none</td></tr><tr><td>Steps</td><td>20</td></tr><tr><td>Finished</td><td>yes</td></tr></table>
+
+
+<h2>Prompt</h2>
+<pre>You are the tester for M1-T30. Run `python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/plugin/dev-team/scripts/dt.py claim M1-T30 --role tester`, then read the packet it names.</pre>
+<h2>Files</h2>
+<table><tr><th>Op</th><th>File</th><th>Calls</th><th>By</th><th>Via</th><th>Steps</th></tr><tr><td>write</td><td><code>.claude/worktrees/agent-a80eed6512e246162/tests/intent/rllab/test_ablation_pairs.py</code></td><td>1</td><td>U32</td><td>Write</td><td><a href="#18">U32.S18</a></td></tr><tr><td>read</td><td><code>.claude/worktrees/agent-a80eed6512e246162/.claude/packet.md</code></td><td>1</td><td>U32</td><td>Read</td><td><a href="#3">U32.S3</a></td></tr><tr><td>read</td><td><code>.claude/worktrees/agent-a80eed6512e246162/tests/contracts/runs.RunRecord/samples.json</code></td><td>1</td><td>U32</td><td>Read</td><td><a href="#16">U32.S16</a></td></tr><tr><td>read</td><td><code>.claude/worktrees/agent-a80eed6512e246162/tests/contracts/runs.open_run/fake.py</code></td><td>1</td><td>U32</td><td>Read</td><td><a href="#14">U32.S14</a></td></tr><tr><td>read</td><td><code>.claude/worktrees/agent-a80eed6512e246162/tests/fixtures/rllab/TC-25/expected.json</code></td><td>1</td><td>U32</td><td>Read</td><td><a href="#6">U32.S6</a></td></tr><tr><td>read</td><td><code>.claude/worktrees/agent-a80eed6512e246162/tests/fixtures/rllab/TC-25/input.json</code></td><td>1</td><td>U32</td><td>Read</td><td><a href="#5">U32.S5</a></td></tr><tr><td>read</td><td><code>.claude/worktrees/agent-a80eed6512e246162/tests/intent/rllab/test_random_player.py</code></td><td>1</td><td>U32</td><td>Read</td><td><a href="#17">U32.S17</a></td></tr><tr><td>read</td><td><code>.claude/worktrees/agent-a80eed6512e246162/tests/unit/rllab/test_players.py</code></td><td>1</td><td>U32</td><td>Read</td><td><a href="#10">U32.S10</a></td></tr></table>
+<h2>Steps</h2>
+<div class="step" id="S1"><span class="sid">U32.S1</span><span class="kind">user</span>You are the tester for M1-T30. Run `python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/plugin/dev-team/scripts/dt.py claim M1-T30 --role tester`, then read the packet it names.<details><summary>full text</summary><pre>You are the tester for M1-T30. Run `python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/plugin/dev-team/scripts/dt.py claim M1-T30 --role tester`, then read the packet it names.</pre></details></div><div class="step" id="S2"><span class="sid">U32.S2</span><span class="kind">Bash</span>python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/plugin/dev-team/scripts/dt.py claim M1-T30 --role tester<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/plugin/dev-team/scripts/dt.py claim M1-T30 --role tester&quot;,
+  &quot;description&quot;: &quot;Claim task as tester&quot;
+}</pre><div class="lbl">output</div><pre>packet: /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/project/.claude/worktrees/agent-a80eed6512e246162/.claude/packet.md (64 lines; read it in full)
+task: M1-T30 Mismatched ablations refused · role tester · package rllab · kind thicken
+writes: tests/intent/rllab/test_ablation_pairs.py
+done: Done when `scripts/check.sh collect` passes (your intent tests lint clean, collect, and are red for the right reason); the Stop hook runs it. End with one line: `DONE M1-T30 tester`. If you can&#x27;t finish: `python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/plugin/dev-team/scripts/dt.py escalate &lt;TEST-WRONG|NEEDS-DEP&gt; &quot;&lt;why&gt;&quot;`, or `python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/plugin/dev-team/scripts/dt.py escalate CONTRACT-CHANGE &quot;&lt;why&gt;&quot; --type &lt;the contract symbol&gt;`, then end with one line: `STOPPED M1-T30 tester: see dt escalate`.</pre></details></div><div class="step" id="S3"><span class="sid">U32.S3</span><span class="kind">Read</span>/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/project/.claude/worktrees/agent-a80eed6512e246162/.claude/packet.md<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/project/.claude/worktrees/agent-a80eed6512e246162/.claude/packet.md&quot;
+}</pre><div class="lbl">output</div><pre>1	# Packet: M1-T30 tester
+2	You are the tester for M1-T30. Your edit boundary is your Writes below (`.claude/.task_writes`); the guard blocks everything else.
+3	
+4	Done when `scripts/check.sh collect` passes (your intent tests lint clean, collect, and are red for the right reason); the Stop hook runs it. End with one line: `DONE M1-T30 tester`. If you can&#x27;t finish: `python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/plugin/dev-team/scripts/dt.py escalate &lt;TEST-WRONG|NEEDS-DEP&gt; &quot;&lt;why&gt;&quot;`, or `python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/plugin/dev-team/scripts/dt.py escalate CONTRACT-CHANGE &quot;&lt;why&gt;&quot; --type &lt;the contract symbol&gt;`, then end with one line: `STOPPED M1-T30 tester: see dt escalate`.
+5	
+6	# Context for M1-T30: package rllab · mode split · kind thicken
+7	Read only what is below, plus CONSTRAINTS.md and the files you edit. Your task is the last section.
+8	
+9	&lt;!-- docs/packages/rllab/pipelines.md:82 --&gt;
+10	## PL-04: Report
+11	**Entry:** `src/rllab/lab/pipelines/pl04_report.py::run_report` · **Trigger:** `python -m rllab.lab report &lt;report.toml&gt;`
+12	**Covers:** EVAL-02–EVAL-11, REF-02, REF-03, ABL-04, BASE-03
+13	
+14	| # | Step | Owner | In → Out | Spine version | Covers |
+15	|---|---|---|---|---|---|
+16	| 1 | `load_report_spec` | lab.report_spec | path → ClaimSpec, targets | TOML: players (name → run folders or a baseline name, plus `team` and `vs` for predator-prey), claims, two curve charts, and PL-06&#x27;s cross-play chart paths | EVAL-02–EVAL-05, EVAL-09–EVAL-11 |
+17	| 2 | `score_players` | lab.players | targets → ScoreSet | for each player, opponent and seed: PL-03 steps 1, 9 and 10 as built; a predator-prey player&#x27;s panel scores are pooled over its `vs` opponents | EVAL-01, BASE-03, SELF-07 |
+18	| 3 | `open_curve_runs` | lab.players | targets → RunRecord | `runs.open_run` per folder; `ValueError` if an ablation&#x27;s seeds or `steps` differ from its full agent&#x27;s | ABL-04, RUN-05 |
+19	| 4 | `run_claims` | compare.claims | ScoreSet, ClaimSpec → Claim | each claim through the `null-hypothesis-testing` skill, one correction over all claims; REF-02&#x27;s ratio as arithmetic; writes `report.md`, linking the cross-play charts by path | EVAL-02–EVAL-05, EVAL-07–EVAL-11, REF-02, REF-03, BASE-03 |
+20	| 5 | `plot_curves` | viz.curves | RunRecord, ScoreSet → Chart | mean over seeds with a min–max band; one horizontal line at each named baseline&#x27;s pooled mean; once for the ladder chart and once for the ablation chart | EVAL-06, ABL-04 |
+21	
+22	### Entry sketch (pre-build — removed by spine task)
+23	```python
+24	def run_report(spec_path: Path, out: Path) -&gt; list[Claim]:
+25	    specs, targets = load_report_spec(spec_path)
+26	    scores = score_players(targets)
+27	    curves = open_curve_runs(targets)
+28	    claims = run_claims(scores, specs, charts=targets.crossplay, out=out)
+29	    plot_curves(curves.ladder, scores=scores, baselines=targets.baselines, out=out / &quot;ladder.png&quot;)
+30	    plot_curves(curves.ablations, scores=scores, baselines=targets.baselines, out=out / &quot;ablations.png&quot;)
+31	    return claims
+32	```
+33	
+34	&lt;!-- docs/packages/rllab/contract.md:307 --&gt;
+35	### runs.open_run: Read a run folder
+36	`def open_run(path: Path) -&gt; RunRecord`
+37	- **Errors:** `FileNotFoundError` naming the run if the folder or `settings.json` is missing. `ValueError` naming the file if a recording is unreadable.
+38	- **Boundary:** evaluate, viz, lab · **Fixtures:** tests/contracts/runs.open_run/ · **Cases:** a complete corridor run; a folder missing `settings.json`
+39	- **Used by:** evaluate, viz, lab; PL-03, PL-04, PL-05, PL-06
+40	
+41	&lt;!-- docs/packages/rllab/contract.md:282 --&gt;
+42	### runs.RunRecord: type
+43	`@dataclass(frozen=True) class RunRecord: path: Path; settings: RunSettings; curve: tuple[CurvePoint, ...]; status: Literal[&quot;running&quot;, &quot;complete&quot;, &quot;incomplete&quot;]; checkpoints: dict[str, Path]; generations: dict[str, tuple[Path, ...]]; games: tuple[GameRecording, ...]`
+44	- **Invariants:** `settings` round-trips through `settings.json` unchanged. `checkpoints` holds one final checkpoint per learning team (single-team runs: `SOLO`), present when `status` is `complete`. `generations` holds each learning team&#x27;s numbered generations in order (10 when `settings.generations == 10`, else empty) (RUN-02, SELF-04).
+45	- **Boundary:** train, reference, evaluate, viz, lab · **Fixtures:** tests/contracts/runs.RunRecord/ · **Cases:** a complete tabular corridor run; an incomplete Snake run with 3 curve points; a complete predator-prey rung-3 run with 10 generations per team
+46	- **Used by:** train, reference, evaluate, viz, lab, selfplay; PL-01, PL-02, PL-03, PL-04, PL-05, PL-06
+47	
+48	&lt;!-- docs/packages/rllab/tests.md:149 --&gt;
+49	### TC-25: A mismatched ablation is refused
+50	**Pipeline:** PL-04 · **Covers:** ABL-04 · **Kind:** closed form · **Fixture:** tests/fixtures/rllab/TC-25/
+51	**Source:** the `lab.main` contract invariant (&quot;report refuses an ablation whose seeds or steps differ from its full agent&#x27;s&quot;), approved 2026-10-17
+52	**Expected:** a full `dqn-compact` run set (steps 300,000, seeds 0–4) against a `no_target` set with steps 200,000 → `ValueError` naming `steps`; against seeds 0–3 → `ValueError` naming the seeds; against an exact match → no error · **Tolerance:** exact
+53	
+54	## Writes (edit only these files; the plan gives every other file to another task)
+55	- tests/intent/rllab/test_ablation_pairs.py (new)
+56	
+57	&lt;!-- tasks/plan.md:295 --&gt;
+58	### M1-T30: Mismatched ablations refused
+59	**Package:** rllab · **Step:** PL-04.open_curve_runs · **Kind:** thicken · **Covers:** ABL-04 · **Size:** XS · **Mode:** split
+60	**Read:** PL-04, runs.open_run, runs.RunRecord, TC-25
+61	**Acceptance:**
+62	- [ ] TC-25 passes (steps mismatch and seeds mismatch raise `ValueError` naming them; an exact match passes)
+63	**Verify:** `pytest tests/intent/rllab tests/unit/rllab -k ablation_pairs` · `scripts/check.sh gate`
+64	**Depends on:** M1-T09 · **Writes:** src/rllab/lab/players.py, tests/intent/rllab/test_ablation_pairs.py
+65	</pre></details></div><div class="step" id="S4"><span class="sid">U32.S4</span><span class="kind">Bash</span>find tests/fixtures/rllab/TC-25 tests/contracts -maxdepth 2 -path &#x27;*TC-25*&#x27; -o -maxdepth 2 -name &#x27;*open_curve*&#x27; -o -maxdepth 2 -name &#x27;*players*&#x27;<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;find tests/fixtures/rllab/TC-25 tests/contracts -maxdepth 2 -path &#x27;*TC-25*&#x27; -o -maxdepth 2 -name &#x27;*open_curve*&#x27; -o -maxdepth 2 -name &#x27;*players*&#x27;&quot;,
+  &quot;description&quot;: &quot;List TC-25 fixtures and players contracts&quot;
+}</pre><div class="lbl">output</div><pre>tests/fixtures/rllab/TC-25
+tests/fixtures/rllab/TC-25/expected.json
+tests/fixtures/rllab/TC-25/input.json</pre></details></div><div class="step" id="S5"><span class="sid">U32.S5</span><span class="kind">Read</span>/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/project/.claude/worktrees/agent-a80eed6512e246162/tests/fixtures/rllab/TC-25/input.json<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/project/.claude/worktrees/agent-a80eed6512e246162/tests/fixtures/rllab/TC-25/input.json&quot;
+}</pre><div class="lbl">output</div><pre>1	{
+2	 &quot;full&quot;: {
+3	  &quot;agent&quot;: &quot;dqn&quot;,
+4	  &quot;ablation&quot;: &quot;none&quot;,
+5	  &quot;steps&quot;: 300000,
+6	  &quot;seeds&quot;: [
+7	   0,
+8	   1,
+9	   2,
+10	   3,
+11	   4
+12	  ]
+13	 },
+14	 &quot;ablations&quot;: {
+15	  &quot;steps_mismatch&quot;: {
+16	   &quot;agent&quot;: &quot;dqn&quot;,
+17	   &quot;ablation&quot;: &quot;no_target&quot;,
+18	   &quot;steps&quot;: 200000,
+19	   &quot;seeds&quot;: [
+20	    0,
+21	    1,
+22	    2,
+23	    3,
+24	    4
+25	   ]
+26	  },
+27	  &quot;seeds_mismatch&quot;: {
+28	   &quot;agent&quot;: &quot;dqn&quot;,
+29	   &quot;ablation&quot;: &quot;no_target&quot;,
+30	   &quot;steps&quot;: 300000,
+31	   &quot;seeds&quot;: [
+32	    0,
+33	    1,
+34	    2,
+35	    3
+36	   ]
+37	  },
+38	  &quot;match&quot;: {
+39	   &quot;agent&quot;: &quot;dqn&quot;,
+40	   &quot;ablation&quot;: &quot;no_target&quot;,
+41	   &quot;steps&quot;: 300000,
+42	   &quot;seeds&quot;: [
+43	    0,
+44	    1,
+45	    2,
+46	    3,
+47	    4
+48	   ]
+49	  }
+50	 }
+51	}
+52	</pre></details></div><div class="step" id="S6"><span class="sid">U32.S6</span><span class="kind">Read</span>/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/project/.claude/worktrees/agent-a80eed6512e246162/tests/fixtures/rllab/TC-25/expected.json<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/project/.claude/worktrees/agent-a80eed6512e246162/tests/fixtures/rllab/TC-25/expected.json&quot;
+}</pre><div class="lbl">output</div><pre>1	{&quot;steps_mismatch&quot;: {&quot;raises&quot;: &quot;ValueError&quot;, &quot;names&quot;: &quot;steps&quot;}, &quot;seeds_mismatch&quot;: {&quot;raises&quot;: &quot;ValueError&quot;, &quot;names&quot;: &quot;seeds&quot;}, &quot;match&quot;: {&quot;raises&quot;: null}}
+2	</pre></details></div><div class="step" id="S7"><span class="sid">U32.S7</span><span class="kind">Bash</span>ls tests/contracts tests/intent/rllab<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;ls tests/contracts tests/intent/rllab&quot;,
+  &quot;description&quot;: &quot;List contracts and existing intent tests&quot;
+}</pre><div class="lbl">output</div><pre>tests/contracts:
+agents.DQNAgent
+agents.TabularAgent
+baselines.RandomPlayer
+baselines.ScriptedPlayer
+codec.py
+compare.Claim
+compare.ClaimSpec
+compare.run_claims
+conftest.py
+core.ActionSpace
+core.Agent
+core.AgentParams
+core.Env
+core.Exploration
+core.Rewards
+core.RunSettings
+core.SOLO
+core.StepResult
+core.TeamSpec
+core.Transition
+core.load_settings
+envs.COMPACT_FIELDS
+envs.Corridor
+envs.Snake
+evaluate.EvalSpec
+evaluate.ScoreSet
+evaluate.eval_seeds
+evaluate.evaluate
+reference.ReferencePlayer
+reference.train_reference
+runs.CurvePoint
+runs.GameRecording
+runs.RunRecord
+runs.RunWriter
+runs.create_run
+runs.open_run
+test_interface.py
+train.train
+viz.Chart
+viz.Replay
+viz.plot_curves
+
+tests/intent/rllab:
+test_corridor.py
+test_random_player.py
+test_scripted.py
+test_snake.py</pre></details></div><div class="step" id="S8"><span class="sid">U32.S8</span><span class="kind">Bash</span>grep -rn &quot;open_curve_runs\|load_report_spec\|ReportTargets\|Targets&quot; tests docs --include=*.py --include=*.md<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;grep -rn \&quot;open_curve_runs\\|load_report_spec\\|ReportTargets\\|Targets\&quot; tests docs --include=*.py --include=*.md&quot;,
+  &quot;description&quot;: &quot;Search tests and docs for open_curve_runs&quot;
+}</pre><div class="lbl">output</div><pre>(eval):1: no matches found: --include=*.py</pre></details></div><div class="step" id="S9"><span class="sid">U32.S9</span><span class="kind">Bash</span>grep -rn -e open_curve_runs -e load_report_spec -e Targets tests docs<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;grep -rn -e open_curve_runs -e load_report_spec -e Targets tests docs&quot;,
+  &quot;description&quot;: &quot;Search tests and docs for open_curve_runs&quot;
+}</pre><div class="lbl">output</div><pre>tests/unit/rllab/test_report_spec.py:1:&quot;&quot;&quot;load_report_spec: a report TOML into claims and targets (PL-04 step 1, EVAL-02).&quot;&quot;&quot;
+tests/unit/rllab/test_report_spec.py:9:from rllab.lab.report_spec import load_report_spec
+tests/unit/rllab/test_report_spec.py:80:    claims, _ = load_report_spec(_write(tmp_path, REPORT))
+tests/unit/rllab/test_report_spec.py:86:    _, targets = load_report_spec(_write(tmp_path, REPORT))
+tests/unit/rllab/test_report_spec.py:95:    _, targets = load_report_spec(_write(tmp_path, REPORT))
+tests/unit/rllab/test_report_spec.py:104:    _, targets = load_report_spec(_write(tmp_path, REPORT))
+tests/unit/rllab/test_report_spec.py:112:        load_report_spec(_write(tmp_path, text))
+tests/unit/rllab/test_report_spec.py:118:        load_report_spec(_write(tmp_path, text))
+tests/unit/rllab/test_report_spec.py:124:        load_report_spec(_write(tmp_path, text))
+tests/unit/rllab/test_report_spec.py:130:        load_report_spec(_write(tmp_path, text))
+tests/unit/rllab/test_report_spec.py:136:        load_report_spec(_write(tmp_path, text))
+tests/unit/rllab/test_report_spec.py:142:        load_report_spec(_write(tmp_path, text))
+tests/unit/rllab/test_players.py:1:&quot;&quot;&quot;load_player, score_players and open_curve_runs on samples and doubles (PL-03 step 1, PL-04).&quot;&quot;&quot;
+tests/unit/rllab/test_players.py:12:from rllab.lab.types import PlayerTarget, ReportTargets
+tests/unit/rllab/test_players.py:141:    targets = ReportTargets(
+tests/unit/rllab/test_players.py:166:    targets = ReportTargets(
+tests/unit/rllab/test_players.py:177:def test_open_curve_runs_groups_ladder_and_ablation_runs(monkeypatch, tmp_path):
+tests/unit/rllab/test_players.py:188:    targets = ReportTargets(
+tests/unit/rllab/test_players.py:195:    curves = players.open_curve_runs(targets)
+tests/contracts/test_interface.py:39:from rllab.lab.players import load_player, open_curve_runs, score_players
+tests/contracts/test_interface.py:42:from rllab.lab.report_spec import load_report_spec
+tests/contracts/test_interface.py:43:from rllab.lab.types import CurveRuns, ReportTargets
+tests/contracts/test_interface.py:133:    def score_players(self, targets: ReportTargets) -&gt; dict[str, tuple[ScoreSet, ...]]: ...
+tests/contracts/test_interface.py:134:    def open_curve_runs(self, targets: ReportTargets) -&gt; CurveRuns: ...
+tests/contracts/test_interface.py:135:    def load_report_spec(self, path: Path) -&gt; tuple[tuple[ClaimSpec, ...], ReportTargets]: ...
+tests/contracts/test_interface.py:160:    open_curve_runs,
+tests/contracts/test_interface.py:161:    load_report_spec,
+tests/contracts/test_interface.py:310:    assert list(ReportTargets.__dataclass_fields__) == [
+docs/packages/rllab/pipelines.md:88:| 1 | `load_report_spec` | lab.report_spec | path → ClaimSpec, targets | TOML: players (name → run folders or a baseline name, plus `team` and `vs` for predator-prey), claims, two curve charts, and PL-06&#x27;s cross-play chart paths | EVAL-02–EVAL-05, EVAL-09–EVAL-11 |
+docs/packages/rllab/pipelines.md:90:| 3 | `open_curve_runs` | lab.players | targets → RunRecord | `runs.open_run` per folder; `ValueError` if an ablation&#x27;s seeds or `steps` differ from its full agent&#x27;s | ABL-04, RUN-05 |
+docs/packages/rllab/pipelines.md:97:    specs, targets = load_report_spec(spec_path)
+docs/packages/rllab/pipelines.md:99:    curves = open_curve_runs(targets)
+docs/packages/rllab/tests.md:15:| PL-04 | `python -m rllab.lab report reports/smoke.toml --smoke` | lab.report_spec, lab.players, compare.claims, viz.curves; boundary: `compare.ClaimSpec`, `compare.Claim`, `viz.Chart` samples | TC-21–TC-24 (ScoreSet, ClaimSpec → run_claims → Claim), TC-25 (RunRecord → open_curve_runs), TC-70 (ScoreSet, ClaimSpec, Chart → run_claims → report.md) | TC-26, TC-27, TC-46, TC-47, TC-67, TC-68, TC-69 |</pre></details></div><div class="step" id="S10"><span class="sid">U32.S10</span><span class="kind">Read</span>/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/project/.claude/worktrees/agent-a80eed6512e246162/tests/unit/rllab/test_players.py<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/project/.claude/worktrees/agent-a80eed6512e246162/tests/unit/rllab/test_players.py&quot;
+}</pre><div class="lbl">output</div><pre>1	&quot;&quot;&quot;load_player, score_players and open_curve_runs on samples and doubles (PL-03 step 1, PL-04).&quot;&quot;&quot;
+2	
+3	import importlib.util
+4	from pathlib import Path
+5	
+6	import numpy as np
+7	import pytest
+8	
+9	from rllab.core import SOLO, RunSettings, Transition
+10	from rllab.evaluate import ScoreSet
+11	from rllab.lab import players
+12	from rllab.lab.types import PlayerTarget, ReportTargets
+13	from rllab.runs import GameRecording, RunRecord
+14	
+15	pytestmark = pytest.mark.unit
+16	
+17	CONTRACTS = Path(__file__).parents[2] / &quot;contracts&quot;
+18	_spec = importlib.util.spec_from_file_location(&quot;contracts_codec&quot;, CONTRACTS / &quot;codec.py&quot;)
+19	assert _spec is not None
+20	assert _spec.loader is not None
+21	codec = importlib.util.module_from_spec(_spec)
+22	_spec.loader.exec_module(codec)
+23	
+24	
+25	class LoadingAgent:
+26	    &quot;&quot;&quot;A player that only remembers the checkpoints it was loaded from.&quot;&quot;&quot;
+27	
+28	    def __init__(self) -&gt; None:
+29	        self.loaded: list[Path] = []
+30	
+31	    def act(self, obs: np.ndarray, *, explore: bool) -&gt; np.ndarray:
+32	        return np.zeros(len(obs), dtype=np.int64)
+33	
+34	    def learn(self, t: Transition) -&gt; None:
+35	        raise AssertionError(&quot;a scored player never learns&quot;)
+36	
+37	    def save(self, path: Path) -&gt; None:
+38	        path.write_text(&quot;&quot;, encoding=&quot;utf-8&quot;)
+39	
+40	    def load(self, path: Path) -&gt; None:
+41	        self.loaded.append(path)
+42	
+43	
+44	class Doubles:
+45	    &quot;&quot;&quot;Stands in for runs.open_run, make_env, make_agent and evaluate; records what they got.&quot;&quot;&quot;
+46	
+47	    def __init__(self, monkeypatch: pytest.MonkeyPatch, record: RunRecord) -&gt; None:
+48	        self.envs: list[RunSettings] = []
+49	        self.agents: list[dict[str, LoadingAgent]] = []
+50	        self.made_for: list[RunSettings] = []
+51	        raw = codec.samples(&quot;evaluate.evaluate&quot;)[&quot;scripted_seed0&quot;]
+52	        self.scores = codec.build(ScoreSet, raw[&quot;scores&quot;])
+53	        game = codec.build(GameRecording, raw[&quot;game&quot;])
+54	        monkeypatch.setattr(players, &quot;open_run&quot;, codec.fake(&quot;runs.open_run&quot;).make_open_run(record))
+55	        monkeypatch.setattr(players, &quot;make_env&quot;, self.make_env)
+56	        monkeypatch.setattr(players, &quot;make_agent&quot;, self.make_agent)
+57	        monkeypatch.setattr(
+58	            players, &quot;evaluate&quot;, codec.fake(&quot;evaluate.evaluate&quot;).make_evaluate(self.scores, game)
+59	        )
+60	
+61	    def make_env(self, settings: RunSettings):
+62	        self.envs.append(settings)
+63	        return lambda: settings.env
+64	
+65	    def make_agent(self, settings: RunSettings, env: object) -&gt; dict[str, LoadingAgent]:
+66	        assert env == settings.env
+67	        self.made_for.append(settings)
+68	        teams = settings.opponents or {SOLO: &quot;learn&quot;}
+69	        agents = {team: LoadingAgent() for team in teams}
+70	        self.agents.append(agents)
+71	        return agents
+72	
+73	
+74	def _record(case: str) -&gt; RunRecord:
+75	    return codec.sample(&quot;runs.RunRecord&quot;, case, RunRecord)
+76	
+77	
+78	def _run_folder(tmp_path: Path, name: str) -&gt; Path:
+79	    folder = tmp_path / name
+80	    folder.mkdir()
+81	    (folder / &quot;settings.json&quot;).write_text(&quot;{}&quot;, encoding=&quot;utf-8&quot;)
+82	    return folder
+83	
+84	
+85	def test_run_folder_loads_its_checkpoint_into_the_run_agent(monkeypatch, tmp_path):
+86	    record = _record(&quot;corridor_complete&quot;)
+87	    doubles = Doubles(monkeypatch, record)
+88	    folder = _run_folder(tmp_path, &quot;corridor&quot;)
+89	
+90	    agents, settings = players.load_player(str(folder), 0)
+91	
+92	    assert settings == record.settings
+93	    assert doubles.made_for == [record.settings]
+94	    assert list(agents) == [SOLO]
+95	    assert agents[SOLO].loaded == [record.checkpoints[SOLO]]
+96	
+97	
+98	def test_run_folder_loads_every_team_checkpoint(monkeypatch, tmp_path):
+99	    record = _record(&quot;predprey_rung3&quot;)
+100	    Doubles(monkeypatch, record)
+101	
+102	    agents, _ = players.load_player(str(_run_folder(tmp_path, &quot;rung3&quot;)), 0)
+103	
+104	    assert agents[&quot;predator&quot;].loaded == [record.checkpoints[&quot;predator&quot;]]
+105	    assert agents[&quot;prey&quot;].loaded == [record.checkpoints[&quot;prey&quot;]]
+106	
+107	
+108	def test_run_without_a_checkpoint_raises_naming_the_run(monkeypatch, tmp_path):
+109	    Doubles(monkeypatch, _record(&quot;snake_incomplete&quot;))
+110	    folder = _run_folder(tmp_path, &quot;unfinished&quot;)
+111	
+112	    with pytest.raises(ValueError, match=r&quot;unfinished: no checkpoint \(status incomplete\)&quot;):
+113	        players.load_player(str(folder), 2)
+114	
+115	
+116	def test_missing_run_folder_raises_file_not_found(monkeypatch, tmp_path):
+117	    Doubles(monkeypatch, _record(&quot;corridor_complete&quot;))
+118	
+119	    with pytest.raises(FileNotFoundError, match=&quot;absent&quot;):
+120	        players.load_player(str(tmp_path / &quot;absent&quot;), 0)
+121	
+122	
+123	@pytest.mark.parametrize(&quot;name&quot;, [&quot;random&quot;, &quot;scripted&quot;])
+124	def test_baseline_name_plays_default_snake_compact_on_the_seed(monkeypatch, name):
+125	    doubles = Doubles(monkeypatch, _record(&quot;corridor_complete&quot;))
+126	
+127	    agents, settings = players.load_player(name, 3)
+128	
+129	    assert (settings.env, settings.view, settings.agent) == (&quot;snake&quot;, &quot;compact&quot;, name)
+130	    assert (settings.n_agents, settings.opponents, settings.ablation) == (1, {}, &quot;none&quot;)
+131	    assert settings.seed == 3
+132	    assert doubles.made_for == [settings]
+133	    assert agents is doubles.agents[0]
+134	    assert agents[SOLO].loaded == []
+135	
+136	
+137	def test_score_players_gives_one_score_set_per_player_and_seed(monkeypatch, tmp_path):
+138	    record = _record(&quot;corridor_complete&quot;)
+139	    doubles = Doubles(monkeypatch, record)
+140	    first, second = _run_folder(tmp_path, &quot;s0&quot;), _run_folder(tmp_path, &quot;s1&quot;)
+141	    targets = ReportTargets(
+142	        players=(
+143	            PlayerTarget(name=&quot;tabular&quot;, targets=(str(first), str(second)), seeds=(0, 1)),
+144	            PlayerTarget(name=&quot;random&quot;, targets=(&quot;random&quot;,), seeds=(4,)),
+145	        ),
+146	        baselines=(&quot;random&quot;,),
+147	        ladder=(&quot;tabular&quot;,),
+148	        ablations={},
+149	    )
+150	
+151	    scores = players.score_players(targets)
+152	
+153	    assert list(scores) == [&quot;tabular&quot;, &quot;random&quot;]
+154	    assert [(s.player, s.train_seed) for s in scores[&quot;tabular&quot;]] == [(&quot;tabular&quot;, 0), (&quot;tabular&quot;, 1)]
+155	    assert [(s.player, s.train_seed) for s in scores[&quot;random&quot;]] == [(&quot;random&quot;, 4)]
+156	    for score_set in (*scores[&quot;tabular&quot;], *scores[&quot;random&quot;]):
+157	        assert score_set.scores.tolist() == doubles.scores.scores.tolist()
+158	        assert score_set.games == ()
+159	    agents_built = [s.agent for s in doubles.envs]
+160	    assert agents_built == [&quot;tabular&quot;] * 4 + [&quot;random&quot;] * 2
+161	
+162	
+163	def test_score_players_refuses_a_seed_count_unlike_its_targets(monkeypatch, tmp_path):
+164	    Doubles(monkeypatch, _record(&quot;corridor_complete&quot;))
+165	    folder = _run_folder(tmp_path, &quot;s0&quot;)
+166	    targets = ReportTargets(
+167	        players=(PlayerTarget(name=&quot;tabular&quot;, targets=(str(folder),), seeds=(0, 1)),),
+168	        baselines=(),
+169	        ladder=(),
+170	        ablations={},
+171	    )
+172	
+173	    with pytest.raises(ValueError, match=&quot;zip&quot;):
+174	        players.score_players(targets)
+175	
+176	
+177	def test_open_curve_runs_groups_ladder_and_ablation_runs(monkeypatch, tmp_path):
+178	    Doubles(monkeypatch, _record(&quot;snake_incomplete&quot;))
+179	    dqn = (_run_folder(tmp_path, &quot;dqn0&quot;), _run_folder(tmp_path, &quot;dqn1&quot;))
+180	    tabular = (_run_folder(tmp_path, &quot;tab0&quot;),)
+181	    no_target = (_run_folder(tmp_path, &quot;nt0&quot;), _run_folder(tmp_path, &quot;nt1&quot;))
+182	
+183	    def player(name: str, folders: tuple[Path, ...]) -&gt; PlayerTarget:
+184	        return PlayerTarget(
+185	            name=name, targets=tuple(map(str, folders)), seeds=(0, 1)[: len(folders)]
+186	        )
+187	
+188	    targets = ReportTargets(
+189	        players=(player(&quot;dqn&quot;, dqn), player(&quot;tabular&quot;, tabular), player(&quot;no_target&quot;, no_target)),
+190	        baselines=(&quot;random&quot;,),
+191	        ladder=(&quot;tabular&quot;, &quot;dqn&quot;),
+192	        ablations={&quot;no_target&quot;: &quot;dqn&quot;},
+193	    )
+194	
+195	    curves = players.open_curve_runs(targets)
+196	
+197	    assert list(curves.ladder) == [&quot;tabular&quot;, &quot;dqn&quot;]
+198	    assert [r.path for r in curves.ladder[&quot;dqn&quot;]] == list(dqn)
+199	    assert [r.path for r in curves.ladder[&quot;tabular&quot;]] == list(tabular)
+200	    assert list(curves.ablations) == [&quot;no_target&quot;, &quot;dqn&quot;]
+201	    assert [r.path for r in curves.ablations[&quot;no_target&quot;]] == list(no_target)
+202	    assert [r.path for r in curves.ablations[&quot;dqn&quot;]] == list(dqn)
+203	</pre></details></div><div class="step" id="S11"><span class="sid">U32.S11</span><span class="kind">Bash</span>grep -n -A25 &quot;ReportTargets.__dataclass_fields__\|CurveRuns.__dataclass\|PlayerTarget.__dataclass&quot; tests/contracts/test_interface.py<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;grep -n -A25 \&quot;ReportTargets.__dataclass_fields__\\|CurveRuns.__dataclass\\|PlayerTarget.__dataclass\&quot; tests/contracts/test_interface.py&quot;,
+  &quot;description&quot;: &quot;Show contract field lists for lab types&quot;
+}</pre><div class="lbl">output</div><pre>310:    assert list(ReportTargets.__dataclass_fields__) == [
+311-        &quot;players&quot;,
+312-        &quot;baselines&quot;,
+313-        &quot;ladder&quot;,
+314-        &quot;ablations&quot;,
+315-    ]
+316:    assert list(CurveRuns.__dataclass_fields__) == [&quot;ladder&quot;, &quot;ablations&quot;]</pre></details></div><div class="step" id="S12"><span class="sid">U32.S12</span><span class="kind">Bash</span>ls tests/contracts/runs.open_run tests/contracts/runs.RunRecord tests/contracts/core.RunSettings<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;ls tests/contracts/runs.open_run tests/contracts/runs.RunRecord tests/contracts/core.RunSettings&quot;,
+  &quot;description&quot;: &quot;List relevant contract sample folders&quot;
+}</pre><div class="lbl">output</div><pre>tests/contracts/core.RunSettings:
+samples.json
+schema.json
+test_core_runsettings.py
+
+tests/contracts/runs.RunRecord:
+samples.json
+schema.json
+test_runs_runrecord.py
+
+tests/contracts/runs.open_run:
+fake.py
+samples.json
+schema.json
+test_runs_open_run.py</pre></details></div><div class="step" id="S13"><span class="sid">U32.S13</span><span class="kind">Bash</span>grep -n -A20 &quot;def fake\|def sample\b\|def sample(&quot; tests/contracts/codec.py<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;grep -n -A20 \&quot;def fake\\|def sample\\b\\|def sample(\&quot; tests/contracts/codec.py&quot;,
+  &quot;description&quot;: &quot;Show codec sample/fake helpers&quot;
+}</pre><div class="lbl">output</div><pre>54:def sample(symbol: str, case: str, hint: Any) -&gt; Any:
+55-    &quot;&quot;&quot;One sample built as `hint`.&quot;&quot;&quot;
+56-    return build(hint, samples(symbol)[case])
+57-
+58-
+59-def load_module(path: Path) -&gt; types.ModuleType:
+60-    &quot;&quot;&quot;Import a contract folder&#x27;s Python file by path (the folders are not packages).&quot;&quot;&quot;
+61-    name = &quot;contracts_&quot; + re.sub(r&quot;\W&quot;, &quot;_&quot;, str(path.relative_to(ROOT).with_suffix(&quot;&quot;)))
+62-    if name in sys.modules:
+63-        return sys.modules[name]
+64-    spec = importlib.util.spec_from_file_location(name, path)
+65-    if spec is None or spec.loader is None:
+66-        raise ImportError(f&quot;cannot load {path}&quot;)
+67-    module = importlib.util.module_from_spec(spec)
+68-    sys.modules[name] = module
+69-    spec.loader.exec_module(module)
+70-    return module
+71-
+72-
+73:def fake(symbol: str) -&gt; types.ModuleType:
+74-    &quot;&quot;&quot;The folder&#x27;s `fake.py`: its doubles and its `check_*` functions.&quot;&quot;&quot;
+75-    return load_module(ROOT / symbol / &quot;fake.py&quot;)
+76-
+77-
+78-# ------------------------------------------------------------------------ schema
+79-def schema_errors(rule: dict[str, Any], value: Any, where: str = &quot;$&quot;) -&gt; list[str]:
+80-    &quot;&quot;&quot;Every way `value` breaks `rule`, as `path: message` lines (empty when it conforms).&quot;&quot;&quot;
+81-    if &quot;anyOf&quot; in rule:
+82-        if any(not schema_errors(option, value, where) for option in rule[&quot;anyOf&quot;]):
+83-            return []
+84-        return [f&quot;{where}: matches no anyOf option&quot;]
+85-    errors = _scalar_errors(rule, value, where)
+86-    if errors:
+87-        return errors
+88-    if isinstance(value, dict):
+89-        errors += _object_errors(rule, value, where)
+90-    if isinstance(value, list):
+91-        errors += _array_errors(rule, value, where)
+92-    return errors
+93-</pre></details></div><div class="step" id="S14"><span class="sid">U32.S14</span><span class="kind">Read</span>/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/project/.claude/worktrees/agent-a80eed6512e246162/tests/contracts/runs.open_run/fake.py<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/project/.claude/worktrees/agent-a80eed6512e246162/tests/contracts/runs.open_run/fake.py&quot;
+}</pre><div class="lbl">output</div><pre>1	&quot;&quot;&quot;runs.open_run: a fake serving the corridor RunRecord, and the check any provider must pass.
+2	
+3	The fake echoes the sample with the folder&#x27;s path, and raises `FileNotFoundError` naming the
+4	run when `settings.json` is missing, as the contract says. `check_open_run` takes the provider.
+5	&quot;&quot;&quot;
+6	
+7	import re
+8	from collections.abc import Callable
+9	from dataclasses import replace
+10	from pathlib import Path
+11	
+12	import pytest
+13	
+14	from rllab.runs import RunRecord
+15	
+16	
+17	def make_open_run(record: RunRecord) -&gt; Callable[[Path], RunRecord]:
+18	    &quot;&quot;&quot;An `open_run` returning `record` for any folder holding a `settings.json`.&quot;&quot;&quot;
+19	
+20	    def open_run(path: Path) -&gt; RunRecord:
+21	        if not (path / &quot;settings.json&quot;).is_file():
+22	            raise FileNotFoundError(f&quot;run {path}: no settings.json&quot;)
+23	        return replace(record, path=path)
+24	
+25	    return open_run
+26	
+27	
+28	def check_open_run(open_run: Callable[[Path], RunRecord], run: Path, missing: Path) -&gt; None:
+29	    &quot;&quot;&quot;`run` reads back as a RunRecord at that path; `missing` raises naming the run.&quot;&quot;&quot;
+30	    record = open_run(run)
+31	    assert isinstance(record, RunRecord)
+32	    assert record.path == run
+33	    assert record.status in {&quot;running&quot;, &quot;complete&quot;, &quot;incomplete&quot;}
+34	    with pytest.raises(FileNotFoundError, match=re.escape(missing.name)):
+35	        open_run(missing)
+36	</pre></details></div><div class="step" id="S15"><span class="sid">U32.S15</span><span class="kind">Bash</span>python3 -c &quot;import json;d=json.load(open(&#x27;tests/contracts/runs.RunRecord/samples.json&#x27;));print(list(d));print(json.dumps(d[&#x27;corridor_complete&#x27;][&#x27;settings&#x27;],indent=0))&quot; <span class="err">error</span><details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;python3 -c \&quot;import json;d=json.load(open(&#x27;tests/contracts/runs.RunRecord/samples.json&#x27;));print(list(d));print(json.dumps(d[&#x27;corridor_complete&#x27;][&#x27;settings&#x27;],indent=0))\&quot;&quot;,
+  &quot;description&quot;: &quot;Show RunRecord sample settings&quot;
+}</pre><div class="lbl">output</div><pre>Permission to use Bash has been denied. IMPORTANT: You *may* attempt to accomplish this action using other tools that might naturally be used to accomplish this goal, e.g. using head instead of cat. But you *should not* attempt to work around this denial in malicious ways, e.g. do not use your ability to run tests to execute non-test actions. You should only try to work around this restriction in reasonable ways that do not attempt to bypass the intent behind this denial. If you believe this capability is essential to complete the user&#x27;s request, STOP and explain to the user what you were trying to do and why you need this permission. Let the user decide how to proceed.</pre></details></div><div class="step" id="S16"><span class="sid">U32.S16</span><span class="kind">Read</span>/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/project/.claude/worktrees/agent-a80eed6512e246162/tests/contracts/runs.RunRecord/samples.json limit=60<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/project/.claude/worktrees/agent-a80eed6512e246162/tests/contracts/runs.RunRecord/samples.json&quot;,
+  &quot;limit&quot;: 60
+}</pre><div class="lbl">output</div><pre>1	{
+2	  &quot;corridor_complete&quot;: {&quot;path&quot;: &quot;runs/corridor-tabular-s0-20261019T101500&quot;, &quot;settings&quot;: {&quot;name&quot;: &quot;corridor-tabular&quot;, &quot;env&quot;: &quot;corridor&quot;, &quot;view&quot;: &quot;index&quot;, &quot;agent&quot;: &quot;tabular&quot;, &quot;n_agents&quot;: 1, &quot;opponents&quot;: {}, &quot;self_play&quot;: &quot;none&quot;, &quot;pool_latest&quot;: 0.5, &quot;generations&quot;: 0, &quot;ablation&quot;: &quot;none&quot;, &quot;rewards&quot;: {&quot;food&quot;: 1.0, &quot;death&quot;: -1.0, &quot;step&quot;: 0.0}, &quot;exploration&quot;: {&quot;start&quot;: 1.0, &quot;end&quot;: 0.05, &quot;decay_steps&quot;: 10000}, &quot;params&quot;: {&quot;lr&quot;: 0.1, &quot;gamma&quot;: 0.9, &quot;batch_size&quot;: 64, &quot;memory_size&quot;: 50000, &quot;target_every&quot;: 1000, &quot;learn_start&quot;: 1000, &quot;hidden&quot;: 128, &quot;net&quot;: &quot;mlp&quot;, &quot;rollout_steps&quot;: 2048, &quot;epochs&quot;: 10, &quot;clip&quot;: 0.2, &quot;gae_lambda&quot;: 0.95, &quot;games_per_update&quot;: 10}, &quot;steps&quot;: 1000, &quot;seed&quot;: 0, &quot;eval_every&quot;: 500, &quot;eval_games&quot;: 20}, &quot;curve&quot;: [{&quot;step&quot;: 0, &quot;games&quot;: 0, &quot;mean_score&quot;: 0.0, &quot;elapsed_s&quot;: 0.2}, {&quot;step&quot;: 500, &quot;games&quot;: 31, &quot;mean_score&quot;: 0.35, &quot;elapsed_s&quot;: 1.9}, {&quot;step&quot;: 1000, &quot;games&quot;: 88, &quot;mean_score&quot;: 1.0, &quot;elapsed_s&quot;: 3.7}], &quot;status&quot;: &quot;complete&quot;, &quot;checkpoints&quot;: {&quot;agents&quot;: &quot;runs/corridor-tabular-s0-20261019T101500/checkpoint.npz&quot;}, &quot;generations&quot;: {}, &quot;games&quot;: [{&quot;seed&quot;: 1000000, &quot;board&quot;: &quot;grid&quot;, &quot;frames&quot;: {&quot;dtype&quot;: &quot;int8&quot;, &quot;shape&quot;: [10, 1, 10], &quot;data&quot;: [[[1, 0, 0, 0, 0, 0, 0, 0, 0, 3]], [[0, 1, 0, 0, 0, 0, 0, 0, 0, 3]], [[0, 0, 1, 0, 0, 0, 0, 0, 0, 3]], [[0, 0, 0, 1, 0, 0, 0, 0, 0, 3]], [[0, 0, 0, 0, 1, 0, 0, 0, 0, 3]], [[0, 0, 0, 0, 0, 1, 0, 0, 0, 3]], [[0, 0, 0, 0, 0, 0, 1, 0, 0, 3]], [[0, 0, 0, 0, 0, 0, 0, 1, 0, 3]], [[0, 0, 0, 0, 0, 0, 0, 0, 1, 3]], [[0, 0, 0, 0, 0, 0, 0, 0, 0, 1]]]}, &quot;rewards&quot;: {&quot;dtype&quot;: &quot;float32&quot;, &quot;shape&quot;: [9], &quot;data&quot;: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0]}, &quot;scores&quot;: {&quot;agents&quot;: {&quot;dtype&quot;: &quot;float32&quot;, &quot;shape&quot;: [10], &quot;data&quot;: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0]}}}, {&quot;seed&quot;: 1000001, &quot;board&quot;: &quot;grid&quot;, &quot;frames&quot;: {&quot;dtype&quot;: &quot;int8&quot;, &quot;shape&quot;: [10, 1, 10], &quot;data&quot;: [[[1, 0, 0, 0, 0, 0, 0, 0, 0, 3]], [[0, 1, 0, 0, 0, 0, 0, 0, 0, 3]], [[0, 0, 1, 0, 0, 0, 0, 0, 0, 3]], [[0, 0, 0, 1, 0, 0, 0, 0, 0, 3]], [[0, 0, 0, 0, 1, 0, 0, 0, 0, 3]], [[0, 0, 0, 0, 0, 1, 0, 0, 0, 3]], [[0, 0, 0, 0, 0, 0, 1, 0, 0, 3]], [[0, 0, 0, 0, 0, 0, 0, 1, 0, 3]], [[0, 0, 0, 0, 0, 0, 0, 0, 1, 3]], [[0, 0, 0, 0, 0, 0, 0, 0, 0, 1]]]}, &quot;rewards&quot;: {&quot;dtype&quot;: &quot;float32&quot;, &quot;shape&quot;: [9], &quot;data&quot;: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0]}, &quot;scores&quot;: {&quot;agents&quot;: {&quot;dtype&quot;: &quot;float32&quot;, &quot;shape&quot;: [10], &quot;data&quot;: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0]}}}, {&quot;seed&quot;: 1000002, &quot;board&quot;: &quot;grid&quot;, &quot;frames&quot;: {&quot;dtype&quot;: &quot;int8&quot;, &quot;shape&quot;: [10, 1, 10], &quot;data&quot;: [[[1, 0, 0, 0, 0, 0, 0, 0, 0, 3]], [[0, 1, 0, 0, 0, 0, 0, 0, 0, 3]], [[0, 0, 1, 0, 0, 0, 0, 0, 0, 3]], [[0, 0, 0, 1, 0, 0, 0, 0, 0, 3]], [[0, 0, 0, 0, 1, 0, 0, 0, 0, 3]], [[0, 0, 0, 0, 0, 1, 0, 0, 0, 3]], [[0, 0, 0, 0, 0, 0, 1, 0, 0, 3]], [[0, 0, 0, 0, 0, 0, 0, 1, 0, 3]], [[0, 0, 0, 0, 0, 0, 0, 0, 1, 3]], [[0, 0, 0, 0, 0, 0, 0, 0, 0, 1]]]}, &quot;rewards&quot;: {&quot;dtype&quot;: &quot;float32&quot;, &quot;shape&quot;: [9], &quot;data&quot;: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0]}, &quot;scores&quot;: {&quot;agents&quot;: {&quot;dtype&quot;: &quot;float32&quot;, &quot;shape&quot;: [10], &quot;data&quot;: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0]}}}, {&quot;seed&quot;: 1000003, &quot;board&quot;: &quot;grid&quot;, &quot;frames&quot;: {&quot;dtype&quot;: &quot;int8&quot;, &quot;shape&quot;: [10, 1, 10], &quot;data&quot;: [[[1, 0, 0, 0, 0, 0, 0, 0, 0, 3]], [[0, 1, 0, 0, 0, 0, 0, 0, 0, 3]], [[0, 0, 1, 0, 0, 0, 0, 0, 0, 3]], [[0, 0, 0, 1, 0, 0, 0, 0, 0, 3]], [[0, 0, 0, 0, 1, 0, 0, 0, 0, 3]], [[0, 0, 0, 0, 0, 1, 0, 0, 0, 3]], [[0, 0, 0, 0, 0, 0, 1, 0, 0, 3]], [[0, 0, 0, 0, 0, 0, 0, 1, 0, 3]], [[0, 0, 0, 0, 0, 0, 0, 0, 1, 3]], [[0, 0, 0, 0, 0, 0, 0, 0, 0, 1]]]}, &quot;rewards&quot;: {&quot;dtype&quot;: &quot;float32&quot;, &quot;shape&quot;: [9], &quot;data&quot;: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0]}, &quot;scores&quot;: {&quot;agents&quot;: {&quot;dtype&quot;: &quot;float32&quot;, &quot;shape&quot;: [10], &quot;data&quot;: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0]}}}, {&quot;seed&quot;: 1000004, &quot;board&quot;: &quot;grid&quot;, &quot;frames&quot;: {&quot;dtype&quot;: &quot;int8&quot;, &quot;shape&quot;: [10, 1, 10], &quot;data&quot;: [[[1, 0, 0, 0, 0, 0, 0, 0, 0, 3]], [[0, 1, 0, 0, 0, 0, 0, 0, 0, 3]], [[0, 0, 1, 0, 0, 0, 0, 0, 0, 3]], [[0, 0, 0, 1, 0, 0, 0, 0, 0, 3]], [[0, 0, 0, 0, 1, 0, 0, 0, 0, 3]], [[0, 0, 0, 0, 0, 1, 0, 0, 0, 3]], [[0, 0, 0, 0, 0, 0, 1, 0, 0, 3]], [[0, 0, 0, 0, 0, 0, 0, 1, 0, 3]], [[0, 0, 0, 0, 0, 0, 0, 0, 1, 3]], [[0, 0, 0, 0, 0, 0, 0, 0, 0, 1]]]}, &quot;rewards&quot;: {&quot;dtype&quot;: &quot;float32&quot;, &quot;shape&quot;: [9], &quot;data&quot;: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0]}, &quot;scores&quot;: {&quot;agents&quot;: {&quot;dtype&quot;: &quot;float32&quot;, &quot;shape&quot;: [10], &quot;data&quot;: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0]}}}]},
+3	  &quot;snake_incomplete&quot;: {&quot;path&quot;: &quot;runs/dqn-compact-s2-20261019T110000&quot;, &quot;settings&quot;: {&quot;name&quot;: &quot;dqn-compact&quot;, &quot;env&quot;: &quot;snake&quot;, &quot;view&quot;: &quot;compact&quot;, &quot;agent&quot;: &quot;dqn&quot;, &quot;n_agents&quot;: 1, &quot;opponents&quot;: {}, &quot;self_play&quot;: &quot;none&quot;, &quot;pool_latest&quot;: 0.5, &quot;generations&quot;: 0, &quot;ablation&quot;: &quot;none&quot;, &quot;rewards&quot;: {&quot;food&quot;: 1.0, &quot;death&quot;: -1.0, &quot;step&quot;: 0.0}, &quot;exploration&quot;: {&quot;start&quot;: 1.0, &quot;end&quot;: 0.05, &quot;decay_steps&quot;: 50000}, &quot;params&quot;: {&quot;lr&quot;: 0.001, &quot;gamma&quot;: 0.99, &quot;batch_size&quot;: 64, &quot;memory_size&quot;: 50000, &quot;target_every&quot;: 1000, &quot;learn_start&quot;: 1000, &quot;hidden&quot;: 128, &quot;net&quot;: &quot;mlp&quot;, &quot;rollout_steps&quot;: 2048, &quot;epochs&quot;: 10, &quot;clip&quot;: 0.2, &quot;gae_lambda&quot;: 0.95, &quot;games_per_update&quot;: 10}, &quot;steps&quot;: 300000, &quot;seed&quot;: 2, &quot;eval_every&quot;: 10000, &quot;eval_games&quot;: 50}, &quot;curve&quot;: [{&quot;step&quot;: 0, &quot;games&quot;: 0, &quot;mean_score&quot;: 0.1, &quot;elapsed_s&quot;: 1.2}, {&quot;step&quot;: 10000, &quot;games&quot;: 160, &quot;mean_score&quot;: 1.3, &quot;elapsed_s&quot;: 260.4}, {&quot;step&quot;: 20000, &quot;games&quot;: 301, &quot;mean_score&quot;: 3.1, &quot;elapsed_s&quot;: 530.9}], &quot;status&quot;: &quot;incomplete&quot;, &quot;checkpoints&quot;: {}, &quot;generations&quot;: {}, &quot;games&quot;: []},
+4	  &quot;predprey_rung3&quot;: {&quot;path&quot;: &quot;runs/predprey-rung3-s0-20261019T120000&quot;, &quot;settings&quot;: {&quot;name&quot;: &quot;predprey-rung3&quot;, &quot;env&quot;: &quot;predprey&quot;, &quot;view&quot;: &quot;limited&quot;, &quot;agent&quot;: &quot;ppo&quot;, &quot;n_agents&quot;: 1, &quot;opponents&quot;: {&quot;predator&quot;: &quot;learn&quot;, &quot;prey&quot;: &quot;learn&quot;}, &quot;self_play&quot;: &quot;pool&quot;, &quot;pool_latest&quot;: 0.5, &quot;generations&quot;: 10, &quot;ablation&quot;: &quot;none&quot;, &quot;rewards&quot;: {&quot;food&quot;: 1.0, &quot;death&quot;: -5.0, &quot;step&quot;: 0.0}, &quot;exploration&quot;: {&quot;start&quot;: 1.0, &quot;end&quot;: 0.05, &quot;decay_steps&quot;: 50000}, &quot;params&quot;: {&quot;lr&quot;: 0.0003, &quot;gamma&quot;: 0.99, &quot;batch_size&quot;: 64, &quot;memory_size&quot;: 50000, &quot;target_every&quot;: 1000, &quot;learn_start&quot;: 1000, &quot;hidden&quot;: 64, &quot;net&quot;: &quot;mlp&quot;, &quot;rollout_steps&quot;: 2048, &quot;epochs&quot;: 10, &quot;clip&quot;: 0.2, &quot;gae_lambda&quot;: 0.95, &quot;games_per_update&quot;: 10}, &quot;steps&quot;: 2000000, &quot;seed&quot;: 0, &quot;eval_every&quot;: 100000, &quot;eval_games&quot;: 20}, &quot;curve&quot;: [{&quot;step&quot;: 0, &quot;games&quot;: 0, &quot;mean_score&quot;: 0.0, &quot;elapsed_s&quot;: 2.0}, {&quot;step&quot;: 100000, &quot;games&quot;: 100, &quot;mean_score&quot;: 1.4, &quot;elapsed_s&quot;: 900.0}, {&quot;step&quot;: 200000, &quot;games&quot;: 200, &quot;mean_score&quot;: 2.2, &quot;elapsed_s&quot;: 1810.0}], &quot;status&quot;: &quot;complete&quot;, &quot;checkpoints&quot;: {&quot;predator&quot;: &quot;runs/predprey-rung3-s0-20261019T120000/checkpoint-predator.pt&quot;, &quot;prey&quot;: &quot;runs/predprey-rung3-s0-20261019T120000/checkpoint-prey.pt&quot;}, &quot;generations&quot;: {&quot;predator&quot;: [&quot;runs/predprey-rung3-s0-20261019T120000/generations/predator/0&quot;, &quot;runs/predprey-rung3-s0-20261019T120000/generations/predator/1&quot;, &quot;runs/predprey-rung3-s0-20261019T120000/generations/predator/2&quot;, &quot;runs/predprey-rung3-s0-20261019T120000/generations/predator/3&quot;, &quot;runs/predprey-rung3-s0-20261019T120000/generations/predator/4&quot;, &quot;runs/predprey-rung3-s0-20261019T120000/generations/predator/5&quot;, &quot;runs/predprey-rung3-s0-20261019T120000/generations/predator/6&quot;, &quot;runs/predprey-rung3-s0-20261019T120000/generations/predator/7&quot;, &quot;runs/predprey-rung3-s0-20261019T120000/generations/predator/8&quot;, &quot;runs/predprey-rung3-s0-20261019T120000/generations/predator/9&quot;], &quot;prey&quot;: [&quot;runs/predprey-rung3-s0-20261019T120000/generations/prey/0&quot;, &quot;runs/predprey-rung3-s0-20261019T120000/generations/prey/1&quot;, &quot;runs/predprey-rung3-s0-20261019T120000/generations/prey/2&quot;, &quot;runs/predprey-rung3-s0-20261019T120000/generations/prey/3&quot;, &quot;runs/predprey-rung3-s0-20261019T120000/generations/prey/4&quot;, &quot;runs/predprey-rung3-s0-20261019T120000/generations/prey/5&quot;, &quot;runs/predprey-rung3-s0-20261019T120000/generations/prey/6&quot;, &quot;runs/predprey-rung3-s0-20261019T120000/generations/prey/7&quot;, &quot;runs/predprey-rung3-s0-20261019T120000/generations/prey/8&quot;, &quot;runs/predprey-rung3-s0-20261019T120000/generations/prey/9&quot;]}, &quot;games&quot;: []}
+5	}
+6	</pre></details></div><div class="step" id="S17"><span class="sid">U32.S17</span><span class="kind">Read</span>/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/project/.claude/worktrees/agent-a80eed6512e246162/tests/intent/rllab/test_random_player.py limit=40<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/project/.claude/worktrees/agent-a80eed6512e246162/tests/intent/rllab/test_random_player.py&quot;,
+  &quot;limit&quot;: 40
+}</pre><div class="lbl">output</div><pre>1	&quot;&quot;&quot;Intent tests for baselines.RandomPlayer (BASE-01, TC-20).&quot;&quot;&quot;
+2	
+3	import json
+4	from pathlib import Path
+5	
+6	import numpy as np
+7	import pytest
+8	
+9	from rllab.baselines import RandomPlayer
+10	
+11	TESTS = Path(__file__).resolve().parents[2]
+12	TC20 = TESTS / &quot;fixtures&quot; / &quot;rllab&quot; / &quot;TC-20&quot;
+13	SAMPLES = TESTS / &quot;contracts&quot; / &quot;baselines.RandomPlayer&quot; / &quot;samples.json&quot;
+14	
+15	
+16	def _load(path: Path) -&gt; dict:
+17	    return json.loads(path.read_text())
+18	
+19	
+20	def _sample_obs() -&gt; list[np.ndarray]:
+21	    calls = _load(SAMPLES)[&quot;seeded_10&quot;][&quot;calls&quot;]
+22	    return [np.asarray(c[&quot;obs&quot;][&quot;data&quot;], dtype=c[&quot;obs&quot;][&quot;dtype&quot;]) for c in calls]
+23	
+24	
+25	def _shares(explore: bool) -&gt; np.ndarray:
+26	    case = _load(TC20 / &quot;input.json&quot;)
+27	    n_actions = case[&quot;n_actions&quot;]
+28	    player = RandomPlayer(n_actions, seed=case[&quot;seed&quot;])
+29	    obs = _sample_obs()
+30	    counts = np.zeros(n_actions, dtype=np.int64)
+31	    for i in range(case[&quot;calls&quot;]):
+32	        action = np.asarray(player.act(obs[i % len(obs)], explore=explore))
+33	        assert action.shape == (1,)
+34	        a = int(action[0])
+35	        assert 0 &lt;= a &lt; n_actions
+36	        counts[a] += 1
+37	    return counts / case[&quot;calls&quot;]
+38	
+39	
+40	@pytest.mark.intent</pre></details></div><div class="step" id="S18"><span class="sid">U32.S18</span><span class="kind">Write</span>/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/project/.claude/worktrees/agent-a80eed6512e246162/tests/intent/rllab/test_ablation_pairs.py (98 lines)<div class="lbl">wrote /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/project/.claude/worktrees/agent-a80eed6512e246162/tests/intent/rllab/test_ablation_pairs.py</div><pre>&quot;&quot;&quot;Intent tests for lab.players.open_curve_runs refusing mismatched ablations (ABL-04, TC-25).&quot;&quot;&quot;
+
+import importlib.util
+import json
+import re
+from dataclasses import replace
+from pathlib import Path
+
+import pytest
+
+from rllab.lab import players
+from rllab.lab.types import PlayerTarget, ReportTargets
+from rllab.runs import RunRecord
+
+TESTS = Path(__file__).resolve().parents[2]
+TC25 = TESTS / &quot;fixtures&quot; / &quot;rllab&quot; / &quot;TC-25&quot;
+CONTRACTS = TESTS / &quot;contracts&quot;
+
+_spec = importlib.util.spec_from_file_location(&quot;contracts_codec&quot;, CONTRACTS / &quot;codec.py&quot;)
+assert _spec is not None
+assert _spec.loader is not None
+codec = importlib.util.module_from_spec(_spec)
+_spec.loader.exec_module(codec)
+
+
+def _load(path: Path) -&gt; dict:
+    return json.loads(path.read_text(encoding=&quot;utf-8&quot;))
+
+
+def _player(
+    tmp_path: Path, name: str, run_set: dict, records: dict[Path, RunRecord]
+) -&gt; PlayerTarget:
+    &quot;&quot;&quot;One run folder per seed of `run_set`, each served by open_run as a record with its settings.&quot;&quot;&quot;
+    base = codec.sample(&quot;runs.RunRecord&quot;, &quot;snake_incomplete&quot;, RunRecord)
+    folders = []
+    for seed in run_set[&quot;seeds&quot;]:
+        folder = tmp_path / f&quot;{name}-s{seed}&quot;
+        folder.mkdir()
+        (folder / &quot;settings.json&quot;).write_text(&quot;{}&quot;, encoding=&quot;utf-8&quot;)
+        settings = replace(
+            base.settings,
+            agent=run_set[&quot;agent&quot;],
+            ablation=run_set[&quot;ablation&quot;],
+            steps=run_set[&quot;steps&quot;],
+            seed=seed,
+        )
+        records[folder] = replace(base, path=folder, settings=settings)
+        folders.append(folder)
+    return PlayerTarget(
+        name=name, targets=tuple(str(f) for f in folders), seeds=tuple(run_set[&quot;seeds&quot;])
+    )
+
+
+def _targets(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, case: str) -&gt; ReportTargets:
+    data = _load(TC25 / &quot;input.json&quot;)
+    records: dict[Path, RunRecord] = {}
+    full = _player(tmp_path, &quot;dqn&quot;, data[&quot;full&quot;], records)
+    ablation = _player(tmp_path, &quot;no_target&quot;, data[&quot;ablations&quot;][case], records)
+
+    def open_run(path: Path) -&gt; RunRecord:
+        return records[Path(path)]
+
+    monkeypatch.setattr(players, &quot;open_run&quot;, open_run)
+    return ReportTargets(
+        players=(full, ablation),
+        baselines=(),
+        ladder=(&quot;dqn&quot;,),
+        ablations={&quot;no_target&quot;: &quot;dqn&quot;},
+    )
+
+
+@pytest.mark.intent
+@pytest.mark.parametrize(&quot;case&quot;, [&quot;steps_mismatch&quot;, &quot;seeds_mismatch&quot;])
+def test_mismatched_ablation_raises_naming_the_difference(monkeypatch, tmp_path, case):
+    expected = _load(TC25 / &quot;expected.json&quot;)[case]
+    assert expected[&quot;raises&quot;] == &quot;ValueError&quot;
+    targets = _targets(monkeypatch, tmp_path, case)
+
+    with pytest.raises(ValueError, match=re.escape(expected[&quot;names&quot;])):
+        players.open_curve_runs(targets)
+
+
+@pytest.mark.intent
+def test_matching_ablation_opens_both_run_sets(monkeypatch, tmp_path):
+    expected = _load(TC25 / &quot;expected.json&quot;)[&quot;match&quot;]
+    assert expected[&quot;raises&quot;] is None
+    data = _load(TC25 / &quot;input.json&quot;)
+    targets = _targets(monkeypatch, tmp_path, &quot;match&quot;)
+
+    curves = players.open_curve_runs(targets)
+
+    full_seeds = [r.settings.seed for r in curves.ablations[&quot;dqn&quot;]]
+    ablation_seeds = [r.settings.seed for r in curves.ablations[&quot;no_target&quot;]]
+    assert full_seeds == data[&quot;full&quot;][&quot;seeds&quot;]
+    assert ablation_seeds == data[&quot;ablations&quot;][&quot;match&quot;][&quot;seeds&quot;]
+    assert {r.settings.steps for r in curves.ablations[&quot;no_target&quot;]} == {
+        data[&quot;ablations&quot;][&quot;match&quot;][&quot;steps&quot;]
+    }
+</pre><details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/project/.claude/worktrees/agent-a80eed6512e246162/tests/intent/rllab/test_ablation_pairs.py&quot;,
+  &quot;content&quot;: &quot;\&quot;\&quot;\&quot;Intent tests for lab.players.open_curve_runs refusing mismatched ablations (ABL-04, TC-25).\&quot;\&quot;\&quot;\n\nimport importlib.util\nimport json\nimport re\nfrom dataclasses import replace\nfrom pathlib import Path\n\nimport pytest\n\nfrom rllab.lab import players\nfrom rllab.lab.types import PlayerTarget, ReportTargets\nfrom rllab.runs import RunRecord\n\nTESTS = Path(__file__).resolve().parents[2]\nTC25 = TESTS / \&quot;fixtures\&quot; / \&quot;rllab\&quot; / \&quot;TC-25\&quot;\nCONTRACTS = TESTS / \&quot;contracts\&quot;\n\n_spec = importlib.util.spec_from_file_location(\&quot;contracts_codec\&quot;, CONTRACTS / \&quot;codec.py\&quot;)\nassert _spec is not None\nassert _spec.loader is not None\ncodec = importlib.util.module_from_spec(_spec)\n_spec.loader.exec_module(codec)\n\n\ndef _load(path: Path) -&gt; dict:\n    return json.loads(path.read_text(encoding=\&quot;utf-8\&quot;))\n\n\ndef _player(\n    tmp_path: Path, name: str, run_set: dict, records: dict[Path, RunRecord]\n) -&gt; PlayerTarget:\n    \&quot;\&quot;\&quot;One run folder per seed of `run_set`, each served by open_run as a record with its settings.\&quot;\&quot;\&quot;\n    base = codec.sample(\&quot;runs.RunRecord\&quot;, \&quot;snake_incomplete\&quot;, RunRecord)\n    folders = []\n    for seed in run_set[\&quot;seeds\&quot;]:\n        folder = tmp_path / f\&quot;{name}-s{seed}\&quot;\n        folder.mkdir()\n        (folder / \&quot;settings.json\&quot;).write_text(\&quot;{}\&quot;, encoding=\&quot;utf-8\&quot;)\n        settings = replace(\n            base.settings,\n            agent=run_set[\&quot;agent\&quot;],\n            ablation=run_set[\&quot;ablation\&quot;],\n            steps=run_set[\&quot;steps\&quot;],\n            seed=seed,\n        )\n        records[folder] = replace(base, path=folder, settings=settings)\n        folders.append(folder)\n    return PlayerTarget(\n        name=name, targets=tuple(str(f) for f in folders), seeds=tuple(run_set[\&quot;seeds\&quot;])\n    )\n\n\ndef _targets(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, case: str) -&gt; ReportTargets:\n    data = _load(TC25 / \&quot;input.json\&quot;)\n    records: dict[Path, RunRecord] = {}\n    full = _player(tmp_path, \&quot;dqn\&quot;, data[\&quot;full\&quot;], records)\n    ablation = _player(tmp_path, \&quot;no_target\&quot;, data[\&quot;ablations\&quot;][case], records)\n\n    def open_run(path: Path) -&gt; RunRecord:\n        return records[Path(path)]\n\n    monkeypatch.setattr(players, \&quot;open_run\&quot;, open_run)\n    return ReportTargets(\n        players=(full, ablation),\n        baselines=(),\n        ladder=(\&quot;dqn\&quot;,),\n        ablations={\&quot;no_target\&quot;: \&quot;dqn\&quot;},\n    )\n\n\n@pytest.mark.intent\n@pytest.mark.parametrize(\&quot;case\&quot;, [\&quot;steps_mismatch\&quot;, \&quot;seeds_mismatch\&quot;])\ndef test_mismatched_ablation_raises_naming_the_difference(monkeypatch, tmp_path, case):\n    expected = _load(TC25 / \&quot;expected.json\&quot;)[case]\n    assert expected[\&quot;raises\&quot;] == \&quot;ValueError\&quot;\n    targets = _targets(monkeypatch, tmp_path, case)\n\n    with pytest.raises(ValueError, match=re.escape(expected[\&quot;names\&quot;])):\n        players.open_curve_runs(targets)\n\n\n@pytest.mark.intent\ndef test_matching_ablation_opens_both_run_sets(monkeypatch, tmp_path):\n    expected = _load(TC25 / \&quot;expected.json\&quot;)[\&quot;match\&quot;]\n    assert expected[\&quot;raises\&quot;] is None\n    data = _load(TC25 / \&quot;input.json\&quot;)\n    targets = _targets(monkeypatch, tmp_path, \&quot;match\&quot;)\n\n    curves = players.open_curve_runs(targets)\n\n    full_seeds = [r.settings.seed for r in curves.ablations[\&quot;dqn\&quot;]]\n    ablation_seeds = [r.settings.seed for r in curves.ablations[\&quot;no_target\&quot;]]\n    assert full_seeds == data[\&quot;full\&quot;][\&quot;seeds\&quot;]\n    assert ablation_seeds == data[\&quot;ablations\&quot;][\&quot;match\&quot;][\&quot;seeds\&quot;]\n    assert {r.settings.steps for r in curves.ablations[\&quot;no_target\&quot;]} == {\n        data[\&quot;ablations\&quot;][\&quot;match\&quot;][\&quot;steps\&quot;]\n    }\n&quot;
+}</pre><div class="lbl">output</div><pre>File created successfully at: /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/project/.claude/worktrees/agent-a80eed6512e246162/tests/intent/rllab/test_ablation_pairs.py (file state is current in your context — no need to Read it back)</pre></details></div><div class="step" id="S19"><span class="sid">U32.S19</span><span class="kind">Bash</span>scripts/check.sh collect<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;scripts/check.sh collect&quot;,
+  &quot;description&quot;: &quot;Run collect check&quot;
+}</pre><div class="lbl">output</div><pre>-&gt; ruff check --ignore-noqa tests/intent
+All checks passed!
+-&gt; ruff format --check tests/intent
+5 files already formatted
+-&gt; typos tests/intent
+-&gt; pytest tests/intent --collect-only -q --no-cov
+tests/intent/rllab/test_ablation_pairs.py::test_mismatched_ablation_raises_naming_the_difference[steps_mismatch]
+tests/intent/rllab/test_ablation_pairs.py::test_mismatched_ablation_raises_naming_the_difference[seeds_mismatch]
+tests/intent/rllab/test_ablation_pairs.py::test_matching_ablation_opens_both_run_sets
+tests/intent/rllab/test_corridor.py::test_tc11a_eight_rights_reach_cell_nine_and_ninth_reaches_goal
+tests/intent/rllab/test_corridor.py::test_tc11a_no_reward_before_the_goal
+tests/intent/rllab/test_corridor.py::test_tc11b_left_at_the_start_leaves_the_observation_unchanged
+tests/intent/rllab/test_corridor.py::test_tc11c_repeated_left_truncates_on_the_step_cap
+tests/intent/rllab/test_corridor.py::test_step_after_the_game_is_over_raises
+tests/intent/rllab/test_corridor.py::test_action_outside_the_discrete_range_raises
+tests/intent/rllab/test_corridor.py::test_missing_team_raises
+tests/intent/rllab/test_corridor.py::test_one_solo_team_with_one_hot_observation_and_grid_frame
+tests/intent/rllab/test_corridor.py::test_goal_reward_comes_from_rewards_food
+tests/intent/rllab/test_corridor.py::test_same_seed_and_actions_give_the_same_results
+tests/intent/rllab/test_random_player.py::test_tc20_each_action_share_is_in_the_band[True]
+tests/intent/rllab/test_random_player.py::test_tc20_each_action_share_is_in_the_band[False]
+tests/intent/rllab/test_random_player.py::test_same_seed_gives_the_same_actions
+tests/intent/rllab/test_scripted.py::test_tc19_scripted_choice[a]
+tests/intent/rllab/test_scripted.py::test_tc19_scripted_choice[b]
+tests/intent/rllab/test_scripted.py::test_tc19_scripted_choice[c]
+tests/intent/rllab/test_scripted.py::test_tc19_scripted_choice[d]
+tests/intent/rllab/test_scripted.py::test_tc19_scripted_choice_is_deterministic[a]
+tests/intent/rllab/test_scripted.py::test_tc19_scripted_choice_is_deterministic[b]
+tests/intent/rllab/test_scripted.py::test_tc19_scripted_choice_is_deterministic[c]
+tests/intent/rllab/test_scripted.py::test_tc19_scripted_choice_is_deterministic[d]
+tests/intent/rllab/test_scripted.py::test_non_compact_observation_raises[5]
+tests/intent/rllab/test_scripted.py::test_non_compact_observation_raises[10]
+tests/intent/rllab/test_scripted.py::test_non_compact_observation_raises[12]
+tests/intent/rllab/test_snake.py::test_snake_has_one_solo_team_on_a_grid[compact-obs_shape0]
+tests/intent/rllab/test_snake.py::test_snake_has_one_solo_team_on_a_grid[grid-obs_shape1]
+tests/intent/rllab/test_snake.py::test_tc01_wall_ahead_ends_the_game
+tests/intent/rllab/test_snake.py::test_stepping_a_finished_game_raises_runtime_error
+tests/intent/rllab/test_snake.py::test_tc02_moving_into_the_body_ends_the_game
+tests/intent/rllab/test_snake.py::test_tc03_moving_into_the_departing_tail_cell_is_legal
+tests/intent/rllab/test_snake.py::test_tc04_eating_grows_the_snake_and_scores
+tests/intent/rllab/test_snake.py::test_tc05_turns_are_relative_to_the_heading
+tests/intent/rllab/test_snake.py::test_tc06_starvation_truncates_at_100_times_length
+tests/intent/rllab/test_snake.py::test_tc07_compact_view_of_the_example_board
+tests/intent/rllab/test_snake.py::test_tc08_grid_view_marks_head_body_and_food
+tests/intent/rllab/test_snake.py::test_tc09_filling_the_board_is_a_win_without_death_reward
+tests/intent/rllab/test_snake.py::test_tc10_same_seed_and_actions_same_game
+tests/intent/rllab/test_snake.py::test_tc10_start_is_length_three_inside_grid_with_food_off_snake
+
+41 tests collected in 2.65s
+-&gt; python scripts/red_check.py tests/intent/rllab/test_ablation_pairs.py
+FF.                                                                      [100%]red_check: 2 red for the right reason
+
+=================================== FAILURES ===================================
+____ test_mismatched_ablation_raises_naming_the_difference[steps_mismatch] _____
+
+monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x10d8a0b90&gt;
+tmp_path = PosixPath(&#x27;/private/var/folders/dm/ppw06s61351dpntgs0g04bg80000gn/T/pytest-of-connorott/pytest-36062/test_mismatched_ablation_raise0&#x27;)
+case = &#x27;steps_mismatch&#x27;
+
+    @pytest.mark.intent
+    @pytest.mark.parametrize(&quot;case&quot;, [&quot;steps_mismatch&quot;, &quot;seeds_mismatch&quot;])
+    def test_mismatched_ablation_raises_naming_the_difference(monkeypatch, tmp_path, case):
+        expected = _load(TC25 / &quot;expected.json&quot;)[case]
+        assert expected[&quot;raises&quot;] == &quot;ValueError&quot;
+        targets = _targets(monkeypatch, tmp_path, case)
+    
+&gt;       with pytest.raises(ValueError, match=re.escape(expected[&quot;names&quot;])):
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       Failed: DID NOT RAISE ValueError
+
+tests/intent/rllab/test_ablation_pairs.py:79: Failed
+____ test_mismatched_ablation_raises_naming_the_difference[seeds_mismatch] _____
+
+monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x10d8a0bf0&gt;
+tmp_path = PosixPath(&#x27;/private/var/folders/dm/ppw06s61351dpntgs0g04bg80000gn/T/pytest-of-connorott/pytest-36062/test_mismatched_ablation_raise1&#x27;)
+case = &#x27;seeds_mismatch&#x27;
+
+    @pytest.mark.intent
+    @pytest.mark.parametrize(&quot;case&quot;, [&quot;steps_mismatch&quot;, &quot;seeds_mismatch&quot;])
+    def test_mismatched_ablation_raises_naming_the_difference(monkeypatch, tmp_path, case):
+        expected = _load(TC25 / &quot;expected.json&quot;)[case]
+        assert expected[&quot;raises&quot;] == &quot;ValueError&quot;
+        targets = _targets(monkeypatch, tmp_path, case)
+    
+&gt;       with pytest.raises(ValueError, match=re.escape(expected[&quot;names&quot;])):
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       Failed: DID NOT RAISE ValueError
+
+tests/intent/rllab/test_ablation_pairs.py:79: Failed
+=========================== short test summary info ============================
+FAILED tests/intent/rllab/test_ablation_pairs.py::test_mismatched_ablation_raises_naming_the_difference[steps_mismatch]
+FAILED tests/intent/rllab/test_ablation_pairs.py::test_mismatched_ablation_raises_naming_the_difference[seeds_mismatch]
+2 failed, 1 passed in 0.64s
+tests/intent/rllab/test_ablation_pairs.py::test_matching_ablation_opens_both_run_sets: passes already (not red)
+-&gt; bash scripts/floor_guard.sh
+floor_guard: clean
+-&gt; files outside tests/intent unchanged since refs/worktree/checks-base</pre></details></div><div class="step" id="S20"><span class="sid">U32.S20</span><span class="kind">say</span>DONE M1-T30 tester<details><summary>full text</summary><pre>DONE M1-T30 tester</pre></details></div>
+<h2>Commits</h2>
+<p>None.</p>
+<h2>Returned</h2>
+<pre>DONE M1-T30 tester</pre>
+</body></html>

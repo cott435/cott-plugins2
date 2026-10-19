@@ -58,7 +58,8 @@ COMMIT_ASK = re.compile(r"\bcommit", re.I)
 APPROVE_ASK = re.compile(r"\bdo you approve\b|\bapprove (?:it|this|both|all \w+|these|them)\b[^.\n]*\?", re.I)
 OFFER_ASK = re.compile(r"\b(shall|should) I\b|\bwant me to\b", re.I)
 QUOTED_CHOICE = re.compile(r"\breply\b[^.\n]*\"[^\"]+\"", re.I)   # Reply "fix the bar" or "pause"
-BAR_BLAME = re.compile(r"build-setup|check\.sh|pkg_scope|CONSTRAINTS\.md|the gate itself|\bthe bar\b", re.I)
+BAR_BLAME = re.compile(r"build-setup|check\.sh|pkg_scope|CONSTRAINTS\.md|the gate itself", re.I)
+GOLDEN = re.compile(r"tests/fixtures/|\bTC-\d+")   # a stop about a golden case is the oracle's question, not the bar's
 PICK_ASK = re.compile(r"recommend|decision needed|pick one|which do you want", re.I)
 SYMBOL = re.compile(r"\b[a-z][a-z0-9_]*\.[A-Z]\w*\b")    # a contract type, e.g. risk.Drawdown
 CONTRACT_TEST = re.compile(r"tests/contracts/\S*test_\w+\.py")   # an escalation blaming a frozen contract test
@@ -326,10 +327,10 @@ class Persona:
             return "contract_test_resolve", p["contract_test_resolve"].format(tasks=tasks)
         self.ct_from = None
         bar = [e for e in escalations if e.get("kind") in ("TEST-WRONG", "NEEDS-DEP")
-               and BAR_BLAME.search(e.get("why") or "")]
+               and BAR_BLAME.search(e.get("why") or "") and not GOLDEN.search(e.get("why") or "")]
         tail = reply[-1500:]
         at_exit = st.get("all_landed") or any(str(r.get("review", "")).startswith("exit.") for r in st.get("reviews") or [])
-        if bar or (asks and not at_exit and "build-setup" in tail and BAR_BLAME.search(tail)):   # nothing else gets past it
+        if bar or (asks and not at_exit and not GOLDEN.search(tail) and "build-setup" in tail and BAR_BLAME.search(tail)):   # nothing else gets past it
             task = bar[0]["task"] if bar else (re.findall(r"M\d+-T\d+", tail) or ["<task>"])[0]
             return "bar_fix", p["bar_fix"].format(task=task)
         if any((e.get("claim"), e.get("time")) not in self.cc_seen for e in cc):   # new ones, maybe several at once

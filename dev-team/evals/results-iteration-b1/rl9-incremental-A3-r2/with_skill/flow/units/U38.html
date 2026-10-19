@@ -1,0 +1,2592 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1"><title>U38 implementer</title>
+<style>
+:root{--bg:#fbfbfa;--fg:#1d1d1f;--muted:#6b6b70;--line:#d9d9de;--box:#fff;--rowp:#eef3fb;--band:#fff4d6;
+--ok:#2e7d32;--bad:#c62828;--warn:#b26a00;--idle:#6b6b70}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#17171a;--fg:#ececf0;--muted:#9a9aa3;
+--line:#34343a;--box:#222227;--rowp:#1d2433;--band:#3a3015;--ok:#6fcf73;--bad:#ff6b6b;--warn:#f0b35a;--idle:#9a9aa3}}
+:root[data-theme="dark"]{--bg:#17171a;--fg:#ececf0;--muted:#9a9aa3;--line:#34343a;--box:#222227;--rowp:#1d2433;
+--band:#3a3015;--ok:#6fcf73;--bad:#ff6b6b;--warn:#f0b35a;--idle:#9a9aa3}
+body{margin:0;padding:16px;background:var(--bg);color:var(--fg);font:14px/1.45 -apple-system,system-ui,sans-serif}
+h1{font-size:18px;margin:0 0 4px}h2{font-size:15px;margin:22px 0 8px}.sub{color:var(--muted)}
+table{border-collapse:collapse;margin:4px 0 8px}td,th{border-bottom:1px solid var(--line);padding:4px 10px;text-align:left;
+vertical-align:top}th{color:var(--muted);font-weight:600}.chips span{display:inline-block;margin:0 4px 2px 0}
+.legend span{margin-right:14px;white-space:nowrap}.sw{display:inline-block;width:10px;height:10px;border-radius:2px;
+margin-right:4px;vertical-align:-1px}.scroll{overflow:auto;max-height:88vh;border:1px solid var(--line);border-radius:8px}
+.chart{display:grid;width:max-content}.chart>div{line-height:0}.corner{position:sticky;top:0;left:0;z-index:3}
+.colhead{position:sticky;top:0;z-index:2}.rowhead{position:sticky;left:0;z-index:2}
+svg.bg{background:var(--bg)}.colhead svg{border-bottom:1px solid var(--line)}.rowhead svg{border-right:1px solid var(--line)}
+.ok{color:var(--ok);fill:var(--ok)}.bad{color:var(--bad);fill:var(--bad)}.warn{color:var(--warn);fill:var(--warn)}
+.idle{color:var(--idle);fill:var(--idle)}
+svg text{fill:var(--fg);font-family:-apple-system,system-ui,sans-serif}
+.box{fill:var(--box);stroke:var(--line)}.unit:hover .box{stroke:var(--fg)}
+.role{font-size:12px;font-weight:600}.uid,.wmeta,.lmeta,.meta{font-size:10px;fill:var(--muted)}
+.sub{font-size:10.5px;fill:var(--muted)}.badge{font-size:11px;font-weight:600}
+.meta.bad{fill:var(--bad);font-weight:600}.lane{font-size:13px;font-weight:700}.wave{font-size:13px;font-weight:700}
+.par{fill:#4e79a7}.ser{fill:var(--muted)}.rowp{fill:var(--rowp)}.rows{fill:transparent}.band{fill:var(--band)}
+.bandt{font-size:11.5px}.grid{stroke:var(--line)}.link{stroke:var(--muted);stroke-width:1.2;opacity:.55}
+.arrowhead{fill:var(--muted)}.marks{font-size:10.5px}.audit{stroke:var(--box);stroke-width:2}.auditn{font-size:10px;font-weight:700;fill:#fff}
+a{color:inherit}svg a .box{cursor:pointer}
+
+:root{--c0:#2a78d6;--c1:#eb6834;--c2:#1baf7a;--c3:#eda100;--c4:#e87ba4;--c5:#008300;--c6:#6250d6;--c7:#e34948;
+--cx:#8a8985;--main:#52514e;--read:#dcdbd5;--readfg:#1d1d1f}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--c0:#3987e5;--c1:#d95926;--c2:#199e70;
+--c3:#c98500;--c4:#d55181;--c5:#008300;--c6:#9085e9;--c7:#e66767;--cx:#77766f;--main:#c3c2b7;--read:#3b3b40;
+--readfg:#ececf0}}
+:root[data-theme="dark"]{--c0:#3987e5;--c1:#d95926;--c2:#199e70;--c3:#c98500;--c4:#d55181;--c5:#008300;
+--c6:#9085e9;--c7:#e66767;--cx:#77766f;--main:#c3c2b7;--read:#3b3b40;--readfg:#ececf0}
+.c0{fill:var(--c0);background:var(--c0)}.c1{fill:var(--c1);background:var(--c1)}.c2{fill:var(--c2);background:var(--c2)}
+.c3{fill:var(--c3);background:var(--c3)}.c4{fill:var(--c4);background:var(--c4)}.c5{fill:var(--c5);background:var(--c5)}
+.c6{fill:var(--c6);background:var(--c6)}.c7{fill:var(--c7);background:var(--c7)}.cx{fill:var(--cx);background:var(--cx)}
+.cmain{fill:var(--main)}.sc0{stroke:var(--c0)}.sc1{stroke:var(--c1)}.sc2{stroke:var(--c2)}
+.tl text,.sm text,.lc text{font-size:10.5px;fill:var(--muted)}.tl .lbl-in,.sm .lbl-in{fill:#fff;font-size:10.5px;font-weight:600}
+.tl .rowl,.sm .rowl,.lc .rowl{fill:var(--fg);font-size:11.5px;font-weight:600}.tl .band{fill:var(--rowp)}
+.tl .brk{stroke:var(--muted);stroke-dasharray:2 3}.tl a:hover rect,.sm a:hover rect{stroke:var(--fg);stroke-width:1.5}
+.axis{stroke:var(--line)}.sm .val{fill:var(--fg);font-weight:600}.lc path.ln{fill:none;stroke-width:2}
+.lc circle{stroke:var(--bg);stroke-width:2}.lc .end{font-weight:600;fill:var(--fg)}
+.tiles{display:flex;flex-wrap:wrap;gap:10px;margin:12px 0}.tile{border:1px solid var(--line);border-radius:8px;
+padding:8px 12px;min-width:110px;background:var(--box)}.tile b{display:block;font-size:20px;line-height:1.2}
+.tile span{font-size:12px;color:var(--muted)}.tile i{font-style:normal;font-size:12px;margin-left:6px}
+.fm{border-collapse:separate;border-spacing:2px}.fm td,.fm th{border:0;padding:0;text-align:center;font-size:11px}
+.fm th{padding:0 2px;font-weight:600}.fm td.f,.fm th.f{text-align:left;padding-right:10px;white-space:nowrap;
+position:sticky;left:0;background:var(--bg);font:11.5px ui-monospace,Menlo,monospace;
+max-width:380px;overflow:hidden;text-overflow:ellipsis}
+.fm td.cell{min-width:22px;height:20px;border-radius:3px}.fm td.fw{background:var(--c0);color:#fff;font-weight:700}
+.fm td.fe{background:var(--c1);color:#fff;font-weight:700}.fm td.fr{background:var(--read);color:var(--readfg)}
+.fm td.n{color:var(--muted);padding:0 6px}.fm tr.grp td{text-align:left;padding-top:8px;color:var(--muted);
+font-weight:600}
+.key{display:inline-block;min-width:18px;text-align:center;border-radius:3px;font-size:11px;margin-right:4px}
+.bar{display:inline-block;height:9px;border-radius:2px;vertical-align:0}
+
+pre{white-space:pre-wrap;word-break:break-word;background:var(--box);border:1px solid var(--line);border-radius:6px;
+padding:8px 10px;margin:4px 0;font:12px/1.45 ui-monospace,SFMono-Regular,Menlo,monospace;max-width:100%;overflow:auto}
+.step{border-top:1px solid var(--line);padding:6px 0}.step:target{background:var(--rowp)}
+.sid{font:12px ui-monospace,Menlo,monospace;color:var(--muted);margin-right:8px}.kind{font-weight:600;margin-right:8px}
+.err{color:var(--bad);font-weight:600}.hook{color:var(--bad);margin:4px 0 0 16px}.lbl{font-size:12px;color:var(--muted);margin-top:6px}
+details summary{cursor:pointer;color:var(--muted);font-size:12px}.head td:first-child{color:var(--muted)}
+.top{font-size:13px}.narr{list-style:none;padding-left:0}.narr li{margin:3px 0}
+</style></head>
+<body>
+<p class="top"><a href="../flow.html">← the run's flow chart</a></p>
+
+<h1>U38 · implementer · M1-T07 solo</h1>
+<table class="head"><tr><td>Type</td><td>implementer</td></tr><tr><td>Description</td><td>M1-T07 solo</td></tr><tr><td>Spawned by</td><td>driver at D318</td></tr><tr><td>Turn</td><td><a href="../turns/T12.html">T12</a></td></tr><tr><td>Model</td><td>claude-opus-5-5</td></tr><tr><td>Start</td><td>2026-10-19 05:56:32 UTC</td></tr><tr><td>Duration</td><td>3 min</td></tr><tr><td>Tool calls</td><td>18</td></tr><tr><td>Errors</td><td>1</td></tr><tr><td>Hook blocks</td><td>1</td></tr><tr><td>Tokens</td><td>13.4k out · 59.0k new in · 595k cached in · peak context 63.7k</td></tr><tr><td>Skills invoked</td><td>none</td></tr><tr><td>Files written or edited</td><td>.claude/worktrees/agent-a8fdb8a11ccbc18f5/src/rllab/reference/train/__init__.py, .claude/worktrees/agent-a8fdb8a11ccbc18f5/src/rllab/reference/train/adapter.py, .claude/worktrees/agent-a8fdb8a11ccbc18f5/tests/unit/rllab/test_train_reference.py</td></tr><tr><td>Definition</td><td>none</td></tr><tr><td>Steps</td><td>21</td></tr><tr><td>Finished</td><td>yes</td></tr></table>
+
+
+<h2>Prompt</h2>
+<pre>You are the solo for M1-T07. Run `python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/plugin/dev-team/scripts/dt.py claim M1-T07 --role solo`, then read the packet it names.</pre>
+<h2>Files</h2>
+<table><tr><th>Op</th><th>File</th><th>Calls</th><th>By</th><th>Via</th><th>Steps</th></tr><tr><td>write</td><td><code>.claude/worktrees/agent-a8fdb8a11ccbc18f5/src/rllab/reference/train/__init__.py</code></td><td>1</td><td>U38</td><td>Write</td><td><a href="#13">U38.S13</a></td></tr><tr><td>write</td><td><code>.claude/worktrees/agent-a8fdb8a11ccbc18f5/src/rllab/reference/train/adapter.py</code></td><td>1</td><td>U38</td><td>Write</td><td><a href="#12">U38.S12</a></td></tr><tr><td>write</td><td><code>.claude/worktrees/agent-a8fdb8a11ccbc18f5/tests/unit/rllab/test_train_reference.py</code></td><td>1</td><td>U38</td><td>Write</td><td><a href="#14">U38.S14</a></td></tr><tr><td>edit</td><td><code>.claude/worktrees/agent-a8fdb8a11ccbc18f5/tests/unit/rllab/test_train_reference.py</code></td><td>2</td><td>U38</td><td>Edit</td><td><a href="#17">U38.S17</a> <a href="#18">U38.S18</a></td></tr><tr><td>read</td><td><code>.claude/worktrees/agent-a8fdb8a11ccbc18f5/.claude/packet.md</code></td><td>1</td><td>U38</td><td>Read</td><td><a href="#4">U38.S4</a></td></tr><tr><td>read</td><td><code>.claude/worktrees/agent-a8fdb8a11ccbc18f5/CONSTRAINTS.md</code></td><td>1</td><td>U38</td><td>Read</td><td><a href="#3">U38.S3</a></td></tr><tr><td>read</td><td><code>.claude/worktrees/agent-a8fdb8a11ccbc18f5/src/rllab/agents/dqn/networks.py</code></td><td>1</td><td>U38</td><td>Bash</td><td><a href="#9">U38.S9</a></td></tr><tr><td>read</td><td><code>.claude/worktrees/agent-a8fdb8a11ccbc18f5/src/rllab/core/__init__.py</code></td><td>1</td><td>U38</td><td>Bash</td><td><a href="#6">U38.S6</a></td></tr><tr><td>read</td><td><code>.claude/worktrees/agent-a8fdb8a11ccbc18f5/src/rllab/core/protocols.py</code></td><td>1</td><td>U38</td><td>Bash</td><td><a href="#6">U38.S6</a></td></tr><tr><td>read</td><td><code>.claude/worktrees/agent-a8fdb8a11ccbc18f5/src/rllab/core/types.py</code></td><td>1</td><td>U38</td><td>Bash</td><td><a href="#6">U38.S6</a></td></tr><tr><td>read</td><td><code>.claude/worktrees/agent-a8fdb8a11ccbc18f5/src/rllab/envs/__init__.py</code></td><td>1</td><td>U38</td><td>Bash</td><td><a href="#7">U38.S7</a></td></tr><tr><td>read</td><td><code>.claude/worktrees/agent-a8fdb8a11ccbc18f5/src/rllab/envs/snake.py</code></td><td>1</td><td>U38</td><td>Bash</td><td><a href="#8">U38.S8</a></td></tr><tr><td>read</td><td><code>.claude/worktrees/agent-a8fdb8a11ccbc18f5/src/rllab/envs/types.py</code></td><td>1</td><td>U38</td><td>Bash</td><td><a href="#9">U38.S9</a></td></tr><tr><td>read</td><td><code>.claude/worktrees/agent-a8fdb8a11ccbc18f5/src/rllab/evaluate/__init__.py</code></td><td>1</td><td>U38</td><td>Bash</td><td><a href="#7">U38.S7</a></td></tr><tr><td>read</td><td><code>.claude/worktrees/agent-a8fdb8a11ccbc18f5/src/rllab/evaluate/protocol.py</code></td><td>1</td><td>U38</td><td>Bash</td><td><a href="#7">U38.S7</a></td></tr><tr><td>read</td><td><code>.claude/worktrees/agent-a8fdb8a11ccbc18f5/src/rllab/evaluate/types.py</code></td><td>1</td><td>U38</td><td>Bash</td><td><a href="#7">U38.S7</a></td></tr><tr><td>read</td><td><code>.claude/worktrees/agent-a8fdb8a11ccbc18f5/src/rllab/lab/build.py</code></td><td>1</td><td>U38</td><td>Bash</td><td><a href="#7">U38.S7</a></td></tr><tr><td>read</td><td><code>.claude/worktrees/agent-a8fdb8a11ccbc18f5/src/rllab/lab/pipelines/pl02_train_reference.py</code></td><td>1</td><td>U38</td><td>Bash</td><td><a href="#7">U38.S7</a></td></tr><tr><td>read</td><td><code>.claude/worktrees/agent-a8fdb8a11ccbc18f5/src/rllab/runs/__init__.py</code></td><td>1</td><td>U38</td><td>Bash</td><td><a href="#6">U38.S6</a></td></tr><tr><td>read</td><td><code>.claude/worktrees/agent-a8fdb8a11ccbc18f5/src/rllab/runs/store.py</code></td><td>1</td><td>U38</td><td>Bash</td><td><a href="#6">U38.S6</a></td></tr><tr><td>read</td><td><code>.claude/worktrees/agent-a8fdb8a11ccbc18f5/src/rllab/runs/types.py</code></td><td>1</td><td>U38</td><td>Bash</td><td><a href="#6">U38.S6</a></td></tr><tr><td>read</td><td><code>.claude/worktrees/agent-a8fdb8a11ccbc18f5/src/rllab/train/loop.py</code></td><td>1</td><td>U38</td><td>Bash</td><td><a href="#7">U38.S7</a></td></tr><tr><td>read</td><td><code>.claude/worktrees/agent-a8fdb8a11ccbc18f5/tests/contracts/core.Env/fake.py</code></td><td>1</td><td>U38</td><td>Bash</td><td><a href="#10">U38.S10</a></td></tr><tr><td>read</td><td><code>.claude/worktrees/agent-a8fdb8a11ccbc18f5/tests/contracts/evaluate.evaluate/fake.py</code></td><td>1</td><td>U38</td><td>Bash</td><td><a href="#10">U38.S10</a></td></tr><tr><td>read</td><td><code>.claude/worktrees/agent-a8fdb8a11ccbc18f5/tests/contracts/reference.train_reference/fake.py</code></td><td>1</td><td>U38</td><td>Bash</td><td><a href="#8">U38.S8</a></td></tr><tr><td>read</td><td><code>.claude/worktrees/agent-a8fdb8a11ccbc18f5/tests/contracts/reference.train_reference/samples.json</code></td><td>1</td><td>U38</td><td>Bash</td><td><a href="#9">U38.S9</a></td></tr><tr><td>read</td><td><code>.claude/worktrees/agent-a8fdb8a11ccbc18f5/tests/contracts/reference.train_reference/test_reference_train_reference.py</code></td><td>1</td><td>U38</td><td>Bash</td><td><a href="#8">U38.S8</a></td></tr><tr><td>read</td><td><code>.claude/worktrees/agent-a8fdb8a11ccbc18f5/tests/unit/rllab/test_reference_player.py</code></td><td>1</td><td>U38</td><td>Bash</td><td><a href="#8">U38.S8</a></td></tr><tr><td>read</td><td><code>.claude/worktrees/agent-a8fdb8a11ccbc18f5/tests/unit/rllab/test_train_loop.py</code></td><td>2</td><td>U38</td><td>Bash</td><td><a href="#9">U38.S9</a> <a href="#10">U38.S10</a></td></tr></table>
+<h2>Steps</h2>
+<div class="step" id="S1"><span class="sid">U38.S1</span><span class="kind">user</span>You are the solo for M1-T07. Run `python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/plugin/dev-team/scripts/dt.py claim M1-T07 --role solo`, then read the packet it names.<details><summary>full text</summary><pre>You are the solo for M1-T07. Run `python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/plugin/dev-team/scripts/dt.py claim M1-T07 --role solo`, then read the packet it names.</pre></details></div><div class="step" id="S2"><span class="sid">U38.S2</span><span class="kind">Bash</span>python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/plugin/dev-team/scripts/dt.py claim M1-T07 --role solo<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/plugin/dev-team/scripts/dt.py claim M1-T07 --role solo&quot;,
+  &quot;description&quot;: &quot;Claim task M1-T07 as solo&quot;
+}</pre><div class="lbl">output</div><pre>packet: /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/project/.claude/worktrees/agent-a8fdb8a11ccbc18f5/.claude/packet.md (192 lines; read it in full)
+task: M1-T07 train_reference spine (library DQN on the adapter) · role solo · package rllab · kind spine
+writes: src/rllab/reference/train/**, tests/unit/rllab/test_train_reference.py
+done: Done when `scripts/check.sh gate` passes (the gate passes on your Writes); the Stop hook runs it. End with one line: `DONE M1-T07 solo`. If you can&#x27;t finish: `python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/plugin/dev-team/scripts/dt.py escalate &lt;TEST-WRONG|NEEDS-DEP&gt; &quot;&lt;why&gt;&quot;`, or `python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/plugin/dev-team/scripts/dt.py escalate CONTRACT-CHANGE &quot;&lt;why&gt;&quot; --type &lt;the contract symbol&gt;`, then end with one line: `STOPPED M1-T07 solo: see dt escalate`.</pre></details></div><div class="step" id="S3"><span class="sid">U38.S3</span><span class="kind">Read</span>/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/project/.claude/worktrees/agent-a8fdb8a11ccbc18f5/CONSTRAINTS.md<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/project/.claude/worktrees/agent-a8fdb8a11ccbc18f5/CONSTRAINTS.md&quot;
+}</pre><div class="lbl">output</div><pre>1	# Constraints
+2	**Status:** Approved · **Last reviewed:** 2026-10-19 by @connorott · **Ratcheted:** —
+3	
+4	The standing quality bar. `pyproject.toml` and `scripts/check.sh` enforce it; every number here names its config key, and `dt status` fails if the two disagree. Only `build-setup` changes this file, with the user: tightening is routine, loosening needs an explicit yes.
+5	
+6	## Floor
+7	- **CR-01** No new suppressions. Ruff runs with `--ignore-noqa` in gate and full, so a Ruff exception is a `per-file-ignores` entry in protected config with a row in Exceptions. `floor_guard.sh` catches the other suppressions on the diff
+8	- **CR-02** No stubs: `raise NotImplementedError` outside abstract methods, `pass`-only bodies, bare `except: pass`. One carve-out: the interface task&#x27;s step signatures, whose body is only `raise NotImplementedError(&quot;&lt;task id&gt;&quot;)` naming the open task that replaces it. `check.sh gate` fails on one naming a task that isn&#x27;t open in `tasks/todo.md`, and on a test that expects one (`stub-pinned`); `check.sh full --exit` fails on any
+9	- **CR-03** No skipped, deleted or assertion-free tests, unless a row in Exceptions names the test file
+10	- **CR-04** No secrets in source
+11	- **CR-05** Oracle files (`tests/fixtures/**/expected.json`) change only with the user&#x27;s approval
+12	- **CR-06** The implementer never changes `tests/intent/**`
+13	- **CR-07** This file, `pyproject.toml` tool config, `scripts/` and `.claude/agents/` are not weakened to make a change pass
+14	- **CR-08** Nothing imports from `references/` or `probes/`, or adds either to `sys.path` (or `PYTHONPATH`, pytest `pythonpath`). `floor_guard.sh` checks the diff for both. Code copied from either is project code and meets the same bar
+15	- **CR-09** A frozen interface (`tests/contracts/&lt;id&gt;.&lt;symbol&gt;/`: schema, samples, fake; and the types, signatures and exports the interface task wrote) is frozen once it exists at the task&#x27;s base. Only the interface task freezing it (`**Kind:** interface`) writes a new folder, and no other task&#x27;s `Writes:` names its `types.py` or `__init__.py`; a frozen interface changes only through `architecture-design` Revise, never to make a test pass
+16	
+17	## Readability
+18	- **CR-10** One entry function per pipeline; it reads top to bottom as its named steps (reviewer + `dt layout`)
+19	- **CR-11** No registries, plugin dispatch or config-driven wiring without an AD
+20	- **CR-12** New abstraction only with a second real implementation or a named seam
+21	
+22	
+23	## Enforced with numbers
+24	| ID | Dimension | Rule | Checked by | Config key | Runs at |
+25	|---|---|---|---|---|---|
+26	| CR-20 | Lint | zero errors; standing per-file-ignores only for `tests/**` and `__init__.py` | ruff | `tool.ruff.lint.select` | edit, gate |
+27	| CR-21 | Complexity | ≤ 10 per function | ruff C901 | `tool.ruff.lint.mccabe.max-complexity` | gate |
+28	| CR-22 | Size | ≤ 500 lines/module, ≤ 60/function | check_size.py | `tool.size_limits` | edit, gate |
+29	| CR-23 | Types | zero errors, strict | mypy | `tool.mypy.strict` | gate |
+30	| CR-24 | Boundaries | import contracts hold | import-linter | `tool.importlinter.contracts` | gate |
+31	| CR-25 | Dependencies | none missing or unused | deptry | `tool.deptry` | gate |
+32	| CR-26 | Deps security | nothing known-vulnerable | pip-audit | — | full, CI nightly |
+33	| CR-27 | Reproducibility | same settings and seed give the same run (RUN-03, AD-08) | pytest `-m repro` | `tool.pytest.ini_options.markers` | gate |
+34	
+35	## Measured, not yet enforced
+36	| ID | Metric | Today | Direction |
+37	|---|---|---|---|
+38	| CR-40 | Coverage (branch) | — (no code) (`tool.coverage.report.fail_under`, raised by Ratchet) | must not fall |
+39	| CR-41 | vulture findings at `min_confidence = 60` (`scripts/vulture_whitelist.py`) | 0 | must not grow by `full --exit` (earlier `full` runs report) |
+40	| CR-42 | Duplicate blocks of ≥ 8 similar source lines (pylint `duplicate-code`, `[tool.pylint.similarities]` in pyproject.toml) | 0 | must not grow |
+41	
+42	## Boundaries (generated from architecture — do not edit)
+43	- `rllab.core` imports nothing first-party · `envs`, `agents`, `runs` → core · `evaluate` → core, runs · `baselines` → core, envs · `train` → core, runs, evaluate · `reference` → core, envs, runs, evaluate · `compare` → evaluate · `viz` → runs · `lab` → all
+44	- Only `rllab.reference` imports `stable_baselines3` or `gymnasium`; only `rllab.agents` imports `torch`
+45	
+46	## Roles and protected paths
+47	| Role | May edit | May not edit | Stop gate |
+48	|---|---|---|---|
+49	| tester | `tests/intent/**`, within the task&#x27;s `Writes:` | everything else; reads no source | `check.sh collect` (lint, collect, red for the right reason) |
+50	| implementer / solo | `src/**`, `tests/unit/**`, within the task&#x27;s `Writes:`; an interface task also the `tests/contracts/&lt;id&gt;.&lt;symbol&gt;/` its `Writes:` names | the protected list; `tasks/` | `check.sh gate` + protected-path diff against the worktree&#x27;s base |
+51	| reviewer | its worktree, for the mutation check, and its findings file; nothing lands (the orchestrator records findings with `dt finding`) | everything else | runs `check.sh full` by hand |
+52	
+53	**Protected list** (`PROTECTED` in `scripts/check.sh`; `path_guard.sh deny --protected` reads the same list): `tests/intent/**`, `tests/fixtures/**`, `tests/conftest.py`, `pyproject.toml`, `uv.lock`, `CONSTRAINTS.md`, `scripts/**`, `.claude/agents/**`, `.claude/settings.json`, `references/**`, `probes/**`, `tests/contracts/**`. `tests/contracts/**` covers the contract folders that exist at the task&#x27;s base (CR-09). **`Writes:`**: `dt claim` writes the role&#x27;s share of the task&#x27;s `Writes:` to `.claude/.task_writes` and sets the worktree&#x27;s base; `path_guard.sh writes` blocks edits outside it, and builder edits before the claim. Only the orchestrator writes `tasks/` (`dt land`, `dt finding`).
+54	
+55	**Worktree links:** none
+56	
+57	## Review
+58	Run by the reviewer agent: the interface review after Phase 0, a phase review per package at each checkpoint, and the milestone exit. `dt land` already checked each landing&#x27;s `Writes:`, protected paths and gates; review judges what tools can&#x27;t.
+59	
+60	**Interface** (after Phase 0): the code is the contract, no more and no less.
+61	1. Types match `contract.md`: fields, types, invariants. Nothing a step&#x27;s In → Out needs is missing; no helper is frozen.
+62	2. Signatures match the step tables, in their owner modules. Each stub names the open task that owns its step; no logic beyond types and validation.
+63	3. One sample per case the contract names, valid and realistic, never holding a TC&#x27;s expected value. Replay doubles replay an interaction the Protocol allows. Each fake passes its contract&#x27;s cases; anything it does beyond echoing a fixture (filtering, ordering, an error) is a case the real provider must pass too. Contract tests check shape only, never a stub or other state a later task changes.
+64	4. `__init__.py` exports exactly the contract; each `Mitigated by` in the plan&#x27;s dependency graph exists; each split task&#x27;s tester can write its tests from the frozen interface and its `Read:`.
+65	
+66	**Each phase**, per package, tests before code:
+67	1. **Interfaces followed** (CR-09): no frozen type, signature or contract folder changed outside a Revise. Consumers use the declared types: no dict for a dataclass, no reaching into a provider&#x27;s internals, no local redefinition. A stub is replaced only by the task it names; no cross-package import outside the contract; spine tests run on samples and doubles, not another step&#x27;s code.
+68	2. **Tests prove something:** each intent test asserts its TC case or acceptance bullet, loading expected values and tolerances from fixtures; none is assertion-free or weakened; Hypothesis runs the `ci` profile. Unit tests are specific, never computing the expected value with the code under test or testing only a mock. **Mutation check** (`.claude/agents/reviewer.md`): per acceptance bullet, the smallest change that should break it; a mutation no test catches is a finding.
+69	3. **Correct to the spec:** each acceptance bullet truly met, not special-cased to the sample; the error paths the requirement names; seeding and determinism; numerical edge cases.
+70	4. **Simple** (CR-11, CR-12, CR-42): no abstraction with one implementation outside the contract or an AD; no forwarding wrapper, one-method class, or class where a function does; no parameter, flag or config key every caller sets the same; no `try/except` that only re-raises or swallows, no checks the types already guarantee; no loop the library already provides. No near-copies within or across the phase&#x27;s tasks: one concept is one function in its owner module (tests may repeat for readability). Each finding names the simpler form, with the same tests passing.
+71	5. **Pipelines** (CR-10): entry functions read as their step tables (`dt layout`); step owners respected; spine baselines still selectable.
+72	6. **The bar** (CR-07): diff this file, `pyproject.toml`, `scripts/` and `.claude/agents/` against the milestone&#x27;s Base. Any loosening is Critical; new exceptions need an owner and expiry.
+73	7. **Hidden and parallel risks:** where a real provider could act differently from its double; fixed output paths, global state, test-order dependence.
+74	8. **The rest:** readability, security, performance where a QR sets a number; reused reference or probe code has its Caveats handled and fits the contract; `dt lint` clean, pre-build sections replaced by `dt layout` pointers.
+75	
+76	**Milestone exit**, over the whole diff, adds: the Scope&#x27;s Exit holds; every Covers ID has a test; `check.sh full --exit` finds no stub; system tests use real providers; the same sample through a real provider and its double agrees; deferred requirements untouched; pip-audit ran.
+77	
+78	**Severity:** Critical: a frozen interface changed, a contract test pinning a transient state, a weakened test, an intent test that misses a mutation changing its TC&#x27;s expected output, a wrong answer, a loosened bar, a security hole, lost data; it stops the build. Important: a consumer bypassing a type, any other surviving mutation, an unneeded abstraction, a duplicate across tasks. Suggestion and Nit: local. Findings go under the checkpoint block in `tasks/plan.md` (`dt finding`), each with a fix task or a reason.
+79	
+80	## Done
+81	agent-skills `references/definition-of-done.md`, tailored once:
+82	- **Correctness and Quality:** checked per task by the gate.
+83	- **Integration and Documentation:** checked at each checkpoint.
+84	- **The full list:** checked at milestone exit.
+85	
+86	## Exceptions
+87	| ID | Rule | Path | Reason | Owner | Expires |
+88	|---|---|---|---|---|---|
+89	| EX-01 | CR-25 DEP002 | `numpy`, `torch`, `matplotlib`, `stable-baselines3`, `gymnasium` | M1 dependencies, declared before the code imports them | @connorott | M1 exit |
+90	| EX-02 | CR-24 layers | `rllab.compare` → `rllab.viz` | `compare.run_claims` takes `charts: Sequence[viz.Chart]` (contract); the sibling layers forbid it (M1-T01 escalation) | @connorott | M1 exit |
+91	</pre></details></div><div class="step" id="S4"><span class="sid">U38.S4</span><span class="kind">Read</span>/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/project/.claude/worktrees/agent-a8fdb8a11ccbc18f5/.claude/packet.md<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/project/.claude/worktrees/agent-a8fdb8a11ccbc18f5/.claude/packet.md&quot;
+}</pre><div class="lbl">output</div><pre>1	# Packet: M1-T07 solo
+2	You are the solo for M1-T07. Your edit boundary is your Writes below (`.claude/.task_writes`); the guard blocks everything else.
+3	
+4	Done when `scripts/check.sh gate` passes (the gate passes on your Writes); the Stop hook runs it. End with one line: `DONE M1-T07 solo`. If you can&#x27;t finish: `python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/plugin/dev-team/scripts/dt.py escalate &lt;TEST-WRONG|NEEDS-DEP&gt; &quot;&lt;why&gt;&quot;`, or `python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/plugin/dev-team/scripts/dt.py escalate CONTRACT-CHANGE &quot;&lt;why&gt;&quot; --type &lt;the contract symbol&gt;`, then end with one line: `STOPPED M1-T07 solo: see dt escalate`.
+5	
+6	# Context for M1-T07: package rllab · mode solo · kind spine
+7	Read only what is below, plus CONSTRAINTS.md and the files you edit. Your task is the last section.
+8	
+9	&lt;!-- docs/packages/rllab/pipelines.md:38 --&gt;
+10	## PL-02: Train the reference
+11	**Entry:** `src/rllab/lab/pipelines/pl02_train_reference.py::run_train_reference` · **Trigger:** `python -m rllab.lab train &lt;reference.toml&gt; --seeds 0-4`, dispatched here when `agent = &quot;reference&quot;`
+12	**Covers:** REF-01, QR-02, QR-06
+13	
+14	| # | Step | Owner | In → Out | Spine version | Covers |
+15	|---|---|---|---|---|---|
+16	| 1 | `load_settings` | core.settings | path → RunSettings | PL-01 as built | RUN-01 |
+17	| 2 | `train_reference` | reference.train | RunSettings → RunRecord | Stable-Baselines3 DQN on Snake (AD-04), or PPO on the single-fish tank (AD-10) or the predator against scripted prey (AD-15), `MlpPolicy` on the one-learner adapter, one-to-one mapping, `device=&quot;cpu&quot;`; a callback calls `evaluate.evaluate` every `eval_every` | REF-01, QR-06 |
+18	
+19	### Entry sketch (pre-build — removed by spine task)
+20	```python
+21	def run_train_reference(settings_path: Path, seed: int) -&gt; RunRecord:
+22	    settings = load_settings(settings_path)
+23	    settings = with_seed(settings, seed)
+24	    return train_reference(settings)
+25	```
+26	
+27	&lt;!-- docs/packages/rllab/contract.md:371 --&gt;
+28	### reference.train_reference: Library agent training
+29	`def train_reference(settings: RunSettings, *, root: Path = Path(&quot;runs&quot;)) -&gt; RunRecord`
+30	- **Invariants:** `settings.agent == &quot;reference&quot;`. Trains Stable-Baselines3 DQN on Snake (AD-04), or PPO on the single-fish tank or on the predator-prey predator against scripted prey (AD-10, AD-15), through the AD-03 adapter with `device=&quot;cpu&quot;` and the matching one-to-one settings mapping. Curve points use `evaluate.evaluate` at the same `eval_every`. The checkpoint loads into `ReferencePlayer`.
+31	- **Errors:** `ValueError` unless the settings are Snake with the compact view, the tank with one fish and the full view, or predator-prey with `opponents == {&quot;predator&quot;: &quot;learn&quot;, &quot;prey&quot;: &quot;scripted&quot;}`
+32	- **Boundary:** lab · **Fixtures:** tests/contracts/reference.train_reference/ · **Cases:** a fake returning a complete 3-point reference RunRecord
+33	- **Used by:** lab; PL-02
+34	
+35	&lt;!-- docs/packages/rllab/contract.md:63 --&gt;
+36	### core.RunSettings: type
+37	```python
+38	@dataclass(frozen=True)
+39	class RunSettings:
+40	    name: str; env: Literal[&quot;snake&quot;, &quot;corridor&quot;, &quot;tank&quot;, &quot;predprey&quot;]; view: Literal[&quot;compact&quot;, &quot;grid&quot;, &quot;index&quot;, &quot;full&quot;, &quot;limited&quot;]
+41	    agent: Literal[&quot;tabular&quot;, &quot;dqn&quot;, &quot;reinforce&quot;, &quot;ppo&quot;, &quot;random&quot;, &quot;scripted&quot;, &quot;reference&quot;]; n_agents: int
+42	    opponents: Mapping[str, Literal[&quot;learn&quot;, &quot;scripted&quot;, &quot;random&quot;]]; self_play: Literal[&quot;none&quot;, &quot;latest&quot;, &quot;pool&quot;]
+43	    pool_latest: float; generations: int
+44	    ablation: Literal[&quot;none&quot;, &quot;no_memory&quot;, &quot;no_target&quot;, &quot;no_explore&quot;]
+45	    rewards: Rewards; exploration: Exploration; params: AgentParams
+46	    steps: int; seed: int; eval_every: int; eval_games: int
+47	```
+48	- **Invariants:** `seed` in `[0, 1_000_000)`. `steps` &gt; 0. `view` belongs to `env` (Snake `compact`/`grid`, corridor `index`, tank `full`/`limited`). `n_agents` is 1 except for the tank (1–16, FISH-07). `reinforce` and `ppo` only with the tank; `tabular` and `dqn` only with Snake or the corridor. `reference` on the tank needs `n_agents == 1` and `full`. For `predprey`, `view` is `limited`, `agent` is `ppo` or `reference`, and `opponents` names both teams (`predator`, `prey`): `learn` teams train with `agent`; `self_play` is `latest` or `pool` only when both learn (rung 2, rung 3), `none` otherwise; `generations` is 10 when any team learns, else 0; `pool_latest` defaults to 0.5 (SELF-03). Single-team runs have `opponents == {}`. `ablation` matches `agent` (`no_memory` and `no_target` with `dqn`, `no_explore` with `tabular`).
+49	- **Boundary:** lab, train, runs, reference · **Fixtures:** tests/contracts/core.RunSettings/ · **Cases:** the dqn-compact ladder settings; a corridor tabular settings; a no_target ablation; the rung-3 tank settings (ppo, 8 fish, full view); the tank reference settings; predator-prey rung 1 (prey learn, scripted predator); rung 3 (both learn, pool)
+50	- **Used by:** lab, train, runs, reference, agents; PL-01, PL-02, PL-03, PL-04, PL-06
+51	
+52	&lt;!-- docs/packages/rllab/contract.md:7 --&gt;
+53	### core.Env: type
+54	```python
+55	class Env(Protocol):
+56	    teams: Mapping[str, TeamSpec]
+57	    board: Literal[&quot;grid&quot;, &quot;tank&quot;]
+58	    def reset(self, seed: int) -&gt; tuple[dict[str, np.ndarray], dict[str, float]]: ...
+59	    def step(self, actions: Mapping[str, np.ndarray]) -&gt; StepResult: ...
+60	    def frame(self) -&gt; np.ndarray: ...
+61	```
+62	- **Invariants:** teams, each batch-first (AD-09, AD-13): observations map each team name to float32 `(n_agents, *obs_shape)` from its `TeamSpec`, and `actions` maps each team to `(n_agents,)` int64 when discrete or `(n_agents, dim)` float32 when continuous. Single-team environments have one team, `&quot;agents&quot;` (`core.SOLO`). Entries for agents already done are ignored. `info` always holds `steps`, `score:&lt;team&gt;` for each team, and `score` for the first team. `frame()` is an int8 grid of cell codes (0 empty, 1 head, 2 body, 3 food or goal) when `board == &quot;grid&quot;`, and a `(K, 4)` float32 array of circles `(x, y, radius, kind)` when `board == &quot;tank&quot;`, with kinds 0 ball, 1 fish, 2 caught fish, 3 predator, 4 prey, 5 caught prey, 6 pellet (AD-12). The same seed and actions give the same results.
+63	- **Errors:** `RuntimeError` if `step` is called after the game is over. `ValueError` for a missing team, an action of the wrong shape, outside the discrete range, or non-finite.
+64	- **Boundary:** train, evaluate, reference, lab · **Fixtures:** tests/contracts/core.Env/ · **Cases:** a recorded 20-step Snake game ending in a wall hit; a recorded 9-step corridor game reaching the goal; a recorded 30-step 8-fish tank game with 2 catches; a recorded 40-step predator-prey game with 1 catch and 2 pellets eaten
+65	- **Used by:** envs (provider), train, evaluate, reference, lab; PL-01, PL-03, PL-04, PL-05, PL-06
+66	
+67	&lt;!-- docs/packages/rllab/contract.md:307 --&gt;
+68	### runs.RunWriter: Run folder writer
+69	```python
+70	class RunWriter:
+71	    def add_point(self, p: CurvePoint) -&gt; None: ...
+72	    def save_checkpoint(self, agent: Agent, *, team: str = SOLO) -&gt; None: ...
+73	    def save_generation(self, agent: Agent, *, team: str, index: int) -&gt; Path: ...
+74	    def save_games(self, games: Sequence[GameRecording]) -&gt; None: ...
+75	    def finish(self, status: Literal[&quot;complete&quot;, &quot;incomplete&quot;]) -&gt; RunRecord: ...
+76	```
+77	- **Invariants:** each `add_point` is flushed to `curve.csv` at once, so an interrupt keeps the curve. Generations are written as `generations/&lt;team&gt;/&lt;index&gt;` and returned, so a pool can load them during the run. The folder layout follows AD-06.
+78	- **Boundary:** train, reference · **Fixtures:** tests/contracts/runs.RunWriter/ · **Cases:** a replay double recording a 3-point run that finishes complete
+79	- **Used by:** train, reference; PL-01, PL-02
+80	
+81	&lt;!-- docs/packages/rllab/contract.md:354 --&gt;
+82	### evaluate.evaluate: Greedy evaluation
+83	`def evaluate(make_env: Callable[[], Env], agents: Mapping[str, Agent], spec: EvalSpec) -&gt; ScoreSet`
+84	- **Invariants:** `agents` has one agent per team of the environment; the scores are `spec.team`&#x27;s `score:&lt;team&gt;`, under the ScoreSet&#x27;s `player` `spec.player` and `train_seed` `spec.train_seed`. Plays `spec.n_games` games on `eval_seeds(spec.train_seed, spec.n_games)` with `explore=False`. It never calls `learn`. It records the first `spec.record` games (REPLAY-03). 200 games of any environment take ≤ 60 s on the laptop (QR-04).
+85	- **Boundary:** train, reference, lab · **Fixtures:** tests/contracts/evaluate.evaluate/ · **Cases:** a fake returning the scripted-player ScoreSet for seed 0
+86	- **Used by:** train, reference, lab; PL-01, PL-02, PL-03, PL-04, PL-05
+87	
+88	&lt;!-- docs/architecture.md:99 --&gt;
+89	### AD-03: Own environment protocol, shaped like Gymnasium
+90	**Status:** Accepted · **Date:** 2026-10-17 · **Scope:** `core`
+91	- **Context:** CORE-01 needs one interface for every environment. REF-01 needs the library agent to train on the same Snake. AGENT-06 keeps library code out of the lab&#x27;s agents.
+92	- **Decision:** `core.Env` is a small Protocol whose `reset(seed)` returns `(obs, info)` and whose `step(actions)` returns a `StepResult` with Gymnasium&#x27;s fields (observation, reward, terminated, truncated, info), plus `frame()` for replay. AD-09 sets their batch-first shape over agents. `reference` wraps one single-agent team of a `core.Env`, with every other team played by a frozen agent (AD-15), in a `gymnasium.Env` adapter.
+93	- **Alternatives:** Subclass `gymnasium.Env` directly — no adapter, but every environment and the core then depend on Gymnasium. A bespoke interface unlike Gymnasium&#x27;s — needs a bigger adapter and teaches a nonstandard shape.
+94	- **Consequences:** Truncation (starvation or the step cap) and termination (a collision or a catch) stay separate, so learning targets bootstrap correctly on truncation. The adapter is checked with Stable-Baselines3&#x27;s `check_env`.
+95	
+96	&lt;!-- docs/architecture.md:106 --&gt;
+97	### AD-04: Stable-Baselines3 DQN as the reference implementation
+98	**Status:** Accepted · **Date:** 2026-10-17 · **Scope:** `reference`
+99	- **Context:** For Snake, REF-01–REF-03 need an established implementation trained with the same view, rewards, step budget and seeds as the compact-view neural agent; AD-10 covers the tank. The Stable-Baselines3 DQN docs (https://stable-baselines3.readthedocs.io/en/master/modules/dqn.html, read 2026-10-17) say it supports Discrete actions and Box observations, has `buffer_size`, `target_update_interval`, `exploration_fraction`, `seed` and `device`, and offers `MlpPolicy` for vector observations. The custom-environment guide (https://stable-baselines3.readthedocs.io/en/master/guide/custom_env.html, read 2026-10-17) requires a `gymnasium.Env` with `reset(seed, options) → (obs, info)` and a five-field `step`, checked by `check_env`.
+100	- **Decision:** `reference` trains Stable-Baselines3 DQN with `MlpPolicy` on the compact view through the AD-03 adapter, with `device=&quot;cpu&quot;`. Its hidden layers, learning rate, discount, batch size, memory size, target interval and exploration schedule are mapped one-to-one from the same `RunSettings` the hand-written agent uses. Its curve points come from `evaluate`, exactly as the lab&#x27;s own agents&#x27; do.
+101	- **Alternatives:** CleanRL&#x27;s single-file DQN — very readable, but a script to copy rather than a library to call, so &quot;matching&quot; it blurs into copying it. RLlib — far heavier than one laptop needs.
+102	- **Consequences:** Stable-Baselines3 measures exploration as a fraction of training rather than in decay steps, and updates every `train_freq` steps. The mapping fixes `train_freq=1` and `gradient_steps=1`, and sets `exploration_fraction = decay_steps / steps`. Stable-Baselines3 and Gymnasium are an optional install extra, so the rest of the lab never carries them.
+103	- **Probe:** none — the two pages above settle the spaces, parameters and environment interface. No account or plan is involved.
+104	
+105	## Layout (`dt layout rllab`)
+106	src/rllab/
+107	  __init__.py — rllab: a reinforcement-learning lab for Snake and the fish tank.
+108	  agents/
+109	    __init__.py — The learning agents.
+110	    tabular.py — The table-based value learner (AGENT-01, AGENT-02, ABL-03).
+111	    dqn/
+112	      __init__.py — The neural value learner.
+113	      agent.py — The neural value learner (AGENT-03 to AGENT-05, ABL-01, ABL-02).
+114	      networks.py — The value networks: one output per action from a flattened observation (AD-05).
+115	  baselines/
+116	    __init__.py — The baseline players.
+117	    random.py — The random baseline (BASE-01).
+118	    scripted.py — The scripted baseline on the compact view (BASE-02).
+119	  compare/
+120	    __init__.py — Claims between players, tested and reported.
+121	    claims.py — Tested claims over pooled scores, and the report (PL-04 step 4).
+122	    types.py — A claim to test between two players, and its tested result.
+123	  core/
+124	    __init__.py — The core: environment and agent interfaces, and run settings.
+125	    protocols.py — The two interfaces every environment and every player implements (AD-03, AD-09, AD-13).
+126	    settings.py — Run settings from TOML (PL-01 step 1).
+127	    types.py — The core&#x27;s data types: teams, actions, steps, transitions and run settings (AD-09, AD-13).
+128	  envs/
+129	    __init__.py — The environments: Snake and the corridor.
+130	    corridor.py — A 1-D corridor with the goal at its far end (CORE-03).
+131	    snake.py — Snake on a square grid, one agent, compact or grid view (SNAKE-01 to SNAKE-09).
+132	    types.py — Observation layouts shared with the players that read them.
+133	  evaluate/
+134	    __init__.py — Held-out greedy evaluation.
+135	    protocol.py — Greedy evaluation on held-out seeds (EVAL-01, DATA-01, AGENT-07).
+136	    types.py — What one evaluation asks for and what it returns.
+137	  lab/
+138	    __init__.py — The lab: the command line and the pipelines it runs.
+139	    __main__.py — `python -m rllab.lab`: dispatch `train`, `eval`, `replay` and `report`.
+140	    build.py — The environment and the agents a run&#x27;s settings name (PL-01 steps 2 and 7).
+141	    cli.py — The command line: `python -m rllab.lab &lt;train | eval | replay | report&gt; ...`.
+142	    players.py — Players from run folders or baseline names, scored or opened (PL-03 step 1, PL-04 steps 2-3).
+143	    printing.py — One line of scores (PL-03 step 11).
+144	    replay.py — The game a replay shows (PL-05 step 2).
+145	    report_spec.py — A report&#x27;s TOML: players, claims and chart groups (PL-04 step 1).
+146	    types.py — What a report names: its players, baselines and chart groups (PL-04).
+147	    pipelines/
+148	      __init__.py — One entry function per pipeline.
+149	      pl01_train.py — PL-01: train a run.
+150	      pl02_train_reference.py — PL-02: train the reference.
+151	      pl03_evaluate.py — PL-03: evaluate.
+152	      pl04_report.py — PL-04: report.
+153	      pl05_replay.py — PL-05: replay.
+154	  reference/
+155	    __init__.py — The reference: a library agent trained and played on the lab&#x27;s environments.
+156	    player.py — A trained library model as an Agent (REF-01).
+157	    train/
+158	      __init__.py — The library agent&#x27;s training through the gymnasium adapter (AD-03, AD-04).
+159	  runs/
+160	    __init__.py — Run folders: settings, curve, checkpoints and recorded games.
+161	    store.py — One folder per run: create it, write it as the run goes, read it back (AD-06).
+162	    types.py — What a run folder holds: its curve, its recorded games and the run itself (AD-06).
+163	  train/
+164	    __init__.py — The training loop.
+165	    loop.py — The training loop over every team (PL-01 step 15).
+166	  viz/
+167	    __init__.py — Charts and the replay window.
+168	    curves.py — Learning curves with baseline lines (PL-04 step 5).
+169	    replay.py — The interactive replay window (REPLAY-01, REPLAY-02).
+170	    types.py — A written chart and what it draws.
+171	
+172	## Interfaces (frozen: build against these, never change them)
+173	&lt;!-- docs/packages/rllab/contract.md:301 --&gt;
+174	### runs.RunRecord: type
+175	`@dataclass(frozen=True) class RunRecord: path: Path; settings: RunSettings; curve: tuple[CurvePoint, ...]; status: Literal[&quot;running&quot;, &quot;complete&quot;, &quot;incomplete&quot;]; checkpoints: dict[str, Path]; generations: dict[str, tuple[Path, ...]]; games: tuple[GameRecording, ...]`
+176	- **Invariants:** `settings` round-trips through `settings.json` unchanged. `checkpoints` holds one final checkpoint per learning team (single-team runs: `SOLO`), present when `status` is `complete`. `generations` holds each learning team&#x27;s numbered generations in order (10 when `settings.generations == 10`, else empty) (RUN-02, SELF-04).
+177	- **Boundary:** train, reference, evaluate, viz, lab · **Fixtures:** tests/contracts/runs.RunRecord/ · **Cases:** a complete tabular corridor run; an incomplete Snake run with 3 curve points; a complete predator-prey rung-3 run with 10 generations per team
+178	- **Used by:** train, reference, evaluate, viz, lab, selfplay; PL-01, PL-02, PL-03, PL-04, PL-05, PL-06
+179	Sample: tests/contracts/runs.RunRecord/ (exists)
+180	
+181	## Writes (edit only these files; the plan gives every other file to another task)
+182	- src/rllab/reference/train/** (folder)
+183	- tests/unit/rllab/test_train_reference.py (new)
+184	
+185	&lt;!-- tasks/plan.md:163 --&gt;
+186	### M1-T07: train_reference spine (library DQN on the adapter)
+187	**Package:** rllab · **Step:** PL-02.train_reference · **Kind:** spine · **Covers:** REF-01, QR-06 · **Size:** XS · **Mode:** solo
+188	**Read:** PL-02, reference.train_reference, core.RunSettings, core.Env, runs.RunWriter, evaluate.evaluate, AD-03, AD-04
+189	**Acceptance:**
+190	- [ ] On the reference `core.RunSettings` sample, `train_reference` trains Stable-Baselines3 DQN with `MlpPolicy` and `device=&quot;cpu&quot;` through a `gymnasium.Env` adapter, with curve points from `evaluate.evaluate`; non-Snake or non-compact settings raise `ValueError`
+191	**Verify:** `pytest tests/unit/rllab -k train_reference` · `scripts/check.sh gate`
+192	**Depends on:** M1-T01, M1-T32 · **Writes:** src/rllab/reference/train/**, tests/unit/rllab/test_train_reference.py
+193	</pre></details></div><div class="step" id="S5"><span class="sid">U38.S5</span><span class="kind">Bash</span>find src/rllab/reference src/rllab/runs src/rllab/evaluate src/rllab/core src/rllab/lab tests/contracts tests/unit -type f | sort; cat src/rllab/reference/train/*.py src/rllab/reference/*.py<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;find src/rllab/reference src/rllab/runs src/rllab/evaluate src/rllab/core src/rllab/lab tests/contracts tests/unit -type f | sort; cat src/rllab/reference/train/*.py src/rllab/reference/*.py&quot;,
+  &quot;description&quot;: &quot;List relevant files and show reference package&quot;
+}</pre><div class="lbl">output</div><pre>src/rllab/core/__init__.py
+src/rllab/core/protocols.py
+src/rllab/core/settings.py
+src/rllab/core/types.py
+src/rllab/evaluate/__init__.py
+src/rllab/evaluate/protocol.py
+src/rllab/evaluate/types.py
+src/rllab/lab/__init__.py
+src/rllab/lab/__main__.py
+src/rllab/lab/build.py
+src/rllab/lab/cli.py
+src/rllab/lab/pipelines/__init__.py
+src/rllab/lab/pipelines/pl01_train.py
+src/rllab/lab/pipelines/pl02_train_reference.py
+src/rllab/lab/pipelines/pl03_evaluate.py
+src/rllab/lab/pipelines/pl04_report.py
+src/rllab/lab/pipelines/pl05_replay.py
+src/rllab/lab/players.py
+src/rllab/lab/printing.py
+src/rllab/lab/replay.py
+src/rllab/lab/report_spec.py
+src/rllab/lab/types.py
+src/rllab/reference/__init__.py
+src/rllab/reference/player.py
+src/rllab/reference/train/__init__.py
+src/rllab/runs/__init__.py
+src/rllab/runs/store.py
+src/rllab/runs/types.py
+tests/contracts/agents.DQNAgent/samples.json
+tests/contracts/agents.DQNAgent/schema.json
+tests/contracts/agents.DQNAgent/test_agents_dqnagent.py
+tests/contracts/agents.TabularAgent/samples.json
+tests/contracts/agents.TabularAgent/schema.json
+tests/contracts/agents.TabularAgent/test_agents_tabularagent.py
+tests/contracts/baselines.RandomPlayer/samples.json
+tests/contracts/baselines.RandomPlayer/schema.json
+tests/contracts/baselines.RandomPlayer/test_baselines_randomplayer.py
+tests/contracts/baselines.ScriptedPlayer/samples.json
+tests/contracts/baselines.ScriptedPlayer/schema.json
+tests/contracts/baselines.ScriptedPlayer/test_baselines_scriptedplayer.py
+tests/contracts/codec.py
+tests/contracts/compare.Claim/samples.json
+tests/contracts/compare.Claim/schema.json
+tests/contracts/compare.Claim/test_compare_claim.py
+tests/contracts/compare.ClaimSpec/samples.json
+tests/contracts/compare.ClaimSpec/schema.json
+tests/contracts/compare.ClaimSpec/test_compare_claimspec.py
+tests/contracts/compare.run_claims/fake.py
+tests/contracts/compare.run_claims/samples.json
+tests/contracts/compare.run_claims/schema.json
+tests/contracts/compare.run_claims/test_compare_run_claims.py
+tests/contracts/conftest.py
+tests/contracts/core.ActionSpace/samples.json
+tests/contracts/core.ActionSpace/schema.json
+tests/contracts/core.ActionSpace/test_core_actionspace.py
+tests/contracts/core.Agent/fake.py
+tests/contracts/core.Agent/samples.json
+tests/contracts/core.Agent/schema.json
+tests/contracts/core.Agent/test_core_agent.py
+tests/contracts/core.AgentParams/samples.json
+tests/contracts/core.AgentParams/schema.json
+tests/contracts/core.AgentParams/test_core_agentparams.py
+tests/contracts/core.Env/fake.py
+tests/contracts/core.Env/samples.json
+tests/contracts/core.Env/schema.json
+tests/contracts/core.Env/test_core_env.py
+tests/contracts/core.Exploration/samples.json
+tests/contracts/core.Exploration/schema.json
+tests/contracts/core.Exploration/test_core_exploration.py
+tests/contracts/core.Rewards/samples.json
+tests/contracts/core.Rewards/schema.json
+tests/contracts/core.Rewards/test_core_rewards.py
+tests/contracts/core.RunSettings/samples.json
+tests/contracts/core.RunSettings/schema.json
+tests/contracts/core.RunSettings/test_core_runsettings.py
+tests/contracts/core.SOLO/samples.json
+tests/contracts/core.SOLO/schema.json
+tests/contracts/core.SOLO/test_core_solo.py
+tests/contracts/core.StepResult/samples.json
+tests/contracts/core.StepResult/schema.json
+tests/contracts/core.StepResult/test_core_stepresult.py
+tests/contracts/core.TeamSpec/samples.json
+tests/contracts/core.TeamSpec/schema.json
+tests/contracts/core.TeamSpec/test_core_teamspec.py
+tests/contracts/core.Transition/samples.json
+tests/contracts/core.Transition/schema.json
+tests/contracts/core.Transition/test_core_transition.py
+tests/contracts/core.load_settings/samples.json
+tests/contracts/core.load_settings/schema.json
+tests/contracts/core.load_settings/test_core_load_settings.py
+tests/contracts/envs.COMPACT_FIELDS/samples.json
+tests/contracts/envs.COMPACT_FIELDS/schema.json
+tests/contracts/envs.COMPACT_FIELDS/test_envs_compact_fields.py
+tests/contracts/envs.Corridor/samples.json
+tests/contracts/envs.Corridor/schema.json
+tests/contracts/envs.Corridor/test_envs_corridor.py
+tests/contracts/envs.Snake/samples.json
+tests/contracts/envs.Snake/schema.json
+tests/contracts/envs.Snake/test_envs_snake.py
+tests/contracts/evaluate.EvalSpec/samples.json
+tests/contracts/evaluate.EvalSpec/schema.json
+tests/contracts/evaluate.EvalSpec/test_evaluate_evalspec.py
+tests/contracts/evaluate.ScoreSet/samples.json
+tests/contracts/evaluate.ScoreSet/schema.json
+tests/contracts/evaluate.ScoreSet/test_evaluate_scoreset.py
+tests/contracts/evaluate.eval_seeds/samples.json
+tests/contracts/evaluate.eval_seeds/schema.json
+tests/contracts/evaluate.eval_seeds/test_evaluate_eval_seeds.py
+tests/contracts/evaluate.evaluate/fake.py
+tests/contracts/evaluate.evaluate/samples.json
+tests/contracts/evaluate.evaluate/schema.json
+tests/contracts/evaluate.evaluate/test_evaluate_evaluate.py
+tests/contracts/reference.ReferencePlayer/samples.json
+tests/contracts/reference.ReferencePlayer/schema.json
+tests/contracts/reference.ReferencePlayer/test_reference_referenceplayer.py
+tests/contracts/reference.train_reference/fake.py
+tests/contracts/reference.train_reference/samples.json
+tests/contracts/reference.train_reference/schema.json
+tests/contracts/reference.train_reference/test_reference_train_reference.py
+tests/contracts/runs.CurvePoint/samples.json
+tests/contracts/runs.CurvePoint/schema.json
+tests/contracts/runs.CurvePoint/test_runs_curvepoint.py
+tests/contracts/runs.GameRecording/samples.json
+tests/contracts/runs.GameRecording/schema.json
+tests/contracts/runs.GameRecording/test_runs_gamerecording.py
+tests/contracts/runs.RunRecord/samples.json
+tests/contracts/runs.RunRecord/schema.json
+tests/contracts/runs.RunRecord/test_runs_runrecord.py
+tests/contracts/runs.RunWriter/fake.py
+tests/contracts/runs.RunWriter/samples.json
+tests/contracts/runs.RunWriter/schema.json
+tests/contracts/runs.RunWriter/test_runs_runwriter.py
+tests/contracts/runs.create_run/fake.py
+tests/contracts/runs.create_run/samples.json
+tests/contracts/runs.create_run/schema.json
+tests/contracts/runs.create_run/test_runs_create_run.py
+tests/contracts/runs.open_run/fake.py
+tests/contracts/runs.open_run/samples.json
+tests/contracts/runs.open_run/schema.json
+tests/contracts/runs.open_run/test_runs_open_run.py
+tests/contracts/test_interface.py
+tests/contracts/train.train/fake.py
+tests/contracts/train.train/samples.json
+tests/contracts/train.train/schema.json
+tests/contracts/train.train/test_train_train.py
+tests/contracts/viz.Chart/samples.json
+tests/contracts/viz.Chart/schema.json
+tests/contracts/viz.Chart/test_viz_chart.py
+tests/contracts/viz.Replay/fake.py
+tests/contracts/viz.Replay/samples.json
+tests/contracts/viz.Replay/schema.json
+tests/contracts/viz.Replay/test_viz_replay.py
+tests/contracts/viz.plot_curves/fake.py
+tests/contracts/viz.plot_curves/samples.json
+tests/contracts/viz.plot_curves/schema.json
+tests/contracts/viz.plot_curves/test_viz_plot_curves.py
+tests/unit/rllab/test_build.py
+tests/unit/rllab/test_claims.py
+tests/unit/rllab/test_corridor.py
+tests/unit/rllab/test_curves.py
+tests/unit/rllab/test_dqn.py
+tests/unit/rllab/test_evaluate.py
+tests/unit/rllab/test_pick_game.py
+tests/unit/rllab/test_players.py
+tests/unit/rllab/test_random_player.py
+tests/unit/rllab/test_reference_player.py
+tests/unit/rllab/test_report_spec.py
+tests/unit/rllab/test_scripted.py
+tests/unit/rllab/test_settings.py
+tests/unit/rllab/test_snake.py
+tests/unit/rllab/test_store.py
+tests/unit/rllab/test_train_loop.py
+&quot;&quot;&quot;The library agent&#x27;s training through the gymnasium adapter (AD-03, AD-04).&quot;&quot;&quot;
+
+from pathlib import Path
+
+from rllab.core import RunSettings
+from rllab.runs import RunRecord
+
+
+def train_reference(settings: RunSettings, *, root: Path = Path(&quot;runs&quot;)) -&gt; RunRecord:
+    &quot;&quot;&quot;Train the library agent on the settings&#x27; environment, with the same curve points.&quot;&quot;&quot;
+    raise NotImplementedError(&quot;M1-T07&quot;)
+&quot;&quot;&quot;The reference: a library agent trained and played on the lab&#x27;s environments.&quot;&quot;&quot;
+
+from rllab.reference.player import ReferencePlayer
+from rllab.reference.train import train_reference
+
+__all__ = [&quot;ReferencePlayer&quot;, &quot;train_reference&quot;]
+&quot;&quot;&quot;A trained library model as an Agent (REF-01).&quot;&quot;&quot;
+
+from pathlib import Path
+
+import numpy as np
+from stable_baselines3 import DQN
+
+from rllab.core import Agent, Transition
+
+
+class ReferencePlayer(Agent):
+    &quot;&quot;&quot;The library model&#x27;s deterministic action, batch-first with one agent.&quot;&quot;&quot;
+
+    def __init__(self, checkpoint: Path) -&gt; None:
+        self.model = DQN.load(checkpoint, device=&quot;cpu&quot;)
+
+    def act(self, obs: np.ndarray, *, explore: bool) -&gt; np.ndarray:
+        &quot;&quot;&quot;The greedy action for each row of `obs`; the reference never explores.&quot;&quot;&quot;
+        action, _ = self.model.predict(obs, deterministic=True)
+        return np.asarray(action, dtype=np.int64)
+
+    def learn(self, t: Transition) -&gt; None:
+        &quot;&quot;&quot;A trained reference does not learn while it plays: the transition is dropped.&quot;&quot;&quot;
+        del t
+
+    def save(self, path: Path) -&gt; None:
+        self.model.save(path)
+
+    def load(self, path: Path) -&gt; None:
+        self.model = DQN.load(path, device=&quot;cpu&quot;)</pre></details></div><div class="step" id="S6"><span class="sid">U38.S6</span><span class="kind">Bash</span>cat src/rllab/core/__init__.py src/rllab/core/types.py src/rllab/core/protocols.py src/rllab/runs/__init__.py src/rllab/runs/store.py src/rllab/runs/types.py<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;cat src/rllab/core/__init__.py src/rllab/core/types.py src/rllab/core/protocols.py src/rllab/runs/__init__.py src/rllab/runs/store.py src/rllab/runs/types.py&quot;,
+  &quot;description&quot;: &quot;Show core and runs modules&quot;
+}</pre><div class="lbl">output</div><pre>&quot;&quot;&quot;The core: environment and agent interfaces, and run settings.&quot;&quot;&quot;
+
+from rllab.core.protocols import Agent, Env
+from rllab.core.settings import load_settings
+from rllab.core.types import (
+    SOLO,
+    ActionSpace,
+    AgentParams,
+    Exploration,
+    Rewards,
+    RunSettings,
+    StepResult,
+    TeamSpec,
+    Transition,
+)
+
+__all__ = [
+    &quot;SOLO&quot;,
+    &quot;ActionSpace&quot;,
+    &quot;Agent&quot;,
+    &quot;AgentParams&quot;,
+    &quot;Env&quot;,
+    &quot;Exploration&quot;,
+    &quot;Rewards&quot;,
+    &quot;RunSettings&quot;,
+    &quot;StepResult&quot;,
+    &quot;TeamSpec&quot;,
+    &quot;Transition&quot;,
+    &quot;load_settings&quot;,
+]
+&quot;&quot;&quot;The core&#x27;s data types: teams, actions, steps, transitions and run settings (AD-09, AD-13).&quot;&quot;&quot;
+
+from collections.abc import Mapping
+from dataclasses import dataclass
+from typing import Literal
+
+import numpy as np
+
+SOLO: str = &quot;agents&quot;
+&quot;&quot;&quot;The one team name every single-team environment uses.&quot;&quot;&quot;
+
+
+@dataclass(frozen=True)
+class ActionSpace:
+    &quot;&quot;&quot;Discrete: `n &gt;= 2` and `dim == 0`. Continuous: `dim &gt;= 1` and `n == 0`.&quot;&quot;&quot;
+
+    kind: Literal[&quot;discrete&quot;, &quot;continuous&quot;]
+    n: int = 0
+    dim: int = 0
+
+
+@dataclass(frozen=True)
+class TeamSpec:
+    &quot;&quot;&quot;One team&#x27;s size, per-agent observation shape and shared action space.&quot;&quot;&quot;
+
+    n_agents: int
+    obs_shape: tuple[int, ...]
+    actions: ActionSpace
+
+
+@dataclass(frozen=True)
+class StepResult:
+    &quot;&quot;&quot;One environment step, each map keyed by team and batch-first over that team&#x27;s agents.&quot;&quot;&quot;
+
+    obs: dict[str, np.ndarray]
+    reward: dict[str, np.ndarray]
+    done: dict[str, np.ndarray]
+    terminated: bool
+    truncated: bool
+    info: dict[str, float]
+
+
+@dataclass(frozen=True)
+class Transition:
+    &quot;&quot;&quot;One learning team&#x27;s step, batch-first; `terminated` is never set by truncation.&quot;&quot;&quot;
+
+    obs: np.ndarray
+    actions: np.ndarray
+    reward: np.ndarray
+    next_obs: np.ndarray
+    terminated: np.ndarray
+    active: np.ndarray
+    truncated: bool
+
+
+@dataclass(frozen=True)
+class Rewards:
+    &quot;&quot;&quot;Reward sizes; for the corridor `food` is the goal reward.&quot;&quot;&quot;
+
+    food: float = 1.0
+    death: float = -1.0
+    step: float = 0.0
+
+
+@dataclass(frozen=True)
+class Exploration:
+    &quot;&quot;&quot;A rate falling linearly from `start` to `end` over `decay_steps`, then constant.&quot;&quot;&quot;
+
+    start: float = 1.0
+    end: float = 0.05
+    decay_steps: int = 50_000
+
+
+@dataclass(frozen=True)
+class AgentParams:
+    &quot;&quot;&quot;Learner hyperparameters; each agent reads the fields it uses.&quot;&quot;&quot;
+
+    lr: float
+    gamma: float
+    batch_size: int = 64
+    memory_size: int = 50_000
+    target_every: int = 1_000
+    learn_start: int = 1_000
+    hidden: int = 128
+    net: Literal[&quot;mlp&quot;, &quot;cnn&quot;] = &quot;mlp&quot;
+    rollout_steps: int = 2048
+    epochs: int = 10
+    clip: float = 0.2
+    gae_lambda: float = 0.95
+    games_per_update: int = 10
+
+
+@dataclass(frozen=True)
+class RunSettings:
+    &quot;&quot;&quot;Everything one run needs, fully resolved (RUN-01).&quot;&quot;&quot;
+
+    name: str
+    env: Literal[&quot;snake&quot;, &quot;corridor&quot;, &quot;tank&quot;, &quot;predprey&quot;]
+    view: Literal[&quot;compact&quot;, &quot;grid&quot;, &quot;index&quot;, &quot;full&quot;, &quot;limited&quot;]
+    agent: Literal[&quot;tabular&quot;, &quot;dqn&quot;, &quot;reinforce&quot;, &quot;ppo&quot;, &quot;random&quot;, &quot;scripted&quot;, &quot;reference&quot;]
+    n_agents: int
+    opponents: Mapping[str, Literal[&quot;learn&quot;, &quot;scripted&quot;, &quot;random&quot;]]
+    self_play: Literal[&quot;none&quot;, &quot;latest&quot;, &quot;pool&quot;]
+    pool_latest: float
+    generations: int
+    ablation: Literal[&quot;none&quot;, &quot;no_memory&quot;, &quot;no_target&quot;, &quot;no_explore&quot;]
+    rewards: Rewards
+    exploration: Exploration
+    params: AgentParams
+    steps: int
+    seed: int
+    eval_every: int
+    eval_games: int
+&quot;&quot;&quot;The two interfaces every environment and every player implements (AD-03, AD-09, AD-13).&quot;&quot;&quot;
+
+from collections.abc import Mapping
+from pathlib import Path
+from typing import Literal, Protocol
+
+import numpy as np
+
+from rllab.core.types import StepResult, TeamSpec, Transition
+
+
+class Env(Protocol):
+    &quot;&quot;&quot;A game over teams of agents, each team batch-first.&quot;&quot;&quot;
+
+    teams: Mapping[str, TeamSpec]
+    board: Literal[&quot;grid&quot;, &quot;tank&quot;]
+
+    def reset(self, seed: int) -&gt; tuple[dict[str, np.ndarray], dict[str, float]]: ...
+
+    def step(self, actions: Mapping[str, np.ndarray]) -&gt; StepResult: ...
+
+    def frame(self) -&gt; np.ndarray: ...
+
+
+class Agent(Protocol):
+    &quot;&quot;&quot;A player acting for one team: one action per agent of the batch.&quot;&quot;&quot;
+
+    def act(self, obs: np.ndarray, *, explore: bool) -&gt; np.ndarray: ...
+
+    def learn(self, t: Transition) -&gt; None: ...
+
+    def save(self, path: Path) -&gt; None: ...
+
+    def load(self, path: Path) -&gt; None: ...
+&quot;&quot;&quot;Run folders: settings, curve, checkpoints and recorded games.&quot;&quot;&quot;
+
+from rllab.runs.store import RunWriter, create_run, open_run
+from rllab.runs.types import CurvePoint, GameRecording, RunRecord
+
+__all__ = [&quot;CurvePoint&quot;, &quot;GameRecording&quot;, &quot;RunRecord&quot;, &quot;RunWriter&quot;, &quot;create_run&quot;, &quot;open_run&quot;]
+&quot;&quot;&quot;One folder per run: create it, write it as the run goes, read it back (AD-06).&quot;&quot;&quot;
+
+import csv
+import json
+import zipfile
+from collections.abc import Sequence
+from dataclasses import asdict
+from datetime import datetime
+from pathlib import Path
+from typing import Any, Literal
+
+import numpy as np
+
+from rllab.core import SOLO, Agent, AgentParams, Exploration, Rewards, RunSettings
+from rllab.runs.types import CurvePoint, GameRecording, RunRecord
+
+_CURVE_FIELDS = (&quot;step&quot;, &quot;games&quot;, &quot;mean_score&quot;, &quot;elapsed_s&quot;)
+_STATUSES: dict[str, Literal[&quot;running&quot;, &quot;complete&quot;, &quot;incomplete&quot;]] = {
+    &quot;running&quot;: &quot;running&quot;,
+    &quot;complete&quot;: &quot;complete&quot;,
+    &quot;incomplete&quot;: &quot;incomplete&quot;,
+}
+_BOARDS: dict[str, Literal[&quot;grid&quot;, &quot;tank&quot;]] = {&quot;grid&quot;: &quot;grid&quot;, &quot;tank&quot;: &quot;tank&quot;}
+_CHECKPOINT_SUFFIX = {&quot;tabular&quot;: &quot;.npz&quot;, &quot;reference&quot;: &quot;.zip&quot;}
+
+
+class RunWriter:
+    &quot;&quot;&quot;Writes one run folder; each curve point is flushed at once.&quot;&quot;&quot;
+
+    def __init__(self, path: Path, settings: RunSettings) -&gt; None:
+        self.path = path
+        self.settings = settings
+
+    def add_point(self, p: CurvePoint) -&gt; None:
+        with (self.path / &quot;curve.csv&quot;).open(&quot;a&quot;, newline=&quot;&quot;, encoding=&quot;utf-8&quot;) as f:
+            csv.writer(f).writerow([p.step, p.games, repr(p.mean_score), repr(p.elapsed_s)])
+
+    def save_checkpoint(self, agent: Agent, *, team: str = SOLO) -&gt; None:
+        stem = &quot;checkpoint&quot; if team == SOLO else f&quot;checkpoint-{team}&quot;
+        agent.save(self.path / (stem + _CHECKPOINT_SUFFIX.get(self.settings.agent, &quot;.pt&quot;)))
+
+    def save_generation(self, agent: Agent, *, team: str, index: int) -&gt; Path:
+        path = self.path / &quot;generations&quot; / team / str(index)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        agent.save(path)
+        return path
+
+    def save_games(self, games: Sequence[GameRecording]) -&gt; None:
+        arrays: dict[str, Any] = {}
+        for i, game in enumerate(games):
+            arrays[f&quot;{i}.seed&quot;] = np.asarray(game.seed, dtype=np.int64)
+            arrays[f&quot;{i}.board&quot;] = np.asarray(game.board)
+            arrays[f&quot;{i}.frames&quot;] = game.frames
+            arrays[f&quot;{i}.rewards&quot;] = game.rewards
+            for team, scores in game.scores.items():
+                arrays[f&quot;{i}.scores.{team}&quot;] = scores
+        np.savez(self.path / &quot;games.npz&quot;, **arrays)
+
+    def finish(self, status: Literal[&quot;complete&quot;, &quot;incomplete&quot;]) -&gt; RunRecord:
+        (self.path / &quot;status&quot;).write_text(status, encoding=&quot;utf-8&quot;)
+        return open_run(self.path)
+
+
+def create_run(settings: RunSettings, *, root: Path = Path(&quot;runs&quot;)) -&gt; RunWriter:
+    &quot;&quot;&quot;Start a uniquely named run folder holding `settings.json` and `status=running`.&quot;&quot;&quot;
+    stamp = datetime.now().strftime(&quot;%Y%m%dT%H%M%S&quot;)
+    path = _new_folder(root, f&quot;{settings.name}-s{settings.seed}-{stamp}&quot;)
+    (path / &quot;settings.json&quot;).write_text(json.dumps(asdict(settings), indent=2), encoding=&quot;utf-8&quot;)
+    (path / &quot;curve.csv&quot;).write_text(&quot;,&quot;.join(_CURVE_FIELDS) + &quot;\n&quot;, encoding=&quot;utf-8&quot;)
+    (path / &quot;status&quot;).write_text(&quot;running&quot;, encoding=&quot;utf-8&quot;)
+    return RunWriter(path, settings)
+
+
+def open_run(path: Path) -&gt; RunRecord:
+    &quot;&quot;&quot;Read a run folder back (PL-05 step 1).&quot;&quot;&quot;
+    settings_file = path / &quot;settings.json&quot;
+    if not settings_file.is_file():
+        raise FileNotFoundError(f&quot;run {path}: no settings.json&quot;)
+    return RunRecord(
+        path=path,
+        settings=_settings_from_json(json.loads(settings_file.read_text(encoding=&quot;utf-8&quot;))),
+        curve=_read_curve(path / &quot;curve.csv&quot;),
+        status=_read_status(path / &quot;status&quot;),
+        checkpoints=_find_checkpoints(path),
+        generations=_find_generations(path / &quot;generations&quot;),
+        games=_read_games(path / &quot;games.npz&quot;),
+    )
+
+
+def _new_folder(root: Path, stem: str) -&gt; Path:
+    &quot;&quot;&quot;`root/stem`, or `root/stem-&lt;n&gt;` with the first free `n` when it exists.&quot;&quot;&quot;
+    root.mkdir(parents=True, exist_ok=True)
+    n = 0
+    while True:
+        path = root / (stem if n == 0 else f&quot;{stem}-{n}&quot;)
+        try:
+            path.mkdir()
+        except FileExistsError:
+            n += 1
+            continue
+        return path
+
+
+def _settings_from_json(raw: dict[str, Any]) -&gt; RunSettings:
+    return RunSettings(
+        **{
+            **raw,
+            &quot;rewards&quot;: Rewards(**raw[&quot;rewards&quot;]),
+            &quot;exploration&quot;: Exploration(**raw[&quot;exploration&quot;]),
+            &quot;params&quot;: AgentParams(**raw[&quot;params&quot;]),
+        }
+    )
+
+
+def _read_curve(path: Path) -&gt; tuple[CurvePoint, ...]:
+    if not path.is_file():
+        return ()
+    with path.open(newline=&quot;&quot;, encoding=&quot;utf-8&quot;) as f:
+        return tuple(
+            CurvePoint(
+                step=int(row[&quot;step&quot;]),
+                games=int(row[&quot;games&quot;]),
+                mean_score=float(row[&quot;mean_score&quot;]),
+                elapsed_s=float(row[&quot;elapsed_s&quot;]),
+            )
+            for row in csv.DictReader(f)
+        )
+
+
+def _read_status(path: Path) -&gt; Literal[&quot;running&quot;, &quot;complete&quot;, &quot;incomplete&quot;]:
+    text = path.read_text(encoding=&quot;utf-8&quot;).strip()
+    if text not in _STATUSES:
+        raise ValueError(f&quot;{path}: unknown status {text!r}&quot;)
+    return _STATUSES[text]
+
+
+def _find_checkpoints(run: Path) -&gt; dict[str, Path]:
+    &quot;&quot;&quot;Each team&#x27;s final checkpoint: `checkpoint.&lt;ext&gt;` is `SOLO`&#x27;s, `checkpoint-&lt;team&gt;.&lt;ext&gt;`.&quot;&quot;&quot;
+    found = {}
+    for path in sorted(run.glob(&quot;checkpoint*&quot;)):
+        team = path.stem.removeprefix(&quot;checkpoint&quot;).removeprefix(&quot;-&quot;)
+        found[team or SOLO] = path
+    return found
+
+
+def _find_generations(folder: Path) -&gt; dict[str, tuple[Path, ...]]:
+    if not folder.is_dir():
+        return {}
+    return {
+        team.name: tuple(sorted(team.iterdir(), key=lambda p: int(p.name)))
+        for team in sorted(folder.iterdir())
+    }
+
+
+def _read_games(path: Path) -&gt; tuple[GameRecording, ...]:
+    if not path.is_file():
+        return ()
+    try:
+        with np.load(path, allow_pickle=False) as data:
+            arrays = {key: data[key] for key in data.files}
+        count = sum(key.endswith(&quot;.seed&quot;) for key in arrays)
+        return tuple(_game_from_arrays(arrays, i) for i in range(count))
+    except (OSError, KeyError, ValueError, zipfile.BadZipFile) as error:
+        raise ValueError(f&quot;{path}: unreadable recording ({error})&quot;) from error
+
+
+def _game_from_arrays(arrays: dict[str, np.ndarray], i: int) -&gt; GameRecording:
+    prefix = f&quot;{i}.scores.&quot;
+    return GameRecording(
+        seed=int(arrays[f&quot;{i}.seed&quot;]),
+        board=_BOARDS[str(arrays[f&quot;{i}.board&quot;])],
+        frames=arrays[f&quot;{i}.frames&quot;],
+        rewards=arrays[f&quot;{i}.rewards&quot;],
+        scores={
+            key.removeprefix(prefix): value
+            for key, value in arrays.items()
+            if key.startswith(prefix)
+        },
+    )
+&quot;&quot;&quot;What a run folder holds: its curve, its recorded games and the run itself (AD-06).&quot;&quot;&quot;
+
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Literal
+
+import numpy as np
+
+from rllab.core import RunSettings
+
+
+@dataclass(frozen=True)
+class CurvePoint:
+    &quot;&quot;&quot;One greedy evaluation during training; `step` strictly increases within a run.&quot;&quot;&quot;
+
+    step: int
+    games: int
+    mean_score: float
+    elapsed_s: float
+
+
+@dataclass(frozen=True)
+class GameRecording:
+    &quot;&quot;&quot;One game&#x27;s frames (start plus one per step), per-step total rewards and team scores.&quot;&quot;&quot;
+
+    seed: int
+    board: Literal[&quot;grid&quot;, &quot;tank&quot;]
+    frames: np.ndarray
+    rewards: np.ndarray
+    scores: dict[str, np.ndarray]
+
+
+@dataclass(frozen=True)
+class RunRecord:
+    &quot;&quot;&quot;A run folder read back: settings, curve, status, checkpoints, generations and games.&quot;&quot;&quot;
+
+    path: Path
+    settings: RunSettings
+    curve: tuple[CurvePoint, ...]
+    status: Literal[&quot;running&quot;, &quot;complete&quot;, &quot;incomplete&quot;]
+    checkpoints: dict[str, Path]
+    generations: dict[str, tuple[Path, ...]]
+    games: tuple[GameRecording, ...]</pre></details></div><div class="step" id="S7"><span class="sid">U38.S7</span><span class="kind">Bash</span>cat src/rllab/evaluate/__init__.py src/rllab/evaluate/protocol.py src/rllab/evaluate/types.py src/rllab/train/loop.py src/rllab/lab/build.py src/rllab/envs/__init__.py src/rllab/lab/pipelines/pl02_train_reference.py<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;cat src/rllab/evaluate/__init__.py src/rllab/evaluate/protocol.py src/rllab/evaluate/types.py src/rllab/train/loop.py src/rllab/lab/build.py src/rllab/envs/__init__.py src/rllab/lab/pipelines/pl02_train_reference.py&quot;,
+  &quot;description&quot;: &quot;Show evaluate, train loop, build, envs&quot;
+}</pre><div class="lbl">output</div><pre>&quot;&quot;&quot;Held-out greedy evaluation.&quot;&quot;&quot;
+
+from rllab.evaluate.protocol import eval_seeds, evaluate
+from rllab.evaluate.types import EvalSpec, ScoreSet
+
+__all__ = [&quot;EvalSpec&quot;, &quot;ScoreSet&quot;, &quot;eval_seeds&quot;, &quot;evaluate&quot;]
+&quot;&quot;&quot;Greedy evaluation on held-out seeds (EVAL-01, DATA-01, AGENT-07).&quot;&quot;&quot;
+
+from collections.abc import Callable, Mapping
+
+import numpy as np
+
+from rllab.core import Agent, Env
+from rllab.evaluate.types import EvalSpec, ScoreSet
+from rllab.runs import GameRecording
+
+HELD_OUT_FLOOR = 1_000_000  # every training seed is below this (DATA-01)
+SEEDS_PER_TRAIN_SEED = 1000
+
+
+def eval_seeds(train_seed: int, n: int) -&gt; list[int]:
+    &quot;&quot;&quot;`1_000_000 + 1000 * train_seed + i` for `i &lt; n`: never a training seed.&quot;&quot;&quot;
+    if not 0 &lt;= n &lt;= SEEDS_PER_TRAIN_SEED:
+        raise ValueError(f&quot;n must be within 0..{SEEDS_PER_TRAIN_SEED}, got {n}&quot;)
+    if not 0 &lt;= train_seed &lt; HELD_OUT_FLOOR:
+        raise ValueError(f&quot;train seed must be within 0..{HELD_OUT_FLOOR - 1}, got {train_seed}&quot;)
+    first = HELD_OUT_FLOOR + SEEDS_PER_TRAIN_SEED * train_seed
+    return list(range(first, first + n))
+
+
+def evaluate(make_env: Callable[[], Env], agents: Mapping[str, Agent], spec: EvalSpec) -&gt; ScoreSet:
+    &quot;&quot;&quot;Play `spec.n_games` greedy games with one agent per team, scoring `spec.team`.&quot;&quot;&quot;
+    env = make_env()
+    scores: list[float] = []
+    games: list[GameRecording] = []
+    for i, seed in enumerate(eval_seeds(spec.train_seed, spec.n_games)):
+        score, game = _play(env, agents, seed, team=spec.team, record=i &lt; spec.record)
+        scores.append(score)
+        if game is not None:
+            games.append(game)
+    return ScoreSet(
+        player=spec.player,
+        train_seed=spec.train_seed,
+        scores=np.array(scores, dtype=np.float64),
+        games=tuple(games),
+    )
+
+
+def _play(
+    env: Env, agents: Mapping[str, Agent], seed: int, *, team: str, record: bool
+) -&gt; tuple[float, GameRecording | None]:
+    &quot;&quot;&quot;One greedy game on `seed`: `team`&#x27;s final score, and the game itself when `record`.&quot;&quot;&quot;
+    obs, info = env.reset(seed)
+    frames = [env.frame()] if record else []
+    rewards: list[float] = []
+    history = {name: [info[f&quot;score:{name}&quot;]] for name in env.teams}
+    over = False
+    while not over:
+        actions = {name: agents[name].act(obs[name], explore=False) for name in env.teams}
+        result = env.step(actions)
+        obs, info = result.obs, result.info
+        over = result.terminated or result.truncated
+        rewards.append(sum(float(r.sum()) for r in result.reward.values()))
+        for name, scores in history.items():
+            scores.append(info[f&quot;score:{name}&quot;])
+        if record:
+            frames.append(env.frame())
+    score = float(info[f&quot;score:{team}&quot;])
+    if not record:
+        return score, None
+    return score, GameRecording(
+        seed=seed,
+        board=env.board,
+        frames=np.stack(frames),
+        rewards=np.array(rewards, dtype=np.float32),
+        scores={name: np.array(s, dtype=np.float32) for name, s in history.items()},
+    )
+&quot;&quot;&quot;What one evaluation asks for and what it returns.&quot;&quot;&quot;
+
+from dataclasses import dataclass
+
+import numpy as np
+
+from rllab.core import SOLO
+from rllab.runs import GameRecording
+
+
+@dataclass(frozen=True)
+class EvalSpec:
+    &quot;&quot;&quot;`n_games` games of `team` on `eval_seeds(train_seed, n_games)`, the first `record` recorded.&quot;&quot;&quot;
+
+    player: str
+    train_seed: int
+    team: str = SOLO
+    n_games: int = 200
+    record: int = 0
+
+    def __post_init__(self) -&gt; None:
+        if self.n_games &lt; 1:
+            raise ValueError(f&quot;n_games must be at least 1, got {self.n_games}&quot;)
+        if not 0 &lt;= self.record &lt;= self.n_games:
+            raise ValueError(f&quot;record must be within 0..{self.n_games}, got {self.record}&quot;)
+
+
+@dataclass(frozen=True)
+class ScoreSet:
+    &quot;&quot;&quot;One score per evaluation game, and the first recorded games.&quot;&quot;&quot;
+
+    player: str
+    train_seed: int
+    scores: np.ndarray
+    games: tuple[GameRecording, ...]
+&quot;&quot;&quot;The training loop over every team (PL-01 step 15).&quot;&quot;&quot;
+
+from collections.abc import Callable, Mapping
+from pathlib import Path
+from time import monotonic
+
+import numpy as np
+
+from rllab.core import SOLO, Agent, Env, RunSettings, StepResult, Transition
+from rllab.evaluate import EvalSpec, evaluate
+from rllab.runs import CurvePoint, RunRecord, RunWriter, create_run
+
+RECORDED_GAMES = 5
+PROGRESS_EVERY_S = 30.0
+TRAINING_SEEDS = 1_000_000  # game seeds stay below every evaluation seed (DATA-01)
+
+
+def train(
+    make_env: Callable[[], Env],
+    agents: Mapping[str, Agent],
+    settings: RunSettings,
+    *,
+    root: Path = Path(&quot;runs&quot;),
+) -&gt; RunRecord:
+    &quot;&quot;&quot;Step for `settings.steps` steps, learning after each, with a curve point every `eval_every`.&quot;&quot;&quot;
+    writer = create_run(settings, root=root)
+    try:
+        _run_steps(make_env, agents, settings, writer)
+        _save_results(make_env, agents, settings, writer)
+    except KeyboardInterrupt:
+        writer.finish(&quot;incomplete&quot;)
+        raise
+    return writer.finish(&quot;complete&quot;)
+
+
+def learning_teams(settings: RunSettings) -&gt; list[str]:
+    &quot;&quot;&quot;The teams that learn: `SOLO` in a single-team run, else those `opponents` marks `learn`.&quot;&quot;&quot;
+    if not settings.opponents:
+        return [SOLO]
+    return [team for team, role in settings.opponents.items() if role == &quot;learn&quot;]
+
+
+def _run_steps(
+    make_env: Callable[[], Env],
+    agents: Mapping[str, Agent],
+    settings: RunSettings,
+    writer: RunWriter,
+) -&gt; None:
+    &quot;&quot;&quot;The step loop: act for every team, then each learning team learns from its Transition.&quot;&quot;&quot;
+    learners = learning_teams(settings)
+    spec = EvalSpec(settings.name, settings.seed, team=learners[0], n_games=settings.eval_games)
+    env = make_env()
+    rng = np.random.default_rng(settings.seed)
+    start = last_print = monotonic()
+    games = 0
+    obs, _ = env.reset(int(rng.integers(TRAINING_SEEDS)))
+    active = _all_active(obs)
+    for step in range(settings.steps):
+        if step % settings.eval_every == 0:
+            score = _mean_score(make_env, agents, spec)
+            writer.add_point(CurvePoint(step, games, score, monotonic() - start))
+        result = _step_and_learn(env, agents, learners, obs, active=active)
+        if result.terminated or result.truncated:
+            games += 1
+            obs, _ = env.reset(int(rng.integers(TRAINING_SEEDS)))
+            active = _all_active(obs)
+        else:
+            obs = result.obs
+            active = {team: ~done for team, done in result.done.items()}
+        if monotonic() - last_print &gt;= PROGRESS_EVERY_S:
+            last_print = monotonic()
+            print(_progress(settings, step + 1, games, last_print - start), flush=True)
+    score = _mean_score(make_env, agents, spec)
+    writer.add_point(CurvePoint(settings.steps, games, score, monotonic() - start))
+
+
+def _step_and_learn(
+    env: Env,
+    agents: Mapping[str, Agent],
+    learners: list[str],
+    obs: Mapping[str, np.ndarray],
+    *,
+    active: Mapping[str, np.ndarray],
+) -&gt; StepResult:
+    &quot;&quot;&quot;Every team acts (exploring), the env steps, then each learner learns from its step.&quot;&quot;&quot;
+    actions = {team: agents[team].act(obs[team], explore=True) for team in env.teams}
+    result = env.step(actions)
+    for team in learners:
+        agents[team].learn(_transition(team, obs, actions, result, active=active[team]))
+    return result
+
+
+def _all_active(obs: Mapping[str, np.ndarray]) -&gt; dict[str, np.ndarray]:
+    return {team: np.ones(len(batch), dtype=np.bool_) for team, batch in obs.items()}
+
+
+def _transition(
+    team: str,
+    obs: Mapping[str, np.ndarray],
+    actions: Mapping[str, np.ndarray],
+    result: StepResult,
+    *,
+    active: np.ndarray,
+) -&gt; Transition:
+    &quot;&quot;&quot;One team&#x27;s batch-first step; agents done only by truncation are not terminated.&quot;&quot;&quot;
+    return Transition(
+        obs=obs[team],
+        actions=actions[team],
+        reward=result.reward[team],
+        next_obs=result.obs[team],
+        terminated=result.done[team] &amp; active &amp; (not result.truncated),
+        active=active,
+        truncated=result.truncated,
+    )
+
+
+def _mean_score(make_env: Callable[[], Env], agents: Mapping[str, Agent], spec: EvalSpec) -&gt; float:
+    &quot;&quot;&quot;A greedy evaluation of the first learning team against the run&#x27;s opposition.&quot;&quot;&quot;
+    return float(np.mean(evaluate(make_env, agents, spec).scores))
+
+
+def _progress(settings: RunSettings, step: int, games: int, elapsed_s: float) -&gt; str:
+    return (
+        f&quot;{settings.name} s{settings.seed}: step {step}/{settings.steps}, &quot;
+        f&quot;{games} games, {elapsed_s:.0f} s&quot;
+    )
+
+
+def _save_results(
+    make_env: Callable[[], Env],
+    agents: Mapping[str, Agent],
+    settings: RunSettings,
+    writer: RunWriter,
+) -&gt; None:
+    &quot;&quot;&quot;Each learner&#x27;s checkpoint, and `RECORDED_GAMES` recorded greedy games.&quot;&quot;&quot;
+    learners = learning_teams(settings)
+    for team in learners:
+        writer.save_checkpoint(agents[team], team=team)
+    spec = EvalSpec(
+        settings.name,
+        settings.seed,
+        team=learners[0],
+        n_games=RECORDED_GAMES,
+        record=RECORDED_GAMES,
+    )
+    writer.save_games(evaluate(make_env, agents, spec).games)
+&quot;&quot;&quot;The environment and the agents a run&#x27;s settings name (PL-01 steps 2 and 7).&quot;&quot;&quot;
+
+from collections.abc import Callable
+from typing import Literal
+
+from rllab.agents import DQNAgent, TabularAgent
+from rllab.baselines import RandomPlayer, ScriptedPlayer
+from rllab.core import SOLO, Agent, Env, RunSettings, TeamSpec
+from rllab.envs import Corridor, Snake
+
+
+def make_env(settings: RunSettings) -&gt; Callable[[], Env]:
+    &quot;&quot;&quot;A zero-argument factory of the settings&#x27; environment.&quot;&quot;&quot;
+    rewards = settings.rewards
+    if settings.env == &quot;snake&quot;:
+        view: Literal[&quot;compact&quot;, &quot;grid&quot;] = &quot;grid&quot; if settings.view == &quot;grid&quot; else &quot;compact&quot;
+        return lambda: Snake(view=view, rewards=rewards)
+    if settings.env == &quot;corridor&quot;:
+        return lambda: Corridor(rewards=rewards)
+    raise ValueError(f&quot;env {settings.env!r}: not built in this milestone&quot;)
+
+
+def make_agent(settings: RunSettings, env: Env) -&gt; dict[str, Agent]:
+    &quot;&quot;&quot;One agent per team of `env`, sized from the team&#x27;s `TeamSpec`.&quot;&quot;&quot;
+    return {SOLO: _solo_agent(settings, env.teams[SOLO])}
+
+
+def _solo_agent(settings: RunSettings, team: TeamSpec) -&gt; Agent:
+    &quot;&quot;&quot;The single team&#x27;s player: a learner or a baseline, with the settings&#x27; ablation.&quot;&quot;&quot;
+    seed = settings.seed
+    if settings.agent == &quot;tabular&quot;:
+        return TabularAgent(
+            team.actions.n,
+            settings.params,
+            settings.exploration,
+            seed=seed,
+            explore_enabled=settings.ablation != &quot;no_explore&quot;,
+        )
+    if settings.agent == &quot;dqn&quot;:
+        ablation = settings.ablation if settings.ablation != &quot;no_explore&quot; else &quot;none&quot;
+        return DQNAgent(team, settings.params, settings.exploration, seed=seed, ablation=ablation)
+    if settings.agent == &quot;random&quot;:
+        return RandomPlayer(team.actions.n, seed=seed)
+    if settings.agent == &quot;scripted&quot;:
+        return ScriptedPlayer()
+    raise ValueError(f&quot;agent {settings.agent!r}: not built from settings in this milestone&quot;)
+&quot;&quot;&quot;The environments: Snake and the corridor.&quot;&quot;&quot;
+
+from rllab.envs.corridor import Corridor
+from rllab.envs.snake import Snake
+from rllab.envs.types import COMPACT_FIELDS
+
+__all__ = [&quot;COMPACT_FIELDS&quot;, &quot;Corridor&quot;, &quot;Snake&quot;]
+&quot;&quot;&quot;PL-02: train the reference.&quot;&quot;&quot;
+
+from pathlib import Path
+
+from rllab.runs import RunRecord
+
+
+def run_train_reference(settings_path: Path, seed: int) -&gt; RunRecord:
+    &quot;&quot;&quot;Train the library agent the settings file names, on one seed.&quot;&quot;&quot;
+    raise NotImplementedError(&quot;M1-T22&quot;)</pre></details></div><div class="step" id="S8"><span class="sid">U38.S8</span><span class="kind">Bash</span>cat tests/contracts/reference.train_reference/test_reference_train_reference.py tests/contracts/reference.train_reference/fake.py tests/unit/rllab/test_reference_player.py; sed -n 1,80p src/rllab/envs/snake.py; grep -n &quot;reference&quot; -A40 tests/contracts/core.RunSettings/samples.json | head -80<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;cat tests/contracts/reference.train_reference/test_reference_train_reference.py tests/contracts/reference.train_reference/fake.py tests/unit/rllab/test_reference_player.py; sed -n 1,80p src/rllab/envs/snake.py; grep -n \&quot;reference\&quot; -A40 tests/contracts/core.RunSettings/samples.json | head -80&quot;,
+  &quot;description&quot;: &quot;Show contract tests, player test, snake, samples&quot;
+}</pre><div class="lbl">output</div><pre>&quot;&quot;&quot;reference.train_reference: the fake serves the 3-point reference run and refuses grids.&quot;&quot;&quot;
+
+from dataclasses import replace
+
+from rllab.core import RunSettings
+from rllab.runs import RunRecord
+
+SYMBOL = &quot;reference.train_reference&quot;
+
+
+def test_samples_follow_the_schema(codec):
+    codec.assert_samples_valid(SYMBOL)
+
+
+def test_fake_passes_the_train_reference_check(codec, tmp_path):
+    fake = codec.fake(SYMBOL)
+    record = codec.sample(SYMBOL, &quot;reference_complete_3&quot;, RunRecord)
+    refused = replace(record.settings, view=&quot;grid&quot;)
+    trained = fake.check_train_reference(
+        fake.make_train_reference(record), record.settings, refused, tmp_path
+    )
+    assert len(trained.curve) == 3
+
+
+def test_fake_accepts_each_supported_settings_sample(codec):
+    fake = codec.fake(SYMBOL)
+    tank = codec.sample(&quot;core.RunSettings&quot;, &quot;tank_reference&quot;, RunSettings)
+    rung1 = codec.sample(&quot;core.RunSettings&quot;, &quot;predprey_rung1&quot;, RunSettings)
+    assert fake.supported(tank)
+    assert not fake.supported(rung1)
+&quot;&quot;&quot;reference.train_reference: a fake serving a complete 3-point reference RunRecord.
+
+The fake raises `ValueError` for settings the contract refuses, and otherwise echoes the
+sample with the given settings and a folder under `root`. `check_train_reference` takes the
+provider.
+&quot;&quot;&quot;
+
+import itertools
+from collections.abc import Callable
+from dataclasses import replace
+from pathlib import Path
+
+import pytest
+
+from rllab.core import SOLO, RunSettings
+from rllab.runs import RunRecord
+
+
+def supported(settings: RunSettings) -&gt; bool:
+    &quot;&quot;&quot;Snake compact, the one-fish full-view tank, or the predator against scripted prey.&quot;&quot;&quot;
+    return settings.agent == &quot;reference&quot; and (
+        (settings.env == &quot;snake&quot; and settings.view == &quot;compact&quot;)
+        or (settings.env == &quot;tank&quot; and settings.n_agents == 1 and settings.view == &quot;full&quot;)
+        or (
+            settings.env == &quot;predprey&quot;
+            and dict(settings.opponents) == {&quot;predator&quot;: &quot;learn&quot;, &quot;prey&quot;: &quot;scripted&quot;}
+        )
+    )
+
+
+def make_train_reference(record: RunRecord) -&gt; Callable[..., RunRecord]:
+    &quot;&quot;&quot;A `train_reference` returning `record` for supported settings.&quot;&quot;&quot;
+
+    def train_reference(settings: RunSettings, *, root: Path = Path(&quot;runs&quot;)) -&gt; RunRecord:
+        if not supported(settings):
+            raise ValueError(f&quot;the reference cannot train {settings.env}/{settings.view}&quot;)
+        return replace(record, path=root / f&quot;{settings.name}-s{settings.seed}&quot;, settings=settings)
+
+    return train_reference
+
+
+def check_train_reference(
+    train_reference: Callable[..., RunRecord],
+    settings: RunSettings,
+    refused: RunSettings,
+    root: Path,
+) -&gt; RunRecord:
+    &quot;&quot;&quot;Snake reference settings finish complete with a curve from 0; `refused` raises.&quot;&quot;&quot;
+    record = train_reference(settings, root=root)
+    assert isinstance(record, RunRecord)
+    assert record.status == &quot;complete&quot;
+    assert record.settings == settings
+    assert record.path.parent == root
+    steps = [point.step for point in record.curve]
+    assert steps[0] == 0
+    assert all(a &lt; b for a, b in itertools.pairwise(steps))
+    assert set(record.checkpoints) == {SOLO}
+    with pytest.raises(ValueError, match=r&quot;\S&quot;):  # any explanation
+        train_reference(refused, root=root)
+    return record
+&quot;&quot;&quot;ReferencePlayer: a saved Stable-Baselines3 DQN plays as a core.Agent, greedily (REF-01).&quot;&quot;&quot;
+
+from pathlib import Path
+from typing import Any
+
+import gymnasium as gym
+import numpy as np
+import pytest
+import torch
+from stable_baselines3 import DQN
+
+from rllab.core import Transition
+from rllab.reference import ReferencePlayer
+
+OBS_SIZE = 11
+N_ACTIONS = 3
+
+
+class _CompactSnakeShape(gym.Env[np.ndarray, np.int64]):
+    &quot;&quot;&quot;Only the spaces of Snake&#x27;s compact view: enough to build and save a DQN.&quot;&quot;&quot;
+
+    observation_space = gym.spaces.Box(0.0, 1.0, shape=(OBS_SIZE,), dtype=np.float32)
+    action_space = gym.spaces.Discrete(N_ACTIONS)
+
+    def reset(
+        self, *, seed: int | None = None, options: dict[str, Any] | None = None
+    ) -&gt; tuple[np.ndarray, dict[str, Any]]:
+        super().reset(seed=seed)
+        return np.zeros(OBS_SIZE, dtype=np.float32), {}
+
+    def step(self, action: np.int64) -&gt; tuple[np.ndarray, float, bool, bool, dict[str, Any]]:
+        return np.zeros(OBS_SIZE, dtype=np.float32), 0.0, True, False, {}
+
+
+@pytest.fixture
+def checkpoint(tmp_path: Path) -&gt; Path:
+    model = DQN(&quot;MlpPolicy&quot;, _CompactSnakeShape(), seed=0, device=&quot;cpu&quot;)
+    path = tmp_path / &quot;reference.zip&quot;
+    model.save(path)
+    return path
+
+
+def _observations() -&gt; np.ndarray:
+    rng = np.random.default_rng(0)
+    return rng.random((20, 1, OBS_SIZE), dtype=np.float32)
+
+
+def _q_argmax(model: DQN, obs: np.ndarray) -&gt; int:
+    with torch.no_grad():
+        q = model.q_net(torch.as_tensor(obs))
+    return int(q.argmax(dim=1).item())
+
+
+def test_reference_player_acts_greedily_on_the_saved_model(checkpoint: Path) -&gt; None:
+    player = ReferencePlayer(checkpoint)
+    saved = DQN.load(checkpoint, device=&quot;cpu&quot;)
+    for obs in _observations():
+        action = player.act(obs, explore=True)
+        assert action.shape == (1,)
+        assert action.dtype == np.int64
+        assert int(action[0]) == _q_argmax(saved, obs)
+
+
+def test_reference_player_ignores_explore(checkpoint: Path) -&gt; None:
+    player = ReferencePlayer(checkpoint)
+    for obs in _observations():
+        np.testing.assert_array_equal(player.act(obs, explore=True), player.act(obs, explore=False))
+
+
+def test_reference_player_learn_changes_nothing(checkpoint: Path) -&gt; None:
+    player = ReferencePlayer(checkpoint)
+    obs = _observations()[0]
+    before = player.act(obs, explore=False)
+    weights = [p.detach().clone() for p in player.model.q_net.parameters()]
+    transition = Transition(
+        obs=obs,
+        actions=before,
+        reward=np.array([1.0], dtype=np.float32),
+        next_obs=obs,
+        terminated=np.array([True]),
+        active=np.array([True]),
+        truncated=False,
+    )
+    player.learn(transition)
+    after = list(player.model.q_net.parameters())
+    assert all(torch.equal(a, b) for a, b in zip(weights, after, strict=True))
+    np.testing.assert_array_equal(player.act(obs, explore=False), before)
+
+
+def test_reference_player_save_then_load_keeps_its_actions(
+    checkpoint: Path, tmp_path: Path
+) -&gt; None:
+    player = ReferencePlayer(checkpoint)
+    observations = _observations()
+    before = [player.act(obs, explore=False) for obs in observations]
+    copy = tmp_path / &quot;copy.zip&quot;
+    player.save(copy)
+    other = ReferencePlayer(checkpoint)
+    with torch.no_grad():
+        for parameter in other.model.q_net.parameters():
+            parameter.add_(1.0)
+    other.load(copy)
+    after = [other.act(obs, explore=False) for obs in observations]
+    for a, b in zip(before, after, strict=True):
+        np.testing.assert_array_equal(a, b)
+    weights = zip(player.model.q_net.parameters(), other.model.q_net.parameters(), strict=True)
+    assert all(torch.equal(a, b) for a, b in weights)
+&quot;&quot;&quot;Snake on a square grid, one agent, compact or grid view (SNAKE-01 to SNAKE-09).&quot;&quot;&quot;
+
+from collections.abc import Mapping, Sequence
+from itertools import pairwise
+from typing import Literal
+
+import numpy as np
+
+from rllab.core import SOLO, ActionSpace, Env, Rewards, StepResult, TeamSpec
+
+_DEFAULT_REWARDS = Rewards()
+_HEADINGS = (&quot;up&quot;, &quot;right&quot;, &quot;down&quot;, &quot;left&quot;)
+&quot;&quot;&quot;Clockwise, so a left turn is one index back and a right turn one index on.&quot;&quot;&quot;
+_MOVES = ((-1, 0), (0, 1), (1, 0), (0, -1))
+_TURNS = (0, -1, 1)
+&quot;&quot;&quot;Heading change per action: 0 straight, 1 turn left, 2 turn right.&quot;&quot;&quot;
+_STARVE_PER_CELL = 100
+&quot;&quot;&quot;The game is cut short after this many steps without food per cell of length (SNAKE-05).&quot;&quot;&quot;
+_EMPTY, _HEAD, _BODY, _FOOD = 0, 1, 2, 3
+
+Cell = tuple[int, int]
+
+
+class Snake(Env):
+    &quot;&quot;&quot;One team, `SOLO`, of one snake; actions 0 straight, 1 turn left, 2 turn right.&quot;&quot;&quot;
+
+    teams: Mapping[str, TeamSpec]
+    board: Literal[&quot;grid&quot;]
+
+    def __init__(
+        self,
+        *,
+        view: Literal[&quot;compact&quot;, &quot;grid&quot;],
+        rewards: Rewards = _DEFAULT_REWARDS,
+        size: int = 10,
+    ) -&gt; None:
+        obs_shape = (11,) if view == &quot;compact&quot; else (3, size, size)
+        self.teams = {SOLO: TeamSpec(1, obs_shape, ActionSpace(&quot;discrete&quot;, n=3))}
+        self.board = &quot;grid&quot;
+        self._view = view
+        self._rewards = rewards
+        self._size = size
+        self._rng = np.random.default_rng(0)
+        self._body: list[Cell] = []
+        self._heading = 1
+        self._food: Cell | None = None
+        self._steps = 0
+        self._hungry = 0
+        self._score = 0
+        self._over = True
+
+    def reset(self, seed: int) -&gt; tuple[dict[str, np.ndarray], dict[str, float]]:
+        &quot;&quot;&quot;A length-3 snake in the middle heading right, food on a seeded free cell.&quot;&quot;&quot;
+        self._rng = np.random.default_rng(seed)
+        row, col = self._size // 2, self._size // 2
+        self._start([(row, col), (row, col - 1), (row, col - 2)], heading=1)
+        self._food = self._place_food()
+        return {SOLO: self._observe()}, self._info()
+
+    def reset_to(
+        self,
+        body: Sequence[tuple[int, int]],
+        heading: Literal[&quot;up&quot;, &quot;right&quot;, &quot;down&quot;, &quot;left&quot;],
+        food: tuple[int, int],
+    ) -&gt; tuple[np.ndarray, dict[str, int]]:
+        &quot;&quot;&quot;Start a game from a given board: cells `(row, col)`, body head first.&quot;&quot;&quot;
+        cells = [(int(r), int(c)) for r, c in body]
+        food_cell = (int(food[0]), int(food[1]))
+        self._check_board(cells, food_cell)
+        self._start(cells, heading=_HEADINGS.index(heading))
+        self._food = food_cell
+        return self._observe(), {&quot;steps&quot;: 0, f&quot;score:{SOLO}&quot;: 0, &quot;score&quot;: 0}
+
+    def step(self, actions: Mapping[str, np.ndarray]) -&gt; StepResult:
+        if self._over:
+            raise RuntimeError(&quot;step called while no game is running&quot;)
+        action = self._check_action(actions)
+        self._steps += 1
+        self._heading = (self._heading + _TURNS[action]) % 4
+        head = _ahead(self._body[0], self._heading)
+6:  &quot;tank_reference&quot;: {&quot;name&quot;: &quot;tank-reference&quot;, &quot;env&quot;: &quot;tank&quot;, &quot;view&quot;: &quot;full&quot;, &quot;agent&quot;: &quot;reference&quot;, &quot;n_agents&quot;: 1, &quot;opponents&quot;: {}, &quot;self_play&quot;: &quot;none&quot;, &quot;pool_latest&quot;: 0.5, &quot;generations&quot;: 0, &quot;ablation&quot;: &quot;none&quot;, &quot;rewards&quot;: {&quot;food&quot;: 0.0, &quot;death&quot;: 0.0, &quot;step&quot;: 1.0}, &quot;exploration&quot;: {&quot;start&quot;: 1.0, &quot;end&quot;: 0.05, &quot;decay_steps&quot;: 50000}, &quot;params&quot;: {&quot;lr&quot;: 0.0003, &quot;gamma&quot;: 0.99, &quot;batch_size&quot;: 64, &quot;memory_size&quot;: 50000, &quot;target_every&quot;: 1000, &quot;learn_start&quot;: 1000, &quot;hidden&quot;: 64, &quot;net&quot;: &quot;mlp&quot;, &quot;rollout_steps&quot;: 2048, &quot;epochs&quot;: 10, &quot;clip&quot;: 0.2, &quot;gae_lambda&quot;: 0.95, &quot;games_per_update&quot;: 10}, &quot;steps&quot;: 1000000, &quot;seed&quot;: 0, &quot;eval_every&quot;: 50000, &quot;eval_games&quot;: 20},
+7-  &quot;predprey_rung1&quot;: {&quot;name&quot;: &quot;predprey-rung1&quot;, &quot;env&quot;: &quot;predprey&quot;, &quot;view&quot;: &quot;limited&quot;, &quot;agent&quot;: &quot;ppo&quot;, &quot;n_agents&quot;: 1, &quot;opponents&quot;: {&quot;predator&quot;: &quot;scripted&quot;, &quot;prey&quot;: &quot;learn&quot;}, &quot;self_play&quot;: &quot;none&quot;, &quot;pool_latest&quot;: 0.5, &quot;generations&quot;: 10, &quot;ablation&quot;: &quot;none&quot;, &quot;rewards&quot;: {&quot;food&quot;: 1.0, &quot;death&quot;: -5.0, &quot;step&quot;: 0.0}, &quot;exploration&quot;: {&quot;start&quot;: 1.0, &quot;end&quot;: 0.05, &quot;decay_steps&quot;: 50000}, &quot;params&quot;: {&quot;lr&quot;: 0.0003, &quot;gamma&quot;: 0.99, &quot;batch_size&quot;: 64, &quot;memory_size&quot;: 50000, &quot;target_every&quot;: 1000, &quot;learn_start&quot;: 1000, &quot;hidden&quot;: 64, &quot;net&quot;: &quot;mlp&quot;, &quot;rollout_steps&quot;: 2048, &quot;epochs&quot;: 10, &quot;clip&quot;: 0.2, &quot;gae_lambda&quot;: 0.95, &quot;games_per_update&quot;: 10}, &quot;steps&quot;: 2000000, &quot;seed&quot;: 0, &quot;eval_every&quot;: 100000, &quot;eval_games&quot;: 20},
+8-  &quot;predprey_rung3&quot;: {&quot;name&quot;: &quot;predprey-rung3&quot;, &quot;env&quot;: &quot;predprey&quot;, &quot;view&quot;: &quot;limited&quot;, &quot;agent&quot;: &quot;ppo&quot;, &quot;n_agents&quot;: 1, &quot;opponents&quot;: {&quot;predator&quot;: &quot;learn&quot;, &quot;prey&quot;: &quot;learn&quot;}, &quot;self_play&quot;: &quot;pool&quot;, &quot;pool_latest&quot;: 0.5, &quot;generations&quot;: 10, &quot;ablation&quot;: &quot;none&quot;, &quot;rewards&quot;: {&quot;food&quot;: 1.0, &quot;death&quot;: -5.0, &quot;step&quot;: 0.0}, &quot;exploration&quot;: {&quot;start&quot;: 1.0, &quot;end&quot;: 0.05, &quot;decay_steps&quot;: 50000}, &quot;params&quot;: {&quot;lr&quot;: 0.0003, &quot;gamma&quot;: 0.99, &quot;batch_size&quot;: 64, &quot;memory_size&quot;: 50000, &quot;target_every&quot;: 1000, &quot;learn_start&quot;: 1000, &quot;hidden&quot;: 64, &quot;net&quot;: &quot;mlp&quot;, &quot;rollout_steps&quot;: 2048, &quot;epochs&quot;: 10, &quot;clip&quot;: 0.2, &quot;gae_lambda&quot;: 0.95, &quot;games_per_update&quot;: 10}, &quot;steps&quot;: 2000000, &quot;seed&quot;: 0, &quot;eval_every&quot;: 100000, &quot;eval_games&quot;: 20}
+9-}</pre></details></div><div class="step" id="S9"><span class="sid">U38.S9</span><span class="kind">Bash</span>cat src/rllab/envs/types.py src/rllab/agents/dqn/networks.py; grep -n &quot;_observe&quot; -A25 src/rllab/envs/snake.py | sed -n 1,60p; cat tests/contracts/reference.train_reference/samples.json | head -c 1500; cat tests/unit/rllab/test_train_loop.py | head -60<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;cat src/rllab/envs/types.py src/rllab/agents/dqn/networks.py; grep -n \&quot;_observe\&quot; -A25 src/rllab/envs/snake.py | sed -n 1,60p; cat tests/contracts/reference.train_reference/samples.json | head -c 1500; cat tests/unit/rllab/test_train_loop.py | head -60&quot;,
+  &quot;description&quot;: &quot;Show obs layout, networks, samples, loop test&quot;
+}</pre><div class="lbl">output</div><pre>&quot;&quot;&quot;Observation layouts shared with the players that read them.&quot;&quot;&quot;
+
+COMPACT_FIELDS: tuple[str, ...] = (
+    &quot;danger_straight&quot;,
+    &quot;danger_left&quot;,
+    &quot;danger_right&quot;,
+    &quot;head_up&quot;,
+    &quot;head_right&quot;,
+    &quot;head_down&quot;,
+    &quot;head_left&quot;,
+    &quot;food_left&quot;,
+    &quot;food_right&quot;,
+    &quot;food_up&quot;,
+    &quot;food_down&quot;,
+)
+&quot;&quot;&quot;Index `i` of a compact Snake observation is field `i`; every value is 0.0 or 1.0.&quot;&quot;&quot;
+&quot;&quot;&quot;The value networks: one output per action from a flattened observation (AD-05).&quot;&quot;&quot;
+
+import math
+
+from torch import nn
+
+from rllab.core import AgentParams
+
+
+def build_net(obs_shape: tuple[int, ...], n_actions: int, params: AgentParams) -&gt; nn.Module:
+    &quot;&quot;&quot;Two hidden ReLU layers of `params.hidden` units over the flattened observation.
+
+    AD-05&#x27;s MLP; until the convolutional network lands it also serves `net=&quot;cnn&quot;`,
+    as AD-05&#x27;s named fallback (an MLP on the flattened grid).
+    &quot;&quot;&quot;
+    return nn.Sequential(
+        nn.Flatten(),
+        nn.Linear(math.prod(obs_shape), params.hidden),
+        nn.ReLU(),
+        nn.Linear(params.hidden, params.hidden),
+        nn.ReLU(),
+        nn.Linear(params.hidden, n_actions),
+    )
+58:        return {SOLO: self._observe()}, self._info()
+59-
+60-    def reset_to(
+61-        self,
+62-        body: Sequence[tuple[int, int]],
+63-        heading: Literal[&quot;up&quot;, &quot;right&quot;, &quot;down&quot;, &quot;left&quot;],
+64-        food: tuple[int, int],
+65-    ) -&gt; tuple[np.ndarray, dict[str, int]]:
+66-        &quot;&quot;&quot;Start a game from a given board: cells `(row, col)`, body head first.&quot;&quot;&quot;
+67-        cells = [(int(r), int(c)) for r, c in body]
+68-        food_cell = (int(food[0]), int(food[1]))
+69-        self._check_board(cells, food_cell)
+70-        self._start(cells, heading=_HEADINGS.index(heading))
+71-        self._food = food_cell
+72:        return self._observe(), {&quot;steps&quot;: 0, f&quot;score:{SOLO}&quot;: 0, &quot;score&quot;: 0}
+73-
+74-    def step(self, actions: Mapping[str, np.ndarray]) -&gt; StepResult:
+75-        if self._over:
+76-            raise RuntimeError(&quot;step called while no game is running&quot;)
+77-        action = self._check_action(actions)
+78-        self._steps += 1
+79-        self._heading = (self._heading + _TURNS[action]) % 4
+80-        head = _ahead(self._body[0], self._heading)
+81-        terminated, truncated, reward = self._move(head)
+82-        self._over = terminated or truncated
+83-        return StepResult(
+84:            obs={SOLO: self._observe()},
+85-            reward={SOLO: np.array([reward], dtype=np.float32)},
+86-            done={SOLO: np.array([terminated], dtype=np.bool_)},
+87-            terminated=terminated,
+88-            truncated=truncated,
+89-            info=self._info(),
+90-        )
+91-
+92-    def frame(self) -&gt; np.ndarray:
+93-        grid = np.full((self._size, self._size), _EMPTY, dtype=np.int8)
+94-        if self._food is not None:
+95-            grid[self._food] = _FOOD
+96-        for cell in self._body[1:]:
+97-            grid[cell] = _BODY
+98-        if self._body:
+99-            grid[self._body[0]] = _HEAD
+100-        return grid
+101-
+102-    def _start(self, body: list[Cell], *, heading: int) -&gt; None:
+103-        self._body = body
+104-        self._heading = heading
+105-        self._steps = 0
+106-        self._hungry = 0
+107-        self._score = 0
+108-        self._over = False
+109-
+--
+138:    def _observe(self) -&gt; np.ndarray:
+139-        &quot;&quot;&quot;The snake&#x27;s observation, batch-first over its one agent.&quot;&quot;&quot;
+140-        if self._view == &quot;compact&quot;:
+141-            return self._compact()[np.newaxis]
+142-        grid = self.frame()
+143-        channels = np.stack([grid == _HEAD, grid == _BODY, grid == _FOOD])
+144-        return channels.astype(np.float32)[np.newaxis]
+{
+  &quot;reference_complete_3&quot;: {&quot;path&quot;: &quot;runs/reference-compact-s0-20261019T130000&quot;, &quot;settings&quot;: {&quot;name&quot;: &quot;reference-compact&quot;, &quot;env&quot;: &quot;snake&quot;, &quot;view&quot;: &quot;compact&quot;, &quot;agent&quot;: &quot;reference&quot;, &quot;n_agents&quot;: 1, &quot;opponents&quot;: {}, &quot;self_play&quot;: &quot;none&quot;, &quot;pool_latest&quot;: 0.5, &quot;generations&quot;: 0, &quot;ablation&quot;: &quot;none&quot;, &quot;rewards&quot;: {&quot;food&quot;: 1.0, &quot;death&quot;: -1.0, &quot;step&quot;: 0.0}, &quot;exploration&quot;: {&quot;start&quot;: 1.0, &quot;end&quot;: 0.05, &quot;decay_steps&quot;: 50000}, &quot;params&quot;: {&quot;lr&quot;: 0.001, &quot;gamma&quot;: 0.99, &quot;batch_size&quot;: 64, &quot;memory_size&quot;: 50000, &quot;target_every&quot;: 1000, &quot;learn_start&quot;: 1000, &quot;hidden&quot;: 128, &quot;net&quot;: &quot;mlp&quot;, &quot;rollout_steps&quot;: 2048, &quot;epochs&quot;: 10, &quot;clip&quot;: 0.2, &quot;gae_lambda&quot;: 0.95, &quot;games_per_update&quot;: 10}, &quot;steps&quot;: 300000, &quot;seed&quot;: 0, &quot;eval_every&quot;: 10000, &quot;eval_games&quot;: 50}, &quot;curve&quot;: [{&quot;step&quot;: 0, &quot;games&quot;: 0, &quot;mean_score&quot;: 0.2, &quot;elapsed_s&quot;: 1.1}, {&quot;step&quot;: 10000, &quot;games&quot;: 171, &quot;mean_score&quot;: 2.4, &quot;elapsed_s&quot;: 240.0}, {&quot;step&quot;: 20000, &quot;games&quot;: 322, &quot;mean_score&quot;: 5.8, &quot;elapsed_s&quot;: 470.2}], &quot;status&quot;: &quot;complete&quot;, &quot;checkpoints&quot;: {&quot;agents&quot;: &quot;runs/reference-compact-s0-20261019T130000/checkpoint.zip&quot;}, &quot;generations&quot;: {}, &quot;games&quot;: [{&quot;seed&quot;: 1000000, &quot;board&quot;: &quot;grid&quot;, &quot;frames&quot;: {&quot;dtype&quot;: &quot;int8&quot;, &quot;shape&quot;: [21, 10, 10], &quot;data&quot;: [[[0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 3, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 2, 2, 1, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], [[0, 0&quot;&quot;&quot;train.train on the core.Env and core.Agent replay doubles, with run writer and evaluate fakes.&quot;&quot;&quot;
+
+import importlib.util
+import itertools
+import sys
+from dataclasses import replace
+from pathlib import Path
+from types import ModuleType
+
+import numpy as np
+import pytest
+
+from rllab.core import SOLO, ActionSpace, RunSettings, StepResult, TeamSpec
+from rllab.evaluate import EvalSpec, ScoreSet
+from rllab.runs import GameRecording, RunRecord
+from rllab.train import loop
+
+STEPS = 20
+EVAL_EVERY = 5
+
+
+def _codec() -&gt; ModuleType:
+    name = &quot;contracts_codec&quot;
+    if name not in sys.modules:
+        path = Path(__file__).parents[2] / &quot;contracts&quot; / &quot;codec.py&quot;
+        spec = importlib.util.spec_from_file_location(name, path)
+        assert spec is not None
+        assert spec.loader is not None
+        sys.modules[name] = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(sys.modules[name])
+    return sys.modules[name]
+
+
+codec = _codec()
+envs = codec.fake(&quot;core.Env&quot;)
+agents_fake = codec.fake(&quot;core.Agent&quot;)
+
+
+class Doubles:
+    &quot;&quot;&quot;The writer and evaluate fakes patched into the loop, keeping what they were given.&quot;&quot;&quot;
+
+    def __init__(self, monkeypatch: pytest.MonkeyPatch) -&gt; None:
+        raw = codec.samples(&quot;evaluate.evaluate&quot;)[&quot;scripted_seed0&quot;]
+        self.sample_scores = codec.build(ScoreSet, raw[&quot;scores&quot;]).scores
+        fake_evaluate = codec.fake(&quot;evaluate.evaluate&quot;).make_evaluate(
+            codec.build(ScoreSet, raw[&quot;scores&quot;]), codec.build(GameRecording, raw[&quot;game&quot;])
+        )
+        self.specs: list[EvalSpec] = []
+        self.writers: list[object] = []
+
+        def evaluate(make_env, agents, spec):
+            self.specs.append(spec)
+            return fake_evaluate(make_env, agents, spec)
+
+        def create_run(settings, *, root):
+            writer = codec.fake(&quot;runs.create_run&quot;).create_run(settings, root=root)
+            self.writers.append(writer)
+            return writer
+
+        monkeypatch.setattr(loop, &quot;evaluate&quot;, evaluate)</pre></details></div><div class="step" id="S10"><span class="sid">U38.S10</span><span class="kind">Bash</span>cat tests/contracts/core.Env/fake.py tests/contracts/evaluate.evaluate/fake.py; sed -n 60,140p tests/unit/rllab/test_train_loop.py<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;cat tests/contracts/core.Env/fake.py tests/contracts/evaluate.evaluate/fake.py; sed -n 60,140p tests/unit/rllab/test_train_loop.py&quot;,
+  &quot;description&quot;: &quot;Show Env and evaluate fakes, rest of loop test&quot;
+}</pre><div class="lbl">output</div><pre>&quot;&quot;&quot;core.Env: a replay double serving a recorded game, and the check any Env must pass.
+
+`check_env(env, actions, seed=...)` takes the provider, so the real environments run the
+same check as the double.
+&quot;&quot;&quot;
+
+from collections.abc import Mapping, Sequence
+from dataclasses import dataclass
+from typing import Literal
+
+import numpy as np
+import pytest
+
+from rllab.core import Env, StepResult, TeamSpec
+
+GRID_CODES = {0, 1, 2, 3}  # empty, head, body, food or goal
+
+
+@dataclass(frozen=True)
+class EnvRecording:
+    &quot;&quot;&quot;One recorded game: its teams, the reset, then each step&#x27;s actions, result and frame.&quot;&quot;&quot;
+
+    teams: dict[str, TeamSpec]
+    board: Literal[&quot;grid&quot;, &quot;tank&quot;]
+    seed: int
+    obs: dict[str, np.ndarray]
+    info: dict[str, float]
+    start_frame: np.ndarray
+    actions: tuple[dict[str, np.ndarray], ...]
+    results: tuple[StepResult, ...]
+    frames: tuple[np.ndarray, ...]
+
+
+class ReplayEnv(Env):
+    &quot;&quot;&quot;Serves a recording: `reset` rewinds to its start, `step` returns the next result.
+
+    `step` validates the actions as the contract says (`ValueError`) and raises `RuntimeError`
+    once the recorded game is over or before the first `reset`.
+    &quot;&quot;&quot;
+
+    def __init__(self, recording: EnvRecording) -&gt; None:
+        self.teams = recording.teams
+        self.board = recording.board
+        self.recording = recording
+        self._t = -1
+
+    def reset(self, seed: int) -&gt; tuple[dict[str, np.ndarray], dict[str, float]]:
+        self._t = 0
+        return {k: v.copy() for k, v in self.recording.obs.items()}, dict(self.recording.info)
+
+    def step(self, actions: Mapping[str, np.ndarray]) -&gt; StepResult:
+        if not 0 &lt;= self._t &lt; len(self.recording.results):
+            raise RuntimeError(&quot;step called while no game is running&quot;)
+        check_actions(self.teams, actions)
+        result = self.recording.results[self._t]
+        self._t += 1
+        return result
+
+    def frame(self) -&gt; np.ndarray:
+        if self._t &lt;= 0:
+            return self.recording.start_frame.copy()
+        return self.recording.frames[self._t - 1].copy()
+
+
+def check_actions(teams: Mapping[str, TeamSpec], actions: Mapping[str, np.ndarray]) -&gt; None:
+    &quot;&quot;&quot;`ValueError` for a missing team, a wrong shape, an out-of-range or non-finite action.&quot;&quot;&quot;
+    for team, spec in teams.items():
+        if team not in actions:
+            raise ValueError(f&quot;no actions for team {team!r}&quot;)
+        action = np.asarray(actions[team])
+        space = spec.actions
+        shape = (spec.n_agents,) if space.kind == &quot;discrete&quot; else (spec.n_agents, space.dim)
+        if action.shape != shape:
+            raise ValueError(f&quot;team {team!r}: actions shaped {action.shape}, expected {shape}&quot;)
+        if not np.all(np.isfinite(action)):
+            raise ValueError(f&quot;team {team!r}: non-finite action&quot;)
+        if space.kind == &quot;discrete&quot; and not np.all((action &gt;= 0) &amp; (action &lt; space.n)):
+            raise ValueError(f&quot;team {team!r}: action outside 0..{space.n - 1}&quot;)
+
+
+def check_env(env: Env, actions: Sequence[Mapping[str, np.ndarray]], *, seed: int) -&gt; None:
+    &quot;&quot;&quot;The core.Env contract on one game: shapes, dtypes, info keys, frames and errors.&quot;&quot;&quot;
+    obs, info = env.reset(seed)
+    _assert_obs(env.teams, obs)
+    _assert_info(env.teams, info)
+    _assert_frame(env.board, env.frame())
+    over = False
+    for step_actions in actions:
+        result = env.step(step_actions)
+        _assert_result(env.teams, result)
+        _assert_frame(env.board, env.frame())
+        over = result.terminated or result.truncated
+        if over:
+            break
+    if over:
+        with pytest.raises(RuntimeError):
+            env.step(actions[-1])
+    env.reset(seed)
+    with pytest.raises(ValueError, match=&quot;team&quot;):
+        env.step({})
+
+
+def _assert_obs(teams: Mapping[str, TeamSpec], obs: Mapping[str, np.ndarray]) -&gt; None:
+    assert set(obs) == set(teams)
+    for team, spec in teams.items():
+        assert obs[team].dtype == np.float32
+        assert obs[team].shape == (spec.n_agents, *spec.obs_shape)
+
+
+def _assert_info(teams: Mapping[str, TeamSpec], info: Mapping[str, float]) -&gt; None:
+    expected = {&quot;steps&quot;, &quot;score&quot;, *(f&quot;score:{team}&quot; for team in teams)}
+    assert expected &lt;= set(info)
+    assert info[&quot;score&quot;] == info[f&quot;score:{next(iter(teams))}&quot;]
+
+
+def _assert_result(teams: Mapping[str, TeamSpec], result: StepResult) -&gt; None:
+    assert isinstance(result, StepResult)
+    _assert_obs(teams, result.obs)
+    _assert_info(teams, result.info)
+    assert not (result.terminated and result.truncated)
+    for team, spec in teams.items():
+        assert result.reward[team].dtype == np.float32
+        assert result.reward[team].shape == (spec.n_agents,)
+        assert result.done[team].dtype == np.bool_
+        assert result.done[team].shape == (spec.n_agents,)
+
+
+def _assert_frame(board: str, frame: np.ndarray) -&gt; None:
+    assert frame.ndim == 2
+    if board == &quot;grid&quot;:
+        assert frame.dtype == np.int8
+        assert set(np.unique(frame).tolist()) &lt;= GRID_CODES
+    else:
+        assert frame.dtype == np.float32
+        assert frame.shape[1] == 4
+&quot;&quot;&quot;evaluate.evaluate: a fake serving the scripted-player ScoreSet, and the provider check.
+
+The fake echoes the sample&#x27;s scores (repeated to `n_games`) under the spec&#x27;s player and seed,
+with `record` copies of the given recording. It never touches the env or the agents.
+`check_evaluate` takes the provider.
+&quot;&quot;&quot;
+
+from collections.abc import Callable, Mapping
+
+import numpy as np
+
+from rllab.core import Agent, Env
+from rllab.evaluate import EvalSpec, ScoreSet
+from rllab.runs import GameRecording
+
+Evaluate = Callable[[Callable[[], Env], Mapping[str, Agent], EvalSpec], ScoreSet]
+
+
+def make_evaluate(scores: ScoreSet, game: GameRecording) -&gt; Evaluate:
+    &quot;&quot;&quot;An `evaluate` returning `scores`&#x27; values and `game` recordings.&quot;&quot;&quot;
+
+    def evaluate(
+        make_env: Callable[[], Env], agents: Mapping[str, Agent], spec: EvalSpec
+    ) -&gt; ScoreSet:
+        return ScoreSet(
+            player=spec.player,
+            train_seed=spec.train_seed,
+            scores=np.resize(scores.scores, spec.n_games),
+            games=(game,) * spec.record,
+        )
+
+    return evaluate
+
+
+def check_evaluate(
+    evaluate: Evaluate,
+    make_env: Callable[[], Env],
+    agents: Mapping[str, Agent],
+    spec: EvalSpec,
+) -&gt; ScoreSet:
+    &quot;&quot;&quot;One float score per game under the spec&#x27;s player and seed, and `record` games.&quot;&quot;&quot;
+    result = evaluate(make_env, agents, spec)
+    assert isinstance(result, ScoreSet)
+    assert result.player == spec.player
+    assert result.train_seed == spec.train_seed
+    assert result.scores.shape == (spec.n_games,)
+    assert np.issubdtype(result.scores.dtype, np.floating)
+    assert len(result.games) == spec.record
+    assert all(isinstance(game, GameRecording) for game in result.games)
+    return result
+        monkeypatch.setattr(loop, &quot;evaluate&quot;, evaluate)
+        monkeypatch.setattr(loop, &quot;create_run&quot;, create_run)
+
+
+def _corridor_settings(**changes) -&gt; RunSettings:
+    record = codec.sample(&quot;train.train&quot;, &quot;corridor_complete_3&quot;, RunRecord)
+    return replace(record.settings, **{&quot;steps&quot;: STEPS, &quot;eval_every&quot;: EVAL_EVERY, **changes})
+
+
+def _corridor():
+    recording = codec.sample(&quot;envs.Corridor&quot;, &quot;goal_9&quot;, envs.EnvRecording)
+    agent = agents_fake.ReplayAgent(
+        codec.sample(&quot;agents.TabularAgent&quot;, &quot;corridor_5&quot;, agents_fake.AgentRecording)
+    )
+    return recording, agent
+
+
+def test_single_team_run_learns_every_step_and_finishes_complete(monkeypatch, tmp_path):
+    Doubles(monkeypatch)
+    recording, agent = _corridor()
+    settings = _corridor_settings()
+
+    record = loop.train(lambda: envs.ReplayEnv(recording), {SOLO: agent}, settings, root=tmp_path)
+
+    assert record.status == &quot;complete&quot;
+    assert record.path.parent == tmp_path
+    assert len(agent.learned) == STEPS
+    first = agent.learned[0]
+    assert first.obs.shape == (1, 10)
+    np.testing.assert_array_equal(first.next_obs, recording.results[0].obs[SOLO])
+    np.testing.assert_array_equal(first.actions, np.array([1]))
+    np.testing.assert_array_equal(first.active, np.array([True]))
+    # the goal is reached on the 9th step of each 9-step game, then a new game starts
+    assert [bool(t.terminated[0]) for t in agent.learned[:10]] == [False] * 8 + [True, False]
+    np.testing.assert_array_equal(agent.learned[9].obs, recording.obs[SOLO])
+    assert all(explore for _, explore in agent.observed)
+
+
+def test_curve_has_a_point_at_step_zero_every_eval_every_and_the_end(monkeypatch, tmp_path):
+    doubles = Doubles(monkeypatch)
+    recording, agent = _corridor()
+    settings = _corridor_settings()
+
+    record = loop.train(lambda: envs.ReplayEnv(recording), {SOLO: agent}, settings, root=tmp_path)
+
+    assert [p.step for p in record.curve] == [0, 5, 10, 15, 20]
+    assert [p.games for p in record.curve] == [0, 0, 1, 1, 2]
+    expected_mean = float(np.mean(np.resize(doubles.sample_scores, settings.eval_games)))
+    assert record.curve[0].mean_score == pytest.approx(expected_mean)
+    curve_specs = doubles.specs[: len(record.curve)]
+    assert {(s.player, s.train_seed, s.team, s.n_games, s.record) for s in curve_specs} == {
+        (settings.name, settings.seed, SOLO, settings.eval_games, 0)
+    }
+
+
+def test_saves_a_checkpoint_and_five_recorded_games(monkeypatch, tmp_path):
+    Doubles(monkeypatch)
+    recording, agent = _corridor()
+
+    record = loop.train(
+        lambda: envs.ReplayEnv(recording), {SOLO: agent}, _corridor_settings(), root=tmp_path
+    )
+
+    assert set(record.checkpoints) == {SOLO}
+    assert record.checkpoints[SOLO].is_file()
+    assert len(record.games) == 5
+
+
+def test_passes_the_train_contract_check(monkeypatch, tmp_path):
+    Doubles(monkeypatch)
+    recording, agent = _corridor()
+    settings = _corridor_settings()
+    check = codec.fake(&quot;train.train&quot;).check_train
+    record = check(loop.train, lambda: envs.ReplayEnv(recording), {SOLO: agent}, settings, tmp_path)
+    assert record.settings == settings
+
+
+def test_prints_a_progress_line_once_30_seconds_pass(monkeypatch, tmp_path, capsys):
+    Doubles(monkeypatch)
+    clock = itertools.count(0.0, 31.0)
+    monkeypatch.setattr(loop, &quot;monotonic&quot;, lambda: next(clock))</pre></details></div><div class="step" id="S11"><span class="sid">U38.S11</span><span class="kind">Bash</span>uv run python -c &quot;import stable_baselines3, gymnasium; print(stable_baselines3.__version__, gymnasium.__version__)&quot;<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;uv run python -c \&quot;import stable_baselines3, gymnasium; print(stable_baselines3.__version__, gymnasium.__version__)\&quot;&quot;,
+  &quot;description&quot;: &quot;Check SB3 and gymnasium versions&quot;
+}</pre><div class="lbl">output</div><pre>Using CPython 3.12.12 interpreter at: /opt/homebrew/opt/python@3.12/bin/python3.12
+Creating virtual environment at: .venv
+   Building rllab @ file:///Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/project/.claude/worktrees/agent-a8fdb8a11ccbc18f5
+      Built rllab @ file:///Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/project/.claude/worktrees/agent-a8fdb8a11ccbc18f5
+Installed 78 packages in 341ms
+2.9.0 1.4.0</pre></details></div><div class="step" id="S12"><span class="sid">U38.S12</span><span class="kind">Write</span>/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/project/.claude/worktrees/agent-a8fdb8a11ccbc18f5/src/rllab/reference/train/adapter.py (42 lines)<div class="lbl">wrote /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/project/.claude/worktrees/agent-a8fdb8a11ccbc18f5/src/rllab/reference/train/adapter.py</div><pre>&quot;&quot;&quot;The one-learner gymnasium adapter over a single-team `core.Env` (AD-03).&quot;&quot;&quot;
+
+from typing import Any
+
+import gymnasium as gym
+import numpy as np
+
+from rllab.core import SOLO, Env
+
+TRAINING_SEEDS = 1_000_000
+&quot;&quot;&quot;Game seeds stay below every evaluation seed (DATA-01).&quot;&quot;&quot;
+
+
+class SoloAdapter(gym.Env[np.ndarray, np.int64]):
+    &quot;&quot;&quot;The `SOLO` team&#x27;s one agent as a `gymnasium.Env`: unbatched observations, one action.
+
+    Each reset starts a game on the next seed drawn from a generator seeded by the latest
+    `reset(seed=...)`, so the same seed gives the same games.
+    &quot;&quot;&quot;
+
+    def __init__(self, env: Env) -&gt; None:
+        spec = env.teams[SOLO]
+        if spec.n_agents != 1 or spec.actions.kind != &quot;discrete&quot;:
+            raise ValueError(f&quot;the adapter needs one discrete-action agent, got {spec}&quot;)
+        self.env = env
+        self.observation_space = gym.spaces.Box(0.0, 1.0, shape=spec.obs_shape, dtype=np.float32)
+        self.action_space = gym.spaces.Discrete(spec.actions.n)
+        self._games = np.random.default_rng(0)
+
+    def reset(
+        self, *, seed: int | None = None, options: dict[str, Any] | None = None
+    ) -&gt; tuple[np.ndarray, dict[str, Any]]:
+        super().reset(seed=seed)
+        if seed is not None:
+            self._games = np.random.default_rng(seed)
+        obs, info = self.env.reset(int(self._games.integers(TRAINING_SEEDS)))
+        return obs[SOLO][0], dict(info)
+
+    def step(self, action: np.int64) -&gt; tuple[np.ndarray, float, bool, bool, dict[str, Any]]:
+        result = self.env.step({SOLO: np.array([int(action)], dtype=np.int64)})
+        reward = float(result.reward[SOLO][0])
+        return result.obs[SOLO][0], reward, result.terminated, result.truncated, dict(result.info)
+</pre><details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/project/.claude/worktrees/agent-a8fdb8a11ccbc18f5/src/rllab/reference/train/adapter.py&quot;,
+  &quot;content&quot;: &quot;\&quot;\&quot;\&quot;The one-learner gymnasium adapter over a single-team `core.Env` (AD-03).\&quot;\&quot;\&quot;\n\nfrom typing import Any\n\nimport gymnasium as gym\nimport numpy as np\n\nfrom rllab.core import SOLO, Env\n\nTRAINING_SEEDS = 1_000_000\n\&quot;\&quot;\&quot;Game seeds stay below every evaluation seed (DATA-01).\&quot;\&quot;\&quot;\n\n\nclass SoloAdapter(gym.Env[np.ndarray, np.int64]):\n    \&quot;\&quot;\&quot;The `SOLO` team&#x27;s one agent as a `gymnasium.Env`: unbatched observations, one action.\n\n    Each reset starts a game on the next seed drawn from a generator seeded by the latest\n    `reset(seed=...)`, so the same seed gives the same games.\n    \&quot;\&quot;\&quot;\n\n    def __init__(self, env: Env) -&gt; None:\n        spec = env.teams[SOLO]\n        if spec.n_agents != 1 or spec.actions.kind != \&quot;discrete\&quot;:\n            raise ValueError(f\&quot;the adapter needs one discrete-action agent, got {spec}\&quot;)\n        self.env = env\n        self.observation_space = gym.spaces.Box(0.0, 1.0, shape=spec.obs_shape, dtype=np.float32)\n        self.action_space = gym.spaces.Discrete(spec.actions.n)\n        self._games = np.random.default_rng(0)\n\n    def reset(\n        self, *, seed: int | None = None, options: dict[str, Any] | None = None\n    ) -&gt; tuple[np.ndarray, dict[str, Any]]:\n        super().reset(seed=seed)\n        if seed is not None:\n            self._games = np.random.default_rng(seed)\n        obs, info = self.env.reset(int(self._games.integers(TRAINING_SEEDS)))\n        return obs[SOLO][0], dict(info)\n\n    def step(self, action: np.int64) -&gt; tuple[np.ndarray, float, bool, bool, dict[str, Any]]:\n        result = self.env.step({SOLO: np.array([int(action)], dtype=np.int64)})\n        reward = float(result.reward[SOLO][0])\n        return result.obs[SOLO][0], reward, result.terminated, result.truncated, dict(result.info)\n&quot;
+}</pre><div class="lbl">output</div><pre>File created successfully at: /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/project/.claude/worktrees/agent-a8fdb8a11ccbc18f5/src/rllab/reference/train/adapter.py (file state is current in your context — no need to Read it back)</pre></details></div><div class="step" id="S13"><span class="sid">U38.S13</span><span class="kind">Write</span>/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/project/.claude/worktrees/agent-a8fdb8a11ccbc18f5/src/rllab/reference/train/__init__.py (123 lines)<div class="lbl">wrote /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/project/.claude/worktrees/agent-a8fdb8a11ccbc18f5/src/rllab/reference/train/__init__.py</div><pre>&quot;&quot;&quot;The library agent&#x27;s training through the gymnasium adapter (AD-03, AD-04).&quot;&quot;&quot;
+
+from collections.abc import Callable
+from pathlib import Path
+from time import monotonic
+
+import numpy as np
+from stable_baselines3 import DQN
+from stable_baselines3.common.callbacks import BaseCallback
+
+from rllab.core import SOLO, Env, RunSettings
+from rllab.envs import Snake
+from rllab.evaluate import EvalSpec, evaluate
+from rllab.reference.player import ReferencePlayer
+from rllab.reference.train.adapter import SoloAdapter
+from rllab.runs import CurvePoint, GameRecording, RunRecord, RunWriter, create_run
+
+RECORDED_GAMES = 5
+
+
+def train_reference(settings: RunSettings, *, root: Path = Path(&quot;runs&quot;)) -&gt; RunRecord:
+    &quot;&quot;&quot;Train the library agent on the settings&#x27; environment, with the same curve points.&quot;&quot;&quot;
+    make_env = _env_factory(settings)
+    writer = create_run(settings, root=root)
+    model = _build_dqn(settings, SoloAdapter(make_env()))
+    player = _TrainingPlayer(model)
+    try:
+        model.learn(settings.steps, callback=_Curve(make_env, player, settings, writer))
+        writer.save_checkpoint(player)
+        writer.save_games(_recorded_games(make_env, player, settings))
+    except KeyboardInterrupt:
+        writer.finish(&quot;incomplete&quot;)
+        raise
+    return writer.finish(&quot;complete&quot;)
+
+
+def _env_factory(settings: RunSettings) -&gt; Callable[[], Env]:
+    &quot;&quot;&quot;Snake with the compact view: the one reference this milestone trains (AD-04).&quot;&quot;&quot;
+    if settings.agent != &quot;reference&quot;:
+        raise ValueError(f&quot;agent {settings.agent!r}: train_reference needs agent &#x27;reference&#x27;&quot;)
+    if settings.env != &quot;snake&quot; or settings.view != &quot;compact&quot;:
+        raise ValueError(f&quot;the reference cannot train {settings.env}/{settings.view}&quot;)
+    rewards = settings.rewards
+
+    def make_env() -&gt; Env:
+        return Snake(view=&quot;compact&quot;, rewards=rewards)
+
+    return make_env
+
+
+def _build_dqn(settings: RunSettings, env: SoloAdapter) -&gt; DQN:
+    &quot;&quot;&quot;DQN with `MlpPolicy` on the CPU, its settings mapped one-to-one (AD-04).&quot;&quot;&quot;
+    params, exploration = settings.params, settings.exploration
+    return DQN(
+        &quot;MlpPolicy&quot;,
+        env,
+        learning_rate=params.lr,
+        buffer_size=params.memory_size,
+        learning_starts=params.learn_start,
+        batch_size=params.batch_size,
+        gamma=params.gamma,
+        train_freq=1,
+        gradient_steps=1,
+        target_update_interval=params.target_every,
+        exploration_fraction=min(1.0, exploration.decay_steps / settings.steps),
+        exploration_initial_eps=exploration.start,
+        exploration_final_eps=exploration.end,
+        policy_kwargs={&quot;net_arch&quot;: [params.hidden, params.hidden]},
+        seed=settings.seed,
+        device=&quot;cpu&quot;,
+    )
+
+
+class _TrainingPlayer(ReferencePlayer):
+    &quot;&quot;&quot;The model being trained, played greedily as an Agent.&quot;&quot;&quot;
+
+    def __init__(self, model: DQN) -&gt; None:
+        self.model = model
+
+
+class _Curve(BaseCallback):
+    &quot;&quot;&quot;A curve point at step 0, every `eval_every` steps and at the last step.&quot;&quot;&quot;
+
+    def __init__(
+        self,
+        make_env: Callable[[], Env],
+        player: _TrainingPlayer,
+        settings: RunSettings,
+        writer: RunWriter,
+    ) -&gt; None:
+        super().__init__()
+        self.make_env = make_env
+        self.player = player
+        self.settings = settings
+        self.writer = writer
+        self.spec = EvalSpec(settings.name, settings.seed, n_games=settings.eval_games)
+        self.games = 0
+        self.start = monotonic()
+
+    def _on_training_start(self) -&gt; None:
+        self.start = monotonic()
+        self._add_point(0)
+
+    def _on_step(self) -&gt; bool:
+        self.games += int(np.sum(self.locals[&quot;dones&quot;]))
+        step = self.num_timesteps
+        if step % self.settings.eval_every == 0 or step == self.settings.steps:
+            self._add_point(step)
+        return True
+
+    def _add_point(self, step: int) -&gt; None:
+        scores = evaluate(self.make_env, {SOLO: self.player}, self.spec).scores
+        elapsed = monotonic() - self.start
+        self.writer.add_point(CurvePoint(step, self.games, float(np.mean(scores)), elapsed))
+
+
+def _recorded_games(
+    make_env: Callable[[], Env], player: _TrainingPlayer, settings: RunSettings
+) -&gt; tuple[GameRecording, ...]:
+    spec = EvalSpec(
+        settings.name, settings.seed, n_games=RECORDED_GAMES, record=RECORDED_GAMES
+    )
+    return evaluate(make_env, {SOLO: player}, spec).games
+</pre><details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/project/.claude/worktrees/agent-a8fdb8a11ccbc18f5/src/rllab/reference/train/__init__.py&quot;,
+  &quot;content&quot;: &quot;\&quot;\&quot;\&quot;The library agent&#x27;s training through the gymnasium adapter (AD-03, AD-04).\&quot;\&quot;\&quot;\n\nfrom collections.abc import Callable\nfrom pathlib import Path\nfrom time import monotonic\n\nimport numpy as np\nfrom stable_baselines3 import DQN\nfrom stable_baselines3.common.callbacks import BaseCallback\n\nfrom rllab.core import SOLO, Env, RunSettings\nfrom rllab.envs import Snake\nfrom rllab.evaluate import EvalSpec, evaluate\nfrom rllab.reference.player import ReferencePlayer\nfrom rllab.reference.train.adapter import SoloAdapter\nfrom rllab.runs import CurvePoint, GameRecording, RunRecord, RunWriter, create_run\n\nRECORDED_GAMES = 5\n\n\ndef train_reference(settings: RunSettings, *, root: Path = Path(\&quot;runs\&quot;)) -&gt; RunRecord:\n    \&quot;\&quot;\&quot;Train the library agent on the settings&#x27; environment, with the same curve points.\&quot;\&quot;\&quot;\n    make_env = _env_factory(settings)\n    writer = create_run(settings, root=root)\n    model = _build_dqn(settings, SoloAdapter(make_env()))\n    player = _TrainingPlayer(model)\n    try:\n        model.learn(settings.steps, callback=_Curve(make_env, player, settings, writer))\n        writer.save_checkpoint(player)\n        writer.save_games(_recorded_games(make_env, player, settings))\n    except KeyboardInterrupt:\n        writer.finish(\&quot;incomplete\&quot;)\n        raise\n    return writer.finish(\&quot;complete\&quot;)\n\n\ndef _env_factory(settings: RunSettings) -&gt; Callable[[], Env]:\n    \&quot;\&quot;\&quot;Snake with the compact view: the one reference this milestone trains (AD-04).\&quot;\&quot;\&quot;\n    if settings.agent != \&quot;reference\&quot;:\n        raise ValueError(f\&quot;agent {settings.agent!r}: train_reference needs agent &#x27;reference&#x27;\&quot;)\n    if settings.env != \&quot;snake\&quot; or settings.view != \&quot;compact\&quot;:\n        raise ValueError(f\&quot;the reference cannot train {settings.env}/{settings.view}\&quot;)\n    rewards = settings.rewards\n\n    def make_env() -&gt; Env:\n        return Snake(view=\&quot;compact\&quot;, rewards=rewards)\n\n    return make_env\n\n\ndef _build_dqn(settings: RunSettings, env: SoloAdapter) -&gt; DQN:\n    \&quot;\&quot;\&quot;DQN with `MlpPolicy` on the CPU, its settings mapped one-to-one (AD-04).\&quot;\&quot;\&quot;\n    params, exploration = settings.params, settings.exploration\n    return DQN(\n        \&quot;MlpPolicy\&quot;,\n        env,\n        learning_rate=params.lr,\n        buffer_size=params.memory_size,\n        learning_starts=params.learn_start,\n        batch_size=params.batch_size,\n        gamma=params.gamma,\n        train_freq=1,\n        gradient_steps=1,\n        target_update_interval=params.target_every,\n        exploration_fraction=min(1.0, exploration.decay_steps / settings.steps),\n        exploration_initial_eps=exploration.start,\n        exploration_final_eps=exploration.end,\n        policy_kwargs={\&quot;net_arch\&quot;: [params.hidden, params.hidden]},\n        seed=settings.seed,\n        device=\&quot;cpu\&quot;,\n    )\n\n\nclass _TrainingPlayer(ReferencePlayer):\n    \&quot;\&quot;\&quot;The model being trained, played greedily as an Agent.\&quot;\&quot;\&quot;\n\n    def __init__(self, model: DQN) -&gt; None:\n        self.model = model\n\n\nclass _Curve(BaseCallback):\n    \&quot;\&quot;\&quot;A curve point at step 0, every `eval_every` steps and at the last step.\&quot;\&quot;\&quot;\n\n    def __init__(\n        self,\n        make_env: Callable[[], Env],\n        player: _TrainingPlayer,\n        settings: RunSettings,\n        writer: RunWriter,\n    ) -&gt; None:\n        super().__init__()\n        self.make_env = make_env\n        self.player = player\n        self.settings = settings\n        self.writer = writer\n        self.spec = EvalSpec(settings.name, settings.seed, n_games=settings.eval_games)\n        self.games = 0\n        self.start = monotonic()\n\n    def _on_training_start(self) -&gt; None:\n        self.start = monotonic()\n        self._add_point(0)\n\n    def _on_step(self) -&gt; bool:\n        self.games += int(np.sum(self.locals[\&quot;dones\&quot;]))\n        step = self.num_timesteps\n        if step % self.settings.eval_every == 0 or step == self.settings.steps:\n            self._add_point(step)\n        return True\n\n    def _add_point(self, step: int) -&gt; None:\n        scores = evaluate(self.make_env, {SOLO: self.player}, self.spec).scores\n        elapsed = monotonic() - self.start\n        self.writer.add_point(CurvePoint(step, self.games, float(np.mean(scores)), elapsed))\n\n\ndef _recorded_games(\n    make_env: Callable[[], Env], player: _TrainingPlayer, settings: RunSettings\n) -&gt; tuple[GameRecording, ...]:\n    spec = EvalSpec(\n        settings.name, settings.seed, n_games=RECORDED_GAMES, record=RECORDED_GAMES\n    )\n    return evaluate(make_env, {SOLO: player}, spec).games\n&quot;
+}</pre><div class="lbl">output</div><pre>The file /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/project/.claude/worktrees/agent-a8fdb8a11ccbc18f5/src/rllab/reference/train/__init__.py has been updated successfully. (file state is current in your context — no need to Read it back)</pre></details></div><div class="step" id="S14"><span class="sid">U38.S14</span><span class="kind">Write</span>/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/project/.claude/worktrees/agent-a8fdb8a11ccbc18f5/tests/unit/rllab/test_train_reference.py (216 lines)<div class="lbl">wrote /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/project/.claude/worktrees/agent-a8fdb8a11ccbc18f5/tests/unit/rllab/test_train_reference.py</div><pre>&quot;&quot;&quot;train_reference: library DQN on the Snake adapter, curve points from evaluate (REF-01).&quot;&quot;&quot;
+
+import importlib.util
+import sys
+from dataclasses import replace
+from pathlib import Path
+from types import ModuleType
+from typing import Any
+
+import numpy as np
+import pytest
+import torch
+from stable_baselines3 import DQN
+from stable_baselines3.common.env_checker import check_env
+
+from rllab.core import SOLO, RunSettings
+from rllab.envs import Snake
+from rllab.evaluate import EvalSpec, ScoreSet
+from rllab.reference import ReferencePlayer, train_reference
+from rllab.reference import train as module
+from rllab.reference.train.adapter import TRAINING_SEEDS, SoloAdapter
+from rllab.runs import GameRecording, RunRecord
+
+STEPS = 60
+EVAL_EVERY = 25
+
+
+def _codec() -&gt; ModuleType:
+    name = &quot;contracts_codec&quot;
+    if name not in sys.modules:
+        path = Path(__file__).parents[2] / &quot;contracts&quot; / &quot;codec.py&quot;
+        spec = importlib.util.spec_from_file_location(name, path)
+        assert spec is not None
+        assert spec.loader is not None
+        sys.modules[name] = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(sys.modules[name])
+    return sys.modules[name]
+
+
+codec = _codec()
+
+
+class FakeEvaluate:
+    &quot;&quot;&quot;The evaluate fake patched into the module, keeping each spec and agent it was given.&quot;&quot;&quot;
+
+    def __init__(self, monkeypatch: pytest.MonkeyPatch) -&gt; None:
+        raw = codec.samples(&quot;evaluate.evaluate&quot;)[&quot;scripted_seed0&quot;]
+        self.sample_scores = codec.build(ScoreSet, raw[&quot;scores&quot;]).scores
+        self.fake = codec.fake(&quot;evaluate.evaluate&quot;).make_evaluate(
+            codec.build(ScoreSet, raw[&quot;scores&quot;]), codec.build(GameRecording, raw[&quot;game&quot;])
+        )
+        self.specs: list[EvalSpec] = []
+        self.agents: list[Any] = []
+        monkeypatch.setattr(module, &quot;evaluate&quot;, self)
+
+    def __call__(self, make_env: Any, agents: Any, spec: EvalSpec) -&gt; ScoreSet:
+        self.specs.append(spec)
+        self.agents.append(agents[SOLO])
+        return self.fake(make_env, agents, spec)
+
+
+def _settings(**changes: Any) -&gt; RunSettings:
+    record = codec.sample(&quot;reference.train_reference&quot;, &quot;reference_complete_3&quot;, RunRecord)
+    small = {&quot;steps&quot;: STEPS, &quot;eval_every&quot;: EVAL_EVERY, &quot;eval_games&quot;: 3}
+    params = replace(record.settings.params, learn_start=10, batch_size=8, hidden=16)
+    return replace(record.settings, params=params, **{**small, **changes})
+
+
+def test_curve_points_at_zero_every_eval_every_and_the_end(monkeypatch, tmp_path):
+    fake = FakeEvaluate(monkeypatch)
+    settings = _settings()
+
+    record = train_reference(settings, root=tmp_path)
+
+    assert record.status == &quot;complete&quot;
+    assert [p.step for p in record.curve] == [0, 25, 50, 60]
+    assert record.curve[0].games == 0
+    assert record.curve[-1].games &gt;= record.curve[1].games
+    expected = float(np.mean(np.resize(fake.sample_scores, 3)))
+    assert record.curve[0].mean_score == pytest.approx(expected)
+    curve_specs = fake.specs[: len(record.curve)]
+    assert {(s.player, s.train_seed, s.team, s.n_games, s.record) for s in curve_specs} == {
+        (settings.name, settings.seed, SOLO, 3, 0)
+    }
+
+
+def test_evaluates_the_model_being_trained_and_records_five_games(monkeypatch, tmp_path):
+    fake = FakeEvaluate(monkeypatch)
+
+    record = train_reference(_settings(), root=tmp_path)
+
+    model = fake.agents[0].model
+    assert isinstance(model, DQN)
+    assert all(agent.model is model for agent in fake.agents)
+    assert model.num_timesteps == STEPS
+    assert (fake.specs[-1].n_games, fake.specs[-1].record) == (5, 5)
+    assert len(record.games) == 5
+
+
+def test_dqn_settings_map_one_to_one(monkeypatch, tmp_path):
+    fake = FakeEvaluate(monkeypatch)
+    settings = _settings()
+
+    train_reference(settings, root=tmp_path)
+
+    model = fake.agents[0].model
+    params = settings.params
+    assert model.device == torch.device(&quot;cpu&quot;)
+    assert model.learning_rate == params.lr
+    assert model.gamma == params.gamma
+    assert model.batch_size == params.batch_size
+    assert model.buffer_size == params.memory_size
+    assert model.learning_starts == params.learn_start
+    assert model.target_update_interval == params.target_every
+    assert model.train_freq.frequency == 1
+    assert model.gradient_steps == 1
+    assert model.exploration_initial_eps == settings.exploration.start
+    assert model.exploration_final_eps == settings.exploration.end
+    assert model.exploration_fraction == 1.0  # decay_steps 50_000 exceeds the 60 steps
+    hidden = [m.out_features for m in model.q_net.q_net if isinstance(m, torch.nn.Linear)]
+    assert hidden == [16, 16, 3]
+
+
+def test_exploration_fraction_is_decay_steps_over_steps(monkeypatch, tmp_path):
+    fake = FakeEvaluate(monkeypatch)
+    settings = _settings(exploration=replace(_settings().exploration, decay_steps=15))
+
+    train_reference(settings, root=tmp_path)
+
+    assert fake.agents[0].model.exploration_fraction == pytest.approx(15 / STEPS)
+
+
+def test_checkpoint_loads_into_reference_player(monkeypatch, tmp_path):
+    fake = FakeEvaluate(monkeypatch)
+
+    record = train_reference(_settings(), root=tmp_path)
+
+    assert record.checkpoints[SOLO].name == &quot;checkpoint.zip&quot;
+    player = ReferencePlayer(record.checkpoints[SOLO])
+    obs = np.random.default_rng(0).random((10, 1, 11), dtype=np.float32)
+    trained = fake.agents[0]
+    for row in obs:
+        np.testing.assert_array_equal(
+            player.act(row, explore=False), trained.act(row, explore=False)
+        )
+
+
+def test_passes_the_train_reference_contract_check(monkeypatch, tmp_path):
+    FakeEvaluate(monkeypatch)
+    settings = _settings()
+    check = codec.fake(&quot;reference.train_reference&quot;).check_train_reference
+    record = check(train_reference, settings, replace(settings, view=&quot;grid&quot;), tmp_path)
+    assert record.settings == settings
+
+
+@pytest.mark.parametrize(
+    &quot;changes&quot;,
+    [
+        {&quot;view&quot;: &quot;grid&quot;},
+        {&quot;env&quot;: &quot;corridor&quot;, &quot;view&quot;: &quot;index&quot;},
+        {&quot;env&quot;: &quot;tank&quot;, &quot;view&quot;: &quot;full&quot;},
+        {&quot;agent&quot;: &quot;dqn&quot;},
+    ],
+)
+def test_refuses_anything_but_snake_compact_reference(tmp_path, changes):
+    with pytest.raises(ValueError, match=r&quot;\S&quot;):
+        train_reference(_settings(**changes), root=tmp_path)
+    assert not any(tmp_path.iterdir())
+
+
+@pytest.mark.repro
+def test_same_settings_and_seed_train_the_same_weights(monkeypatch, tmp_path):
+    fake = FakeEvaluate(monkeypatch)
+    train_reference(_settings(), root=tmp_path / &quot;a&quot;)
+    train_reference(_settings(), root=tmp_path / &quot;b&quot;)
+    first, second = fake.agents[0].model, fake.agents[-1].model
+    assert first is not second
+    pairs = zip(first.q_net.parameters(), second.q_net.parameters(), strict=True)
+    assert all(torch.equal(a, b) for a, b in pairs)
+
+
+def test_adapter_passes_the_library_env_check():
+    check_env(SoloAdapter(Snake(view=&quot;compact&quot;)))
+
+
+def test_adapter_reset_seed_fixes_the_games():
+    a, b = SoloAdapter(Snake(view=&quot;compact&quot;)), SoloAdapter(Snake(view=&quot;compact&quot;))
+    first = [a.reset(seed=3)[0]] + [a.reset()[0] for _ in range(5)]
+    second = [b.reset(seed=3)[0]] + [b.reset()[0] for _ in range(5)]
+    for x, y in zip(first, second, strict=True):
+        np.testing.assert_array_equal(x, y)
+    assert first[0].shape == (11,)
+    assert first[0].dtype == np.float32
+
+
+def test_adapter_plays_the_drawn_training_seed():
+    adapter = SoloAdapter(Snake(view=&quot;compact&quot;))
+    obs, _ = adapter.reset(seed=7)
+    game_seed = int(np.random.default_rng(7).integers(TRAINING_SEEDS))
+    expected, _ = Snake(view=&quot;compact&quot;).reset(game_seed)
+    np.testing.assert_array_equal(obs, expected[SOLO][0])
+
+
+def test_adapter_steps_the_one_agent_and_unbatches_the_result():
+    adapter = SoloAdapter(Snake(view=&quot;compact&quot;))
+    adapter.reset(seed=0)
+    total_steps = 0
+    terminated = truncated = False
+    while not (terminated or truncated):
+        obs, reward, terminated, truncated, info = adapter.step(np.int64(0))
+        total_steps += 1
+        assert obs.shape == (11,)
+        assert isinstance(reward, float)
+    assert info[&quot;steps&quot;] == total_steps
+    assert terminated  # going straight from the middle hits the wall
+    assert reward == -1.0
+</pre><details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/project/.claude/worktrees/agent-a8fdb8a11ccbc18f5/tests/unit/rllab/test_train_reference.py&quot;,
+  &quot;content&quot;: &quot;\&quot;\&quot;\&quot;train_reference: library DQN on the Snake adapter, curve points from evaluate (REF-01).\&quot;\&quot;\&quot;\n\nimport importlib.util\nimport sys\nfrom dataclasses import replace\nfrom pathlib import Path\nfrom types import ModuleType\nfrom typing import Any\n\nimport numpy as np\nimport pytest\nimport torch\nfrom stable_baselines3 import DQN\nfrom stable_baselines3.common.env_checker import check_env\n\nfrom rllab.core import SOLO, RunSettings\nfrom rllab.envs import Snake\nfrom rllab.evaluate import EvalSpec, ScoreSet\nfrom rllab.reference import ReferencePlayer, train_reference\nfrom rllab.reference import train as module\nfrom rllab.reference.train.adapter import TRAINING_SEEDS, SoloAdapter\nfrom rllab.runs import GameRecording, RunRecord\n\nSTEPS = 60\nEVAL_EVERY = 25\n\n\ndef _codec() -&gt; ModuleType:\n    name = \&quot;contracts_codec\&quot;\n    if name not in sys.modules:\n        path = Path(__file__).parents[2] / \&quot;contracts\&quot; / \&quot;codec.py\&quot;\n        spec = importlib.util.spec_from_file_location(name, path)\n        assert spec is not None\n        assert spec.loader is not None\n        sys.modules[name] = importlib.util.module_from_spec(spec)\n        spec.loader.exec_module(sys.modules[name])\n    return sys.modules[name]\n\n\ncodec = _codec()\n\n\nclass FakeEvaluate:\n    \&quot;\&quot;\&quot;The evaluate fake patched into the module, keeping each spec and agent it was given.\&quot;\&quot;\&quot;\n\n    def __init__(self, monkeypatch: pytest.MonkeyPatch) -&gt; None:\n        raw = codec.samples(\&quot;evaluate.evaluate\&quot;)[\&quot;scripted_seed0\&quot;]\n        self.sample_scores = codec.build(ScoreSet, raw[\&quot;scores\&quot;]).scores\n        self.fake = codec.fake(\&quot;evaluate.evaluate\&quot;).make_evaluate(\n            codec.build(ScoreSet, raw[\&quot;scores\&quot;]), codec.build(GameRecording, raw[\&quot;game\&quot;])\n        )\n        self.specs: list[EvalSpec] = []\n        self.agents: list[Any] = []\n        monkeypatch.setattr(module, \&quot;evaluate\&quot;, self)\n\n    def __call__(self, make_env: Any, agents: Any, spec: EvalSpec) -&gt; ScoreSet:\n        self.specs.append(spec)\n        self.agents.append(agents[SOLO])\n        return self.fake(make_env, agents, spec)\n\n\ndef _settings(**changes: Any) -&gt; RunSettings:\n    record = codec.sample(\&quot;reference.train_reference\&quot;, \&quot;reference_complete_3\&quot;, RunRecord)\n    small = {\&quot;steps\&quot;: STEPS, \&quot;eval_every\&quot;: EVAL_EVERY, \&quot;eval_games\&quot;: 3}\n    params = replace(record.settings.params, learn_start=10, batch_size=8, hidden=16)\n    return replace(record.settings, params=params, **{**small, **changes})\n\n\ndef test_curve_points_at_zero_every_eval_every_and_the_end(monkeypatch, tmp_path):\n    fake = FakeEvaluate(monkeypatch)\n    settings = _settings()\n\n    record = train_reference(settings, root=tmp_path)\n\n    assert record.status == \&quot;complete\&quot;\n    assert [p.step for p in record.curve] == [0, 25, 50, 60]\n    assert record.curve[0].games == 0\n    assert record.curve[-1].games &gt;= record.curve[1].games\n    expected = float(np.mean(np.resize(fake.sample_scores, 3)))\n    assert record.curve[0].mean_score == pytest.approx(expected)\n    curve_specs = fake.specs[: len(record.curve)]\n    assert {(s.player, s.train_seed, s.team, s.n_games, s.record) for s in curve_specs} == {\n        (settings.name, settings.seed, SOLO, 3, 0)\n    }\n\n\ndef test_evaluates_the_model_being_trained_and_records_five_games(monkeypatch, tmp_path):\n    fake = FakeEvaluate(monkeypatch)\n\n    record = train_reference(_settings(), root=tmp_path)\n\n    model = fake.agents[0].model\n    assert isinstance(model, DQN)\n    assert all(agent.model is model for agent in fake.agents)\n    assert model.num_timesteps == STEPS\n    assert (fake.specs[-1].n_games, fake.specs[-1].record) == (5, 5)\n    assert len(record.games) == 5\n\n\ndef test_dqn_settings_map_one_to_one(monkeypatch, tmp_path):\n    fake = FakeEvaluate(monkeypatch)\n    settings = _settings()\n\n    train_reference(settings, root=tmp_path)\n\n    model = fake.agents[0].model\n    params = settings.params\n    assert model.device == torch.device(\&quot;cpu\&quot;)\n    assert model.learning_rate == params.lr\n    assert model.gamma == params.gamma\n    assert model.batch_size == params.batch_size\n    assert model.buffer_size == params.memory_size\n    assert model.learning_starts == params.learn_start\n    assert model.target_update_interval == params.target_every\n    assert model.train_freq.frequency == 1\n    assert model.gradient_steps == 1\n    assert model.exploration_initial_eps == settings.exploration.start\n    assert model.exploration_final_eps == settings.exploration.end\n    assert model.exploration_fraction == 1.0  # decay_steps 50_000 exceeds the 60 steps\n    hidden = [m.out_features for m in model.q_net.q_net if isinstance(m, torch.nn.Linear)]\n    assert hidden == [16, 16, 3]\n\n\ndef test_exploration_fraction_is_decay_steps_over_steps(monkeypatch, tmp_path):\n    fake = FakeEvaluate(monkeypatch)\n    settings = _settings(exploration=replace(_settings().exploration, decay_steps=15))\n\n    train_reference(settings, root=tmp_path)\n\n    assert fake.agents[0].model.exploration_fraction == pytest.approx(15 / STEPS)\n\n\ndef test_checkpoint_loads_into_reference_player(monkeypatch, tmp_path):\n    fake = FakeEvaluate(monkeypatch)\n\n    record = train_reference(_settings(), root=tmp_path)\n\n    assert record.checkpoints[SOLO].name == \&quot;checkpoint.zip\&quot;\n    player = ReferencePlayer(record.checkpoints[SOLO])\n    obs = np.random.default_rng(0).random((10, 1, 11), dtype=np.float32)\n    trained = fake.agents[0]\n    for row in obs:\n        np.testing.assert_array_equal(\n            player.act(row, explore=False), trained.act(row, explore=False)\n        )\n\n\ndef test_passes_the_train_reference_contract_check(monkeypatch, tmp_path):\n    FakeEvaluate(monkeypatch)\n    settings = _settings()\n    check = codec.fake(\&quot;reference.train_reference\&quot;).check_train_reference\n    record = check(train_reference, settings, replace(settings, view=\&quot;grid\&quot;), tmp_path)\n    assert record.settings == settings\n\n\n@pytest.mark.parametrize(\n    \&quot;changes\&quot;,\n    [\n        {\&quot;view\&quot;: \&quot;grid\&quot;},\n        {\&quot;env\&quot;: \&quot;corridor\&quot;, \&quot;view\&quot;: \&quot;index\&quot;},\n        {\&quot;env\&quot;: \&quot;tank\&quot;, \&quot;view\&quot;: \&quot;full\&quot;},\n        {\&quot;agent\&quot;: \&quot;dqn\&quot;},\n    ],\n)\ndef test_refuses_anything_but_snake_compact_reference(tmp_path, changes):\n    with pytest.raises(ValueError, match=r\&quot;\\S\&quot;):\n        train_reference(_settings(**changes), root=tmp_path)\n    assert not any(tmp_path.iterdir())\n\n\n@pytest.mark.repro\ndef test_same_settings_and_seed_train_the_same_weights(monkeypatch, tmp_path):\n    fake = FakeEvaluate(monkeypatch)\n    train_reference(_settings(), root=tmp_path / \&quot;a\&quot;)\n    train_reference(_settings(), root=tmp_path / \&quot;b\&quot;)\n    first, second = fake.agents[0].model, fake.agents[-1].model\n    assert first is not second\n    pairs = zip(first.q_net.parameters(), second.q_net.parameters(), strict=True)\n    assert all(torch.equal(a, b) for a, b in pairs)\n\n\ndef test_adapter_passes_the_library_env_check():\n    check_env(SoloAdapter(Snake(view=\&quot;compact\&quot;)))\n\n\ndef test_adapter_reset_seed_fixes_the_games():\n    a, b = SoloAdapter(Snake(view=\&quot;compact\&quot;)), SoloAdapter(Snake(view=\&quot;compact\&quot;))\n    first = [a.reset(seed=3)[0]] + [a.reset()[0] for _ in range(5)]\n    second = [b.reset(seed=3)[0]] + [b.reset()[0] for _ in range(5)]\n    for x, y in zip(first, second, strict=True):\n        np.testing.assert_array_equal(x, y)\n    assert first[0].shape == (11,)\n    assert first[0].dtype == np.float32\n\n\ndef test_adapter_plays_the_drawn_training_seed():\n    adapter = SoloAdapter(Snake(view=\&quot;compact\&quot;))\n    obs, _ = adapter.reset(seed=7)\n    game_seed = int(np.random.default_rng(7).integers(TRAINING_SEEDS))\n    expected, _ = Snake(view=\&quot;compact\&quot;).reset(game_seed)\n    np.testing.assert_array_equal(obs, expected[SOLO][0])\n\n\ndef test_adapter_steps_the_one_agent_and_unbatches_the_result():\n    adapter = SoloAdapter(Snake(view=\&quot;compact\&quot;))\n    adapter.reset(seed=0)\n    total_steps = 0\n    terminated = truncated = False\n    while not (terminated or truncated):\n        obs, reward, terminated, truncated, info = adapter.step(np.int64(0))\n        total_steps += 1\n        assert obs.shape == (11,)\n        assert isinstance(reward, float)\n    assert info[\&quot;steps\&quot;] == total_steps\n    assert terminated  # going straight from the middle hits the wall\n    assert reward == -1.0\n&quot;
+}</pre><div class="lbl">output</div><pre>File created successfully at: /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/project/.claude/worktrees/agent-a8fdb8a11ccbc18f5/tests/unit/rllab/test_train_reference.py (file state is current in your context — no need to Read it back)</pre></details></div><div class="step" id="S15"><span class="sid">U38.S15</span><span class="kind">Bash</span>uv run pytest tests/unit/rllab/test_train_reference.py tests/contracts -q -x 2&gt;&amp;1 | tail -20<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;uv run pytest tests/unit/rllab/test_train_reference.py tests/contracts -q -x 2&gt;&amp;1 | tail -20&quot;,
+  &quot;description&quot;: &quot;Run new unit tests and contract tests&quot;,
+  &quot;timeout&quot;: 600000
+}</pre><div class="lbl">output</div><pre>........................................................................ [ 30%]
+........................................................................ [ 61%]
+........................................................................ [ 92%]
+..................                                                       [100%]
+234 passed in 6.40s</pre></details></div><div class="step" id="S16"><span class="sid">U38.S16</span><span class="kind">Bash</span>scripts/check.sh gate <span class="err">error</span><details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;scripts/check.sh gate&quot;,
+  &quot;description&quot;: &quot;Run the gate checks&quot;,
+  &quot;timeout&quot;: 600000
+}</pre><div class="lbl">output</div><pre>Exit code 1
+-&gt; ruff check --ignore-noqa .
+All checks passed!
+-&gt; ruff format --check .
+137 files already formatted
+-&gt; mypy
+Success: no issues found in 51 source files
+-&gt; python scripts/check_size.py src
+-&gt; deptry . --no-ansi
+Scanning 55 files...
+
+Success! No dependency issues found.
+-&gt; lint-imports --no-logo
+
+---------
+Contracts
+---------
+
+Analyzed 72 files, 185 dependencies.
+------------------------------------
+
+Layers: lab &gt; train | reference | compare | viz | baselines &gt; evaluate | envs | 
+agents &gt; runs &gt; core KEPT (1 ignored import)
+Hand-written code stays free of the reference library (AGENT-06, AD-04) KEPT
+Only agents imports PyTorch (AD-02) KEPT
+envs → core only KEPT
+agents → core only KEPT
+baselines → core, envs KEPT
+train → core, runs, evaluate KEPT
+reference → core, envs, runs, evaluate KEPT
+compare → evaluate KEPT
+viz → runs, evaluate KEPT
+
+Contracts: 10 kept, 0 broken.
+-&gt; pytest tests/intent tests/unit tests/contracts --no-cov -q -x
+........................................................................ [ 14%]
+........................................................................ [ 29%]
+........................................................................ [ 44%]
+........................................................................ [ 59%]
+........................................................................ [ 74%]
+........................................................................ [ 88%]
+......................................................                   [100%]
+486 passed in 8.60s
+-&gt; bash scripts/floor_guard.sh
+floor_guard: 1 floor violation(s). Fix the code; a real exception goes through build-setup (Revise) and the Exceptions table in CONSTRAINTS.md.
+tests/unit/rllab/test_train_reference.py:182: [test-without-assertion] `test_adapter_passes_the_library_env_check` asserts nothing
+-&gt; protected files unchanged since refs/worktree/checks-base
+FAILED: bash scripts/floor_guard.sh</pre></details></div><div class="step" id="S17"><span class="sid">U38.S17</span><span class="kind">Edit</span>/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/project/.claude/worktrees/agent-a8fdb8a11ccbc18f5/tests/unit/rllab/test_train_reference.py | old: &#x27;check_env(SoloAdapter(Snake(view=&quot;compact&quot;)))&#x27; | new: &#x27;adapter = SoloAdapter(Snake(view=&quot;compact&quot;)) ⏎     with warnings.catch_warnings(&#x27;<div class="lbl">edited /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/project/.claude/worktrees/agent-a8fdb8a11ccbc18f5/tests/unit/rllab/test_train_reference.py · old</div><pre>    check_env(SoloAdapter(Snake(view=&quot;compact&quot;)))</pre><div class="lbl">new</div><pre>    adapter = SoloAdapter(Snake(view=&quot;compact&quot;))
+    with warnings.catch_warnings():
+        warnings.simplefilter(&quot;error&quot;)
+        check_env(adapter)
+    assert adapter.observation_space.shape == (11,)
+    assert adapter.action_space.n == 3</pre><div class="hook">⛔ hook PostToolUse:Edit blocked: [bash &quot;$CLAUDE_PROJECT_DIR&quot;/scripts/hooks/post_edit.sh]: -&gt; ruff check --fix --quiet /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/project/.claude/worktrees/agent-a8fdb8a11ccbc18f5/tests/unit/rllab/test_train_reference.py
+F821 Undefined name `warnings`
+   --&gt; tests/unit/rllab/test_train_reference.py:184:10
+    |
+182 | def test_adapter_passes_the_library_env_check():
+183 |     adapter = SoloAdapter(Snake(view=&quot;compact&quot;))
+184 |     with warnings.catch_warnings():
+    |          ^^^^^^^^
+185 |         warnings.simplefilter(&quot;error&quot;)
+186 |         check_env(adapter)
+    |
+
+F821 Undefined name `warnings`
+   --&gt; tests/unit/rllab/test_train_reference.py:185:9
+    |
+183 |     adapter = SoloAdapter(Snake(view=&quot;compact&quot;))
+184 |     with warnings.catch_warnings():
+185 |         warnings.simplefilter(&quot;error&quot;)
+    |         ^^^^^^^^
+186 |         check_env(adapter)
+187 |     assert adapter.observation_space.shape == (11,)
+    |
+
+-&gt; ruff format --quiet /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/project/.claude/worktrees/agent-a8fdb8a11ccbc18f5/tests/unit/rllab/test_train_reference.py
+-&gt; typos /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/project/.claude/worktrees/agent-a8fdb8a11ccbc18f5/tests/unit/rllab/test_train_reference.py
+-&gt; python scripts/check_size.py /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/project/.claude/worktrees/agent-a8fdb8a11ccbc18f5/tests/unit/rllab/test_train_reference.py
+FAILED: ruff check --fix --quiet /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/project/.claude/worktrees/agent-a8fdb8a11ccbc18f5/tests/unit/rllab/test_train_reference.py
+</div><details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;replace_all&quot;: false,
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/project/.claude/worktrees/agent-a8fdb8a11ccbc18f5/tests/unit/rllab/test_train_reference.py&quot;,
+  &quot;old_string&quot;: &quot;    check_env(SoloAdapter(Snake(view=\&quot;compact\&quot;)))&quot;,
+  &quot;new_string&quot;: &quot;    adapter = SoloAdapter(Snake(view=\&quot;compact\&quot;))\n    with warnings.catch_warnings():\n        warnings.simplefilter(\&quot;error\&quot;)\n        check_env(adapter)\n    assert adapter.observation_space.shape == (11,)\n    assert adapter.action_space.n == 3&quot;
+}</pre><div class="lbl">output</div><pre>The file /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/project/.claude/worktrees/agent-a8fdb8a11ccbc18f5/tests/unit/rllab/test_train_reference.py has been updated successfully. (file state is current in your context — no need to Read it back)</pre></details></div><div class="step" id="S18"><span class="sid">U38.S18</span><span class="kind">Edit</span>/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/project/.claude/worktrees/agent-a8fdb8a11ccbc18f5/tests/unit/rllab/test_train_reference.py | old: &#x27;import sys&#x27; | new: &#x27;import sys ⏎ import warnings&#x27;<div class="lbl">edited /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/project/.claude/worktrees/agent-a8fdb8a11ccbc18f5/tests/unit/rllab/test_train_reference.py · old</div><pre>import sys
+</pre><div class="lbl">new</div><pre>import sys
+import warnings
+</pre><details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;replace_all&quot;: false,
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/project/.claude/worktrees/agent-a8fdb8a11ccbc18f5/tests/unit/rllab/test_train_reference.py&quot;,
+  &quot;old_string&quot;: &quot;import sys\n&quot;,
+  &quot;new_string&quot;: &quot;import sys\nimport warnings\n&quot;
+}</pre><div class="lbl">output</div><pre>The file /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/project/.claude/worktrees/agent-a8fdb8a11ccbc18f5/tests/unit/rllab/test_train_reference.py has been updated successfully. (file state is current in your context — no need to Read it back)</pre></details></div><div class="step" id="S19"><span class="sid">U38.S19</span><span class="kind">say</span>The second edit added the import (that error was from the intermediate state). Running the gate.<details><summary>full text</summary><pre>The second edit added the import (that error was from the intermediate state). Running the gate.</pre></details></div><div class="step" id="S20"><span class="sid">U38.S20</span><span class="kind">Bash</span>scripts/check.sh gate<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;scripts/check.sh gate&quot;,
+  &quot;description&quot;: &quot;Run the gate checks again&quot;,
+  &quot;timeout&quot;: 600000
+}</pre><div class="lbl">output</div><pre>-&gt; ruff check --ignore-noqa .
+All checks passed!
+-&gt; ruff format --check .
+137 files already formatted
+-&gt; mypy
+Success: no issues found in 51 source files
+-&gt; python scripts/check_size.py src
+-&gt; deptry . --no-ansi
+Scanning 55 files...
+
+Success! No dependency issues found.
+-&gt; lint-imports --no-logo
+
+---------
+Contracts
+---------
+
+Analyzed 72 files, 185 dependencies.
+------------------------------------
+
+Layers: lab &gt; train | reference | compare | viz | baselines &gt; evaluate | envs | 
+agents &gt; runs &gt; core KEPT (1 ignored import)
+Hand-written code stays free of the reference library (AGENT-06, AD-04) KEPT
+Only agents imports PyTorch (AD-02) KEPT
+envs → core only KEPT
+agents → core only KEPT
+baselines → core, envs KEPT
+train → core, runs, evaluate KEPT
+reference → core, envs, runs, evaluate KEPT
+compare → evaluate KEPT
+viz → runs, evaluate KEPT
+
+Contracts: 10 kept, 0 broken.
+-&gt; pytest tests/intent tests/unit tests/contracts --no-cov -q -x
+........................................................................ [ 14%]
+........................................................................ [ 29%]
+........................................................................ [ 44%]
+........................................................................ [ 59%]
+........................................................................ [ 74%]
+........................................................................ [ 88%]
+......................................................                   [100%]
+486 passed in 7.96s
+-&gt; bash scripts/floor_guard.sh
+floor_guard: clean
+-&gt; protected files unchanged since refs/worktree/checks-base</pre></details></div><div class="step" id="S21"><span class="sid">U38.S21</span><span class="kind">say</span>DONE M1-T07 solo<details><summary>full text</summary><pre>DONE M1-T07 solo</pre></details></div>
+<h2>Commits</h2>
+<p>None.</p>
+<h2>Returned</h2>
+<pre>DONE M1-T07 solo</pre>
+</body></html>

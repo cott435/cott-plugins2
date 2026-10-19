@@ -1,0 +1,1109 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1"><title>U47 implementer</title>
+<style>
+:root{--bg:#fbfbfa;--fg:#1d1d1f;--muted:#6b6b70;--line:#d9d9de;--box:#fff;--rowp:#eef3fb;--band:#fff4d6;
+--ok:#2e7d32;--bad:#c62828;--warn:#b26a00;--idle:#6b6b70}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#17171a;--fg:#ececf0;--muted:#9a9aa3;
+--line:#34343a;--box:#222227;--rowp:#1d2433;--band:#3a3015;--ok:#6fcf73;--bad:#ff6b6b;--warn:#f0b35a;--idle:#9a9aa3}}
+:root[data-theme="dark"]{--bg:#17171a;--fg:#ececf0;--muted:#9a9aa3;--line:#34343a;--box:#222227;--rowp:#1d2433;
+--band:#3a3015;--ok:#6fcf73;--bad:#ff6b6b;--warn:#f0b35a;--idle:#9a9aa3}
+body{margin:0;padding:16px;background:var(--bg);color:var(--fg);font:14px/1.45 -apple-system,system-ui,sans-serif}
+h1{font-size:18px;margin:0 0 4px}h2{font-size:15px;margin:22px 0 8px}.sub{color:var(--muted)}
+table{border-collapse:collapse;margin:4px 0 8px}td,th{border-bottom:1px solid var(--line);padding:4px 10px;text-align:left;
+vertical-align:top}th{color:var(--muted);font-weight:600}.chips span{display:inline-block;margin:0 4px 2px 0}
+.legend span{margin-right:14px;white-space:nowrap}.sw{display:inline-block;width:10px;height:10px;border-radius:2px;
+margin-right:4px;vertical-align:-1px}.scroll{overflow:auto;max-height:88vh;border:1px solid var(--line);border-radius:8px}
+.chart{display:grid;width:max-content}.chart>div{line-height:0}.corner{position:sticky;top:0;left:0;z-index:3}
+.colhead{position:sticky;top:0;z-index:2}.rowhead{position:sticky;left:0;z-index:2}
+svg.bg{background:var(--bg)}.colhead svg{border-bottom:1px solid var(--line)}.rowhead svg{border-right:1px solid var(--line)}
+.ok{color:var(--ok);fill:var(--ok)}.bad{color:var(--bad);fill:var(--bad)}.warn{color:var(--warn);fill:var(--warn)}
+.idle{color:var(--idle);fill:var(--idle)}
+svg text{fill:var(--fg);font-family:-apple-system,system-ui,sans-serif}
+.box{fill:var(--box);stroke:var(--line)}.unit:hover .box{stroke:var(--fg)}
+.role{font-size:12px;font-weight:600}.uid,.wmeta,.lmeta,.meta{font-size:10px;fill:var(--muted)}
+.sub{font-size:10.5px;fill:var(--muted)}.badge{font-size:11px;font-weight:600}
+.meta.bad{fill:var(--bad);font-weight:600}.lane{font-size:13px;font-weight:700}.wave{font-size:13px;font-weight:700}
+.par{fill:#4e79a7}.ser{fill:var(--muted)}.rowp{fill:var(--rowp)}.rows{fill:transparent}.band{fill:var(--band)}
+.bandt{font-size:11.5px}.grid{stroke:var(--line)}.link{stroke:var(--muted);stroke-width:1.2;opacity:.55}
+.arrowhead{fill:var(--muted)}.marks{font-size:10.5px}.audit{stroke:var(--box);stroke-width:2}.auditn{font-size:10px;font-weight:700;fill:#fff}
+a{color:inherit}svg a .box{cursor:pointer}
+
+:root{--c0:#2a78d6;--c1:#eb6834;--c2:#1baf7a;--c3:#eda100;--c4:#e87ba4;--c5:#008300;--c6:#6250d6;--c7:#e34948;
+--cx:#8a8985;--main:#52514e;--read:#dcdbd5;--readfg:#1d1d1f}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--c0:#3987e5;--c1:#d95926;--c2:#199e70;
+--c3:#c98500;--c4:#d55181;--c5:#008300;--c6:#9085e9;--c7:#e66767;--cx:#77766f;--main:#c3c2b7;--read:#3b3b40;
+--readfg:#ececf0}}
+:root[data-theme="dark"]{--c0:#3987e5;--c1:#d95926;--c2:#199e70;--c3:#c98500;--c4:#d55181;--c5:#008300;
+--c6:#9085e9;--c7:#e66767;--cx:#77766f;--main:#c3c2b7;--read:#3b3b40;--readfg:#ececf0}
+.c0{fill:var(--c0);background:var(--c0)}.c1{fill:var(--c1);background:var(--c1)}.c2{fill:var(--c2);background:var(--c2)}
+.c3{fill:var(--c3);background:var(--c3)}.c4{fill:var(--c4);background:var(--c4)}.c5{fill:var(--c5);background:var(--c5)}
+.c6{fill:var(--c6);background:var(--c6)}.c7{fill:var(--c7);background:var(--c7)}.cx{fill:var(--cx);background:var(--cx)}
+.cmain{fill:var(--main)}.sc0{stroke:var(--c0)}.sc1{stroke:var(--c1)}.sc2{stroke:var(--c2)}
+.tl text,.sm text,.lc text{font-size:10.5px;fill:var(--muted)}.tl .lbl-in,.sm .lbl-in{fill:#fff;font-size:10.5px;font-weight:600}
+.tl .rowl,.sm .rowl,.lc .rowl{fill:var(--fg);font-size:11.5px;font-weight:600}.tl .band{fill:var(--rowp)}
+.tl .brk{stroke:var(--muted);stroke-dasharray:2 3}.tl a:hover rect,.sm a:hover rect{stroke:var(--fg);stroke-width:1.5}
+.axis{stroke:var(--line)}.sm .val{fill:var(--fg);font-weight:600}.lc path.ln{fill:none;stroke-width:2}
+.lc circle{stroke:var(--bg);stroke-width:2}.lc .end{font-weight:600;fill:var(--fg)}
+.tiles{display:flex;flex-wrap:wrap;gap:10px;margin:12px 0}.tile{border:1px solid var(--line);border-radius:8px;
+padding:8px 12px;min-width:110px;background:var(--box)}.tile b{display:block;font-size:20px;line-height:1.2}
+.tile span{font-size:12px;color:var(--muted)}.tile i{font-style:normal;font-size:12px;margin-left:6px}
+.fm{border-collapse:separate;border-spacing:2px}.fm td,.fm th{border:0;padding:0;text-align:center;font-size:11px}
+.fm th{padding:0 2px;font-weight:600}.fm td.f,.fm th.f{text-align:left;padding-right:10px;white-space:nowrap;
+position:sticky;left:0;background:var(--bg);font:11.5px ui-monospace,Menlo,monospace;
+max-width:380px;overflow:hidden;text-overflow:ellipsis}
+.fm td.cell{min-width:22px;height:20px;border-radius:3px}.fm td.fw{background:var(--c0);color:#fff;font-weight:700}
+.fm td.fe{background:var(--c1);color:#fff;font-weight:700}.fm td.fr{background:var(--read);color:var(--readfg)}
+.fm td.n{color:var(--muted);padding:0 6px}.fm tr.grp td{text-align:left;padding-top:8px;color:var(--muted);
+font-weight:600}
+.key{display:inline-block;min-width:18px;text-align:center;border-radius:3px;font-size:11px;margin-right:4px}
+.bar{display:inline-block;height:9px;border-radius:2px;vertical-align:0}
+
+pre{white-space:pre-wrap;word-break:break-word;background:var(--box);border:1px solid var(--line);border-radius:6px;
+padding:8px 10px;margin:4px 0;font:12px/1.45 ui-monospace,SFMono-Regular,Menlo,monospace;max-width:100%;overflow:auto}
+.step{border-top:1px solid var(--line);padding:6px 0}.step:target{background:var(--rowp)}
+.sid{font:12px ui-monospace,Menlo,monospace;color:var(--muted);margin-right:8px}.kind{font-weight:600;margin-right:8px}
+.err{color:var(--bad);font-weight:600}.hook{color:var(--bad);margin:4px 0 0 16px}.lbl{font-size:12px;color:var(--muted);margin-top:6px}
+details summary{cursor:pointer;color:var(--muted);font-size:12px}.head td:first-child{color:var(--muted)}
+.top{font-size:13px}.narr{list-style:none;padding-left:0}.narr li{margin:3px 0}
+</style></head>
+<body>
+<p class="top"><a href="../flow.html">← the run's flow chart</a></p>
+
+<h1>U47 · implementer · M1-T15 implementer</h1>
+<table class="head"><tr><td>Type</td><td>implementer</td></tr><tr><td>Description</td><td>M1-T15 implementer</td></tr><tr><td>Spawned by</td><td>driver at D341</td></tr><tr><td>Turn</td><td><a href="../turns/T12.html">T12</a></td></tr><tr><td>Model</td><td>claude-opus-5-5</td></tr><tr><td>Start</td><td>2026-10-19 05:58:34 UTC</td></tr><tr><td>Duration</td><td>1 min</td></tr><tr><td>Tool calls</td><td>14</td></tr><tr><td>Errors</td><td>0</td></tr><tr><td>Hook blocks</td><td>0</td></tr><tr><td>Tokens</td><td>5.7k out · 30.2k new in · 188k cached in · peak context 34.9k</td></tr><tr><td>Skills invoked</td><td>none</td></tr><tr><td>Files written or edited</td><td>.claude/worktrees/agent-a64e2d7e170c8d509/src/rllab/agents/tabular.py, .claude/worktrees/agent-a64e2d7e170c8d509/tests/unit/rllab/test_tabular.py</td></tr><tr><td>Definition</td><td>none</td></tr><tr><td>Steps</td><td>16</td></tr><tr><td>Finished</td><td>yes</td></tr></table>
+
+
+<h2>Prompt</h2>
+<pre>You are the implementer for M1-T15. Run `python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/plugin/dev-team/scripts/dt.py claim M1-T15 --role implementer`, then read the packet it names.</pre>
+<h2>Files</h2>
+<table><tr><th>Op</th><th>File</th><th>Calls</th><th>By</th><th>Via</th><th>Steps</th></tr><tr><td>write</td><td><code>.claude/worktrees/agent-a64e2d7e170c8d509/src/rllab/agents/tabular.py</code></td><td>1</td><td>U47</td><td>Write</td><td><a href="#13">U47.S13</a></td></tr><tr><td>write</td><td><code>.claude/worktrees/agent-a64e2d7e170c8d509/tests/unit/rllab/test_tabular.py</code></td><td>1</td><td>U47</td><td>Write</td><td><a href="#14">U47.S14</a></td></tr><tr><td>read</td><td><code>.claude/worktrees/agent-a64e2d7e170c8d509/.claude/packet.md</code></td><td>1</td><td>U47</td><td>Read</td><td><a href="#4">U47.S4</a></td></tr><tr><td>read</td><td><code>.claude/worktrees/agent-a64e2d7e170c8d509/CONSTRAINTS.md</code></td><td>1</td><td>U47</td><td>Read</td><td><a href="#3">U47.S3</a></td></tr><tr><td>read</td><td><code>.claude/worktrees/agent-a64e2d7e170c8d509/src/rllab/agents/__init__.py</code></td><td>1</td><td>U47</td><td>Read</td><td><a href="#12">U47.S12</a></td></tr><tr><td>read</td><td><code>.claude/worktrees/agent-a64e2d7e170c8d509/src/rllab/agents/dqn/agent.py</code></td><td>1</td><td>U47</td><td>Read</td><td><a href="#10">U47.S10</a></td></tr><tr><td>read</td><td><code>.claude/worktrees/agent-a64e2d7e170c8d509/src/rllab/agents/tabular.py</code></td><td>1</td><td>U47</td><td>Read</td><td><a href="#5">U47.S5</a></td></tr><tr><td>read</td><td><code>.claude/worktrees/agent-a64e2d7e170c8d509/tests/contracts/agents.TabularAgent/test_agents_tabularagent.py</code></td><td>1</td><td>U47</td><td>Read</td><td><a href="#11">U47.S11</a></td></tr><tr><td>read</td><td><code>.claude/worktrees/agent-a64e2d7e170c8d509/tests/intent/rllab/test_tabular.py</code></td><td>1</td><td>U47</td><td>Read</td><td><a href="#7">U47.S7</a></td></tr></table>
+<h2>Steps</h2>
+<div class="step" id="S1"><span class="sid">U47.S1</span><span class="kind">user</span>You are the implementer for M1-T15. Run `python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/plugin/dev-team/scripts/dt.py claim M1-T15 --role implementer`, then read the packet it names.<details><summary>full text</summary><pre>You are the implementer for M1-T15. Run `python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/plugin/dev-team/scripts/dt.py claim M1-T15 --role implementer`, then read the packet it names.</pre></details></div><div class="step" id="S2"><span class="sid">U47.S2</span><span class="kind">Bash</span>python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/plugin/dev-team/scripts/dt.py claim M1-T15 --role implementer<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/plugin/dev-team/scripts/dt.py claim M1-T15 --role implementer&quot;,
+  &quot;description&quot;: &quot;Claim task M1-T15 as implementer&quot;
+}</pre><div class="lbl">output</div><pre>packet: /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/project/.claude/worktrees/agent-a64e2d7e170c8d509/.claude/packet.md (182 lines; read it in full)
+task: M1-T15 Table-based value learner · role implementer · package rllab · kind thicken
+writes: src/rllab/agents/tabular.py, tests/unit/rllab/test_tabular.py
+done: Done when `scripts/check.sh gate` passes (the gate passes on your Writes); the Stop hook runs it. End with one line: `DONE M1-T15 implementer`. If you can&#x27;t finish: `python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/plugin/dev-team/scripts/dt.py escalate &lt;TEST-WRONG|NEEDS-DEP&gt; &quot;&lt;why&gt;&quot;`, or `python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/plugin/dev-team/scripts/dt.py escalate CONTRACT-CHANGE &quot;&lt;why&gt;&quot; --type &lt;the contract symbol&gt;`, then end with one line: `STOPPED M1-T15 implementer: see dt escalate`.</pre></details></div><div class="step" id="S3"><span class="sid">U47.S3</span><span class="kind">Read</span>/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/project/.claude/worktrees/agent-a64e2d7e170c8d509/CONSTRAINTS.md<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/project/.claude/worktrees/agent-a64e2d7e170c8d509/CONSTRAINTS.md&quot;
+}</pre><div class="lbl">output</div><pre>1	# Constraints
+2	**Status:** Approved · **Last reviewed:** 2026-10-19 by @connorott · **Ratcheted:** —
+3	
+4	The standing quality bar. `pyproject.toml` and `scripts/check.sh` enforce it; every number here names its config key, and `dt status` fails if the two disagree. Only `build-setup` changes this file, with the user: tightening is routine, loosening needs an explicit yes.
+5	
+6	## Floor
+7	- **CR-01** No new suppressions. Ruff runs with `--ignore-noqa` in gate and full, so a Ruff exception is a `per-file-ignores` entry in protected config with a row in Exceptions. `floor_guard.sh` catches the other suppressions on the diff
+8	- **CR-02** No stubs: `raise NotImplementedError` outside abstract methods, `pass`-only bodies, bare `except: pass`. One carve-out: the interface task&#x27;s step signatures, whose body is only `raise NotImplementedError(&quot;&lt;task id&gt;&quot;)` naming the open task that replaces it. `check.sh gate` fails on one naming a task that isn&#x27;t open in `tasks/todo.md`, and on a test that expects one (`stub-pinned`); `check.sh full --exit` fails on any
+9	- **CR-03** No skipped, deleted or assertion-free tests, unless a row in Exceptions names the test file
+10	- **CR-04** No secrets in source
+11	- **CR-05** Oracle files (`tests/fixtures/**/expected.json`) change only with the user&#x27;s approval
+12	- **CR-06** The implementer never changes `tests/intent/**`
+13	- **CR-07** This file, `pyproject.toml` tool config, `scripts/` and `.claude/agents/` are not weakened to make a change pass
+14	- **CR-08** Nothing imports from `references/` or `probes/`, or adds either to `sys.path` (or `PYTHONPATH`, pytest `pythonpath`). `floor_guard.sh` checks the diff for both. Code copied from either is project code and meets the same bar
+15	- **CR-09** A frozen interface (`tests/contracts/&lt;id&gt;.&lt;symbol&gt;/`: schema, samples, fake; and the types, signatures and exports the interface task wrote) is frozen once it exists at the task&#x27;s base. Only the interface task freezing it (`**Kind:** interface`) writes a new folder, and no other task&#x27;s `Writes:` names its `types.py` or `__init__.py`; a frozen interface changes only through `architecture-design` Revise, never to make a test pass
+16	
+17	## Readability
+18	- **CR-10** One entry function per pipeline; it reads top to bottom as its named steps (reviewer + `dt layout`)
+19	- **CR-11** No registries, plugin dispatch or config-driven wiring without an AD
+20	- **CR-12** New abstraction only with a second real implementation or a named seam
+21	
+22	
+23	## Enforced with numbers
+24	| ID | Dimension | Rule | Checked by | Config key | Runs at |
+25	|---|---|---|---|---|---|
+26	| CR-20 | Lint | zero errors; standing per-file-ignores only for `tests/**` and `__init__.py` | ruff | `tool.ruff.lint.select` | edit, gate |
+27	| CR-21 | Complexity | ≤ 10 per function | ruff C901 | `tool.ruff.lint.mccabe.max-complexity` | gate |
+28	| CR-22 | Size | ≤ 500 lines/module, ≤ 60/function | check_size.py | `tool.size_limits` | edit, gate |
+29	| CR-23 | Types | zero errors, strict | mypy | `tool.mypy.strict` | gate |
+30	| CR-24 | Boundaries | import contracts hold | import-linter | `tool.importlinter.contracts` | gate |
+31	| CR-25 | Dependencies | none missing or unused | deptry | `tool.deptry` | gate |
+32	| CR-26 | Deps security | nothing known-vulnerable | pip-audit | — | full, CI nightly |
+33	| CR-27 | Reproducibility | same settings and seed give the same run (RUN-03, AD-08) | pytest `-m repro` | `tool.pytest.ini_options.markers` | gate |
+34	
+35	## Measured, not yet enforced
+36	| ID | Metric | Today | Direction |
+37	|---|---|---|---|
+38	| CR-40 | Coverage (branch) | — (no code) (`tool.coverage.report.fail_under`, raised by Ratchet) | must not fall |
+39	| CR-41 | vulture findings at `min_confidence = 60` (`scripts/vulture_whitelist.py`) | 0 | must not grow by `full --exit` (earlier `full` runs report) |
+40	| CR-42 | Duplicate blocks of ≥ 8 similar source lines (pylint `duplicate-code`, `[tool.pylint.similarities]` in pyproject.toml) | 0 | must not grow |
+41	
+42	## Boundaries (generated from architecture — do not edit)
+43	- `rllab.core` imports nothing first-party · `envs`, `agents`, `runs` → core · `evaluate` → core, runs · `baselines` → core, envs · `train` → core, runs, evaluate · `reference` → core, envs, runs, evaluate · `compare` → evaluate · `viz` → runs · `lab` → all
+44	- Only `rllab.reference` imports `stable_baselines3` or `gymnasium`; only `rllab.agents` imports `torch`
+45	
+46	## Roles and protected paths
+47	| Role | May edit | May not edit | Stop gate |
+48	|---|---|---|---|
+49	| tester | `tests/intent/**`, within the task&#x27;s `Writes:` | everything else; reads no source | `check.sh collect` (lint, collect, red for the right reason) |
+50	| implementer / solo | `src/**`, `tests/unit/**`, within the task&#x27;s `Writes:`; an interface task also the `tests/contracts/&lt;id&gt;.&lt;symbol&gt;/` its `Writes:` names | the protected list; `tasks/` | `check.sh gate` + protected-path diff against the worktree&#x27;s base |
+51	| reviewer | its worktree, for the mutation check, and its findings file; nothing lands (the orchestrator records findings with `dt finding`) | everything else | runs `check.sh full` by hand |
+52	
+53	**Protected list** (`PROTECTED` in `scripts/check.sh`; `path_guard.sh deny --protected` reads the same list): `tests/intent/**`, `tests/fixtures/**`, `tests/conftest.py`, `pyproject.toml`, `uv.lock`, `CONSTRAINTS.md`, `scripts/**`, `.claude/agents/**`, `.claude/settings.json`, `references/**`, `probes/**`, `tests/contracts/**`. `tests/contracts/**` covers the contract folders that exist at the task&#x27;s base (CR-09). **`Writes:`**: `dt claim` writes the role&#x27;s share of the task&#x27;s `Writes:` to `.claude/.task_writes` and sets the worktree&#x27;s base; `path_guard.sh writes` blocks edits outside it, and builder edits before the claim. Only the orchestrator writes `tasks/` (`dt land`, `dt finding`).
+54	
+55	**Worktree links:** none
+56	
+57	## Review
+58	Run by the reviewer agent: the interface review after Phase 0, a phase review per package at each checkpoint, and the milestone exit. `dt land` already checked each landing&#x27;s `Writes:`, protected paths and gates; review judges what tools can&#x27;t.
+59	
+60	**Interface** (after Phase 0): the code is the contract, no more and no less.
+61	1. Types match `contract.md`: fields, types, invariants. Nothing a step&#x27;s In → Out needs is missing; no helper is frozen.
+62	2. Signatures match the step tables, in their owner modules. Each stub names the open task that owns its step; no logic beyond types and validation.
+63	3. One sample per case the contract names, valid and realistic, never holding a TC&#x27;s expected value. Replay doubles replay an interaction the Protocol allows. Each fake passes its contract&#x27;s cases; anything it does beyond echoing a fixture (filtering, ordering, an error) is a case the real provider must pass too. Contract tests check shape only, never a stub or other state a later task changes.
+64	4. `__init__.py` exports exactly the contract; each `Mitigated by` in the plan&#x27;s dependency graph exists; each split task&#x27;s tester can write its tests from the frozen interface and its `Read:`.
+65	
+66	**Each phase**, per package, tests before code:
+67	1. **Interfaces followed** (CR-09): no frozen type, signature or contract folder changed outside a Revise. Consumers use the declared types: no dict for a dataclass, no reaching into a provider&#x27;s internals, no local redefinition. A stub is replaced only by the task it names; no cross-package import outside the contract; spine tests run on samples and doubles, not another step&#x27;s code.
+68	2. **Tests prove something:** each intent test asserts its TC case or acceptance bullet, loading expected values and tolerances from fixtures; none is assertion-free or weakened; Hypothesis runs the `ci` profile. Unit tests are specific, never computing the expected value with the code under test or testing only a mock. **Mutation check** (`.claude/agents/reviewer.md`): per acceptance bullet, the smallest change that should break it; a mutation no test catches is a finding.
+69	3. **Correct to the spec:** each acceptance bullet truly met, not special-cased to the sample; the error paths the requirement names; seeding and determinism; numerical edge cases.
+70	4. **Simple** (CR-11, CR-12, CR-42): no abstraction with one implementation outside the contract or an AD; no forwarding wrapper, one-method class, or class where a function does; no parameter, flag or config key every caller sets the same; no `try/except` that only re-raises or swallows, no checks the types already guarantee; no loop the library already provides. No near-copies within or across the phase&#x27;s tasks: one concept is one function in its owner module (tests may repeat for readability). Each finding names the simpler form, with the same tests passing.
+71	5. **Pipelines** (CR-10): entry functions read as their step tables (`dt layout`); step owners respected; spine baselines still selectable.
+72	6. **The bar** (CR-07): diff this file, `pyproject.toml`, `scripts/` and `.claude/agents/` against the milestone&#x27;s Base. Any loosening is Critical; new exceptions need an owner and expiry.
+73	7. **Hidden and parallel risks:** where a real provider could act differently from its double; fixed output paths, global state, test-order dependence.
+74	8. **The rest:** readability, security, performance where a QR sets a number; reused reference or probe code has its Caveats handled and fits the contract; `dt lint` clean, pre-build sections replaced by `dt layout` pointers.
+75	
+76	**Milestone exit**, over the whole diff, adds: the Scope&#x27;s Exit holds; every Covers ID has a test; `check.sh full --exit` finds no stub; system tests use real providers; the same sample through a real provider and its double agrees; deferred requirements untouched; pip-audit ran.
+77	
+78	**Severity:** Critical: a frozen interface changed, a contract test pinning a transient state, a weakened test, an intent test that misses a mutation changing its TC&#x27;s expected output, a wrong answer, a loosened bar, a security hole, lost data; it stops the build. Important: a consumer bypassing a type, any other surviving mutation, an unneeded abstraction, a duplicate across tasks. Suggestion and Nit: local. Findings go under the checkpoint block in `tasks/plan.md` (`dt finding`), each with a fix task or a reason.
+79	
+80	## Done
+81	agent-skills `references/definition-of-done.md`, tailored once:
+82	- **Correctness and Quality:** checked per task by the gate.
+83	- **Integration and Documentation:** checked at each checkpoint.
+84	- **The full list:** checked at milestone exit.
+85	
+86	## Exceptions
+87	| ID | Rule | Path | Reason | Owner | Expires |
+88	|---|---|---|---|---|---|
+89	| EX-01 | CR-25 DEP002 | `numpy`, `torch`, `matplotlib`, `stable-baselines3`, `gymnasium` | M1 dependencies, declared before the code imports them | @connorott | M1 exit |
+90	| EX-02 | CR-24 layers | `rllab.compare` → `rllab.viz` | `compare.run_claims` takes `charts: Sequence[viz.Chart]` (contract); the sibling layers forbid it (M1-T01 escalation) | @connorott | M1 exit |
+91	</pre></details></div><div class="step" id="S4"><span class="sid">U47.S4</span><span class="kind">Read</span>/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/project/.claude/worktrees/agent-a64e2d7e170c8d509/.claude/packet.md<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/project/.claude/worktrees/agent-a64e2d7e170c8d509/.claude/packet.md&quot;
+}</pre><div class="lbl">output</div><pre>1	# Packet: M1-T15 implementer
+2	You are the implementer for M1-T15. Your edit boundary is your Writes below (`.claude/.task_writes`); the guard blocks everything else.
+3	
+4	Done when `scripts/check.sh gate` passes (the gate passes on your Writes); the Stop hook runs it. End with one line: `DONE M1-T15 implementer`. If you can&#x27;t finish: `python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/plugin/dev-team/scripts/dt.py escalate &lt;TEST-WRONG|NEEDS-DEP&gt; &quot;&lt;why&gt;&quot;`, or `python3 /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/plugin/dev-team/scripts/dt.py escalate CONTRACT-CHANGE &quot;&lt;why&gt;&quot; --type &lt;the contract symbol&gt;`, then end with one line: `STOPPED M1-T15 implementer: see dt escalate`.
+5	
+6	# Context for M1-T15: package rllab · mode split · kind thicken
+7	Read only what is below, plus CONSTRAINTS.md and the files you edit. Your task is the last section.
+8	
+9	&lt;!-- docs/packages/rllab/pipelines.md:5 --&gt;
+10	## PL-01: Train a run
+11	**Entry:** `src/rllab/lab/pipelines/pl01_train.py::run_train` · **Trigger:** `python -m rllab.lab train &lt;settings.toml&gt; --seeds 0-4`
+12	**Covers:** SNAKE-01–SNAKE-09, FISH-01–FISH-10, HUNT-01–HUNT-09, CORE-01–CORE-07, AGENT-01–AGENT-06, PG-01–PG-05, SELF-01–SELF-04, BASE-06–BASE-08, ABL-01–ABL-03, RUN-01–RUN-04, DATA-02, QR-01–QR-03, QR-05–QR-07
+13	
+14	| # | Step | Owner | In → Out | Spine version | Covers |
+15	|---|---|---|---|---|---|
+16	| 1 | `load_settings` | core.settings | path → RunSettings | TOML into the frozen dataclasses; unknown names raise `ValueError` naming the key | RUN-01 |
+17	| 2 | `make_env` | lab.build | RunSettings → Env | `if` on `settings.env`: Snake, Corridor, FishTank (with `n_agents` fish) or PredatorPrey, returned as a zero-argument factory | CORE-01, DATA-02 |
+18	| 3 | `Snake` | envs.snake | view, Rewards → Env | full rules on 10×10, compact and grid views | SNAKE-01–SNAKE-09 |
+19	| 4 | `Corridor` | envs.corridor | length, Rewards → Env | 10 cells, one-hot position, 50-step cap | CORE-03 |
+20	| 5 | `FishTank` | envs.tank | view, n_fish, Rewards → Env | vectorised ball reflection, shortened swim vectors, wall stop, catches, 1,000-step cap, full view (AD-12) | FISH-01–FISH-09 |
+21	| 6 | `PredatorPrey` | envs.predprey | Rewards → Env | the tank&#x27;s movement functions (AD-16) plus pellets, catches, 50-step prey respawns, both teams&#x27; limited views, 1,000-step cap | HUNT-01–HUNT-09 |
+22	| 7 | `make_agent` | lab.build | RunSettings, Env → Agent | one agent per team of `env.teams`: learners from `settings.agent` (tabular, dqn, reinforce or ppo) sized from the team&#x27;s `TeamSpec`, other teams scripted or random per `settings.opponents`; ablation switches from `settings.ablation` | ABL-01–ABL-03, PG-05, HUNT-07, SELF-02 |
+23	| 8 | `TabularAgent` | agents.tabular | AgentParams, Exploration → Agent | dict of NumPy rows keyed on observation bytes; linear exploration decay | AGENT-01, AGENT-02, AGENT-06, ABL-03 |
+24	| 9 | `DQNAgent` | agents.dqn | AgentParams, Exploration → Agent | 128×128 MLP, uniform memory, hard target refresh, Huber loss, gradient clip 10 | AGENT-02–AGENT-06, ABL-01, ABL-02 |
+25	| 10 | `ReinforceAgent` | agents.reinforce | ActionSpace, AgentParams → Agent | Gaussian 64×64 Tanh policy with a learned log-std; one update per `games_per_update` games on normalised returns-to-go (AD-11) | PG-01, PG-02, AGENT-06 |
+26	| 11 | `PPOAgent` | agents.ppo | ActionSpace, AgentParams → Agent | the same policy plus a 64×64 value net; GAE, clipped objective, `epochs` passes over minibatches, one instance for every fish (AD-11) | PG-01, PG-03, PG-04, AGENT-06, SELF-01 |
+27	| 12 | `ScriptedPredator` | baselines.scripted_predator | () → Agent | length-1 vector toward the nearest visible prey, else toward the centre | BASE-06 |
+28	| 13 | `ScriptedPrey` | baselines.scripted_prey | () → Agent | flee within 0.3, else toward the nearest visible pellet, else still | BASE-07 |
+29	| 14 | `RandomSwimmer` | baselines.random_swimmer | n_agents, seed → Agent | uniform over the unit disc, for either team | BASE-08 |
+30	| 15 | `train` | train.loop | Env, Agent, RunSettings → RunRecord | batch-first step loop over every team, building one Transition per learning team and calling its `learn` after each step; each learner&#x27;s generation every tenth of the run (SELF-04); `evaluate.evaluate` every `eval_every` into a CurvePoint; progress line every 30 s; checkpoints and 5 recorded games at the end | CORE-02, CORE-07, RUN-02–RUN-04, SELF-01, SELF-04, QR-01–QR-03, QR-07 |
+31	| 16 | `OpponentPool` | selfplay.pool | Agent, latest_share, seed → OpponentPool | always the latest policy (rung 2&#x27;s behaviour) | SELF-03 |
+32	
+33	### Entry sketch (pre-build — removed by spine task)
+34	```python
+35	def run_train(settings_path: Path, seed: int) -&gt; RunRecord:
+36	    settings = load_settings(settings_path)
+37	    settings = with_seed(settings, seed)
+38	    make = make_env(settings)
+39	    agents = make_agent(settings, make())
+40	    return train(make, agents, settings)
+41	```
+42	
+43	&lt;!-- docs/packages/rllab/contract.md:227 --&gt;
+44	### agents.TabularAgent: Table-based value learner
+45	```python
+46	class TabularAgent(Agent):
+47	    def __init__(self, n_actions: int, params: AgentParams, exploration: Exploration, *, seed: int, explore_enabled: bool = True) -&gt; None: ...
+48	    def values(self, obs: np.ndarray) -&gt; np.ndarray: ...
+49	    def epsilon(self, step: int) -&gt; float: ...
+50	```
+51	- **Invariants:** single-agent (batches of 1). One value per (observation, action), keyed on the observation&#x27;s bytes and starting at 0. Each `learn` moves the value toward `reward + gamma · max next value`, with no bootstrap when `terminated` (AGENT-01). `explore_enabled=False` is the `no_explore` ablation (ABL-03). The checkpoint is NPZ. `values(obs)` takes a `(1, *obs_shape)` observation and returns its `(n_actions,)` float64 values, zeros for an unseen observation, without changing the table. `epsilon(step)` is the exploration rate after `step` `learn` calls: `exploration.start` at 0, falling linearly to `exploration.end` at `exploration.decay_steps` and staying there; `act` with `explore=True` uses `epsilon` of the number of `learn` calls so far. Both are pure.
+52	- **Errors:** `ValueError` if `values` gets a batch other than 1 or `epsilon` a negative step
+53	- **Boundary:** lab · **Fixtures:** tests/contracts/agents.TabularAgent/ · **Cases:** a replay double of 5 act/learn calls on the corridor
+54	- **Used by:** lab; PL-01, PL-03
+55	
+56	&lt;!-- docs/packages/rllab/contract.md:51 --&gt;
+57	### core.Agent: type
+58	```python
+59	class Agent(Protocol):
+60	    def act(self, obs: np.ndarray, *, explore: bool) -&gt; np.ndarray: ...
+61	    def learn(self, t: Transition) -&gt; None: ...
+62	    def save(self, path: Path) -&gt; None: ...
+63	    def load(self, path: Path) -&gt; None: ...
+64	```
+65	- **Invariants:** one agent acts for one team: `act` takes that team&#x27;s `(n_agents, *obs_shape)` and returns one action per agent, shaped by the team&#x27;s `ActionSpace`. `explore=False` never samples or takes a random action (AGENT-07): value learners take the best-valued action and policy learners the policy&#x27;s mean. Players that don&#x27;t learn make `learn` a no-op. `save` then `load` gives the same `act` outputs.
+66	- **Boundary:** train, evaluate, lab · **Fixtures:** tests/contracts/core.Agent/ · **Cases:** a replay double recording 5 act/learn calls of a tabular agent
+67	- **Used by:** agents, baselines, reference (providers); train, evaluate, lab; PL-01, PL-03, PL-04, PL-05
+68	
+69	&lt;!-- docs/packages/rllab/contract.md:45 --&gt;
+70	### core.Transition: type
+71	`@dataclass(frozen=True) class Transition: obs: np.ndarray; actions: np.ndarray; reward: np.ndarray; next_obs: np.ndarray; terminated: np.ndarray; active: np.ndarray; truncated: bool`
+72	- **Invariants:** one `Transition` per learning team per step, every array batch-first over that team&#x27;s agents. `active` marks agents that acted this step. `terminated` is true per agent only for that agent&#x27;s real end (a collision, the corridor goal or a catch), never for truncation, so truncated steps still bootstrap.
+73	- **Boundary:** agents, baselines · **Fixtures:** tests/contracts/core.Transition/ · **Cases:** a food step; a collision step; a truncated step; a tank step with 8 active fish of which one is caught
+74	- **Used by:** train, agents, baselines; PL-01
+75	
+76	&lt;!-- docs/packages/rllab/contract.md:91 --&gt;
+77	### core.AgentParams: type
+78	`@dataclass(frozen=True) class AgentParams: lr: float; gamma: float; batch_size: int = 64; memory_size: int = 50_000; target_every: int = 1_000; learn_start: int = 1_000; hidden: int = 128; net: Literal[&quot;mlp&quot;, &quot;cnn&quot;] = &quot;mlp&quot;; rollout_steps: int = 2048; epochs: int = 10; clip: float = 0.2; gae_lambda: float = 0.95; games_per_update: int = 10`
+79	- **Invariants:** `0 &lt; gamma ≤ 1`. The table-based agent reads only `lr` (its step size) and `gamma`. Policy-gradient agents read `lr`, `gamma`, `hidden` and `batch_size`; PPO also `rollout_steps`, `epochs`, `clip`, `gae_lambda`; REINFORCE also `games_per_update` (AD-11).
+80	- **Boundary:** agents, reference · **Fixtures:** tests/contracts/core.AgentParams/ · **Cases:** the dqn-compact defaults; tabular `lr=0.1, gamma=0.9`; the ppo defaults (`lr=3e-4, gamma=0.99, hidden=64`)
+81	- **Used by:** agents, reference; PL-01, PL-02
+82	
+83	&lt;!-- docs/packages/rllab/contract.md:85 --&gt;
+84	### core.Exploration: type
+85	`@dataclass(frozen=True) class Exploration: start: float = 1.0; end: float = 0.05; decay_steps: int = 50_000`
+86	- **Invariants:** `0 ≤ end ≤ start ≤ 1`. The rate falls linearly to `end` at `decay_steps`, then stays there (AGENT-02).
+87	- **Boundary:** agents, reference · **Fixtures:** tests/contracts/core.Exploration/ · **Cases:** defaults; no decay (`start == end`)
+88	- **Used by:** agents, reference; PL-01, PL-02
+89	
+90	&lt;!-- docs/packages/rllab/tests.md:74 --&gt;
+91	### TC-12: One-step value update
+92	**Pipeline:** PL-01 · **Covers:** AGENT-01 · **Kind:** closed form · **Fixture:** tests/fixtures/rllab/TC-12/
+93	**Source:** the one-step value-update rule `Q ← Q + α(r + γ·maxₐ′ Q(s′,a′) − Q)`, with no bootstrap at termination (Sutton &amp; Barto, *Reinforcement Learning*, 2nd ed., eq. 6.8)
+94	**Expected:** corridor one-hot states, `lr=0.1`, `gamma=0.9`, table at 0. The terminal transition (cell 8, right, +1) gives `Q(cell 8, right) = 0.1`. Then (cell 7, right, 0, next cell 8, not terminal) gives `Q(cell 7, right) = 0.009` · **Tolerance:** 1e-12 absolute, float rounding
+95	
+96	&lt;!-- docs/packages/rllab/tests.md:79 --&gt;
+97	### TC-13: Exploration rate decays linearly to its floor
+98	**Pipeline:** PL-01 · **Covers:** AGENT-02 · **Kind:** closed form · **Fixture:** tests/fixtures/rllab/TC-13/
+99	**Source:** the `core.Exploration` invariant (linear from `start` to `end` over `decay_steps`, then constant), approved 2026-10-17
+100	**Expected:** `start=1.0, end=0.05, decay_steps=50000` → rate 1.0 at step 0, 0.525 at 25,000, 0.05 at 50,000 and at 80,000 · **Tolerance:** 1e-9 absolute, float rounding
+101	
+102	## Layout (`dt layout rllab`)
+103	src/rllab/
+104	  __init__.py — rllab: a reinforcement-learning lab for Snake and the fish tank.
+105	  agents/
+106	    __init__.py — The learning agents.
+107	    tabular.py — The table-based value learner (AGENT-01, AGENT-02, ABL-03).
+108	    dqn/
+109	      __init__.py — The neural value learner.
+110	      agent.py — The neural value learner (AGENT-03 to AGENT-05, ABL-01, ABL-02).
+111	      networks.py — The value networks: one output per action from a flattened observation (AD-05).
+112	  baselines/
+113	    __init__.py — The baseline players.
+114	    random.py — The random baseline (BASE-01).
+115	    scripted.py — The scripted baseline on the compact view (BASE-02).
+116	  compare/
+117	    __init__.py — Claims between players, tested and reported.
+118	    claims.py — Tested claims over pooled scores, and the report (PL-04 step 4).
+119	    types.py — A claim to test between two players, and its tested result.
+120	  core/
+121	    __init__.py — The core: environment and agent interfaces, and run settings.
+122	    protocols.py — The two interfaces every environment and every player implements (AD-03, AD-09, AD-13).
+123	    settings.py — Run settings from TOML (PL-01 step 1).
+124	    types.py — The core&#x27;s data types: teams, actions, steps, transitions and run settings (AD-09, AD-13).
+125	  envs/
+126	    __init__.py — The environments: Snake and the corridor.
+127	    corridor.py — A 1-D corridor with the goal at its far end (CORE-03).
+128	    snake.py — Snake on a square grid, one agent, compact or grid view (SNAKE-01 to SNAKE-09).
+129	    types.py — Observation layouts shared with the players that read them.
+130	  evaluate/
+131	    __init__.py — Held-out greedy evaluation.
+132	    protocol.py — Greedy evaluation on held-out seeds (EVAL-01, DATA-01, AGENT-07).
+133	    types.py — What one evaluation asks for and what it returns.
+134	  lab/
+135	    __init__.py — The lab: the command line and the pipelines it runs.
+136	    __main__.py — `python -m rllab.lab`: dispatch `train`, `eval`, `replay` and `report`.
+137	    build.py — The environment and the agents a run&#x27;s settings name (PL-01 steps 2 and 7).
+138	    cli.py — The command line: `python -m rllab.lab &lt;train | eval | replay | report&gt; ...`.
+139	    players.py — Players from run folders or baseline names, scored or opened (PL-03 step 1, PL-04 steps 2-3).
+140	    printing.py — One line of scores (PL-03 step 11).
+141	    replay.py — The game a replay shows (PL-05 step 2).
+142	    report_spec.py — A report&#x27;s TOML: players, claims and chart groups (PL-04 step 1).
+143	    types.py — What a report names: its players, baselines and chart groups (PL-04).
+144	    pipelines/
+145	      __init__.py — One entry function per pipeline.
+146	      pl01_train.py — PL-01: train a run.
+147	      pl02_train_reference.py — PL-02: train the reference.
+148	      pl03_evaluate.py — PL-03: evaluate.
+149	      pl04_report.py — PL-04: report.
+150	      pl05_replay.py — PL-05: replay.
+151	  reference/
+152	    __init__.py — The reference: a library agent trained and played on the lab&#x27;s environments.
+153	    player.py — A trained library model as an Agent (REF-01).
+154	    train/
+155	      __init__.py — The library agent&#x27;s training through the gymnasium adapter (AD-03, AD-04).
+156	  runs/
+157	    __init__.py — Run folders: settings, curve, checkpoints and recorded games.
+158	    store.py — One folder per run: create it, write it as the run goes, read it back (AD-06).
+159	    types.py — What a run folder holds: its curve, its recorded games and the run itself (AD-06).
+160	  train/
+161	    __init__.py — The training loop.
+162	    loop.py — The training loop over every team (PL-01 step 15).
+163	  viz/
+164	    __init__.py — Charts and the replay window.
+165	    curves.py — Learning curves with baseline lines (PL-04 step 5).
+166	    replay.py — The interactive replay window (REPLAY-01, REPLAY-02).
+167	    types.py — A written chart and what it draws.
+168	
+169	## Writes (edit only these files; the plan gives every other file to another task)
+170	- src/rllab/agents/tabular.py (exists)
+171	- tests/unit/rllab/test_tabular.py (new)
+172	
+173	&lt;!-- tasks/plan.md:171 --&gt;
+174	### M1-T15: Table-based value learner
+175	**Package:** rllab · **Step:** PL-01.TabularAgent · **Kind:** thicken · **Covers:** AGENT-01, AGENT-02, ABL-03 · **Size:** XS · **Mode:** split
+176	**Reason:** fold: spine is the whole behavior
+177	**Read:** PL-01, agents.TabularAgent, core.Agent, core.Transition, core.AgentParams, core.Exploration, TC-12, TC-13
+178	**Acceptance:**
+179	- [ ] TC-12 passes (0.1, then 0.009) and TC-13 passes (1.0 / 0.525 / 0.05 / 0.05)
+180	- [ ] With `explore_enabled=False`, no action in 1,000 `act(explore=True)` calls differs from the argmax (ABL-03)
+181	**Verify:** `pytest tests/intent/rllab tests/unit/rllab -k tabular` · `scripts/check.sh gate`
+182	**Depends on:** M1-T01, M1-T32 · **Writes:** src/rllab/agents/tabular.py, tests/intent/rllab/test_tabular.py, tests/unit/rllab/test_tabular.py
+183	</pre></details></div><div class="step" id="S5"><span class="sid">U47.S5</span><span class="kind">Read</span>/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/project/.claude/worktrees/agent-a64e2d7e170c8d509/src/rllab/agents/tabular.py<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/project/.claude/worktrees/agent-a64e2d7e170c8d509/src/rllab/agents/tabular.py&quot;
+}</pre><div class="lbl">output</div><pre>1	&quot;&quot;&quot;The table-based value learner (AGENT-01, AGENT-02, ABL-03).&quot;&quot;&quot;
+2	
+3	from pathlib import Path
+4	
+5	import numpy as np
+6	
+7	from rllab.core import Agent, AgentParams, Exploration, Transition
+8	
+9	
+10	class TabularAgent(Agent):
+11	    &quot;&quot;&quot;One value per (observation bytes, action), starting at 0; batches of one agent.&quot;&quot;&quot;
+12	
+13	    def __init__(
+14	        self,
+15	        n_actions: int,
+16	        params: AgentParams,
+17	        exploration: Exploration,
+18	        *,
+19	        seed: int,
+20	        explore_enabled: bool = True,
+21	    ) -&gt; None:
+22	        raise NotImplementedError(&quot;M1-T15&quot;)
+23	
+24	    def values(self, obs: np.ndarray) -&gt; np.ndarray:
+25	        &quot;&quot;&quot;The `(n_actions,)` values of a `(1, *obs_shape)` observation; zeros when unseen.&quot;&quot;&quot;
+26	        raise NotImplementedError(&quot;M1-T15&quot;)
+27	
+28	    def epsilon(self, step: int) -&gt; float:
+29	        &quot;&quot;&quot;The exploration rate after `step` `learn` calls.&quot;&quot;&quot;
+30	        raise NotImplementedError(&quot;M1-T15&quot;)
+31	
+32	    def act(self, obs: np.ndarray, *, explore: bool) -&gt; np.ndarray:
+33	        raise NotImplementedError(&quot;M1-T15&quot;)
+34	
+35	    def learn(self, t: Transition) -&gt; None:
+36	        raise NotImplementedError(&quot;M1-T15&quot;)
+37	
+38	    def save(self, path: Path) -&gt; None:
+39	        raise NotImplementedError(&quot;M1-T15&quot;)
+40	
+41	    def load(self, path: Path) -&gt; None:
+42	        raise NotImplementedError(&quot;M1-T15&quot;)
+43	</pre></details></div><div class="step" id="S6"><span class="sid">U47.S6</span><span class="kind">Bash</span>git status --short<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;git status --short&quot;,
+  &quot;description&quot;: &quot;Show working tree status&quot;
+}</pre><div class="lbl">output</div><pre>(Bash completed with no output)</pre></details></div><div class="step" id="S7"><span class="sid">U47.S7</span><span class="kind">Read</span>/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/project/.claude/worktrees/agent-a64e2d7e170c8d509/tests/intent/rllab/test_tabular.py<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/project/.claude/worktrees/agent-a64e2d7e170c8d509/tests/intent/rllab/test_tabular.py&quot;
+}</pre><div class="lbl">output</div><pre>1	&quot;&quot;&quot;Intent tests for agents.TabularAgent (M1-T15): TC-12 (AGENT-01), TC-13 (AGENT-02), ABL-03.&quot;&quot;&quot;
+2	
+3	import json
+4	from pathlib import Path
+5	from typing import Any
+6	
+7	import numpy as np
+8	import pytest
+9	
+10	from rllab.agents import TabularAgent
+11	from rllab.core import AgentParams, Exploration, Transition
+12	
+13	FIXTURES = Path(__file__).resolve().parents[2] / &quot;fixtures&quot; / &quot;rllab&quot;
+14	CONTRACTS = Path(__file__).resolve().parents[2] / &quot;contracts&quot;
+15	CORRIDOR_LENGTH = 10
+16	N_ACTIONS = 2
+17	SEED = 0
+18	
+19	
+20	def _load(path: Path) -&gt; Any:
+21	    return json.loads(path.read_text())
+22	
+23	
+24	@pytest.fixture
+25	def tc12_input() -&gt; Any:
+26	    return _load(FIXTURES / &quot;TC-12&quot; / &quot;input.json&quot;)
+27	
+28	
+29	@pytest.fixture
+30	def tc12_expected() -&gt; Any:
+31	    return _load(FIXTURES / &quot;TC-12&quot; / &quot;expected.json&quot;)
+32	
+33	
+34	@pytest.fixture
+35	def tc13_input() -&gt; Any:
+36	    return _load(FIXTURES / &quot;TC-13&quot; / &quot;input.json&quot;)
+37	
+38	
+39	@pytest.fixture
+40	def tc13_expected() -&gt; Any:
+41	    return _load(FIXTURES / &quot;TC-13&quot; / &quot;expected.json&quot;)
+42	
+43	
+44	def _tabular_params() -&gt; AgentParams:
+45	    sample = _load(CONTRACTS / &quot;core.AgentParams&quot; / &quot;samples.json&quot;)[&quot;tabular&quot;]
+46	    return AgentParams(**sample)
+47	
+48	
+49	def _onehot(cell: int) -&gt; np.ndarray:
+50	    obs = np.zeros((1, CORRIDOR_LENGTH), dtype=np.float32)
+51	    if cell &lt; CORRIDOR_LENGTH:
+52	        obs[0, cell] = 1.0
+53	    return obs
+54	
+55	
+56	def _transition(
+57	    obs_cell: int,
+58	    action: int,
+59	    reward: float,
+60	    next_cell: int,
+61	    terminated: bool,
+62	    *,
+63	    truncated: bool = False,
+64	) -&gt; Transition:
+65	    return Transition(
+66	        obs=_onehot(obs_cell),
+67	        actions=np.array([action], dtype=np.int64),
+68	        reward=np.array([reward], dtype=np.float32),
+69	        next_obs=_onehot(next_cell),
+70	        terminated=np.array([terminated], dtype=bool),
+71	        active=np.array([True], dtype=bool),
+72	        truncated=truncated,
+73	    )
+74	
+75	
+76	def _from_fixture(spec: Any, **kwargs: Any) -&gt; Transition:
+77	    return _transition(
+78	        spec[&quot;obs_cell&quot;],
+79	        spec[&quot;action&quot;],
+80	        spec[&quot;reward&quot;],
+81	        spec[&quot;next_cell&quot;],
+82	        spec[&quot;terminated&quot;],
+83	        **kwargs,
+84	    )
+85	
+86	
+87	def _agent(
+88	    params: AgentParams | None = None,
+89	    exploration: Exploration | None = None,
+90	    *,
+91	    explore_enabled: bool = True,
+92	) -&gt; TabularAgent:
+93	    return TabularAgent(
+94	        N_ACTIONS,
+95	        params if params is not None else _tabular_params(),
+96	        exploration if exploration is not None else Exploration(),
+97	        seed=SEED,
+98	        explore_enabled=explore_enabled,
+99	    )
+100	
+101	
+102	def _tc12_agent(tc12_input: Any) -&gt; TabularAgent:
+103	    params = AgentParams(lr=tc12_input[&quot;lr&quot;], gamma=tc12_input[&quot;gamma&quot;])
+104	    return _agent(params)
+105	
+106	
+107	@pytest.mark.intent
+108	def test_tc12_terminal_update_then_bootstrapped_update(tc12_input, tc12_expected):
+109	    tol = tc12_expected[&quot;tol&quot;]
+110	    agent = _tc12_agent(tc12_input)
+111	    first, second = tc12_input[&quot;transitions&quot;]
+112	
+113	    agent.learn(_from_fixture(first))
+114	    after_1 = tc12_expected[&quot;after_1&quot;]
+115	    values_1 = agent.values(_onehot(after_1[&quot;cell&quot;]))
+116	    assert values_1[after_1[&quot;action&quot;]] == pytest.approx(after_1[&quot;value&quot;], abs=tol)
+117	
+118	    agent.learn(_from_fixture(second))
+119	    after_2 = tc12_expected[&quot;after_2&quot;]
+120	    values_2 = agent.values(_onehot(after_2[&quot;cell&quot;]))
+121	    assert values_2[after_2[&quot;action&quot;]] == pytest.approx(after_2[&quot;value&quot;], abs=tol)
+122	    # The earlier entry is untouched by the second update.
+123	    again = agent.values(_onehot(after_1[&quot;cell&quot;]))
+124	    assert again[after_1[&quot;action&quot;]] == pytest.approx(after_1[&quot;value&quot;], abs=tol)
+125	
+126	
+127	@pytest.mark.intent
+128	def test_tc12_truncated_step_still_bootstraps(tc12_input, tc12_expected):
+129	    tol = tc12_expected[&quot;tol&quot;]
+130	    agent = _tc12_agent(tc12_input)
+131	    first, second = tc12_input[&quot;transitions&quot;]
+132	    agent.learn(_from_fixture(first))
+133	    agent.learn(_from_fixture(second, truncated=True))
+134	    after_2 = tc12_expected[&quot;after_2&quot;]
+135	    values = agent.values(_onehot(after_2[&quot;cell&quot;]))
+136	    assert values[after_2[&quot;action&quot;]] == pytest.approx(after_2[&quot;value&quot;], abs=tol)
+137	
+138	
+139	@pytest.mark.intent
+140	def test_terminated_step_does_not_bootstrap_from_next_value(tc12_input, tc12_expected):
+141	    tol = tc12_expected[&quot;tol&quot;]
+142	    agent = _tc12_agent(tc12_input)
+143	    first, second = tc12_input[&quot;transitions&quot;]
+144	    agent.learn(_from_fixture(first))
+145	    # Same as the second step, but the agent&#x27;s real end: next value must be ignored.
+146	    terminal = dict(second, terminated=True)
+147	    agent.learn(_from_fixture(terminal))
+148	    values = agent.values(_onehot(second[&quot;obs_cell&quot;]))
+149	    assert values[second[&quot;action&quot;]] == pytest.approx(0.0, abs=tol)
+150	    assert agent.values(_onehot(first[&quot;obs_cell&quot;]))[first[&quot;action&quot;]] &gt; 0.0
+151	
+152	
+153	@pytest.mark.intent
+154	def test_values_start_at_zero_with_float64_row_per_action():
+155	    agent = _agent()
+156	    values = agent.values(_onehot(3))
+157	    assert values.shape == (N_ACTIONS,)
+158	    assert values.dtype == np.float64
+159	    assert np.array_equal(values, np.zeros(N_ACTIONS))
+160	
+161	
+162	@pytest.mark.intent
+163	def test_values_does_not_change_the_table(tc12_input):
+164	    agent = _tc12_agent(tc12_input)
+165	    first = tc12_input[&quot;transitions&quot;][0]
+166	    agent.learn(_from_fixture(first))
+167	    unseen = _onehot(2)
+168	    assert np.array_equal(agent.values(unseen), np.zeros(N_ACTIONS))
+169	    before = agent.values(_onehot(first[&quot;obs_cell&quot;])).copy()
+170	    for _ in range(3):
+171	        agent.values(unseen)
+172	        after = agent.values(_onehot(first[&quot;obs_cell&quot;]))
+173	    assert np.array_equal(before, after)
+174	    assert np.array_equal(agent.values(unseen), np.zeros(N_ACTIONS))
+175	
+176	
+177	@pytest.mark.intent
+178	def test_values_rejects_a_batch_other_than_one():
+179	    agent = _agent()
+180	    batch = np.zeros((2, CORRIDOR_LENGTH), dtype=np.float32)
+181	    with pytest.raises(ValueError, match=r&quot;\S&quot;):
+182	        agent.values(batch)
+183	
+184	
+185	@pytest.mark.intent
+186	def test_tc13_exploration_rate_decays_linearly_to_its_floor(tc13_input, tc13_expected):
+187	    tol = tc13_expected[&quot;tol&quot;]
+188	    agent = _agent(exploration=Exploration(**tc13_input[&quot;exploration&quot;]))
+189	    for step in tc13_input[&quot;steps&quot;]:
+190	        expected = tc13_expected[&quot;rate&quot;][str(step)]
+191	        assert agent.epsilon(step) == pytest.approx(expected, abs=tol)
+192	
+193	
+194	@pytest.mark.intent
+195	def test_epsilon_is_pure(tc13_input, tc13_expected):
+196	    tol = tc13_expected[&quot;tol&quot;]
+197	    agent = _agent(exploration=Exploration(**tc13_input[&quot;exploration&quot;]))
+198	    step = tc13_input[&quot;steps&quot;][1]
+199	    first = agent.epsilon(step)
+200	    assert agent.epsilon(step) == first
+201	    assert first == pytest.approx(tc13_expected[&quot;rate&quot;][str(step)], abs=tol)
+202	
+203	
+204	@pytest.mark.intent
+205	def test_epsilon_without_decay_stays_at_start():
+206	    sample = _load(CONTRACTS / &quot;core.Exploration&quot; / &quot;samples.json&quot;)[&quot;no_decay&quot;]
+207	    exploration = Exploration(**sample)
+208	    agent = _agent(exploration=exploration)
+209	    for step in (0, 1, exploration.decay_steps, exploration.decay_steps * 2):
+210	        assert agent.epsilon(step) == pytest.approx(exploration.start, abs=1e-9)
+211	
+212	
+213	@pytest.mark.intent
+214	def test_epsilon_rejects_a_negative_step():
+215	    agent = _agent()
+216	    with pytest.raises(ValueError, match=r&quot;\S&quot;):
+217	        agent.epsilon(-1)
+218	
+219	
+220	def _trained_two_state_agent(*, explore_enabled: bool, exploration: Exploration) -&gt; TabularAgent:
+221	    &quot;&quot;&quot;Cell 8 prefers right (1), cell 3 prefers left (0).&quot;&quot;&quot;
+222	    agent = _agent(exploration=exploration, explore_enabled=explore_enabled)
+223	    agent.learn(_transition(8, 1, 1.0, 9, True))
+224	    agent.learn(_transition(3, 0, 1.0, 2, True))
+225	    return agent
+226	
+227	
+228	@pytest.mark.intent
+229	def test_ablation_no_explore_always_takes_the_argmax():
+230	    agent = _trained_two_state_agent(explore_enabled=False, exploration=Exploration())
+231	    # Exploration is near its start rate, so an exploring agent would act randomly often.
+232	    assert agent.epsilon(2) &gt; 0.9
+233	    cells = (8, 3)
+234	    greedy = {cell: int(np.argmax(agent.values(_onehot(cell)))) for cell in cells}
+235	    assert greedy == {8: 1, 3: 0}
+236	    mismatches = 0
+237	    for i in range(1000):
+238	        cell = cells[i % 2]
+239	        action = agent.act(_onehot(cell), explore=True)
+240	        assert action.shape == (1,)
+241	        if int(action[0]) != greedy[cell]:
+242	            mismatches += 1
+243	    assert mismatches == 0
+244	
+245	
+246	@pytest.mark.intent
+247	def test_exploring_agent_does_take_non_greedy_actions():
+248	    agent = _trained_two_state_agent(explore_enabled=True, exploration=Exploration())
+249	    greedy = int(np.argmax(agent.values(_onehot(8))))
+250	    actions = [int(agent.act(_onehot(8), explore=True)[0]) for _ in range(1000)]
+251	    assert any(a != greedy for a in actions)
+252	    assert set(actions) &lt;= set(range(N_ACTIONS))
+253	
+254	
+255	@pytest.mark.intent
+256	def test_explore_false_takes_the_best_valued_action():
+257	    agent = _trained_two_state_agent(explore_enabled=True, exploration=Exploration())
+258	    for cell, best in ((8, 1), (3, 0)):
+259	        for _ in range(200):
+260	            assert int(agent.act(_onehot(cell), explore=False)[0]) == best
+261	
+262	
+263	@pytest.mark.intent
+264	def test_act_explore_uses_epsilon_of_learn_calls_so_far():
+265	    # Rate reaches 0 after two learn calls, so exploring acts are then greedy.
+266	    exploration = Exploration(start=1.0, end=0.0, decay_steps=2)
+267	    agent = _trained_two_state_agent(explore_enabled=True, exploration=exploration)
+268	    assert agent.epsilon(2) == pytest.approx(0.0, abs=1e-12)
+269	    for _ in range(500):
+270	        assert int(agent.act(_onehot(8), explore=True)[0]) == 1
+271	        assert int(agent.act(_onehot(3), explore=True)[0]) == 0
+272	
+273	
+274	@pytest.mark.intent
+275	def test_save_then_load_restores_values_and_actions(tmp_path):
+276	    agent = _trained_two_state_agent(explore_enabled=True, exploration=Exploration())
+277	    path = tmp_path / &quot;tabular.npz&quot;
+278	    agent.save(path)
+279	    fresh = _agent()
+280	    fresh.load(path)
+281	    for cell in (8, 3, 5):
+282	        obs = _onehot(cell)
+283	        assert np.array_equal(fresh.values(obs), agent.values(obs))
+284	        assert np.array_equal(fresh.act(obs, explore=False), agent.act(obs, explore=False))
+285	    with np.load(path) as archive:
+286	        assert len(archive.files) &gt; 0
+287	</pre></details></div><div class="step" id="S8"><span class="sid">U47.S8</span><span class="kind">Bash</span>grep -rn &quot;def \|epsilon\|tobytes\|savez&quot; src/rllab/agents/dqn/agent.py src/rllab/core/types.py<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;grep -rn \&quot;def \\|epsilon\\|tobytes\\|savez\&quot; src/rllab/agents/dqn/agent.py src/rllab/core/types.py&quot;,
+  &quot;description&quot;: &quot;Look for existing helpers in agents and core&quot;
+}</pre><div class="lbl">output</div><pre>src/rllab/agents/dqn/agent.py:18:def exploration_rate(exploration: Exploration, steps: int) -&gt; float:
+src/rllab/agents/dqn/agent.py:26:def _check_team(team: TeamSpec, params: AgentParams) -&gt; None:
+src/rllab/agents/dqn/agent.py:41:    def __init__(
+src/rllab/agents/dqn/agent.py:71:    def act(self, obs: np.ndarray, *, explore: bool) -&gt; np.ndarray:
+src/rllab/agents/dqn/agent.py:79:    def learn(self, t: Transition) -&gt; None:
+src/rllab/agents/dqn/agent.py:91:    def online_state(self) -&gt; dict[str, torch.Tensor]:
+src/rllab/agents/dqn/agent.py:95:    def target_state(self) -&gt; dict[str, torch.Tensor]:
+src/rllab/agents/dqn/agent.py:99:    def save(self, path: Path) -&gt; None:
+src/rllab/agents/dqn/agent.py:103:    def load(self, path: Path) -&gt; None:
+src/rllab/agents/dqn/agent.py:109:    def _remember(self, t: Transition) -&gt; None:
+src/rllab/agents/dqn/agent.py:118:    def _update(self, rows: np.ndarray) -&gt; None:</pre></details></div><div class="step" id="S9"><span class="sid">U47.S9</span><span class="kind">Bash</span>ls tests/contracts/agents.TabularAgent tests/unit/rllab<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;ls tests/contracts/agents.TabularAgent tests/unit/rllab&quot;,
+  &quot;description&quot;: &quot;List contract folder and unit tests&quot;
+}</pre><div class="lbl">output</div><pre>tests/contracts/agents.TabularAgent:
+samples.json
+schema.json
+test_agents_tabularagent.py
+
+tests/unit/rllab:
+test_build.py
+test_claims.py
+test_corridor.py
+test_curves.py
+test_dqn.py
+test_evaluate.py
+test_pick_game.py
+test_pl03_smoke.py
+test_players.py
+test_random_player.py
+test_reference_player.py
+test_report_spec.py
+test_scripted.py
+test_settings.py
+test_snake.py
+test_store.py
+test_train_loop.py</pre></details></div><div class="step" id="S10"><span class="sid">U47.S10</span><span class="kind">Read</span>/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/project/.claude/worktrees/agent-a64e2d7e170c8d509/src/rllab/agents/dqn/agent.py limit=80<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/project/.claude/worktrees/agent-a64e2d7e170c8d509/src/rllab/agents/dqn/agent.py&quot;,
+  &quot;limit&quot;: 80
+}</pre><div class="lbl">output</div><pre>1	&quot;&quot;&quot;The neural value learner (AGENT-03 to AGENT-05, ABL-01, ABL-02).&quot;&quot;&quot;
+2	
+3	import copy
+4	from pathlib import Path
+5	from typing import Literal
+6	
+7	import numpy as np
+8	import torch
+9	from torch import nn
+10	
+11	from rllab.agents.dqn.networks import build_net
+12	from rllab.core import Agent, AgentParams, Exploration, TeamSpec, Transition
+13	
+14	GRAD_CLIP = 10.0
+15	&quot;&quot;&quot;Largest gradient norm per update.&quot;&quot;&quot;
+16	
+17	
+18	def exploration_rate(exploration: Exploration, steps: int) -&gt; float:
+19	    &quot;&quot;&quot;The rate after `steps` steps: linear from `start` to `end` at `decay_steps`, then flat.&quot;&quot;&quot;
+20	    if exploration.decay_steps &lt;= 0:
+21	        return exploration.end
+22	    fraction = min(1.0, steps / exploration.decay_steps)
+23	    return exploration.start + (exploration.end - exploration.start) * fraction
+24	
+25	
+26	def _check_team(team: TeamSpec, params: AgentParams) -&gt; None:
+27	    if team.n_agents != 1:
+28	        raise ValueError(f&quot;DQNAgent plays one agent, got n_agents={team.n_agents}&quot;)
+29	    if team.actions.kind != &quot;discrete&quot;:
+30	        raise ValueError(f&quot;DQNAgent needs discrete actions, got {team.actions.kind!r}&quot;)
+31	    if params.net == &quot;cnn&quot; and len(team.obs_shape) != 3:
+32	        raise ValueError(f&#x27;net=&quot;cnn&quot; needs a 3-D obs_shape, got {team.obs_shape}&#x27;)
+33	
+34	
+35	class DQNAgent(Agent):
+36	    &quot;&quot;&quot;A value network sized from `team`, with a replay memory and a target copy.
+37	
+38	    The spine always learns with both; the `ablation` switches arrive with M1-T26.
+39	    &quot;&quot;&quot;
+40	
+41	    def __init__(
+42	        self,
+43	        team: TeamSpec,
+44	        params: AgentParams,
+45	        exploration: Exploration,
+46	        *,
+47	        seed: int,
+48	        ablation: Literal[&quot;none&quot;, &quot;no_memory&quot;, &quot;no_target&quot;] = &quot;none&quot;,
+49	    ) -&gt; None:
+50	        _check_team(team, params)
+51	        torch.set_num_threads(1)
+52	        torch.use_deterministic_algorithms(True)
+53	        self._params = params
+54	        self._exploration = exploration
+55	        self._n_actions = team.actions.n
+56	        self._rng = np.random.default_rng(seed)
+57	        with torch.random.fork_rng():
+58	            torch.manual_seed(seed)
+59	            self._online = build_net(team.obs_shape, team.actions.n, params)
+60	        self._target = copy.deepcopy(self._online)
+61	        self._optimizer = torch.optim.Adam(self._online.parameters(), lr=params.lr)
+62	        size = params.memory_size
+63	        self._obs = np.zeros((size, *team.obs_shape), dtype=np.float32)
+64	        self._next_obs = np.zeros((size, *team.obs_shape), dtype=np.float32)
+65	        self._actions = np.zeros(size, dtype=np.int64)
+66	        self._rewards = np.zeros(size, dtype=np.float32)
+67	        self._terminated = np.zeros(size, dtype=np.float32)
+68	        self._stored = 0
+69	        self._updates = 0
+70	
+71	    def act(self, obs: np.ndarray, *, explore: bool) -&gt; np.ndarray:
+72	        &quot;&quot;&quot;Greedy over the online network&#x27;s values; with `explore`, random at the current rate.&quot;&quot;&quot;
+73	        if explore and self._rng.random() &lt; exploration_rate(self._exploration, self._stored):
+74	            return self._rng.integers(0, self._n_actions, size=1, dtype=np.int64)
+75	        with torch.no_grad():
+76	            values: torch.Tensor = self._online(torch.as_tensor(obs, dtype=torch.float32))
+77	        return values.argmax(dim=1).numpy().astype(np.int64)
+78	
+79	    def learn(self, t: Transition) -&gt; None:
+80	        &quot;&quot;&quot;Remember the step; from `learn_start` on, one update on a random batch of memory.&quot;&quot;&quot;</pre></details></div><div class="step" id="S11"><span class="sid">U47.S11</span><span class="kind">Read</span>/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/project/.claude/worktrees/agent-a64e2d7e170c8d509/tests/contracts/agents.TabularAgent/test_agents_tabularagent.py<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/project/.claude/worktrees/agent-a64e2d7e170c8d509/tests/contracts/agents.TabularAgent/test_agents_tabularagent.py&quot;
+}</pre><div class="lbl">output</div><pre>1	&quot;&quot;&quot;agents.TabularAgent: the corridor recording passes the Agent check via the replay double.&quot;&quot;&quot;
+2	
+3	import inspect
+4	from typing import Protocol
+5	
+6	import numpy as np
+7	
+8	from rllab.agents import TabularAgent
+9	from rllab.core import ActionSpace, Agent, TeamSpec
+10	
+11	SYMBOL = &quot;agents.TabularAgent&quot;
+12	
+13	
+14	class Inspection(Protocol):
+15	    def values(self, obs: np.ndarray) -&gt; np.ndarray: ...
+16	    def epsilon(self, step: int) -&gt; float: ...
+17	
+18	
+19	def test_inspection_methods_have_their_signatures():
+20	    for name in (&quot;values&quot;, &quot;epsilon&quot;):
+21	        assert inspect.signature(getattr(TabularAgent, name)) == inspect.signature(
+22	            getattr(Inspection, name)
+23	        )
+24	
+25	
+26	def test_samples_follow_the_schema(codec):
+27	    codec.assert_samples_valid(SYMBOL)
+28	
+29	
+30	def test_recording_passes_the_agent_check(codec, tmp_path):
+31	    fake = codec.fake(&quot;core.Agent&quot;)
+32	    recording = codec.sample(SYMBOL, &quot;corridor_5&quot;, fake.AgentRecording)
+33	    assert recording.team == TeamSpec(1, (10,), ActionSpace(&quot;discrete&quot;, n=2))
+34	    assert sum(call.kind == &quot;learn&quot; for call in recording.calls) == 5
+35	    fake.check_agent(fake.ReplayAgent(recording), recording, tmp_path)
+36	
+37	
+38	def test_tabular_agent_is_an_agent():
+39	    assert Agent in TabularAgent.__mro__
+40	</pre></details></div><div class="step" id="S12"><span class="sid">U47.S12</span><span class="kind">Read</span>/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/project/.claude/worktrees/agent-a64e2d7e170c8d509/src/rllab/agents/__init__.py<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/project/.claude/worktrees/agent-a64e2d7e170c8d509/src/rllab/agents/__init__.py&quot;
+}</pre><div class="lbl">output</div><pre>1	&quot;&quot;&quot;The learning agents.&quot;&quot;&quot;
+2	
+3	from rllab.agents.dqn import DQNAgent
+4	from rllab.agents.tabular import TabularAgent
+5	
+6	__all__ = [&quot;DQNAgent&quot;, &quot;TabularAgent&quot;]
+7	</pre></details></div><div class="step" id="S13"><span class="sid">U47.S13</span><span class="kind">Write</span>/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/project/.claude/worktrees/agent-a64e2d7e170c8d509/src/rllab/agents/tabular.py (85 lines)<div class="lbl">wrote /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/project/.claude/worktrees/agent-a64e2d7e170c8d509/src/rllab/agents/tabular.py</div><pre>&quot;&quot;&quot;The table-based value learner (AGENT-01, AGENT-02, ABL-03).&quot;&quot;&quot;
+
+from pathlib import Path
+
+import numpy as np
+
+from rllab.agents.dqn.agent import exploration_rate
+from rllab.core import Agent, AgentParams, Exploration, Transition
+
+
+def _key(obs: np.ndarray) -&gt; bytes:
+    &quot;&quot;&quot;The table key of a `(1, *obs_shape)` observation.&quot;&quot;&quot;
+    if obs.shape[0] != 1:
+        raise ValueError(f&quot;TabularAgent takes a batch of 1, got {obs.shape[0]}&quot;)
+    return np.ascontiguousarray(obs[0]).tobytes()
+
+
+class TabularAgent(Agent):
+    &quot;&quot;&quot;One value per (observation bytes, action), starting at 0; batches of one agent.&quot;&quot;&quot;
+
+    def __init__(
+        self,
+        n_actions: int,
+        params: AgentParams,
+        exploration: Exploration,
+        *,
+        seed: int,
+        explore_enabled: bool = True,
+    ) -&gt; None:
+        self._n_actions = n_actions
+        self._params = params
+        self._exploration = exploration
+        self._explore_enabled = explore_enabled
+        self._rng = np.random.default_rng(seed)
+        self._table: dict[bytes, np.ndarray] = {}
+        self._learns = 0
+
+    def values(self, obs: np.ndarray) -&gt; np.ndarray:
+        &quot;&quot;&quot;The `(n_actions,)` values of a `(1, *obs_shape)` observation; zeros when unseen.&quot;&quot;&quot;
+        row = self._table.get(_key(obs))
+        return np.zeros(self._n_actions) if row is None else row.copy()
+
+    def epsilon(self, step: int) -&gt; float:
+        &quot;&quot;&quot;The exploration rate after `step` `learn` calls.&quot;&quot;&quot;
+        if step &lt; 0:
+            raise ValueError(f&quot;step must be non-negative, got {step}&quot;)
+        return exploration_rate(self._exploration, step)
+
+    def act(self, obs: np.ndarray, *, explore: bool) -&gt; np.ndarray:
+        &quot;&quot;&quot;The best-valued action; with `explore` (unless disabled), random at the current rate.&quot;&quot;&quot;
+        explores = explore and self._explore_enabled
+        if explores and self._rng.random() &lt; self.epsilon(self._learns):
+            return self._rng.integers(0, self._n_actions, size=1, dtype=np.int64)
+        return np.array([np.argmax(self.values(obs))], dtype=np.int64)
+
+    def learn(self, t: Transition) -&gt; None:
+        &quot;&quot;&quot;Move Q(obs, action) toward `reward + gamma * max next value`, not bootstrapping at an end.&quot;&quot;&quot;
+        key = _key(t.obs)
+        row = self._table.setdefault(key, np.zeros(self._n_actions))
+        bootstrap = 0.0 if bool(t.terminated[0]) else float(np.max(self.values(t.next_obs)))
+        target = float(t.reward[0]) + self._params.gamma * bootstrap
+        action = int(t.actions[0])
+        row[action] += self._params.lr * (target - row[action])
+        self._learns += 1
+
+    def save(self, path: Path) -&gt; None:
+        &quot;&quot;&quot;The table as NPZ: one uint8 row of key bytes and one value row per observation.&quot;&quot;&quot;
+        keys = [np.frombuffer(key, dtype=np.uint8) for key in self._table]
+        np.savez(
+            path,
+            keys=np.stack(keys) if keys else np.zeros((0, 0), dtype=np.uint8),
+            values=np.stack(list(self._table.values()))
+            if keys
+            else np.zeros((0, self._n_actions)),
+            learns=np.array(self._learns),
+        )
+
+    def load(self, path: Path) -&gt; None:
+        &quot;&quot;&quot;Replace the table and the learn count with those saved at `path`.&quot;&quot;&quot;
+        with np.load(path) as archive:
+            self._table = {
+                key.tobytes(): row.copy()
+                for key, row in zip(archive[&quot;keys&quot;], archive[&quot;values&quot;], strict=True)
+            }
+            self._learns = int(archive[&quot;learns&quot;])
+</pre><details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/project/.claude/worktrees/agent-a64e2d7e170c8d509/src/rllab/agents/tabular.py&quot;,
+  &quot;content&quot;: &quot;\&quot;\&quot;\&quot;The table-based value learner (AGENT-01, AGENT-02, ABL-03).\&quot;\&quot;\&quot;\n\nfrom pathlib import Path\n\nimport numpy as np\n\nfrom rllab.agents.dqn.agent import exploration_rate\nfrom rllab.core import Agent, AgentParams, Exploration, Transition\n\n\ndef _key(obs: np.ndarray) -&gt; bytes:\n    \&quot;\&quot;\&quot;The table key of a `(1, *obs_shape)` observation.\&quot;\&quot;\&quot;\n    if obs.shape[0] != 1:\n        raise ValueError(f\&quot;TabularAgent takes a batch of 1, got {obs.shape[0]}\&quot;)\n    return np.ascontiguousarray(obs[0]).tobytes()\n\n\nclass TabularAgent(Agent):\n    \&quot;\&quot;\&quot;One value per (observation bytes, action), starting at 0; batches of one agent.\&quot;\&quot;\&quot;\n\n    def __init__(\n        self,\n        n_actions: int,\n        params: AgentParams,\n        exploration: Exploration,\n        *,\n        seed: int,\n        explore_enabled: bool = True,\n    ) -&gt; None:\n        self._n_actions = n_actions\n        self._params = params\n        self._exploration = exploration\n        self._explore_enabled = explore_enabled\n        self._rng = np.random.default_rng(seed)\n        self._table: dict[bytes, np.ndarray] = {}\n        self._learns = 0\n\n    def values(self, obs: np.ndarray) -&gt; np.ndarray:\n        \&quot;\&quot;\&quot;The `(n_actions,)` values of a `(1, *obs_shape)` observation; zeros when unseen.\&quot;\&quot;\&quot;\n        row = self._table.get(_key(obs))\n        return np.zeros(self._n_actions) if row is None else row.copy()\n\n    def epsilon(self, step: int) -&gt; float:\n        \&quot;\&quot;\&quot;The exploration rate after `step` `learn` calls.\&quot;\&quot;\&quot;\n        if step &lt; 0:\n            raise ValueError(f\&quot;step must be non-negative, got {step}\&quot;)\n        return exploration_rate(self._exploration, step)\n\n    def act(self, obs: np.ndarray, *, explore: bool) -&gt; np.ndarray:\n        \&quot;\&quot;\&quot;The best-valued action; with `explore` (unless disabled), random at the current rate.\&quot;\&quot;\&quot;\n        explores = explore and self._explore_enabled\n        if explores and self._rng.random() &lt; self.epsilon(self._learns):\n            return self._rng.integers(0, self._n_actions, size=1, dtype=np.int64)\n        return np.array([np.argmax(self.values(obs))], dtype=np.int64)\n\n    def learn(self, t: Transition) -&gt; None:\n        \&quot;\&quot;\&quot;Move Q(obs, action) toward `reward + gamma * max next value`, not bootstrapping at an end.\&quot;\&quot;\&quot;\n        key = _key(t.obs)\n        row = self._table.setdefault(key, np.zeros(self._n_actions))\n        bootstrap = 0.0 if bool(t.terminated[0]) else float(np.max(self.values(t.next_obs)))\n        target = float(t.reward[0]) + self._params.gamma * bootstrap\n        action = int(t.actions[0])\n        row[action] += self._params.lr * (target - row[action])\n        self._learns += 1\n\n    def save(self, path: Path) -&gt; None:\n        \&quot;\&quot;\&quot;The table as NPZ: one uint8 row of key bytes and one value row per observation.\&quot;\&quot;\&quot;\n        keys = [np.frombuffer(key, dtype=np.uint8) for key in self._table]\n        np.savez(\n            path,\n            keys=np.stack(keys) if keys else np.zeros((0, 0), dtype=np.uint8),\n            values=np.stack(list(self._table.values()))\n            if keys\n            else np.zeros((0, self._n_actions)),\n            learns=np.array(self._learns),\n        )\n\n    def load(self, path: Path) -&gt; None:\n        \&quot;\&quot;\&quot;Replace the table and the learn count with those saved at `path`.\&quot;\&quot;\&quot;\n        with np.load(path) as archive:\n            self._table = {\n                key.tobytes(): row.copy()\n                for key, row in zip(archive[\&quot;keys\&quot;], archive[\&quot;values\&quot;], strict=True)\n            }\n            self._learns = int(archive[\&quot;learns\&quot;])\n&quot;
+}</pre><div class="lbl">output</div><pre>The file /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/project/.claude/worktrees/agent-a64e2d7e170c8d509/src/rllab/agents/tabular.py has been updated successfully. (file state is current in your context — no need to Read it back)</pre></details></div><div class="step" id="S14"><span class="sid">U47.S14</span><span class="kind">Write</span>/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/project/.claude/worktrees/agent-a64e2d7e170c8d509/tests/unit/rllab/test_tabular.py (98 lines)<div class="lbl">wrote /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/project/.claude/worktrees/agent-a64e2d7e170c8d509/tests/unit/rllab/test_tabular.py</div><pre>&quot;&quot;&quot;Unit tests for agents.TabularAgent: the table, its NPZ checkpoint and the learn count.&quot;&quot;&quot;
+
+import numpy as np
+import pytest
+
+from rllab.agents import TabularAgent
+from rllab.core import AgentParams, Exploration, Transition
+
+
+def _obs(cell: int) -&gt; np.ndarray:
+    obs = np.zeros((1, 4), dtype=np.float32)
+    obs[0, cell] = 1.0
+    return obs
+
+
+def _step(cell: int, action: int, reward: float, next_cell: int, terminated: bool) -&gt; Transition:
+    return Transition(
+        obs=_obs(cell),
+        actions=np.array([action], dtype=np.int64),
+        reward=np.array([reward], dtype=np.float32),
+        next_obs=_obs(next_cell),
+        terminated=np.array([terminated]),
+        active=np.array([True]),
+        truncated=False,
+    )
+
+
+def _agent(exploration: Exploration | None = None) -&gt; TabularAgent:
+    return TabularAgent(
+        3,
+        AgentParams(lr=0.5, gamma=0.5),
+        exploration if exploration is not None else Exploration(),
+        seed=1,
+    )
+
+
+def test_repeated_updates_follow_the_step_size():
+    agent = _agent()
+    agent.learn(_step(0, 2, 1.0, 1, True))
+    agent.learn(_step(0, 2, 1.0, 1, True))
+    assert agent.values(_obs(0)) == pytest.approx([0.0, 0.0, 0.75], abs=1e-12)
+
+
+def test_bootstrap_uses_the_max_over_next_actions():
+    agent = _agent()
+    agent.learn(_step(1, 0, 4.0, 2, True))
+    agent.learn(_step(1, 1, 2.0, 2, True))
+    agent.learn(_step(0, 2, 0.0, 1, False))
+    # 0.5 * (0 + 0.5 * max(2.0, 1.0, 0.0)) = 0.5
+    assert agent.values(_obs(0))[2] == pytest.approx(0.5, abs=1e-12)
+
+
+def test_values_returns_a_copy():
+    agent = _agent()
+    agent.learn(_step(0, 1, 1.0, 1, True))
+    values = agent.values(_obs(0))
+    values[:] = 99.0
+    assert agent.values(_obs(0))[1] == pytest.approx(0.5, abs=1e-12)
+
+
+def test_epsilon_halfway_through_decay():
+    agent = _agent(Exploration(start=0.8, end=0.2, decay_steps=10))
+    assert agent.epsilon(5) == pytest.approx(0.5, abs=1e-12)
+    assert agent.epsilon(10) == pytest.approx(0.2, abs=1e-12)
+    assert agent.epsilon(1000) == pytest.approx(0.2, abs=1e-12)
+
+
+def test_save_then_load_of_an_empty_table(tmp_path):
+    path = tmp_path / &quot;empty.npz&quot;
+    _agent().save(path)
+    fresh = _agent()
+    fresh.learn(_step(0, 0, 1.0, 1, True))
+    fresh.load(path)
+    assert np.array_equal(fresh.values(_obs(0)), np.zeros(3))
+
+
+def test_load_restores_the_learn_count(tmp_path):
+    exploration = Exploration(start=1.0, end=0.0, decay_steps=1)
+    trained = _agent(exploration)
+    trained.learn(_step(0, 2, 1.0, 1, True))
+    path = tmp_path / &quot;trained.npz&quot;
+    trained.save(path)
+    fresh = _agent(exploration)
+    fresh.load(path)
+    # After one learn call the rate is 0, so exploring acts are greedy.
+    assert all(int(fresh.act(_obs(0), explore=True)[0]) == 2 for _ in range(100))
+
+
+def test_keys_with_trailing_zero_bytes_survive_the_checkpoint(tmp_path):
+    agent = _agent()
+    agent.learn(_step(0, 1, 1.0, 1, True))
+    agent.learn(_step(3, 0, 1.0, 1, True))
+    path = tmp_path / &quot;table.npz&quot;
+    agent.save(path)
+    fresh = _agent()
+    fresh.load(path)
+    assert fresh.values(_obs(0))[1] == pytest.approx(0.5, abs=1e-12)
+    assert fresh.values(_obs(3))[0] == pytest.approx(0.5, abs=1e-12)
+</pre><details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;file_path&quot;: &quot;/Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/project/.claude/worktrees/agent-a64e2d7e170c8d509/tests/unit/rllab/test_tabular.py&quot;,
+  &quot;content&quot;: &quot;\&quot;\&quot;\&quot;Unit tests for agents.TabularAgent: the table, its NPZ checkpoint and the learn count.\&quot;\&quot;\&quot;\n\nimport numpy as np\nimport pytest\n\nfrom rllab.agents import TabularAgent\nfrom rllab.core import AgentParams, Exploration, Transition\n\n\ndef _obs(cell: int) -&gt; np.ndarray:\n    obs = np.zeros((1, 4), dtype=np.float32)\n    obs[0, cell] = 1.0\n    return obs\n\n\ndef _step(cell: int, action: int, reward: float, next_cell: int, terminated: bool) -&gt; Transition:\n    return Transition(\n        obs=_obs(cell),\n        actions=np.array([action], dtype=np.int64),\n        reward=np.array([reward], dtype=np.float32),\n        next_obs=_obs(next_cell),\n        terminated=np.array([terminated]),\n        active=np.array([True]),\n        truncated=False,\n    )\n\n\ndef _agent(exploration: Exploration | None = None) -&gt; TabularAgent:\n    return TabularAgent(\n        3,\n        AgentParams(lr=0.5, gamma=0.5),\n        exploration if exploration is not None else Exploration(),\n        seed=1,\n    )\n\n\ndef test_repeated_updates_follow_the_step_size():\n    agent = _agent()\n    agent.learn(_step(0, 2, 1.0, 1, True))\n    agent.learn(_step(0, 2, 1.0, 1, True))\n    assert agent.values(_obs(0)) == pytest.approx([0.0, 0.0, 0.75], abs=1e-12)\n\n\ndef test_bootstrap_uses_the_max_over_next_actions():\n    agent = _agent()\n    agent.learn(_step(1, 0, 4.0, 2, True))\n    agent.learn(_step(1, 1, 2.0, 2, True))\n    agent.learn(_step(0, 2, 0.0, 1, False))\n    # 0.5 * (0 + 0.5 * max(2.0, 1.0, 0.0)) = 0.5\n    assert agent.values(_obs(0))[2] == pytest.approx(0.5, abs=1e-12)\n\n\ndef test_values_returns_a_copy():\n    agent = _agent()\n    agent.learn(_step(0, 1, 1.0, 1, True))\n    values = agent.values(_obs(0))\n    values[:] = 99.0\n    assert agent.values(_obs(0))[1] == pytest.approx(0.5, abs=1e-12)\n\n\ndef test_epsilon_halfway_through_decay():\n    agent = _agent(Exploration(start=0.8, end=0.2, decay_steps=10))\n    assert agent.epsilon(5) == pytest.approx(0.5, abs=1e-12)\n    assert agent.epsilon(10) == pytest.approx(0.2, abs=1e-12)\n    assert agent.epsilon(1000) == pytest.approx(0.2, abs=1e-12)\n\n\ndef test_save_then_load_of_an_empty_table(tmp_path):\n    path = tmp_path / \&quot;empty.npz\&quot;\n    _agent().save(path)\n    fresh = _agent()\n    fresh.learn(_step(0, 0, 1.0, 1, True))\n    fresh.load(path)\n    assert np.array_equal(fresh.values(_obs(0)), np.zeros(3))\n\n\ndef test_load_restores_the_learn_count(tmp_path):\n    exploration = Exploration(start=1.0, end=0.0, decay_steps=1)\n    trained = _agent(exploration)\n    trained.learn(_step(0, 2, 1.0, 1, True))\n    path = tmp_path / \&quot;trained.npz\&quot;\n    trained.save(path)\n    fresh = _agent(exploration)\n    fresh.load(path)\n    # After one learn call the rate is 0, so exploring acts are greedy.\n    assert all(int(fresh.act(_obs(0), explore=True)[0]) == 2 for _ in range(100))\n\n\ndef test_keys_with_trailing_zero_bytes_survive_the_checkpoint(tmp_path):\n    agent = _agent()\n    agent.learn(_step(0, 1, 1.0, 1, True))\n    agent.learn(_step(3, 0, 1.0, 1, True))\n    path = tmp_path / \&quot;table.npz\&quot;\n    agent.save(path)\n    fresh = _agent()\n    fresh.load(path)\n    assert fresh.values(_obs(0))[1] == pytest.approx(0.5, abs=1e-12)\n    assert fresh.values(_obs(3))[0] == pytest.approx(0.5, abs=1e-12)\n&quot;
+}</pre><div class="lbl">output</div><pre>File created successfully at: /Users/connorott/plugins/dev-team-workspace/iteration-b1/rl9-incremental-A3-r2/with_skill/project/.claude/worktrees/agent-a64e2d7e170c8d509/tests/unit/rllab/test_tabular.py (file state is current in your context — no need to Read it back)</pre></details></div><div class="step" id="S15"><span class="sid">U47.S15</span><span class="kind">Bash</span>scripts/check.sh gate<details><summary>full input and output</summary><div class="lbl">input</div><pre>{
+  &quot;command&quot;: &quot;scripts/check.sh gate&quot;,
+  &quot;description&quot;: &quot;Run the gate checks&quot;,
+  &quot;timeout&quot;: 600000
+}</pre><div class="lbl">output</div><pre>-&gt; ruff check --ignore-noqa .
+All checks passed!
+-&gt; ruff format --check .
+138 files already formatted
+-&gt; mypy
+Success: no issues found in 50 source files
+-&gt; python scripts/check_size.py src
+-&gt; deptry . --no-ansi
+Scanning 54 files...
+
+Success! No dependency issues found.
+-&gt; lint-imports --no-logo
+
+---------
+Contracts
+---------
+
+Analyzed 70 files, 177 dependencies.
+------------------------------------
+
+Layers: lab &gt; train | reference | compare | viz | baselines &gt; evaluate | envs | 
+agents &gt; runs &gt; core KEPT (1 ignored import)
+Hand-written code stays free of the reference library (AGENT-06, AD-04) KEPT
+Only agents imports PyTorch (AD-02) KEPT
+envs → core only KEPT
+agents → core only KEPT
+baselines → core, envs KEPT
+train → core, runs, evaluate KEPT
+reference → core, envs, runs, evaluate KEPT
+compare → evaluate KEPT
+viz → runs, evaluate KEPT
+
+Contracts: 10 kept, 0 broken.
+-&gt; pytest tests/intent tests/unit tests/contracts --no-cov -q -x
+........................................................................ [ 14%]
+........................................................................ [ 29%]
+........................................................................ [ 43%]
+........................................................................ [ 58%]
+........................................................................ [ 72%]
+........................................................................ [ 87%]
+...............................................................          [100%]
+495 passed in 16.84s
+-&gt; bash scripts/floor_guard.sh
+floor_guard: clean
+-&gt; protected files unchanged since refs/worktree/checks-base</pre></details></div><div class="step" id="S16"><span class="sid">U47.S16</span><span class="kind">say</span>DONE M1-T15 implementer<details><summary>full text</summary><pre>DONE M1-T15 implementer</pre></details></div>
+<h2>Commits</h2>
+<p>None.</p>
+<h2>Returned</h2>
+<pre>DONE M1-T15 implementer</pre>
+</body></html>

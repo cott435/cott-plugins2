@@ -2,15 +2,20 @@
 """Cases for the driver's own decisions: driver.session_step (when a turn resumes the current agent session and when
 it opens a fresh one, for which skill, and whether with `/dev-team:<skill>`), driver.user_steps (the probe.py and
 public.py steps a probe's README gives the user, run in order on "ran it"), driver.readiness's probe and approval
-clauses, run_report (what the simulated user is told after its run), and sim_user's fallback when every call fails. No dt, no model calls; the dry run runs this too.
+clauses, run_report (what the simulated user is told after its run), sim_user's fallback when every call fails and
+sim_answer's when it answers in prose, working_skill (the skill a turn worked in), and start_vendors' proxied Sharadar
+(no base URL; the closed proxy serves api.sharadar.com with the canary key). No dt, no model calls; the dry run runs
+this too.
 
 Usage: sessions.py   prints one line per case; exit 1 if any case comes out wrong
 """
-import json, pathlib, sys, tempfile
+import json, pathlib, sys, tempfile, urllib.request
 
-sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
+HERE = pathlib.Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(HERE))
+import driver  # noqa: E402
 from driver import (FALLBACK_APPROVE, FALLBACK_ASKED, approved_docs, asked, readiness, run_report,  # noqa: E402
-                    session_step, sim_user, user_steps)
+                    ran_said, session_step, sim_answer, sim_user, user_steps, vendor_env, working_skill)
 
 
 def sess(skill, *seen):
@@ -59,6 +64,14 @@ CASES = [
      (True, "api-probe", True)),
     ("a probe run reported to api-probe's own session resumes it", nxt("api-probe", "record"),
      nxt("api-probe", "waiting"), sess("api-probe"), ASKS, RAN, "I ran it.", (False, "api-probe", False)),
+    # Iteration 10 opened api-probe here, then build-planning, five sessions for one plan approval (H3).
+    ("a probe run while another skill's gate is open stays in that skill's session", nxt("build-planning", "gate"),
+     nxt("build-planning", "gate"), sess("build-planning"), ASKS, RAN, "I ran PB-01 and PB-03.",
+     (False, "build-planning", False)),
+    ("the gate approved, its session hands the run's Record on to a fresh api-probe", nxt("api-probe", "record"),
+     nxt("build-planning", "gate"), sess("build-planning"), OK, REPLY, "Please continue.", (True, "api-probe", True)),
+    ("a probe run at api-probe's own gate still goes to api-probe", nxt("api-probe", "gate"),
+     nxt("architecture-design", "gate"), sess("architecture-design"), ASKS, RAN, "I ran it.", (True, "api-probe", True)),
     ("nothing left to plan: a new stage goes to idea-refine", {"skill": None, "mode": "done"},
      nxt("build-setup", "gate"), sess("build-setup"), OK, NEW_STAGE, "Approved. Next idea: …", (True, "idea-refine", True)),
     ("a new stage goes to idea-refine whatever dt next names", nxt("build-planning", "new"),
@@ -82,6 +95,32 @@ CASES = [
      (True, "api-probe", True)),
 ]
 
+
+# PB-03's README from iteration 10's quant incremental run (Who runs what and Steps, as written).
+PB03_README = """# PB-03: yahooquery returns AAPL's daily history since 1998 with splits and dividends
+
+## Who runs what
+
+| Check | Runner | Command |
+|---|---|---|
+| C1–C3 | agent | `uv run --script probes/PB-03-yahooquery-history/public.py shape` |
+| C5 | agent | `uv run --script probes/PB-03-yahooquery-history/public.py burst` |
+| C4 | user | `uv run --script probes/PB-03-yahooquery-history/probe.py compare` |
+
+## Steps, in order
+
+C4 reads `../PB-01-sharadar-coverage/out/aapl_stocks.json` and `aapl_actions.json`, written by PB-01's
+step 2 (`collect`).
+
+1. `uv run --script probes/PB-03-yahooquery-history/probe.py compare` — under a minute; one Yahoo request.
+
+When you've finished, say "ran it", whether or not it failed. Don't paste the output.
+
+## Files
+
+- `probe.py` (yours), `public.py` (the agent's: it reads no environment at all), `yahoo.py` (the
+  yahooquery call both use), `probe_kit.py` (the shared helper, copied in).
+"""
 
 STEPS_README = """## Who runs what
 
@@ -114,6 +153,11 @@ STEPS = [
      [["adjust"]], "public.py"),
     ("public.py in a user row of the table", "| C6 | user | `uv run probes/PB-03-y/public.py chart` |", [["chart"]],
      "public.py"),
+    # Iteration 10 ran PB-03's probe.py 15 times with no step (H2): `uv run --script` wasn't read.
+    ("`uv run --script <path> <step>`: the step is kept (iteration 10's PB-03)", PB03_README, [["compare"]]),
+    ("PB-03's public.py, in agent rows only, isn't the user's", PB03_README, [], "public.py"),
+    ("options before the script are skipped, their values too", "1. `uv run --with yahooquery==2.4.1 --script "
+     "probes/PB-03-y/probe.py compare`\n2. `python3 -B probe.py checks`", [["compare"], ["checks"]]),
 ]
 
 
@@ -147,6 +191,47 @@ ASKED_U, ASKED_LOG = sim_fallback("Two questions before I write it.\n\n1. Which 
 DRAFT_U, _ = sim_fallback("The spec is ready for review: docs/spec.md (Draft).")
 
 
+# Iteration 10's sim user, in prose (H4): taken as the message, with `ran` and `approves` read off its words.
+PROSE_RAN = sim_answer({"result": "No, I didn't intend the local address. I re-ran PB-01, PB-02 and the PB-03 compare "
+                                  "step. Ran it."})
+PROSE_OK = sim_answer({"result": "Approved. On the eqdata split, take your recommendation."})
+PROSE_NOT = sim_answer({"result": "I don't approve this yet: the start date should be 2011."})
+STRUCTURED = sim_answer({"structured_output": {"action": "finish", "message": "Done.", "ran": False, "approves": True},
+                         "result": "ignored"})
+
+
+def proxied_sharadar():
+    """start_vendors on the quant scenario (driver.ENV restored after): Sharadar's record, the .env vendor_env gives
+    a probe naming its key and base URL, and what a request to api.sharadar.com through the closed proxy (a user
+    run's environment) gets, with the fake's log line for it."""
+    project = dict(json.loads((HERE / "scenarios.json").read_text())["projects"]["quant"], id="quant")
+    out = pathlib.Path(tempfile.mkdtemp(prefix="vendors-"))
+    saved = dict(driver.ENV)
+    try:
+        vendors, servers = driver.start_vendors(out, project, "selftest")
+        env = vendor_env(["SHARADAR_API_KEY", "SHARADAR_BASE_URL", "NDL_BASE_URL"], vendors)
+        run_env = vendors["sharadar"]["run_env"]
+        proxy_url = run_env["HTTPS_PROXY"]
+        ctx = __import__("ssl").create_default_context(cafile=run_env["SSL_CERT_FILE"])
+        opener = urllib.request.build_opener(urllib.request.ProxyHandler({"https": proxy_url}),
+                                             urllib.request.HTTPSHandler(context=ctx))
+        try:
+            code = opener.open(f"https://api.sharadar.com/v1.0/data/tickers?ticker=AAPL&api_key={env.get('SHARADAR_API_KEY')}",
+                               timeout=20).status
+        except Exception as e:
+            code = repr(e)
+        log = [json.loads(l) for l in (out / "vendor_sharadar.jsonl").read_text().splitlines()] if (out / "vendor_sharadar.jsonl").exists() else []
+        for server in servers:
+            server.shutdown()
+        return vendors["sharadar"], env, code, log, len(servers)
+    finally:
+        driver.ENV.clear()
+        driver.ENV.update(saved)
+
+
+SHARADAR, SHARADAR_ENV, SHARADAR_CODE, SHARADAR_LOG, N_SERVERS = proxied_sharadar()
+
+
 RUNS = [{"probe": "PB-01", "script": "probes/PB-01-x/public.py", "args": [], "rc": 0, "stdout_tail": "secret rows"},
         {"probe": "PB-01", "script": "probes/PB-01-x/probe.py", "args": ["bulk"], "rc": 1, "stderr_tail": "Traceback"},
         {"probe": "PB-02", "script": None, "rc": None, "error": "no folder PB-02"}]
@@ -166,6 +251,10 @@ DECISIONS = [
     ("the run report gives each step's exit code and no output",
      run_report(RUNS), "PB-01 public.py: exit code 0; PB-01 probe.py bulk: exit code 1; PB-02 (no folder): no folder PB-02"),
     ("nothing Ready: the report says nothing ran", run_report([]), "nothing ran: no probe was Ready"),
+    # Smoke 12: the sim user's rewrite named PB-02's step when only PB-01's had run; the driver says what ran.
+    ("the user's message says what ran in the driver's words", (ran_said(run_report(RUNS[:2])), ran_said(run_report([]))),
+     ("I ran them as the READMEs say: PB-01 public.py: exit code 0; PB-01 probe.py bulk: exit code 1.",
+      "Nothing ran: no probe was Ready.")),
     ("a reply ending on a question asks; one ending on a statement doesn't",
      (asked("Which start date?\n"), asked("Approved and marked.")), (True, False)),
     ("a failed sim-user call is tried three times, each logged with its exit code and output (flow-F7)",
@@ -174,6 +263,28 @@ DECISIONS = [
      (ASKED_U["message"], ASKED_U["approves"], ASKED_U.get("fallback")), (FALLBACK_ASKED, False, True)),
     ("with no question pending, the fallback approves and says nothing more",
      (DRAFT_U["message"], DRAFT_U["approves"]), (FALLBACK_APPROVE, True)),
+    ("a prose answer is the message, a reply that ran (H4)",
+     (PROSE_RAN["action"], PROSE_RAN["message"][:24], PROSE_RAN["ran"], PROSE_RAN["approves"], PROSE_RAN["prose"]),
+     ("reply", "No, I didn't intend the ", True, False, True)),
+    ("a prose approval approves; a refused one doesn't", (PROSE_OK["approves"], PROSE_OK["ran"], PROSE_NOT["approves"]),
+     (True, False, False)),
+    ("structured output wins over the result text", (STRUCTURED["action"], STRUCTURED["message"]), ("finish", "Done.")),
+    ("a broken JSON object is no answer (retried, then the fallback)", sim_answer({"result": '{"action": "reply", '}), None),
+    ("the sim user is told it can't change its environment (H4)", "unset or exported a variable" in driver.SIM_LIMITS, True),
+    ("Sharadar is served on its real hosts only: no base URL, no 127.0.0.1 server (H1)",
+     (SHARADAR["url"], SHARADAR["server"], N_SERVERS), (None, None, 2)),
+    ("a user run's .env gets the canary key and no base URL", SHARADAR_ENV, {"SHARADAR_API_KEY": "sk-canary-selftest",
+                                                                             "NASDAQ_DATA_LINK_API_KEY": "sk-canary-selftest"}),
+    ("api.sharadar.com through the closed proxy reaches the fake, which takes the canary",
+     (SHARADAR_CODE, [(e["path"], e["key_ok"]) for e in SHARADAR_LOG]), (200, [("/v1.0/data/tickers", True)])),
+    ("a turn's working skill: the last its calls show", working_skill(["api-probe", "pipeline-design"], ["probes/x"],
+                                                                     "api-probe", "api-probe"), ("pipeline-design", "calls")),
+    ("no skill in its calls: the owner of most of the files it changed",
+     working_skill([], ["docs/packages/a/pipelines.md", "docs/explained/a.md", "docs/spec.md", "docs/roadmap.md"],
+                   "api-probe", "api-probe"), ("pipeline-design", "files")),
+    ("nothing changed and no call: carried within the session, else its opening skill",
+     (working_skill([], ["docs/roadmap.md"], "test-planning", "api-probe"), working_skill(["null-hypothesis-testing"], [], None, "test-planning")),
+     (("test-planning", "carried"), ("test-planning", "opening"))),
 ]
 
 

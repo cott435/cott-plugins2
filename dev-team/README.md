@@ -1,6 +1,6 @@
 # dev-team
 
-A Claude Code plugin that takes a project from a raw idea to an enforced build plan: brief, spec, architecture, pipelines, test plan, milestone plan and quality bar. Building itself is agent-skills' `/build`; dev-team makes sure builders get small, correct inputs. This README covers the documents the skills produce, how they change over time, and the `dt` tool that reads them.
+A Claude Code plugin that takes a project from a raw idea to an enforced build plan: brief, spec, architecture, pipelines, test plan, milestone plan and quality bar. Then its `build` skill builds each milestone with parallel agents held to that bar, every builder fed one `dt context` packet. This README covers the documents the skills produce, how they change over time, and the `dt` tool that reads them.
 
 **Install the whole plugin**, not single skills: the skills share `scripts/dt.py` and the hooks in `hooks/hooks.json`. Requires `python3` (stdlib only); `build-setup` also needs `uv` and `jq` in the project.
 
@@ -89,7 +89,7 @@ idea-refine (New) → brief + roadmap stages S1… ─ accept
 → test-planning (New, optional): golden cases + fixtures ─ approve the expected outputs
 → build-planning (New): cut each designed stage into milestones, M1 plan (interface → step spines → wiring and thicken → system, dependency graph, checkpoints), AGENTS.md ─ approve
 → build-setup (New): CONSTRAINTS.md, tool config, check scripts, agent roles ─ approve
-→ /build
+→ build (Run): the milestone on build/M<n>, landings through dt land, reviews at each checkpoint ─ approve the merge
 ```
 
 ### A new stage
@@ -129,7 +129,7 @@ exit checkpoint (reviewer findings dispositioned) ─ you approve the milestone
 → kickoff check: dt status; Sync pipelines.md and contract.md against the code ─ approve if mismatched
 → build-planning: next milestone's plan (cutting the next stage first if it has no milestones) ─ approve
 → build-setup Extend (new packages, dependencies, Grow) ─ approve; dt base records the start commit
-→ /build
+→ build (Run) ─ approve the merge
 ```
 
 ### Changing something that already exists

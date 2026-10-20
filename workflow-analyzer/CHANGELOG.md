@@ -4,6 +4,12 @@ One entry per tagged release. The versioning policy — what triggers patch/mino
 how model and eval versioning relate to it — is in the `plugin-dev` plugin's `bump-version`
 skill. This repo's own decisions are in `VERSIONING.md`.
 
+## [0.3.0] - 2026-10-19
+
+### Added
+- Plan map reads schema `plan-map/2`: goal, feature and requirement levels with `serves` and `covers` edges, traced to the build.
+- R6: an order row that serializes work is flagged "worth a look". R9: critical paths drawn as whole tasks, tied paths shown; shared-entry edges; file and integration edges before order; the mitigated tile counts data and call edges; testers wait on the interface.
+
 ## [0.2.0] - 2026-10-17
 
 ### Added

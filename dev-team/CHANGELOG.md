@@ -2,6 +2,26 @@
 
 One entry per tagged release, newest first.
 
+## [0.6.0] - 2026-10-19
+
+### Added
+- `build` skill (Run, Resume, Task, Exit): each milestone built by parallel agents on `build/M<n>`, testers blind to code, implementers confined to their `Writes:`, reviewers that land nothing; stops for a CONTRACT-CHANGE, TEST-WRONG, NEEDS-DEP or a Critical finding, and the merge after the user's yes. `dt build workflow` runs the loop as a Workflow script.
+- dt build commands: `dt ready --reserve` (task halves, holds, barriers), `dt claim` (the packet, the `Writes:` guard, a per-worktree base), `dt land` (tests branch, squash with a `Dt-Landed:` trailer, merged-tree gate, flaky rerun, `prebuild-clear` once a wiring lands), `dt escalate`, `dt finding --from`, `dt build start|status|go|resolve|release|submit-review|prune`.
+- dt reviews every interface before code builds on it: a checkpoint straight after an interface task is a barrier, and dt adds one where the plan has none; the interface review checks what later tasks need from the frozen surface; testers start during that review; the exit review covers only what no checkpoint reviewed.
+- `dt context`: a tester's packet withholds source files; a system task's packet adds a Conformance block (each fake's contract cases, run on the real provider); a step table over 12 rows keeps the task's own rows; a `Read:` path an earlier task stubs says so.
+- build-setup: per-worktree bases (`refs/worktree/checks-base`), a fail-closed `Writes:` guard, stop-gate verdicts and escalations, allow rules for background agents, floor_guard's `stub-pinned` (no test pins an interface stub), a single package's id scopes `check.sh` to every test, `tests/support/**` open to interface tasks for shared test helpers.
+- Lints `writes-unit`, `call-fake`, `contract-args`, `contract-depends`, `task-order`, `stale-row`, `read-unwritten` (errors); `interface-barrier`, `milestone-lopsided`, `step-unplanned`, `spine-claim`, and `step-io-types` while a route names the type (warnings). `dt status --skill build-planning` reports `steps_unplanned`, `stage_ids_unplaced` and `grow_held`; Replan comes before cutting the next stage; request traces go into the archive.
+- Build evals: `build_driver.py`, `grade_build.py`, `dryrun_build.py`, the minilab fixture and its arms, `port_bar.py` for a planning run's own project; iteration b1 results. Planning evals: a fresh agent session per skill run, the fake Sharadar behind a closed proxy on its real host, a timed-out turn recorded and the run going on, a judge with score anchors and `--repeats` that reads `final__requests.md`.
+
+### Changed
+- build-planning: Phase 0 is a types task, then one contract task per component. The build mode follows the oracle whatever the Kind: `split` when the acceptance names a TC case, a Given/When/Then or a model criterion, or `Writes:` has a `tests/intent/` path (a system task that runs golden cases included), overridden only by `**Reason:** mode:`; `**Risk:** external`; every task but an interface task names a `tests/unit/<pkg>/` path; a long run is its own task after the system task, opened by a feasibility run; milestones are vertical slices of the user's success criteria; task size counts what a task builds; Grow only on a real boundary; one-round routes; a human approval is never a task's acceptance; the re-freeze runs as an implementer agent; shared test helpers go to `tests/support/**` (`tests/conftest.py` is protected).
+- architecture-design: a typed field for every setting (no untyped map, no mutable default); an invariant with a condition says both sides; a type holding an external source's records says what its values mean; a contract signature fits the bar (at most 5 arguments and 4 positional, only types its component depends on); an `api-probe` is asked for when a milestone reads an external source with no PB sample behind its record type.
+- Every planning skill: gate and next-run wording, revision sweeps, no process narration.
+- A project that passed `dt lint` under 0.5.0 can now fail it: the new lints above are errors.
+
+### Fixed
+- The planning eval's grader; the rl scenario's facts agree with each other.
+
 ## [0.5.0] - 2026-10-18
 
 ### Added
